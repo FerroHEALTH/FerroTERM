@@ -1,5 +1,5 @@
 {
-  "date": "2026-09-24T17:45:14.440403Z",
+  "date": "2026-10-01T15:54:58.87999Z",
   "description": "Serves the FHIR R6 ballot (version 6.0.0-ballot5). Every behaviour grounded only in the ballot is re-verified against the published specification when it appears, and may change with it.",
   "extension": [
     {
@@ -10,7 +10,7 @@
         },
         {
           "url": "value",
-          "valueCode": "0.1.5"
+          "valueCode": "0.1.6"
         }
       ],
       "url": "http://hl7.org/fhir/uv/application-feature/StructureDefinition/feature"
@@ -266,11 +266,11 @@
   ],
   "software": {
     "name": "FerroTERM",
-    "releaseDate": "2026-09-24",
-    "version": "0.1.5"
+    "releaseDate": "2026-10-01",
+    "version": "0.1.6"
   },
   "status": "active",
   "title": "FerroTERM terminology server (R6 ballot)",
   "url": "https://ferroterm.eu/fhir/CapabilityStatement/ferroterm-r6",
-  "version": "0.1.5"
+  "version": "0.1.6"
 }

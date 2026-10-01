@@ -12,7 +12,7 @@ to run.
 
 ## Where the project is
 
-v0.1.5 is the current release. It ships as Linux binaries for `x86_64` and
+v0.1.6 is the current release. It ships as Linux binaries for `x86_64` and
 `aarch64` (glibc and musl), as a container image for `linux/amd64` and
 `linux/arm64`, and as a Compose file, all built with signed provenance. The
 server answers FHIR R4 under `/r4`, R4B under `/r4b`, R5 under `/r5`, and the

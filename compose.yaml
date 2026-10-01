@@ -34,7 +34,7 @@
 
 services:
   ferroterm:
-    image: ghcr.io/ferrohealth/ferroterm:${FERROTERM_VERSION:-0.1.5}
+    image: ghcr.io/ferrohealth/ferroterm:${FERROTERM_VERSION:-0.1.6}
     container_name: ferroterm
     restart: unless-stopped
     ports:
@@ -88,7 +88,7 @@ services:
   # The Snapshot is unpacked to the container's /tmp (a tmpfs here) and gone
   # with the container; no RF2 content is written anywhere else.
   build:
-    image: ghcr.io/ferrohealth/ferroterm:${FERROTERM_VERSION:-0.1.5}
+    image: ghcr.io/ferrohealth/ferroterm:${FERROTERM_VERSION:-0.1.6}
     profiles: [build]
     entrypoint: ["/usr/local/bin/ferroterm-build"]
     command: ["--rf2", "/rf2/release.zip", "--out", "/data/index/snomed"]
