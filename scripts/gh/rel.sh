@@ -35,7 +35,7 @@
 #   scripts/gh/rel.sh id         <n>                          # print the database id of n
 #
 # All commands act on the current repository (`gh repo view`); default
-# rubentalstra/FerroTERM when run inside its clone.
+# FerroHEALTH/FerroTERM when run inside its clone.
 
 set -euo pipefail
 

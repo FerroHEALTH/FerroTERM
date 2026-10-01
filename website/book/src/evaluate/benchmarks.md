@@ -105,20 +105,20 @@ the machine's. Resident memory is the median of five readings of the one
 server process, read with `footprint` so the pages macOS compressed are
 counted; peak build memory is the `ferroterm-build` child's peak over one
 system's release, from `/usr/bin/time`. The set's own
-[README](https://github.com/rubentalstra/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/README.md)
+[README](https://github.com/FerroHEALTH/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/README.md)
 carries the machine state in full, including what the one-minute load average
 in each record is an average of.
 
 <!-- bench-table:begin -->
 | Code system | Release | Concepts | Build | Peak build memory | Index on disk | Resident | `$lookup` | `$validate-code` | `$subsumes` | `$expand` (small) | `$expand` (large) | Search | Snowstorm |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| [ICD-10-CM](https://github.com/rubentalstra/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/icd-10-cm-2026-09-22T23-23-19-858381Z.json) | 2026 | 98,827 | 1.51 s | 359 MB | 44 MB | 91 MB | 105 µs | 60 µs | 58 µs | n/a | n/a | n/a | not run |
-| [ICD-10-NL](https://github.com/rubentalstra/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/icd-10-nl-2026-09-22T23-23-22-144431Z.json) | 2021 | 42,769 | 880.52 ms | 221 MB | 21 MB | 66 MB | 96 µs | 60 µs | 64 µs | n/a | n/a | n/a | not run |
-| [ICD-11 MMS](https://github.com/rubentalstra/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/icd-11-mms-2026-09-22T23-23-27-084934Z.json) | 2026-01 | 37,211 | n/a | n/a | 44 MB | 99 MB | 138 µs | 59 µs | n/a | 129 µs | 116 µs | 139 µs | not run |
-| [LOINC](https://github.com/rubentalstra/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/loinc-2026-09-22T23-23-17-47383Z.json) | 2.83 | 257,266 | 8.15 s | 2.54 GB | 310 MB | 440 MB | 136 µs | 56 µs | n/a | 126 µs | 7.23 ms | 283 µs | not run |
-| [RxNorm (prescribable subset)](https://github.com/rubentalstra/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/rxnorm-prescribable-subset-2026-09-22T23-23-24-615167Z.json) | 09082026 | 81,468 | 4.58 s | 667 MB | 77 MB | 133 MB | 388 µs | 114 µs | n/a | n/a | n/a | n/a | not run |
-| [SNOMED CT (International edition)](https://github.com/rubentalstra/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/snomed-ct-international-edition-2026-09-22T23-23-13-36281Z.json) | 20260901 | 535,502 | 14.12 s | 3.06 GB | 559 MB | 943 MB | 217 µs | 66 µs | 59 µs | 215 µs | 1.7 ms | 353 µs | not run |
-| [SNOMED CT (Netherlands edition)](https://github.com/rubentalstra/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/snomed-ct-netherlands-edition-2026-09-22T23-23-10-140124Z.json) | 20260630 | 548,949 | 17.66 s | 3.88 GB | 864 MB | 1.14 GB | 222 µs | 66 µs | 59 µs | 285 µs | 2.28 ms | 817 µs | not run |
+| [ICD-10-CM](https://github.com/FerroHEALTH/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/icd-10-cm-2026-09-22T23-23-19-858381Z.json) | 2026 | 98,827 | 1.51 s | 359 MB | 44 MB | 91 MB | 105 µs | 60 µs | 58 µs | n/a | n/a | n/a | not run |
+| [ICD-10-NL](https://github.com/FerroHEALTH/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/icd-10-nl-2026-09-22T23-23-22-144431Z.json) | 2021 | 42,769 | 880.52 ms | 221 MB | 21 MB | 66 MB | 96 µs | 60 µs | 64 µs | n/a | n/a | n/a | not run |
+| [ICD-11 MMS](https://github.com/FerroHEALTH/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/icd-11-mms-2026-09-22T23-23-27-084934Z.json) | 2026-01 | 37,211 | n/a | n/a | 44 MB | 99 MB | 138 µs | 59 µs | n/a | 129 µs | 116 µs | 139 µs | not run |
+| [LOINC](https://github.com/FerroHEALTH/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/loinc-2026-09-22T23-23-17-47383Z.json) | 2.83 | 257,266 | 8.15 s | 2.54 GB | 310 MB | 440 MB | 136 µs | 56 µs | n/a | 126 µs | 7.23 ms | 283 µs | not run |
+| [RxNorm (prescribable subset)](https://github.com/FerroHEALTH/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/rxnorm-prescribable-subset-2026-09-22T23-23-24-615167Z.json) | 09082026 | 81,468 | 4.58 s | 667 MB | 77 MB | 133 MB | 388 µs | 114 µs | n/a | n/a | n/a | n/a | not run |
+| [SNOMED CT (International edition)](https://github.com/FerroHEALTH/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/snomed-ct-international-edition-2026-09-22T23-23-13-36281Z.json) | 20260901 | 535,502 | 14.12 s | 3.06 GB | 559 MB | 943 MB | 217 µs | 66 µs | 59 µs | 215 µs | 1.7 ms | 353 µs | not run |
+| [SNOMED CT (Netherlands edition)](https://github.com/FerroHEALTH/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/snomed-ct-netherlands-edition-2026-09-22T23-23-10-140124Z.json) | 20260630 | 548,949 | 17.66 s | 3.88 GB | 864 MB | 1.14 GB | 222 µs | 66 µs | 59 µs | 285 µs | 2.28 ms | 817 µs | not run |
 
 Warm p50 over 200 HTTP round trips on one machine (Apple M2, 17.18 GB, macos/aarch64), FerroTERM 0.1.4 serving FHIR R4B, taken 2026-09-22. The records are under `bench/records/`; the [benchmarks page](https://ferroterm.eu/benchmarks.html) has the method, the cold and tail latencies, and how to reproduce a record.
 <!-- bench-table:end -->

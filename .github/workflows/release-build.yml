@@ -19,8 +19,8 @@
 # certificate names THIS workflow as the signer, which a consumer can require:
 #
 #   gh attestation verify ferroterm-<tag>-<target>.tar.gz \
-#     -R rubentalstra/FerroTERM \
-#     --signer-workflow rubentalstra/FerroTERM/.github/workflows/release-build.yml
+#     -R FerroHEALTH/FerroTERM \
+#     --signer-workflow FerroHEALTH/FerroTERM/.github/workflows/release-build.yml
 #
 # That flag is the consumer-visible prize: it lets a downstream verifier insist
 # an artifact came from this hardened lane rather than from any workflow that

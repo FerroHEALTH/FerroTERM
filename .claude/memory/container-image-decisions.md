@@ -8,7 +8,7 @@ metadata:
   modified: 2026-09-02T20:03:52.397Z
 ---
 
-Decided 2026-09-02 for the image at `ghcr.io/rubentalstra/ferroterm` (PR #61,
+Decided 2026-09-02 for the image at `ghcr.io/ferrohealth/ferroterm` (PR #61,
 issue #57), after research on primary sources and a read of FerroEHR's setup:
 
 - `docker/Dockerfile` (the Dockerfile lives under `docker/`, only the

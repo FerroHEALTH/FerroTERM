@@ -60,7 +60,7 @@ under Apache 2.0 by the FerroBRIDGE repository.
 ## Starting a commercial licence
 
 It starts with a short conversation with the maintainer named in
-[MAINTAINERS.md](https://github.com/rubentalstra/FerroTERM/blob/main/MAINTAINERS.md).
+[MAINTAINERS.md](https://github.com/FerroHEALTH/FerroTERM/blob/main/MAINTAINERS.md).
 Companies and care providers building on FerroTERM are wanted here, and the
 commercial licence is the normal path for them.
 

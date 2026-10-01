@@ -26,7 +26,7 @@ def build_rss(r): if r.ingest == null then "n/a" else bytes(r.ingest.peak_rss_by
 def release(v): if v == null then "n/a" elif (v | contains("/version/")) then (v | split("/version/")[1]) else v end;
 def same(key): (map(key) | unique | length) == 1;
 def html(s): s | gsub("&"; "&amp;") | gsub("<"; "&lt;") | gsub(">"; "&gt;");
-def record_url(r): "https://github.com/rubentalstra/FerroTERM/blob/main/" + r.record;
+def record_url(r): "https://github.com/FerroHEALTH/FerroTERM/blob/main/" + r.record;
 
 def conditions($first):
   "Warm p50 over " + ($first.latency[0][1].warm_requests | tostring)

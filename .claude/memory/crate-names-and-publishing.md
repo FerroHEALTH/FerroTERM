@@ -31,7 +31,7 @@ upload).
 **How to apply:** crates.io rate-limits NEW crate names (about five, then one
 per ten minutes): publish a first release in batches and retry; the script
 counts "already exists" as done. The Trusted Publisher entries per crate are
-the owner's step (#168): repository `rubentalstra/FerroTERM`, workflows
+the owner's step (#168): repository `FerroHEALTH/FerroTERM`, workflows
 `release.yml` and `publish-crates.yml`, environment `crates-io`. The
 `::loinc::`, `::icd11::`, `::classification::` paths exist because same-named
 modules live in `fhir-terminology`, `ferroterm-build`, and the testkit. See

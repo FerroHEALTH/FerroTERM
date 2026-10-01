@@ -51,8 +51,8 @@ the build+attest into a normal job; that is only L2.
 Consumers verify provenance against the signer workflow:
 
 ```
-gh attestation verify ferroterm-<tag>-<target>.tar.gz -R rubentalstra/FerroTERM \
-  --signer-workflow rubentalstra/FerroTERM/.github/workflows/release-build.yml
+gh attestation verify ferroterm-<tag>-<target>.tar.gz -R FerroHEALTH/FerroTERM \
+  --signer-workflow FerroHEALTH/FerroTERM/.github/workflows/release-build.yml
 ```
 
 We claim L3 by GitHub's builder isolation; we do not (yet) claim reproducible or
@@ -144,7 +144,7 @@ binary with no viewer in it.
 
 ## The container image
 
-`ghcr.io/rubentalstra/ferroterm` (`linux/amd64` and `linux/arm64`) is
+`ghcr.io/ferrohealth/ferroterm` (`linux/amd64` and `linux/arm64`) is
 `docker/Dockerfile`: the static musl binary copied root-owned onto
 `gcr.io/distroless/static-debian13:nonroot`, pinned by index digest and bumped
 by Dependabot. Distroless static brings `/etc/passwd`, `/tmp`, tzdata, and
@@ -175,11 +175,11 @@ Tags are `<version>`, `<major.minor>`, and `latest` (skipped for a
 pre-release); GHCR tags are mutable, so deploy by digest. Verify:
 
 ```
-gh attestation verify oci://ghcr.io/rubentalstra/ferroterm:<version> \
-  -R rubentalstra/FerroTERM \
-  --signer-workflow rubentalstra/FerroTERM/.github/workflows/release-image.yml
-gh attestation verify oci://ghcr.io/rubentalstra/ferroterm@<platform digest> \
-  -R rubentalstra/FerroTERM --predicate-type https://spdx.dev/Document/v2.3
+gh attestation verify oci://ghcr.io/ferrohealth/ferroterm:<version> \
+  -R FerroHEALTH/FerroTERM \
+  --signer-workflow FerroHEALTH/FerroTERM/.github/workflows/release-image.yml
+gh attestation verify oci://ghcr.io/ferrohealth/ferroterm@<platform digest> \
+  -R FerroHEALTH/FerroTERM --predicate-type https://spdx.dev/Document/v2.3
 ```
 
 ## OpenSSF

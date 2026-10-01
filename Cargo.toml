@@ -15,7 +15,7 @@ version = "0.1.5"
 edition = "2024"
 rust-version = "1.98"
 license = "BUSL-1.1"
-repository = "https://github.com/rubentalstra/FerroTERM"
+repository = "https://github.com/FerroHEALTH/FerroTERM"
 homepage = "https://ferroterm.eu"
 authors = ["Ruben Talstra"]
 # The server and the tools are never published; the `crates/*` members set

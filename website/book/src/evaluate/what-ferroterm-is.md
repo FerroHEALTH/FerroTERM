@@ -51,7 +51,7 @@ The server exposes the FHIR terminology API on R4B:
 | FHIR `CodeSystem`, `ValueSet`, `ConceptMap` | a FHIR package or a directory of JSON | hierarchy, filters, properties, and supplements as the resources declare them |
 | UCUM, BCP 47, BCP 13, ISO 3166-1 | nothing | grammar and registry validation, vendored into the binary |
 
-[`docs/terminologies.md`](https://github.com/rubentalstra/FerroTERM/blob/main/docs/terminologies.md)
+[`docs/terminologies.md`](https://github.com/FerroHEALTH/FerroTERM/blob/main/docs/terminologies.md)
 records each system's FHIR page, its licence, and exactly what the provider
 implements.
 
@@ -74,7 +74,7 @@ run a clinical terminology server on hardware you already have.
 FerroTERM speaks the FHIR terminology API, so any FHIR client can use it: a
 validator, an IG publisher, a clinical application resolving value set
 bindings. One such client is
-[FerroEHR](https://github.com/rubentalstra/FerroEHR), a pure-Rust openEHR
+[FerroEHR](https://github.com/FerroHEALTH/FerroEHR), a pure-Rust openEHR
 clinical data repository by the same author. FerroTERM is independent of it.
 
 ## What is not built yet

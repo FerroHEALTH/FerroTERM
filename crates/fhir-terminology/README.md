@@ -13,7 +13,7 @@ read from FHIR resources. This is the engine of the FerroTERM server.
 
 ## Where it sits
 
-`fhir-terminology` is one crate of [FerroTERM](https://github.com/rubentalstra/FerroTERM),
+`fhir-terminology` is one crate of [FerroTERM](https://github.com/FerroHEALTH/FerroTERM),
 a pure-Rust FHIR terminology server for SNOMED CT, LOINC, and other clinical
 code systems. The crates are published so other projects can reuse them; the
 API is pre-1.0 and moves with the FerroTERM release train. Documentation:

@@ -15,7 +15,7 @@ cd "$(dirname "$0")/../.."
 
 readonly OUT="${1:?usage: $0 OUT}"
 readonly LANDING=website/landing
-readonly REPO=rubentalstra/FerroTERM
+readonly REPO=FerroHEALTH/FerroTERM
 
 roadmap() {
   gh api "repos/$REPO/milestones?state=open&sort=due_on&direction=asc" --jq '

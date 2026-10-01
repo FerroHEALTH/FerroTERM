@@ -15,7 +15,7 @@ Start the server and open `/ui`. The root path redirects there, so
 `http://localhost:8080/` lands on the overview.
 
 ```console
-$ docker run --rm -p 8080:8080 ghcr.io/rubentalstra/ferroterm:0.1.5
+$ docker run --rm -p 8080:8080 ghcr.io/ferrohealth/ferroterm:0.1.5
 $ open http://localhost:8080/ui
 ```
 

@@ -11,7 +11,7 @@ authors:
   - given-names: Ruben
     family-names: Talstra
 license: BUSL-1.1
-repository-code: "https://github.com/rubentalstra/FerroTERM"
+repository-code: "https://github.com/FerroHEALTH/FerroTERM"
 url: "https://ferroterm.eu"
 keywords:
   - FHIR

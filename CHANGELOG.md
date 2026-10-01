@@ -46,6 +46,12 @@ fresh link reference.
 
 ### Changed
 
+- **The repository moved to the FerroHEALTH organisation**: it lives at
+  <https://github.com/FerroHEALTH/FerroTERM>, and releases from this one on
+  publish the image to `ghcr.io/ferrohealth/ferroterm` and sign their
+  attestations as `FerroHEALTH/FerroTERM`. Releases up to v0.1.5 keep their
+  `rubentalstra` signer identity, and the book's verification page says how to
+  check them.
 - **The NTS add-on names the Dutch canonicals the service serves** (#602):
   ICD-10-NL, the Labcodeset supplement and its three maps, NHG-Tabel 24, the
   NHG table prefix, and the zib value set prefix, read from the live service.
@@ -1543,21 +1549,21 @@ binary answers `GET /health` only.
 - No existing Rust terminology or FHIR crate is a dependency; the README
   records the evaluation and the reasons.
 
-[Unreleased]: https://github.com/rubentalstra/FerroTERM/compare/v0.1.5...HEAD
-[0.1.5]: https://github.com/rubentalstra/FerroTERM/compare/v0.1.4...v0.1.5
-[0.1.4]: https://github.com/rubentalstra/FerroTERM/compare/v0.1.3...v0.1.4
-[0.1.3]: https://github.com/rubentalstra/FerroTERM/compare/v0.1.2...v0.1.3
-[0.1.2]: https://github.com/rubentalstra/FerroTERM/compare/v0.1.1...v0.1.2
-[0.1.1]: https://github.com/rubentalstra/FerroTERM/releases/tag/v0.1.1
-[0.1.0]: https://github.com/rubentalstra/FerroTERM/releases/tag/v0.1.0
-[0.0.11]: https://github.com/rubentalstra/FerroTERM/releases/tag/v0.0.11
-[0.0.10]: https://github.com/rubentalstra/FerroTERM/releases/tag/v0.0.10
-[0.0.9]: https://github.com/rubentalstra/FerroTERM/releases/tag/v0.0.9
-[0.0.8]: https://github.com/rubentalstra/FerroTERM/releases/tag/v0.0.8
-[0.0.7]: https://github.com/rubentalstra/FerroTERM/releases/tag/v0.0.7
-[0.0.6]: https://github.com/rubentalstra/FerroTERM/releases/tag/v0.0.6
-[0.0.5]: https://github.com/rubentalstra/FerroTERM/releases/tag/v0.0.5
-[0.0.4]: https://github.com/rubentalstra/FerroTERM/releases/tag/v0.0.4
-[0.0.3]: https://github.com/rubentalstra/FerroTERM/releases/tag/v0.0.3
-[0.0.2]: https://github.com/rubentalstra/FerroTERM/releases/tag/v0.0.2
-[0.0.1]: https://github.com/rubentalstra/FerroTERM/releases/tag/v0.0.1
+[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.4...v0.1.5
+[0.1.4]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.3...v0.1.4
+[0.1.3]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/FerroHEALTH/FerroTERM/releases/tag/v0.1.1
+[0.1.0]: https://github.com/FerroHEALTH/FerroTERM/releases/tag/v0.1.0
+[0.0.11]: https://github.com/FerroHEALTH/FerroTERM/releases/tag/v0.0.11
+[0.0.10]: https://github.com/FerroHEALTH/FerroTERM/releases/tag/v0.0.10
+[0.0.9]: https://github.com/FerroHEALTH/FerroTERM/releases/tag/v0.0.9
+[0.0.8]: https://github.com/FerroHEALTH/FerroTERM/releases/tag/v0.0.8
+[0.0.7]: https://github.com/FerroHEALTH/FerroTERM/releases/tag/v0.0.7
+[0.0.6]: https://github.com/FerroHEALTH/FerroTERM/releases/tag/v0.0.6
+[0.0.5]: https://github.com/FerroHEALTH/FerroTERM/releases/tag/v0.0.5
+[0.0.4]: https://github.com/FerroHEALTH/FerroTERM/releases/tag/v0.0.4
+[0.0.3]: https://github.com/FerroHEALTH/FerroTERM/releases/tag/v0.0.3
+[0.0.2]: https://github.com/FerroHEALTH/FerroTERM/releases/tag/v0.0.2
+[0.0.1]: https://github.com/FerroHEALTH/FerroTERM/releases/tag/v0.0.1

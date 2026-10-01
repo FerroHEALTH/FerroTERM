@@ -5,7 +5,7 @@
 #   docker compose up
 #   curl 'http://localhost:8080/r4b/metadata?mode=terminology'
 #
-# It pulls the published image (ghcr.io/rubentalstra/ferroterm, pinned to the
+# It pulls the published image (ghcr.io/ferrohealth/ferroterm, pinned to the
 # release this file shipped with) and needs no repository checkout. The one
 # thing you provide is the index root: a directory whose child directories
 # are the artifacts ferroterm-build wrote (each with store.redb, hierarchy.bin,
@@ -34,7 +34,7 @@
 
 services:
   ferroterm:
-    image: ghcr.io/rubentalstra/ferroterm:${FERROTERM_VERSION:-0.1.5}
+    image: ghcr.io/ferrohealth/ferroterm:${FERROTERM_VERSION:-0.1.5}
     container_name: ferroterm
     restart: unless-stopped
     ports:
@@ -88,7 +88,7 @@ services:
   # The Snapshot is unpacked to the container's /tmp (a tmpfs here) and gone
   # with the container; no RF2 content is written anywhere else.
   build:
-    image: ghcr.io/rubentalstra/ferroterm:${FERROTERM_VERSION:-0.1.5}
+    image: ghcr.io/ferrohealth/ferroterm:${FERROTERM_VERSION:-0.1.5}
     profiles: [build]
     entrypoint: ["/usr/local/bin/ferroterm-build"]
     command: ["--rf2", "/rf2/release.zip", "--out", "/data/index/snomed"]

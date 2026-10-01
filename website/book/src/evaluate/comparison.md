@@ -8,7 +8,7 @@ Ontoserver, and Hermes.
 > [!NOTE]
 > The numbers for the other servers come from their own documentation and
 > published work, cited in
-> [`docs/architecture.md`](https://github.com/rubentalstra/FerroTERM/blob/main/docs/architecture.md).
+> [`docs/architecture.md`](https://github.com/FerroHEALTH/FerroTERM/blob/main/docs/architecture.md).
 > FerroTERM's own figures are measurements over the licensed Dutch SNOMED CT
 > edition on a laptop, and each one links the record that produced it, naming
 > the release it was measured on; see

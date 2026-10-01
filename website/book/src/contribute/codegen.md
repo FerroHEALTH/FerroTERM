@@ -37,5 +37,5 @@ repository.
   by itself when a release lands.
 
 The generator design follows the sibling project
-[FerroEHR](https://github.com/rubentalstra/FerroEHR), which generates its openEHR
+[FerroEHR](https://github.com/FerroHEALTH/FerroEHR), which generates its openEHR
 model from vendored machine-readable specs the same way.
