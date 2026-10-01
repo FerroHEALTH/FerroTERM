@@ -32,3 +32,4 @@
 - [FerroEHR: no worktrees](ferroehr-no-worktrees.md), an agent sent into the FerroEHR clone works in its main checkout on a branch, never a git worktree (that repo's owner rule of 2026-08-06); a brief from here must not override it
 - [Git -C absolute paths](git-c-absolute-paths.md), a `cd` in a compound command does not reliably set cwd for git; `git -C /abs/path` everywhere, and a force push checks the branch name in the same command (2026-09-24, PRs #674/#676 collided)
 - [NTS account facts](nts-account-facts.md), owner has an NTS account since 2026-09-25 (creds in ~/.ferroterm-nts.env); feed is SNOMED binary-only, FHIR content behind the API (#692), LOINC and NHG hidden until Nictiz grants those licences
+- [FerroHEALTH org move](ferrohealth-org-move.md), repo is FerroHEALTH/FerroTERM since 2026-10-01; attestations and the old GHCR package stay under rubentalstra, image path lowercase ghcr.io/ferrohealth, crates.io Trusted Publishing must name FerroHEALTH

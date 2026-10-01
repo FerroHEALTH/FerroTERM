@@ -13,6 +13,8 @@ fresh link reference.
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-10-01
+
 ### Added
 
 - **The sync lists a service's FHIR API beside its feed** (#692). The Nictiz
@@ -1549,7 +1551,8 @@ binary answers `GET /health` only.
 - No existing Rust terminology or FHIR crate is a dependency; the README
   records the evaluation and the reasons.
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.6...HEAD
+[0.1.6]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.2...v0.1.3
