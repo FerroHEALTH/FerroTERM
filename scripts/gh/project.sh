@@ -15,7 +15,7 @@
 #
 # OWNER SETUP REQUIRED: the board is not created by this script. The repository
 # owner must first create a GitHub Project (v2) titled "FerroTERM Roadmap" under
-# the `rubentalstra` account, with a single-select "Status" field carrying the
+# the `FerroHEALTH` organisation, with a single-select "Status" field carrying the
 # options Todo / In Progress / Done (and, for the roadmap view, a Date field
 # named "Target date"), then grant this clone the `project` token scope
 # (`gh auth refresh -s project`). Until that project exists, every command here
@@ -224,12 +224,12 @@ cmd_updates() {
   # shellcheck disable=SC2016  # GraphQL $variables are literal, never shell expansion
   gh api graphql \
     -f query='query($owner: String!, $number: Int!) {
-      user(login: $owner) { projectV2(number: $number) { statusUpdates(last: 10) {
+      organization(login: $owner) { projectV2(number: $number) { statusUpdates(last: 10) {
         nodes { status startDate targetDate createdAt creator { login } body }
       } } }
     }' \
     -f owner="$OWNER" -F number="$PROJ_NUMBER" \
-    --jq '.data.user.projectV2.statusUpdates.nodes | reverse | .[] | "== \(.status)  \(.createdAt)  by \(.creator.login)" + (if .startDate then "  start \(.startDate)" else "" end) + (if .targetDate then "  target \(.targetDate)" else "" end), .body, ""'
+    --jq '.data.organization.projectV2.statusUpdates.nodes | reverse | .[] | "== \(.status)  \(.createdAt)  by \(.creator.login)" + (if .startDate then "  start \(.startDate)" else "" end) + (if .targetDate then "  target \(.targetDate)" else "" end), .body, ""'
 }
 
 # Derive "Target date" from each item's milestone due date. The roadmap

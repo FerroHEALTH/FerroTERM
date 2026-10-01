@@ -97,7 +97,7 @@ do_verify() {
     # retried, and a failed request counts as "not seen yet", not as a miss.
     got=""
     for _ in 1 2 3 4 5 6; do
-      if body="$(curl --proto '=https' --tlsv1.2 -sSL --fail -H 'User-Agent: ferroterm-publish-verify (https://github.com/rubentalstra/FerroTERM)' \
+      if body="$(curl --proto '=https' --tlsv1.2 -sSL --fail -H 'User-Agent: ferroterm-publish-verify (https://github.com/FerroHEALTH/FerroTERM)' \
         "https://crates.io/api/v1/crates/$crate/versions" 2>/dev/null)"; then
         got="$(printf '%s' "$body" |
           jq -r --arg v "$want" '.versions[]? | select(.num == $v) | .num' |

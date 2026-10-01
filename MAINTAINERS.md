@@ -16,11 +16,12 @@ to grow into.
 |---------------|--------------------------------------------------|-------------------|------------|
 | Ruben Talstra | [@rubentalstra](https://github.com/rubentalstra) | Maintainer (sole) | 2026-08-01 |
 
-**The bus factor of this project is one.** There is exactly one person with
-write access to the repository (`GET /repos/rubentalstra/FerroTERM/collaborators`
-returns one login), one person who can publish a release, and one person who
-can accept a pull request. No second maintainer exists, no organisation stands
-behind the project, and no legal entity is a party to it.
+**The bus factor of this project is one.** There is one maintainer, one person
+who publishes a release, and one person who accepts a pull request. The
+repository lives in the [FerroHEALTH](https://github.com/FerroHEALTH) GitHub
+organisation, so its organisation owners also hold admin access
+(`GET /repos/FerroHEALTH/FerroTERM/collaborators` lists them). No second
+maintainer exists.
 
 Everything else in this file follows from that sentence, and no wording
 elsewhere in the repository should be read as softening it. The path out is in
@@ -35,11 +36,11 @@ inventory nobody can hand over.
 
 | Identity                                     | What it publishes                                                    | Held by                                                       | Recovery if the holder is unavailable                                                                                                                                                        |
 |----------------------------------------------|---------------------------------------------------------------------|--------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| The GitHub account `rubentalstra`            | everything: the repository, releases, issues, settings              | the maintainer                                               | none: the repository is user-owned, so GitHub's account-recovery process is the only route, and it is between GitHub and the account holder                                                  |
+| The GitHub organisation `FerroHEALTH`        | everything: the repository, releases, issues, settings              | the organisation owners, the maintainer among them           | another organisation owner keeps access if the maintainer's account is unavailable                                                                                                         |
 | The commit- and tag-signing key              | the verified signature on every commit and every release tag        | the maintainer, on his own hardware                          | none: the private key is not escrowed. A successor would publish a new key and re-establish trust from a signed statement on the repository; historical signatures stay verifiable regardless |
 | `GITHUB_TOKEN` (ephemeral, per workflow run) | the GitHub release binaries, their SBOMs, and the Sigstore provenance | GitHub, minted per run; nothing is stored                    | not applicable: there is no credential to lose                                                                                                                                              |
 | The `SONAR_TOKEN` repository secret          | nothing; it uploads code analysis to SonarQube Cloud                | the repository                                               | not applicable: a lost key costs a scan, not a release                                                                                                                                      |
-| The GitHub Pages documentation site          | the landing page and the mdBook site                                | the maintainer's GitHub account                             | none: GitHub account recovery only                                                                                                                                                          |
+| The GitHub Pages documentation site          | the landing page and the mdBook site                                | the `FerroHEALTH` organisation                              | another organisation owner                                                                                                                                                                 |
 
 **The honest reading of that table:** every publishing identity terminates at
 one person's GitHub account or one person's hardware. Keyless Sigstore signing

@@ -12,7 +12,7 @@ system is an index you build from a release you are licensed for
 ## The first call, with nothing to load
 
 ```console
-$ docker run --rm -p 8080:8080 ghcr.io/rubentalstra/ferroterm:0.1.5
+$ docker run --rm -p 8080:8080 ghcr.io/ferrohealth/ferroterm:0.1.5
 $ curl 'http://localhost:8080/r4b/CodeSystem/$lookup?system=http://unitsofmeasure.org&code=mg/dL'
 ```
 
@@ -27,7 +27,7 @@ Every release attaches a `compose.yaml`. With it and a SNOMED CT release zip
 centre), the whole path is two commands: build the index once, then serve it.
 
 ```console
-$ curl -LO https://github.com/rubentalstra/FerroTERM/releases/latest/download/compose.yaml
+$ curl -LO https://github.com/FerroHEALTH/FerroTERM/releases/latest/download/compose.yaml
 $ FERROTERM_RF2=/path/to/SnomedCT_Release.zip docker compose run --rm build
 $ docker compose up
 ```
@@ -63,7 +63,7 @@ probe does.
 
 ## Run the container by hand
 
-The image is `ghcr.io/rubentalstra/ferroterm`, published for `linux/amd64` and
+The image is `ghcr.io/ferrohealth/ferroterm`, published for `linux/amd64` and
 `linux/arm64` with every release. It holds the static `ferroterm` and
 `ferroterm-build` binaries on a distroless base: no shell, no package manager,
 a numeric non-root user (`65532`), and the listen address preset to
@@ -73,7 +73,7 @@ a numeric non-root user (`65532`), and the listen address preset to
 $ docker run --rm -p 8080:8080 \
     -v /srv/ferroterm/index:/data/index:ro \
     -e FERROTERM_INDEX=/data/index \
-    ghcr.io/rubentalstra/ferroterm:0.1.5
+    ghcr.io/ferrohealth/ferroterm:0.1.5
 ```
 
 Mount the index root read-only; each child directory under it is one
@@ -83,9 +83,9 @@ container runs with a read-only root filesystem. Tags are `<version>`,
 provenance first (see [Verifying releases](verifying-releases.md)):
 
 ```console
-$ gh attestation verify oci://ghcr.io/rubentalstra/ferroterm:0.1.5 \
-    -R rubentalstra/FerroTERM \
-    --signer-workflow rubentalstra/FerroTERM/.github/workflows/release-image.yml
+$ gh attestation verify oci://ghcr.io/ferrohealth/ferroterm:0.1.5 \
+    -R FerroHEALTH/FerroTERM \
+    --signer-workflow FerroHEALTH/FerroTERM/.github/workflows/release-image.yml
 ```
 
 The image carries a `HEALTHCHECK` that runs `ferroterm healthcheck`: the
@@ -104,9 +104,9 @@ musl) holding `ferroterm` and `ferroterm-build`, with a checksum, a CycloneDX
 SBOM, and Sigstore attestations beside it. Download, verify, unpack, run:
 
 ```console
-$ gh release download v0.1.5 -R rubentalstra/FerroTERM -p 'ferroterm-v0.1.5-x86_64-unknown-linux-musl.tar.gz*'
-$ gh attestation verify ferroterm-v0.1.5-x86_64-unknown-linux-musl.tar.gz -R rubentalstra/FerroTERM \
-    --signer-workflow rubentalstra/FerroTERM/.github/workflows/release-build.yml
+$ gh release download v0.1.5 -R FerroHEALTH/FerroTERM -p 'ferroterm-v0.1.5-x86_64-unknown-linux-musl.tar.gz*'
+$ gh attestation verify ferroterm-v0.1.5-x86_64-unknown-linux-musl.tar.gz -R FerroHEALTH/FerroTERM \
+    --signer-workflow FerroHEALTH/FerroTERM/.github/workflows/release-build.yml
 $ tar xzf ferroterm-v0.1.5-x86_64-unknown-linux-musl.tar.gz
 $ FERROTERM_INDEX=/srv/ferroterm/index ./ferroterm
 ```

@@ -16,7 +16,7 @@ authorized.
 ## Where it sits
 
 `terminology-syndication` is one crate of
-[FerroTERM](https://github.com/rubentalstra/FerroTERM), a pure-Rust FHIR
+[FerroTERM](https://github.com/FerroHEALTH/FerroTERM), a pure-Rust FHIR
 terminology server for SNOMED CT, LOINC, and other clinical code systems. This
 crate is not published on crates.io: it is consumed inside the FerroTERM
 workspace by the sync service and its add-ons, and its version moves with the

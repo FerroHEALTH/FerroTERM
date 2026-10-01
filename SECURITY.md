@@ -23,7 +23,7 @@ Once the project reaches 1.0 this table will name a supported minor line.
 **Do not open a public issue for a security vulnerability.** Report it
 privately through GitHub's private vulnerability reporting:
 
-1. Open <https://github.com/rubentalstra/FerroTERM/security/advisories/new>,
+1. Open <https://github.com/FerroHEALTH/FerroTERM/security/advisories/new>,
    or go to the repository's **Security** tab and choose **Report a
    vulnerability**.
 2. Describe the issue, the affected version or commit, and a reproduction if
@@ -83,6 +83,6 @@ Provenance can be verified with:
 
 ```
 gh attestation verify ferroterm-<tag>-<target>.tar.gz \
-  -R rubentalstra/FerroTERM \
-  --signer-workflow rubentalstra/FerroTERM/.github/workflows/release-build.yml
+  -R FerroHEALTH/FerroTERM \
+  --signer-workflow FerroHEALTH/FerroTERM/.github/workflows/release-build.yml
 ```

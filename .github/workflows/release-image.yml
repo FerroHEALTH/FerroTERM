@@ -19,12 +19,12 @@
 #     index and for each platform manifest, and an SPDX SBOM per platform.
 #
 # Verify a published image (the tag resolves to the index):
-#   gh attestation verify oci://ghcr.io/rubentalstra/ferroterm:<version> \
-#     -R rubentalstra/FerroTERM \
-#     --signer-workflow rubentalstra/FerroTERM/.github/workflows/release-image.yml
+#   gh attestation verify oci://ghcr.io/ferrohealth/ferroterm:<version> \
+#     -R FerroHEALTH/FerroTERM \
+#     --signer-workflow FerroHEALTH/FerroTERM/.github/workflows/release-image.yml
 # and the SBOM of one platform manifest:
-#   gh attestation verify oci://ghcr.io/rubentalstra/ferroterm@<manifest digest> \
-#     -R rubentalstra/FerroTERM --predicate-type https://spdx.dev/Document/v2.3
+#   gh attestation verify oci://ghcr.io/ferrohealth/ferroterm@<manifest digest> \
+#     -R FerroHEALTH/FerroTERM --predicate-type https://spdx.dev/Document/v2.3
 name: Release image (reusable)
 
 on:
@@ -47,7 +47,7 @@ permissions: {}
 
 env:
   # Lowercase by GHCR's rule; the owner segment is derived, not typed.
-  IMAGE: ghcr.io/${{ github.repository_owner }}/ferroterm
+  IMAGE: ghcr.io/ferrohealth/ferroterm
   # Annotate the index as well as the manifests: GHCR reads the package
   # description from the index (https://docs.docker.com/build/ci/github-actions/annotations/).
   DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index

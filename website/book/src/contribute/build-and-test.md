@@ -8,11 +8,11 @@ to get building.
 
 ## Read these first
 
-- [`docs/architecture.md`](https://github.com/rubentalstra/FerroTERM/blob/main/docs/architecture.md):
+- [`docs/architecture.md`](https://github.com/FerroHEALTH/FerroTERM/blob/main/docs/architecture.md):
   the design authority, with citations.
-- [`docs/terminologies.md`](https://github.com/rubentalstra/FerroTERM/blob/main/docs/terminologies.md):
+- [`docs/terminologies.md`](https://github.com/FerroHEALTH/FerroTERM/blob/main/docs/terminologies.md):
   every code system, its FHIR page, its licence, and what the provider serves.
-- [`CONTRIBUTING.md`](https://github.com/rubentalstra/FerroTERM/blob/main/CONTRIBUTING.md):
+- [`CONTRIBUTING.md`](https://github.com/FerroHEALTH/FerroTERM/blob/main/CONTRIBUTING.md):
   the contribution rules, branches, commit signing, and pull-request checklist.
 
 ## The workspace

@@ -2,7 +2,7 @@
 [package]
 name = "sct-ecl"
 description = "The SNOMED CT Expression Constraint Language lexer, parser, and evaluator"
-version = "0.1.114"
+version = "0.1.115"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

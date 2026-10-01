@@ -17,8 +17,8 @@ build-dir = "book"
 site-url = "/docs/"
 default-theme = "rust"
 preferred-dark-theme = "coal"
-git-repository-url = "https://github.com/rubentalstra/FerroTERM"
-edit-url-template = "https://github.com/rubentalstra/FerroTERM/edit/main/website/book/src/{path}"
+git-repository-url = "https://github.com/FerroHEALTH/FerroTERM"
+edit-url-template = "https://github.com/FerroHEALTH/FerroTERM/edit/main/website/book/src/{path}"
 mathjax-support = true
 additional-js = ["mermaid.min.js", "mermaid-init.js"]
 

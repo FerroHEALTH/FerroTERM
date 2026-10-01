@@ -18,7 +18,7 @@ than a reply:
   with the citations behind each decision.
 
 If the documentation does not answer it, **open a GitHub issue** through the
-[issue chooser](https://github.com/rubentalstra/FerroTERM/issues/new/choose): how
+[issue chooser](https://github.com/FerroHEALTH/FerroTERM/issues/new/choose): how
 to configure something, whether an approach fits, what a FHIR terminology
 operation or an ECL construct means in this implementation, or why a design is
 the way it is.
@@ -29,7 +29,7 @@ paid tier. Answers come when the maintainer is at a keyboard
 
 ## I found a defect
 
-**[Open an issue](https://github.com/rubentalstra/FerroTERM/issues/new/choose)**
+**[Open an issue](https://github.com/FerroHEALTH/FerroTERM/issues/new/choose)**
 when something is wrong, missing, or contradicts the FHIR or SNOMED CT
 specifications.
 
@@ -53,7 +53,7 @@ does it differently" is not by itself a defect; a spec citation is.
 
 **Do not open a public issue.** Follow [SECURITY.md](SECURITY.md): report
 privately through
-[GitHub private vulnerability reporting](https://github.com/rubentalstra/FerroTERM/security/advisories/new).
+[GitHub private vulnerability reporting](https://github.com/FerroHEALTH/FerroTERM/security/advisories/new).
 
 That document also carries what you can expect in return: an acknowledgement
 window, an assessment window, and coordinated disclosure with credit by

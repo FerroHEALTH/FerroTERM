@@ -69,7 +69,7 @@ the repository. Neither lane restores a build cache (`ci-cd.md`).
    from the merged `main`, with `scripts/release/publish-crates.sh verify`
    after it.
 2. On crates.io, each crate's Settings, Trusted Publishing: two GitHub entries,
-   repository owner `rubentalstra`, repository `FerroTERM`, workflow
+   repository owner `FerroHEALTH`, repository `FerroTERM`, workflow
    `release.yml` and workflow `publish-crates.yml`, environment `crates-io`.
 3. The `crates-io` GitHub environment carries the owner as required reviewer.
 

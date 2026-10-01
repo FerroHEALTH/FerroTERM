@@ -28,7 +28,7 @@
     "@type": "SoftwareSourceCode",
     "name": "FerroTERM",
     "description": "A pure-Rust FHIR terminology server for SNOMED CT, LOINC, ICD-10, ICD-11, RxNorm, UCUM, and any FHIR CodeSystem. Serves the HL7 FHIR terminology API from a precomputed index read at startup, with no JVM and no Elasticsearch.",
-    "codeRepository": "https://github.com/rubentalstra/FerroTERM",
+    "codeRepository": "https://github.com/FerroHEALTH/FerroTERM",
     "programmingLanguage": "Rust",
     "license": "https://spdx.org/licenses/BUSL-1.1.html",
     "applicationCategory": "HealthApplication",
@@ -52,7 +52,7 @@
         <a href="./docs/evaluate/code-systems.html" class="hide-sm">Code systems</a>
         <a href="./benchmarks.html">Benchmarks</a>
         <a href="./comparison.html" class="hide-sm">Comparison</a>
-        <a href="https://github.com/rubentalstra/FerroTERM" rel="noopener">GitHub</a>
+        <a href="https://github.com/FerroHEALTH/FerroTERM" rel="noopener">GitHub</a>
       </nav>
     </div>
   </header>
@@ -100,13 +100,13 @@
         </div>
         <!-- bench-figures:begin -->
 <div class="figures">
-  <a class="figure" href="https://github.com/rubentalstra/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/icd-10-cm-2026-09-22T23-23-19-858381Z.json" rel="noopener"><span class="figure-name">ICD-10-CM</span><span class="figure-big">105 µs</span><span class="figure-cap">a <code>$lookup</code>, warm p50 · 91 MB resident · 44 MB on disk · built in 1.51 s</span></a>
-  <a class="figure" href="https://github.com/rubentalstra/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/icd-10-nl-2026-09-22T23-23-22-144431Z.json" rel="noopener"><span class="figure-name">ICD-10-NL</span><span class="figure-big">96 µs</span><span class="figure-cap">a <code>$lookup</code>, warm p50 · 66 MB resident · 21 MB on disk · built in 880.52 ms</span></a>
-  <a class="figure" href="https://github.com/rubentalstra/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/icd-11-mms-2026-09-22T23-23-27-084934Z.json" rel="noopener"><span class="figure-name">ICD-11 MMS</span><span class="figure-big">138 µs</span><span class="figure-cap">a <code>$lookup</code>, warm p50 · 99 MB resident · 44 MB on disk</span></a>
-  <a class="figure" href="https://github.com/rubentalstra/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/loinc-2026-09-22T23-23-17-47383Z.json" rel="noopener"><span class="figure-name">LOINC</span><span class="figure-big">136 µs</span><span class="figure-cap">a <code>$lookup</code>, warm p50 · 440 MB resident · 310 MB on disk · built in 8.15 s</span></a>
-  <a class="figure" href="https://github.com/rubentalstra/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/rxnorm-prescribable-subset-2026-09-22T23-23-24-615167Z.json" rel="noopener"><span class="figure-name">RxNorm (prescribable subset)</span><span class="figure-big">388 µs</span><span class="figure-cap">a <code>$lookup</code>, warm p50 · 133 MB resident · 77 MB on disk · built in 4.58 s</span></a>
-  <a class="figure" href="https://github.com/rubentalstra/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/snomed-ct-international-edition-2026-09-22T23-23-13-36281Z.json" rel="noopener"><span class="figure-name">SNOMED CT (International edition)</span><span class="figure-big">217 µs</span><span class="figure-cap">a <code>$lookup</code>, warm p50 · 943 MB resident · 559 MB on disk · built in 14.12 s</span></a>
-  <a class="figure" href="https://github.com/rubentalstra/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/snomed-ct-netherlands-edition-2026-09-22T23-23-10-140124Z.json" rel="noopener"><span class="figure-name">SNOMED CT (Netherlands edition)</span><span class="figure-big">222 µs</span><span class="figure-cap">a <code>$lookup</code>, warm p50 · 1.14 GB resident · 864 MB on disk · built in 17.66 s</span></a>
+  <a class="figure" href="https://github.com/FerroHEALTH/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/icd-10-cm-2026-09-22T23-23-19-858381Z.json" rel="noopener"><span class="figure-name">ICD-10-CM</span><span class="figure-big">105 µs</span><span class="figure-cap">a <code>$lookup</code>, warm p50 · 91 MB resident · 44 MB on disk · built in 1.51 s</span></a>
+  <a class="figure" href="https://github.com/FerroHEALTH/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/icd-10-nl-2026-09-22T23-23-22-144431Z.json" rel="noopener"><span class="figure-name">ICD-10-NL</span><span class="figure-big">96 µs</span><span class="figure-cap">a <code>$lookup</code>, warm p50 · 66 MB resident · 21 MB on disk · built in 880.52 ms</span></a>
+  <a class="figure" href="https://github.com/FerroHEALTH/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/icd-11-mms-2026-09-22T23-23-27-084934Z.json" rel="noopener"><span class="figure-name">ICD-11 MMS</span><span class="figure-big">138 µs</span><span class="figure-cap">a <code>$lookup</code>, warm p50 · 99 MB resident · 44 MB on disk</span></a>
+  <a class="figure" href="https://github.com/FerroHEALTH/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/loinc-2026-09-22T23-23-17-47383Z.json" rel="noopener"><span class="figure-name">LOINC</span><span class="figure-big">136 µs</span><span class="figure-cap">a <code>$lookup</code>, warm p50 · 440 MB resident · 310 MB on disk · built in 8.15 s</span></a>
+  <a class="figure" href="https://github.com/FerroHEALTH/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/rxnorm-prescribable-subset-2026-09-22T23-23-24-615167Z.json" rel="noopener"><span class="figure-name">RxNorm (prescribable subset)</span><span class="figure-big">388 µs</span><span class="figure-cap">a <code>$lookup</code>, warm p50 · 133 MB resident · 77 MB on disk · built in 4.58 s</span></a>
+  <a class="figure" href="https://github.com/FerroHEALTH/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/snomed-ct-international-edition-2026-09-22T23-23-13-36281Z.json" rel="noopener"><span class="figure-name">SNOMED CT (International edition)</span><span class="figure-big">217 µs</span><span class="figure-cap">a <code>$lookup</code>, warm p50 · 943 MB resident · 559 MB on disk · built in 14.12 s</span></a>
+  <a class="figure" href="https://github.com/FerroHEALTH/FerroTERM/blob/main/bench/records/2026-09-23-apple-m2/snomed-ct-netherlands-edition-2026-09-22T23-23-10-140124Z.json" rel="noopener"><span class="figure-name">SNOMED CT (Netherlands edition)</span><span class="figure-big">222 µs</span><span class="figure-cap">a <code>$lookup</code>, warm p50 · 1.14 GB resident · 864 MB on disk · built in 17.66 s</span></a>
 </div>
 <p class="figures-note">Warm p50 over 200 HTTP round trips on one machine (Apple M2, 17.18 GB, macos/aarch64), FerroTERM 0.1.4 serving FHIR R4B, taken 2026-09-22. Every tile links to its record.</p>
 <!-- bench-figures:end -->
@@ -280,7 +280,7 @@
           <!-- roadmap:end -->
           <div class="hero-cta">
             <a class="btn btn-primary" href="./docs/">Read the documentation</a>
-            <a class="btn btn-ghost" href="https://github.com/rubentalstra/FerroTERM/milestones" rel="noopener">See the roadmap</a>
+            <a class="btn btn-ghost" href="https://github.com/FerroHEALTH/FerroTERM/milestones" rel="noopener">See the roadmap</a>
           </div>
         </div>
       </div>
@@ -300,7 +300,7 @@
           <p>
             A pure-Rust FHIR terminology server for SNOMED CT, LOINC, ICD, RxNorm, and every FHIR code system.
             The software is licensed under the
-            <a href="https://github.com/rubentalstra/FerroTERM/blob/main/LICENSE" rel="noopener">Business Source License 1.1</a>:
+            <a href="https://github.com/FerroHEALTH/FerroTERM/blob/main/LICENSE" rel="noopener">Business Source License 1.1</a>:
             free to read, build, modify and redistribute, free outside production, and
             free in production for personal use, research, teaching and a non-profit or
             public body outside the course of a business. Treating patients, any other
@@ -326,9 +326,9 @@
           <div>
             <h4>Project</h4>
             <ul>
-              <li><a href="https://github.com/rubentalstra/FerroTERM" rel="noopener">GitHub</a></li>
-              <li><a href="https://github.com/rubentalstra/FerroTERM/releases" rel="noopener">Releases</a></li>
-              <li><a href="https://github.com/rubentalstra/FerroTERM/issues" rel="noopener">Issues</a></li>
+              <li><a href="https://github.com/FerroHEALTH/FerroTERM" rel="noopener">GitHub</a></li>
+              <li><a href="https://github.com/FerroHEALTH/FerroTERM/releases" rel="noopener">Releases</a></li>
+              <li><a href="https://github.com/FerroHEALTH/FerroTERM/issues" rel="noopener">Issues</a></li>
             </ul>
           </div>
         </div>

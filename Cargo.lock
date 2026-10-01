@@ -469,7 +469,7 @@ checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 
 [[package]]
 name = "classification"
-version = "0.1.114"
+version = "0.1.115"
 dependencies = [
  "csv",
  "ferroterm-testkit",
@@ -522,7 +522,7 @@ dependencies = [
 
 [[package]]
 name = "concept-graph"
-version = "0.1.114"
+version = "0.1.115"
 dependencies = [
  "proptest",
  "rf2",
@@ -532,7 +532,7 @@ dependencies = [
 
 [[package]]
 name = "concept-store"
-version = "0.1.114"
+version = "0.1.115"
 dependencies = [
  "concept-graph",
  "redb",
@@ -841,7 +841,7 @@ dependencies = [
 
 [[package]]
 name = "designation-index"
-version = "0.1.114"
+version = "0.1.115"
 dependencies = [
  "concept-graph",
  "fst",
@@ -854,7 +854,7 @@ dependencies = [
 
 [[package]]
 name = "dhd-thesaurus"
-version = "0.1.114"
+version = "0.1.115"
 dependencies = [
  "classification",
  "csv",
@@ -1122,7 +1122,7 @@ dependencies = [
 
 [[package]]
 name = "fhir-terminology"
-version = "0.1.114"
+version = "0.1.115"
 dependencies = [
  "concept-graph",
  "concept-store",
@@ -1408,7 +1408,7 @@ dependencies = [
 
 [[package]]
 name = "gstandaard"
-version = "0.1.114"
+version = "0.1.115"
 dependencies = [
  "classification",
  "ferroterm-testkit",
@@ -1607,7 +1607,7 @@ dependencies = [
 
 [[package]]
 name = "icd11"
-version = "0.1.114"
+version = "0.1.115"
 dependencies = [
  "ferroterm-testkit",
  "reqwest",
@@ -1928,7 +1928,7 @@ checksum = "a4933f3f57a8e9d9da04db23fb153356ecaf00cbd14aee46279c33dc80925c37"
 
 [[package]]
 name = "labcodeset"
-version = "0.1.114"
+version = "0.1.115"
 dependencies = [
  "ferroterm-testkit",
  "quick-xml",
@@ -2190,7 +2190,7 @@ dependencies = [
 
 [[package]]
 name = "loinc"
-version = "0.1.114"
+version = "0.1.115"
 dependencies = [
  "csv",
  "ferroterm-testkit",
@@ -2957,7 +2957,7 @@ dependencies = [
 
 [[package]]
 name = "rf2"
-version = "0.1.114"
+version = "0.1.115"
 dependencies = [
  "csv",
  "jiff",
@@ -3128,7 +3128,7 @@ dependencies = [
 
 [[package]]
 name = "rxnorm-rrf"
-version = "0.1.114"
+version = "0.1.115"
 dependencies = [
  "csv",
  "ferroterm-testkit",
@@ -3168,7 +3168,7 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "sct-ecl"
-version = "0.1.114"
+version = "0.1.115"
 dependencies = [
  "concept-graph",
  "logos",
@@ -3180,7 +3180,7 @@ dependencies = [
 
 [[package]]
 name = "sct-scg"
-version = "0.1.114"
+version = "0.1.115"
 dependencies = [
  "logos",
  "thiserror 2.0.20",
@@ -3591,7 +3591,7 @@ dependencies = [
 
 [[package]]
 name = "terminology-syndication"
-version = "0.1.114"
+version = "0.1.115"
 dependencies = [
  "jiff",
  "md-5",

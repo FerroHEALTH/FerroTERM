@@ -1,14 +1,14 @@
-# <img src="https://raw.githubusercontent.com/rubentalstra/FerroTERM/main/assets/brand/ferroterm-lockup-auto.svg" alt="FerroTERM" width="284" height="64">
+# <img src="https://raw.githubusercontent.com/FerroHEALTH/FerroTERM/main/assets/brand/ferroterm-lockup-auto.svg" alt="FerroTERM" width="284" height="64">
 
 
-[![CI](https://github.com/rubentalstra/FerroTERM/actions/workflows/ci.yml/badge.svg)](https://github.com/rubentalstra/FerroTERM/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/rubentalstra/FerroTERM/actions/workflows/codeql.yml/badge.svg)](https://github.com/rubentalstra/FerroTERM/actions/workflows/codeql.yml)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/rubentalstra/FerroTERM/badge)](https://scorecard.dev/viewer/?uri=github.com/rubentalstra/FerroTERM)
+[![CI](https://github.com/FerroHEALTH/FerroTERM/actions/workflows/ci.yml/badge.svg)](https://github.com/FerroHEALTH/FerroTERM/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/FerroHEALTH/FerroTERM/actions/workflows/codeql.yml/badge.svg)](https://github.com/FerroHEALTH/FerroTERM/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/FerroHEALTH/FerroTERM/badge)](https://scorecard.dev/viewer/?uri=github.com/FerroHEALTH/FerroTERM)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=rubentalstra_FerroTERM&metric=alert_status)](https://sonarcloud.io/summary/overall?id=rubentalstra_FerroTERM)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=rubentalstra_FerroTERM&metric=coverage)](https://sonarcloud.io/summary/new_code?id=rubentalstra_FerroTERM)
 [![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)
-[![GitHub Release](https://img.shields.io/github/release/rubentalstra/FerroTERM.svg?logo=github)](https://github.com/rubentalstra/FerroTERM/releases/latest)
-[![Image pulls](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fghcr-badge.elias.eu.org%2Fapi%2Frubentalstra%2FFerroTERM%2Fferroterm&query=downloadCount&label=image%20pulls&logo=github)](https://github.com/rubentalstra/FerroTERM/pkgs/container/ferroterm)
+[![GitHub Release](https://img.shields.io/github/release/FerroHEALTH/FerroTERM.svg?logo=github)](https://github.com/FerroHEALTH/FerroTERM/releases/latest)
+[![Image pulls](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fghcr-badge.elias.eu.org%2Fapi%2FFerroHEALTH%2FFerroTERM%2Fferroterm&query=downloadCount&label=image%20pulls&logo=github)](https://github.com/FerroHEALTH/FerroTERM/pkgs/container/ferroterm)
 
 [![tx-ecosystem R4](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fr4.json)](https://ferroterm.eu/docs/evaluate/conformance.html)
 [![tx-ecosystem R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fr4b.json)](https://ferroterm.eu/docs/evaluate/conformance.html)
@@ -30,7 +30,7 @@ The image serves UCUM, BCP 47, BCP 13, and ISO 3166-1 with no configuration,
 so the first call needs nothing beyond Docker:
 
 ```console
-$ docker run --rm -p 8080:8080 ghcr.io/rubentalstra/ferroterm:0.1.5
+$ docker run --rm -p 8080:8080 ghcr.io/ferrohealth/ferroterm:0.1.5
 $ curl 'http://localhost:8080/r4b/CodeSystem/$lookup?system=http://unitsofmeasure.org&code=mg/dL'
 ```
 
@@ -53,7 +53,7 @@ index by `ferroterm-build` (in the same image and every release tarball) and
 served read-only. With the release `compose.yaml` and a SNOMED CT release zip:
 
 ```console
-$ curl -LO https://github.com/rubentalstra/FerroTERM/releases/latest/download/compose.yaml
+$ curl -LO https://github.com/FerroHEALTH/FerroTERM/releases/latest/download/compose.yaml
 $ FERROTERM_RF2=/path/to/SnomedCT_Release.zip docker compose run --rm build
 $ docker compose up
 $ curl 'http://localhost:8080/r4b/CodeSystem/$lookup?system=http://snomed.info/sct&code=404684003&displayLanguage=nl'
@@ -170,7 +170,7 @@ Every route answers FHIR JSON or FHIR XML, by `_format` or `Accept`.
 v0.1.5 is the current release. The tracker's milestones are the roadmap, and
 the open issues under each are the worklist:
 
-- **[v0.1.5](https://github.com/rubentalstra/FerroTERM/milestone/19)**: the
+- **[v0.1.5](https://github.com/FerroHEALTH/FerroTERM/milestone/19)**: the
   first real run of the synchronisation against the Nationale
   Terminologieserver once an account exists, the viewer restructure and its
   design, the benchmark record set retaken on a quiet machine with the
@@ -178,7 +178,7 @@ the open issues under each are the worklist:
   accounted for structure by structure, and the `x-caused-by-unknown-system`
   parameter the terminology ecosystem requires but no `OperationDefinition`
   declares.
-- **[v0.3.0](https://github.com/rubentalstra/FerroTERM/milestone/16)**: the
+- **[v0.3.0](https://github.com/FerroHEALTH/FerroTERM/milestone/16)**: the
   differential check against the Nictiz Nationale Terminologieserver for the
   Dutch variants (the Snowstorm differential harness runs today), and the
   suite cases that are waiting on an upstream ruling rather than on work here.

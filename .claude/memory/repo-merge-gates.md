@@ -8,7 +8,7 @@ metadata:
   modified: 2026-09-02T14:53:33.612Z
 ---
 
-The `main` ruleset on rubentalstra/FerroTERM requires: one approving review plus code-owner review, signed commits (the owner's GPG key signs by default), and the `conclusion` status check with strict up-to-date policy. Merge commits are disabled; squash and rebase are allowed, and branches delete on merge.
+The `main` ruleset on FerroHEALTH/FerroTERM requires: one approving review plus code-owner review, signed commits (the owner's GPG key signs by default), and the `conclusion` status check with strict up-to-date policy. Merge commits are disabled; squash and rebase are allowed, and branches delete on merge.
 
 **Why:** Claude cannot approve or merge its own PRs, so work stacks: the next issue's branch is cut from the previous issue's branch and its PR targets that branch until the base merges.
 

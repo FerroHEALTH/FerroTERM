@@ -53,7 +53,7 @@ add-on.
 ## Where it sits
 
 `addon-nts` is one member of
-[FerroTERM](https://github.com/rubentalstra/FerroTERM), a pure-Rust FHIR
+[FerroTERM](https://github.com/FerroHEALTH/FerroTERM), a pure-Rust FHIR
 terminology server for SNOMED CT, LOINC, and other clinical code systems. An
 add-on is compiled into the sync service and is never published to crates.io.
 It depends on `terminology-syndication` and leaf crates only.
