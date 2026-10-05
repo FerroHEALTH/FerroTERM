@@ -82,6 +82,7 @@ Anything you notice that is wrong, misplaced, or suspicious OUTSIDE your
 assigned scope (code in the wrong crate, a duplicated definition, a stale
 claim, a missing test, a dependency smell) goes in your final report under an
 explicit "En-route findings" heading, each with file:line and one sentence of
-evidence, so the orchestrator files a tracker issue for it. "It was already
-there" is never a reason to stay silent. Do not fix out-of-scope findings
-yourself; report them.
+evidence and the type (Bug, Feature or Task) and priority you would give it, so
+the orchestrator files a tracker issue for it with `scripts/gh/fields.sh new`.
+You file no issue yourself. "It was already there" is never a reason to stay
+silent. Do not fix out-of-scope findings yourself; report them.

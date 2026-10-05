@@ -54,7 +54,11 @@ a shell script, keep it clean at `shellcheck --severity=style`.
 
 - Keep changes compiling and tested at every step; do not defer compilation.
 - Never weaken, skip, or delete a test to make a build pass.
-- Update the changelog for any user-visible change once `CHANGELOG.md` exists.
+- Record any user-visible change as a changelog fragment,
+  `changelog.d/<issue>-<kebab-slug>.<section>.md`, in the format
+  `changelog.d/README.md` describes. Do not edit `CHANGELOG.md`: the release
+  cut assembles the fragments into it. A pull request with no user-visible
+  effect carries the `no-changelog` label instead.
 - Every workflow `uses:` is pinned to a full commit SHA with a trailing version
   comment; keep it that way. `permissions:` is `{}` at the workflow level with
   the minimum granted per job, and no untrusted context is interpolated into a

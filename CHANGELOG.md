@@ -7,9 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Maintenance rule: every pull request that changes user-visible behaviour (the
 REST/terminology surface, ECL, validation, configuration, CLI, or
-container/deployment artifacts) adds an entry under **[Unreleased]** in the
-same PR. Cutting a release renames [Unreleased] to the version + date and adds a
-fresh link reference.
+container/deployment artifacts) adds a fragment under `changelog.d/` in the
+same PR (`changelog.d/README.md`) and leaves this file alone. Cutting a release
+runs `scripts/release/changelog.sh --assemble <version> <date>`, which moves the
+fragments here under the version and its date.
 
 ## [Unreleased]
 

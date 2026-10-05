@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: BUSL-1.1
 name: Feature request
 description: Propose a new capability or an improvement.
-labels: [enhancement]
+type: Feature
 body:
   - type: markdown
     attributes:
       value: |
-        A maintainer sets the type and priority labels during triage, so you do
-        not need to add them.
+        The type is already Feature, and a maintainer sets the priority during
+        triage, so you do not need to choose one.
   - type: textarea
     id: problem
     attributes:

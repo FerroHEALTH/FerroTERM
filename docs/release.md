@@ -17,8 +17,21 @@ cut follows, in order.
    re-record them in the same commit:
    `FERROTERM_RECORD_VIEWER_FIXTURES=1 cargo nextest run -p ferroterm-server
    -E 'test(the_viewer_capability_fixtures)'`.
-3. **The changelog names the release**: `[Unreleased]` becomes the version and
-   the date, with a fresh `[Unreleased]` above it and a new link reference.
+3. **The changelog names the release.** Every change since the last release
+   is a fragment under `changelog.d/` (`changelog.d/README.md`), and entries
+   written before the fragments may still sit under `[Unreleased]`. Run
+
+   ```sh
+   scripts/release/changelog.sh --assemble X.Y.Z YYYY-MM-DD
+   ```
+
+   in the version-bump branch. It writes a `## [X.Y.Z] - YYYY-MM-DD` section
+   under a fresh empty `[Unreleased]`, holding the `[Unreleased]` entries and
+   then the fragments in Keep a Changelog order; it moves the `[Unreleased]`
+   link reference on, adds the version's, and `git rm`s the fragments. It
+   refuses a malformed fragment, a version that already has a section, and a
+   release with no entry. Commit `CHANGELOG.md` and the removals together, and
+   read the section as the release notes before you tag.
 4. **The gates pass on the release commit**: `cargo fmt --all --check`,
    `cargo clippy --workspace --all-targets --all-features`, `cargo nextest run
    --workspace --locked`, `RUSTDOCFLAGS="-D warnings" cargo doc`, and the

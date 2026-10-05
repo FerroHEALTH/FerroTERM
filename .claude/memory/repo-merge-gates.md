@@ -1,6 +1,6 @@
 ---
 name: repo-merge-gates
-description: "main requires one approving review, a code-owner review, GPG-signed commits, and the CI `conclusion` check; PRs wait for the owner to merge, and the \"FerroTERM Roadmap\" project board did not exist as of 2026-09-02"
+description: "main requires signed commits and the CI `conclusion` check and merges through the merge queue since 2026-10-05 (no strict up-to-date rule, no manual rebase train); the FerroTERM Roadmap board is a FerroHEALTH org project"
 metadata: 
   node_type: memory
   type: project
@@ -27,3 +27,13 @@ the branch is fully up to date with `main` (the ruleset's strict status
 checks). Before arming `gh pr merge --auto`, rebase the branch onto
 `origin/main` and force-push with lease; after any other PR merges, rebase
 every open PR again. Never leave a green PR sitting behind main.
+
+**Update 2026-10-05 (#704):** the `main` ruleset carries the merge queue
+(squash, `ALLGREEN`, up to 5 entries built at a time) and the strict
+up-to-date policy is off. The queue builds each entry on top of the ones ahead
+of it, so the rebase-every-open-PR rule above is retired: arm
+`gh pr merge <n> --auto` and let the queue order the merges. A PR that
+conflicts with `main` still needs a local signed rebase
+(`gh pr update-branch --rebase` strips the signature). The "FerroTERM Roadmap"
+board is a FerroHEALTH organisation project; the user-owned board never
+existed.
