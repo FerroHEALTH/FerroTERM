@@ -20,7 +20,7 @@
     "deny": [
       "Bash(sudo:*)",
       "Bash(gh pr merge *--admin*)",
-      "Bash(gh pr merge *-R *)",
+      "Bash(gh pr merge *-R*)",
       "Bash(gh pr merge *--repo*)"
     ]
   },

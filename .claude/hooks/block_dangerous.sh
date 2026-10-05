@@ -6,6 +6,7 @@
 #   - a recursive forced delete (delete specific files, use git rm, or work
 #     under /tmp)
 #   - force-pushes touching main or master, and bare force-pushes
+#   - deleting main or master on a remote, and mirror pushes
 #   - deletion of LICENSE or CLAUDE.md (the licence and the working discipline)
 #
 # Reads the tool-call JSON on stdin. Exit 2 blocks; exit 0 allows.
@@ -21,13 +22,59 @@ else
 fi
 [[ -n "${cmd:-}" ]] || exit 0
 
-# A delete carrying both -r and -f (combined or separate flags), unless it is
-# scoped under /tmp.
-if {
-  printf '%s' "$cmd" | grep -qE '(^|[;&|[:space:]])rm[[:space:]]+-[a-zA-Z]*([rR][a-zA-Z]*f|f[a-zA-Z]*[rR])' ||
-    printf '%s' "$cmd" | grep -qE '(^|[;&|[:space:]])rm[[:space:]]+(-[a-zA-Z]+[[:space:]]+)*-[a-zA-Z]*[rR][a-zA-Z]*([[:space:]]+-[a-zA-Z]+)*[[:space:]]+-[a-zA-Z]*f'
-} && ! printf '%s' "$cmd" | grep -qE 'rm[[:space:]]+-[a-zA-Z]+[[:space:]]+"?(/private)?/tmp/'; then
+# A delete carrying a recursive flag (-r, -R, --recursive) and a force flag
+# (-f, --force), in any spelling or order, unless every path it names sits
+# under /tmp. Each command of a compound line is judged on its own, so one
+# /tmp delete never clears another delete on the same line.
+recursive_forced_delete() {
+  local segment word recursive force path outside
+  while IFS= read -r segment; do
+    # Word splitting is the tokenizer here, with globbing off.
+    set -f
+    # shellcheck disable=SC2086
+    set -- $segment
+    set +f
+    # Skip a leading sudo, env or VAR=value before the command word.
+    while [[ $# -gt 0 && ( "$1" == sudo || "$1" == env || "$1" == *=* ) ]]; do shift; done
+    [[ "${1:-}" == rm || "${1:-}" == */rm ]] || continue
+    shift
+    recursive=0 force=0 outside=0 path=0
+    for word in "$@"; do
+      case "$word" in
+        --recursive) recursive=1 ;;
+        --force) force=1 ;;
+        --*) ;;
+        -*)
+          [[ "$word" == *[rR]* ]] && recursive=1
+          [[ "$word" == *f* ]] && force=1
+          ;;
+        *)
+          path=1
+          word="${word//\"/}"
+          word="${word//\'/}"
+          if [[ ! ( "$word" == /tmp/* || "$word" == /private/tmp/* ) || "$word" == *..* ]]; then
+            outside=1
+          fi
+          ;;
+      esac
+    done
+    if [[ "$recursive" -eq 1 && "$force" -eq 1 && ( "$outside" -eq 1 || "$path" -eq 0 ) ]]; then
+      return 0
+    fi
+  done <<<"${cmd//[;&|()\`]/$'\n'}"
+  return 1
+}
+
+if recursive_forced_delete; then
   echo "BLOCKED: a recursive forced delete is not allowed (block_dangerous hook). Delete specific files with 'git rm' or a plain 'rm <file>', or operate under /tmp." >&2
+  exit 2
+fi
+
+# Deleting main or master on a remote is never allowed: `git push origin
+# :main`, `--delete main`, or `-d main`, and a mirror push, which can delete
+# every remote branch.
+if printf '%s' "$cmd" | grep -qE 'git[[:space:]]+push[^;|&]*([[:space:]]:(refs/heads/)?(main|master)([[:space:]]|$)|--delete[^;|&]*[[:space:]](main|master)([[:space:]]|$)|[[:space:]]-d[[:space:]][^;|&]*(main|master)([[:space:]]|$)|--mirror)'; then
+  echo "BLOCKED: deleting main or master on a remote, or a mirror push, is forbidden (CLAUDE.md hard rule)." >&2
   exit 2
 fi
 
