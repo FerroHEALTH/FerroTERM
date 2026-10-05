@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-FileCopyrightText: Vernum Projecten B.V.
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # One end-to-end run of the synchronisation on this machine, with YOUR NTS
 # account: the server starts on an empty index root with its admin listener,
