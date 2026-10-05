@@ -20,6 +20,11 @@ fresh link reference.
   `SPDX-FileCopyrightText` line, the contribution grant, the governance text and
   the site footer name the company. The licence terms are unchanged, and
   maintainer credit stays a person.
+- A commercial licence, and any other business or licensing question, goes to
+  Cadasto B.V. at info@cadasto.com or https://www.cadasto.com/contact/ (#702).
+  Every `LICENSE` copy, the README, the handbook licensing page,
+  `MAINTAINERS.md`, `GOVERNANCE.md` and `SUPPORT.md` say so. The maintainer
+  keeps the technical side, and the licence terms are unchanged.
 
 ## [0.1.6] - 2026-10-01
 

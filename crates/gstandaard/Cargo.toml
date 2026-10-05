@@ -2,7 +2,7 @@
 [package]
 name = "gstandaard"
 description = "G-Standaard (Z-Index) product ladder reader: GPK, PRK, HPK, and article files"
-version = "0.1.116"
+version = "0.1.117"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

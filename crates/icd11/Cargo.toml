@@ -2,7 +2,7 @@
 [package]
 name = "icd11"
 description = "ICD-11 entities from the WHO ICD-API local deployment, cached and read"
-version = "0.1.116"
+version = "0.1.117"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

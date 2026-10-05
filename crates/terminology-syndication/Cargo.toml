@@ -2,7 +2,7 @@
 [package]
 name = "terminology-syndication"
 description = "Atom terminology syndication client: the feed model, entry selection, and checksum-verified download"
-version = "0.1.116"
+version = "0.1.117"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

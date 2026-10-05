@@ -230,8 +230,11 @@ distributing it for a fee need a commercial licence in every case, including
 for an organisation the free rows above would otherwise cover.
 
 **Each version becomes Apache License 2.0 four years after that version is
-published.** A commercial licence starts with a short conversation with the
-maintainer named in [MAINTAINERS.md](MAINTAINERS.md).
+published.** A commercial licence is arranged with Cadasto B.V., the Licensor,
+which handles the business side of FerroTERM: write to
+[info@cadasto.com](mailto:info@cadasto.com) or use
+<https://www.cadasto.com/contact/>. Technical questions go to the maintainer
+named in [MAINTAINERS.md](MAINTAINERS.md).
 
 ## Licensing
 
@@ -256,8 +259,11 @@ its own or inside another product, need a commercial licence in every case.
 Each version becomes Apache License 2.0 four years after that version is
 published. One crate is outside all of this: `rf2` (the SNOMED CT release file
 reader) is Apache 2.0 on crates.io, so any Rust project can use it without a
-licence conversation. The commercial licence starts with a short conversation with the
-maintainer named in [MAINTAINERS.md](MAINTAINERS.md).
+licence conversation. A commercial licence is arranged with Cadasto B.V., the
+Licensor, which handles the business side of FerroTERM: write to
+[info@cadasto.com](mailto:info@cadasto.com) or use
+<https://www.cadasto.com/contact/>. Technical questions go to the maintainer
+named in [MAINTAINERS.md](MAINTAINERS.md).
 
 The code systems are licensed separately: SNOMED CT by SNOMED International,
 LOINC by Regenstrief, ICD by WHO, RxNorm by NLM, and the repository ships none

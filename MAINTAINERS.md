@@ -23,6 +23,12 @@ organisation, so its organisation owners also hold admin access
 (`GET /repos/FerroHEALTH/FerroTERM/collaborators` lists them). No second
 maintainer exists.
 
+The maintainer handles the technical side: code, review, releases, issues, and
+security reports. Cadasto B.V. is the Licensor and copyright holder, and
+handles the business side of FerroTERM, the commercial licence included: write
+to [info@cadasto.com](mailto:info@cadasto.com) or use
+<https://www.cadasto.com/contact/>.
+
 Everything else in this file follows from that sentence, and no wording
 elsewhere in the repository should be read as softening it. The path out is in
 [GOVERNANCE.md](GOVERNANCE.md): becoming a maintainer is a defined route, and
@@ -47,8 +53,8 @@ one person's GitHub account or one person's hardware. Keyless Sigstore signing
 removes the *stored secret* risk for releases (there is no long-lived signing
 key to leak), but it does not distribute the *authority*, which is still one
 account's. That is the residual risk, and it is stated rather than mitigated
-because no mitigation is currently available to a one-person project without a
-legal entity behind it.
+because no mitigation is currently available while the technical roles rest on
+one maintainer.
 
 ## If the maintainer is unavailable
 
