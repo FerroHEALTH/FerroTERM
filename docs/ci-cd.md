@@ -210,22 +210,48 @@ harness are maturity additions.
 
 Every `uses:` SHA-pinned; `permissions: {}` + least-privilege per job;
 `persist-credentials: false`; no context interpolation in `run:`; no build cache
-in publishing lanes. A `main` ruleset requires PRs, status checks, signed
-commits, and blocks force-push and deletion. Releases are immutable (freeze on
-publish; recover with a new patch version, never a retag).
+in publishing lanes. A `main` ruleset requires PRs, the `conclusion` status
+check, and signed commits, blocks force-push and deletion, and merges through
+GitHub's merge queue (squash, all-green grouping, up to 5 entries built at a
+time). Releases are immutable (freeze on publish; recover with a new patch
+version, never a retag).
+
+## The merge queue
+
+`main` takes every pull request through the merge queue
+(<https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue>).
+A pull request is armed with `gh pr merge <n> --auto`, which adds it to the
+queue once `conclusion` is green; the queue sets the merge method itself and
+refuses `--squash` and `--delete-branch`, and the repository deletes a merged
+head branch on its own. The queue builds each entry on top of the entries
+ahead of it, so the strict up-to-date policy is off and no pull request needs
+a rebase just because another one merged first.
+
+`ci.yml` runs on `merge_group`, and the `conclusion` job reports on the queued
+commit. The jobs that read a pull-request payload (`contribution-licence-guard`,
+`crate-version-guard`, `changelog-guard`, `dependency-review`) skip on a merge
+group: each pull request passed them on its own before it joined the queue, and
+`conclusion` counts a skip as a pass. The pull-request trigger also listens for
+`labeled` and `unlabeled`, so adding `no-crate-bump` or `no-changelog` re-runs
+CI without a new push.
 
 ## Owner actions (one-time, cannot be scripted)
 
-- `main` ruleset: require PR + status checks, **require signed commits**, block
-  force-push + deletion.
+- `main` ruleset: require PR + the `conclusion` status check, **require signed
+  commits**, block force-push + deletion, merge queue on (squash, `ALLGREEN`).
 - Enable: code scanning, secret scanning + push protection, Dependabot
   alerts/updates, artifact attestations. (Immutable releases: already enabled.)
-- Add the `SONAR_TOKEN` repository secret. (Done.) Keep SonarCloud **Automatic
-  Analysis OFF** (done) so CI-based analysis is authoritative.
+- Add the `SONAR_TOKEN` repository secret, for the SonarQube Cloud project
+  `FerroHEALTH_FerroTERM` in the organization `ferrohealth`. (Done.) Keep
+  SonarCloud **Automatic Analysis OFF** (done) so CI-based analysis is
+  authoritative.
 - Register the project at bestpractices.dev; add the returned badge to the
   README.
-- Run `scripts/gh/labels.sh` once to create the label taxonomy; create the
-  "FerroTERM Roadmap" Project if the board is wanted.
+- Run `scripts/gh/migrate-fields.sh apply` and `verify`, then
+  `scripts/gh/labels.sh`, to move the tracker onto the organisation's issue
+  types and fields and converge the label taxonomy.
+- The "FerroTERM Roadmap" organisation project: the built-in workflows
+  (auto-add, closed to Done, reopened to Todo) are set in the project UI.
 
 ## Sources
 

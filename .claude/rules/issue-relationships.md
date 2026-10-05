@@ -55,8 +55,9 @@ release spine** (`issue-workflow.md`: a release cuts when its milestone hits zer
 open issues). Do not create per-release "epic" parent issues. Sub-issues
 express *decomposition*, milestones express *release*.
 
-When new work is discovered en route, its new issue (`gh issue create`) is
-**linked**, as a sub-issue of the issue it decomposes, or a dependency of the
+When new work is discovered en route, its new issue (`scripts/gh/fields.sh
+new`, with a type, a priority and an effort) is **linked**, as a sub-issue of
+the issue it decomposes, or a dependency of the
 issue it sequences, not left as a prose "see also".
 
 ### 2. Blocked-by: "Mark as blocked by" (sequencing)

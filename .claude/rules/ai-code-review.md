@@ -2,10 +2,19 @@
 
 Every pull request and every push to `main` is analyzed by SonarQube Cloud
 (`.github/workflows/sonar.yml`; scope in `sonar-project.properties`; project
-`rubentalstra_FerroTERM`, org `rubentalstra`). Rust is analyzed first-party (the
-analyzer runs Clippy over the workspace); shell, YAML, and other languages are
-covered by the multi-language sweep. It exists as a second opinion beside the
-local gates and CodeQL.
+`FerroHEALTH_FerroTERM`, organization `ferrohealth`). Rust is analyzed
+first-party (the analyzer runs Clippy over the workspace); shell, YAML, and
+other languages are covered by the multi-language sweep. It exists as a second
+opinion beside the local gates and CodeQL.
+
+After each analysis of `main`, the workflow converts the open issues to SARIF
+(`scripts/sonar/sarif.sh`) and uploads them to GitHub code scanning under the
+category `sonarqube-cloud`, so SonarQube Cloud is listed as a code-scanning
+tool beside CodeQL and Scorecard. Sonar's own code-scanning integration needs
+its Enterprise plan. Pull requests are not uploaded: a pull-request analysis
+lists only the issues the change adds, and code scanning would read every
+other alert as fixed. SonarQube Cloud decorates the pull request itself.
+Those alerts are as advisory as the dashboard.
 
 It is a **second opinion**. It is not authority, and it gates no merge.
 

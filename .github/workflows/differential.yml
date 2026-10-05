@@ -153,6 +153,7 @@ jobs:
           if [[ -n "$open" ]]; then
             gh issue comment "$open" --body-file divergence.md
           else
-            gh issue create --title "$title" --body-file divergence.md \
-              --label test --label P1 --label "spec:SNOMED"
+            bash scripts/gh/fields.sh new task high medium \
+              --title "$title" --body-file divergence.md \
+              --label test --label "spec:SNOMED"
           fi

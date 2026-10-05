@@ -1,27 +1,28 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: BUSL-1.1
-# scripts/gh/project.sh — the deterministic GitHub Projects (v2) board helper.
+# scripts/gh/project.sh: the deterministic GitHub Projects (v2) board helper.
 #
 # WHY THIS EXISTS: the public roadmap board is a GitHub Project (v2), and its
-# write commands (`gh project item-edit`) take OPAQUE GraphQL node ids — the
-# project id, the Status field id, the option id, and the per-item id — never
+# write commands (`gh project item-edit`) take OPAQUE GraphQL node ids (the
+# project id, the Status field id, the option id, and the per-item id), never
 # the issue #number a human knows. Hand-resolving four ids per status move is
 # the same foot-gun class scripts/gh/rel.sh exists for, so this wrapper
 # resolves everything from the issue #number and fails loud.
 #
 # The board is a VIEW, not a tracker: Status (Todo / In Progress / Done) is
 # the ONLY board-managed datum, and this script deliberately exposes nothing
-# else. Policy: .claude/rules/project-board.md.
+# else. Policy: no specification governs it: our own design.
 #
-# OWNER SETUP REQUIRED: the board is not created by this script. The repository
-# owner must first create a GitHub Project (v2) titled "FerroTERM Roadmap" under
-# the `FerroHEALTH` organisation, with a single-select "Status" field carrying the
-# options Todo / In Progress / Done (and, for the roadmap view, a Date field
-# named "Target date"), then grant this clone the `project` token scope
-# (`gh auth refresh -s project`). Until that project exists, every command here
-# fails loud with "no project titled 'FerroTERM Roadmap'".
+# The board is not created by this script. It exists as the GitHub Project (v2)
+# "FerroTERM Roadmap" under the `FerroHEALTH` organization, with a
+# single-select "Status" field carrying Todo / In Progress / Done and a Date
+# field named "Target date" for the roadmap view. The clone needs the
+# `project` token scope (`gh auth refresh -s project`). The project is found by
+# title, never by number, so a recreated board needs no edit here; with no
+# project of that title every command fails loud with "no project titled
+# 'FerroTERM Roadmap'".
 #
-# Official docs (durable references — the ONLY citations allowed for this):
+# Official docs (durable references, the ONLY citations allowed for this):
 #   gh project commands .. https://cli.github.com/manual/gh_project
 #   Projects v2 API ...... https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/using-the-api-to-manage-projects
 #   Built-in workflows ... https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/using-the-built-in-automations
@@ -31,6 +32,8 @@
 # Usage:
 #   scripts/gh/project.sh status <issue> <todo|in-progress|done>  # move an issue's board Status
 #   scripts/gh/project.sh add    <issue>                          # add an issue to the board (auto-add normally does this)
+#   scripts/gh/project.sh transfer <issue> <owner/repo>            # move an issue to another repo AND drop its card (the only way out)
+#   scripts/gh/project.sh transferred <owner/repo>#<n>              # repair: drop the card of an issue moved with a raw gh issue transfer
 #   scripts/gh/project.sh show   <issue>                          # print the issue's current board Status
 #   scripts/gh/project.sh board                                   # print the whole board grouped by Status
 #   scripts/gh/project.sh url                                     # print the project URL
@@ -76,7 +79,7 @@ resolve_project() {
   row="$(gh project list --owner "$OWNER" --format json \
     --jq ".projects[] | select(.title == \"$TITLE\") | \"\(.number) \(.id)\"" 2>/dev/null)" ||
     die "could not list projects for $OWNER (missing 'project' token scope? run: gh auth refresh -s project)"
-  [[ -n "$row" ]] || die "no project titled '$TITLE' under $OWNER — the owner must create the '$TITLE' Project (v2) first (see the header of this script)"
+  [[ -n "$row" ]] || die "no project titled '$TITLE' under $OWNER: the owner must create the '$TITLE' Project (v2) first (see the header of this script)"
   PROJ_NUMBER="${row%% *}"
   PROJ_ID="${row##* }"
 }
@@ -99,15 +102,16 @@ status_option_id() {
 
 # Resolve the board item id for issue #n ("" when the issue is not on the board).
 item_id_for_issue() {
+  local number="$1"
   resolve_project
-  need_int "$1"
+  need_int "$number"
   # Looked up from the ISSUE side (one cheap node query), never by listing the
   # whole project: the board keeps every closed item, so `gh project
   # item-list --limit 1000` costs enough GraphQL points that GitHub's
   # secondary rate limit rejects it once the board is large.
   # shellcheck disable=SC2016 # $owner/$name/$number are GraphQL variables, bound by the -f flags
   gh api graphql \
-    -f owner="${REPO%%/*}" -f name="${REPO##*/}" -F number="$1" \
+    -f owner="${REPO%%/*}" -f name="${REPO##*/}" -F number="$number" \
     -f query='query($owner:String!,$name:String!,$number:Int!){
       repository(owner:$owner,name:$name){issue(number:$number){
         projectItems(first:20){nodes{id project{id}}}}}}' \
@@ -115,11 +119,12 @@ item_id_for_issue() {
 }
 
 canonical_status() {
-  case "$1" in
+  local status="$1"
+  case "$status" in
     todo | Todo) echo "Todo" ;;
     in-progress | in_progress | 'In Progress') echo "In Progress" ;;
     done | Done) echo "Done" ;;
-    *) die "unknown status '$1' (use todo | in-progress | done)" ;;
+    *) die "unknown status '$status' (use todo | in-progress | done)" ;;
   esac
 }
 
@@ -130,6 +135,52 @@ cmd_add() {
   gh project item-add "$PROJ_NUMBER" --owner "$OWNER" \
     --url "https://github.com/$REPO/issues/$n" >/dev/null
   echo "ok: #$n is on the board"
+}
+
+# `transfer` is the ONE way an issue leaves this repository: it moves the
+# issue with `gh issue transfer` and removes its card from this board in the
+# same step, because GitHub carries the project item along with the issue and
+# the board would otherwise show a foreign issue as ours.
+cmd_transfer() {
+  local n="${1:?issue number}" dest="${2:?owner/repo}"
+  need_int "$n"
+  [[ "$dest" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || die "transfer: expected owner/repo, got '$dest'"
+  [[ "$dest" != "$REPO" ]] || die "transfer: $dest is this repository"
+  resolve_project
+  local item url
+  item="$(item_id_for_issue "$n")"
+  url="$(gh issue transfer "$n" "$dest")"
+  if [[ -n "$item" ]]; then
+    gh project item-delete "$PROJ_NUMBER" --owner "$OWNER" --id "$item" >/dev/null
+    echo "ok: #$n moved to $url and its card left the board"
+  else
+    echo "ok: #$n moved to $url (it had no card on the board)"
+  fi
+}
+
+# An issue transferred to another repository keeps its card on this board
+# (GitHub moves project items with the issue), so the board then shows a
+# foreign issue as if it were ours. The card is looked up from the ISSUE side
+# in its new repository, so no whole-board listing is needed.
+cmd_transferred() {
+  local ref="${1:?owner/repo#number}"
+  [[ "$ref" =~ ^([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)#([0-9]+)$ ]] \
+    || die "transferred: expected owner/repo#number, got '$ref'"
+  local new_repo="${BASH_REMATCH[1]}" n="${BASH_REMATCH[2]}"
+  [[ "$new_repo" != "$REPO" ]] \
+    || die "transferred: $ref is this repository's own issue; only a transferred-out issue is removed"
+  resolve_project
+  local item
+  # shellcheck disable=SC2016 # GraphQL variables, bound by the -f flags
+  item="$(gh api graphql \
+    -f owner="${new_repo%%/*}" -f name="${new_repo##*/}" -F number="$n" \
+    -f query='query($owner:String!,$name:String!,$number:Int!){
+      repository(owner:$owner,name:$name){issue(number:$number){
+        projectItems(first:20){nodes{id project{id}}}}}}' \
+    --jq ".data.repository.issue.projectItems.nodes[] | select(.project.id == \"$PROJ_ID\") | .id")"
+  [[ -n "$item" ]] || die "transferred: $ref has no card on this board"
+  gh project item-delete "$PROJ_NUMBER" --owner "$OWNER" --id "$item" >/dev/null
+  echo "ok: removed the card of $ref (transferred out of $REPO)"
 }
 
 cmd_status() {
@@ -187,12 +238,13 @@ cmd_update() {
   local status="${1:?status (on-track|at-risk|off-track|complete|inactive)}"
   local body="${2:?message body (markdown)}"
   shift 2
-  local start="" target="" enum
+  local start="" target="" enum flag
   while [[ $# -gt 0 ]]; do
-    case "$1" in
+    flag="$1"
+    case "$flag" in
       --start) start="${2:?--start needs YYYY-MM-DD}"; shift 2 ;;
       --target) target="${2:?--target needs YYYY-MM-DD}"; shift 2 ;;
-      *) die "unknown flag '$1' (only --start/--target)" ;;
+      *) die "unknown flag '$flag' (only --start/--target)" ;;
     esac
   done
   case "$status" in
@@ -283,7 +335,7 @@ cmd_sync_dates() {
 
 usage() {
   # The banner is the header comment block itself, printed structurally
-  # (skip the shebang + SPDX lines, stop at the first non-comment line) so
+  # (skip the shebang and SPDX lines, stop at the first non-comment line) so
   # editing the header can never misalign a hardcoded line window.
   awk 'NR <= 2 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0"
 }
@@ -298,6 +350,8 @@ main() {
   case "$sub" in
     status) cmd_status "$@" ;;
     add) cmd_add "$@" ;;
+    transfer) cmd_transfer "$@" ;;
+    transferred) cmd_transferred "$@" ;;
     show) cmd_show "$@" ;;
     board) cmd_board "$@" ;;
     url) cmd_url "$@" ;;

@@ -214,15 +214,23 @@ Conformance is measured against Snowstorm as the reference server (see
 ## Issue workflow (the loop)
 
 The tracker is GitHub Issues; the open issue list is the worklist
-(`.claude/rules/issue-workflow.md`). One type label per issue (bug/enhancement/
-documentation/chore/refactor/perf/ci), one priority label (P0-P3), and domain
-labels as needed. Milestones are releases. Record progress on the issue (tick
-criteria, comment); a PR declares `Closes #N`. New work found while working an
-issue is filed and fixed before the next unit starts (fix-first cadence). Native
-sub-issue and dependency edges are set only with `scripts/gh/rel.sh`; the roadmap
-board is a view over the tracker, written only with `scripts/gh/project.sh`
+(`.claude/rules/issue-workflow.md`). The type (`Bug`, `Feature`, `Task`), the
+priority (`Urgent`, `High`, `Medium`, `Low`) and the effort of an issue are the
+FerroHEALTH organisation's native issue type and issue fields, never labels:
+file every issue with `scripts/gh/fields.sh new <type> <priority> <effort>
+...` and change one with `scripts/gh/fields.sh`. A `Task` carries exactly one
+work-kind label (documentation/chore/refactor/perf/test/ci), plus domain and
+area labels as needed. Read an issue with `gh issue view <n> --json
+title,body,comments`, never `--comments`. Milestones are releases. Record
+progress on the issue (tick criteria, comment); a PR declares `Closes #N` and
+arms auto-merge at once with `gh pr merge <n> --auto`, which puts it in the
+merge queue. A user-visible change adds a fragment under `changelog.d/`, never
+an edit of `CHANGELOG.md`. New work found while working an issue is filed and
+fixed before the next unit starts (fix-first cadence). Native sub-issue and
+dependency edges are set only with `scripts/gh/rel.sh`; the roadmap board is a
+view over the tracker, written only with `scripts/gh/project.sh`
 (`.claude/rules/issue-relationships.md`, `project-board.md`). The SessionStart
-hook prints the open issue list.
+hook prints the open issue list with `<Type/Priority>` after each title.
 
 ## Working discipline (`.claude/`)
 

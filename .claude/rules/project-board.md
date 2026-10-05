@@ -11,16 +11,18 @@ tracker, never a second tracker.** This file is the policy (what the board may
 and may not carry) and the canonical commands (the one sanctioned write path is
 `scripts/gh/project.sh`).
 
-## Owner-created
+## The board
 
-**The board does not exist until the owner creates it.** The repository owner
-must create a GitHub Project (v2) titled **"FerroTERM Roadmap"** under the
-`FerroHEALTH` organisation, with the built-in single-select `Status` field carrying
-exactly `Todo` / `In Progress` / `Done`, plus a Date field named `Target date`
-for the roadmap layout, and grant the working clone the `project` token scope
-(`gh auth refresh -s project`). Until then, every `scripts/gh/project.sh`
-command fails loud with "no project titled 'FerroTERM Roadmap'". The board
-configuration intent (fields, views, automations) is at the bottom of this file.
+The board is the GitHub Project (v2) **"FerroTERM Roadmap"** under the
+`FerroHEALTH` organisation, beside the other FerroHEALTH roadmaps, public and
+linked to this repository. It carries the built-in single-select `Status`
+field with exactly `Todo` / `In Progress` / `Done`, plus a Date field named
+`Target date` for the roadmap layout. The clone needs the `project` token
+scope (`gh auth refresh -s project`). `scripts/gh/project.sh` finds the board
+by title under the repository owner, never by number, so a recreated board
+needs no edit; with no project of that title every command fails loud with
+"no project titled 'FerroTERM Roadmap'". The board configuration intent
+(fields, views, automations) is at the bottom of this file.
 
 ## The one-datum rule
 
@@ -30,8 +32,9 @@ has a canonical home:
 
 | Fact | Canonical home | NEVER duplicated as |
 |---|---|---|
-| Priority | `P0` to `P3` labels | a board Priority field |
-| Type | `bug`/`enhancement`/… labels | a board Type field |
+| Type | the native issue type (`Bug`, `Feature`, `Task`) | a board Type field |
+| Priority | the organisation's `Priority` issue field | a board Priority field |
+| Effort | the organisation's `Effort` issue field | a board Effort field |
 | Release | the `vX.Y.Z` milestone | a board Release/Iteration field |
 | Decomposition | native sub-issue edges | a board hierarchy field |
 | Sequencing | native blocked-by edges | a board Blocked column/field |
@@ -89,9 +92,13 @@ token scope (`gh auth refresh -s project`).
 | Post a status update | `scripts/gh/project.sh update <on-track\|at-risk\|off-track\|complete\|inactive> "<markdown>" [--start YYYY-MM-DD] [--target YYYY-MM-DD]` |
 | Read recent status updates | `scripts/gh/project.sh updates` |
 | Sync Target date from milestones | `scripts/gh/project.sh sync-dates` |
+| Move #n to another repository and drop its card | `scripts/gh/project.sh transfer <n> <owner/repo>` |
+| Drop the card of an issue moved with a raw `gh issue transfer` | `scripts/gh/project.sh transferred <owner/repo>#<n>` |
 
 Never move `Done` by hand, never `gh project item-edit` raw, and never
 `item-archive`/`item-delete`; closed items stay visible as the shipped record.
+The one exception is an issue that leaves this repository: GitHub carries its
+card along, so `transfer` moves the issue and deletes the card in one step.
 
 ## Status updates (the board's progress narrative)
 
@@ -117,9 +124,10 @@ plus a Date field `Target date` (kept true by `sync-dates`). Views:
    "what is going on right now" surface.
 2. **Roadmap:** roadmap layout, filter `is:open`; items placed by the derived
    `Target date` field; group by Milestone; milestone markers on.
-3. **Current focus:** table layout, filter `is:open label:P0,P1`; columns
-   Title/Status/Labels/Milestone/Sub-issues progress.
-4. **Needs attention:** table layout, filter `is:open label:P0`.
+3. **Current focus:** table layout, filter `is:open priority:Urgent,High`;
+   columns Title/Status/Type/Priority/Effort/Labels/Milestone/Sub-issues
+   progress.
+4. **Needs attention:** table layout, filter `is:open priority:Urgent`.
 
 Built-in workflows: Auto-add to project (`is:issue is:open` → Todo), Item
 reopened → Todo, Item closed → Done, Pull request linked to issue → In Progress.

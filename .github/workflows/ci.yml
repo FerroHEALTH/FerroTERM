@@ -18,8 +18,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-    # `edited` re-runs the contribution-licence guard when the checkbox is ticked.
-    types: [opened, synchronize, reopened, edited]
+    # `edited` re-runs the contribution-licence guard when the checkbox is
+    # ticked. `labeled` and `unlabeled` too: the label escapes
+    # (`no-crate-bump`, `no-changelog`) are read from the event payload, so a
+    # label added after the run started takes effect without a new push.
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
   merge_group:
   workflow_dispatch:
 
@@ -609,6 +612,74 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  # The tracker helpers under scripts/gh/ (no specification governs them: our
+  # own design). Each drives itself against a stub gh, so the self-tests need
+  # no token and run on every event.
+  tracker-helpers:
+    name: tracker-helpers
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: |
+          set -euo pipefail
+          bash scripts/gh/fields.sh --self-test
+          bash scripts/gh/labels.sh --self-test
+          bash scripts/gh/migrate-fields.sh --self-test
+          bash scripts/gh/rel.sh --self-test
+
+  # The changelog fragments under changelog.d/ (no specification governs
+  # them: our own design). Every fragment's name and content is checked on
+  # every event, so a malformed one never reaches the release cut that
+  # assembles them. The self-tests prove the check, the assembly and the
+  # pull-request guard below over stub repositories.
+  changelog:
+    name: changelog
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: |
+          set -euo pipefail
+          bash scripts/release/changelog.sh --self-test
+          bash scripts/checks/changelog-guard.sh --self-test
+          bash scripts/release/changelog.sh --check
+
+  # A pull request records its user-visible effect as a fragment under
+  # changelog.d/, or as an edit of CHANGELOG.md while pull requests opened
+  # before the fragments still land. `no-changelog` is the escape for a change
+  # with no user-visible effect. Bots are skipped by author type: a dependency
+  # or pin bump carries no entry of its own. The script diffs from the merge
+  # base of the two shas, so the full history is fetched.
+  changelog-guard:
+    name: changelog-guard
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.pull_request.user.type != 'Bot'
+      && !contains(github.event.pull_request.labels.*.name, 'no-changelog')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: The pull request carries a changelog entry
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: bash scripts/checks/changelog-guard.sh "$BASE" "$HEAD"
+
   # The crate-line bump rule (.claude/rules/crates-publishing.md): a PR that
   # changes packaged content of a crates/* member bumps the lockstep crate
   # version in the same PR. The `no-crate-bump` label is the escape for a diff
@@ -822,6 +893,9 @@ jobs:
       - viewer
       - ui-e2e
       - crate-version-guard
+      - tracker-helpers
+      - changelog
+      - changelog-guard
       - publish-dry-run
       - msrv
       - bench-bars

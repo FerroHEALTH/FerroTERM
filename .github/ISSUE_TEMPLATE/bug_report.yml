@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: BUSL-1.1
 name: Bug report
 description: Report a defect in FerroTERM.
-labels: [bug]
+type: Bug
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting a bug. A maintainer sets the type and priority
-        labels during triage, so you do not need to add them.
+        Thanks for reporting a bug. The type is already Bug, and a maintainer
+        sets the priority during triage, so you do not need to choose one.
 
         Do not use this form for a security vulnerability. Report those
         privately through the Security tab. See

@@ -15,7 +15,9 @@ and records, it does not decide the work is done on your behalf.
 
 1. **Identify the issue being closed** (the user names it, or it is the issue
    this branch's PR declares `Closes #N` for). Read it with
-   `gh issue view <n> --comments`.
+   `gh issue view <n> --json title,body,comments --jq '.title, .body,
+   (.comments[] | "--- comment ---", .body)'` (`--comments` prints nothing
+   for an issue without comments).
 2. **Verify every `## Acceptance criteria` checkbox is ticked.** If any remain
    `- [ ]`, stop and list them; do not tick a criterion yourself just to
    proceed; a tick must reflect real, verified state (e.g. "workspace builds"
@@ -35,22 +37,30 @@ and records, it does not decide the work is done on your behalf.
 5. **FHIR model pin:** if the work took a new `fhir-types` release, confirm
    the root requirement, `docs/VERSIONS.md`, and `Cargo.lock` all name it
    (`scripts/checks/versions.sh`).
-6. **Write the close narrative into the PR description:** what shipped, the key
+6. **Changelog check:** a change with user-visible effect adds a fragment,
+   `changelog.d/<issue>-<kebab-slug>.<section>.md` (`changelog.d/README.md`),
+   and `scripts/release/changelog.sh --check` passes. Add the fragment if it is
+   missing, and never edit `CHANGELOG.md` for it. A change with no
+   user-visible effect carries the `no-changelog` label.
+7. **Write the close narrative into the PR description:** what shipped, the key
    decisions with their spec citations, the gate results, and what was
    deliberately left out (with follow-up issue numbers). The PR description +
    the issue thread ARE the build record.
-7. **Post the handoff comment on the issue** (`gh issue comment <n>`): where
+8. **Post the handoff comment on the issue** (`gh issue comment <n>`): where
    things stand at close, what was deliberately left out (with follow-up issue
    numbers), and what a follow-up session should do first.
-8. **Ensure the PR body declares `Closes #<n>`** (`gh pr view` / `gh pr edit`)
+9. **Ensure the PR body declares `Closes #<n>`** (`gh pr view` / `gh pr edit`)
    so the merge into `main` auto-closes the issue; never close the issue by
-   hand when a PR carries the work. One `Closes` keyword per issue.
-9. **Roadmap-board check** (`.claude/rules/project-board.md`): `Done` is set by
+   hand when a PR carries the work. One `Closes` keyword per issue. Confirm
+   auto-merge is armed (`gh pr view --json autoMergeRequest`); arm it if not,
+   as its own command (`gh pr merge <n> --auto`, which adds it to the merge
+   queue).
+10. **Roadmap-board check** (`.claude/rules/project-board.md`): `Done` is set by
    the built-in workflow when the merge closes the issue, never by hand. After
    the merge, `scripts/gh/project.sh show <n>` should say `Done`; if the issue
    is missing from the board entirely, `scripts/gh/project.sh add <n>` and let
    the closed→Done workflow settle it. Do not archive or delete board items.
-10. **Remind the user to commit** the close on the current conventional-type
+11. **Remind the user to commit** the close on the current conventional-type
    branch (`feat/…` etc.).
 
 ## What this skill does not do

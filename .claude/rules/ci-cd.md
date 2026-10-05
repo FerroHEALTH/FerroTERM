@@ -28,6 +28,19 @@ Scorecard) is in `docs/ci-cd.md`; this file is the enforceable discipline.
   --min-severity=low` over `.github/workflows/`, and `shellcheck --severity=style`
   over tracked shell scripts. These run even before any Rust exists.
 
+## The merge queue and the pull-request guards
+
+- **`main` merges through the merge queue.** `ci.yml` runs on `merge_group`,
+  and `conclusion` is the one required check. A job that reads the
+  pull-request payload is gated on `github.event_name == 'pull_request'`, so
+  it skips in the queue and `conclusion` counts the skip as a pass. A new
+  required job keeps that shape or runs on every event.
+- **Tracker helpers and changelog fragments are checked on every event:** the
+  `tracker-helpers` job runs the `--self-test` of every `scripts/gh/` helper,
+  and the `changelog` job runs `scripts/release/changelog.sh --check` plus
+  both self-tests. `changelog-guard` fails a pull request with no fragment
+  under `changelog.d/` unless it carries `no-changelog`.
+
 ## Rust CI lanes (activate with the Cargo workspace)
 
 `cargo fmt --all --check`; `cargo clippy --workspace --all-targets --all-features

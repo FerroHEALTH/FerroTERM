@@ -62,6 +62,8 @@ Anything you notice that is wrong, misplaced, or suspicious OUTSIDE your
 assigned scope (a stale claim in a doc, a per-version parameter the code will
 get wrong, a spec contradiction, a missing test) goes in your final report
 under an explicit "En-route findings" heading, each with a location and one
-sentence of evidence, so the orchestrator files a tracker issue for it. "Not
-in my task list" is never a reason to stay silent. Do not fix out-of-scope
-findings yourself; report them.
+sentence of evidence and the type (Bug, Feature or Task) and priority you would
+give it, so the orchestrator files a tracker issue for it with
+`scripts/gh/fields.sh new`. You file no issue yourself. "Not in my task list"
+is never a reason to stay silent. Do not fix out-of-scope findings yourself;
+report them.

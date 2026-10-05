@@ -17,7 +17,7 @@ On 2026-10-01 the owner asked to transfer the repository to the FerroHEALTH orga
 - crates.io Trusted Publishing checks the owner id, so every crate needs its GitHub entries re-added with owner `FerroHEALTH` (owner step) before a tag publishes crates.
 - The org has three owners with admin on the repo (rubentalstra, AlessandroTorrisi, sebastian-iancu); MAINTAINERS.md says so.
 - The org is on the free plan: CI queues behind FerroEHR and the other org repos' jobs.
-- Sonar keys `rubentalstra_FerroTERM` / org `rubentalstra` are unchanged; PR decoration needs the SonarCloud app on the FerroHEALTH org.
+- Sonar moved on 2026-10-05 (#704): the project is `FerroHEALTH_FerroTERM` in the SonarQube Cloud organization `ferrohealth`, as FerroFED and FerroEHR; the old `rubentalstra_FerroTERM` project is retired, and main's open issues reach code scanning as SARIF (category `sonarqube-cloud`).
 - FerroBRIDGE still lives at rubentalstra/FerroBRIDGE.
 
 Related: [[release-cut-cadence]], [[repo-merge-gates]], [[container-image-decisions]].

@@ -3,18 +3,19 @@
 # Configuration for GitHub's auto-generated release notes. Categories map to the
 # issue and PR labels (see .claude/rules/issue-workflow.md and
 # scripts/gh/labels.sh); the hand-curated CHANGELOG.md stays the primary record.
+# A feature or a fix carries no label since 2026-10-05, when the native issue
+# type took over from `enhancement` and `bug`, and release notes cannot group
+# by an issue type, so those pull requests land under "Other changes".
 # https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes
 changelog:
   exclude:
     labels:
       - ignore-for-release
+      - no-changelog
   categories:
-    - title: Features
+    - title: Security
       labels:
-        - enhancement
-    - title: Fixes
-      labels:
-        - bug
+        - security
     - title: Documentation
       labels:
         - documentation
@@ -24,6 +25,7 @@ changelog:
         - refactor
         - perf
         - ci
+        - test
         - dependencies
     - title: Other changes
       labels:
