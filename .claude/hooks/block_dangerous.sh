@@ -34,10 +34,15 @@ recursive_forced_delete() {
     # shellcheck disable=SC2086
     set -- $segment
     set +f
-    # Skip a leading sudo, env or VAR=value before the command word.
-    while [[ $# -gt 0 && ( "$1" == sudo || "$1" == env || "$1" == *=* ) ]]; do shift; done
-    [[ "${1:-}" == rm || "${1:-}" == */rm ]] || continue
-    shift
+    # Find rm wherever it stands (after sudo, xargs, then, `bash -c "`, a
+    # backslash), with quotes and backslashes stripped from the word.
+    word=""
+    while [[ $# -gt 0 ]]; do
+      word="${1//[\"\'\\]/}"
+      shift
+      [[ "$word" == rm || "$word" == */rm ]] && break
+    done
+    [[ "${word:-}" == rm || "${word:-}" == */rm ]] || continue
     recursive=0 force=0 outside=0 path=0
     for word in "$@"; do
       case "$word" in
@@ -50,8 +55,7 @@ recursive_forced_delete() {
           ;;
         *)
           path=1
-          word="${word//\"/}"
-          word="${word//\'/}"
+          word="${word//[\"\'\\]/}"
           if [[ ! ( "$word" == /tmp/* || "$word" == /private/tmp/* ) || "$word" == *..* ]]; then
             outside=1
           fi
