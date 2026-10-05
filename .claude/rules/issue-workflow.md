@@ -98,10 +98,11 @@ priority and the age of the issue decide.
 The type maps to the conventional-commit type of the branch and the commit: a
 `Bug` is a `fix`, a `Feature` is a `feat`, and a `Task` says which one it is
 with exactly ONE work-kind label. `scripts/gh/migrate-fields.sh` moves every
-issue, open and closed, off the labels that carried these before (`bug` to
-Bug, `enhancement` to Feature, everything else to Task; `P0` to Urgent, `P1`
-to High, `P2` to Medium, `P3` to Low), gives every open issue its judged
-effort and every Task its work-kind label. It is re-runnable (`plan`,
+open issue off the labels that carried these before (`bug` to Bug,
+`enhancement` to Feature, everything else to Task; `P0` to Urgent, `P1` to
+High, `P2` to Medium, `P3` to Low), gives it its judged effort and gives every
+Task its work-kind label. Closed issues stay as they were and carry no type
+or priority once the old labels are gone (owner decision 2026-10-05). It is re-runnable (`plan`,
 `apply`, `verify`), and it runs before `scripts/gh/labels.sh` deletes the six
 labels, which a re-run of `labels.sh` retires again wherever they reappear.
 

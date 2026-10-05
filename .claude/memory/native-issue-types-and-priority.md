@@ -23,7 +23,9 @@ github setup here with native org things", pointing at FerroFED's
 - A Task carries exactly one work-kind label (`documentation`, `chore`,
   `refactor`, `perf`, `test`, `ci`); a Bug or a Feature carries none.
 - The migration is `scripts/gh/migrate-fields.sh plan|apply|verify`, run
-  before `scripts/gh/labels.sh` deletes the old labels. The auto-mode
+  before `scripts/gh/labels.sh` deletes the old labels. It moves OPEN issues
+  only: the owner chose on 2026-10-05 to leave closed issues as they are,
+  accepting that they lose their type and priority with the labels. The auto-mode
   classifier refuses `apply` from an agent session (FerroFED 2026-10-02,
   FerroTERM 2026-10-05), so the owner runs `apply`, `verify` and then
   `labels.sh` by hand.

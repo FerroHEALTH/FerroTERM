@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: BUSL-1.1
-# scripts/gh/migrate-fields.sh: move every issue, open and closed, from the
-# type and priority labels onto GitHub's native issue type and the
-# organisation's Priority and Effort issue fields.
+# scripts/gh/migrate-fields.sh: move every OPEN issue from the type and
+# priority labels onto GitHub's native issue type and the organisation's
+# Priority and Effort issue fields. A closed issue is left as it is (owner
+# decision 2026-10-05), so it loses its type and priority labels when
+# scripts/gh/labels.sh deletes them.
 #
-# The mapping (owner decision 2026-10-02; no specification governs it: our own
+# The mapping (owner decision 2026-10-05; no specification governs it: our own
 # design):
 #   * type: `bug` -> Bug, `enhancement` -> Feature, anything else -> Task; an
 #     issue with neither label keeps a type it already has;
 #   * priority: P0 -> Urgent, P1 -> High, P2 -> Medium, P3 -> Low; an issue
 #     with no P label keeps a priority it already has;
-#   * effort: every OPEN issue that has none gets the value judged for it in
-#     EFFORT_JUDGED below; a closed issue gets none;
+#   * effort: every open issue that has none gets the value judged for it in
+#     EFFORT_JUDGED below;
 #   * a Task with no work-kind label gets the one its title's conventional
 #     prefix implies (`docs:` -> documentation, `build:` -> ci, `chore:`,
 #     `refactor:`, `perf:`, `test:`, `ci:` as named), or the one judged for it
@@ -24,12 +26,12 @@
 # Usage:
 #   scripts/gh/migrate-fields.sh plan
 #       Prints every change `apply` would make and the totals; writes nothing.
-#       Exits 1 when an issue cannot be mapped (a conflict, or an open issue
+#       Exits 1 when an open issue cannot be mapped (a conflict, or an issue
 #       or Task the tables below do not cover).
 #   scripts/gh/migrate-fields.sh apply
 #       Makes those changes.
 #   scripts/gh/migrate-fields.sh verify
-#       Exits 0 only when no issue differs from the mapping and none is
+#       Exits 0 only when no open issue differs from the mapping and none is
 #       unmappable, and prints the totals.
 #   scripts/gh/migrate-fields.sh --self-test
 #       Drives the three commands against a stub gh and a stub fields.sh.
@@ -65,7 +67,6 @@ EFFORT_JUDGED="${GH_MIGRATE_EFFORT:-
 # The work kind of each Task whose labels name none and whose title carries
 # no conventional prefix, judged from what the issue asks for.
 WORKKIND_JUDGED="${GH_MIGRATE_WORKKIND:-
-326 chore
 }"
 
 WORKKINDS="documentation chore refactor perf test ci"
@@ -186,12 +187,12 @@ STUB
   said "$plan_case" "$work/out" "#1  priority Urgent"
   said "$plan_case" "$work/out" "#1  effort Low"
   said "$plan_case" "$work/out" "#2  type Feature (was Task)"
-  said "$plan_case" "$work/out" "#3  label +documentation"
-  said "$plan_case" "$work/out" "#6  label +chore"
-  said "$plan_case" "$work/out" "types: Bug 1, Feature 1, Task 3"
-  said "$plan_case" "$work/out" "priorities: Urgent 1, High 1, Medium 1, Low 1, none 1"
-  never "$plan_case" "$work/out" "#3  effort"
+  said "$plan_case" "$work/out" "#2  effort Medium"
+  said "$plan_case" "$work/out" "types: Bug 1, Feature 1, Task 0"
+  said "$plan_case" "$work/out" "priorities: Urgent 1, High 0, Medium 1, Low 0, none 0"
+  never "$plan_case" "$work/out" "#3  "
   never "$plan_case" "$work/out" "#4  "
+  never "$plan_case" "$work/out" "#6  "
   never "$plan_case" "$calls" "fields "
   never "$plan_case" "$calls" "issue edit"
 
@@ -201,13 +202,14 @@ STUB
   said "$apply_case" "$calls" "fields priority 1 urgent"
   said "$apply_case" "$calls" "fields effort 1 low"
   said "$apply_case" "$calls" "fields type 2 feature"
-  said "$apply_case" "$calls" "fields priority 3 low"
-  said "$apply_case" "$calls" "gh issue edit 3 --add-label documentation"
+  never "$apply_case" "$calls" "fields priority 3"
+  never "$apply_case" "$calls" "issue edit 3"
+  never "$apply_case" "$calls" "issue edit 6"
   never "$apply_case" "$calls" "fields type 4"
   never "$apply_case" "$calls" "fields effort 3"
 
   run "a verify before the apply took" 1 verify
-  said "a verify before the apply took" "$work/err" "11 changes still to make"
+  said "a verify before the apply took" "$work/err" "6 changes still to make"
 
   # The same issues once migrated and with the old labels deleted.
   issues="$(page \
@@ -217,7 +219,7 @@ STUB
     "$(node 4 CLOSED Task High "" "chore" "Housekeeping")" \
     "$(node 6 CLOSED Task "" "" "chore,upstream-report" "A report")")"
   run "a verify after the migration" 0 verify
-  said "a verify after the migration" "$work/out" "types: Bug 1, Feature 1, Task 3"
+  said "a verify after the migration" "$work/out" "types: Bug 1, Feature 1, Task 0"
   run "an apply after the migration" 0 apply
   never "an apply after the migration" "$calls" "fields "
 
@@ -331,6 +333,8 @@ problem() {
 plan_lines=""
 while IFS=$'\t' read -r n state type priority effort labels title; do
   [[ -n "$n" ]] || continue
+  # A closed issue stays as it is.
+  [[ "$state" == OPEN ]] || continue
 
   want_type="$type"
   if has "$labels" bug && has "$labels" enhancement; then
