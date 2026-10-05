@@ -241,8 +241,10 @@ CI without a new push.
   commits**, block force-push + deletion, merge queue on (squash, `ALLGREEN`).
 - Enable: code scanning, secret scanning + push protection, Dependabot
   alerts/updates, artifact attestations. (Immutable releases: already enabled.)
-- Add the `SONAR_TOKEN` repository secret. (Done.) Keep SonarCloud **Automatic
-  Analysis OFF** (done) so CI-based analysis is authoritative.
+- Add the `SONAR_TOKEN` repository secret, for the SonarQube Cloud project
+  `FerroHEALTH_FerroTERM` in the organization `ferrohealth`. (Done.) Keep
+  SonarCloud **Automatic Analysis OFF** (done) so CI-based analysis is
+  authoritative.
 - Register the project at bestpractices.dev; add the returned badge to the
   README.
 - Run `scripts/gh/migrate-fields.sh apply` and `verify`, then

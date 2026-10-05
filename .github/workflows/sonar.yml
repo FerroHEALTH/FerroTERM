@@ -82,6 +82,8 @@ jobs:
     permissions:
       contents: read
       pull-requests: read # PR decoration reads the PR metadata
+      security-events: write # the main-branch SARIF upload to code scanning
+      actions: read # upload-sarif reads the run it belongs to
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -124,3 +126,22 @@ jobs:
       - uses: SonarSource/sonarqube-scan-action@ba9859eae8dd6bd29e412f25ddbbef3d032000f4 # v8.2.2
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      # SonarQube Cloud reports to GitHub code scanning itself only on Sonar's
+      # Enterprise plan, so the main branch's open issues are converted to
+      # SARIF here and uploaded the way scorecard.yml uploads its own; the
+      # alerts stay advisory. Pull requests are not uploaded: their analysis
+      # holds only the issues the change adds, and code scanning would read
+      # every other alert as fixed.
+      - name: Convert the main branch's open issues to SARIF
+        if: github.event_name == 'push'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: scripts/sonar/sarif.sh sonar.sarif
+
+      - name: Upload the SARIF log to code scanning
+        if: github.event_name == 'push'
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: sonar.sarif
+          category: sonarqube-cloud
