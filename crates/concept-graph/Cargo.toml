@@ -2,7 +2,7 @@
 [package]
 name = "concept-graph"
 description = "The materialized SNOMED CT ontology: CSR adjacency and roaring transitive-closure bitmaps"
-version = "0.1.116"
+version = "0.1.117"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

@@ -2,7 +2,7 @@
 [package]
 name = "classification"
 description = "ClaML and ICD-10-CM tabular readers into one classification model"
-version = "0.1.116"
+version = "0.1.117"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

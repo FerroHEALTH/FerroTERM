@@ -16,6 +16,12 @@ final say on every decision: what gets built, what gets merged, what gets
 released, and what the project refuses to do. There is no steering committee,
 no technical oversight body, no foundation, and no vote.
 
+The business side sits elsewhere. Cadasto B.V. is the Licensor and copyright
+holder, and handles the business side of FerroTERM, the commercial licence
+included: write to [info@cadasto.com](mailto:info@cadasto.com) or use
+<https://www.cadasto.com/contact/>. The maintainer handles the technical side,
+and the decisions this document describes are the technical ones.
+
 This is the standard structure for a project of this age and size, and it
 carries the standard trade-off: decisions are fast and coherent, and the
 project's resilience is one person's. The second half of that sentence is
@@ -137,6 +143,6 @@ occupies. Enforcement is the maintainer's, at the contact address given there.
 
 Governance changes are pull requests against this file, like anything else, and
 they take effect when they merge. If the structure described here stops being
-true (a second maintainer joins, a legal entity forms, a decision body is
+true (a second maintainer joins, the Licensor changes, a decision body is
 created), this file changes in the same pull request that makes it true, not
 afterwards.
