@@ -106,7 +106,7 @@ claim, not a test that merely touches the area.
 
 | Claim | Evidence |
 |---|---|
-| The software is source-available under the Business Source License 1.1 | `LICENSE` (BSL 1.1 text, Licensor Vernum Projecten B.V., Change License Apache 2.0), `NOTICE`, `Cargo.toml:14` `license = "BUSL-1.1"`; `scripts/checks/versions.sh` fails on a stale MIT or Apache claim |
+| The software is source-available under the Business Source License 1.1 | `LICENSE` (BSL 1.1 text, Licensor Cadasto B.V., Change License Apache 2.0), `NOTICE`, `Cargo.toml:14` `license = "BUSL-1.1"`; `scripts/checks/versions.sh` fails on a stale MIT or Apache claim |
 | No open-core tier: engine, server, and tools are in this repository under the one licence | Every workspace member under `crates/*`, `addons/*`, `app/*`, and `tools/*` is in this repository, which `scripts/checks/repo-map.sh` keeps listed; no private module |
 | Each version becomes Apache 2.0 four years after publication | `LICENSE:38` and the terms body ("This License applies separately for each version") |
 | `rf2` is Apache 2.0 on crates.io | `crates/rf2/Cargo.toml:8`, with its own Apache 2.0 `LICENSE` file |

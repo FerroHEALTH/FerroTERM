@@ -75,10 +75,10 @@ FerroTERM's own code is licensed under the Business Source License 1.1
 2. license it under the Business Source License 1.1 as applied to the version it
    lands in, including that version's Change License, so it becomes Apache 2.0
    with the rest of that version; and
-3. grant the Licensor named in `LICENSE` a perpetual, irrevocable, worldwide,
-   royalty-free, transferable right to use, reproduce, modify, distribute,
-   sublicense and relicense the contribution as part of the Licensed Work under
-   any terms, including commercial licences.
+3. grant the Licensor named in `LICENSE`, Cadasto B.V., a perpetual,
+   irrevocable, worldwide, royalty-free, transferable right to use, reproduce,
+   modify, distribute, sublicense and relicense the contribution as part of the
+   Licensed Work under any terms, including commercial licences.
 
 You keep your copyright. Point 3 is what lets the Licensed Work stay one work
 with one licensor: a commercial licence, a change of the licence parameters, or a

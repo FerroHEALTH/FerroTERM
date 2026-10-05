@@ -113,7 +113,7 @@ request:
 - **No copyright assignment, and one Licensor.** You keep your copyright; the
   licence is the Business Source License 1.1 for everyone, the maintainer
   included, and every version becomes Apache 2.0 on its Change Date. A
-  contribution grants the Licensor the relicensing right in
+  contribution grants the Licensor, Cadasto B.V., the relicensing right in
   [CONTRIBUTING.md § Licensing of contributions](CONTRIBUTING.md#licensing-of-contributions),
   recorded by the pull request checkbox, so the work stays one work under one
   licensor. This is a deliberate position, not an oversight.

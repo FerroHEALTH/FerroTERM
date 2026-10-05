@@ -13,6 +13,14 @@ fresh link reference.
 
 ## [Unreleased]
 
+### Changed
+
+- The Licensor and copyright holder of the project's own work is Cadasto B.V.
+  (#700), which replaces Vernum Projecten B.V. Every `Licensor:`, copyright and
+  `SPDX-FileCopyrightText` line, the contribution grant, the governance text and
+  the site footer name the company. The licence terms are unchanged, and
+  maintainer credit stays a person.
+
 ## [0.1.6] - 2026-10-01
 
 ### Added

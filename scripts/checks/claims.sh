@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-FileCopyrightText: Vernum Projecten B.V.
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # The evidence in docs/claims.md stays verifiable: a citation names a file and
 # a symbol or test (`path.rs::name`), never a line number, because line

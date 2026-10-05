@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-FileCopyrightText: Vernum Projecten B.V.
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # Every workspace member is named in the repo map of CLAUDE.md and in the
 # workspace-layout table of docs/architecture.md. The two lists are prose, so

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-FileCopyrightText: Vernum Projecten B.V.
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # Every fetcher under scripts/vendor/ writes to a directory that exists in the
 # tree (.claude/rules/vendored-inputs.md). A fetcher whose destination moved
