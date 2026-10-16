@@ -78,7 +78,9 @@ async fn run(config: Config, started: std::time::Instant) -> anyhow::Result<()> 
         .context("summarising the loaded code systems")?;
     tracing::info!(
         version = env!("CARGO_PKG_VERSION"),
-        fhir_versions = "r4b",
+        fhir_versions = ferroterm_server::FHIR_BASES
+            .map(|base| base.trim_start_matches('/'))
+            .join(","),
         code_systems = summaries.len(),
         "ferroterm starting"
     );
@@ -123,7 +125,11 @@ async fn run(config: Config, started: std::time::Instant) -> anyhow::Result<()> 
     let listener = TcpListener::bind(&config.listen)
         .await
         .with_context(|| format!("binding {} (set {LISTEN_ENV} to change it)", config.listen))?;
-    tracing::info!(listen = %config.listen, base = "/r4b", "listening");
+    tracing::info!(
+        listen = %config.listen,
+        bases = ferroterm_server::FHIR_BASES.join(","),
+        "listening"
+    );
     let admin = match &config.admin_listen {
         Some(address) => {
             let bound = TcpListener::bind(address).await.with_context(|| {

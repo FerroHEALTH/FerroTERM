@@ -35,9 +35,10 @@ at most 1,000 members without `count` and asks for paging beyond that
 ## What the server logs
 
 At start: the banner (pretty only), one `ferroterm starting` line with the
-version and the count of code systems, one `serving code system` line per
-loaded version (`id`, `system`, `version`, `concepts`, `languages`, `path`),
-one `listening` line with the address and the base path, and one `usage
+version, the served FHIR versions (`fhir_versions`), and the count of code
+systems, one `serving code system` line per loaded version (`id`, `system`,
+`version`, `concepts`, `languages`, `path`), one `listening` line with the
+address and the base path of every served version (`bases`), and one `usage
 report ON` or `usage report OFF` line (see [Usage report](usage-report.md)).
 Per request: one
 `request` line with `method`, `route`, `status`, `latency_ms`, and the

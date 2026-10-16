@@ -59,9 +59,9 @@
 #     --public https://host.docker.internal:18443 \
 #     --name localhost --name host.docker.internal \
 #     --ca /tmp/e2e/ca.pem --serve-name ferroterm-smart --serve-dir /tmp/e2e/certs
-#   FERROTERM_LISTEN=0.0.0.0:8080 FERROTERM_UI=on \
+#   FERROTERM_USAGE_REPORT=off FERROTERM_LISTEN=0.0.0.0:8080 FERROTERM_UI=on \
 #     FERROTERM_CODESYSTEMS=e2e/fixtures/codesystems target/release/ferroterm
-#   FERROTERM_LISTEN=0.0.0.0:8081 FERROTERM_UI=on \
+#   FERROTERM_USAGE_REPORT=off FERROTERM_LISTEN=0.0.0.0:8081 FERROTERM_UI=on \
 #     FERROTERM_CODESYSTEMS=e2e/fixtures/codesystems \
 #     FERROTERM_BASE_URL=https://ferroterm-smart \
 #     FERROTERM_OIDC_ISSUER=https://localhost:18443 \
