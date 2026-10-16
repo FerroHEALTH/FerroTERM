@@ -25,6 +25,18 @@ ARG TARGETARCH
 COPY --chmod=0555 dist/${TARGETOS}/${TARGETARCH}/ferroterm /usr/local/bin/ferroterm
 COPY --chmod=0555 dist/${TARGETOS}/${TARGETARCH}/ferroterm-build /usr/local/bin/ferroterm-build
 
+# The one directory the server writes: its own state, the usage report's
+# instance id. It is owned by the runtime user and declared a volume, so a
+# named volume mounted here starts with that ownership and `docker run`
+# gets an anonymous one. The base has no shell to `mkdir`, so a heredoc COPY
+# creates it. Kubernetes ignores VOLUME; with no writable mount the report
+# stays off and the boot line says why.
+COPY --chown=65532:65532 <<EOF /data/state/README
+The FerroTERM server keeps its own state here: the usage report's instance id.
+EOF
+VOLUME ["/data/state"]
+ENV FERROTERM_STATE_DIR=/data/state
+
 # The binary's default listen address is loopback, which no container can
 # publish; the image default is every interface on the documented port.
 ENV FERROTERM_LISTEN=0.0.0.0:8080

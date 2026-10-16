@@ -36,6 +36,7 @@ const LARGE_INCLUDE_FILE: u64 = 1_000_000;
 
 fn main() {
     release_date_env();
+    git_sha_env();
     if std::env::var_os("CARGO_FEATURE_UI").is_some() {
         ui_bundle();
     }
@@ -66,6 +67,21 @@ fn release_date_env() {
             changelog.display()
         ),
     }
+}
+
+/// Records the commit being built into `FERROTERM_GIT_SHA`, for the usage
+/// report.
+///
+/// The release lane builds on a GitHub runner, which names the commit in
+/// `GITHUB_SHA`; `FERROTERM_GIT_SHA` overrides it. A build that names none
+/// records the empty string, and the report then states seven zeros.
+fn git_sha_env() {
+    println!("cargo::rerun-if-env-changed=FERROTERM_GIT_SHA");
+    println!("cargo::rerun-if-env-changed=GITHUB_SHA");
+    let sha = std::env::var("FERROTERM_GIT_SHA")
+        .or_else(|_unset| std::env::var("GITHUB_SHA"))
+        .unwrap_or_default();
+    println!("cargo:rustc-env=FERROTERM_GIT_SHA={}", sha.trim());
 }
 
 /// Writes the two viewer bundle tables into `OUT_DIR/ui_bundle.rs`.

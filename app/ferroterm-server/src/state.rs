@@ -227,6 +227,28 @@ pub struct InstanceSummary {
     pub path: Option<PathBuf>,
 }
 
+/// Where a code system the deployment loaded came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Origin {
+    /// An artifact directory named by `FERROTERM_INDEX`.
+    Index,
+    /// A `CodeSystem` resource from a directory named by
+    /// `FERROTERM_CODESYSTEMS`, a supplement included.
+    CodeSystems,
+}
+
+impl Origin {
+    /// Returns the origin of the source loaded at `index`, when the
+    /// `CodeSystem` directories were loaded from `first_code_system` on.
+    const fn at(index: usize, first_code_system: usize) -> Self {
+        if index >= first_code_system {
+            Self::CodeSystems
+        } else {
+            Self::Index
+        }
+    }
+}
+
 /// The code systems, value sets, and concept maps an operation resolves in.
 ///
 /// One layer holds what the deployment loaded from disk and the persisted
@@ -423,6 +445,9 @@ pub struct AppState {
     supplements: BTreeMap<String, Arc<CodeSystemModel>>,
     /// The directory each version was loaded from.
     paths: BTreeMap<(String, String), PathBuf>,
+    /// Where each system the deployment loaded came from, by system URL; the
+    /// registry systems that ship with the server are not here.
+    origins: BTreeMap<String, Origin>,
     /// The software version reported in the capability statements.
     software_version: &'static str,
     /// The authentication the deployment declares, as codes of the FHIR
@@ -599,6 +624,8 @@ impl AppState {
                 source,
             })?),
         });
+        // Everything pushed from here on came from a `CodeSystem` directory.
+        let from_code_systems = loaded.len();
         let mut supplements = Vec::new();
         let mut value_sets = ValueSetStore::new();
         let mut concept_maps = ConceptMapStore::new();
@@ -624,9 +651,11 @@ impl AppState {
         )?;
         let mut registry = Registry::new();
         let mut paths = BTreeMap::new();
-        for Loaded { path, provider } in loaded {
+        let mut origins = BTreeMap::new();
+        for (index, Loaded { path, provider }) in loaded.into_iter().enumerate() {
             let identity = provider.identity();
             if !path.as_os_str().is_empty() {
+                origins.insert(identity.url.clone(), Origin::at(index, from_code_systems));
                 paths.insert((identity.url.clone(), identity.version.clone()), path);
             }
             registry.register(provider)?;
@@ -634,6 +663,7 @@ impl AppState {
         // NOTE: a loaded supplement stays dormant until a request names it
         // (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
         for (target, model) in &supplements {
+            origins.insert(model.url.clone(), Origin::CodeSystems);
             registry.register_supplement(target.clone(), supplement_of(model));
         }
         let mut state = Self::from_registry(registry);
@@ -644,6 +674,7 @@ impl AppState {
             state.caches = caches;
         }
         state.paths = paths;
+        state.origins = origins;
         state
             .security_services
             .clone_from(&config.security_services);
@@ -868,6 +899,7 @@ impl AppState {
             instances,
             supplements: BTreeMap::new(),
             paths: BTreeMap::new(),
+            origins: BTreeMap::new(),
             software_version: env!("CARGO_PKG_VERSION"),
             security_services: Vec::new(),
             base_url: None,
@@ -1223,6 +1255,15 @@ impl AppState {
     #[must_use]
     pub fn supplement_instance(&self, id: &str) -> Option<Arc<CodeSystemModel>> {
         self.supplements.get(id).map(Arc::clone)
+    }
+
+    /// The systems the deployment loaded and where each came from, sorted by
+    /// system URL; the registry systems that ship with the server are left
+    /// out.
+    pub fn origins(&self) -> impl Iterator<Item = (&str, Origin)> {
+        self.origins
+            .iter()
+            .map(|(url, origin)| (url.as_str(), *origin))
     }
 
     /// The software version.

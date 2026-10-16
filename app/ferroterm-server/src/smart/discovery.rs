@@ -133,8 +133,9 @@ fn owned(values: &[&str]) -> Vec<String> {
 /// OpenID Connect Discovery 1.0 §7.1 requires TLS on the issuer's endpoints,
 /// and §3 says `jwks_uri` "MUST use the https scheme", because these bytes
 /// decide which signatures this server trusts. A loopback issuer is the one
-/// place the transport cannot be observed, and a test issuer is that.
-fn secure(url: &str) -> bool {
+/// place the transport cannot be observed, and a test issuer is that. The
+/// usage report holds its collector to the same rule.
+pub(crate) fn secure(url: &str) -> bool {
     if url.starts_with("https://") {
         return true;
     }

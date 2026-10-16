@@ -32,6 +32,11 @@ concurrency:
 
 permissions: {}
 
+# A server a lane starts is no installation, so it sends no usage report
+# (scripts/checks/usage-report-off.sh holds every launcher to this).
+env:
+  FERROTERM_USAGE_REPORT: "off"
+
 jobs:
   # ── Tier 1: the workflow + shell checks (always run) ────────────────────────
 
@@ -192,6 +197,12 @@ jobs:
         run: bash scripts/checks/claims.sh
       - name: extension-definitions
         run: bash scripts/checks/extension-definitions.sh
+      # Every launcher that starts the server switches the usage report off.
+      # The self-test runs first: it judges synthetic launchers.
+      - name: usage-report-off
+        run: |
+          bash scripts/checks/usage-report-off.sh --self-test
+          bash scripts/checks/usage-report-off.sh
 
   dockerfile-lint:
     name: hadolint

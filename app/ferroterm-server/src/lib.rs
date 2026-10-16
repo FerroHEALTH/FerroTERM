@@ -35,6 +35,7 @@ pub mod smart;
 pub mod state;
 pub mod telemetry;
 pub mod ui;
+pub mod usage_report;
 pub mod version;
 pub mod wire;
 

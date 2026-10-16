@@ -114,7 +114,7 @@ if [[ -z "$server" ]]; then
   if [[ -n "$index" ]]; then
     export FERROTERM_INDEX="$index"
   fi
-  FERROTERM_LISTEN=127.0.0.1:"$port" FERROTERM_LOG_FORMAT=json target/release/ferroterm > "$work/server.log" 2>&1 &
+  FERROTERM_USAGE_REPORT=off FERROTERM_LISTEN=127.0.0.1:"$port" FERROTERM_LOG_FORMAT=json target/release/ferroterm > "$work/server.log" 2>&1 &
   started=$!
   trap 'kill "$started" 2>/dev/null || true; wait "$started" 2>/dev/null || true' EXIT
   ready=""

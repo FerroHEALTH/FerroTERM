@@ -29,6 +29,7 @@ Every vendored tree is:
 | The Compositional Grammar normative ABNF and example corpus (IHTSDO, Apache 2.0), commit pinned in `docs/VERSIONS.md` | `scripts/vendor/scg-grammar.sh` | `crates/sct-scg/vendor/` |
 | The IANA, CLDR, and UCUM registry data behind the registry code systems | `scripts/vendor/registries.sh` | `crates/fhir-terminology/data/` |
 | Three public terminology syndication listings, the parser's real corpus | `scripts/vendor/syndication-feeds.sh` | `crates/terminology-syndication/vendor/feeds/` |
+| The FerroPULSE report envelope v2 JSON Schema and its examples (Cadasto B.V.), commit pinned in `docs/VERSIONS.md` | `scripts/vendor/ferropulse-schemas.sh` | `app/ferroterm-server/tests/fixtures/ferropulse/` |
 
 A vendored tree is protected by discipline and review; a hand-edit of one is a
 defect to revert. The pins it names are checked against `docs/VERSIONS.md` by

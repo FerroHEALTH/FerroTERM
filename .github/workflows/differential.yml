@@ -36,6 +36,11 @@ on:
 
 permissions: {}
 
+# A server a lane starts is no installation, so it sends no usage report
+# (scripts/checks/usage-report-off.sh holds every launcher to this).
+env:
+  FERROTERM_USAGE_REPORT: "off"
+
 concurrency:
   group: differential
   cancel-in-progress: false

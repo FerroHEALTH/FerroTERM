@@ -354,7 +354,7 @@ if [[ -z "$base_url" ]]; then
   # would change every image on every run.
   docker run --detach --name "$server" --network "$network" \
     --network-alias "$SERVER_HOST" \
-    --env FERROTERM_UI=on --env FERROTERM_LOG_FORMAT=json \
+    --env FERROTERM_UI=on --env FERROTERM_LOG_FORMAT=json --env FERROTERM_USAGE_REPORT=off \
     --env FERROTERM_CODESYSTEMS=/fixtures/codesystems \
     --volume "$root/e2e/fixtures/codesystems:/fixtures/codesystems:ro" \
     --publish "127.0.0.1:$server_port:8080" "$SERVER_IMAGE" >/dev/null
@@ -417,7 +417,7 @@ if [[ -z "$base_url" ]]; then
   docker run --detach --name "$signed_in" --network "$network" \
     --network-alias "$SIGNED_IN_ORIGIN_HOST" \
     --add-host "$ISSUER_HOST:host-gateway" \
-    --env FERROTERM_UI=on --env FERROTERM_LOG_FORMAT=json \
+    --env FERROTERM_UI=on --env FERROTERM_LOG_FORMAT=json --env FERROTERM_USAGE_REPORT=off \
     --env FERROTERM_CODESYSTEMS=/fixtures/codesystems \
     --env "FERROTERM_BASE_URL=$signed_in_base_url" \
     --env "FERROTERM_OIDC_ISSUER=$issuer_url" \

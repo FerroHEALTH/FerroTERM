@@ -85,6 +85,7 @@ cleanup() {
 trap cleanup EXIT
 
 echo "== starting the server on 127.0.0.1:8080 (admin 127.0.0.1:8081) over the empty root"
+FERROTERM_USAGE_REPORT=off \
 FERROTERM_INDEX="$work/index" \
 FERROTERM_CODESYSTEMS="$work/codesystems" \
 FERROTERM_LISTEN=127.0.0.1:8080 \
