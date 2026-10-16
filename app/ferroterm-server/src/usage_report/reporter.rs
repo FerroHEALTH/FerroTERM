@@ -128,14 +128,15 @@ pub fn announce(config: &UsageReportConfig, decision: &Result<Prepared, Off>) {
         Err(Off::NoStateDir) => tracing::info!(
             "usage report OFF: no state directory ({STATE_DIR_ENV} is unset), and without a \
              stable instance id each restart would count as a new installation; nothing is sent. \
-             Details: {NOTICE_URL}"
+             On: mount a writable volume and set {STATE_DIR_ENV} to it. Details: {NOTICE_URL}"
         ),
         Err(Off::StateDir { path, error }) => tracing::info!(
             path = %path.display(),
             error = %error_chain(error),
             "usage report OFF: the state directory ({STATE_DIR_ENV}) cannot be written, and \
              without a stable instance id each restart would count as a new installation; \
-             nothing is sent. Details: {NOTICE_URL}"
+             nothing is sent. On: mount a writable volume and set {STATE_DIR_ENV} to it. \
+             Details: {NOTICE_URL}"
         ),
     }
 }

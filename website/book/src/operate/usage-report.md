@@ -31,8 +31,20 @@ There are two kinds of report, and both are one HTTPS `POST` to
 The report needs a state directory, `FERROTERM_STATE_DIR`, where the server
 keeps the instance id. Without one, or with one it cannot write, the server
 sends nothing: without a stable id each restart would count as a new
-installation. The container image sets `/data/state` and declares it a volume,
-and the compose file mounts a named volume there.
+installation. The compose file is the one deployment that turns it on: it
+mounts the named volume `ferroterm-state` at `/data/state` and sets
+`FERROTERM_STATE_DIR=/data/state`. The container image sets no state
+directory, so a plain `docker run` or a Kubernetes pod sends nothing until
+you mount a writable volume and set `FERROTERM_STATE_DIR` to it:
+
+```shell
+docker run -v ferroterm-state:/data/state -e FERROTERM_STATE_DIR=/data/state \
+  ghcr.io/ferrohealth/ferroterm:<version>
+```
+
+The image owns `/data/state` by its runtime user (uid 65532), so a named
+volume mounted there is writable. A bind mount needs a host directory that uid
+65532 can write.
 
 The boot line, with the report on, reads:
 
@@ -46,7 +58,7 @@ report off, the line says why, for example:
 ```text
 usage report OFF: switched off (FERROTERM_USAGE_REPORT=off); nothing is sent. Details: https://ferroterm.eu/docs/operate/usage-report.html
 usage report OFF: CI detected (GITHUB_ACTIONS); nothing is sent. Details: https://ferroterm.eu/docs/operate/usage-report.html
-usage report OFF: no state directory (FERROTERM_STATE_DIR is unset), and without a stable instance id each restart would count as a new installation; nothing is sent. Details: https://ferroterm.eu/docs/operate/usage-report.html
+usage report OFF: no state directory (FERROTERM_STATE_DIR is unset), and without a stable instance id each restart would count as a new installation; nothing is sent. On: mount a writable volume and set FERROTERM_STATE_DIR to it. Details: https://ferroterm.eu/docs/operate/usage-report.html
 ```
 
 ## What a report contains
