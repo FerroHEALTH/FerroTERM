@@ -14,6 +14,28 @@ fragments here under the version and its date.
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-10-16
+
+### Added
+
+- The server sends a usage report to FerroPULSE, operated by Cadasto B.V.: one
+  report at each start and one a day, with the instance id, the version, the
+  deployment kind, coarse host size, the loaded code system families, and
+  latency per operation group. It never carries a code, a URL, or a request
+  path. It is on by default, `FERROTERM_USAGE_REPORT=off` stops it, and it is
+  off in CI and without a writable `FERROTERM_STATE_DIR`. The compose file
+  keeps the state on a named `/data/state` volume; a plain container sends
+  nothing until it is given one. What is sent, what
+  the collector stores (the source IP address and the country derived from
+  it, for 13 months), and how to have it erased:
+  <https://ferroterm.eu/docs/operate/usage-report.html>.
+
+### Fixed
+
+- The `ferroterm starting` and `listening` log lines name every served FHIR
+  version (`fhir_versions=r4,r4b,r5,r6`, `bases=/r4,/r4b,/r5,/r6`) instead of
+  `r4b` alone.
+
 ## [0.1.7] - 2026-10-16
 
 ### Changed
@@ -1583,7 +1605,8 @@ binary answers `GET /health` only.
 - No existing Rust terminology or FHIR crate is a dependency; the README
   records the evaluation and the reasons.
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.7...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.4...v0.1.5

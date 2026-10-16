@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "addon-nts"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "jiff",
  "reqwest",
@@ -1085,7 +1085,7 @@ checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 
 [[package]]
 name = "ferroterm-bench"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "clap",
@@ -1103,7 +1103,7 @@ dependencies = [
 
 [[package]]
 name = "ferroterm-build"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "clap",
@@ -1130,7 +1130,7 @@ dependencies = [
 
 [[package]]
 name = "ferroterm-server"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "axum",
@@ -1164,7 +1164,7 @@ dependencies = [
 
 [[package]]
 name = "ferroterm-sync"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "addon-nts",
  "anyhow",
@@ -1189,7 +1189,7 @@ dependencies = [
 
 [[package]]
 name = "ferroterm-testkit"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "classification",
  "concept-graph",
@@ -1209,7 +1209,7 @@ dependencies = [
 
 [[package]]
 name = "ferroterm-viewer"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "console_error_panic_hook",
  "gloo-net 0.7.0",
