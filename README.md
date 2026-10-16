@@ -30,7 +30,7 @@ The image serves UCUM, BCP 47, BCP 13, and ISO 3166-1 with no configuration,
 so the first call needs nothing beyond Docker:
 
 ```console
-$ docker run --rm -p 8080:8080 ghcr.io/ferrohealth/ferroterm:0.1.6
+$ docker run --rm -p 8080:8080 ghcr.io/ferrohealth/ferroterm:0.1.7
 $ curl 'http://localhost:8080/r4b/CodeSystem/$lookup?system=http://unitsofmeasure.org&code=mg/dL'
 ```
 
@@ -169,15 +169,17 @@ Every route answers FHIR JSON or FHIR XML, by `_format` or `Accept`.
 
 ## What is next
 
-v0.1.6 is the current release. The tracker's milestones are the roadmap, and
+v0.1.7 is the current release. The tracker's milestones are the roadmap, and
 the open issues under each are the worklist:
 
-- **[v0.1.7](https://github.com/FerroHEALTH/FerroTERM/milestone/21)**: the
+- **[v0.1.8](https://github.com/FerroHEALTH/FerroTERM/milestone/22)**: the
   viewer restructure and its design, the differential check against the Nictiz
   Nationale Terminologieserver for the Dutch variants, the benchmark record set
   retaken after the memory change with the published table re-rendered from
-  it, a shorter sync run record, and the NHG tables for licence holders once
-  Nictiz grants that licence.
+  it, a shorter sync run record, the rest of the FerroHEALTH organisation
+  setup with both SPDX lines on every first-party file, the documentation
+  narrowed to FerroTERM's own with the family book linked for the rest, and
+  the NHG tables for licence holders once Nictiz grants that licence.
 - **[v0.3.0](https://github.com/FerroHEALTH/FerroTERM/milestone/16)**: the
   suite cases that are waiting on an upstream ruling rather than on work here,
   the two unmaintained advisories in the viewer's dependency tree, and the

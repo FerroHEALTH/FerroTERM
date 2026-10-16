@@ -14,6 +14,8 @@ fragments here under the version and its date.
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-10-16
+
 ### Changed
 
 - The Licensor and copyright holder of the project's own work is Cadasto B.V.
@@ -26,6 +28,22 @@ fragments here under the version and its date.
   Every `LICENSE` copy, the README, the handbook licensing page,
   `MAINTAINERS.md`, `GOVERNANCE.md` and `SUPPORT.md` say so. The maintainer
   keeps the technical side, and the licence terms are unchanged.
+- Pull requests record a user-visible change as a fragment under
+  `changelog.d/`, which the release cut assembles into this file (#704).
+- The `build` service in the release `compose.yaml` builds any code system
+  `ferroterm-build` knows, so a deployment without a SNOMED CT licence builds
+  LOINC or another system through Compose. It mounts a release directory
+  (`./releases`, or `FERROTERM_RELEASES_DIR`) at `/releases` and takes the
+  builder's own arguments:
+  `docker compose run --rm build --loinc /releases/Loinc_2.82.zip --out /data/index/loinc`.
+  `FERROTERM_RF2` is gone; a SNOMED CT build passes
+  `--rf2 /releases/<zip> --out /data/index/snomed` (#713).
+
+### Security
+
+- `rustls` moves to 0.23.46, which fixes RUSTSEC-2026-0346, RUSTSEC-2026-0347,
+  RUSTSEC-2026-0348 and RUSTSEC-2026-0349 in the server and sync service TLS
+  stack, and `zip` moves to 9.0.3 because every 8.x release is yanked (#715).
 
 ## [0.1.6] - 2026-10-01
 
@@ -1565,7 +1583,8 @@ binary answers `GET /health` only.
 - No existing Rust terminology or FHIR crate is a dependency; the README
   records the evaluation and the reasons.
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.7...HEAD
+[0.1.7]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.3...v0.1.4
