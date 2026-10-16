@@ -104,7 +104,7 @@ jobs:
           cache-save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Install cargo-llvm-cov + cargo-nextest
         if: ${{ hashFiles('Cargo.toml') != '' }}
-        uses: taiki-e/install-action@4cef1412cce204788f482e778a0b9187f9626a29 # v2.87.21
+        uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
         with:
           tool: cargo-llvm-cov,cargo-nextest
       - name: Instrumented tests → lcov
@@ -123,7 +123,7 @@ jobs:
           v="$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)"
           echo "sonar.projectVersion=$v" >> sonar-project.properties
 
-      - uses: SonarSource/sonarqube-scan-action@ba9859eae8dd6bd29e412f25ddbbef3d032000f4 # v8.2.2
+      - uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
@@ -141,7 +141,7 @@ jobs:
 
       - name: Upload the SARIF log to code scanning
         if: github.event_name == 'push'
-        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           sarif_file: sonar.sarif
           category: sonarqube-cloud
