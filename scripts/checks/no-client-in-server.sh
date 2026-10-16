@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: BUSL-1.1
-# The server binary carries no general HTTP client. Its only outbound call is
-# the OIDC issuer's discovery document and JWKS, which the optional SMART gate
-# makes over `hyper-util` plus `hyper-rustls`.
+# The server binary carries no general HTTP client. Its outbound calls are the
+# OIDC issuer's discovery document and JWKS, which the optional SMART gate
+# makes, and the usage report to FerroPULSE, both over `hyper-util` plus
+# `hyper-rustls`.
 # `reqwest` reaches the workspace only through the WHO ICD-API walker, which the
 # offline build tool turns on with the `icd11/api` feature; a manifest edit that
 # puts it back on a default path would restore the dependency with nothing
@@ -54,7 +55,7 @@ for client in "${clients[@]}"; do
 done
 
 if [[ "$fail" -ne 0 ]]; then
-  echo "The server answers requests and reads its indexes; its only outbound call is the configured OIDC issuer." >&2
+  echo "The server answers requests and reads its indexes; its outbound calls are the OIDC issuer and the usage report, over hyper-util." >&2
   echo "Put the client behind a cargo feature the server does not enable." >&2
   exit 1
 fi

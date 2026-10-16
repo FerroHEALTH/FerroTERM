@@ -1,5 +1,8 @@
 # The build context for docker/Dockerfile is the repository root, so this file
-# guards it: nothing enters the context but the staged binaries. A checkout
-# with a target/ directory would otherwise send gigabytes to the builder.
+# guards it: nothing enters the context but the staged binaries and the empty
+# state directory. A checkout with a target/ directory would otherwise send
+# gigabytes to the builder.
 *
 !dist/
+# The state directory the image ships empty but for its README (docker/Dockerfile).
+!docker/state/

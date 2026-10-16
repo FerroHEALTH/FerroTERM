@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 use crate::telemetry::{FILTER_ENV, FORMAT_ENV, FormatError, LogFormat};
+use crate::usage_report::config::UsageReportConfig;
 
 /// The environment variable naming the socket address to listen on.
 pub const LISTEN_ENV: &str = "FERROTERM_LISTEN";
@@ -88,6 +89,27 @@ pub const VIEWER_CLIENT_ID_ENV: &str = "FERROTERM_VIEWER_CLIENT_ID";
 /// too, in any case). Off, the server mounts no `/ui` routes at all, so an
 /// API-only deployment presents no viewer rather than a refusal.
 pub const UI_ENV: &str = "FERROTERM_UI";
+/// The environment variable switching the usage report to `FerroPULSE` on or
+/// off.
+///
+/// It reads `on` or `off`, like [`UI_ENV`], and is on when unset. Off always
+/// wins, and so does a CI environment ([`CI_ENVS`]): the switch can only turn
+/// the report off.
+pub const USAGE_REPORT_ENV: &str = "FERROTERM_USAGE_REPORT";
+/// The environment variable naming the collector the usage report is posted to.
+pub const USAGE_REPORT_ENDPOINT_ENV: &str = "FERROTERM_USAGE_REPORT_ENDPOINT";
+/// The environment variable naming the writable directory the server keeps its
+/// own state in: the usage report's instance id and the time of its last start
+/// report.
+pub const STATE_DIR_ENV: &str = "FERROTERM_STATE_DIR";
+/// The environment variable naming how the server was deployed, as the usage
+/// report states it: `helm`, `compose`, `binary`, or `unknown`.
+pub const DEPLOYMENT_ENV: &str = "FERROTERM_DEPLOYMENT";
+/// The environment variables a CI runner sets, in the order they are read.
+///
+/// Either one set to `true` or `1`, in any case, switches the usage report
+/// off for the process.
+pub const CI_ENVS: [&str; 2] = ["GITHUB_ACTIONS", "CI"];
 
 /// The codes of the FHIR `restful-security-service` value set
 /// (<http://hl7.org/fhir/ValueSet/restful-security-service>), each with its
@@ -146,6 +168,8 @@ pub struct Config {
     pub viewer_client_id: Option<String>,
     /// Whether the server mounts the viewer under `/ui`.
     pub viewer: bool,
+    /// The usage report to `FerroPULSE`.
+    pub usage_report: UsageReportConfig,
 }
 
 /// A configuration value that does not parse.
@@ -162,6 +186,18 @@ pub enum ConfigError {
     /// `FERROTERM_UI` names neither `on` nor `off`.
     #[error("{UI_ENV}: `{0}` is neither `on` nor `off`")]
     Viewer(String),
+    /// `FERROTERM_USAGE_REPORT` names neither `on` nor `off`.
+    #[error("{USAGE_REPORT_ENV}: `{0}` is neither `on` nor `off`")]
+    UsageReport(String),
+    /// `FERROTERM_USAGE_REPORT_ENDPOINT` is not an `https` URL without
+    /// credentials, or plain `http` to a loopback host.
+    #[error(
+        "{USAGE_REPORT_ENDPOINT_ENV}: `{0}` is not an https URL without credentials (plain http is accepted for a loopback host only)"
+    )]
+    UsageReportEndpoint(String),
+    /// `FERROTERM_DEPLOYMENT` names no deployment kind.
+    #[error("{DEPLOYMENT_ENV}: `{0}` is none of `helm`, `compose`, `binary`, `unknown`")]
+    Deployment(String),
 }
 
 impl Default for Config {
@@ -182,6 +218,7 @@ impl Default for Config {
             oidc_admin_scope: String::from("ferroterm/admin"),
             viewer_client_id: None,
             viewer: true,
+            usage_report: UsageReportConfig::default(),
         }
     }
 }
@@ -235,6 +272,7 @@ impl Config {
                 .map(|client| client.trim().to_owned())
                 .filter(|client| !client.is_empty()),
             viewer: viewer(defaults.viewer)?,
+            usage_report: UsageReportConfig::from_lookup(|name| std::env::var(name).ok())?,
         })
     }
 }
@@ -287,7 +325,7 @@ fn viewer(default: bool) -> Result<bool, ConfigError> {
 }
 
 /// The state `value` names, or `None` when it names neither.
-fn switch_of(value: &str) -> Option<bool> {
+pub(crate) fn switch_of(value: &str) -> Option<bool> {
     match value.trim().to_ascii_lowercase().as_str() {
         "on" | "true" | "1" | "yes" => Some(true),
         "off" | "false" | "0" | "no" => Some(false),

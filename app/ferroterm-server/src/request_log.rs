@@ -5,6 +5,7 @@
 //! the `X-Request-Id` the client sent or one this server made, so a log line, a
 //! metric sample, and a client trace name the same request. No specification
 //! governs the header: our own design, and the name every proxy already uses.
+//! The pass also feeds the usage report window, by matched route template.
 
 use std::sync::Arc;
 use std::time::Instant;
@@ -16,6 +17,7 @@ use http::HeaderValue;
 
 use crate::metrics;
 use crate::state::AppState;
+use crate::usage_report::window::Window;
 
 /// The header a client sends to name its request, and the server echoes.
 pub const REQUEST_ID: &str = "x-request-id";
@@ -41,18 +43,27 @@ fn request_id(headers: &http::HeaderMap) -> String {
 const LOGGED_QUERY: [&str; 6] = ["system", "url", "version", "code", "codeA", "codeB"];
 
 /// Logs the request after it completes, records it, and answers with its id.
-pub async fn log(State(state): State<Arc<AppState>>, request: Request, next: Next) -> Response {
+pub async fn log(
+    State(state): State<Arc<AppState>>,
+    State(usage): State<Arc<Window>>,
+    request: Request,
+    next: Next,
+) -> Response {
     let method = request.method().clone();
-    let route = request.extensions().get::<MatchedPath>().map_or_else(
-        || request.uri().path().to_owned(),
-        |m| m.as_str().to_owned(),
-    );
+    let matched = request
+        .extensions()
+        .get::<MatchedPath>()
+        .map(|m| m.as_str().to_owned());
+    let path = request.uri().path().to_owned();
+    let route = matched.clone().unwrap_or_else(|| path.clone());
     let named = named_parameters(request.uri().query().unwrap_or(""));
     let id = request_id(request.headers());
     let started = Instant::now();
     let mut response = next.run(request).await;
     let status = response.status();
-    let elapsed = started.elapsed().as_secs_f64();
+    let duration = started.elapsed();
+    usage.record(&method, matched.as_deref(), &path, duration, status);
+    let elapsed = duration.as_secs_f64();
     let latency_ms = elapsed * 1000.0;
     state.metrics().record(
         &metrics::Request {

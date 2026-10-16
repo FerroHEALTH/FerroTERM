@@ -627,6 +627,8 @@ impl Server {
             .env("FERROTERM_INDEX", artifact)
             .env("FERROTERM_LISTEN", format!("127.0.0.1:{port}"))
             .env("FERROTERM_LOG_FORMAT", "json")
+            // A benchmark run is no installation, so it sends no usage report.
+            .env("FERROTERM_USAGE_REPORT", "off")
             .stdout(Stdio::from(also))
             .stderr(Stdio::from(sink))
             .spawn()

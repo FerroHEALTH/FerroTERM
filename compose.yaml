@@ -28,7 +28,8 @@
 #   FERROTERM_PORT=8081 docker compose up
 #
 # Hardening: the container drops every capability, refuses privilege
-# escalation, and runs a read-only root filesystem; the server writes nothing.
+# escalation, and runs a read-only root filesystem; the server writes only its
+# own state (the usage report's instance id) to the `ferroterm-state` volume.
 # The image runs as uid 65532 and has no shell; the health probe is the binary
 # itself (`ferroterm healthcheck`), declared on the service below.
 
@@ -56,11 +57,21 @@ services:
       # statement (`OAuth`, `SMART-on-FHIR`, `Basic`, `Certificates`, ...).
       FERROTERM_SECURITY_SERVICE: ${FERROTERM_SECURITY_SERVICE:-}
       RUST_LOG: ${RUST_LOG:-info}
+      # The usage report to FerroPULSE: on by default, `FERROTERM_USAGE_REPORT=off`
+      # stops it. What it sends and when:
+      # https://ferroterm.eu/docs/operate/usage-report.html
+      FERROTERM_USAGE_REPORT: ${FERROTERM_USAGE_REPORT:-on}
+      FERROTERM_DEPLOYMENT: compose
+      # The instance id lives here, on the one writable volume.
+      FERROTERM_STATE_DIR: /data/state
     volumes:
       - type: bind
         source: ${FERROTERM_INDEX_DIR:-./index}
         target: /data/index
         read_only: true
+      - type: volume
+        source: ferroterm-state
+        target: /data/state
     # The image declares the same probe (`ferroterm healthcheck`: one GET
     # /health, exit 0 on 200). Stating it here is what lets another service
     # wait on it with `condition: service_healthy`, as the proxy below does,
@@ -170,5 +181,6 @@ services:
       - no-new-privileges:true
 
 volumes:
+  ferroterm-state:
   caddy-data:
   caddy-config:

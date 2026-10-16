@@ -39,6 +39,9 @@ struct Inner {
     rebuilding: Mutex<()>,
     /// The SMART bearer gate, when the deployment configured an issuer.
     smart: Option<Arc<crate::smart::Smart>>,
+    /// The usage report window the request middleware records into; it
+    /// outlives every swap of the served set.
+    usage: Arc<crate::usage_report::window::Window>,
 }
 
 /// One code system version the served set carries.
@@ -81,6 +84,7 @@ impl Serving {
                 config,
                 rebuilding: Mutex::new(()),
                 smart,
+                usage: Arc::default(),
             }),
         }
     }
@@ -89,6 +93,12 @@ impl Serving {
     #[must_use]
     pub fn smart(&self) -> Option<Arc<crate::smart::Smart>> {
         self.inner.smart.clone()
+    }
+
+    /// The usage report window of this process.
+    #[must_use]
+    pub fn usage_window(&self) -> Arc<crate::usage_report::window::Window> {
+        Arc::clone(&self.inner.usage)
     }
 
     /// The set as of now.
@@ -163,6 +173,12 @@ impl Serving {
 impl FromRef<Serving> for Arc<AppState> {
     fn from_ref(serving: &Serving) -> Self {
         serving.current()
+    }
+}
+
+impl FromRef<Serving> for Arc<crate::usage_report::window::Window> {
+    fn from_ref(serving: &Serving) -> Self {
+        serving.usage_window()
     }
 }
 

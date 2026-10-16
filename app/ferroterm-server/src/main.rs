@@ -21,11 +21,12 @@ use ferroterm_server::reload::Serving;
 use ferroterm_server::smart::Smart;
 use ferroterm_server::state::AppState;
 use ferroterm_server::telemetry::ResolvedFormat;
-use ferroterm_server::{banner, healthcheck, reload, telemetry};
+use ferroterm_server::{banner, healthcheck, reload, telemetry, usage_report};
 use tokio::net::TcpListener;
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    let started = std::time::Instant::now();
     let cli = Cli::parse();
     if let Some(Command::Healthcheck { url }) = cli.command {
         return healthcheck_main(url).await;
@@ -45,7 +46,7 @@ async fn main() -> ExitCode {
         eprintln!("ferroterm: cannot start: {error}");
         return ExitCode::FAILURE;
     }
-    match run(config).await {
+    match run(config, started).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             tracing::error!(error = format!("{error:#}"), "cannot start");
@@ -67,7 +68,7 @@ async fn healthcheck_main(url: Option<String>) -> ExitCode {
     }
 }
 
-async fn run(config: Config) -> anyhow::Result<()> {
+async fn run(config: Config, started: std::time::Instant) -> anyhow::Result<()> {
     use anyhow::Context;
 
     let state = AppState::load(&config)
@@ -139,6 +140,9 @@ async fn run(config: Config) -> anyhow::Result<()> {
     // NOTE: dropping the handle detaches the task, which then runs until the
     // process ends (<https://docs.rs/tokio/latest/tokio/task/struct.JoinHandle.html>).
     let _hangup = tokio::spawn(reload::on_hangup(serving.clone()));
+    // The report never blocks boot: the task it starts is detached the same way.
+    let _usage =
+        usage_report::reporter::start(&serving.config().usage_report, &serving, started).await;
     match admin {
         Some(admin) => {
             let fhir = ferroterm_server::serve(listener, serving.clone());

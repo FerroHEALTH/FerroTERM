@@ -193,6 +193,25 @@ else
   note "no vendored SCG syntax yet — skipped"
 fi
 
+# --- The vendored FerroPULSE schema commit == docs/VERSIONS.md pin ------------
+echo "== vendored FerroPULSE report v2 (PROVENANCE.md <-> docs/VERSIONS.md)"
+pulse_prov="app/ferroterm-server/tests/fixtures/ferropulse/PROVENANCE.md"
+if [[ -f "$pulse_prov" ]]; then
+  pulse_commit="$(sed -nE 's/^- Commit:[[:space:]]*//p' "$pulse_prov" | head -n1 | tr -d '[:space:]')"
+  pulse_pin="$(awk -F'|' '$2 ~ /^[[:space:]]*FerroPULSE report v2[[:space:]]*$/ { v = $3; gsub(/^[[:space:]]+/, "", v); split(v, w, /[[:space:]]/); print w[1]; exit }' docs/VERSIONS.md)"
+  if [[ -z "$pulse_commit" ]]; then
+    bad "$pulse_prov has no '- Commit:' line"
+  elif [[ -z "$pulse_pin" ]]; then
+    bad "docs/VERSIONS.md has no FerroPULSE report v2 row"
+  elif [[ "$pulse_commit" != "$pulse_pin" ]]; then
+    bad "FerroPULSE report v2: PROVENANCE.md says $pulse_commit, docs/VERSIONS.md pins $pulse_pin"
+  else
+    note "OK: FerroPULSE report v2 ${pulse_commit:0:12}"
+  fi
+else
+  note "no vendored FerroPULSE schema yet — skipped"
+fi
+
 # --- One licence everywhere the project names its own ------------------------
 # The project's own code is BUSL-1.1 (LICENSE); a header, manifest, badge, or
 # image label still saying MIT or Apache-2.0 is a stale claim. Third-party files keep theirs.

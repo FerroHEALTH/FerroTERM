@@ -24,6 +24,10 @@ at most 1,000 members without `count` and asks for paging beyond that
 | `FERROTERM_OIDC_ADMIN_SCOPE` | The scope the admin-listener routes require, compared verbatim against the scopes the token grants. Map an operator's role to it and leave it off a terminologist's and a reader's roles. No specification governs the admin surface, so the name is yours. | `ferroterm/admin` |
 | `FERROTERM_VIEWER_CLIENT_ID` | The OAuth client the viewer signs in as. The viewer is a public client: it holds no secret, signs in with the authorization code flow with PKCE, and learns this value from `[base]/.well-known/smart-configuration`, where the server publishes it as `ferroterm_viewer_client_id` (RFC 8414 §2 admits the extra member). Register the client in the same issuer `FERROTERM_OIDC_ISSUER` names, with the redirect address `{base}/ui/editor/callback` (the editing bundle is where the viewer signs in), no client secret, `S256` as a code challenge method, and the scopes `openid`, `fhirUser`, `user/CodeSystem.cud`, `user/ValueSet.cud`, `user/ConceptMap.cud`. Unset, the viewer offers no sign-in and draws no edit control. | none (the viewer stays read-only) |
 | `FERROTERM_UI` | Whether the server serves the viewer at `/ui`, the editing bundle at `/ui/editor`, and redirects `/` onto the first. Reads `on` or `off` (`true`/`false`, `1`/`0`, `yes`/`no`). Off, the `/ui` routes are absent and both `/` and `/ui` answer the `not-found` `OperationOutcome` every unknown path answers, for a deployment that wants an API-only surface. A build that carries no viewer bundle serves no `/ui` route whatever this is set to, and says so at start. | `on` |
+| `FERROTERM_USAGE_REPORT` | Whether the server sends the [usage report](usage-report.md) to FerroPULSE. Reads `on` or `off` (`true`/`false`, `1`/`0`, `yes`/`no`). `on` cannot override CI detection: with `GITHUB_ACTIONS` or `CI` set to `true` or `1`, the report is off. | `on` |
+| `FERROTERM_USAGE_REPORT_ENDPOINT` | The collector the usage report is posted to: an `https` URL without credentials, or plain `http` to a loopback host. The server refuses to start on anything else. | `https://report.ferropulse.eu/v1/report` |
+| `FERROTERM_STATE_DIR` | A writable directory where the server keeps its own state: the usage report's instance id and the time of its last start report. Without one, or with one the server cannot write, the usage report is off. | none (the compose file sets `/data/state`, on a named volume; the container image sets none) |
+| `FERROTERM_DEPLOYMENT` | How the server was deployed, as the usage report states it: `helm`, `compose`, `binary`, or `unknown`. The compose file sets `compose`. | `unknown` |
 | `FERROTERM_DEFAULT_LANGUAGE` | The BCP 47 language used for `display` when a request names none. | `en` |
 | `FERROTERM_LOG_FORMAT` | `auto`, `json`, or `pretty`. `json` writes one object per line (`timestamp`, `level`, `message`, and the fields) for a log pipeline; `pretty` writes aligned human lines with colour; `auto` picks `pretty` when stdout is a terminal and `json` otherwise. The startup banner prints only with `pretty`. | `auto` |
 | `RUST_LOG` | The `tracing` filter. | `info,hyper=warn,tower=warn,h2=warn` |
@@ -33,7 +37,9 @@ at most 1,000 members without `count` and asks for paging beyond that
 At start: the banner (pretty only), one `ferroterm starting` line with the
 version and the count of code systems, one `serving code system` line per
 loaded version (`id`, `system`, `version`, `concepts`, `languages`, `path`),
-and one `listening` line with the address and the base path. Per request: one
+one `listening` line with the address and the base path, and one `usage
+report ON` or `usage report OFF` line (see [Usage report](usage-report.md)).
+Per request: one
 `request` line with `method`, `route`, `status`, `latency_ms`, and the
 `system`, `url`, `version`, `code`, `codeA`, `codeB` query parameters the
 request named (`named`); bodies and free-text parameters are never logged. A

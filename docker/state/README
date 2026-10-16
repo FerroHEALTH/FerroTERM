@@ -1,0 +1,4 @@
+The FerroTERM server keeps its own state here: the usage report's instance id
+and the time of its last start report. The image ships this directory owned by
+the runtime user (uid 65532) so a volume mounted at /data/state is writable;
+the server writes to it only when FERROTERM_STATE_DIR names it.

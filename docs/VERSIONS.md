@@ -70,6 +70,12 @@ in a change that moves the pin with it.
 | SCG | 23d3812cf17ac8459fc9f1a0068041b95bacd3e1 (the commit of the official `IHTSDO/SNOMEDCT-Languages` repository, which publishes no tags; the normative Compositional Grammar ABNF and the example corpus vendored under `crates/sct-scg/vendor/` by `scripts/vendor/scg-grammar.sh`) |
 | SNOMED CT content | **not pinned in-repo**: licence-gated, bring-your-own RF2 (International edition); the loaded edition+version is a runtime/deployment fact (`.claude/rules/snomed-terminology.md`) |
 
+## Usage report contract
+
+| Item | Pin |
+|---|---|
+| FerroPULSE report v2 | 095ccb5718a1b5b0adb088f4d8cb143ba3f5f101 (the commit of the private `FerroHEALTH/FerroPULSE` repository; the report envelope v2 JSON Schema and its examples vendored under `app/ferroterm-server/tests/fixtures/ferropulse/` by `scripts/vendor/ferropulse-schemas.sh`) |
+
 ## Rust dependency pins
 
 The authoritative, fully-pinned third-party crate set lives in the root

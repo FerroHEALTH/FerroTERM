@@ -42,6 +42,7 @@ mod snomed_expression;
 mod telemetry;
 mod translate;
 mod ui;
+mod usage_report;
 mod value_set;
 mod viewer_fixtures;
 mod xml;
