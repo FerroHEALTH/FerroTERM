@@ -222,7 +222,7 @@ pub fn unpack_loinc(zip_path: &Path, into: &Path) -> Result<PathBuf, ArchiveErro
         }
         found_terms |= file_name.eq_ignore_ascii_case("Loinc.csv");
         let target = into.join(&name);
-        let entry_name = entry.name().to_owned();
+        let entry_name = entry.name().map_err(read)?.into_owned();
         let unpack = |source| ArchiveError::Unpack {
             entry: entry_name.clone(),
             source,
@@ -270,7 +270,7 @@ fn unpack_matching(
             continue;
         }
         let target = into.join(&name);
-        let entry_name = entry.name().to_owned();
+        let entry_name = entry.name().map_err(read)?.into_owned();
         let unpack = |source| ArchiveError::Unpack {
             entry: entry_name.clone(),
             source,
@@ -439,7 +439,7 @@ mod tests {
         let path = dir.join(name);
         let file = std::fs::File::create(&path).expect("a zip to write");
         let mut writer = zip::ZipWriter::new(file);
-        let options: zip::write::FileOptions<'_, ()> =
+        let options: zip::write::FileOptions<'_, '_, ()> =
             zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
         for (entry, body) in entries {
             if let Some(folder) = entry.strip_suffix('/') {

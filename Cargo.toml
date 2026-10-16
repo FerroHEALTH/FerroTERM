@@ -58,7 +58,7 @@ ariadne = "0.6.0"
 csv = "1.4.0"
 # Data parallelism for the offline build (order-preserving collection).
 rayon = "1.12.0"
-zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+zip = { version = "9.0.3", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 # The UCUM essence (unit definitions) is XML.
 quick-xml = "0.42.0"
 # Content digests. A syndication feed advertises a SHA-256 for a content item,
@@ -122,25 +122,25 @@ tempfile = "3.27.0"
 # consumed here from crates.io like any other third-party crate. The pin is
 # recorded in docs/VERSIONS.md and `scripts/checks/versions.sh` fails when the
 # manifest, the lock, and that table disagree.
-fhir-types = "0.1.106"
+fhir-types = "0.1.109"
 # Workspace-internal crates. The `crates/*` members carry the published crate
 # line (lockstep, bumped with their packaged content, never the product
 # version); the tools stay on the workspace version.
-rf2 = { path = "crates/rf2", version = "0.1.117" }
-loinc = { path = "crates/loinc", version = "0.1.117" }
-classification = { path = "crates/classification", version = "0.1.117" }
-dhd-thesaurus = { path = "crates/dhd-thesaurus", version = "0.1.117" }
-gstandaard = { path = "crates/gstandaard", version = "0.1.117" }
-labcodeset = { path = "crates/labcodeset", version = "0.1.117" }
-icd11 = { path = "crates/icd11", version = "0.1.117" }
-rxnorm-rrf = { path = "crates/rxnorm-rrf", version = "0.1.117" }
-concept-graph = { path = "crates/concept-graph", version = "0.1.117" }
-concept-store = { path = "crates/concept-store", version = "0.1.117" }
-designation-index = { path = "crates/designation-index", version = "0.1.117" }
-sct-ecl = { path = "crates/sct-ecl", version = "0.1.117" }
-sct-scg = { path = "crates/sct-scg", version = "0.1.117" }
-fhir-terminology = { path = "crates/fhir-terminology", version = "0.1.117" }
-terminology-syndication = { path = "crates/terminology-syndication", version = "0.1.117" }
+rf2 = { path = "crates/rf2", version = "0.1.118" }
+loinc = { path = "crates/loinc", version = "0.1.118" }
+classification = { path = "crates/classification", version = "0.1.118" }
+dhd-thesaurus = { path = "crates/dhd-thesaurus", version = "0.1.118" }
+gstandaard = { path = "crates/gstandaard", version = "0.1.118" }
+labcodeset = { path = "crates/labcodeset", version = "0.1.118" }
+icd11 = { path = "crates/icd11", version = "0.1.118" }
+rxnorm-rrf = { path = "crates/rxnorm-rrf", version = "0.1.118" }
+concept-graph = { path = "crates/concept-graph", version = "0.1.118" }
+concept-store = { path = "crates/concept-store", version = "0.1.118" }
+designation-index = { path = "crates/designation-index", version = "0.1.118" }
+sct-ecl = { path = "crates/sct-ecl", version = "0.1.118" }
+sct-scg = { path = "crates/sct-scg", version = "0.1.118" }
+fhir-terminology = { path = "crates/fhir-terminology", version = "0.1.118" }
+terminology-syndication = { path = "crates/terminology-syndication", version = "0.1.118" }
 # The source add-ons. Path-only and never published; only app/ferroterm-sync
 # may take one (scripts/checks/addon-boundary.sh).
 addon-nts = { path = "addons/nts" }

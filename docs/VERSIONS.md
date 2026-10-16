@@ -55,7 +55,7 @@ requested on that repository's tracker.
 
 | Package | Pin | Notes |
 |---|---|---|
-| `fhir-types` | 0.1.106 | from crates.io; the requirement lives in the root `Cargo.toml` `[workspace.dependencies]` |
+| `fhir-types` | 0.1.109 | from crates.io; the requirement lives in the root `Cargo.toml` `[workspace.dependencies]` |
 
 The requirement is a caret, so a later 0.1.x release resolves into `Cargo.lock`
 by itself. `scripts/checks/versions.sh` fails when the row above, the root
