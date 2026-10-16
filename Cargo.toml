@@ -58,7 +58,7 @@ ariadne = "0.6.0"
 csv = "1.4.0"
 # Data parallelism for the offline build (order-preserving collection).
 rayon = "1.12.0"
-zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+zip = { version = "9.0.3", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 # The UCUM essence (unit definitions) is XML.
 quick-xml = "0.42.0"
 # Content digests. A syndication feed advertises a SHA-256 for a content item,
@@ -122,7 +122,7 @@ tempfile = "3.27.0"
 # consumed here from crates.io like any other third-party crate. The pin is
 # recorded in docs/VERSIONS.md and `scripts/checks/versions.sh` fails when the
 # manifest, the lock, and that table disagree.
-fhir-types = "0.1.106"
+fhir-types = "0.1.109"
 # Workspace-internal crates. The `crates/*` members carry the published crate
 # line (lockstep, bumped with their packaged content, never the product
 # version); the tools stay on the workspace version.
