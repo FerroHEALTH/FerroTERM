@@ -22,19 +22,36 @@ lists what a deployment serves.
 
 ## Run with Docker Compose
 
-Every release attaches a `compose.yaml`. With it and a SNOMED CT release zip
-(a licensed download from SNOMED International or your national release
-centre), the whole path is two commands: build the index once, then serve it.
+Every release attaches a `compose.yaml`. With it and the release files of the
+code systems you hold a licence for, the path is two steps: build an index for
+each code system once, then serve them. Put the release files in `./releases`
+beside the compose file (or point `FERROTERM_RELEASES_DIR` at their
+directory). For SNOMED CT, a licensed download from SNOMED International or
+your national release centre:
 
 ```console
 $ curl -LO https://github.com/FerroHEALTH/FerroTERM/releases/latest/download/compose.yaml
-$ FERROTERM_RF2=/path/to/SnomedCT_Release.zip docker compose run --rm build
+$ docker compose run --rm build --rf2 /releases/SnomedCT_Release.zip --out /data/index/snomed
 $ docker compose up
 ```
 
-The `build` service runs `ferroterm-build` from the same image with the zip
-mounted read-only and writes the index to `./index` (or `FERROTERM_INDEX_DIR`);
-the Snapshot is unpacked to the container's tmpfs and gone with it. It sits
+SNOMED CT is optional. A deployment that serves LOINC alone builds only that:
+
+```console
+$ docker compose run --rm build --loinc /releases/Loinc_2.82.zip --out /data/index/loinc
+$ docker compose up
+```
+
+The `build` service runs `ferroterm-build` from the same image, and the
+arguments after `build` are its own, so every code system in
+[Loading code systems](loading-snomed.md) builds the same way: the release
+directory is mounted read-only at `/releases`, and each `--out` names a child
+of `/data/index`, which is `./index` on the host (or `FERROTERM_INDEX_DIR`).
+`docker compose run --rm build` with no arguments prints the builder's help.
+The release mount is read-only, so filling an ICD-11 cache with `--icd11-api`
+(which writes into the cache) runs with the binary; a build from a filled
+cache in `./releases` runs here.
+A zip is unpacked to the container's tmpfs and gone with it. The service sits
 under the `build` profile, so `docker compose up` never starts it. To serve
 indexes you built elsewhere, skip the first command and point the variable at
 an index root: a directory whose child directories are the artifacts, one per

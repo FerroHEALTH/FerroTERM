@@ -50,11 +50,13 @@ $ curl 'http://localhost:8080/r4b/CodeSystem/$lookup?system=http://unitsofmeasur
 
 A clinical code system is a release you hold a licence for, built once into an
 index by `ferroterm-build` (in the same image and every release tarball) and
-served read-only. With the release `compose.yaml` and a SNOMED CT release zip:
+served read-only. With the release `compose.yaml` and a SNOMED CT release zip
+in `./releases` (any other code system builds the same way, with its own
+`ferroterm-build` flag, and SNOMED CT is optional):
 
 ```console
 $ curl -LO https://github.com/FerroHEALTH/FerroTERM/releases/latest/download/compose.yaml
-$ FERROTERM_RF2=/path/to/SnomedCT_Release.zip docker compose run --rm build
+$ docker compose run --rm build --rf2 /releases/SnomedCT_Release.zip --out /data/index/snomed
 $ docker compose up
 $ curl 'http://localhost:8080/r4b/CodeSystem/$lookup?system=http://snomed.info/sct&code=404684003&displayLanguage=nl'
 ```
