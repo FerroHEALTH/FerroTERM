@@ -50,6 +50,10 @@ use tokio::net::TcpListener;
 use crate::reload::Serving;
 use crate::state::AppState;
 
+/// The base path of every served FHIR version; the router mounts each and the
+/// boot lines name them.
+pub const FHIR_BASES: [&str; 4] = ["/r4", "/r4b", "/r5", "/r6"];
+
 /// Builds the HTTP application over `serving`.
 ///
 /// `GET /health` answers `200 OK` while the process is up ([`healthcheck`] is
@@ -84,12 +88,13 @@ pub fn router_with_bundles(
     // The gate sits inside each version's router, so the path it reads is the
     // one under the version prefix that `nest` leaves.
     let gate = || axum::middleware::from_fn_with_state(serving.smart(), smart::guard::writes);
+    let [r4, r4b, r5, r6] = FHIR_BASES;
     let mut app = Router::new()
         .route("/health", get(health))
-        .nest("/r4", r4::router().layer(gate()))
-        .nest("/r4b", r4b::router().layer(gate()))
-        .nest("/r5", r5::router().layer(gate()))
-        .nest("/r6", r6::router().layer(gate()))
+        .nest(r4, r4::router().layer(gate()))
+        .nest(r4b, r4b::router().layer(gate()))
+        .nest(r5, r5::router().layer(gate()))
+        .nest(r6, r6::router().layer(gate()))
         .route("/metrics", get(metrics_scrape));
     if viewer {
         app = app.route("/", get(ui::root));
