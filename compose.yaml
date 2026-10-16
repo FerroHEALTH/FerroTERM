@@ -79,25 +79,31 @@ services:
       - no-new-privileges:true
 
   # The offline index build, one shot, under its own profile so `docker compose
-  # up` never starts it. Same image; the release zip (a licensed download you
-  # obtained yourself) is mounted read-only, the index lands in the directory
-  # the server reads. Run it once per edition:
+  # up` never starts it. Same image. The directory holding your release files
+  # (licensed downloads you obtained yourself) is mounted read-only at
+  # /releases, the index lands in the directory the server reads, one child
+  # per code system. The arguments after `build` are ferroterm-build's own, so
+  # every code system it knows builds through this one service. Run it once
+  # per release:
   #
-  #   FERROTERM_RF2=/path/to/SnomedCT_Release.zip docker compose run --rm build
+  #   docker compose run --rm build --rf2 /releases/SnomedCT_Release.zip --out /data/index/snomed
+  #   docker compose run --rm build --loinc /releases/Loinc_2.82.zip --out /data/index/loinc
   #
-  # The Snapshot is unpacked to the container's /tmp (a tmpfs here) and gone
-  # with the container; no RF2 content is written anywhere else.
+  # FERROTERM_RELEASES_DIR names the directory, ./releases beside this file by
+  # default. With no arguments the service prints ferroterm-build's help. A
+  # zip is unpacked to the container's /tmp (a tmpfs here) and gone with the
+  # container; no release content is written anywhere else.
   build:
     image: ghcr.io/ferrohealth/ferroterm:${FERROTERM_VERSION:-0.1.6}
     profiles: [build]
     entrypoint: ["/usr/local/bin/ferroterm-build"]
-    command: ["--rf2", "/rf2/release.zip", "--out", "/data/index/snomed"]
+    command: ["--help"]
     environment:
       TMPDIR: /tmp
     volumes:
       - type: bind
-        source: ${FERROTERM_RF2:?set FERROTERM_RF2 to the SNOMED CT release zip}
-        target: /rf2/release.zip
+        source: ${FERROTERM_RELEASES_DIR:-./releases}
+        target: /releases
         read_only: true
       - type: bind
         source: ${FERROTERM_INDEX_DIR:-./index}
