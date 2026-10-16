@@ -4,6 +4,7 @@
 [![CI](https://github.com/FerroHEALTH/FerroTERM/actions/workflows/ci.yml/badge.svg)](https://github.com/FerroHEALTH/FerroTERM/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/FerroHEALTH/FerroTERM/actions/workflows/codeql.yml/badge.svg)](https://github.com/FerroHEALTH/FerroTERM/actions/workflows/codeql.yml)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/FerroHEALTH/FerroTERM/badge)](https://scorecard.dev/viewer/?uri=github.com/FerroHEALTH/FerroTERM)
+[![SLSA Build Level 3](https://slsa.dev/images/gh-badge-level3.svg)](https://ferroterm.eu/docs/operate/verifying-releases.html)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=FerroHEALTH_FerroTERM&metric=alert_status)](https://sonarcloud.io/summary/overall?id=FerroHEALTH_FerroTERM)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=FerroHEALTH_FerroTERM&metric=coverage)](https://sonarcloud.io/summary/new_code?id=FerroHEALTH_FerroTERM)
 [![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)
