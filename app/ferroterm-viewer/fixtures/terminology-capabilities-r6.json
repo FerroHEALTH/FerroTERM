@@ -1065,7 +1065,7 @@
       ]
     }
   ],
-  "date": "2026-10-01T15:54:58.883139Z",
+  "date": "2026-10-16T07:56:19.301136Z",
   "description": "Serves the FHIR R6 ballot (version 6.0.0-ballot5). Every behaviour grounded only in the ballot is re-verified against the published specification when it appears, and may change with it.",
   "expansion": {
     "hierarchical": false,
@@ -1137,9 +1137,9 @@
   "resourceType": "TerminologyCapabilities",
   "software": {
     "name": "FerroTERM",
-    "version": "0.1.6"
+    "version": "0.1.7"
   },
   "status": "active",
   "title": "FerroTERM terminology capabilities (R6 ballot)",
-  "version": "0.1.6"
+  "version": "0.1.7"
 }

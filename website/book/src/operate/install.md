@@ -12,7 +12,7 @@ system is an index you build from a release you are licensed for
 ## The first call, with nothing to load
 
 ```console
-$ docker run --rm -p 8080:8080 ghcr.io/ferrohealth/ferroterm:0.1.6
+$ docker run --rm -p 8080:8080 ghcr.io/ferrohealth/ferroterm:0.1.7
 $ curl 'http://localhost:8080/r4b/CodeSystem/$lookup?system=http://unitsofmeasure.org&code=mg/dL'
 ```
 
@@ -90,7 +90,7 @@ a numeric non-root user (`65532`), and the listen address preset to
 $ docker run --rm -p 8080:8080 \
     -v /srv/ferroterm/index:/data/index:ro \
     -e FERROTERM_INDEX=/data/index \
-    ghcr.io/ferrohealth/ferroterm:0.1.6
+    ghcr.io/ferrohealth/ferroterm:0.1.7
 ```
 
 Mount the index root read-only; each child directory under it is one
@@ -100,7 +100,7 @@ container runs with a read-only root filesystem. Tags are `<version>`,
 provenance first (see [Verifying releases](verifying-releases.md)):
 
 ```console
-$ gh attestation verify oci://ghcr.io/ferrohealth/ferroterm:0.1.6 \
+$ gh attestation verify oci://ghcr.io/ferrohealth/ferroterm:0.1.7 \
     -R FerroHEALTH/FerroTERM \
     --signer-workflow FerroHEALTH/FerroTERM/.github/workflows/release-image.yml
 ```
@@ -121,10 +121,10 @@ musl) holding `ferroterm` and `ferroterm-build`, with a checksum, a CycloneDX
 SBOM, and Sigstore attestations beside it. Download, verify, unpack, run:
 
 ```console
-$ gh release download v0.1.6 -R FerroHEALTH/FerroTERM -p 'ferroterm-v0.1.6-x86_64-unknown-linux-musl.tar.gz*'
-$ gh attestation verify ferroterm-v0.1.6-x86_64-unknown-linux-musl.tar.gz -R FerroHEALTH/FerroTERM \
+$ gh release download v0.1.7 -R FerroHEALTH/FerroTERM -p 'ferroterm-v0.1.7-x86_64-unknown-linux-musl.tar.gz*'
+$ gh attestation verify ferroterm-v0.1.7-x86_64-unknown-linux-musl.tar.gz -R FerroHEALTH/FerroTERM \
     --signer-workflow FerroHEALTH/FerroTERM/.github/workflows/release-build.yml
-$ tar xzf ferroterm-v0.1.6-x86_64-unknown-linux-musl.tar.gz
+$ tar xzf ferroterm-v0.1.7-x86_64-unknown-linux-musl.tar.gz
 $ FERROTERM_INDEX=/srv/ferroterm/index ./ferroterm
 ```
 
