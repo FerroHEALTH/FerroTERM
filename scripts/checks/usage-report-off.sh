@@ -13,6 +13,8 @@
 # chart), or is only ever sourced by scripts that carry it. A `docker run` of
 # the server image carries it on its own command line (`--env
 # FERROTERM_USAGE_REPORT=off`): a container inherits nothing from the shell.
+# A Rust source that starts the server as a child process (the bench harness)
+# sets `.env("FERROTERM_USAGE_REPORT", "off")` on that `Command`.
 # The one-shot `ferroterm healthcheck` starts no server and is not a launch.
 # No FHIR or SNOMED CT specification governs this: our own design.
 #
@@ -32,6 +34,9 @@ readonly HELM_INSTALL='(^|[;&|(`[:space:]])helm[[:space:]]+(upgrade|install)[[:s
 readonly DOCKER_RUN='docker[[:space:]]+run[[:space:]].*(ghcr\.io/ferrohealth/ferroterm[:@]|SERVER_IMAGE|FERROTERM_IMAGE)'
 # The switch handed to a container on its own `docker run` command line.
 readonly RUN_SWITCH='(-e|--env)[[:space:]=]+["'\'']?FERROTERM_USAGE_REPORT=off'
+# A Rust `Command` that starts the server, and the switch it must carry.
+readonly RUST_LAUNCH='\.env\( ?"FERROTERM_LISTEN",'
+readonly RUST_SWITCH='\.env\( ?"FERROTERM_USAGE_REPORT", ?"off",? ?\)'
 # A one-shot subcommand that starts no server.
 readonly ONE_SHOT='[[:space:]"'\'',]healthcheck(["'\''[:space:]]|$)'
 
@@ -116,6 +121,23 @@ findings() {
     fi
     [[ "$covered" -eq 1 ]] || printf '%s\n' "$f"
   done <<<"$list"
+  rust_findings "$@"
+}
+
+# Prints every tracked Rust source that starts the server as a child process
+# without the switch. A Rust launcher names the listen address on its
+# `Command` (`.env("FERROTERM_LISTEN", …)`), as the bench harness does, and
+# must also set `.env("FERROTERM_USAGE_REPORT", "off")`. The source is read
+# with its line breaks folded, so a call that rustfmt wraps still matches.
+rust_findings() {
+  local f text
+  while IFS= read -r f; do
+    [[ -n "$f" ]] || continue
+    grep -q 'FERROTERM_LISTEN' "$f" || continue
+    text="$(tr '\n' ' ' <"$f" | tr -s '[:space:]' ' ')"
+    grep -qE "$RUST_LAUNCH" <<<"$text" || continue
+    grep -qE "$RUST_SWITCH" <<<"$text" || printf '%s\n' "$f"
+  done < <("$@" | grep -E '^(app|tools|crates|addons)/.*\.rs$' | sort)
 }
 
 self_test() {
@@ -152,11 +174,15 @@ self_test() {
   printf 'jobs:\n  a:\n    steps:\n      - run: target/release/ferroterm &\n' >"$tmp/.github/workflows/bin-on.yml"
   printf '#!/usr/bin/env bash\ngrep "target/release/ferroterm &" x\n' >"$tmp/$SELF"
   printf '#!/usr/bin/env bash\ndocker run --rm ghcr.io/ferrohealth/ferroterm:main healthcheck\n' >"$tmp/docker/one-shot.sh"
+  mkdir -p "$tmp/tools/bench/src"
+  printf 'Command::new(b)\n    .env("FERROTERM_LISTEN", a)\n    .spawn()\n' >"$tmp/tools/bench/src/on.rs"
+  printf 'Command::new(b)\n    .env("FERROTERM_LISTEN", a)\n    .env(\n        "FERROTERM_USAGE_REPORT",\n        "off",\n    )\n' >"$tmp/tools/bench/src/off.rs"
+  printf 'Command::new(b).env("FERROTERM_INDEX", a).spawn()\n' >"$tmp/tools/bench/src/build.rs"
 
-  found="$(cd "$tmp" && findings find scripts docker .github -type f)"
+  found="$(cd "$tmp" && findings find scripts docker .github tools -type f)"
   for name in scripts/on.sh scripts/bin-on.sh scripts/cargo-on.sh scripts/compose-on.sh scripts/long-on.sh \
     scripts/helm-on.sh scripts/fam/orphan.sh .github/workflows/run-on.yml .github/workflows/run-job-env.yml \
-    .github/workflows/bin-on.yml; do
+    .github/workflows/bin-on.yml tools/bench/src/on.rs; do
     grep -qxF "$name" <<<"$found" || {
       echo "self-test: $name was not caught" >&2
       failures=1
@@ -164,14 +190,14 @@ self_test() {
   done
   for name in scripts/off.sh scripts/bin-off.sh scripts/helm-off.sh scripts/commented.sh scripts/tools.sh \
     scripts/probe.sh scripts/fam/covered.sh scripts/carrier.sh scripts/bare-carrier.sh .github/workflows/run-off.yml \
-    .github/workflows/bin-off.yml "$SELF" docker/one-shot.sh; do
+    .github/workflows/bin-off.yml "$SELF" docker/one-shot.sh tools/bench/src/off.rs tools/bench/src/build.rs; do
     if grep -qxF "$name" <<<"$found"; then
       echo "self-test: $name was wrongly caught" >&2
       failures=1
     fi
   done
   [[ "$failures" -eq 0 ]] || return 1
-  echo "usage-report-off: self-test OK (ten unswitched launchers caught, thirteen clean or exempt files allowed)."
+  echo "usage-report-off: self-test OK (eleven unswitched launchers caught, fifteen clean or exempt files allowed)."
 }
 
 report() {
