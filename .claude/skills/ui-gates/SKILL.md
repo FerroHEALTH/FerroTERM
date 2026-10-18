@@ -1,91 +1,63 @@
 ---
 name: ui-gates
 description: >
-  Runs the full viewer quality-gate battery for app/ferroterm-viewer:
-  formatting, clippy on the wasm32 target, nextest, a Trunk release build,
-  and the recorded bundle size. Use before committing any viewer change, when
-  the user asks to "check the UI", or as the done-gate a ui-implementer task
-  must pass.
+  Runs the full console quality-gate battery for app/ferroterm-viewer:
+  formatting, clippy on both halves, nextest, the release site bundle built by
+  cargo-leptos, and its size against the budget. Use before committing any
+  console change, when the user asks to "check the UI", or as the done-gate a
+  ui-implementer task must pass.
 allowed-tools: Bash, Read, Grep, Glob
 ---
 
 # /ui-gates
 
-Run every gate the viewer must pass (`.claude/rules/leptos-ui.md` §10). Stop and
-report on the first hard failure; run the cheap gates first.
+Run every gate the console must pass (`.claude/rules/leptos-ui.md` §6 and §7).
+Stop and report on the first hard failure; run the cheap gates first.
 
 ## Preconditions
 
-- `app/ferroterm-viewer` must exist. If it does not, say so and stop: the
-  viewer is designed in `docs/viewer.md` and tracked under issue #366.
 - Tooling presence, reported rather than silently installed:
-  `rustup target list --installed | grep wasm32` (add with
-  `rustup target add wasm32-unknown-unknown`), `trunk --version`,
-  `leptosfmt --version`. Ask before installing anything.
+  `rustup target list --installed | grep wasm32`, `cargo leptos --version`
+  (0.3.11), `wasm-bindgen --version` (the `=` pin of the root manifest),
+  `leptosfmt --version`. `scripts/release/viewer-tools.sh` fetches the
+  Tailwind CLI and `wasm-opt` by SHA-256. Ask before installing anything else.
 - Shared `./target`, no ad-hoc `RUSTFLAGS`, no flag variation between runs.
 
 ## The battery, in order
 
 ```bash
-# 1. Formatting. tests/ carries view! macros too, so leptosfmt covers both.
+# 1. Formatting.
 cargo fmt -p ferroterm-viewer --check
-leptosfmt --check app/ferroterm-viewer/src app/ferroterm-viewer/tests
+leptosfmt --check app/ferroterm-viewer/src
 
-# 2. Clippy on the target the crate actually ships to, in both feature sets,
-#    because the crate builds as two bundles. This is the gate that catches a
-#    dependency that cannot compile for the browser.
-cargo clippy -p ferroterm-viewer --target wasm32-unknown-unknown \
-  --all-targets -- -D warnings
-cargo clippy -p ferroterm-viewer --target wasm32-unknown-unknown \
-  --all-features --all-targets -- -D warnings
+# 2. Clippy on both halves: the host half (ssr) and the browser half
+#    (hydrate), the gate that catches a dependency that cannot compile for
+#    the browser.
+cargo clippy -p ferroterm-viewer --all-targets -- -D warnings
+cargo clippy -p ferroterm-viewer --lib --target wasm32-unknown-unknown -- -D warnings
 
-# 3. Tests: the component-free logic (URL building, OperationOutcome
-#    flattening, capability reading, paging arithmetic, the tree model, the
-#    editor's form model).
+# 3. Tests: the component-free logic.
 cargo nextest run -p ferroterm-viewer
-cargo nextest run -p ferroterm-viewer --features editor
 
-# 4. The full bundle, only when the change touches the build surface
-#    (Cargo.toml, index.html, Trunk.toml, styles, assets); otherwise report it
-#    skipped with the reason. --locked so the build cannot re-resolve.
-(cd app/ferroterm-viewer && trunk build --release --locked)
-(cd app/ferroterm-viewer &&
-  trunk build --release --locked --features editor --dist dist-editor \
-    --public-url /ui/editor/)
+# 4. The release site bundle and its size. A budget never moves to match a
+#    fatter build.
+bash scripts/release/viewer-site.sh --release
+bash scripts/checks/viewer-bundle.sh
+bash scripts/checks/viewer-paths.sh
 
-# 5. The recorded size of each bundle. A claim never moves to match a fatter
-#    build.
-bash scripts/checks/bundle-size.sh
-bash scripts/checks/bundle-size.sh --bars app/ferroterm-viewer/bundle-size-editor.json \
-  --dist app/ferroterm-viewer/dist-editor
-
-# 6. E2E journeys (merge-gating in CI; local needs Docker): thirtyfour over
-#    WebDriver against the built image.
+# 5. The journeys (merge-gating in CI): server, console and stub issuer on
+#    loopback, Chrome for Testing over chromedriver.
 bash scripts/ui-e2e.sh
 ```
 
-Stages 4 and 5 locally: `Trunk.toml` sets a `trunk-version` floor, and an
-older `trunk` refuses the build, so check `trunk --version` against that floor
-before running stage 4. When it is too old, or the build is skipped as
-untouched, stage 5 has no `dist/` to measure and exits 0 with a SKIPPED banner.
-Report both as `SKIPPED(reason)` and say that CI's `viewer` job runs them over
-a real bundle and gates the merge; a skip here is not a pass.
-
-Stage 6 locally: the script builds the image `docker/Dockerfile` describes, and
-that image stages linux binaries, so the managed mode needs Docker
-(`docker info`) and a Linux host. Anywhere else, report `SKIPPED(reason)` and
-state explicitly that CI's `ui-e2e` job runs it and gates the merge, so a skip
-here is not a pass. To drive a server you started yourself, pass both
-`--base-url` and `--webdriver`; the address must be one the browser can reach,
-which for a browser in a container is `host.docker.internal`, never
-`127.0.0.1`.
-
-Read the crate's `Cargo.toml` and `Trunk.toml` before running: the feature
-names and the `dist` path are the convention, not a guess.
+Stage 5 locally needs Chrome for Testing and its chromedriver at the release
+`docs/VERSIONS.md` pins, named by `FERROTERM_UI_E2E_CHROME` and
+`FERROTERM_UI_E2E_CHROMEDRIVER`. Without them, report `SKIPPED(reason)` and
+say that CI's `ui-e2e` job runs it and gates the merge; a skip is not a pass.
 
 ## Report
 
 One line per gate: PASS, FAIL, or SKIPPED(reason), with the failing output
 excerpted verbatim on a failure. Never mark a gate green you did not run. A
 FAIL is never fixed by weakening the gate (removing a lint, deleting a test,
-dropping the wasm pass, raising the size bar): fix the code.
+dropping the wasm pass, raising the budget): fix the code.

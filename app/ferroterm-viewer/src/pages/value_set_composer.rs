@@ -36,7 +36,6 @@ use crate::components::failure::Failure;
 use crate::components::field::group;
 use crate::components::history::history_offer;
 use crate::components::icon;
-use crate::components::icon::Icon;
 use crate::components::reading::Reading;
 use crate::components::reload::READING_AGAIN;
 use crate::components::reload::announced;
@@ -73,6 +72,8 @@ use crate::routes::COMPOSER_ID_PARAM;
 use crate::routes::VERSION_PARAM;
 use crate::routes::base_url;
 use crate::styles;
+use ferrohealth_ui::view::button::Variant;
+use ferrohealth_ui::view::surface::stack;
 use serde_json::Value;
 
 /// The query parameter carrying the preview's text filter.
@@ -210,11 +211,18 @@ pub(crate) fn ValueSetComposerPage() -> impl IntoView {
     view! {
         {heading}
         <div class="mt-loose grid items-start gap-loose lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-            <div class="min-w-0">
-                {versions} {refused_read} {refused_capabilities} {banner} {identity} {clauses}
-                {actions} {refused}
-            </div>
-            <div class="min-w-0">{preview}</div>
+            {stack(
+                view! {
+                    {versions}
+                    {refused_read}
+                    {refused_capabilities}
+                    {banner}
+                    {identity}
+                    {clauses}
+                    {actions}
+                    {refused}
+                },
+            )} <div class="min-w-0">{preview}</div>
         </div>
     }
 }
@@ -245,15 +253,36 @@ fn heading(report: RwSignal<String>, announcement: Memo<String>) -> AnyView {
     };
     view! {
         <Title text="Compose a value set" />
-        <h1 class=styles::PAGE_TITLE>"Compose a value set"</h1>
-        <p class=styles::LEAD>
-            "Draw in a published value set, add your own codes, and see what the selection holds."
-        </p>
+        <div>
+            {ferrohealth_ui::view::surface::page_heading(
+                ferrohealth_ui::view::surface::Header {
+                    title: String::from("Compose a value set"),
+                    subtitle: Some(
+                        String::from(
+                            "Draw in a published value set, add your own codes, and see what the selection holds.",
+                        ),
+                    ),
+                    crumbs: vec![
+                        ferrohealth_ui::view::surface::Crumb::new("Value sets", "/valuesets"),
+                    ],
+                    mono: false,
+                },
+                (),
+            )}
+        </div>
         <p
             id=REPORT_ID
             tabindex="-1"
             aria-live="polite"
-            class=format!("mt-default {}", styles::MUTED)
+            // An empty region keeps its place in the accessibility tree and
+            // takes none on the page, so it still announces what arrives.
+            class=move || {
+                if report.with(String::is_empty) {
+                    "fui-sr-only".to_owned()
+                } else {
+                    styles::MUTED.to_owned()
+                }
+            }
         >
             {said}
         </p>
@@ -582,7 +611,7 @@ fn text_control(
 ) -> AnyView {
     let described_by = format!("{id}-note");
     view! {
-        <div class="grid gap-tight">
+        <div class="grid content-start gap-tight">
             <label for=id.clone() class=styles::LABEL>
                 {move || label.get()}
             </label>
@@ -611,6 +640,19 @@ fn select_control(
     options: Options,
     change: OnEvent,
 ) -> AnyView {
+    select_with(named, chosen, empty, options, change, None)
+}
+
+/// One labelled choice control with the control that acts on it beside the
+/// select, above the note, so the two line up.
+fn select_with(
+    named: Named,
+    chosen: Signal<String>,
+    empty: &'static str,
+    options: Options,
+    change: OnEvent,
+    beside: Option<AnyView>,
+) -> AnyView {
     let Named {
         id,
         name,
@@ -622,21 +664,24 @@ fn select_control(
     // is drawn again when the offers arrive and the selection is reapplied.
     let offered = move || drawn(&options, &chosen.get());
     view! {
-        <div class="grid gap-tight">
+        <div class="grid content-start gap-tight">
             <label for=id.clone() class=styles::LABEL>
                 {label}
             </label>
-            <select
-                id=id
-                name=name
-                class=styles::INPUT
-                aria-describedby=described_by.clone()
-                prop:value=move || chosen.get()
-                on:change=change
-            >
-                <option value="">{empty}</option>
-                {offered}
-            </select>
+            <div class="flex items-center gap-default">
+                <select
+                    id=id
+                    name=name
+                    class=format!("{} min-w-0 flex-1", ferrohealth_ui::view::form::SELECT)
+                    aria-describedby=described_by.clone()
+                    prop:value=move || chosen.get()
+                    on:change=change
+                >
+                    <option value="">{empty}</option>
+                    {offered}
+                </select>
+                {beside}
+            </div>
             <p id=described_by class=styles::HINT>
                 {note}
             </p>
@@ -688,7 +733,7 @@ fn read_only_banner(writable: Memo<bool>, id: Memo<String>, session: Session) ->
     };
     view! {
         <Show when=move || !writable.get() fallback=|| ()>
-            <p class=format!("mt-default rounded-md panel-p {}", styles::NOTICE)>{sentence}</p>
+            <p class=format!("mt-default rounded-md p-loose {}", styles::NOTICE)>{sentence}</p>
         </Show>
     }
     .into_any()
@@ -734,10 +779,18 @@ fn identity_section(editing: Editing, editable: Memo<bool>) -> AnyView {
         inactive_control(editing),
     ];
     view! {
-        <fieldset class="mt-loose grid gap-default" disabled=move || !editable.get()>
-            <legend class=format!("{} mb-tight", styles::EYEBROW)>"The value set"</legend>
-            <div class="grid gap-default sm:grid-cols-2">{fields}</div>
-        </fieldset>
+        <section class="fui-card" aria-labelledby="compose-identity-heading">
+            <h2 id="compose-identity-heading" class="fui-card-title">
+                "The value set"
+            </h2>
+            <fieldset
+                class="fui-fieldset mt-default"
+                aria-labelledby="compose-identity-heading"
+                disabled=move || !editable.get()
+            >
+                <div class="grid gap-default sm:grid-cols-2">{fields}</div>
+            </fieldset>
+        </section>
     }
     .into_any()
 }
@@ -856,11 +909,11 @@ fn clause_section(
     }
     .into_any();
     view! {
-        <section class="mt-section" aria-labelledby=heading_id>
-            <h2 id=heading_id class=styles::SECTION_TITLE>
+        <section class="fui-card" aria-labelledby=heading_id>
+            <h2 id=heading_id class="fui-card-title">
                 {heading}
             </h2>
-            <p class=styles::LEAD>{rule}</p>
+            <p class="fui-muted">{rule}</p>
             <div class="mt-default grid gap-default">{cards}</div>
             <button
                 type="button"
@@ -913,14 +966,11 @@ fn clause_card(
     let filters = filter_rows(editing, offers, key, clause, system);
 
     view! {
-        <fieldset
-            class=format!("grid gap-default panel-p {}", styles::PANEL)
-            disabled=move || !editable.get()
-        >
-            <legend class=styles::EYEBROW>{if included { "Include" } else { "Exclude" }}</legend>
+        <fieldset class="fui-fieldset fui-well" disabled=move || !editable.get()>
+            <legend>{if included { "Include" } else { "Exclude" }}</legend>
             <p class=styles::MUTED>{move || clause.with(Clause::rule)}</p>
             <Show when=move || defect.with(Option::is_some) fallback=|| ()>
-                <p role="status" class=format!("rounded-md panel-p {}", styles::NOTICE)>
+                <p role="status" class=format!("rounded-md p-loose {}", styles::NOTICE)>
                     {move || defect.get().unwrap_or_default()}
                 </p>
             </Show>
@@ -928,13 +978,15 @@ fn clause_card(
             {system_control}
             {codes}
             {filters}
-            <button
-                type="button"
-                class=styles::BUTTON_QUIET
-                on:click=move |_| editing.change(move |draft| draft.remove_clause(key))
-            >
-                "Remove this clause"
-            </button>
+            <div>
+                <button
+                    type="button"
+                    class=Variant::Destructive.class()
+                    on:click=move |_| editing.change(move |draft| draft.remove_clause(key))
+                >
+                    "Remove this clause"
+                </button>
+            </div>
         </fieldset>
     }
     .into_any()
@@ -1004,18 +1056,6 @@ fn value_set_row(editing: Editing, key: u32, row: u32, clause: Memo<Clause>) -> 
 /// The control that adds one of the value sets this root publishes.
 fn add_published_value_set(editing: Editing, offers: Offers, key: u32) -> AnyView {
     let picked = RwSignal::new(String::new());
-    let control = select_control(
-        Named {
-            id: format!("compose-add-vs-{key}"),
-            name: "addValueSet",
-            label: "Add a published value set",
-            note: "compose.include.valueSet, which draws the whole of that value set in.",
-        },
-        picked.into(),
-        "Choose one this server holds",
-        options_of(move || offers.value_sets.get()),
-        Box::new(move |event| picked.set(event_target_value(&event))),
-    );
     let add = act(
         "Add",
         Box::new(move |_| {
@@ -1026,7 +1066,19 @@ fn add_published_value_set(editing: Editing, offers: Offers, key: u32) -> AnyVie
             }
         }),
     );
-    view! { <div class="flex items-end gap-default">{control} {add}</div> }.into_any()
+    select_with(
+        Named {
+            id: format!("compose-add-vs-{key}"),
+            name: "addValueSet",
+            label: "Add a published value set",
+            note: "compose.include.valueSet, which draws the whole of that value set in.",
+        },
+        picked.into(),
+        "Choose one this server holds",
+        options_of(move || offers.value_sets.get()),
+        Box::new(move |event| picked.set(event_target_value(&event))),
+        Some(add),
+    )
 }
 
 /// The control that adds an implicit value set of the clause's code system.
@@ -1396,17 +1448,18 @@ fn code_search(
             count: SEARCH_COUNT,
         })
     });
-    let found = LocalResource::new(move || {
-        let client = client.clone();
-        let version = version.get();
-        let query = query.get();
-        async move {
-            match query {
-                Some(query) => Some(client.expand_inline(version, &query).await),
-                None => None,
+    let found = Resource::new(
+        move || (version.get(), query.get()),
+        move |(version, query)| {
+            let client = client.clone();
+            async move {
+                match query {
+                    Some(query) => Some(client.expand_inline(version, &query).await),
+                    None => None,
+                }
             }
-        }
-    });
+        },
+    );
     let typed: NodeRef<Input> = NodeRef::new();
     let submit = move |event: SubmitEvent| {
         event.prevent_default();
@@ -1448,7 +1501,7 @@ fn code_search(
                     class=styles::BUTTON
                     disabled=move || system.with(String::is_empty)
                 >
-                    <Icon glyph=icon::SEARCH />
+                    {ferrohealth_ui::icon::icon(icon::SEARCH, "16")}
                     "Search"
                 </button>
             </form>
@@ -1538,7 +1591,20 @@ fn filter_rows(
     }
     .into_any();
     let chosen = RwSignal::new(String::new());
-    let control = select_control(
+    let add = act(
+        "Add",
+        Box::new(move |_| {
+            let picked = chosen.get_untracked();
+            let Some((property, operator)) = picked.split_once(' ') else {
+                return;
+            };
+            let property = property.to_owned();
+            let operator = operator.to_owned();
+            editing.change(move |draft| draft.add_filter(key, &property, &operator));
+            chosen.set(String::new());
+        }),
+    );
+    let control = select_with(
         Named {
             id: format!("compose-add-filter-{key}"),
             name: "addFilter",
@@ -1564,23 +1630,11 @@ fn filter_rows(
                 .collect()
         }),
         Box::new(move |event| chosen.set(event_target_value(&event))),
-    );
-    let add = act(
-        "Add",
-        Box::new(move |_| {
-            let picked = chosen.get_untracked();
-            let Some((property, operator)) = picked.split_once(' ') else {
-                return;
-            };
-            let property = property.to_owned();
-            let operator = operator.to_owned();
-            editing.change(move |draft| draft.add_filter(key, &property, &operator));
-            chosen.set(String::new());
-        }),
+        Some(add),
     );
     let adder = view! {
         <div class="grid gap-tight">
-            <div class="flex items-end gap-default">{control} {add}</div>
+            {control}
             <Show
                 when=move || !system.with(String::is_empty) && declared.with(Vec::is_empty)
                 fallback=|| ()
@@ -1676,7 +1730,6 @@ fn save_section(
         let client = client.clone();
         let version = version.get_untracked();
         let draft = editing.draft();
-        let token = session.token();
         let body = draft.resource().to_string();
         spawn_local(async move {
             let written = if draft.saved() {
@@ -1689,12 +1742,11 @@ fn save_section(
                         Some(&draft.version_id)
                             .filter(|held| !held.is_empty())
                             .map(String::as_str),
-                        token.as_deref(),
                     ),
                 )
                 .await
             } else {
-                Box::pin(client.create(version, VALUE_SET, &body, token.as_deref())).await
+                Box::pin(client.create(version, VALUE_SET, &body)).await
             };
             saving.set(false);
             match written {
@@ -1852,8 +1904,8 @@ fn preview_section(
     };
     let controls = preview_controls(previewed, editing, page, report, id);
     view! {
-        <section class="mt-loose" aria-labelledby="compose-preview-heading">
-            <h2 id="compose-preview-heading" class=styles::SECTION_TITLE>
+        <section class="fui-card" aria-labelledby="compose-preview-heading">
+            <h2 id="compose-preview-heading" class="fui-card-title">
                 "The preview"
             </h2>
             {controls}
@@ -1915,7 +1967,7 @@ fn preview_controls(
                 />
             </div>
             <button type="submit" class=styles::SUBMIT>
-                <Icon glyph=icon::EXPAND />
+                {ferrohealth_ui::icon::icon(icon::EXPAND, "16")}
                 "Run the preview"
             </button>
         </form>
@@ -2069,7 +2121,7 @@ fn marked_expression(expression: &str, column: u32, editing: Editing) -> Option<
     let (before, at, after) = mark(&value, column);
     Some(
         view! {
-            <div class=format!("rounded-md panel-p {}", styles::NOTICE)>
+            <div class=format!("rounded-md p-loose {}", styles::NOTICE)>
                 <p class=styles::LABEL>{format!("{form}, at character {column}")}</p>
                 <p class=format!(
                     "mt-tight {}",

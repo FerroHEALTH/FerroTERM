@@ -5,8 +5,8 @@ description: >
   viewer (app/ferroterm-viewer): components, routes, the FHIR client module,
   forms, tables, charts, styling, and the E2E journeys. The orchestrator hands
   it a tight spec naming the screens and the operations involved; it delivers
-  code that compiles for wasm32, is clippy-clean, leptosfmt-formatted, tested,
-  and inside the bundle-size bar. Not for architecture, the FHIR-client
+  code that compiles in both halves, is clippy-clean, leptosfmt-formatted,
+  tested, and inside the bundle budget. Not for architecture, the FHIR-client
   boundary design, or the screen inventory. The orchestrator keeps those.
 model: opus
 color: cyan
@@ -63,13 +63,14 @@ Non-negotiables (violations are rejected at review):
   Deferred work is always `// TODO(#NNNN): <what is missing>`, never a prose
   deferral and never a phase marker. No AI or Claude attribution anywhere.
   Commit only if told to, on a conventional-type branch.
-- Done = ALL of: `cargo clippy -p ferroterm-viewer --target
-  wasm32-unknown-unknown --all-features -- -D warnings` green, `cargo nextest
-  run -p ferroterm-viewer` green, `cargo fmt` and `leptosfmt` clean, `trunk
-  build --release --locked` completing when the task touches the build surface,
-  and the recorded bundle size not regressing. When the change touches an
-  E2E-covered journey and Docker is available, run the E2E script too; if you
-  cannot, say so explicitly, because CI's `ui-e2e` job gates the merge
+- Done = ALL of: `cargo clippy -p ferroterm-viewer --all-targets -- -D
+  warnings` and `cargo clippy -p ferroterm-viewer --lib --target
+  wasm32-unknown-unknown -- -D warnings` green, `cargo nextest run -p
+  ferroterm-viewer` green, `cargo fmt` and `leptosfmt` clean, and
+  `scripts/release/viewer-site.sh --release` plus
+  `scripts/checks/viewer-bundle.sh` passing when the task touches the build
+  surface. When the change touches a journey and Chrome for Testing is
+  available, run `scripts/ui-e2e.sh` too; if you cannot, say so explicitly, because CI's `ui-e2e` job gates the merge
   regardless. Report actual command output; never claim green you did not see.
 
 Your final message reports: what changed (files), gate evidence, the bundle

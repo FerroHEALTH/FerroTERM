@@ -47,7 +47,6 @@ use crate::components::reload::focus_report;
 use crate::components::reload::reload_offer;
 use crate::components::reload::reloaded_text;
 use crate::components::shell::SelectedVersion;
-use crate::components::spinner::Spinner;
 use crate::fhir::CODE_SYSTEM;
 use crate::fhir::FhirClient;
 use crate::fhir::error::FhirError;
@@ -59,6 +58,7 @@ use crate::fhir::version::FhirVersion;
 use crate::fhir::write::Refusal;
 use crate::routes::editing_link;
 use crate::styles;
+use ferrohealth_ui::view::empty::{Busy, busy};
 
 /// The value set whose codes `CodeSystem.status` is bound to.
 ///
@@ -120,25 +120,27 @@ pub(crate) fn EditorPage() -> impl IntoView {
     // back, rather than an effect writing the form's own signals.
     let reload = Reload::new(system);
     let reader = client.clone();
-    let stored = LocalResource::new(move || {
-        let client = reader.clone();
-        let version = version.get();
-        let system = system.get();
-        reload.track();
-        async move {
-            if system.trim().is_empty() {
-                return Ok(None);
+    let stored = Resource::new(
+        move || (version.get(), system.get(), reload.generation()),
+        move |(version, system, _reloads)| {
+            let client = reader.clone();
+            async move {
+                if system.trim().is_empty() {
+                    return Ok(None);
+                }
+                client.authored(version, &system).await
             }
-            client.authored(version, &system).await
-        }
-    });
+        },
+    );
 
     let capability_client = client.clone();
-    let capabilities = LocalResource::new(move || {
-        let client = capability_client.clone();
-        let version = version.get();
-        async move { client.terminology_capabilities(version).await }
-    });
+    let capabilities = Resource::new(
+        move || version.get(),
+        move |version| {
+            let client = capability_client.clone();
+            async move { client.terminology_capabilities(version).await }
+        },
+    );
     let standing = standing_of(capabilities, system);
 
     let statuses = codes_of(&client, version, bound(PUBLICATION_STATUS));
@@ -147,18 +149,29 @@ pub(crate) fn EditorPage() -> impl IntoView {
 
     let heading = view! {
         <Title text=move || title_of(&system.get()) />
-        <header>
-            <h1 class=styles::PAGE_TITLE>"Edit a code system"</h1>
-            <p class=styles::LEAD>
-                "Its metadata, the properties it declares, and its concepts with their designations and lifecycle."
-            </p>
-        </header>
+        <div>
+            {ferrohealth_ui::view::surface::page_heading(
+                ferrohealth_ui::view::surface::Header {
+                    title: String::from("Edit a code system"),
+                    subtitle: Some(
+                        String::from(
+                            "Its metadata, the properties it declares, and its concepts with their designations and lifecycle.",
+                        ),
+                    ),
+                    crumbs: vec![
+                        ferrohealth_ui::view::surface::Crumb::new("Code systems", "/systems"),
+                    ],
+                    mono: false,
+                },
+                (),
+            )}
+        </div>
     }
     .into_any();
 
     let form = view! {
         <Transition fallback=|| {
-            view! { <Spinner label="Reading the code system" /> }
+            busy("Reading the code system", Busy::Section)
         }>
             {move || {
                 let client = client.clone();
@@ -202,7 +215,7 @@ pub(crate) fn EditorPage() -> impl IntoView {
 /// different standings and neither is "no artifact": the screen offers to
 /// change nothing it cannot place.
 fn standing_of(
-    capabilities: LocalResource<Result<TerminologyCapabilities, FhirError>>,
+    capabilities: Resource<Result<TerminologyCapabilities, FhirError>>,
     system: Signal<String>,
 ) -> Standing {
     Standing {
@@ -365,7 +378,7 @@ fn form_section(
         version,
     );
 
-    view! {
+    ferrohealth_ui::view::surface::stack(view! {
         {notice}
         {versions}
         {outcome}
@@ -373,7 +386,7 @@ fn form_section(
         {properties}
         {concepts}
         {save}
-    }
+    })
     .into_any()
 }
 
@@ -438,7 +451,15 @@ fn outcome_section(
             id=REPORT_ID
             tabindex="-1"
             aria-live="polite"
-            class=format!("mt-default {}", styles::MUTED)
+            // An empty region keeps its place in the accessibility tree and
+            // takes none on the page, so it still announces what arrives.
+            class=move || {
+                if report.with(String::is_empty) {
+                    "fui-sr-only".to_owned()
+                } else {
+                    styles::MUTED.to_owned()
+                }
+            }
         >
             {move || report.get()}
         </p>
@@ -502,11 +523,11 @@ fn validation_view(validation: &Validation) -> AnyView {
     let status = validation.status.clone().unwrap_or_default();
     let message = validation.message.clone().unwrap_or_default();
     view! {
-        <section class="mt-loose" aria-labelledby="editor-check-heading">
-            <h2 id="editor-check-heading" class=styles::SECTION_TITLE>
+        <section class="fui-card" aria-labelledby="editor-check-heading">
+            <h2 id="editor-check-heading" class="fui-card-title">
                 "What the server says about the retired concept"
             </h2>
-            <p class=styles::LEAD>
+            <p class="fui-muted">
                 "CodeSystem/$validate-code, run against the version that was just saved."
             </p>
             <table class=format!("mt-default {}", styles::TABLE)>
@@ -566,8 +587,8 @@ fn metadata_section(draft: RwSignal<Draft>, readonly: Signal<bool>, options: Opt
     let url = seed.url.clone();
     let business = seed.version.clone();
     view! {
-        <section class="mt-loose" aria-labelledby="editor-metadata-heading">
-            <h2 id="editor-metadata-heading" class=styles::SECTION_TITLE>
+        <section class="fui-card" aria-labelledby="editor-metadata-heading">
+            <h2 id="editor-metadata-heading" class="fui-card-title">
                 "Metadata"
             </h2>
             <div class="mt-default grid gap-default sm:grid-cols-2">
@@ -663,11 +684,11 @@ fn properties_section(draft: RwSignal<Draft>, readonly: Signal<bool>, kinds: Cod
             .collect::<Vec<Key>>()
     });
     view! {
-        <section class="mt-loose" aria-labelledby="editor-properties-heading">
-            <h2 id="editor-properties-heading" class=styles::SECTION_TITLE>
+        <section class="fui-card" aria-labelledby="editor-properties-heading">
+            <h2 id="editor-properties-heading" class="fui-card-title">
                 "Declared properties"
             </h2>
-            <p class=styles::LEAD>
+            <p class="fui-muted">
                 "The lifecycle properties are declared by the editor on every save, so they are not listed here."
             </p>
             <table class=format!("mt-default {}", styles::TABLE)>
@@ -864,11 +885,11 @@ fn concepts_section(draft: RwSignal<Draft>, readonly: Signal<bool>, kinds: Codes
             .collect::<Vec<Key>>()
     });
     view! {
-        <section class="mt-loose" aria-labelledby="editor-concepts-heading">
-            <h2 id="editor-concepts-heading" class=styles::SECTION_TITLE>
+        <section class="fui-card" aria-labelledby="editor-concepts-heading">
+            <h2 id="editor-concepts-heading" class="fui-card-title">
                 "Concepts"
             </h2>
-            <p class=styles::LEAD>
+            <p class="fui-muted">
                 "A concept is retired rather than removed, so a code that has been published keeps meaning what it meant."
             </p>
             <div class="mt-default grid gap-default">
@@ -919,8 +940,8 @@ fn concept_row(draft: RwSignal<Draft>, key: Key, readonly: Signal<bool>, kinds: 
     let values = values_view(draft, key, readonly, kinds);
     let lifecycle = lifecycle_view(draft, key, readonly);
     view! {
-        <fieldset class=format!("p-default {}", styles::PANEL)>
-            <legend class=styles::EYEBROW>{named}</legend>
+        <fieldset class="fui-fieldset fui-well">
+            <legend>{named}</legend>
             <div class="grid gap-default sm:grid-cols-2">
                 <div class="grid gap-tight">
                     <label for=format!("concept-{id}-code") class=styles::LABEL>
@@ -1027,7 +1048,7 @@ fn lifecycle_view(draft: RwSignal<Draft>, key: Key, readonly: Signal<bool>) -> A
                 <select
                     id=format!("concept-{id}-lifecycle")
                     name="concept-lifecycle"
-                    class=styles::INPUT
+                    class=ferrohealth_ui::view::form::SELECT
                     disabled=move || readonly.get()
                     prop:value=move || state.get().status().to_owned()
                     on:change=move |event: Event| {
@@ -1480,12 +1501,10 @@ fn save_section(
         report.set(String::from("Saving"));
         let client = client.get_value();
         let version = version.get_untracked();
-        let token = session.token();
         spawn_local(async move {
             send_it(
                 &client,
                 version,
-                token.as_deref(),
                 &held,
                 Reports {
                     draft,
@@ -1502,11 +1521,11 @@ fn save_section(
     };
     view! {
         <Show when=move || !readonly.get() fallback=|| ()>
-            <section class="mt-loose" aria-labelledby="editor-save-heading">
-                <h2 id="editor-save-heading" class=styles::SECTION_TITLE>
+            <section class="fui-card" aria-labelledby="editor-save-heading">
+                <h2 id="editor-save-heading" class="fui-card-title">
                     "Save"
                 </h2>
-                <p class=styles::LEAD>
+                <p class="fui-muted">
                     "An update states the version it replaces, so a change made elsewhere since this form was opened is refused rather than overwritten."
                 </p>
                 <p class="mt-default">
@@ -1559,16 +1578,10 @@ struct Reports {
 }
 
 /// Sends one save and writes down what came back.
-async fn send_it(
-    client: &FhirClient,
-    version: FhirVersion,
-    token: Option<&str>,
-    held: &Draft,
-    into: Reports,
-) {
+async fn send_it(client: &FhirClient, version: FhirVersion, held: &Draft, into: Reports) {
     let body = held.body();
     let written = if held.id.is_empty() {
-        Box::pin(client.create(version, CODE_SYSTEM, &body, token)).await
+        Box::pin(client.create(version, CODE_SYSTEM, &body)).await
     } else {
         Box::pin(client.update(
             version,
@@ -1576,7 +1589,6 @@ async fn send_it(
             &held.id,
             &body,
             Some(held.version_id.as_str()).filter(|version| !version.is_empty()),
-            token,
         ))
         .await
     };

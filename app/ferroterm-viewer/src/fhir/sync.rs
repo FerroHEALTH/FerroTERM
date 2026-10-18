@@ -15,10 +15,11 @@
 //! a screen draws. Only those five are read: the record carries its counts as
 //! pointer-sized integers, and WebAssembly is 32-bit.
 
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// One local code a new release changed, as the screen draws it.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub(crate) struct Finding {
     /// The locally authored resource that names the code, as the run named it.
     pub(crate) resource: String,

@@ -13,10 +13,10 @@
 
 use std::collections::BTreeMap;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// What the narrowed search answered.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct NamedSearch {
     /// `Bundle.entry`, one per match.
     #[serde(default)]
@@ -24,14 +24,14 @@ pub(crate) struct NamedSearch {
 }
 
 /// One `Bundle.entry`.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 struct NamedEntry {
     /// The resource the entry carries.
     resource: Option<Named>,
 }
 
 /// One published resource, as little of it as a name needs.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 struct Named {
     /// The canonical a request carries.
     url: Option<String>,

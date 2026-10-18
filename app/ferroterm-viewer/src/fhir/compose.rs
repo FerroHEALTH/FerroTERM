@@ -15,7 +15,7 @@
 //! The model lives here, outside every component, so the composition rules and
 //! the JSON the server receives are values plain unit tests can pin.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use serde_json::Number;
 use serde_json::Value;
@@ -719,7 +719,7 @@ impl ClauseFilter {
 ///
 /// It carries the elements the composer authors and the `meta` an update needs,
 /// and nothing else: the viewer never mirrors a whole FHIR resource.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct StoredValueSet {
     /// `ValueSet.id`.
     #[serde(default)]
@@ -748,7 +748,7 @@ pub(crate) struct StoredValueSet {
 }
 
 /// The `meta` elements the composer reads.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 struct StoredMeta {
     /// `meta.versionId`.
     #[serde(default, rename = "versionId")]
@@ -756,7 +756,7 @@ struct StoredMeta {
 }
 
 /// `ValueSet.compose`, as it is read back.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(default)]
 struct StoredCompose {
     /// `compose.inactive`.
@@ -768,7 +768,7 @@ struct StoredCompose {
 }
 
 /// One `compose.include` or `compose.exclude`, as it is read back.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(default)]
 struct StoredSet {
     /// `system`.
@@ -785,7 +785,7 @@ struct StoredSet {
 }
 
 /// One `compose.include.concept`, as it is read back.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(default)]
 struct StoredConcept {
     /// `concept.code`.
@@ -795,7 +795,7 @@ struct StoredConcept {
 }
 
 /// One `compose.include.filter`, as it is read back.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(default)]
 struct StoredFilter {
     /// `filter.property`.

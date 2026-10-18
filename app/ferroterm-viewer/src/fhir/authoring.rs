@@ -11,14 +11,14 @@
 //! This is still the minimum the screen draws. The viewer never mirrors a
 //! whole FHIR resource.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// The resource type an entry must declare to be read as a code system.
 const CODE_SYSTEM: &str = "CodeSystem";
 
 /// What `GET [base]/CodeSystem?url=` answered, read for authoring.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct AuthoredSearch {
     /// `Bundle.entry`, one per match.
     #[serde(default)]
@@ -31,7 +31,7 @@ pub(crate) struct AuthoredSearch {
 /// resource (<https://hl7.org/fhir/R4B/http.html#update>), so every element
 /// the editor does not draw still has to reach the server again, and an
 /// element this viewer has never heard of cannot survive a typed read.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 struct SearchEntry {
     /// The resource the entry carries.
     resource: Option<Value>,
@@ -67,7 +67,7 @@ impl AuthoredSearch {
 /// This is the elements the screen draws, and no more. The resource itself
 /// travels beside it, so what the screen does not draw is still what is sent
 /// back.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct StoredCodeSystem {
     /// `id`, the logical id an update addresses.
     #[serde(default)]
@@ -99,7 +99,7 @@ pub(crate) struct StoredCodeSystem {
 }
 
 /// The `Resource.meta` elements the editor reads.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct Meta {
     /// `meta.versionId`, the version an `If-Match` states.
     #[serde(default, rename = "versionId")]
@@ -107,7 +107,7 @@ pub(crate) struct Meta {
 }
 
 /// One `CodeSystem.property` declaration.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct StoredProperty {
     /// `property.code`, the name a concept's value refers to.
     #[serde(default)]
@@ -121,7 +121,7 @@ pub(crate) struct StoredProperty {
 }
 
 /// One `CodeSystem.concept`.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct StoredConcept {
     /// `concept.code`.
     #[serde(default)]
@@ -141,7 +141,7 @@ pub(crate) struct StoredConcept {
 }
 
 /// One `concept.designation`.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct StoredDesignation {
     /// `designation.language`, a BCP 47 tag.
     #[serde(default)]
@@ -155,7 +155,7 @@ pub(crate) struct StoredDesignation {
 }
 
 /// A `Coding`, in the two elements the editor authors.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct StoredCoding {
     /// `Coding.system`.
     #[serde(default)]
@@ -171,7 +171,7 @@ pub(crate) struct StoredCoding {
 /// (<https://hl7.org/fhir/R4B/codesystem-definitions.html#CodeSystem.concept.property.value_x_>),
 /// and the editor draws one control per value whose shape the declared type
 /// decides, so every arm is read into the text that control holds.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct StoredValue {
     /// `property.code`, naming the declared property.
     #[serde(default)]
@@ -256,7 +256,7 @@ impl StoredValue {
 /// (<https://hl7.org/fhir/R4B/conceptmap.html>,
 /// <https://hl7.org/fhir/R5/conceptmap.html>). The resource itself travels
 /// beside this, so what the screen does not draw is still what is sent back.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct StoredConceptMap {
     /// `id`, the logical id an update addresses.
     #[serde(default)]
@@ -303,7 +303,7 @@ pub(crate) struct StoredConceptMap {
 }
 
 /// One `ConceptMap.group`.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct StoredMapGroup {
     /// `group.source`, a `uri` in R4 and R4B and a `canonical` in R5 and R6.
     #[serde(default)]
@@ -323,7 +323,7 @@ pub(crate) struct StoredMapGroup {
 }
 
 /// One `group.element`: a source code and what it maps to.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct StoredMapElement {
     /// `element.code`.
     #[serde(default)]
@@ -340,7 +340,7 @@ pub(crate) struct StoredMapElement {
 }
 
 /// One `element.target`: a code and its relationship to the source.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct StoredMapTarget {
     /// `target.code`.
     #[serde(default)]

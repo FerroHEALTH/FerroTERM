@@ -38,7 +38,6 @@ unicode-normalization = "0.1.25"
 axum = "0.8.9"
 prometheus-client = "0.25.1"
 tower = "0.5.3"
-tower-http = "0.7.1"
 hyper = "1.11.1"
 hyper-util = { version = "0.1.20", default-features = false, features = ["client-legacy", "http1", "tokio"] }
 http = "1.5.0"
@@ -69,10 +68,11 @@ md-5 = "0.11.0"
 # Serde and formats.
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.151", features = ["raw_value"] }
-# The synchronisation service reads one TOML configuration file; it writes
-# none, so the writer half of the crate stays out. Checked against crates.io on
+# The synchronisation service and the console each read one TOML configuration
+# file; the console writes its environment overrides back into the tree, so the
+# writer half is on. Checked against crates.io on
 # 2026-09-22.
-toml = { version = "1.1.6", default-features = false, features = ["std", "parse", "serde"] }
+toml = { version = "1.1.6", default-features = false, features = ["std", "parse", "display", "serde"] }
 # Bearer-token validation for the optional SMART App Launch gate: an RFC 7519
 # JWT verified against the issuer's RFC 7517 JWKS. The `aws_lc_rs` backend is
 # the one `rustls` already resolves to; the pure-Rust backend would add the
@@ -86,21 +86,34 @@ anyhow = "1.0.104"
 jiff = "0.2.35"
 # Expansion identifiers (`ValueSet.expansion.identifier`, a `urn:uuid:`).
 uuid = { version = "1.26.0", features = ["v4"] }
-# The viewer (app/ferroterm-viewer): a Leptos WebAssembly FHIR client, built by
-# Trunk and rendered entirely in the browser. Every version below was checked
-# against crates.io on 2026-09-06.
-leptos = { version = "0.8.20", features = ["csr"] }
-leptos_meta = "0.8.6"
-leptos_router = "0.8.15"
-gloo-net = { version = "0.7.0", default-features = false, features = ["http", "json"] }
-web-sys = "0.3.105"
-wasm-bindgen = "0.2.128"
-# The browser APIs the sign-in needs: `crypto.getRandomValues` and
-# `crypto.subtle.digest` are the PKCE primitives, and the digest is a promise.
-js-sys = "0.3.105"
-wasm-bindgen-futures = "0.4.78"
+# The console (app/ferroterm-viewer): a Leptos app rendered on the server and
+# hydrated in the browser, with a backend-for-frontend that reaches the FHIR
+# API server to server. The halves are chosen by target, so the workspace pins
+# leptos with no render-mode feature and the console turns `ssr` on for the
+# host and `hydrate` for wasm32. The wasm-bindgen CLI cargo-leptos runs must
+# equal the crate (docs/VERSIONS.md). Verified against crates.io on 2026-10-18.
+leptos = "0.8.22"
+leptos_axum = "0.8.10"
+leptos_meta = "0.8.7"
+leptos_router = "0.8.17"
+wasm-bindgen = "=0.2.129"
 console_error_panic_hook = "0.1.7"
+# The shared FerroHEALTH UI components, pinned exactly: a console moves its pin
+# after looking at its own screens. Verified against crates.io on 2026-10-19.
+ferrohealth-ui = "=0.1.3"
 percent-encoding = "2.3.2"
+# The console's operator sign-in: the `__Host-` session cookies, the random
+# ids, PKCE verifiers and the SHA-256 of a PKCE challenge (RFC 7636 §4.2) from
+# the crypto library rustls already builds on, a configured secret held so it
+# never renders, and the URLs of the FHIR server and the OpenID Provider.
+# Verified against crates.io on 2026-10-18.
+cookie = { version = "0.18.2", default-features = false }
+aws-lc-rs = { version = "1.18.2", default-features = false, features = ["aws-lc-sys"] }
+secrecy = { version = "0.10.3", features = ["serde"] }
+url = "2.5.8"
+# Only the console's site bundle is compressed, brotli or gzip as the request
+# asks; the security headers are set per response. Verified 2026-10-18.
+tower-http = { version = "0.7.1", default-features = false, features = ["set-header", "compression-br", "compression-gzip"] }
 # Observability.
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
@@ -279,10 +292,9 @@ panic = "unwind"
 overflow-checks = true
 debug = "line-tables-only"
 
-# The viewer bundle is downloaded by every reader, so it optimizes for size
-# where the server optimizes for speed. `index.html` selects this profile with
-# `data-cargo-profile-release`
-# (https://github.com/trunk-rs/trunk/blob/main/guide/src/assets/index.md).
+# The console's WebAssembly is downloaded by every reader, so it optimizes for
+# size where the server optimizes for speed. cargo-leptos selects this profile
+# with `lib-profile-release` in app/ferroterm-viewer/Cargo.toml.
 [profile.wasm-release]
 inherits = "release"
 opt-level = "z"
@@ -292,3 +304,4 @@ codegen-units = 1
 # is dead weight in a downloaded artifact.
 debug = false
 strip = "debuginfo"
+

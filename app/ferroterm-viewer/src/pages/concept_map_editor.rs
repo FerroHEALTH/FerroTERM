@@ -49,7 +49,6 @@ use crate::components::reload::focus_report;
 use crate::components::reload::reload_offer;
 use crate::components::reload::reloaded_text;
 use crate::components::shell::SelectedVersion;
-use crate::components::spinner::Spinner;
 use crate::fhir::CONCEPT_MAP;
 use crate::fhir::FhirClient;
 use crate::fhir::concept::ConceptQuery;
@@ -61,6 +60,7 @@ use crate::fhir::version::FhirVersion;
 use crate::fhir::write::Refusal;
 use crate::routes::editing_link;
 use crate::styles;
+use ferrohealth_ui::view::empty::{Busy, busy};
 
 /// The value set whose codes `ConceptMap.status` is bound to.
 ///
@@ -119,18 +119,18 @@ pub(crate) fn ConceptMapEditorPage() -> impl IntoView {
     // back, rather than an effect writing the form's own signals.
     let reload = Reload::new(canonical);
     let reader = client.clone();
-    let stored = LocalResource::new(move || {
-        let client = reader.clone();
-        let version = version.get();
-        let canonical = canonical.get();
-        reload.track();
-        async move {
-            if canonical.trim().is_empty() {
-                return Ok(None);
+    let stored = Resource::new(
+        move || (version.get(), canonical.get(), reload.generation()),
+        move |(version, canonical, _reloads)| {
+            let client = reader.clone();
+            async move {
+                if canonical.trim().is_empty() {
+                    return Ok(None);
+                }
+                client.authored_map(version, &canonical).await
             }
-            client.authored_map(version, &canonical).await
-        }
-    });
+        },
+    );
 
     let statuses = codes_of(
         &client,
@@ -148,18 +148,29 @@ pub(crate) fn ConceptMapEditorPage() -> impl IntoView {
 
     let heading = view! {
         <Title text=move || title_of(&canonical.get()) />
-        <header>
-            <h1 class=styles::PAGE_TITLE>"Edit a concept map"</h1>
-            <p class=styles::LEAD>
-                "Its metadata, the systems each group maps between, and every code with what it maps to."
-            </p>
-        </header>
+        <div>
+            {ferrohealth_ui::view::surface::page_heading(
+                ferrohealth_ui::view::surface::Header {
+                    title: String::from("Edit a concept map"),
+                    subtitle: Some(
+                        String::from(
+                            "Its metadata, the systems each group maps between, and every code with what it maps to.",
+                        ),
+                    ),
+                    crumbs: vec![
+                        ferrohealth_ui::view::surface::Crumb::new("Concept maps", "/conceptmaps"),
+                    ],
+                    mono: false,
+                },
+                (),
+            )}
+        </div>
     }
     .into_any();
 
     let form = view! {
         <Transition fallback=|| {
-            view! { <Spinner label="Reading the concept map" /> }
+            busy("Reading the concept map", Busy::Section)
         }>
             {move || {
                 let client = client.clone();
@@ -288,14 +299,14 @@ fn form_section(
         held, version, draft, readonly, saving, report, refusal, session, canonical,
     );
 
-    view! {
+    ferrohealth_ui::view::surface::stack(view! {
         {notice}
         {versions}
         {outcome}
         {metadata}
         {groups}
         {save}
-    }
+    })
     .into_any()
 }
 
@@ -343,7 +354,15 @@ fn outcome_section(
             id=REPORT_ID
             tabindex="-1"
             aria-live="polite"
-            class=format!("mt-default {}", styles::MUTED)
+            // An empty region keeps its place in the accessibility tree and
+            // takes none on the page, so it still announces what arrives.
+            class=move || {
+                if report.with(String::is_empty) {
+                    "fui-sr-only".to_owned()
+                } else {
+                    styles::MUTED.to_owned()
+                }
+            }
         >
             {move || report.get()}
         </p>
@@ -397,8 +416,8 @@ fn metadata_section(
     let source_label = move || format!("Source scope ({})", dialect(version.get()).source_scope);
     let target_label = move || format!("Target scope ({})", dialect(version.get()).target_scope);
     view! {
-        <section class="mt-loose" aria-labelledby="map-metadata-heading">
-            <h2 id="map-metadata-heading" class=styles::SECTION_TITLE>
+        <section class="fui-card" aria-labelledby="map-metadata-heading">
+            <h2 id="map-metadata-heading" class="fui-card-title">
                 "Metadata"
             </h2>
             <div class="mt-default grid gap-default sm:grid-cols-2">
@@ -507,11 +526,11 @@ fn groups_section(
             .collect::<Vec<Key>>()
     });
     view! {
-        <section class="mt-loose" aria-labelledby="map-groups-heading">
-            <h2 id="map-groups-heading" class=styles::SECTION_TITLE>
+        <section class="fui-card" aria-labelledby="map-groups-heading">
+            <h2 id="map-groups-heading" class="fui-card-title">
                 "Groups"
             </h2>
-            <p class=styles::LEAD>
+            <p class="fui-muted">
                 "A group maps codes of one system to codes of another, and carries at least one code."
             </p>
             <div class="mt-default grid gap-default">
@@ -575,8 +594,8 @@ fn group_panel(
     );
     let systems = systems_view(draft, key, readonly);
     view! {
-        <fieldset class=format!("p-default {}", styles::PANEL)>
-            <legend class=styles::EYEBROW>{named}</legend>
+        <fieldset class="fui-fieldset fui-well">
+            <legend>{named}</legend>
             {systems}
             {elements}
             <Show when=move || !readonly.get() fallback=|| ()>
@@ -799,8 +818,8 @@ fn element_panel(
     let no_map = no_map_control(draft, version, group, key, readonly);
     let fields = element_fields(draft, group, key, readonly);
     view! {
-        <fieldset class=format!("p-default {}", styles::PANEL)>
-            <legend class=styles::EYEBROW>
+        <fieldset class="fui-fieldset fui-well">
+            <legend>
                 {move || {
                     let code = element_of(draft, group, key, |element| element.code.clone());
                     if code.trim().is_empty() { "A code not chosen yet".to_owned() } else { code }
@@ -1177,29 +1196,29 @@ fn picker(
 ) -> AnyView {
     let typed = RwSignal::new(String::new());
     let asked = RwSignal::new(String::new());
-    let found = LocalResource::new(move || {
-        let client = client.get_value();
-        let version = version.get();
-        let system = system.get();
-        let filter = asked.get();
-        async move {
-            if system.trim().is_empty() || filter.trim().is_empty() {
-                return Ok(Vec::new());
+    let found = Resource::new(
+        move || (version.get(), system.get(), asked.get()),
+        move |(version, system, filter)| {
+            let client = client.get_value();
+            async move {
+                if system.trim().is_empty() || filter.trim().is_empty() {
+                    return Ok(Vec::new());
+                }
+                let query = ConceptQuery {
+                    system,
+                    filter: Some(filter),
+                    count: SEARCH_COUNT,
+                    ..ConceptQuery::default()
+                };
+                client.expand_inline(version, &query).await.map(|expanded| {
+                    expanded
+                        .expansion()
+                        .map(|expansion| expansion.concepts)
+                        .unwrap_or_default()
+                })
             }
-            let query = ConceptQuery {
-                system,
-                filter: Some(filter),
-                count: SEARCH_COUNT,
-                ..ConceptQuery::default()
-            };
-            client.expand_inline(version, &query).await.map(|expanded| {
-                expanded
-                    .expansion()
-                    .map(|expansion| expansion.concepts)
-                    .unwrap_or_default()
-            })
-        }
-    });
+        },
+    );
     let named = StoredValue::new(id);
     let field = move || format!("{}-search", named.with_value(Clone::clone));
     let region = move || format!("{}-found", named.with_value(Clone::clone));
@@ -1256,7 +1275,7 @@ fn picker(
             // A picker that has not been searched has nothing to wait for, so a
             // saved map with twenty codes does not paint twenty spinners.
             <Transition fallback=move || {
-                (!asked.read().trim().is_empty()).then(|| view! { <Spinner label="Searching" /> })
+                (!asked.read().trim().is_empty()).then(|| busy("Searching", Busy::Section))
             }>{results}</Transition>
         </div>
     }
@@ -1529,12 +1548,10 @@ fn save_section(
         refusal.set(None);
         report.set(String::from("Saving"));
         let client = client.get_value();
-        let token = session.token();
         spawn_local(async move {
             send_it(
                 &client,
                 at,
-                token.as_deref(),
                 &held,
                 Reports {
                     draft,
@@ -1557,11 +1574,11 @@ fn save_section(
     };
     view! {
         <Show when=move || !readonly.get() fallback=|| ()>
-            <section class="mt-loose" aria-labelledby="map-save-heading">
-                <h2 id="map-save-heading" class=styles::SECTION_TITLE>
+            <section class="fui-card" aria-labelledby="map-save-heading">
+                <h2 id="map-save-heading" class="fui-card-title">
                     "Save"
                 </h2>
-                <p class=styles::LEAD>
+                <p class="fui-muted">
                     "An update states the version it replaces, so a change made elsewhere since this form was opened is refused rather than overwritten."
                 </p>
                 <Show when=move || !problems.read().is_empty() fallback=|| ()>
@@ -1606,16 +1623,10 @@ struct Reports {
 }
 
 /// Sends one save and writes down what came back.
-async fn send_it(
-    client: &FhirClient,
-    version: FhirVersion,
-    token: Option<&str>,
-    held: &MapDraft,
-    into: Reports,
-) {
+async fn send_it(client: &FhirClient, version: FhirVersion, held: &MapDraft, into: Reports) {
     let body = held.body(version);
     let written = if held.id.is_empty() {
-        Box::pin(client.create(version, CONCEPT_MAP, &body, token)).await
+        Box::pin(client.create(version, CONCEPT_MAP, &body)).await
     } else {
         Box::pin(client.update(
             version,
@@ -1623,7 +1634,6 @@ async fn send_it(
             &held.id,
             &body,
             Some(held.version_id.as_str()).filter(|version| !version.is_empty()),
-            token,
         ))
         .await
     };

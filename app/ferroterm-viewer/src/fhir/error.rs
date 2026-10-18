@@ -1,6 +1,7 @@
 //! The typed failure every FHIR request can return.
 
 use http::StatusCode;
+use serde::{Deserialize, Serialize};
 
 use crate::fhir::outcome::OperationOutcome;
 
@@ -10,9 +11,9 @@ use crate::fhir::outcome::OperationOutcome;
 /// [`StatusCode`] rather than a number so a comparison cannot be written
 /// against a literal, and the server's own `OperationOutcome` travels as data
 /// so a screen can render its wording verbatim.
-#[derive(Clone, Debug, thiserror::Error)]
+#[derive(Clone, Debug, thiserror::Error, Serialize, Deserialize)]
 pub(crate) enum FhirError {
-    /// The browser could not send the request or read the answer.
+    /// The request could not be sent or the answer read.
     #[error("{url} could not be reached: {message}")]
     Transport {
         /// The URL that was attempted.
@@ -26,6 +27,7 @@ pub(crate) enum FhirError {
         /// The URL that was requested.
         url: String,
         /// The HTTP status the server answered with.
+        #[serde(with = "status_code")]
         status: StatusCode,
         /// The refusal, as the server wrote it.
         outcome: OperationOutcome,
@@ -37,6 +39,7 @@ pub(crate) enum FhirError {
         /// The URL that was requested.
         url: String,
         /// The HTTP status the server answered with.
+        #[serde(with = "status_code")]
         status: StatusCode,
         /// The first part of the body, so a reader sees what arrived.
         body: String,
@@ -131,5 +134,27 @@ mod tests {
             "/r6/metadata answered 502 Bad Gateway without an OperationOutcome",
             "the message says what was asked and what came back"
         );
+    }
+}
+
+/// A [`StatusCode`] as the number a page carries from the server to the
+/// browser half (serde, `with`).
+mod status_code {
+    use http::StatusCode;
+    use serde::{Deserialize as _, Deserializer, Serializer};
+
+    /// Writes `status` as its number.
+    #[expect(
+        clippy::trivially_copy_pass_by_ref,
+        reason = "serde's `with` calls the function with a reference to the field"
+    )]
+    pub(super) fn serialize<S: Serializer>(status: &StatusCode, out: S) -> Result<S::Ok, S::Error> {
+        out.serialize_u16(status.as_u16())
+    }
+
+    /// Reads a status from its number, refusing one that is no HTTP status.
+    pub(super) fn deserialize<'de, D: Deserializer<'de>>(input: D) -> Result<StatusCode, D::Error> {
+        let code = u16::deserialize(input)?;
+        StatusCode::from_u16(code).map_err(serde::de::Error::custom)
     }
 }

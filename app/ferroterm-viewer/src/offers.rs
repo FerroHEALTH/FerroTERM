@@ -27,6 +27,8 @@ pub(crate) fn published(
     resource_type: &'static str,
 ) -> Memo<NamedSearch> {
     let client = client.clone();
+    // NOTE: Leptos book, `async/10_resources`: a read a memo outside every
+    // suspense boundary consumes is the browser's own, so hydration never sees it.
     let read = LocalResource::new(move || {
         let client = client.clone();
         let version = version.get();

@@ -71,6 +71,9 @@ exceptions = [
   { allow = ["BUSL-1.1"], crate = "ferroterm-server" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-sync" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-viewer" },
+  # The FerroHEALTH console components, published by the same Licensor under
+  # the same licence, which the console links from crates.io.
+  { allow = ["BUSL-1.1"], crate = "ferrohealth-ui" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-build" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-bench" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-testkit" },

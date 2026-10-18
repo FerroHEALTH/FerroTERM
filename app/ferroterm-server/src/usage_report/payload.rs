@@ -236,7 +236,8 @@ pub struct Status {
     pub index_ok: bool,
     /// The loaded code system families, unique and sorted ascending.
     pub code_systems: Vec<Family>,
-    /// Whether the viewer is mounted under `/ui`.
+    /// Whether this server mounts a viewer, which it no longer does: the
+    /// console is a binary of its own.
     pub viewer: bool,
     /// Whether a resources database is configured.
     pub persistence: bool,

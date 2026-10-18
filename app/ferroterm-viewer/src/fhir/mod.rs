@@ -1,65 +1,56 @@
-//! The FHIR client: the one module in the viewer that issues HTTP.
+//! The FHIR client: the one module in the console that builds a request.
 //!
-//! Every request goes to the origin the bundle was served from, so the viewer
-//! is a client of this server's public API and nothing else. No component
-//! calls `fetch`, and no second client exists.
+//! Every request is an ordinary request to the terminology server's public
+//! FHIR API, written as an [`exchange::Exchange`] and sent from whichever half
+//! of the console runs it: the server half calls the server itself, and the
+//! browser half asks the console's server to, so no token reaches the
+//! browser. No component builds a request, and no second client exists.
 
-#[cfg(feature = "editor")]
+pub(crate) mod activity;
 pub(crate) mod authoring;
 pub(crate) mod capability;
 pub(crate) mod code_system;
-#[cfg(feature = "editor")]
 pub(crate) mod compose;
 pub(crate) mod concept;
 pub(crate) mod concept_map;
 pub(crate) mod error;
+pub mod exchange;
 pub(crate) mod expansion;
 pub(crate) mod facts;
 pub(crate) mod named;
 pub(crate) mod outcome;
 pub(crate) mod searchset;
-pub(crate) mod smart;
-#[cfg(feature = "editor")]
 pub(crate) mod sync;
 pub(crate) mod terminology;
 pub(crate) mod translate;
 pub(crate) mod validation;
 pub(crate) mod value_set;
-pub(crate) mod version;
-#[cfg_attr(
-    not(feature = "editor"),
-    expect(
-        dead_code,
-        reason = "only the editor bundle carries a screen that writes or reads a version"
-    )
-)]
+pub mod version;
 pub(crate) mod write;
 
-use gloo_net::http::Request;
-use gloo_net::http::Response;
 use http::StatusCode;
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 
 use crate::fhir::capability::CapabilityStatement;
 use crate::fhir::code_system::CodeSystemSearch;
-#[cfg(feature = "editor")]
 use crate::fhir::compose::Draft;
-#[cfg(feature = "editor")]
 use crate::fhir::compose::Preview;
 use crate::fhir::concept::ConceptQuery;
 use crate::fhir::concept::LookupAnswer;
 use crate::fhir::concept::LookupRequest;
 use crate::fhir::concept_map::PublishedConceptMap;
 use crate::fhir::error::FhirError;
+use crate::fhir::exchange::Answer;
+use crate::fhir::exchange::Exchange;
+use crate::fhir::exchange::ExchangeError;
+use crate::fhir::exchange::Method;
 use crate::fhir::expansion::ExpandRequest;
 use crate::fhir::expansion::ExpandedValueSet;
 use crate::fhir::named::NamedSearch;
 use crate::fhir::outcome::OperationOutcome;
 use crate::fhir::searchset::SearchFilter;
 use crate::fhir::searchset::SearchSet;
-use crate::fhir::smart::SignIn;
-use crate::fhir::smart::SmartConfiguration;
-use crate::fhir::smart::TokenAnswer;
 use crate::fhir::terminology::TerminologyCapabilities;
 use crate::fhir::translate::TranslateAnswer;
 use crate::fhir::translate::TranslateRequest;
@@ -71,7 +62,6 @@ use crate::fhir::version::FhirVersion;
 use crate::fhir::write::History;
 use crate::fhir::write::Written;
 use crate::fhir::write::if_match;
-use crate::routes::CALLBACK_PATH;
 use crate::url::RequestUrl;
 
 /// The media type a FHIR JSON request asks for.
@@ -80,21 +70,12 @@ use crate::url::RequestUrl;
 /// (<https://hl7.org/fhir/R4B/http.html#mime-type>).
 const FHIR_JSON: &str = "application/fhir+json";
 
-/// The media type of everything this viewer reads that is not FHIR.
-///
-/// The SMART discovery document is served as this whatever the request asks
-/// for (<https://hl7.org/fhir/smart-app-launch/conformance.html>), and the
-/// sync service's admin listener answers ordinary JSON too.
+/// The media type of everything the console reads that is not FHIR: the
+/// health route and the sync service's admin listener answer ordinary JSON.
 const PLAIN_JSON: &str = "application/json";
-
-/// The media type an OAuth token or revocation request sends (RFC 6749 §4.1.3).
-const FORM_ENCODED: &str = "application/x-www-form-urlencoded";
 
 /// How much of an unparseable failure body is kept as evidence.
 const BODY_EXCERPT_BYTES: usize = 2_000;
-
-/// The path the bundle is served under, which the server root sits above.
-const UI_PREFIX: &str = "/ui";
 
 /// The `ValueSet` resource type, as it appears in a request path.
 pub(crate) const VALUE_SET: &str = "ValueSet";
@@ -105,30 +86,21 @@ pub(crate) const CODE_SYSTEM: &str = "CodeSystem";
 /// The `ConceptMap` resource type, as it appears in a request path.
 pub(crate) const CONCEPT_MAP: &str = "ConceptMap";
 
-/// A client for the FerroTERM server that served this bundle.
+/// A client for the FerroTERM server the console is configured with.
+///
+/// `root` is the address the server's readers reach it at, which every
+/// request address a screen discloses starts with; the console's server
+/// decides where a request actually goes.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct FhirClient {
     root: String,
 }
 
 impl FhirClient {
-    /// Builds a client from the address of the page the bundle came from.
-    ///
-    /// The base is never compiled in: one bundle serves every deployment, and
-    /// a build-time address would make the artifact deployment-specific.
-    pub(crate) fn from_document() -> Self {
-        let location = web_sys::window().map(|window| window.location());
-        let origin = location
-            .as_ref()
-            .and_then(|location| location.origin().ok())
-            .unwrap_or_default();
-        let pathname = location
-            .as_ref()
-            .and_then(|location| location.pathname().ok())
-            .unwrap_or_default();
-        Self {
-            root: server_root(&origin, &pathname),
-        }
+    /// A client whose disclosed addresses start with `root`, the server's
+    /// public root without a final `/`.
+    pub(crate) fn new(root: String) -> Self {
+        Self { root }
     }
 
     /// The FHIR base of one served version, as a reader would type it.
@@ -149,12 +121,12 @@ impl FhirClient {
     /// server, and [`FhirError::Status`] when it answered a failure.
     pub(crate) async fn health(&self) -> Result<StatusCode, FhirError> {
         let url = RequestUrl::new().segment("health").render(&self.root);
-        let response = send(Request::get(&url), &url).await?;
-        let status = status_of(&response, &url)?;
+        let answer = self.send(Method::Get, &url, PLAIN_JSON).await?;
+        let status = status_of(&answer, &url)?;
         if status.is_success() {
             Ok(status)
         } else {
-            Err(failure(&response, status, &url).await)
+            Err(failure(&answer, status, &url))
         }
     }
 
@@ -260,8 +232,8 @@ impl FhirClient {
         &self,
         version: FhirVersion,
         system: &str,
-    ) -> Result<CodeSystemSearch, FhirError> {
-        self.get_json(&self.code_system_search_url(version, system))
+    ) -> Result<Document<CodeSystemSearch>, FhirError> {
+        self.get_document(&self.code_system_search_url(version, system))
             .await
     }
 
@@ -425,8 +397,8 @@ impl FhirClient {
         &self,
         version: FhirVersion,
         id: &str,
-    ) -> Result<PublishedValueSet, FhirError> {
-        self.get_json(&self.resource_url(version, VALUE_SET, id))
+    ) -> Result<Document<PublishedValueSet>, FhirError> {
+        self.get_document(&self.resource_url(version, VALUE_SET, id))
             .await
     }
 
@@ -455,8 +427,8 @@ impl FhirClient {
         &self,
         version: FhirVersion,
         id: &str,
-    ) -> Result<PublishedConceptMap, FhirError> {
-        self.get_json(&self.resource_url(version, CONCEPT_MAP, id))
+    ) -> Result<Document<PublishedConceptMap>, FhirError> {
+        self.get_document(&self.resource_url(version, CONCEPT_MAP, id))
             .await
     }
 
@@ -563,80 +535,9 @@ impl FhirClient {
     ) -> Result<TranslateAnswer, FhirError> {
         self.get_json(&self.translate_url(version, request)).await
     }
-
-    /// The address the identity provider redirects a sign-in back to.
-    ///
-    /// It is derived from the page, like the FHIR base, so one bundle serves
-    /// every deployment. The same value is sent with the authorization request
-    /// and with the token request, which RFC 6749 §4.1.3 requires, and it is
-    /// what the operator registers with the identity provider.
-    pub(crate) fn redirect_uri(&self) -> String {
-        crate::routes::base_url()
-            .segment(CALLBACK_PATH)
-            .render(&self.root)
-    }
-
-    /// What a sign-in against this root needs, when it offers one.
-    ///
-    /// The capability statement is asked first, because SMART names
-    /// `SMART-on-FHIR` in `rest.security.service` and serves its discovery
-    /// document only where it does
-    /// (<https://hl7.org/fhir/smart-app-launch/conformance.html>). A
-    /// deployment that configured no issuer serves no document, and probing
-    /// for one would put a `404` in every reader's browser console.
-    ///
-    /// # Errors
-    ///
-    /// Returns the variant of [`FhirError`] describing what went wrong. A root
-    /// that offers no sign-in answers `Ok(None)`, which is a different answer
-    /// from a read that failed.
-    pub(crate) async fn sign_in_offer(
-        &self,
-        version: FhirVersion,
-    ) -> Result<Option<SignIn>, FhirError> {
-        // The two reads are boxed so this future holds a pointer to each
-        // rather than both state machines inlined into it.
-        let statement = Box::pin(self.capability_statement(version)).await?;
-        if !statement.declares_smart() {
-            return Ok(None);
-        }
-        let document = Box::pin(self.smart_configuration(version)).await?;
-        Ok(document.sign_in())
-    }
-
-    /// The address the served version's SMART discovery document sits at.
-    ///
-    /// SMART puts the document under the FHIR base of the server it describes,
-    /// so it is read per version, same-origin, like every other request here
-    /// (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
-    pub(crate) fn smart_configuration_url(&self, version: FhirVersion) -> String {
-        RequestUrl::new()
-            .segment(version.segment())
-            .segment(".well-known")
-            .segment("smart-configuration")
-            .render(&self.root)
-    }
-
-    /// Reads the SMART discovery document of one served version.
-    ///
-    /// # Errors
-    ///
-    /// Returns the variant of [`FhirError`] describing what went wrong. A
-    /// deployment that configured no issuer serves nothing here, which arrives
-    /// as a `404` refusal and means the viewer offers no sign-in.
-    pub(crate) async fn smart_configuration(
-        &self,
-        version: FhirVersion,
-    ) -> Result<SmartConfiguration, FhirError> {
-        let url = self.smart_configuration_url(version);
-        let response = send(Request::get(&url).header("Accept", PLAIN_JSON), &url).await?;
-        self.read_json(response, &url).await
-    }
 }
 
-/// The reads the value set composer makes, which the editor bundle alone
-/// carries.
-#[cfg(feature = "editor")]
+/// The reads the value set composer makes.
 impl FhirClient {
     /// Reads one `ValueSet` as the document the server sent.
     ///
@@ -686,13 +587,6 @@ impl FhirClient {
 /// The server carries these interactions on `CodeSystem`, `ValueSet`, and
 /// `ConceptMap` (<https://hl7.org/fhir/R4B/http.html>), gated on a SMART scope
 /// where the deployment configured an issuer.
-#[cfg_attr(
-    not(feature = "editor"),
-    expect(
-        dead_code,
-        reason = "only the editor bundle carries a screen that writes"
-    )
-)]
 impl FhirClient {
     /// The address a create posts to.
     pub(crate) fn create_url(&self, version: FhirVersion, resource_type: &str) -> String {
@@ -722,7 +616,7 @@ impl FhirClient {
 
     /// Creates a resource (<https://hl7.org/fhir/R4B/http.html#create>).
     ///
-    /// `token` is the bearer to present, when one is held; without it the
+    /// The console's server presents the signed-in reader's token; a visitor's
     /// request goes unauthenticated and a server that gates its writes answers
     /// `401`.
     ///
@@ -736,13 +630,11 @@ impl FhirClient {
         version: FhirVersion,
         resource_type: &str,
         body: &str,
-        token: Option<&str>,
     ) -> Result<Written, FhirError> {
         let url = self.create_url(version, resource_type);
-        let request = bearing(Request::post(&url), token)
-            .header("Accept", FHIR_JSON)
-            .header("Content-Type", FHIR_JSON);
-        self.write(request, body, &url).await
+        let exchange = Exchange::new(Method::Post, self.path_of(&url)?, FHIR_JSON)
+            .with_body(FHIR_JSON, body.to_owned());
+        self.write(exchange, &url).await
     }
 
     /// Updates a resource (<https://hl7.org/fhir/R4B/http.html#update>).
@@ -763,16 +655,12 @@ impl FhirClient {
         id: &str,
         body: &str,
         version_id: Option<&str>,
-        token: Option<&str>,
     ) -> Result<Written, FhirError> {
         let url = self.resource_url(version, resource_type, id);
-        let mut request = bearing(Request::put(&url), token)
-            .header("Accept", FHIR_JSON)
-            .header("Content-Type", FHIR_JSON);
-        if let Some(held) = version_id {
-            request = request.header("If-Match", &if_match(held));
-        }
-        self.write(request, body, &url).await
+        let exchange = Exchange::new(Method::Put, self.path_of(&url)?, FHIR_JSON)
+            .with_body(FHIR_JSON, body.to_owned())
+            .with_if_match(version_id.map(if_match));
+        self.write(exchange, &url).await
     }
 
     /// Deletes a resource (<https://hl7.org/fhir/R4B/http.html#delete>).
@@ -781,29 +669,49 @@ impl FhirClient {
     ///
     /// Returns the variant of [`FhirError`] describing what went wrong. A
     /// server that refuses says why in an `OperationOutcome`.
-    #[cfg_attr(
-        feature = "editor",
-        expect(
-            dead_code,
-            reason = "no authoring screen deletes a resource: a published code is retired in place"
-        )
+    #[expect(
+        dead_code,
+        reason = "no authoring screen deletes a resource: a published code is retired in place"
     )]
     pub(crate) async fn delete(
         &self,
         version: FhirVersion,
         resource_type: &str,
         id: &str,
-        token: Option<&str>,
     ) -> Result<(), FhirError> {
         let url = self.resource_url(version, resource_type, id);
-        let request = bearing(Request::delete(&url), token).header("Accept", FHIR_JSON);
-        let response = send(request, &url).await?;
-        let status = status_of(&response, &url)?;
+        let answer = self.send(Method::Delete, &url, FHIR_JSON).await?;
+        let status = status_of(&answer, &url)?;
         if status.is_success() {
             Ok(())
         } else {
-            Err(failure(&response, status, &url).await)
+            Err(failure(&answer, status, &url))
         }
+    }
+
+    /// The address every version of every resource of one type is read from:
+    /// the type-level `_history`
+    /// (<https://hl7.org/fhir/R4B/http.html#history>).
+    pub(crate) fn type_history_url(&self, version: FhirVersion, resource_type: &str) -> String {
+        RequestUrl::new()
+            .segment(version.segment())
+            .segment(resource_type)
+            .segment("_history")
+            .render(&self.root)
+    }
+
+    /// Reads every version of every resource of one type.
+    ///
+    /// # Errors
+    ///
+    /// Returns the variant of [`FhirError`] describing what went wrong.
+    pub(crate) async fn type_history(
+        &self,
+        version: FhirVersion,
+        resource_type: &str,
+    ) -> Result<History, FhirError> {
+        self.get_json(&self.type_history_url(version, resource_type))
+            .await
     }
 
     /// Reads one resource's version history.
@@ -816,50 +724,28 @@ impl FhirClient {
         version: FhirVersion,
         resource_type: &str,
         id: &str,
-        token: Option<&str>,
     ) -> Result<History, FhirError> {
-        let url = self.history_url(version, resource_type, id);
-        let request = bearing(Request::get(&url), token).header("Accept", FHIR_JSON);
-        let response = send(request, &url).await?;
-        self.read_json(response, &url).await
+        self.get_json(&self.history_url(version, resource_type, id))
+            .await
     }
 
     /// Sends one write and reads what the server committed.
-    async fn write(
-        &self,
-        request: gloo_net::http::RequestBuilder,
-        body: &str,
-        url: &str,
-    ) -> Result<Written, FhirError> {
-        let built = request.body(body).map_err(|error| FhirError::Transport {
-            url: url.to_owned(),
-            message: error.to_string(),
-        })?;
-        let response = built.send().await.map_err(|error| FhirError::Transport {
-            url: url.to_owned(),
-            message: error.to_string(),
-        })?;
-        let status = status_of(&response, url)?;
+    async fn write(&self, exchange: Exchange, url: &str) -> Result<Written, FhirError> {
+        let answer = exchange::send(exchange)
+            .await
+            .map_err(|error| transport(url, &error))?;
+        let status = status_of(&answer, url)?;
         if !status.is_success() {
-            return Err(failure(&response, status, url).await);
+            return Err(failure(&answer, status, url));
         }
-        let headers = response.headers();
-        let etag = headers.get("etag");
-        let location = headers
-            .get("location")
-            .or_else(|| headers.get("content-location"));
-        let text = response.text().await.map_err(|error| FhirError::Decode {
-            url: url.to_owned(),
-            message: error.to_string(),
-        })?;
         // A server asked for a minimal return answers no body, which is a
         // success and not a decode failure
         // (<https://hl7.org/fhir/R4B/http.html#return>).
-        let resource = if text.trim().is_empty() {
+        let resource = if answer.body.trim().is_empty() {
             None
         } else {
             Some(
-                serde_json::from_str(&text).map_err(|error| FhirError::Decode {
+                serde_json::from_str(&answer.body).map_err(|error| FhirError::Decode {
                     url: url.to_owned(),
                     message: error.to_string(),
                 })?,
@@ -867,14 +753,44 @@ impl FhirClient {
         };
         Ok(Written {
             resource,
-            etag,
-            location,
+            etag: answer.etag,
+            location: answer.location,
         })
     }
 }
 
+/// The resources a `searchset` `Bundle` text carries, indented: the one
+/// resource when it carries one, an array of them otherwise, and the text as
+/// it came when it is no `Bundle`
+/// (<https://hl7.org/fhir/R4B/bundle.html>).
+pub(crate) fn resources_text(bundle: &str) -> String {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(bundle) else {
+        return bundle.to_owned();
+    };
+    let Some(entries) = value.get("entry").and_then(serde_json::Value::as_array) else {
+        return bundle.to_owned();
+    };
+    let resources: Vec<&serde_json::Value> = entries
+        .iter()
+        .filter_map(|entry| entry.get("resource"))
+        .collect();
+    let shown = match resources.as_slice() {
+        [one] => serde_json::to_string_pretty(one),
+        many => serde_json::to_string_pretty(many),
+    };
+    shown.unwrap_or_else(|_unwritable| bundle.to_owned())
+}
+
+/// An answer as a screen reads it and as the server sent it.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub(crate) struct Document<T> {
+    /// The elements the screen reads.
+    pub(crate) value: T,
+    /// The whole document, indented for a reader.
+    pub(crate) text: String,
+}
+
 /// The reads the authoring screens make, which no reading screen needs.
-#[cfg(feature = "editor")]
 impl FhirClient {
     /// Reads the `CodeSystem` one root holds for a canonical, for authoring.
     ///
@@ -998,12 +914,9 @@ impl FhirClient {
         version: FhirVersion,
         resource_type: &str,
         id: &str,
-        token: Option<&str>,
     ) -> Result<serde_json::Value, FhirError> {
-        let url = self.resource_url(version, resource_type, id);
-        let request = bearing(Request::get(&url), token).header("Accept", FHIR_JSON);
-        let response = send(request, &url).await?;
-        self.read_json(response, &url).await
+        self.get_json(&self.resource_url(version, resource_type, id))
+            .await
     }
 
     /// Reads one version of one resource (<https://hl7.org/fhir/R4B/http.html#vread>).
@@ -1017,19 +930,15 @@ impl FhirClient {
         resource_type: &str,
         id: &str,
         version_id: &str,
-        token: Option<&str>,
     ) -> Result<serde_json::Value, FhirError> {
-        let url = self.version_read_url(version, resource_type, id, version_id);
-        let request = bearing(Request::get(&url), token).header("Accept", FHIR_JSON);
-        let response = send(request, &url).await?;
-        self.read_json(response, &url).await
+        self.get_json(&self.version_read_url(version, resource_type, id, version_id))
+            .await
     }
 
     /// The address the sync service's run list is read from.
     ///
-    /// The listener is the sync service's own, and the viewer is same-origin,
-    /// so a deployment that wants its findings on screen puts the listener
-    /// behind the address the server is served from. Nothing answers there by
+    /// The listener is the sync service's own, which the console's server
+    /// reaches when its configuration names one; nothing answers there by
     /// default.
     pub(crate) fn runs_url(&self) -> String {
         RequestUrl::new().segment("runs").render(&self.root)
@@ -1067,8 +976,8 @@ impl FhirClient {
     /// request asks for ordinary JSON and a refusal carries no
     /// `OperationOutcome`.
     async fn get_plain_json<T: DeserializeOwned>(&self, url: &str) -> Result<T, FhirError> {
-        let response = send(Request::get(url).header("Accept", PLAIN_JSON), url).await?;
-        self.read_json(response, url).await
+        let answer = self.send(Method::Get, url, PLAIN_JSON).await?;
+        read_json(&answer, url)
     }
 
     /// The codes one value set expands to, in the order the server sent them.
@@ -1098,189 +1007,98 @@ impl FhirClient {
 }
 
 impl FhirClient {
+    /// The path below the server's root that `url`, one of this client's
+    /// addresses, names, as an exchange carries it.
+    fn path_of(&self, url: &str) -> Result<String, FhirError> {
+        url.strip_prefix(self.root.as_str())
+            .filter(|path| path.starts_with('/'))
+            .map(str::to_owned)
+            .ok_or_else(|| FhirError::Transport {
+                url: url.to_owned(),
+                message: String::from("the address is not below the server's root"),
+            })
+    }
+
+    /// Sends a request of `method` to `url` with no body, asking for
+    /// `accept`, and answers what came back.
+    async fn send(&self, method: Method, url: &str, accept: &str) -> Result<Answer, FhirError> {
+        exchange::send(Exchange::new(method, self.path_of(url)?, accept))
+            .await
+            .map_err(|error| transport(url, &error))
+    }
+
+    /// Sends a FHIR JSON `GET` and keeps both the elements a screen reads and
+    /// the document as the server sent it, which a screen shows as JSON.
+    async fn get_document<T: DeserializeOwned>(&self, url: &str) -> Result<Document<T>, FhirError> {
+        let answer = self.send(Method::Get, url, FHIR_JSON).await?;
+        let value = read_json(&answer, url)?;
+        Ok(Document {
+            value,
+            text: pretty(&answer.body),
+        })
+    }
+
     /// Sends a FHIR JSON `GET` and decodes the resource it answers.
     async fn get_json<T: DeserializeOwned>(&self, url: &str) -> Result<T, FhirError> {
-        let response = send(Request::get(url).header("Accept", FHIR_JSON), url).await?;
-        self.read_json(response, url).await
+        let answer = self.send(Method::Get, url, FHIR_JSON).await?;
+        read_json(&answer, url)
     }
 
     /// Sends a FHIR JSON `POST` and decodes the resource it answers.
     async fn post_json<T: DeserializeOwned>(&self, url: &str, body: &str) -> Result<T, FhirError> {
-        let request = Request::post(url)
-            .header("Accept", FHIR_JSON)
-            .header("Content-Type", FHIR_JSON)
-            .body(body)
-            .map_err(|error| FhirError::Transport {
-                url: url.to_owned(),
-                message: error.to_string(),
-            })?;
-        let response = request.send().await.map_err(|error| FhirError::Transport {
-            url: url.to_owned(),
-            message: error.to_string(),
-        })?;
-        self.read_json(response, url).await
-    }
-
-    /// Turns an answer into the resource it carries, or into the refusal.
-    async fn read_json<T: DeserializeOwned>(
-        &self,
-        response: Response,
-        url: &str,
-    ) -> Result<T, FhirError> {
-        let status = status_of(&response, url)?;
-        if !status.is_success() {
-            return Err(failure(&response, status, url).await);
-        }
-        let body = response.text().await.map_err(|error| FhirError::Decode {
-            url: url.to_owned(),
-            message: error.to_string(),
-        })?;
-        serde_json::from_str(&body).map_err(|error| FhirError::Decode {
-            url: url.to_owned(),
-            message: error.to_string(),
-        })
+        let exchange = Exchange::new(Method::Post, self.path_of(url)?, FHIR_JSON)
+            .with_body(FHIR_JSON, body.to_owned());
+        let answer = exchange::send(exchange)
+            .await
+            .map_err(|error| transport(url, &error))?;
+        read_json(&answer, url)
     }
 }
 
-/// Adds the bearer credential to `request`, when one is held (RFC 6750 §2.1).
-#[cfg_attr(
-    not(feature = "editor"),
-    expect(
-        dead_code,
-        reason = "only the editor bundle carries a screen that writes"
-    )
-)]
-fn bearing(
-    request: gloo_net::http::RequestBuilder,
-    token: Option<&str>,
-) -> gloo_net::http::RequestBuilder {
-    match token {
-        Some(held) => request.header("Authorization", &format!("Bearer {held}")),
-        None => request,
-    }
+/// Turns an answer into the resource it carries, or into the refusal.
+/// A JSON document indented two spaces a level, for a reader; a body that is
+/// no JSON (which `read_json` has already refused) stays as it came.
+fn pretty(body: &str) -> String {
+    serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .and_then(|value| serde_json::to_string_pretty(&value).ok())
+        .unwrap_or_else(|| body.to_owned())
 }
 
-/// Exchanges an authorization code for an access token.
-///
-/// The request is a public client's: the `code_verifier` and the `client_id`
-/// are what bind it to the authorization that issued the code, and no client
-/// secret travels (RFC 6749 §4.1.3, RFC 7636 §4.5, and
-/// <https://hl7.org/fhir/smart-app-launch/app-launch.html>). The endpoint is
-/// the one the server's own discovery document named, so nothing here is
-/// configured into the bundle.
-///
-/// # Errors
-///
-/// Returns the variant of [`FhirError`] describing what went wrong. An issuer
-/// that refuses answers RFC 6749 §5.2, which carries no `OperationOutcome`, so
-/// it arrives as [`FhirError::Status`] with the body as the evidence.
-pub(crate) async fn exchange_code(
-    sign_in: &SignIn,
-    code: &str,
-    redirect_uri: &str,
-    verifier: &str,
-) -> Result<TokenAnswer, FhirError> {
-    let body = sign_in.token_request_body(code, redirect_uri, verifier);
-    post_form(&sign_in.token_endpoint, &body).await
-}
-
-/// Revokes the held token at the issuer's revocation endpoint (RFC 7009 §2.1).
-///
-/// # Errors
-///
-/// Returns the variant of [`FhirError`] describing what went wrong. RFC 7009
-/// §2.2 makes revoking a token the issuer does not know a success, so a refusal
-/// here is the issuer's own and is reported rather than hidden.
-#[cfg_attr(
-    not(feature = "editor"),
-    expect(
-        dead_code,
-        reason = "only the editor bundle starts a sign-in and reads the token one holds"
-    )
-)]
-pub(crate) async fn revoke(sign_in: &SignIn, token: &str) -> Result<(), FhirError> {
-    let Some(endpoint) = sign_in.revocation_endpoint.as_deref() else {
-        return Ok(());
-    };
-    let body = sign_in.revocation_request_body(token);
-    let request = Request::post(endpoint)
-        .header("Content-Type", FORM_ENCODED)
-        .body(&body)
-        .map_err(|error| FhirError::Transport {
-            url: endpoint.to_owned(),
-            message: error.to_string(),
-        })?;
-    let response = request.send().await.map_err(|error| FhirError::Transport {
-        url: endpoint.to_owned(),
-        message: error.to_string(),
-    })?;
-    let status = status_of(&response, endpoint)?;
-    if status.is_success() {
-        Ok(())
-    } else {
-        Err(failure(&response, status, endpoint).await)
-    }
-}
-
-/// Posts a form-encoded body to an OAuth endpoint and decodes the answer.
-async fn post_form<T: DeserializeOwned>(url: &str, body: &str) -> Result<T, FhirError> {
-    let request = Request::post(url)
-        .header("Accept", PLAIN_JSON)
-        .header("Content-Type", FORM_ENCODED)
-        .body(body)
-        .map_err(|error| FhirError::Transport {
-            url: url.to_owned(),
-            message: error.to_string(),
-        })?;
-    let response = request.send().await.map_err(|error| FhirError::Transport {
-        url: url.to_owned(),
-        message: error.to_string(),
-    })?;
-    let status = status_of(&response, url)?;
+fn read_json<T: DeserializeOwned>(answer: &Answer, url: &str) -> Result<T, FhirError> {
+    let status = status_of(answer, url)?;
     if !status.is_success() {
-        return Err(failure(&response, status, url).await);
+        return Err(failure(answer, status, url));
     }
-    let text = response.text().await.map_err(|error| FhirError::Decode {
-        url: url.to_owned(),
-        message: error.to_string(),
-    })?;
-    serde_json::from_str(&text).map_err(|error| FhirError::Decode {
+    serde_json::from_str(&answer.body).map_err(|error| FhirError::Decode {
         url: url.to_owned(),
         message: error.to_string(),
     })
 }
 
-/// Sends a built request, turning a browser-level failure into an error.
-async fn send(request: gloo_net::http::RequestBuilder, url: &str) -> Result<Response, FhirError> {
-    request.send().await.map_err(|error| FhirError::Transport {
+/// The failure of an exchange that produced no answer.
+fn transport(url: &str, error: &ExchangeError) -> FhirError {
+    FhirError::Transport {
         url: url.to_owned(),
         message: error.to_string(),
-    })
+    }
 }
 
 /// Reads the answered status as a [`StatusCode`].
 ///
-/// The Fetch standard allows a status of 0 for an opaque answer
-/// (<https://fetch.spec.whatwg.org/#concept-response-status>), which is not an
-/// HTTP status, so the conversion is fallible and says so.
-fn status_of(response: &Response, url: &str) -> Result<StatusCode, FhirError> {
-    let code = response.status();
-    StatusCode::from_u16(code).map_err(|_invalid| FhirError::Transport {
+/// A status outside 100 to 999 is no HTTP status
+/// (<https://www.rfc-editor.org/rfc/rfc9110#section-15>), so the conversion is
+/// fallible and says so.
+fn status_of(answer: &Answer, url: &str) -> Result<StatusCode, FhirError> {
+    StatusCode::from_u16(answer.status).map_err(|_invalid| FhirError::Transport {
         url: url.to_owned(),
-        message: format!("the browser reported a response status of {code}"),
+        message: format!("the server answered a status of {}", answer.status),
     })
 }
 
 /// Turns a non-success answer into the refusal the reader is shown.
-async fn failure(response: &Response, status: StatusCode, url: &str) -> FhirError {
-    let Ok(body) = response.text().await else {
-        return FhirError::Status {
-            url: url.to_owned(),
-            status,
-            body: String::new(),
-        };
-    };
-    match serde_json::from_str::<OperationOutcome>(&body) {
+fn failure(answer: &Answer, status: StatusCode, url: &str) -> FhirError {
+    match serde_json::from_str::<OperationOutcome>(&answer.body) {
         // A body that parses but carries no issue says nothing, so the body
         // itself stays the evidence.
         Ok(outcome) if !outcome.issue.is_empty() => FhirError::Refused {
@@ -1291,7 +1109,7 @@ async fn failure(response: &Response, status: StatusCode, url: &str) -> FhirErro
         Ok(_) | Err(_) => FhirError::Status {
             url: url.to_owned(),
             status,
-            body: excerpt(&body),
+            body: excerpt(&answer.body),
         },
     }
 }
@@ -1304,62 +1122,9 @@ fn excerpt(body: &str) -> String {
         .collect()
 }
 
-/// Derives the server root from the address of the page the bundle came from.
-///
-/// The bundle is served under `/ui`, so everything before that prefix is where
-/// the server is mounted, which keeps the viewer working behind a proxy that
-/// mounts it below the origin. Trunk is told the same prefix with `public_url`
-/// (<https://github.com/trunk-rs/trunk/blob/main/guide/src/configuration/index.md>).
-fn server_root(origin: &str, pathname: &str) -> String {
-    let mount = pathname
-        .find(UI_PREFIX)
-        .and_then(|index| pathname.get(..index))
-        .unwrap_or_default();
-    format!("{origin}{mount}")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn a_bundle_at_the_origin_root_finds_the_server_at_the_origin() {
-        assert_eq!(
-            server_root("https://tx.example.org", "/ui/settings"),
-            "https://tx.example.org"
-        );
-        assert_eq!(
-            server_root("https://tx.example.org", "/ui/"),
-            "https://tx.example.org"
-        );
-    }
-
-    #[test]
-    fn a_bundle_mounted_below_the_origin_keeps_the_prefix() {
-        assert_eq!(
-            server_root("https://hospital.example", "/terminology/ui/browse"),
-            "https://hospital.example/terminology",
-            "a proxy that mounts the server below the origin still works"
-        );
-    }
-
-    #[test]
-    fn a_page_outside_the_bundle_prefix_falls_back_to_the_origin() {
-        assert_eq!(
-            server_root("https://tx.example.org", "/"),
-            "https://tx.example.org",
-            "the root path names no mount point"
-        );
-    }
-
-    #[test]
-    fn an_absent_window_yields_relative_urls_that_stay_same_origin() {
-        assert_eq!(
-            server_root("", ""),
-            "",
-            "an empty root renders `/health`, which the browser resolves itself"
-        );
-    }
 
     #[test]
     fn a_version_base_is_the_root_plus_the_version_segment() {
@@ -1574,41 +1339,6 @@ mod tests {
     }
 
     #[test]
-    fn the_sign_in_document_sits_under_the_base_it_describes() {
-        let client = FhirClient {
-            root: "https://tx.example.org".to_owned(),
-        };
-        assert_eq!(
-            client.smart_configuration_url(FhirVersion::R4B),
-            "https://tx.example.org/r4b/.well-known/smart-configuration",
-            "SMART puts the document under the FHIR base of the server it describes"
-        );
-    }
-
-    #[test]
-    fn the_redirect_address_is_the_bundle_s_own_callback() {
-        let client = FhirClient {
-            root: "https://tx.example.org".to_owned(),
-        };
-        assert_eq!(
-            client.redirect_uri(),
-            format!("https://tx.example.org{}/callback", crate::routes::UI_BASE),
-            "the same value is sent with the authorization and the token request"
-        );
-        let below = FhirClient {
-            root: "https://hospital.example/terminology".to_owned(),
-        };
-        assert_eq!(
-            below.redirect_uri(),
-            format!(
-                "https://hospital.example/terminology{}/callback",
-                crate::routes::UI_BASE
-            ),
-            "a server mounted below the origin redirects back to its own mount"
-        );
-    }
-
-    #[test]
     fn a_create_addresses_the_resource_type_and_a_history_the_instance() {
         let client = FhirClient {
             root: "https://tx.example.org".to_owned(),
@@ -1638,5 +1368,19 @@ mod tests {
             body.starts_with(&kept),
             "the excerpt is a prefix of the body the server sent"
         );
+    }
+}
+
+#[cfg(test)]
+mod document_tests {
+    use super::resources_text;
+
+    #[test]
+    fn a_bundle_of_one_shows_the_resource_and_of_several_an_array() {
+        let one = r#"{"resourceType":"Bundle","entry":[{"resource":{"id":"a"}}]}"#;
+        assert_eq!(resources_text(one), "{\n  \"id\": \"a\"\n}");
+        let two = r#"{"entry":[{"resource":{"id":"a"}},{"resource":{"id":"b"}}]}"#;
+        assert!(resources_text(two).starts_with('['));
+        assert_eq!(resources_text("not json"), "not json");
     }
 }

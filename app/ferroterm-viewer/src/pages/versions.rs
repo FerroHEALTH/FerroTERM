@@ -19,18 +19,18 @@ use crate::comparison::notes;
 use crate::comparison::state_sentence;
 use crate::components::NOT_DECLARED;
 use crate::components::failure::Failure;
+use crate::components::icon;
 use crate::components::reading::Reading;
 use crate::fhir::FhirClient;
 use crate::fhir::capability::CapabilityStatement;
 use crate::fhir::error::FhirError;
 use crate::fhir::version::FhirVersion;
-use crate::styles;
+use ferrohealth_ui::table::view::{Body, Column, DataTable, data_table};
+use ferrohealth_ui::view::empty::empty_quiet;
+use ferrohealth_ui::view::surface::{card, disclosure, panel_body, titled_panel};
 
 /// What one root answered, before the screen has read it.
 type RootRead = LocalResource<Result<CapabilityStatement, FhirError>>;
-
-/// The classes a table cell shares across both tables.
-const CELL: &str = "py-default pr-default align-top";
 
 /// Reads the four roots and draws what they declare, side by side.
 ///
@@ -65,13 +65,15 @@ fn comparison_section(roots: [RootRead; 4]) -> AnyView {
     let announcement = Memo::new(move |_| state_sentence(&answers(roots)));
 
     view! {
-        <section class="mt-loose" aria-labelledby="comparison-heading">
-            <h3 id="comparison-heading" class=styles::SECTION_TITLE>
-                "What each root declares"
-            </h3>
-            <p aria-live="polite" class=styles::LEAD>
-                {announcement}
-            </p>
+        <section class="fui-stack" aria-labelledby="comparison-heading">
+            <div>
+                <h3 id="comparison-heading" class="fui-card-title">
+                    "What each root declares"
+                </h3>
+                <p aria-live="polite" class="fui-muted fui-small">
+                    {announcement}
+                </p>
+            </div>
             <Reading label="Reading the four capability statements">
                 {move || drawn(&answers(roots))}
             </Reading>
@@ -112,7 +114,7 @@ fn drawn(answers: &[(FhirVersion, RootAnswer)]) -> AnyView {
     let added = notes_view(answers);
     view! {
         {refused}
-        {facts}
+        {titled_panel("What each root says about itself", (), facts)}
         {operations}
         {added}
     }
@@ -130,8 +132,8 @@ fn refusals_view(answers: &[(FhirVersion, RootAnswer)]) -> AnyView {
             let error = answer.failure()?.clone();
             Some(
                 view! {
-                    <div class="mt-default">
-                        <p class="text-body font-medium">{version.label()} " did not answer:"</p>
+                    <div>
+                        <p class="fui-label">{version.label()} " did not answer"</p>
                         <Failure error=Signal::stored(error) />
                     </div>
                 }
@@ -142,26 +144,27 @@ fn refusals_view(answers: &[(FhirVersion, RootAnswer)]) -> AnyView {
     if drawn.is_empty() {
         return ().into_any();
     }
-    view! { <div>{drawn}</div> }.into_any()
+    view! { <div class="fui-stack">{drawn}</div> }.into_any()
 }
 
 /// The operations table, with the sentence that reads its shape.
 fn operations_view(comparison: &Comparison) -> AnyView {
-    if comparison.operations.is_empty() {
-        return view! {
-            <p class="mt-loose text-body text-muted">
-                "No root that answered declares an operation."
-            </p>
-        }
-        .into_any();
-    }
-    let table = table_view(
-        "Operations, and the levels each answers at",
-        "Operation",
-        &comparison.columns,
-        &comparison.operations,
-    );
-    view! { {table} }.into_any()
+    let table = if comparison.operations.is_empty() {
+        panel_body(empty_quiet(
+            icon::VERSION,
+            "No operation",
+            "No root that answered declares an operation.",
+        ))
+        .into_any()
+    } else {
+        table_view(
+            "Operations, and the levels each answers at",
+            "Operation",
+            &comparison.columns,
+            &comparison.operations,
+        )
+    };
+    titled_panel("Operations, and the levels each answers at", (), table).into_any()
 }
 
 /// One comparison table: a row heading, then one cell per root.
@@ -171,69 +174,73 @@ fn operations_view(comparison: &Comparison) -> AnyView {
 /// `<For>` key it retained would be moved rather than re-rendered, and a row
 /// would keep the old answer under its new heading.
 fn table_view(caption: &str, corner: &str, columns: &[RootColumn], rows: &[Row]) -> AnyView {
-    let headers: Vec<AnyView> = columns
+    let mut heads = vec![Column::owned("corner", corner)];
+    heads.extend(columns.iter().map(|column| {
+        let release = column
+            .fhir_version
+            .clone()
+            .unwrap_or_else(|| NOT_DECLARED.to_owned());
+        Column::owned(
+            column.version.segment(),
+            format!(
+                "{} · FHIR {release}, {}",
+                column.version.label(),
+                column.state
+            ),
+        )
+    }));
+    let labels: Vec<&'static str> = columns
         .iter()
-        .map(|column| {
-            let release = column
-                .fhir_version
-                .clone()
-                .unwrap_or_else(|| NOT_DECLARED.to_owned());
-            view! {
-                <th scope="col" class="py-default pr-default font-medium">
-                    {column.version.label()}
-                    <span class="block text-small font-normal text-muted">
-                        "FHIR " {release} ", " {column.state}
-                    </span>
-                </th>
-            }
-            .into_any()
-        })
+        .map(|column| column.version.label())
         .collect();
-    let body: Vec<AnyView> = rows.iter().map(row_view).collect();
-    view! {
-        <div class="mt-default overflow-x-auto">
-            <table class="w-full border-collapse text-left text-body">
-                <caption class="pb-tight text-left text-small font-medium tracking-wide uppercase">
-                    {caption.to_owned()}
-                </caption>
-                <thead>
-                    <tr class="border-b border-line-strong">
-                        <th scope="col" class="py-default pr-default font-medium">
-                            {corner.to_owned()}
-                        </th>
-                        {headers}
-                    </tr>
-                </thead>
-                <tbody>{body}</tbody>
-            </table>
-        </div>
-    }
+    data_table(DataTable {
+        caption,
+        columns: &heads,
+        sort: None,
+        sort_href: &|_| String::new(),
+        body: Body::Rows(
+            rows.iter()
+                .map(|row| row_view(row, &labels))
+                .collect_view()
+                .into_any(),
+        ),
+    })
     .into_any()
 }
 
-/// One row: what it describes, then what each root says about it.
-fn row_view(row: &Row) -> AnyView {
+/// One row: what it describes, then what each root says about it, each cell
+/// named by its root's version for a stacked card.
+fn row_view(row: &Row, labels: &[&'static str]) -> AnyView {
     let cells: Vec<AnyView> = row
         .cells
         .iter()
-        .map(|cell| view! { <td class=CELL>{cell_text(cell)}</td> }.into_any())
+        .zip(labels.iter().copied())
+        .map(|(cell, label)| view! { <td data-label=label>{cell_view(cell)}</td> }.into_any())
         .collect();
+    // An operation is named by its code, which reads in the code face;
+    // a declaration is named in words.
+    let class = if row.label.contains('$') {
+        "fui-mono wrap-break-word"
+    } else {
+        "wrap-break-word"
+    };
     view! {
-        <tr class="border-b border-line align-top">
-            // `wrap-break-word` rather than `break-all`: an operation label
-            // is one long token with nowhere to break, but a declaration label
-            // is a sentence, and `break-all` chops it mid-word
-            // (<https://developer.mozilla.org/en-US/docs/Web/CSS/overflow-wrap>).
-            <th
-                scope="row"
-                class="py-default pr-default font-mono text-small font-normal wrap-break-word"
-            >
+        <tr>
+            <th scope="row" class=class>
                 {row.label.clone()}
             </th>
             {cells}
         </tr>
     }
     .into_any()
+}
+
+/// One cell, in words, because a tint carries no meaning.
+fn cell_view(cell: &Cell) -> AnyView {
+    match cell {
+        Cell::NotDeclared => view! { <span class="fui-muted">{cell_text(cell)}</span> }.into_any(),
+        Cell::Stated(_) | Cell::Unread => cell_text(cell).into_any(),
+    }
 }
 
 /// One cell, in words, because a tint carries no meaning.
@@ -251,14 +258,11 @@ fn notes_view(answers: &[(FhirVersion, RootAnswer)]) -> AnyView {
         .iter()
         .map(|(version, answer)| root_notes_view(version.label(), &notes(answer)))
         .collect();
-    view! {
-        <div class="mt-section">
-            <h3 class="text-body font-medium">"What each root adds to its own definition"</h3>
-            <p class=styles::LEAD>"One root's own operation.documentation, as it sent it."</p>
-            {drawn}
-        </div>
-    }
-    .into_any()
+    let body = view! {
+        <p class="fui-muted">"One root's own operation.documentation, as it sent it."</p>
+        <div class="fui-stack">{drawn}</div>
+    };
+    card("What each root adds to its own definition", body).into_any()
 }
 
 /// One root's notes, closed until a reader opens them.
@@ -268,31 +272,23 @@ fn root_notes_view(label: &'static str, notes: &[(String, String)]) -> AnyView {
         .iter()
         .map(|(operation, note)| {
             view! {
-                <dt class="mt-default font-mono text-small wrap-break-word">{operation.clone()}</dt>
-                <dd class="text-body text-muted">{note.clone()}</dd>
+                <dt class="fui-mono wrap-break-word">{operation.clone()}</dt>
+                <dd>{note.clone()}</dd>
             }
             .into_any()
         })
         .collect();
     let body = if count == 0 {
         view! {
-            <p class="text-body text-muted">
+            <p class="fui-muted">
                 "This root added nothing to the definitions its release publishes, or did not answer."
             </p>
         }
         .into_any()
     } else {
-        view! { <dl>{lines}</dl> }.into_any()
+        view! { <dl class="fui-facts">{lines}</dl> }.into_any()
     };
-    view! {
-        <details class="mt-default rounded border border-line">
-            <summary class="cursor-pointer px-default py-default text-body font-medium">
-                {label} " · " {note_count(count)}
-            </summary>
-            <div class="border-t border-line px-default py-default">{body}</div>
-        </details>
-    }
-    .into_any()
+    disclosure(format!("{label} · {}", note_count(count)), body).into_any()
 }
 
 /// How many operations one root wrote a note on, as a phrase.

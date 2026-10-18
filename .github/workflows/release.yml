@@ -5,7 +5,8 @@
 # ONE workflow owns the `v*` tag, and every ordering in it is a `needs` edge.
 # The graph:
 #
-#   plan ── github-release (draft) ── build-binaries ── finalize-release (publish)
+#   plan ── github-release (draft) ─┬─ build-binaries ── build-image ─┬─ finalize-release (publish)
+#                                   └─ build-viewer ─────────────────┘
 #
 # The release is created as a DRAFT, the per-arch binaries + SBOMs + Sigstore
 # bundles are attached by the reusable build lane, and only then — once every
@@ -48,6 +49,10 @@ jobs:
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
       version: ${{ steps.tag.outputs.version }}
+      # The console ships as an image on distroless static, so its binary is
+      # built for the two static targets alone, each named by the platform
+      # it fills.
+      viewer-targets: '{"include":[{"runner":"ubuntu-latest","target":"x86_64-unknown-linux-musl","arch":"amd64"},{"runner":"ubuntu-24.04-arm","target":"aarch64-unknown-linux-musl","arch":"arm64"}]}'
       is-prerelease: ${{ steps.tag.outputs.is_prerelease }}
       have-notes: ${{ steps.notes.outputs.have_notes }}
     steps:
@@ -229,10 +234,27 @@ jobs:
       tag: ${{ needs.plan.outputs.tag }}
       sha: ${{ github.sha }}
 
+  # ── build-viewer: the console's binaries, site bundle and image ─────────────
+  # A call and nothing else, for the same L3 reason. It attaches the console's
+  # assets to the draft, so it waits for the draft to exist.
+  build-viewer:
+    name: viewer (binaries, site bundle, image)
+    needs: [plan, github-release]
+    permissions:
+      contents: write # attach the console's assets to the draft release
+      packages: write # push the image and its attestations to GHCR
+      id-token: write # Sigstore, for the provenance and SBOM attestations
+      attestations: write # store them against this repository
+    uses: ./.github/workflows/release-viewer.yml
+    with:
+      tag: ${{ needs.plan.outputs.tag }}
+      version: ${{ needs.plan.outputs.version }}
+      targets: ${{ needs.plan.outputs.viewer-targets }}
+
   # ── finalize-release: verify the asset set, then PUBLISH (freeze) ───────────
   finalize-release:
     name: github release (publish)
-    needs: [plan, build-binaries, build-image]
+    needs: [plan, build-binaries, build-image, build-viewer]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -270,6 +292,24 @@ jobs:
             printf '%s\n' "$assets" \
               | grep -Fxq "ferroterm-build-${TAG}-${target}.cdx.json" \
               || missing="$missing ferroterm-build-${TAG}-${target}.cdx.json"
+          done
+          # Every suffix release-viewer.yml uploads: per console target, and
+          # once for the architecture-independent site bundle.
+          for target in x86_64-unknown-linux-musl aarch64-unknown-linux-musl; do
+            for suffix in \
+              ".tar.gz" \
+              ".tar.gz.sha256sum" \
+              ".tar.gz.sigstore.json" \
+              ".tar.gz.sbom.sigstore.json" \
+              ".tar.gz.intoto.jsonl" \
+              ".spdx.json"; do
+              printf '%s\n' "$assets" | grep -Fxq "ferroterm-viewer-${TAG}-${target}${suffix}" \
+                || missing="$missing ferroterm-viewer-${TAG}-${target}${suffix}"
+            done
+          done
+          for suffix in ".tar.gz" ".tar.gz.sha256sum" ".tar.gz.sigstore.json" ".tar.gz.intoto.jsonl"; do
+            printf '%s\n' "$assets" | grep -Fxq "ferroterm-viewer-${TAG}-site${suffix}" \
+              || missing="$missing ferroterm-viewer-${TAG}-site${suffix}"
           done
           printf '%s\n' "$assets" | grep -Fxq "compose.yaml" || missing="$missing compose.yaml"
           [ -z "$missing" ] || {

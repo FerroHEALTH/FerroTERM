@@ -6,17 +6,9 @@
 use crate::fhir::version::FhirVersion;
 use crate::url::RequestUrl;
 
-/// Where the server mounts the reader bundle, and where its router is based.
-///
-/// The crate builds twice. The reader bundle is this base; the editor bundle
-/// is the same crate with the `editor` feature on, mounted a level below it,
-/// so a reader who never edits downloads none of the authoring code.
-#[cfg(not(feature = "editor"))]
-pub(crate) const UI_BASE: &str = "/ui";
-
-/// Where the server mounts the editor bundle, and where its router is based.
-#[cfg(feature = "editor")]
-pub(crate) const UI_BASE: &str = "/ui/editor";
+/// Where the console's router is based: the console is its own server, so
+/// its pages sit at the root of its origin.
+pub(crate) const UI_BASE: &str = "";
 
 /// The query parameter that carries the selected FHIR version.
 pub(crate) const VERSION_PARAM: &str = "fhir";
@@ -37,7 +29,6 @@ pub(crate) const VALIDATE_PATH: &str = "validate";
 pub(crate) const VALUE_SETS_PATH: &str = "valuesets";
 
 /// The value set composer's path below the base, in the editor bundle.
-#[cfg(feature = "editor")]
 pub(crate) const COMPOSE_PATH: &str = "compose";
 
 /// The concept map screen's path below the base.
@@ -46,45 +37,37 @@ pub(crate) const CONCEPT_MAPS_PATH: &str = "conceptmaps";
 /// The path segment of the translate runner.
 pub(crate) const TRANSLATE_PATH: &str = "translate";
 
+/// The path segment of the lookup runner.
+pub(crate) const LOOKUP_PATH: &str = "lookup";
+
 /// The path the command bar sends what a reader typed to.
 pub(crate) const FIND_PATH: &str = "find";
 
-/// The path the identity provider redirects a sign-in back to.
-pub(crate) const CALLBACK_PATH: &str = "callback";
-
 /// The code system editor's path below the base, in the editor bundle.
-#[cfg(feature = "editor")]
 pub(crate) const CODE_SYSTEM_EDITOR_PATH: &str = "codesystem";
 
 /// The concept map editor's path below the base, in the editor bundle.
-#[cfg(feature = "editor")]
 pub(crate) const CONCEPT_MAP_EDITOR_PATH: &str = "conceptmap";
 
 /// The history and restore screen's path below the base, in the editor bundle.
-#[cfg(feature = "editor")]
 pub(crate) const HISTORY_PATH: &str = "history";
 
 /// The query parameter that carries a resource type into the history screen.
-#[cfg(feature = "editor")]
 pub(crate) const TYPE_PARAM: &str = "type";
 
 /// The query parameter that carries a logical id into the history screen.
-#[cfg(feature = "editor")]
 pub(crate) const ID_PARAM: &str = "id";
 
 /// The query parameter the code system editor takes its canonical in.
 ///
 /// It is the field the screen's own query type names, so the two move
 /// together or the link it builds stops opening what it says it opens.
-#[cfg(feature = "editor")]
 pub(crate) const EDITOR_SYSTEM_PARAM: &str = "system";
 
 /// The query parameter the value set composer takes its logical id in.
-#[cfg(feature = "editor")]
 pub(crate) const COMPOSER_ID_PARAM: &str = "id";
 
 /// The query parameter the concept map editor takes its canonical in.
-#[cfg(feature = "editor")]
 pub(crate) const MAP_EDITOR_PARAM: &str = "map";
 
 /// The link back to the screen that edits one resource.
@@ -92,7 +75,6 @@ pub(crate) const MAP_EDITOR_PARAM: &str = "map";
 /// Each authoring screen opens the resource it edits by the fact it addresses
 /// it with: a canonical for a code system and a concept map, the logical id
 /// for a value set. A type no screen here edits answers `None`.
-#[cfg(feature = "editor")]
 pub(crate) fn editing_link(
     resource_type: &str,
     canonical: &str,
@@ -114,12 +96,38 @@ pub(crate) fn editing_link(
     Some(url.render(""))
 }
 
+/// The link to one resource's own screen, and the words that name it.
+///
+/// A code system's screen is addressed by its canonical, a value set's and a
+/// concept map's by the logical id. A type with no screen here, or a resource
+/// missing the fact its screen needs, answers `None`.
+pub(crate) fn screen_link(
+    resource_type: &str,
+    canonical: &str,
+    id: &str,
+    version: FhirVersion,
+) -> Option<(String, &'static str)> {
+    match resource_type {
+        "CodeSystem" if !canonical.is_empty() => {
+            Some((system_link(canonical, version), "Back to the code system"))
+        }
+        "ValueSet" if !id.is_empty() => Some((
+            resource_link(VALUE_SETS_PATH, id, version),
+            "Back to the value set",
+        )),
+        "ConceptMap" if !id.is_empty() => Some((
+            resource_link(CONCEPT_MAPS_PATH, id, version),
+            "Back to the concept map",
+        )),
+        _ => None,
+    }
+}
+
 /// The link that opens one resource's versions, from a screen editing it.
 ///
 /// The type and the id are the two facts the history interaction addresses an
 /// instance by (<https://hl7.org/fhir/R4B/http.html#history>), so they are
 /// what the address carries.
-#[cfg(feature = "editor")]
 pub(crate) fn history_link(resource_type: &str, id: &str, version: FhirVersion) -> String {
     base_url()
         .segment(HISTORY_PATH)
@@ -129,37 +137,8 @@ pub(crate) fn history_link(resource_type: &str, id: &str, version: FhirVersion) 
         .render("")
 }
 
-/// Where the server mounts the editor bundle, for the reader bundle to link to.
-///
-/// It is a whole address rather than a route of this bundle: the two bundles
-/// are two documents, and the link between them is a page load.
-#[cfg(not(feature = "editor"))]
-pub(crate) const EDITOR_BASE: &str = "/ui/editor";
-
-/// The link that opens the editor bundle on the same served FHIR version.
-#[cfg(not(feature = "editor"))]
-pub(crate) fn editor_link(version: FhirVersion) -> String {
-    let mut url = RequestUrl::new();
-    for segment in EDITOR_BASE.split('/').filter(|segment| !segment.is_empty()) {
-        url = url.segment(segment);
-    }
-    url.query(VERSION_PARAM, version.segment()).render("")
-}
-
 /// The About screen's path below the base.
 pub(crate) const ABOUT_PATH: &str = "about";
-
-/// The version comparison's path, which the About screen's pane took over.
-pub(crate) const VERSIONS_PATH: &str = "versions";
-
-/// The evidence screen's path below the base.
-pub(crate) const EVIDENCE_PATH: &str = "evidence";
-
-/// The settings screen's path below the base.
-pub(crate) const SETTINGS_PATH: &str = "settings";
-
-/// The overview's path below the base, which is the base itself.
-pub(crate) const OVERVIEW_PATH: &str = "";
 
 /// The query parameter that carries a code system canonical into a screen.
 pub(crate) const SYSTEM_PARAM: &str = "system";
@@ -187,7 +166,17 @@ pub(crate) fn ui_link(path: &str, version: FhirVersion) -> String {
     for part in path.split('/').filter(|part| !part.is_empty()) {
         url = url.segment(part);
     }
-    url.query(VERSION_PARAM, version.segment()).render("")
+    rooted(url.query(VERSION_PARAM, version.segment()).render(""))
+}
+
+/// `link` as an absolute path: the root page renders as its query alone,
+/// which a browser resolves against the current page rather than the root.
+fn rooted(link: String) -> String {
+    if link.starts_with('/') {
+        link
+    } else {
+        format!("/{link}")
+    }
 }
 
 /// Builds the link to one code system's own screen.
@@ -203,6 +192,17 @@ pub(crate) fn system_link(system: &str, version: FhirVersion) -> String {
     base_url()
         .segment(SYSTEMS_PATH)
         .segment(system)
+        .query(VERSION_PARAM, version.segment())
+        .render("")
+}
+
+/// Builds the link to one stored resource's own screen under `path`, the
+/// logical id one percent-encoded path segment
+/// (<https://hl7.org/fhir/R4B/http.html#read>).
+pub(crate) fn resource_link(path: &str, id: &str, version: FhirVersion) -> String {
+    base_url()
+        .segment(path)
+        .segment(id)
         .query(VERSION_PARAM, version.segment())
         .render("")
 }
@@ -241,49 +241,6 @@ pub(crate) fn expansion_link(canonical: &str, version: FhirVersion) -> String {
         .render("")
 }
 
-/// The sidebar entry a browser address belongs under, as its path segment.
-///
-/// `pathname` is the raw address the browser is on, base included, because
-/// `use_location().pathname` never strips the router base. An address with no
-/// sidebar entry answers `None`, so a screen a reader reached some other way
-/// leaves every entry unmarked.
-pub(crate) fn nav_section(pathname: &str) -> Option<&'static str> {
-    let below = pathname.strip_prefix(UI_BASE)?;
-    if !(below.is_empty() || below.starts_with('/')) {
-        return None;
-    }
-    let mut segments = below.split('/').filter(|segment| !segment.is_empty());
-    match segments.next() {
-        // A code system's own screen is reached from the overview that lists
-        // the systems, so the overview stays marked while a reader reads one.
-        None | Some(SYSTEMS_PATH) => Some(OVERVIEW_PATH),
-        Some(BROWSE_PATH) => Some(BROWSE_PATH),
-        Some(EXPAND_PATH) => Some(EXPAND_PATH),
-        Some(VALIDATE_PATH) => Some(VALIDATE_PATH),
-        Some(VALUE_SETS_PATH) => Some(VALUE_SETS_PATH),
-        #[cfg(feature = "editor")]
-        Some(CODE_SYSTEM_EDITOR_PATH) => Some(CODE_SYSTEM_EDITOR_PATH),
-        #[cfg(feature = "editor")]
-        Some(COMPOSE_PATH) => Some(COMPOSE_PATH),
-        #[cfg(feature = "editor")]
-        Some(CONCEPT_MAP_EDITOR_PATH) => Some(CONCEPT_MAP_EDITOR_PATH),
-        // The versions of a resource are reached from the screen editing it,
-        // so that screen's entry stays marked while a reader reads them.
-        #[cfg(feature = "editor")]
-        Some(HISTORY_PATH) => None,
-        Some(CONCEPT_MAPS_PATH) => Some(CONCEPT_MAPS_PATH),
-        Some(TRANSLATE_PATH) => Some(TRANSLATE_PATH),
-        // The command bar is on every screen rather than in the sidebar, and
-        // the sign-in callback is a place the issuer sends a reader through,
-        // so neither marks an entry.
-        Some(FIND_PATH | CALLBACK_PATH) => None,
-        // The three panes are one screen and one sidebar entry, and the
-        // addresses they had still open the pane they named.
-        Some(ABOUT_PATH | VERSIONS_PATH | EVIDENCE_PATH | SETTINGS_PATH) => Some(ABOUT_PATH),
-        Some(_unlisted) => None,
-    }
-}
-
 /// Rewrites the address a reader is on to select another FHIR version.
 ///
 /// The switcher stays on the page the reader is reading, so switching version
@@ -292,6 +249,13 @@ pub(crate) fn nav_section(pathname: &str) -> Option<&'static str> {
 /// works over one code system carries it in the query and switching version
 /// must not drop what the reader is looking at. `search` is the query without
 /// its leading `?`, already percent-encoded, so each pair is carried verbatim.
+#[cfg_attr(
+    target_arch = "wasm32",
+    expect(
+        dead_code,
+        reason = "the console's server rewrites the address a version post returns to"
+    )
+)]
 pub(crate) fn version_link(pathname: &str, search: &str, version: FhirVersion) -> String {
     let mut kept: Vec<&str> = search
         .split('&')
@@ -320,7 +284,7 @@ mod tests {
 
     #[test]
     fn the_index_link_carries_the_version() {
-        assert_eq!(ui_link("", FhirVersion::R4B), under("?fhir=r4b"));
+        assert_eq!(ui_link("", FhirVersion::R4B), under("/?fhir=r4b"));
     }
 
     #[test]
@@ -345,7 +309,7 @@ mod tests {
         assert_eq!(
             base_url().render(""),
             UI_BASE,
-            "a base of more than one segment keeps its separator rather than escaping it"
+            "the base renders as it is written, with no separator escaped"
         );
     }
 
@@ -430,63 +394,14 @@ mod tests {
     }
 
     #[test]
-    fn the_base_itself_is_the_overview() {
-        assert_eq!(nav_section(UI_BASE), Some(OVERVIEW_PATH));
-        assert_eq!(
-            nav_section(&under("/")),
-            Some(OVERVIEW_PATH),
-            "the index is reachable with and without its trailing separator"
-        );
-    }
-
-    #[test]
-    fn a_screen_marks_its_own_entry() {
-        assert_eq!(nav_section(&under("/browse")), Some(BROWSE_PATH));
-        assert_eq!(nav_section(&under("/expand")), Some(EXPAND_PATH));
-        assert_eq!(nav_section(&under("/validate")), Some(VALIDATE_PATH));
-        assert_eq!(nav_section(&under("/valuesets")), Some(VALUE_SETS_PATH));
-        assert_eq!(nav_section(&under("/conceptmaps")), Some(CONCEPT_MAPS_PATH));
-        assert_eq!(nav_section(&under("/translate")), Some(TRANSLATE_PATH));
-        assert_eq!(nav_section(&under("/about")), Some(ABOUT_PATH));
-    }
-
-    #[test]
-    fn an_address_a_pane_used_to_have_marks_the_screen_it_moved_into() {
-        for pane in ["/versions", "/evidence", "/settings"] {
-            let address = under(pane);
-            assert_eq!(
-                nav_section(&address),
-                Some(ABOUT_PATH),
-                "`{address}` opens a pane of About, so About is the entry it marks"
-            );
-        }
-    }
-
-    #[test]
-    fn a_code_system_screen_marks_the_overview_that_lists_it() {
-        assert_eq!(
-            nav_section(&under("/systems/https:%2F%2Fterminology.example%2Fanimals")),
-            Some(OVERVIEW_PATH),
-            "a reader reading one system is still under the screen that listed it"
-        );
-    }
-
-    #[cfg(feature = "editor")]
-    #[test]
     fn a_history_link_names_the_instance_the_versions_belong_to() {
         assert_eq!(
             history_link("CodeSystem", "colours/1", FhirVersion::R4B),
             under("/history?fhir=r4b&type=CodeSystem&id=colours%2F1"),
             "an id carrying a separator stays inside the parameter it belongs to"
         );
-        assert_eq!(
-            nav_section(&under("/history")),
-            None,
-            "the versions are reached from the screen editing the resource"
-        );
     }
 
-    #[cfg(feature = "editor")]
     #[test]
     fn each_resource_type_links_back_to_the_screen_that_edits_it() {
         let system = "https://terminology.example/colours";
@@ -516,21 +431,6 @@ mod tests {
             editing_link("CodeSystem", "", "", FhirVersion::R4),
             Some(under("/codesystem?fhir=r4")),
             "a resource with nothing to address it by opens the empty screen"
-        );
-    }
-
-    #[test]
-    fn an_address_with_no_entry_marks_nothing() {
-        assert_eq!(nav_section(&under("/nowhere")), None);
-        assert_eq!(
-            nav_section("/health"),
-            None,
-            "an address outside the base is not one of the viewer's screens"
-        );
-        assert_eq!(
-            nav_section(&format!("{UI_BASE}nowhere")),
-            None,
-            "a path that only starts with the base's characters is not under it"
         );
     }
 
@@ -571,5 +471,24 @@ mod tests {
             under("/browse?flat&fhir=r4b"),
             "the query is carried verbatim, so a bare parameter is not invented into a pair"
         );
+    }
+
+    #[test]
+    fn a_resource_screen_is_addressed_by_what_it_is_read_by() {
+        let system = "https://example.org/fhir/CodeSystem/colours";
+        assert_eq!(
+            screen_link("CodeSystem", system, "colours", FhirVersion::R4B).map(|(link, _)| link),
+            Some(system_link(system, FhirVersion::R4B))
+        );
+        assert_eq!(
+            screen_link("ValueSet", system, "palette", FhirVersion::R5).map(|(link, _)| link),
+            Some("/valuesets/palette?fhir=r5".to_owned())
+        );
+        assert_eq!(
+            screen_link("ConceptMap", system, "m", FhirVersion::R6).map(|(link, _)| link),
+            Some("/conceptmaps/m?fhir=r6".to_owned())
+        );
+        assert_eq!(screen_link("ValueSet", system, "", FhirVersion::R4), None);
+        assert_eq!(screen_link("Patient", system, "p", FhirVersion::R4), None);
     }
 }

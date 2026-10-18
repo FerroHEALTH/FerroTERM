@@ -1,4 +1,5 @@
-//! The value sets this root holds: the search, and one resource read by id.
+//! The value sets this root holds: the search and its pages. One value set
+//! is read on its own screen, `pages::value_set`.
 //!
 //! The screen reads and never writes. The RESTful API defines create, update,
 //! and delete beside read and search
@@ -10,14 +11,11 @@ use leptos::html::Input;
 use leptos::prelude::*;
 use leptos_meta::Title;
 use leptos_router::NavigateOptions;
+use leptos_router::components::Redirect;
 use leptos_router::hooks::use_navigate;
 use leptos_router::hooks::use_query_map;
 
-use crate::components::NOT_DECLARED;
 use crate::components::failure::Failure;
-use crate::components::field::Help;
-use crate::components::icon;
-use crate::components::icon::Icon;
 use crate::components::reading::Reading;
 use crate::components::shell::SelectedVersion;
 use crate::components::state::empty;
@@ -25,26 +23,25 @@ use crate::fhir::FhirClient;
 use crate::fhir::error::FhirError;
 use crate::fhir::searchset::SearchFilter;
 use crate::fhir::searchset::SearchSet;
-use crate::fhir::value_set::ClauseRow;
 use crate::fhir::value_set::PublishedValueSet;
 use crate::fhir::version::FhirVersion;
 use crate::listing::Action;
 use crate::listing::ListParams;
 use crate::listing::Published;
-use crate::listing::SortColumn;
 use crate::listing::SortOrder;
 use crate::listing::count_sentence;
 use crate::listing::filter_form;
-use crate::listing::heading;
 use crate::listing::pager_view;
 use crate::listing::published_row;
-use crate::listing::sortable;
-use crate::listing::table;
+use crate::listing::published_table;
 use crate::listing::window;
 use crate::routes::VALUE_SETS_PATH;
 use crate::routes::expansion_link;
+use crate::routes::resource_link;
 use crate::settings::Settings;
-use crate::styles;
+use ferrohealth_ui::table::model::Noun;
+use ferrohealth_ui::table::view::Listing;
+use ferrohealth_ui::view::surface::{page_header, stack};
 
 /// Lists the `ValueSet` resources this root holds, and reads one of them.
 ///
@@ -61,19 +58,25 @@ use crate::styles;
 pub(crate) fn ValueSetsPage() -> impl IntoView {
     let client = expect_context::<FhirClient>();
     let SelectedVersion(version) = expect_context::<SelectedVersion>();
-    let settings = expect_context::<Settings>();
-    provide_context(Help(RwSignal::new(false)));
+    let page_size = expect_context::<Settings>().page_size;
+    let _help = ferrohealth_ui::widget::help::provide_help();
 
     let query = use_query_map();
-    let params: Signal<ListParams> = Memo::new(move |_| {
-        query.with(|map| ListParams::read(&|name| map.get(name), settings.page_size.get()))
-    })
-    .into();
+    let params: Signal<ListParams> =
+        Memo::new(move |_| query.with(|map| ListParams::read(&|name| map.get(name), page_size)))
+            .into();
 
     let heading = view! {
         <Title text="Value sets" />
-        <h1 class=styles::PAGE_TITLE>"Value sets"</h1>
-        <p class=styles::LEAD>"What this root publishes. Open one to see what it selects."</p>
+        {page_header(
+            "Value sets",
+            Some(
+                String::from(
+                    "The ValueSet resources this server publishes. Open one to see what it selects.",
+                ),
+            ),
+            (),
+        )}
     }
     .into_any();
 
@@ -81,13 +84,26 @@ pub(crate) fn ValueSetsPage() -> impl IntoView {
     // The order lives in the address, so an ordered list is a link.
     let order = Memo::new(move |_| query.with(|map| SortOrder::read(&|name| map.get(name))));
     let list = list_section(&client, version, params, order);
-    let detail = detail_section(&client, version, params);
+    // NOTE: no specification governs this: our own design; an address from
+    // before the detail screen named the resource as `?id=`, now its path.
+    let moved = move || {
+        params.with(|params| {
+            (!params.id.is_empty()).then(|| {
+                let target = resource_link(VALUE_SETS_PATH, &params.id, version.get());
+                view! { <Redirect path=target /> }
+            })
+        })
+    };
 
     view! {
+        {moved}
         {heading}
-        {form}
-        {list}
-        {detail}
+        {stack(
+            view! {
+                {form}
+                {list}
+            },
+        )}
     }
 }
 
@@ -133,12 +149,13 @@ fn list_section(
 ) -> AnyView {
     let read_client = client.clone();
     let filter = Memo::new(move |_| params.with(|params| params.filter.clone()));
-    let found = LocalResource::new(move || {
-        let client = read_client.clone();
-        let version = version.get();
-        let filter = filter.get();
-        async move { client.value_set_search(version, &filter).await }
-    });
+    let found = Resource::new(
+        move || (version.get(), filter.get()),
+        move |(version, filter)| {
+            let client = read_client.clone();
+            async move { client.value_set_search(version, &filter).await }
+        },
+    );
 
     // The live region is in the document before the read settles, which is
     // what lets a screen reader announce the count when it arrives. Every
@@ -146,7 +163,7 @@ fn list_section(
     // the transition boundary keeps the previous rows on screen while the next
     // read runs and a sentence built from the address would describe rows that
     // are not there yet.
-    let announcement = Memo::new(move |_| {
+    let announcement = move || {
         let params = params.get();
         found.with(|answered| {
             answered
@@ -158,16 +175,18 @@ fn list_section(
                 })
                 .unwrap_or_default()
         })
-    });
+    };
 
     view! {
-        <section class="mt-section" aria-labelledby="valuesets-heading">
-            <h2 id="valuesets-heading" class=styles::SECTION_TITLE>
-                "What this root holds"
-            </h2>
-            <p aria-live="polite" class="mt-default text-body text-muted">
-                {announcement}
-            </p>
+        <section class="fui-card fui-panel" aria-labelledby="valuesets-heading">
+            <div class="fui-panel-head">
+                <h2 id="valuesets-heading" class="fui-card-title">
+                    "What this root holds"
+                </h2>
+                <p aria-live="polite" class="fui-muted fui-small">
+                    <Transition fallback=|| ()>{announcement}</Transition>
+                </p>
+            </div>
             <Reading label="Reading the value sets">
                 {move || {
                     let params = params.get();
@@ -214,10 +233,10 @@ fn list_view(
         .indexes()
         .filter_map(|index| ordered.get(index))
         .filter_map(|(_, index)| resources.get(*index))
-        .map(|resource| row_view(resource, params, version))
+        .map(|resource| row_view(resource, version))
         .collect();
     let pager = pager_view(
-        "Value set pages",
+        Listing::new("Value set pages").noun(Noun::new("value set", "value sets")),
         view,
         params,
         VALUE_SETS_PATH,
@@ -225,14 +244,14 @@ fn list_view(
         &[],
     );
     view! {
-        {table(
-            vec![
-                sortable(SortColumn::Name, "Value set", order, VALUE_SETS_PATH, params, version),
-                sortable(SortColumn::Version, "Version", order, VALUE_SETS_PATH, params, version),
-                sortable(SortColumn::Status, "Status", order, VALUE_SETS_PATH, params, version),
-                heading("Open in"),
-            ],
+        {published_table(
+            "Value sets this root holds",
+            "Value set",
             rows,
+            order,
+            params,
+            VALUE_SETS_PATH,
+            version,
         )}
         {pager}
     }
@@ -250,12 +269,12 @@ fn facts(resource: &PublishedValueSet) -> Published<'_> {
 }
 
 /// One published value set, as a row that opens it and one that expands it.
-fn row_view(resource: &PublishedValueSet, params: &ListParams, version: FhirVersion) -> AnyView {
+fn row_view(resource: &PublishedValueSet, version: FhirVersion) -> AnyView {
     published_row(
         &facts(resource),
         resource
             .id()
-            .map(|id| params.reading(id).address(VALUE_SETS_PATH, version)),
+            .map(|id| resource_link(VALUE_SETS_PATH, id, version)),
         // The runner takes the canonical as its `url` parameter, so a row
         // hands its subject on rather than making a reader retype one.
         resource.url().map(|canonical| Action {
@@ -263,199 +282,6 @@ fn row_view(resource: &PublishedValueSet, params: &ListParams, version: FhirVers
             href: expansion_link(canonical, version),
         }),
     )
-}
-
-/// One value set read by its id, with what its definition selects.
-fn detail_section(
-    client: &FhirClient,
-    version: Signal<FhirVersion>,
-    params: Signal<ListParams>,
-) -> AnyView {
-    let read_client = client.clone();
-    let id = Memo::new(move |_| params.with(|params| params.id.clone()));
-    let resource = LocalResource::new(move || {
-        let client = read_client.clone();
-        let version = version.get();
-        let id = id.get();
-        async move {
-            if id.is_empty() {
-                None
-            } else {
-                Some(client.value_set_read(version, &id).await)
-            }
-        }
-    });
-
-    view! {
-        <Show when=move || id.with(|id| !id.is_empty()) fallback=|| ()>
-            <section class="mt-section" aria-labelledby="valueset-detail-heading">
-                <h2 id="valueset-detail-heading" class=styles::SECTION_TITLE>
-                    "The value set you opened"
-                </h2>
-                <Reading label="Reading the value set">
-                    {move || {
-                        let version = version.get();
-                        resource
-                            .with(|answered| {
-                                answered
-                                    .as_ref()
-                                    .map(|answer| match answer {
-                                        None => ().into_any(),
-                                        Some(Ok(resource)) => resource_view(resource, version),
-                                        Some(Err(error)) => failure_view(error),
-                                    })
-                            })
-                    }}
-                </Reading>
-            </section>
-        </Show>
-    }
-    .into_any()
-}
-
-/// One resource: its facts, its definition, and the runner that expands it.
-fn resource_view(resource: &PublishedValueSet, version: FhirVersion) -> AnyView {
-    let rows: Vec<AnyView> = resource
-        .facts()
-        .into_iter()
-        .map(|fact| {
-            let value = fact.value.unwrap_or_else(|| NOT_DECLARED.to_owned());
-            view! {
-                <div class="grid gap-tight border-b border-line py-tight last:border-0 sm:grid-cols-[16rem_1fr]">
-                    <dt class="font-medium">{fact.label}</dt>
-                    <dd class="wrap-break-word">{value}</dd>
-                </div>
-            }
-            .into_any()
-        })
-        .collect();
-    let canonical = resource.url().map(str::to_owned);
-    let heading = canonical
-        .clone()
-        .unwrap_or_else(|| format!("Canonical {NOT_DECLARED}"));
-    let run = canonical.map_or_else(
-        || {
-            view! {
-                <p class="mt-default text-body text-muted">
-                    "This resource declares no canonical, so there is no url for the expansion runner to expand."
-                </p>
-            }
-            .into_any()
-        },
-        |canonical| {
-            let href = expansion_link(&canonical, version);
-            view! {
-                <p class="mt-default">
-                    <a href=href class="inline-flex items-center gap-tight text-accent underline">
-                        <Icon glyph=icon::EXPAND />
-                        "Run this value set in the expansion runner"
-                    </a>
-                </p>
-            }
-            .into_any()
-        },
-    );
-    let clauses = clauses_view(&resource.clauses());
-    view! {
-        <article class=format!("mt-default panel-p {}", styles::PANEL)>
-            <h3 class="font-mono text-body font-semibold break-all">{heading}</h3>
-            {run}
-            <dl class="mt-default text-body">{rows}</dl>
-            {clauses}
-        </article>
-    }
-    .into_any()
-}
-
-/// What the definition selects, one clause at a time.
-///
-/// The clauses are a plain `Vec`, which rebuilds every position when another
-/// resource is read. A `<For>` key it retained would be moved rather than
-/// re-rendered, so opening a second value set would keep the first one's rows.
-fn clauses_view(clauses: &[ClauseRow]) -> AnyView {
-    if clauses.is_empty() {
-        return view! {
-            <p class="mt-default text-body text-muted">
-                "This resource carries no compose element, so its content is whatever the server holds for it rather than a selection written here."
-            </p>
-        }
-        .into_any();
-    }
-    let rows: Vec<AnyView> = clauses.iter().map(clause_row).collect();
-    view! {
-        <div class="mt-loose overflow-x-auto">
-            <table class="w-full border-collapse text-left text-body">
-                <caption class="pb-tight text-left text-small font-medium tracking-wide uppercase">
-                    "What the definition selects"
-                </caption>
-                <thead>
-                    <tr class="border-b border-line">
-                        <th scope="col" class="py-tight pr-default text-small font-medium">
-                            "Clause"
-                        </th>
-                        <th scope="col" class="py-tight pr-default text-small font-medium">
-                            "Code system"
-                        </th>
-                        <th scope="col" class="py-tight text-small font-medium">
-                            "Selects"
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>{rows}</tbody>
-            </table>
-        </div>
-    }
-    .into_any()
-}
-
-/// One clause, with the word that says whether it draws codes in or out.
-fn clause_row(clause: &ClauseRow) -> AnyView {
-    let kind = if clause.included {
-        "include"
-    } else {
-        "exclude"
-    };
-    let system = match (clause.system.as_deref(), clause.version.as_deref()) {
-        (Some(system), Some(version)) => format!("{system}|{version}"),
-        (Some(system), None) => system.to_owned(),
-        (None, _) => NOT_DECLARED.to_owned(),
-    };
-    view! {
-        <tr class="border-b border-line align-top last:border-0">
-            <th scope="row" class="py-tight pr-default text-small font-normal">
-                {kind}
-            </th>
-            <td class="py-tight pr-default font-mono text-small break-all">{system}</td>
-            <td class="py-tight text-small">{selection_view(clause)}</td>
-        </tr>
-    }
-    .into_any()
-}
-
-/// What one clause selects, as the lines the publisher wrote.
-fn selection_view(clause: &ClauseRow) -> AnyView {
-    let mut lines: Vec<String> = Vec::new();
-    if clause.codes > 0 {
-        lines.push(match clause.codes {
-            1 => "1 code named one by one".to_owned(),
-            codes => format!("{codes} codes named one by one"),
-        });
-    }
-    lines.extend(clause.filters.iter().cloned());
-    lines.extend(
-        clause
-            .value_sets
-            .iter()
-            .map(|url| format!("every code in {url}")),
-    );
-    if lines.is_empty() {
-        return view! { "the whole code system" }.into_any();
-    }
-    let items: Vec<AnyView> = lines
-        .into_iter()
-        .map(|line| view! { <li class="break-all">{line}</li> }.into_any())
-        .collect();
-    view! { <ul class="ml-loose list-disc">{items}</ul> }.into_any()
 }
 
 /// A refused read, in the server's own words.

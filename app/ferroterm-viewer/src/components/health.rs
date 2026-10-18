@@ -1,70 +1,63 @@
-//! The health indicator, which polls `GET /health`.
+//! The health indicator, which asks the server's `GET /health`.
 
 use std::time::Duration;
 
+use ferrohealth_ui::tone::Tone;
+use ferrohealth_ui::view::status::status;
 use leptos::prelude::*;
 
 use crate::components::icon;
-use crate::components::icon::Icon;
 use crate::components::reading::Reading;
 use crate::fhir::FhirClient;
-use crate::styles;
 
 /// How often the indicator asks the server whether it is still up.
 const POLL: Duration = Duration::from_secs(15);
 
-/// Shows whether the server that served this bundle is answering.
+/// Shows whether the terminology server the console reads is answering.
 ///
-/// The resource refetches on every tick, so it is read under a transition
-/// boundary: a `<Suspense>` would flash its fallback on each poll
-/// (<https://github.com/leptos-rs/book/blob/main/src/async/12_transition.md>).
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type, and a binary crate has no reachable public API"
-)]
-pub(crate) fn HealthIndicator() -> impl IntoView {
+/// The server asks once while it renders the page, and the browser asks
+/// again on every tick; the resource refetches, so it is read under a
+/// transition boundary, as a `<Suspense>` would flash its fallback on each
+/// poll (<https://github.com/leptos-rs/book/blob/main/src/async/12_transition.md>).
+pub(crate) fn health_indicator() -> impl IntoView {
     let client = expect_context::<FhirClient>();
-    let health = LocalResource::new(move || {
-        let client = client.clone();
-        async move { client.health().await }
-    });
-
+    let health = Resource::new(
+        || (),
+        move |()| {
+            let client = client.clone();
+            async move { client.health().await.map(|status| status.as_u16()) }
+        },
+    );
+    #[cfg(target_arch = "wasm32")]
     match set_interval_with_handle(move || health.refetch(), POLL) {
         Ok(handle) => on_cleanup(move || handle.clear()),
-        Err(_) => leptos::logging::warn!("this browser refused an interval; health is read once"),
+        Err(_refused) => {
+            leptos::logging::warn!("this browser refused an interval; health is read once");
+        }
     }
+    #[cfg(not(target_arch = "wasm32"))]
+    let _: Duration = POLL;
 
-    let state = move || {
-        health.get().map(|result| match result.as_ref() {
-            Ok(status) => (
-                icon::SERVING,
-                "Serving",
-                status.to_string(),
-                styles::BADGE_OK,
-            ),
-            Err(error) => (
-                icon::UNREACHABLE,
-                "Unreachable",
-                error.to_string(),
-                styles::BADGE_DANGER,
-            ),
-        })
-    };
-
+    // NOTE: no specification governs this: our own design; below 40rem the
+    // bar holds the version and the theme on one row, so the status yields.
     view! {
-        <Reading inline=true label="Checking the server">
-            {move || {
-                state()
-                    .map(|(glyph, word, detail, tint)| {
-                        view! {
-                            <span class=tint title=detail>
-                                <Icon glyph=glyph class="h-3.5 w-3.5" />
-                                {word}
-                            </span>
-                        }
-                    })
-            }}
-        </Reading>
+        <span class="hidden sm:contents">
+            <Reading inline=true label="Checking the server">
+                {move || {
+                    health
+                        .get()
+                        .map(|answered| match answered {
+                            Ok(_code) => status(Tone::Ok, icon::SERVING, "Serving", None).into_any(),
+                            Err(error) => {
+                                let detail = error
+                                    .status()
+                                    .map(|status| status.as_u16().to_string());
+                                status(Tone::Bad, icon::UNREACHABLE, "Unreachable", detail)
+                                    .into_any()
+                            }
+                        })
+                }}
+            </Reading>
+        </span>
     }
 }

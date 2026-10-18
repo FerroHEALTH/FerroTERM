@@ -30,5 +30,7 @@ disallowed-types = [
 # documentation. WebDriver is the W3C protocol the browser journeys speak
 # (https://www.w3.org/TR/webdriver2/); OpenID Connect is the specification the
 # SMART bearer gate discovers its issuer through
-# (https://openid.net/specs/openid-connect-discovery-1_0.html).
-doc-valid-idents = ["FerroTERM", "FerroEHR", "OpenID", "RESTful", "WebDriver", ".."]
+# (https://openid.net/specs/openid-connect-discovery-1_0.html). FerroUI is the
+# shared component library of the FerroHEALTH consoles the console is drawn
+# with.
+doc-valid-idents = ["FerroTERM", "FerroEHR", "FerroUI", "FerroHEALTH", "OpenID", "RESTful", "WebDriver", ".."]

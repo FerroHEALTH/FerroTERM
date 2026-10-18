@@ -14,9 +14,7 @@ use std::sync::Arc;
 
 use clap::Parser;
 use ferroterm_server::cli::{Cli, Command};
-use ferroterm_server::config::{
-    ADMIN_LISTEN_ENV, Config, INDEX_ENV, LISTEN_ENV, OIDC_ISSUER_ENV, UI_ENV,
-};
+use ferroterm_server::config::{ADMIN_LISTEN_ENV, Config, INDEX_ENV, LISTEN_ENV, OIDC_ISSUER_ENV};
 use ferroterm_server::reload::Serving;
 use ferroterm_server::smart::Smart;
 use ferroterm_server::state::AppState;
@@ -99,15 +97,6 @@ async fn run(config: Config, started: std::time::Instant) -> anyhow::Result<()> 
             path = summary.path.as_ref().map(|p| p.display().to_string()),
             "serving code system"
         );
-    }
-    if config.viewer {
-        if ferroterm_server::ui::BUNDLE.is_empty() {
-            tracing::warn!(
-                "{UI_ENV} is on and this binary carries no viewer bundle, so no /ui route is served"
-            );
-        } else {
-            tracing::info!(base = ferroterm_server::ui::MOUNT, "serving the viewer");
-        }
     }
     // The issuer is read before the listener binds, so a server that cannot
     // check a token never answers on a surface it has declared protected.

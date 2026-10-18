@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-//! Journeys through the viewer the server serves at `/ui`.
+//! Journeys through the console's reading screens.
 
 use thirtyfour::prelude::*;
 use thirtyfour::stringmatch::StringMatch;
@@ -8,11 +8,12 @@ use crate::harness::Journey;
 use crate::harness::server;
 use crate::harness::session;
 
-/// The version switcher, found by the landmark a screen reader announces.
-const SWITCHER: &str = "nav[aria-label='FHIR version']";
+/// The version switcher, found by the group name a screen reader announces.
+const SWITCHER: &str = "[role='group'][aria-label='FHIR version']";
 
-/// The switcher link marked as the page the reader is on.
-const SELECTED_VERSION: &str = "nav[aria-label='FHIR version'] a[aria-current='page']";
+/// The switcher button marked as the version the reader is on.
+const SELECTED_VERSION: &str =
+    "[role='group'][aria-label='FHIR version'] button[aria-pressed='true']";
 
 /// The sidebar the screens are reached from, by the landmark it announces.
 const SIDEBAR: &str = "nav[aria-label='Screens']";
@@ -20,19 +21,19 @@ const SIDEBAR: &str = "nav[aria-label='Screens']";
 /// The sidebar entry marked as the screen the reader is on.
 const CURRENT_SCREEN: &str = "nav[aria-label='Screens'] a[aria-current='page']";
 
-/// The overview screen's rendered FHIR base, found by the term beside it.
-const RENDERED_BASE: &str = "//dt[normalize-space()='FHIR base']/following-sibling::dd[1]";
+/// The dashboard's line under its title, which leads with the FHIR base read.
+const RENDERED_BASE: &str = ".fui-page-meta";
 
 /// A code system row's link into that system's own screen.
-const SYSTEM_LINK: &str = "a[href^='/ui/systems/']";
+const SYSTEM_LINK: &str = "a[href^='/systems/']";
 
 /// The expansion runner's value set control, which offers what the root publishes.
-const EXPAND_URL: &str = "#expand-url-pick";
+const EXPAND_URL: &str = "#expand-url";
 
 /// The expansion runner's submit control, scoped past the command bar.
 const EXPAND_SUBMIT: &str = "main form button[type='submit']";
 
-/// The disclosure holding the runs this browser remembers.
+/// The disclosure holding the runs the page remembers.
 const REMEMBERED: &str = "main details";
 
 /// One remembered run, as the link that re-runs it.
@@ -47,13 +48,10 @@ const COMMAND_SUBMIT: &str = "form[role='search'] button[type='submit']";
 /// One offer the find screen made, as the link that takes it.
 const OFFER: &str = "section[aria-labelledby='find-offers-heading'] li a";
 
-/// The settings pane of the About screen, by the anchor that opens it.
-const SETTINGS_PANE: &str = "about-settings-heading";
-
 /// The density control that pane carries.
 const DENSITY_CONTROL: &str = "#viewer-density";
 
-/// One drawn row of the overview's table.
+/// One drawn row of the code system listing's table.
 const SYSTEM_ROW: &str = "section[aria-labelledby='systems-heading'] tbody tr";
 
 /// How many code systems a deployment is read on one screen at.
@@ -70,13 +68,13 @@ const SYSTEMS_ON_ONE_SCREEN: f64 = 20.0;
 const DESKTOP: (u32, u32) = (1280, 1024);
 
 /// The sidebar entry onto the screen a code is checked on.
-const CHECK_LINK: &str = "nav[aria-label='Screens'] a[href^='/ui/validate']";
+const CHECK_LINK: &str = "nav[aria-label='Screens'] a[href^='/validate']";
 
 /// The control that names the code system that screen works over.
-const CHECK_SYSTEM: &str = "#validate-system-pick";
+const CHECK_SYSTEM: &str = "#validate-system";
 
 /// The first code system that control offers.
-const FIRST_OFFER: &str = "#validate-system-pick option:nth-child(2)";
+const FIRST_OFFER: &str = "#validate-system-list li[role='option']:first-child";
 
 /// The field the code being checked is typed into.
 const CHECK_CODE: &str = "#validate-code";
@@ -94,17 +92,24 @@ const ANNOUNCEMENT: &str = "p[aria-live='polite']";
 /// result of false, which is an answer the server gave.
 const A_CODE: &str = "ca-leaf";
 
-/// The overview's own table, by the heading it is labelled by.
+/// The code system listing's table, by the heading it is labelled by.
 const SYSTEM_TABLE: &str = "section[aria-labelledby='systems-heading'] table";
 
 /// The control that orders the table by the code system column.
-const SORT_BY_SYSTEM: &str = "//section[@aria-labelledby='systems-heading']//th[1]/button";
+const SORT_BY_SYSTEM: &str = "//section[@aria-labelledby='systems-heading']//th[1]/a";
 
 /// The heading a screen reader hears as ordered upward.
 const SORTED_UP: &str = "section[aria-labelledby='systems-heading'] th[aria-sort='ascending']";
 
 /// What the table leads each system with, in the order it draws them.
-const ROW_LABELS: &str = "section[aria-labelledby='systems-heading'] tbody a[href^='/ui/systems/']";
+const ROW_LABELS: &str = "section[aria-labelledby='systems-heading'] tbody a[href^='/systems/']";
+
+/// The canonical a detail screen states in its facts.
+const CANONICAL_FACT: &str = "//dt[normalize-space()='Canonical']/following-sibling::dd[1]";
+
+/// The code system screen's tab onto what this server can do with it.
+const SUPPORT_TAB: &str =
+    "//nav[@aria-label='Views of this code system']//a[normalize-space()='Server support']";
 
 /// The code system screen's capability pane, by the heading it is labelled by.
 const CAPABILITY_PANE: &str = "section[aria-labelledby='system-capability-heading']";
@@ -121,7 +126,7 @@ const SYSTEM_TOOLS: &str = "nav[aria-label^='Screens for']";
 /// which system it names. A row offers the concept browser only where its
 /// version declares the direct-child operator, so the browse link is the mark.
 const WALKABLE_ROW: &str =
-    "//tr[.//a[contains(@href, '/ui/browse')]]//a[starts-with(@href, '/ui/systems/')]";
+    "//tr[.//a[contains(@href, '/browse')]]//a[starts-with(@href, '/systems/')]";
 
 /// The surface the tree journey drives.
 ///
@@ -130,10 +135,10 @@ const WALKABLE_ROW: &str =
 /// (<https://hl7.org/fhir/R4B/codesystem-filter-operator.html>) and the
 /// browser draws no tree to walk. The journey opens the version that can
 /// express the filter it exercises.
-const TREE_SURFACE: &str = "/ui?fhir=r5";
+const TREE_SURFACE: &str = "/systems?fhir=r5";
 
 /// The link from a code system's screen into the concept browser.
-const BROWSE_LINK: &str = "nav[aria-label^='Screens for'] a[href*='/ui/browse']";
+const BROWSE_LINK: &str = "nav[aria-label^='Screens for'] a[href*='/browse']";
 
 /// A concept the search answered, as the link that reads it.
 const SEARCH_RESULT: &str = "section[aria-labelledby='browse-search-heading'] ul li a";
@@ -149,6 +154,9 @@ const TREE_SETTLED: &str = "li[role='treeitem'], #browse-tree-empty";
 /// One row of the tree.
 const TREE_ROW: &str = "li[role='treeitem']";
 
+/// The code a tree row draws after its words.
+const TREE_CODE: &str = "code.fui-tree-code";
+
 /// The row that holds the tree's one tab stop.
 const TAB_STOP: &str = "li[role='treeitem'][tabindex='0']";
 
@@ -159,10 +167,10 @@ const SELECTED_ROW: &str = "li[role='treeitem'][aria-selected='true']";
 const PARENT_LINK: &str = "nav[aria-label='Parents of this concept'] a";
 
 /// The sidebar entry onto the screen the version comparison is a tab of.
-const ABOUT_LINK: &str = "nav[aria-label='Screens'] a[href^='/ui/about']";
+const ABOUT_LINK: &str = "nav[aria-label='Screens'] a[href^='/about']";
 
 /// The tab that shows that comparison.
-const VERSIONS_TAB: &str = "nav[aria-label='About this server'] a[href='#about-versions-heading']";
+const VERSIONS_TAB: &str = "nav[aria-label='About this server'] a[data-tab='versions']";
 
 /// The version comparison, by the heading it is labelled by.
 const COMPARISON: &str = "section[aria-labelledby='comparison-heading']";
@@ -173,30 +181,30 @@ const COMPARISON: &str = "section[aria-labelledby='comparison-heading']";
 /// the panes beside it draw tables of their own.
 const COMPARISON_TABLE: &str = "section[aria-labelledby='comparison-heading'] table";
 
-/// The listing screens a row is opened on, each as its own address, the
-/// heading link of a listed row, and the heading its detail pane draws.
+/// The listing screens a row is opened from, the heading link of a listed
+/// row, the canonical beside it, and the fact its detail screen states it in.
 ///
 /// Both screens draw that link from `listing.rs`, which renders a row unlinked
 /// when the resource it lists carries no `Resource.id`, so a link found here is
 /// the wire carrying one.
 const LISTINGS: [(&str, &str, &str, &str); 2] = [
     (
-        "/ui/valuesets",
+        "/valuesets",
         "section[aria-labelledby='valuesets-heading'] tbody th a",
         "section[aria-labelledby='valuesets-heading'] tbody th span",
-        "section[aria-labelledby='valueset-detail-heading'] h3",
+        "//dt[normalize-space()='Canonical']/following-sibling::dd[1]",
     ),
     (
-        "/ui/conceptmaps",
+        "/conceptmaps",
         "section[aria-labelledby='conceptmaps-heading'] tbody th a",
         "section[aria-labelledby='conceptmaps-heading'] tbody th span",
-        "section[aria-labelledby='conceptmap-detail-heading'] h3",
+        "//dt[normalize-space()='Canonical']/following-sibling::dd[1]",
     ),
 ];
 
-/// A switcher link, by the version name a reader reads on it.
+/// A switcher button, by the version name a reader reads on it.
 fn version_link(label: &str) -> String {
-    format!("//nav[@aria-label='FHIR version']//a[normalize-space()='{label}']")
+    format!("//*[@role='group'][@aria-label='FHIR version']//button[normalize-space()='{label}']")
 }
 
 /// One root's cell on the `CodeSystem/$lookup` row, counting from the left.
@@ -216,8 +224,9 @@ fn screen_link(label: &str) -> String {
 ///
 /// The mark is the `aria-current="page"` a screen reader announces, and it is
 /// computed from the address rather than from the click, so a reader who typed
-/// the address gets the same mark. The click also proves the entry carries the
-/// FHIR version the reader was already on.
+/// the address gets the same mark. The click also proves the screen it
+/// reached reads the FHIR version the reader switched to: the switcher keeps
+/// it as the version an address naming none reads.
 #[tokio::test]
 async fn the_sidebar_reaches_another_screen_and_marks_the_one_it_reached() {
     let Some(base) = server() else {
@@ -226,7 +235,7 @@ async fn the_sidebar_reaches_another_screen_and_marks_the_one_it_reached() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &base, "/ui").await;
+            let journey = Journey::open(driver, &base, "/").await;
 
             journey
                 .element(By::Css(SIDEBAR), "the sidebar the screens are reached from")
@@ -234,8 +243,20 @@ async fn the_sidebar_reaches_another_screen_and_marks_the_one_it_reached() {
             journey
                 .text_becoming(
                     By::Css(CURRENT_SCREEN),
-                    "Overview",
-                    "the sidebar to mark the overview the reader opened",
+                    "Dashboard",
+                    "the sidebar to mark the dashboard the reader opened",
+                )
+                .await;
+            journey
+                .element(By::XPath(version_link("R5")), "the R5 button")
+                .await
+                .click()
+                .await?;
+            journey
+                .text_becoming(
+                    By::Css(SELECTED_VERSION),
+                    "R5",
+                    "the switcher to mark R5 after the press",
                 )
                 .await;
 
@@ -252,13 +273,16 @@ async fn the_sidebar_reaches_another_screen_and_marks_the_one_it_reached() {
                     "the sidebar to mark value sets after the click",
                 )
                 .await;
-            let address = journey
-                .address_carrying("/ui/valuesets", "the value sets screen's own address")
+            journey
+                .address_carrying("/valuesets", "the value sets screen's own address")
                 .await;
-            assert!(
-                address.contains("fhir=r4b"),
-                "a sidebar entry keeps the version the reader was on: `{address}`"
-            );
+            journey
+                .text_becoming(
+                    By::Css(SELECTED_VERSION),
+                    "R5",
+                    "the value sets screen to read the version the reader switched to",
+                )
+                .await;
             assert_eq!(
                 journey.count(By::Css(CURRENT_SCREEN)).await,
                 1,
@@ -272,13 +296,11 @@ async fn the_sidebar_reaches_another_screen_and_marks_the_one_it_reached() {
     outcome.expect("the journey ran and the browser session ended cleanly");
 }
 
-/// The shell renders under `/ui`, and the switcher moves the whole page onto
-/// another FHIR version.
+/// The shell renders, and the switcher moves the whole page onto another FHIR
+/// version.
 ///
-/// This is the journey that proves the bundle the server embeds boots at all:
-/// the switcher exists only once the WebAssembly module has mounted the
-/// application, and the rendered FHIR base below it is read from the same
-/// signal the address carries.
+/// The rendered FHIR base below the switcher is read from the same signal the
+/// address carries, so the press is proved by what the page reads after it.
 #[tokio::test]
 async fn the_shell_renders_and_the_switcher_moves_the_page_onto_another_version() {
     let Some(base) = server() else {
@@ -290,7 +312,7 @@ async fn the_shell_renders_and_the_switcher_moves_the_page_onto_another_version(
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &base, "/ui").await;
+            let journey = Journey::open(driver, &base, "/").await;
 
             journey
                 .element(By::Css(SWITCHER), "the FHIR version switcher")
@@ -304,11 +326,16 @@ async fn the_shell_renders_and_the_switcher_moves_the_page_onto_another_version(
                 .await;
             let base_before = journey
                 .text_becoming(
-                    By::XPath(RENDERED_BASE),
-                    StringMatch::new("/r4b").partial(),
+                    By::Css(RENDERED_BASE),
+                    StringMatch::new("/r4b ").partial(),
                     "the overview to render the R4B FHIR base",
                 )
                 .await;
+            let base_before = base_before
+                .split(" · ")
+                .next()
+                .unwrap_or_default()
+                .to_owned();
             let address_before = journey.address().await;
             assert!(
                 base_before.ends_with("/r4b"),
@@ -320,7 +347,7 @@ async fn the_shell_renders_and_the_switcher_moves_the_page_onto_another_version(
             );
 
             journey
-                .element(By::XPath(version_link("R5")), "the R5 link")
+                .element(By::XPath(version_link("R5")), "the R5 button")
                 .await
                 .click()
                 .await?;
@@ -334,11 +361,16 @@ async fn the_shell_renders_and_the_switcher_moves_the_page_onto_another_version(
                 .await;
             let base_after = journey
                 .text_becoming(
-                    By::XPath(RENDERED_BASE),
-                    StringMatch::new("/r5").partial(),
+                    By::Css(RENDERED_BASE),
+                    StringMatch::new("/r5 ").partial(),
                     "the overview to render the R5 FHIR base",
                 )
                 .await;
+            let base_after = base_after
+                .split(" · ")
+                .next()
+                .unwrap_or_default()
+                .to_owned();
             let address_after = journey.address().await;
             assert!(
                 base_after.ends_with("/r5"),
@@ -350,7 +382,7 @@ async fn the_shell_renders_and_the_switcher_moves_the_page_onto_another_version(
             );
             assert!(
                 address_after.contains("fhir=r5"),
-                "the switcher is a navigation, so the address carries the version: `{address_after}`"
+                "the switcher returns the reader with the version in the address: `{address_after}`"
             );
             assert_ne!(
                 address_before, address_after,
@@ -379,7 +411,7 @@ async fn a_row_opens_the_code_system_screen_and_both_panes_draw() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &base, "/ui").await;
+            let journey = Journey::open(driver, &base, "/").await;
 
             let row = journey
                 .element(By::Css(SYSTEM_LINK), "a code system link on the overview")
@@ -393,16 +425,21 @@ async fn a_row_opens_the_code_system_screen_and_both_panes_draw() {
 
             journey
                 .text_becoming(
-                    By::Css("h1"),
+                    By::XPath(CANONICAL_FACT),
                     StringMatch::new(canonical.clone()).full(),
-                    "the detail screen to head with the canonical the row named",
+                    "the detail screen to state the canonical the row named",
                 )
                 .await;
             journey
-                .element(By::Css(CAPABILITY_PANE), "the capability pane")
+                .element(By::Css(PUBLISHED_PANE), "the published-resource pane")
                 .await;
             journey
-                .element(By::Css(PUBLISHED_PANE), "the published-resource pane")
+                .element(By::XPath(SUPPORT_TAB), "the server support tab")
+                .await
+                .click()
+                .await?;
+            journey
+                .element(By::Css(CAPABILITY_PANE), "the capability pane")
                 .await;
             // The links row is drawn only for a system the capability
             // statement names, so finding it proves the canonical round-tripped
@@ -413,7 +450,7 @@ async fn a_row_opens_the_code_system_screen_and_both_panes_draw() {
 
             let address = journey.address().await;
             assert!(
-                address.contains("/ui/systems/"),
+                address.contains("/systems/"),
                 "the screen is addressed under the systems route: `{address}`"
             );
             assert!(
@@ -421,7 +458,7 @@ async fn a_row_opens_the_code_system_screen_and_both_panes_draw() {
                 "the link carries the version the reader was on: `{address}`"
             );
             assert!(
-                !address.contains("/ui/systems//"),
+                !address.contains("/systems//"),
                 "the canonical is one encoded segment, so it never splits: `{address}`"
             );
 
@@ -446,7 +483,7 @@ async fn the_address_a_row_links_to_opens_the_same_screen_when_it_is_loaded_fres
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &base, "/ui").await;
+            let journey = Journey::open(driver, &base, "/").await;
 
             let row = journey
                 .element(By::Css(SYSTEM_LINK), "a code system link on the overview")
@@ -457,7 +494,7 @@ async fn the_address_a_row_links_to_opens_the_same_screen_when_it_is_loaded_fres
                 .await?
                 .expect("an anchor resolves its own href");
             assert!(
-                address.contains("/ui/systems/"),
+                address.contains("/systems/"),
                 "the row links into the systems route: `{address}`"
             );
 
@@ -467,9 +504,9 @@ async fn the_address_a_row_links_to_opens_the_same_screen_when_it_is_loaded_fres
 
             journey
                 .text_becoming(
-                    By::Css("h1"),
+                    By::XPath(CANONICAL_FACT),
                     StringMatch::new(canonical.clone()).full(),
-                    "the freshly loaded screen to head with the same canonical",
+                    "the freshly loaded screen to state the same canonical",
                 )
                 .await;
             journey
@@ -483,26 +520,33 @@ async fn the_address_a_row_links_to_opens_the_same_screen_when_it_is_loaded_fres
     outcome.expect("the journey ran and the browser session ended cleanly");
 }
 
-/// A run is remembered in this browser and re-run from the list.
+/// A run is remembered in the page and re-run from the list.
 ///
 /// A run is already a URL, because every runner puts its parameters in the
 /// address, so the list holds links and nothing else. That is what makes a
 /// remembered run safe: it is re-run when a reader returns to it, and can
-/// never show a stale answer beside a live one. Nothing is sent anywhere.
+/// never show a stale answer beside a live one. Nothing is sent anywhere and
+/// nothing is stored in the browser.
 #[tokio::test]
-async fn a_run_is_remembered_in_this_browser_and_re_run_from_the_list() {
+async fn a_run_is_remembered_in_the_page_and_re_run_from_the_list() {
     let Some(base) = server() else {
         return;
     };
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &base, "/ui/expand?fhir=r5").await;
+            let journey = Journey::open(driver, &base, "/expand?fhir=r5").await;
             journey
                 .element(By::Css(EXPAND_URL), "the runner's value set control")
                 .await
-                .find(By::Css("option:nth-child(2)"))
-                .await?
+                .click()
+                .await?;
+            journey
+                .visible(
+                    By::Css("#expand-url-list li[role='option']:first-child"),
+                    "the first value set the list offers",
+                )
+                .await
                 .click()
                 .await?;
             journey
@@ -515,7 +559,7 @@ async fn a_run_is_remembered_in_this_browser_and_re_run_from_the_list() {
                 .await;
 
             let held = journey
-                .element(By::Css(REMEMBERED), "the runs this browser remembers")
+                .element(By::Css(REMEMBERED), "the runs the page remembers")
                 .await;
             held.click().await?;
             let remembered = journey
@@ -527,11 +571,27 @@ async fn a_run_is_remembered_in_this_browser_and_re_run_from_the_list() {
                 "the list holds the address that made the run: `{href}`"
             );
 
-            // Somewhere else, then back through the list: the run has to be
-            // reachable from a screen that is not the one that made it.
-            journey.reopen(&format!("{base}/ui/expand?fhir=r5")).await;
+            // Somewhere else and back by the sidebar, then through the list:
+            // the list lives in the page, so it outlasts a move between
+            // screens and is re-run from a runner holding no run.
             journey
-                .element(By::Css(REMEMBERED), "the runs this browser remembers")
+                .element(By::XPath(screen_link("Check a code")), "the check entry")
+                .await
+                .click()
+                .await?;
+            journey
+                .address_carrying("/validate", "the check screen")
+                .await;
+            journey
+                .element(
+                    By::XPath(screen_link("Expand a value set")),
+                    "the expansion entry",
+                )
+                .await
+                .click()
+                .await?;
+            journey
+                .element(By::Css(REMEMBERED), "the runs the page remembers")
                 .await
                 .click()
                 .await?;
@@ -570,7 +630,7 @@ async fn the_command_bar_reads_what_was_typed_and_offers_addresses_for_it() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &base, "/ui?fhir=r5").await;
+            let journey = Journey::open(driver, &base, "/?fhir=r5").await;
             let row = journey
                 .element(By::Css(SYSTEM_LINK), "a code system on the overview")
                 .await;
@@ -587,11 +647,11 @@ async fn the_command_bar_reads_what_was_typed_and_offers_addresses_for_it() {
                 .click()
                 .await?;
             journey
-                .address_carrying("/ui/find", "the screen the command bar opens")
+                .address_carrying("/find", "the screen the command bar opens")
                 .await;
             journey
                 .text_becoming(
-                    By::Css("h1 + p"),
+                    By::Css(".fui-page-subtitle"),
                     StringMatch::new("a canonical".to_owned()).partial(),
                     "the viewer to say it read a canonical",
                 )
@@ -602,7 +662,7 @@ async fn the_command_bar_reads_what_was_typed_and_offers_addresses_for_it() {
                 .await;
             let href = offer.attr("href").await?.unwrap_or_default();
             assert!(
-                href.starts_with("/ui/"),
+                href.starts_with('/'),
                 "an offer is an address inside the viewer: `{href}`"
             );
             offer.click().await?;
@@ -623,7 +683,7 @@ async fn the_command_bar_reads_what_was_typed_and_offers_addresses_for_it() {
 /// The sort is a navigation rather than a private signal, so the ordered table
 /// is a URL a reader can send. `aria-sort` on the header cell is what a screen
 /// reader announces (<https://www.w3.org/WAI/ARIA/apg/patterns/table/>), and
-/// the control inside it is a real button, so the column is reordered from the
+/// the control inside it is a link, so the column is reordered from the
 /// keyboard with no key handler of ours.
 #[tokio::test]
 async fn the_overview_table_orders_itself_and_the_order_is_a_link() {
@@ -633,7 +693,7 @@ async fn the_overview_table_orders_itself_and_the_order_is_a_link() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &base, "/ui?fhir=r5").await;
+            let journey = Journey::open(driver, &base, "/systems?fhir=r5").await;
             journey
                 .element(By::Css(SYSTEM_TABLE), "the table of served systems")
                 .await;
@@ -704,20 +764,13 @@ async fn the_overview_reads_twenty_systems_on_one_screen_in_compact_mode() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &base, "/ui/about?fhir=r5").await;
+            let journey = Journey::open(driver, &base, "/about?fhir=r5").await;
             journey.resize(DESKTOP.0, DESKTOP.1).await;
             journey
-                .reopen(&format!("{base}/ui/about?fhir=r5#{SETTINGS_PANE}"))
-                .await;
-            journey
-                .element(By::Css(DENSITY_CONTROL), "the density control")
-                .await
-                .find(By::Css("option[value='compact']"))
-                .await?
-                .click()
+                .keep_setting(&base, DENSITY_CONTROL, "compact", Some("data-density"))
                 .await?;
 
-            journey.reopen(&format!("{base}/ui?fhir=r5")).await;
+            journey.reopen(&format!("{base}/systems?fhir=r5")).await;
             journey
                 .element(By::Css(SYSTEM_TABLE), "the table of served systems")
                 .await;
@@ -765,7 +818,7 @@ async fn a_code_is_checked_in_three_clicks_with_no_canonical_typed() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &base, "/ui?fhir=r5").await;
+            let journey = Journey::open(driver, &base, "/?fhir=r5").await;
 
             journey
                 .element(By::Css(CHECK_LINK), "the sidebar entry onto the check")
@@ -775,16 +828,26 @@ async fn a_code_is_checked_in_three_clicks_with_no_canonical_typed() {
 
             journey
                 .element(By::Css(CHECK_SYSTEM), "the code system control")
-                .await;
+                .await
+                .click()
+                .await?;
             let offer = journey
-                .element(By::Css(FIRST_OFFER), "the first code system offered")
+                .visible(By::Css(FIRST_OFFER), "the first code system offered")
                 .await;
-            let picked = offer.text().await?;
+            let picked = offer
+                .find(By::Css(".fui-combobox-label"))
+                .await?
+                .text()
+                .await?;
             assert!(
                 !picked.is_empty(),
                 "an offer a reader cannot read is an offer they cannot pick"
             );
-            let canonical = offer.attr("value").await?.unwrap_or_default();
+            let canonical = offer
+                .find(By::Css(".fui-combobox-detail"))
+                .await?
+                .text()
+                .await?;
             assert!(
                 !canonical.is_empty(),
                 "the offer carries the canonical the run sends"
@@ -806,13 +869,13 @@ async fn a_code_is_checked_in_three_clicks_with_no_canonical_typed() {
                 .address_carrying("system=", "the picked system in the address")
                 .await;
             assert!(
-                address.contains("code=") && address.contains("/ui/validate"),
+                address.contains("code=") && address.contains("/validate"),
                 "a run is a link a reader can send: `{address}`"
             );
             journey
-                .text_becoming(
+                .live_region_saying(
                     By::Css(ANNOUNCEMENT),
-                    StringMatch::new("result".to_owned()).partial(),
+                    "result",
                     "the validation to announce what the server answered",
                 )
                 .await;
@@ -932,9 +995,7 @@ async fn the_taxonomy_tree_is_walked_by_keyboard_alone() {
                 .attr("id")
                 .await?
                 .expect("every tree row carries the id its focus is moved by");
-            // The row's first span is the twist's `sr-only` word, not the code, so
-            // the code is selected by the class that renders it.
-            let row_code = stop.find(By::Css("span.font-mono")).await?.text().await?;
+            let row_code = stop.find(By::Css(TREE_CODE)).await?.text().await?;
             assert!(
                 !row_code.is_empty(),
                 "the row names the code it draws, and the journey selects by it"
@@ -953,8 +1014,14 @@ async fn the_taxonomy_tree_is_walked_by_keyboard_alone() {
                 "opening a node leaves the concept being read alone: `{opened}`"
             );
 
-            // The navigation redrew the tree, so the tab stop is read again
-            // rather than carried across the render.
+            // The navigation redrew the tree once the opened level answered, so
+            // that level is waited for and the tab stop read again.
+            journey
+                .element(
+                    By::Css("li[role='treeitem'] li[role='treeitem']"),
+                    "the level the right arrow opened",
+                )
+                .await;
             journey
                 .element(By::Css(TAB_STOP), "the tab stop after the node opened")
                 .await
@@ -996,23 +1063,7 @@ async fn the_taxonomy_tree_is_walked_by_keyboard_alone() {
                 journey.count(By::Css(TREE_ROW)).await > closed_rows,
                 "the opened node drew a level, or there is nothing to close again"
             );
-            journey
-                .element(By::Css(TAB_STOP), "the tab stop before the node is closed")
-                .await
-                .send_keys(Key::Left)
-                .await?;
-            journey
-                .count_becoming(
-                    By::Css(TREE_ROW),
-                    closed_rows,
-                    "the left arrow to close the level the right arrow opened",
-                )
-                .await;
-            assert_eq!(
-                journey.count(By::Css(TAB_STOP)).await,
-                1,
-                "closing a node leaves the tree with one tab stop"
-            );
+            closed_again(&journey, closed_rows).await?;
 
             journey.no_console_errors().await;
             Ok::<(), WebDriverError>(())
@@ -1020,6 +1071,30 @@ async fn the_taxonomy_tree_is_walked_by_keyboard_alone() {
         .await;
     outcome.expect("the journey ran and the browser session ended cleanly");
 }
+
+/// Presses the left arrow on the tab stop and waits for the tree to draw
+/// `closed_rows` rows again, with one tab stop.
+async fn closed_again(journey: &Journey, closed_rows: usize) -> WebDriverResult<()> {
+    journey
+        .element(By::Css(TAB_STOP), "the tab stop before the node is closed")
+        .await
+        .send_keys(Key::Left)
+        .await?;
+    journey
+        .count_becoming(
+            By::Css(TREE_ROW),
+            closed_rows,
+            "the left arrow to close the level the right arrow opened",
+        )
+        .await;
+    assert_eq!(
+        journey.count(By::Css(TAB_STOP)).await,
+        1,
+        "closing a node leaves the tree with one tab stop"
+    );
+    Ok(())
+}
+
 /// The version comparison reads all four roots and shows where they differ.
 ///
 /// The row this asserts on is the one the screen exists for: R4 and R4B
@@ -1036,7 +1111,7 @@ async fn the_four_roots_are_compared_and_their_lookup_levels_differ() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &base, "/ui").await;
+            let journey = Journey::open(driver, &base, "/").await;
 
             journey
                 .element(
@@ -1095,9 +1170,8 @@ async fn the_four_roots_are_compared_and_their_lookup_levels_differ() {
 /// `Resource.id`, the logical id the read interaction addresses
 /// (<https://hl7.org/fhir/R4B/resource.html#id>). A row without one renders as
 /// plain text, so a click here would find nothing to click. Opening it proves
-/// the id round-tripped: the detail pane reads the resource back by the id the
-/// address now carries, and heads with the canonical the row carried beside
-/// its name.
+/// the id round-tripped: the detail screen reads the resource back by the id
+/// its path carries, and states the canonical the row carried beside its name.
 #[tokio::test]
 async fn a_listed_row_opens_the_resource_it_names() {
     let Some(base) = server() else {
@@ -1106,7 +1180,7 @@ async fn a_listed_row_opens_the_resource_it_names() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &base, "/ui").await;
+            let journey = Journey::open(driver, &base, "/").await;
             for (path, row, subject, heading) in LISTINGS {
                 journey.reopen(&format!("{base}{path}")).await;
                 let link = journey
@@ -1128,17 +1202,20 @@ async fn a_listed_row_opens_the_resource_it_names() {
                 link.click().await?;
 
                 let address = journey
-                    .address_carrying("id=", "the address to carry the row that was opened")
+                    .address_carrying(
+                        &format!("{path}/"),
+                        "the address to name the row that was opened",
+                    )
                     .await;
                 assert!(
-                    address.contains(path),
-                    "opening a row stays on the listing screen: `{address}`"
+                    address.contains("fhir="),
+                    "opening a row keeps the version the reader was on: `{address}`"
                 );
                 journey
                     .text_becoming(
-                        By::Css(heading),
-                        StringMatch::new(canonical.clone()).full(),
-                        "the detail pane to head with the canonical the row named",
+                        By::XPath(heading),
+                        StringMatch::new(canonical.clone()).partial(),
+                        "the detail screen to state the canonical the row named",
                     )
                     .await;
             }

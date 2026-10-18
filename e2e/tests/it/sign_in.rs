@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
-//! What the viewer offers when the deployment configured no identity provider.
+//! What the console offers when it configures no identity provider.
 //!
-//! A server with no `FERROTERM_OIDC_ISSUER` serves no
-//! `.well-known/smart-configuration`
-//! (<https://hl7.org/fhir/smart-app-launch/conformance.html>), so the viewer
-//! can complete no sign-in and offers none. The battery's server is exactly
-//! that deployment, which is what these journeys drive.
+//! A console with no `[oidc]` can complete no sign-in and offers none; it
+//! reads every screen, as the server's read surface asks for no token. The
+//! battery's first console is exactly that deployment, which is what these
+//! journeys drive.
 
 use thirtyfour::prelude::*;
 use thirtyfour::stringmatch::StringMatch;
@@ -15,25 +14,22 @@ use crate::harness::server;
 use crate::harness::session;
 
 /// The control that starts a sign-in, wherever on the chrome it sits.
-const SIGN_IN: &str = "//button[normalize-space()='Sign in']";
+const SIGN_IN: &str = "//a[normalize-space()='Sign in']";
 
 /// The control that ends one.
 const SIGN_OUT: &str = "//button[normalize-space()='Sign out']";
 
-/// The live region the callback screen reports into.
-const OUTCOME: &str = "#sign-in-outcome";
-
 /// The shell's own mark, which proves the bundle booted.
-const LOCKUP: &str = "header a[href^='/ui']";
+const LOCKUP: &str = "header a.fui-lockup";
 
 /// The screens a reader can reach, which between them carry every control.
 const SCREENS: [&str; 6] = [
-    "/ui",
-    "/ui/browse",
-    "/ui/expand",
-    "/ui/validate",
-    "/ui/valuesets",
-    "/ui/about",
+    "/",
+    "/browse",
+    "/expand",
+    "/validate",
+    "/valuesets",
+    "/about",
 ];
 
 /// A deployment with no issuer offers no sign-in on any screen.
@@ -48,7 +44,7 @@ async fn no_issuer_means_no_sign_in_control_on_any_screen() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &base, "/ui").await;
+            let journey = Journey::open(driver, &base, "/").await;
             for screen in SCREENS {
                 journey.reopen(&format!("{base}{screen}")).await;
                 // The shell is waited for first, so the count below is taken
@@ -75,11 +71,13 @@ async fn no_issuer_means_no_sign_in_control_on_any_screen() {
     outcome.expect("the journey ran and the browser session ended cleanly");
 }
 
-/// The callback address says, in a live region, that there is no sign-in here.
+/// The callback address refuses a code that no sign-in of this console
+/// started, and says so.
 ///
-/// A reader can reach the address: it is a plain URL, and an identity provider
-/// of another deployment could send someone to it. It renders what happened
-/// rather than an empty screen, and announces it.
+/// A reader can reach the address: it is a plain URL, and an identity
+/// provider of another deployment could send someone to it. The console
+/// matches the `state` against a sign-in it holds before it spends a code
+/// (RFC 6749 §10.12), so this one is refused before anything is sent.
 #[tokio::test]
 async fn the_callback_says_there_is_no_sign_in_to_complete() {
     let Some(base) = server() else {
@@ -88,34 +86,20 @@ async fn the_callback_says_there_is_no_sign_in_to_complete() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &base, "/ui/callback?code=abc&state=xyz").await;
-
-            let said = journey
-                .text_becoming(
-                    By::Css(OUTCOME),
-                    StringMatch::new("no sign-in").partial(),
-                    "the callback to report that this server publishes none",
-                )
-                .await;
-            assert!(
-                said.contains("nothing to complete"),
-                "the reader is told what happened, not left on an empty screen: `{said}`"
-            );
-
-            let region = journey
-                .element(By::Css(OUTCOME), "the callback's live region")
-                .await;
-            assert_eq!(
-                region.attr("aria-live").await?.as_deref(),
-                Some("polite"),
-                "the outcome is announced rather than only drawn"
-            );
+            let journey = Journey::open(driver, &base, "/auth/callback?code=abc&state=xyz").await;
 
             journey
-                .element(By::Css("a[href^='/ui?']"), "the way back to the overview")
+                .text_becoming(
+                    By::Css("body"),
+                    StringMatch::new("no sign-in is pending").partial(),
+                    "the callback to say there is no sign-in to complete",
+                )
                 .await;
-
-            journey.no_console_errors().await;
+            assert_eq!(
+                journey.count(By::Css(LOCKUP)).await,
+                0,
+                "the refusal is the console's answer, not a screen that signed anyone in"
+            );
             Ok::<(), WebDriverError>(())
         })
         .await;

@@ -2,7 +2,7 @@
 
 use leptos::prelude::*;
 
-use crate::components::spinner::Spinner;
+use ferrohealth_ui::view::empty::{Busy, busy};
 
 /// Draws a section's answer, keeping the last one on screen while it reloads.
 ///
@@ -31,7 +31,7 @@ pub(crate) fn Reading(
 ) -> impl IntoView {
     view! {
         <Transition fallback=move || {
-            view! { <Spinner inline=inline label=label /> }
+            busy(label, if inline { Busy::Inline } else { Busy::Section })
         }>{move || children()}</Transition>
     }
 }

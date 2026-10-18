@@ -25,8 +25,6 @@ pub(crate) struct SmartSetup {
     pub(crate) audience: Option<String>,
     /// `FERROTERM_OIDC_ADMIN_SCOPE`.
     pub(crate) admin_scope: Option<String>,
-    /// `FERROTERM_VIEWER_CLIENT_ID`.
-    pub(crate) viewer_client_id: Option<String>,
     /// `FERROTERM_BASE_URL`, the address clients reach this server at.
     pub(crate) base_url: Option<String>,
 }
@@ -38,7 +36,6 @@ impl SmartSetup {
             issuer: issuer.to_owned(),
             audience: None,
             admin_scope: None,
-            viewer_client_id: None,
             base_url: None,
         }
     }
@@ -220,20 +217,9 @@ impl Server {
         audience: Option<&str>,
         admin_scope: Option<&str>,
     ) -> Self {
-        Self::start_persisting_with_smart_client(issuer, audience, admin_scope, None).await
-    }
-
-    /// The same server, with the OAuth client the viewer signs in as.
-    pub(crate) async fn start_persisting_with_smart_client(
-        issuer: &str,
-        audience: Option<&str>,
-        admin_scope: Option<&str>,
-        viewer_client_id: Option<&str>,
-    ) -> Self {
         Self::start_persisting_with_smart_setup(SmartSetup {
             audience: audience.map(str::to_owned),
             admin_scope: admin_scope.map(str::to_owned),
-            viewer_client_id: viewer_client_id.map(str::to_owned),
             ..SmartSetup::for_issuer(issuer)
         })
         .await
@@ -245,7 +231,6 @@ impl Server {
             issuer,
             audience,
             admin_scope,
-            viewer_client_id,
             base_url,
         } = setup;
         let dir = tempfile::tempdir().expect("tempdir");
@@ -261,7 +246,6 @@ impl Server {
             oidc_issuer: Some(issuer),
             oidc_audience: audience,
             oidc_admin_scope: admin_scope.unwrap_or_else(|| Config::default().oidc_admin_scope),
-            viewer_client_id,
             ..Config::default()
         };
         let smart = ferroterm_server::smart::Smart::start(&config)

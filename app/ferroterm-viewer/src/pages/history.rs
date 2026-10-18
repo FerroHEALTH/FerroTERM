@@ -40,8 +40,8 @@ use crate::components::reload::READING_AGAIN;
 use crate::components::reload::announced;
 use crate::components::reload::focus_report;
 use crate::components::reload::reload_offer;
+use crate::components::shell::Console;
 use crate::components::shell::SelectedVersion;
-use crate::components::spinner::Spinner;
 use crate::fhir::CODE_SYSTEM;
 use crate::fhir::CONCEPT_MAP;
 use crate::fhir::FhirClient;
@@ -57,8 +57,9 @@ use crate::routes::ID_PARAM;
 use crate::routes::TYPE_PARAM;
 use crate::routes::VERSION_PARAM;
 use crate::routes::base_url;
-use crate::routes::editing_link;
+use crate::routes::screen_link;
 use crate::styles;
+use ferrohealth_ui::view::empty::{Busy, busy};
 
 /// The live region every outcome of this screen is announced in.
 const REPORT_ID: &str = "history-report";
@@ -138,25 +139,24 @@ pub(crate) fn HistoryPage() -> impl IntoView {
     // nothing drawn from the answer has to read the address a second time.
     let reloads = RwSignal::new(0_u32);
     let reader = client.clone();
-    let read = LocalResource::new(move || {
-        let client = reader.clone();
-        let at = version.get();
-        let held = subject.get();
-        let token = session.token();
-        let _reload = reloads.get();
-        async move {
-            if !WRITTEN_TYPES.contains(&held.resource_type.as_str()) {
-                return Ok(Opened {
-                    subject: held,
-                    support: Support::Neither,
-                    ..Opened::default()
-                });
+    let read = Resource::new(
+        move || (version.get(), subject.get(), reloads.get()),
+        move |(at, held, _reload)| {
+            let client = reader.clone();
+            async move {
+                if !WRITTEN_TYPES.contains(&held.resource_type.as_str()) {
+                    return Ok(Opened {
+                        subject: held,
+                        support: Support::Neither,
+                        ..Opened::default()
+                    });
+                }
+                let statement = client.capability_statement(at).await?;
+                let support = Support::of(&statement, &held.resource_type);
+                open(&client, at, support, held).await
             }
-            let statement = client.capability_statement(at).await?;
-            let support = Support::of(&statement, &held.resource_type);
-            open(&client, at, support, held, token.as_deref()).await
-        }
-    });
+        },
+    );
 
     // Everything a restore reports lives here rather than inside the section
     // below: a taken restore raises `reloads`, which rebuilds that section, and
@@ -177,7 +177,7 @@ pub(crate) fn HistoryPage() -> impl IntoView {
     let finder = client.clone();
     let body = view! {
         <Transition fallback=|| {
-            view! { <Spinner label="Reading the versions" /> }
+            busy("Reading the versions", Busy::Section)
         }>
             {move || {
                 read.with(|answered| {
@@ -197,7 +197,13 @@ pub(crate) fn HistoryPage() -> impl IntoView {
         </Transition>
     }
     .into_any();
-    let findings = findings_section(&finder, read);
+    // NOTE: no specification governs this: our own design; a console that
+    // reaches no sync service has no runs to read, so it asks for none.
+    let findings = if expect_context::<Console>().sync {
+        findings_section(&finder, read)
+    } else {
+        ().into_any()
+    };
 
     view! {
         {heading}
@@ -222,15 +228,34 @@ fn heading_section(subject: Memo<Subject>) -> AnyView {
     };
     view! {
         <Title text=named />
-        <header>
-            <h1 class=styles::PAGE_TITLE>"Versions of this resource"</h1>
-            <p class=styles::LEAD>
-                "Every version the server holds, what any two of them differ by, and putting an earlier one back."
-            </p>
-            <p class=format!("mt-tight {}", styles::CODE_MUTED)>{named}</p>
-        </header>
+        {move || {
+            ferrohealth_ui::view::surface::page_heading(
+                ferrohealth_ui::view::surface::Header {
+                    title: named(),
+                    subtitle: Some(
+                        String::from(
+                            "Every version the server holds, what any two of them differ by, and putting an earlier one back.",
+                        ),
+                    ),
+                    crumbs: listing_crumb(&subject.get().resource_type).into_iter().collect(),
+                    mono: true,
+                },
+                (),
+            )
+        }}
     }
     .into_any()
+}
+
+/// The listing a resource of `resource_type` is found in, as a crumb.
+fn listing_crumb(resource_type: &str) -> Option<ferrohealth_ui::view::surface::Crumb> {
+    let (label, href) = match resource_type {
+        "CodeSystem" => ("Code systems", "/systems"),
+        "ValueSet" => ("Value sets", "/valuesets"),
+        "ConceptMap" => ("Concept maps", "/conceptmaps"),
+        _ => return None,
+    };
+    Some(ferrohealth_ui::view::surface::Crumb::new(label, href))
 }
 
 /// What the screen says about a resource type it does not write.
@@ -241,8 +266,13 @@ fn unwritten_section(resource_type: &str) -> AnyView {
     } else {
         format!("This editor does not write {resource_type}, so it reads no versions of one.")
     };
-    view! { <p class=format!("mt-loose rounded-md p-default {}", styles::NOTICE)>{named}</p> }
-        .into_any()
+    ferrohealth_ui::view::notice::notice(
+        ferrohealth_ui::tone::Tone::Info,
+        ferrohealth_ui::view::notice::Announce::Status,
+        None,
+        named,
+    )
+    .into_any()
 }
 
 /// The version list, the comparison, and everything a restore reports.
@@ -263,21 +293,21 @@ fn versions_body(restoring: Restoring, opened: &Opened, compared: Memo<Compared>
     let compare = compare_section(opened, compared, restoring.version);
     let difference = difference_section(opened, compared);
 
-    view! {
+    ferrohealth_ui::view::surface::stack(view! {
         {back}
         {listed}
         {compare}
         {difference}
-    }
+    })
     .into_any()
 }
 
-/// The link back to the screen that edits the resource this answer is about.
+/// The link back to the resource's own screen.
 ///
 /// The canonical comes off the resource the server sent, because that is what
-/// the code system and concept map editors address a resource by.
+/// a code system's screen addresses it by.
 fn back_section(opened: &Opened, version: Signal<FhirVersion>) -> AnyView {
-    let Some(address) = editing_link(
+    let Some((address, words)) = screen_link(
         &opened.subject.resource_type,
         &opened.canonical(),
         &opened.subject.id,
@@ -286,9 +316,9 @@ fn back_section(opened: &Opened, version: Signal<FhirVersion>) -> AnyView {
         return ().into_any();
     };
     view! {
-        <p class="mt-default">
+        <p>
             <a href=address class=styles::LINK>
-                "Back to editing this resource"
+                {words}
             </a>
         </p>
     }
@@ -343,7 +373,6 @@ impl Restoring {
             let sent = restore(&chosen, &subject.id, &current);
             let client = self.client.get_value();
             let version = self.version.get_untracked();
-            let token = self.session.token();
             let resource_type = subject.resource_type.clone();
             let logical = subject.id.clone();
             let chose = at.clone();
@@ -355,7 +384,6 @@ impl Restoring {
                     &logical,
                     &sent.body,
                     Some(sent.version_id.as_str()).filter(|stated| !stated.is_empty()),
-                    token.as_deref(),
                 ))
                 .await;
                 held.wrote(&chose, written);
@@ -531,8 +559,8 @@ fn list_section(restoring: Restoring, opened: &Opened, writable: bool) -> AnyVie
         ().into_any()
     };
     view! {
-        <section class="mt-loose" aria-labelledby="history-versions-heading">
-            <h2 id="history-versions-heading" class=styles::SECTION_TITLE>
+        <section class="fui-card" aria-labelledby="history-versions-heading">
+            <h2 id="history-versions-heading" class="fui-card-title">
                 "Versions"
             </h2>
             {listed}
@@ -708,7 +736,7 @@ fn compare_section(
                     <select
                         id="history-from"
                         name="from"
-                        class=styles::INPUT
+                        class=ferrohealth_ui::view::form::SELECT
                         prop:value=move || earlier.get()
                         on:change:target=move |event| earlier.set(event.target().value())
                     >
@@ -722,7 +750,7 @@ fn compare_section(
                     <select
                         id="history-to"
                         name="to"
-                        class=styles::INPUT
+                        class=ferrohealth_ui::view::form::SELECT
                         prop:value=move || later.get()
                         on:change:target=move |event| later.set(event.target().value())
                     >
@@ -737,8 +765,8 @@ fn compare_section(
         .into_any()
     };
     view! {
-        <section class="mt-loose" aria-labelledby="history-compare-heading">
-            <h2 id="history-compare-heading" class=styles::SECTION_TITLE>
+        <section class="fui-card" aria-labelledby="history-compare-heading">
+            <h2 id="history-compare-heading" class="fui-card-title">
                 "Compare two versions"
             </h2>
             {form}
@@ -829,14 +857,14 @@ fn difference_section(opened: &Opened, compared: Memo<Compared>) -> AnyView {
         .into_any()
     };
     view! {
-        <section class="mt-loose" aria-labelledby="history-difference-heading">
-            <h2 id="history-difference-heading" class=styles::SECTION_TITLE>
+        <section class="fui-card" aria-labelledby="history-difference-heading">
+            <h2 id="history-difference-heading" class="fui-card-title">
                 "What changed"
             </h2>
             // The region is in the document before the first comparison runs,
             // because a region inserted along with its first message is not
             // announced (<https://www.w3.org/TR/wai-aria-1.2/#aria-live>).
-            <p id="history-difference-count" aria-live="polite" class=styles::LEAD>
+            <p id="history-difference-count" aria-live="polite" class="fui-muted">
                 {counted}
             </p>
             {table}
@@ -875,14 +903,10 @@ fn difference_row(row: &Difference) -> AnyView {
 
 /// What the newest synchronisation run found about the resource on screen.
 ///
-/// The sync service's admin listener is its own process and this viewer is
-/// same-origin, so this answers only where a deployment put that listener
-/// behind the address the server is served from. Where nothing answers, the
-/// section is not in the document at all.
-fn findings_section(
-    client: &FhirClient,
-    read: LocalResource<Result<Opened, FhirError>>,
-) -> AnyView {
+/// The console's server reads the sync service's admin listener named in its
+/// configuration. Where the run list cannot be read or names nothing that
+/// concerns this resource, the section is not in the document at all.
+fn findings_section(client: &FhirClient, read: Resource<Result<Opened, FhirError>>) -> AnyView {
     let client = client.clone();
     let revalidated = LocalResource::new(move || {
         let client = client.clone();
@@ -926,11 +950,11 @@ fn findings_section(
     view! {
         <Transition fallback=|| ()>
             <Show when=move || !concerning.read().is_empty() fallback=|| ()>
-                <section class="mt-loose" aria-labelledby="history-findings-heading">
-                    <h2 id="history-findings-heading" class=styles::SECTION_TITLE>
+                <section class="fui-card" aria-labelledby="history-findings-heading">
+                    <h2 id="history-findings-heading" class="fui-card-title">
                         "What the last synchronisation found"
                     </h2>
-                    <p class=styles::LEAD>
+                    <p class="fui-muted">
                         "Codes this resource names that the release the sync service last activated changed."
                     </p>
                     <div class="mt-default overflow-x-auto">

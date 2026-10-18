@@ -2,313 +2,138 @@
 paths: ["app/ferroterm-viewer/**"]
 ---
 
-# Leptos viewer rules (`app/ferroterm-viewer`, and any Leptos code)
+# The FerroTERM Console's own rules (`app/ferroterm-viewer`)
 
-The design is `docs/viewer.md`; this file is the enforceable discipline. The
-oracle for every Leptos question is the official Leptos book
-(<https://github.com/leptos-rs/book>, `main`, targets Leptos 0.8) through
-`/leptos-lookup`, never memory and never the sibling project's SSR-era
-patterns. Citations below are book chapters (`view/04_iteration`,
-`async/12_transition`) and pinned crate documentation.
+**The component rules are FerroUI's**: `.claude/rules/leptos-ui.md` in
+FerroHEALTH/FerroUI, the one rule set of every FerroHEALTH console, covers the
+mandates (Rust only, no inline style, no server function in the library, no
+browser storage), the two tiers of component, rendering in both halves,
+reactivity, views, forms, tables and paging, accessibility, tokens and icons.
+Read it first. This file keeps only what is particular to FerroTERM's console.
+The oracle for a Leptos question is the official Leptos book
+(<https://github.com/leptos-rs/book>, Leptos 0.8) through `/leptos-lookup`.
 
-**The viewer is client-side rendered.** It compiles to WebAssembly with
-`leptos/csr`, is built by Trunk, and runs entirely in the browser. There is no
-server-side rendering, no hydration, no `#[server]` function, and no
-`cargo-leptos`. Rules that exist in the sibling project for the `ssr`/`hydrate`
-split do not apply here, and a rule reintroducing one is wrong.
+## 1. What the console is
 
-## 0. The three mandates (absolute)
+- **A backend-for-frontend binary, rendered on the server and hydrated.**
+  `ferroterm-viewer` (`serve`, `config check`, `healthcheck`) serves the
+  pages, the server functions, the site bundle and the components' and the
+  brand's stylesheets. The halves are chosen by compilation target, never by
+  a Cargo feature: the host half links `leptos` with `ssr` and `nonce`, the
+  wasm32 half with `hydrate`. cargo-leptos 0.3.11 builds it
+  (`scripts/release/viewer-site.sh`). The terminology server serves no UI
+  file.
+- **A FHIR client and nothing else.** Every request is an ordinary request to
+  the server's public FHIR API, built in `crate::fhir` and sent as one
+  `fhir::exchange::Exchange`: the server half sends it itself
+  (`crate::upstream`), the browser half through the `forward` server
+  function, which sends it from the console's server. The console depends on
+  **no** workspace crate, not `fhir-terminology`, not `fhir-types`;
+  `scripts/checks/viewer-boundary.sh` walks the resolved closure and fails on
+  an edge into the engine.
+- **No code system is a special case.** Every screen renders from
+  `TerminologyCapabilities` and the operations; the test
+  `pages::tests::no_screen_names_a_code_system` refuses a canonical written
+  into a screen.
 
-- **Rust only, zero hand-written JavaScript.** No authored `.js` files, no
-  inline `<script>` bodies, no HTML `onxxx="..."` attributes carrying JS
-  strings. Use an `on:` Rust listener. JS-wrapping crates (ECharts, Plotly
-  bindings) are banned; a chart is drawn in Rust, as SVG or as a sized
-  element. `leptos-chartistry` was the pinned pure-Rust answer until it was
-  weighed at 132,228 gzipped bytes for one bar chart (`docs/viewer.md`
-  section 3), so a screen that wants a chart draws it and justifies any
-  charting dependency against a measured bundle cost. The only JavaScript in
-  the product is the `wasm-bindgen` bootstrap the toolchain generates.
-- **The viewer is a FHIR client and nothing else.** It reaches FerroTERM only
-  over the FHIR API, from the browser, same-origin. It depends on **no**
-  workspace crate: not `fhir-terminology`, not `concept-graph`, not
-  `concept-store`, not `sct-ecl`, not `ferroterm-server`, and not `fhir-types`.
-  Anything the viewer can do, any client can do. That is the property the whole
-  design exists to hold, and a dependency edge into the engine breaks it
-  silently, so `scripts/checks/viewer-boundary.sh` walks the resolved closure
-  and fails on one; CI runs it as the `viewer-boundary` job.
-- **No code system is a special case.** Every page renders from
-  `TerminologyCapabilities` and the operations. A page that names a system URI,
-  assumes one hierarchy, or assumes one language reference set is a defect
-  (`docs/viewer.md` §5).
+## 2. Server functions and the session
 
-The third mandate has a corollary worth stating: the viewer carries its own
-small `serde` types for the fields it renders, and nothing beyond them. It
-never mirrors a whole FHIR resource, and it never re-implements a terminology
-operation in the browser.
+- **Every server function is a `POST` and reads the session itself**, since
+  each is a public endpoint (the Leptos book, `server/25_server_functions`):
+  `fhir::exchange::forward`, `settings::set_theme`, `set_version`,
+  `save_settings`. A function that takes a value checks it (`upstream::target`
+  forwards only the four FHIR roots, `/health` and the sync service's `/runs`;
+  `settings::return_path` returns only to the console's own pages).
+- **The reader's sign-in lives on the console's server** (`crate::session`,
+  `crate::oidc`): authorization code with PKCE at the configured OpenID
+  Provider, the session in memory behind one opaque `HttpOnly` cookie. The
+  browser never holds a token; it is told the reader's name and granted
+  scopes (`auth::Operator`), which decide whether an edit control is drawn.
+  The terminology server checks the token on every write as before.
+- **Reading is open.** A visitor reads every screen, as the server's read
+  surface asks for no token; the sign-in is for editing, and a console with
+  no `[oidc]` offers none.
+- **Preferences are cookies of the console's own** (theme, density, default
+  FHIR version, display language, page size), written by a plain form post
+  and read while the page renders, so the theme and the density are on
+  `<html>` before any script runs. No browser storage, ever; the runs a
+  reader made live in the page alone (`runs::RunList`).
 
-## 1. Crate and build discipline
+## 3. Rendering
 
-- One compilation target: `wasm32-unknown-unknown`, feature `csr`. The crate
-  is a binary (`fn main` calling `leptos::mount::mount_to_body`), not a
-  `cdylib`/`rlib` pair.
-- The build is `trunk build`, driven by `index.html` and `Trunk.toml`. Keep
-  `locked = true` so the build cannot re-resolve `Cargo.lock`, `filehash =
-  true` so asset names are content-hashed, and `public_url = "/ui/"` so the
-  emitted hrefs match where the server mounts the bundle
-  (<https://github.com/trunk-rs/trunk/blob/main/guide/src/configuration/index.md>).
-- Tailwind is Trunk's `rel="tailwind-css"` asset over the official standalone
-  CLI, pinned with `[tools] tailwindcss`. No Node, no npm, ever.
-- **WebAssembly is 32-bit: never `usize`/`isize` in a serialized type.** Use
-  fixed-size integers in anything that crosses the wire or is stored.
-- **Bundle size is gated.** The bundle builds under the root `Cargo.toml`
-  `[profile.wasm-release]` (`opt-level = "z"`, `lto = true`,
-  `codegen-units = 1`), which `index.html` selects with
-  `data-cargo-profile-release`
-  (<https://github.com/trunk-rs/trunk/blob/main/guide/src/assets/index.md>).
-  It is a profile of its own because `[profile.release]` is shared with the
-  server, where `opt-level = "z"` would trade away the latency the server is
-  built for. Avoid `regex` and generics-heavy code on client paths
-  (monomorphization bloat: factor a concrete inner function). A new dependency
-  is justified against the bundle size it adds, and
-  `scripts/checks/bundle-size.sh` compares the gzipped bundle to the claims in
-  `app/ferroterm-viewer/bundle-size.json`.
-- **Views are built in `.into_any()`-erased sections.** A monolithic `view!`
-  tree over deeply nested components blows rustc's layout-recursion depth at
-  codegen. Break every screen into section functions bound to erased locals.
-  Erasure is also the second-largest bundle lever, after removing a dependency
-  the viewer barely uses (`docs/viewer.md` §13, the bundle bar).
-- No `unsafe` (the workspace forbids it), no `unwrap`/`expect` outside tests,
-  `thiserror` for the viewer's own error enum, every public item documented,
-  suppressions as `#[expect(lint, reason = "…")]` scoped to the smallest item.
-  `.claude/rules/reliability.md` applies unchanged.
+- **A route renders whole on the server** (`SsrMode::Async`): content a
+  screen exists to show is a `Resource` read inside a `<Transition>` (the
+  `Reading` section or an explicit one), so the server waits for it and the
+  browser hydrates from what the server sent.
+- **A read a memo outside every suspense boundary consumes is a
+  `LocalResource`**, the browser's alone: the capability documents a form is
+  shaped by, the offers a picker makes. Reading a `Resource` outside a
+  boundary is what made hydration fail; the browser's log says so in
+  development, and a journey fails on it.
+- **A live region's text reads its resource inside a `<Transition>`**, never
+  through a memo built outside one.
+- An input written from the address carries `value` for the server's render
+  and `prop:value` for the hydrated page; an option says itself whether it is
+  `selected`, because the options of a picker can arrive after the select.
 
-## 1b. The token layer (a screen names no colour, size or spacing of its own)
+## 4. Styling
 
-**A screen names a role, a type step and a spacing step, and nothing else.**
-The tokens are in `app/ferroterm-viewer/style/tailwind.css` and the class
-strings built on them in `app/ferroterm-viewer/src/styles.rs`. Concretely, and
-enforced by `scripts/checks/viewer-tokens.sh` as its own CI job:
+- The components' stylesheet is `ferrohealth_ui::style::STYLESHEET`, served at
+  `/ferrohealth-ui.css`; the brand is `ferrohealth_ui::style::Brand::Term`'s
+  theme (FerroTERM teal), served at `/theme.css`; the
+  console's own utilities are Tailwind 4 over `style/tailwind.css`, which
+  imports Tailwind's theme and utilities and **not its preflight** (it would
+  reset what the components' stylesheet draws), and maps the FerroUI roles,
+  steps and spacing in an `@theme inline reference` block.
+- `scripts/checks/viewer-tokens.sh` refuses a palette entry, a per-element
+  `dark:` variant, a raw type size and a spacing value off the four steps.
+- A screen draws with FerroUI components. What FerroUI does not have yet is
+  filed on FerroHEALTH/FerroUI and drawn with the nearest FerroUI piece, its
+  place marked `TODO(#730)`; nothing is built as a single-use component here.
+- A detail screen's tab is a query parameter (`tab`, `components::detail`),
+  never a fragment: the server renders the pane the address names, so the
+  page hydrates without a mismatch.
 
-- **No palette entry.** `bg-slate-100`, `text-teal-700` and the rest are
-  refused. Name the role: `bg-inset`, `text-accent`. The palette is measured
-  once, which is what lets the WCAG pass in `e2e/tests/it/accessibility.rs`
-  cover every pairing the viewer draws.
-- **No per-element `dark:` variant.** A role is redefined once under
-  `:root.dark`. A `dark:` prefix on an element puts a theme decision in the
-  screen, where it cannot be measured with the others.
-- **No raw type size.** `text-sm`, `text-lg`, `text-2xl` are refused; the six
-  steps are `text-display`, `text-title`, `text-heading`, `text-body`,
-  `text-small`, `text-micro`.
-- **No spacing off the scale.** Margin, padding and gap take `tight`,
-  `default`, `loose` or `section`, and nothing between them. A numeric or
-  bracketed value (`mt-3`, `p-[13px]`) is refused. Sizes are not spacing: an
-  icon is still `h-4 w-4`.
-- **A pairing more than one screen paints belongs in `styles.rs`**, not copied
-  into each screen. Five copies of one class string all read the same and all
-  failed the contrast bar together.
+## 5. Security headers
 
-**Prose is part of the design, and less of it is the rule.** A heading that
-says what a section is does not need a paragraph saying it again, and a figure
-a reader is deciding against is the first thing they should meet. A control's
-explanation lives behind the form's one help switch, `sr-only` when it is off
-so it stays in the accessibility tree
-(<https://www.w3.org/WAI/WCAG22/Techniques/css/C7>).
+Every answer carries a Content-Security-Policy with scripts by a nonce minted
+per response, `style-src 'self'` (no `style` attribute, no `<style>`),
+`frame-ancestors 'none'` and `form-action` the console and the provider's
+end-session origin, plus `nosniff`, `DENY` framing and no referrer; documents
+and server function answers are `no-store`, and only the site bundle is
+compressed (`server.rs`).
 
-## 2. Reactivity
+## 6. Testing and gates
 
-- Component functions are **setup functions and run once**. Anything dynamic
-  in a view is a signal or a closure reading signals
-  (`reactivity/interlude_functions`).
-- Access discipline (`reactivity/working_with_signals`): `.get()`/`.set()` for
-  cheap `Copy`-ish values; `.read()`/`.write()` guards or `.with()`/`.update()`
-  for collections. Never `sig.get().is_empty()`, which clones the whole value.
-  Never hold a `.read()` guard across a write or a `.write()` guard across a
-  read.
-- Signal depending on signal is a derived closure (`move || a.get() * 2`) or a
-  `Memo`. **Writing one signal from an `Effect` that reads another is
-  forbidden**; the book calls it out (`working_with_signals` §4). Effects exist
-  only to sync with the non-reactive outside world (`localStorage`, the
-  document title, logging). Most "I need an effect" cases are an event listener
-  or a `leptos-use` primitive; check there first.
-- Prefer local component state. Escalate in this order: **URL (router), then a
-  context signal, then a `Store`** (`15_global_state`). Context values use the
-  newtype pattern so the type is unambiguous; `expect_context` only where
-  provision is structurally guaranteed.
+- Business logic lives outside components, in plain types with unit tests
+  (URL building, `OperationOutcome` flattening, the paging arithmetic, the
+  tree model, the authoring models, the exchange's path check).
+- `cargo fmt` and `leptosfmt` clean; `cargo clippy -p ferroterm-viewer
+  --all-targets -- -D warnings` on the host and `cargo clippy -p
+  ferroterm-viewer --lib --target wasm32-unknown-unknown -- -D warnings`;
+  `cargo nextest run -p ferroterm-viewer`.
+- **The journeys are a merge gate, Rust only**: `scripts/ui-e2e.sh` builds
+  the server, the console and the stub issuer, starts them on loopback with
+  chromedriver, and runs `e2e/` (thirtyfour). Every journey fails on a
+  browser log at `SEVERE`; waits are explicit, never `sleep`; the painted
+  colour walk in `e2e/tests/it/accessibility.rs` measures what the browser
+  drew in both themes and both densities.
 
-## 3. Components and props
+## 7. Bundle
 
-- Props that change over time are signal types, not plain values
-  (`view/03_components`). A reusable component takes `#[prop(into)] x:
-  Signal<T>` so a caller can pass a `ReadSignal`, a `Memo`, or a
-  `Signal::derive`.
-- Doc-comment every component and every prop; the macro turns them into real
-  documentation.
-- Child to parent is a callback prop or an `on:` listener on the component tag.
-  Pass a `WriteSignal` down only where genuinely needed.
+`scripts/checks/viewer-bundle.sh` fails when the brotli-compressed
+WebAssembly of the release site bundle is over the number below, which it
+reads from this table. The console carries the reader and the editor in one
+bundle.
 
-## 4. Views: iteration and control flow
+| Measure | Budget |
+|---|---|
+| WebAssembly, brotli-compressed | 1153434 bytes |
 
-- Dynamic lists use `<For each key children>` with a **stable, unique,
-  data-derived key, never an index** (`view/04_iteration`). A concept id, a
-  system URI, or a `ValueSet.url` is a real key. Signals stored in dynamic rows
-  are `ArcRwSignal`.
-- Key-includes-value re-renders the whole row (`view/04b_iteration`); prefer
-  nested signals. Never `each = ….enumerate()` plus a `Memo` capturing the
-  plain index inside `<For>`.
-- Cheap conditional text or class is `move || if …` or `class:x=cond`.
-  Expensive branches go behind `<Show when fallback>`. Divergent branch types
-  use `Either`/`EitherOf3` or `.into_any()`.
-- **An error never renders as nothing.** Resolve a `Result` where it arrives
-  and render content or an explicit inline error view. A failed read renders
-  inline, in the section whose data failed.
-- **The taxonomy tree keeps UI state off positional keys.** Collapse and
-  selection keyed by a `<For>` index bleed to the sibling that shifts into that
-  position when the list changes (a confirmed hazard, see the agent memory).
-  Key them by concept id.
-
-## 5. Forms
-
-- Controlled inputs use `prop:value` plus `on:input:target`, or the
-  `bind:value`/`bind:checked`/`bind:group` sugar (`view/05_forms`). The `value`
-  *attribute* only sets the initial value. A `<textarea>` needs child text plus
-  `prop:value`; a `<select>` is driven by `prop:value` on the select.
-- Uncontrolled forms use `NodeRef<html::X>` with `on:submit` and
-  `ev.prevent_default()`.
-- Parse user input yourself. `type="number"` is not validation.
-- **A form whose result is shareable puts its state in the URL** (§8). The
-  expansion runner, the search box, and every filter are URL state.
-- Give every input an explicit, stable `id` and `name`, and associate the
-  label with `for`. Do not rely on a widget to mint one.
-
-## 6. Async data
-
-- Loading is `LocalResource::new(|| async_fn())`. The book is explicit that
-  `LocalResource` is the client-side-rendering resource and that
-  `Resource::new()` "is used with SSR" and serializes a value from server to
-  client (`async/10_resources`). **There is no server here, so every resource
-  is a `LocalResource`.** The sibling project's rule that `LocalResource` is a
-  deoptimization is an SSR rule; it does not apply.
-- Read resources under `<Suspense>` on first load, and under **`<Transition>`
-  whenever the resource refetches** on a filter, parameter, or interval change
-  (`async/12_transition`). A `<Suspense>` over a refetching resource flashes
-  its fallback on every reload. Every listing, search, and paged table in this
-  viewer refetches, so `<Transition>` is the default there.
-- Never fetch inside an `Effect` and write a signal. `spawn_local` is for
-  genuine fire-and-forget only.
-- **Only the visible tab fetches.** A tabbed screen gates each tab's resource
-  source on the active tab, so opening a screen does not fan out one request
-  per tab.
-
-## 7. The FHIR client
-
-- **One module owns every request.** All HTTP goes through `crate::fhir`, a
-  thin `gloo-net` client that builds the URL, sets `Accept:
-  application/fhir+json`, sends the request, and maps the answer. Never a
-  second client, and never a `fetch` from a component body.
-- **The base URL is derived from the page, never configured into the bundle.**
-  The bundle is served by the server it queries, so the FHIR base is the
-  document's own origin. A build-time base URL would make one artifact
-  deployment-specific.
-- **Every value interpolated into a URL is percent-encoded.** Code system
-  URIs, ECL expressions, concept ids, and value set canonicals all contain
-  characters that are structural in a URL. This is load-bearing, not cosmetic.
-- **A refusal is an `OperationOutcome`, and the viewer renders it.** The
-  server answers every failure with an `OperationOutcome` carrying `severity`,
-  `code`, and `details`. Show the server's own diagnostic verbatim rather than
-  a paraphrase, and never swallow a non-2xx into an empty view.
-- **Errors are a typed enum** (`thiserror`), with the HTTP status as a
-  `http::StatusCode` and the `OperationOutcome` carried as data. A caller that
-  branches on the outcome gets a variant, not a substring match.
-- The viewer's own FHIR types are the minimum it renders. Do not re-model the
-  specification, and do not depend on `fhir-types`.
-
-## 8. Router
-
-- One `<Router>` at the root, `<Routes fallback=…>` with a real 404
-  (`router/16`). The router base matches the server's mount point.
-- Params and queries are typed: `use_params::<T>()` / `use_query::<T>()` with
-  `#[derive(Params)]`, whose fields are `Option<T>`. Handle the `Err` and
-  `None` cases; they are user input (`router/18`).
-- **Filter, search, and pagination state lives in the URL** (`router/20`,
-  `15_global_state`): shareable, refresh-safe, and walkable with the browser's
-  back button.
-- **A path or query param that can change without leaving the route is read
-  reactively**, never `get_untracked` at setup. A navigation matching the same
-  `<Route>` updates the params signal without re-running the component body
-  (confirmed in `leptos_router` 0.8; see the agent memory), so an untracked
-  read goes stale. The FHIR version switcher and the code system switcher are
-  exactly such navigations.
-- Navigation is `<A>` or a plain same-origin `<a href>`, both of which the
-  router intercepts through its window-level click handler. Never write
-  `window.location`. An anchor that opens a raw FHIR request needs
-  `rel="external"`, or the router intercepts it and 404s.
-- `<Form method="GET">` pointed at the **same** path does a client-side
-  navigation whose `rebuild` short-circuits: the route body does not re-run.
-  Combine it with a reactive query read, or use a plain `<form>` with an
-  `on:submit` that navigates.
-- Every routed page sets a `<Title>` through `leptos_meta`, from the component
-  body and never by editing the document head by hand.
-
-## 9. Accessibility
-
-The bar is **WCAG 2.2 Level AA** (<https://www.w3.org/TR/WCAG22/>), checked per
-slice, not at the end.
-
-- Every control is keyboard reachable and operable, with a visible focus
-  indicator. Nothing is mouse-only.
-- The taxonomy tree implements the ARIA Authoring Practices tree view pattern
-  (<https://www.w3.org/WAI/ARIA/apg/patterns/treeview/>): one tab stop, arrow
-  keys to walk and expand, correct `role`, `aria-expanded`, `aria-selected`.
-- Tables emit valid HTML with an explicit `<tbody>` and real `<th scope=…>`
-  headers. No block element inside a `<p>`.
-- No meaning is carried by colour alone; a status is a word as well as a tint.
-  Contrast meets AA in both themes.
-- A search or expansion result count is announced in a live region.
-- Motion respects `prefers-reduced-motion`.
-- A colour pairing that more than one screen paints lives in `styles.rs`,
-  never copied into each screen. Five copies of the submit button's class
-  string all read the same and all failed the contrast bar together; one copy
-  is measured once.
-- Contrast is measured over what the browser painted, never over the token the
-  source names. Tailwind writes its palette in oklch and a browser
-  resolves `color` in the space the author wrote
-  (<https://www.w3.org/TR/css-color-4/#resolving-color-values>), so a reader of
-  `getComputedStyle` sees oklch; a colour inherited from an ancestor, or one a
-  transparent background lets through, is only visible from the painted value.
-- A dark theme lightens the tint and darkens the text on it. White on `brand-600` is
-  3.7:1 and fails as text; darkening the tint further fixes the text and breaks
-  the component's own 3:1 boundary against the page
-  (<https://www.w3.org/TR/WCAG22/#non-text-contrast>). The dark theme inverts
-  the pairing instead: a light tint under dark text passes both.
-
-`e2e/tests/it/accessibility.rs` measures every item above across every screen
-in both themes, and is the one place in the battery that runs a script in the
-page: WebDriver has no primitive for the element focus landed on or for the
-colour the browser painted.
-
-## 10. Testing and gates
-
-- **Business logic lives outside components**, in plain types with ordinary
-  unit tests: URL building, `OperationOutcome` flattening, capability-statement
-  reading, the paging arithmetic, the tree model. Components stay thin. This is
-  also what keeps the logic testable without a browser.
-- Component tests are `wasm-bindgen-test` with `mount_to`; updates are async,
-  so `tick().await` before asserting.
-- **E2E is a merge gate, and it is Rust only**: `thirtyfour` (WebDriver)
-  driving headless Chromium against the built image, journeys as plain
-  `#[tokio::test]`s that skip with a reason when the base URL is unset. Every
-  journey fails on any browser console error. Explicit waits on elements and
-  conditions, never `sleep`. A flaky journey is fixed, never `#[ignore]`d.
-  Playwright is JavaScript and the no-JavaScript mandate covers the test suite.
-- **An E2E assertion on page source proves nothing.** A journey drives the real
-  widget: type into it, click it, wait for the URL or the DOM to change.
-- Gates for every viewer change (`/ui-gates`): `cargo fmt` and `leptosfmt`
-  clean; `cargo clippy -p ferroterm-viewer --target wasm32-unknown-unknown
-  --all-features -- -D warnings`; `cargo nextest run -p ferroterm-viewer`;
-  `trunk build --release --locked` completing; the recorded bundle size not
-  regressing.
-- `console_error_panic_hook` is installed in `main`, so a panic names its
-  source in the browser console.
-- **Never weaken a gate to make a change pass.** A failing wasm clippy pass
-  usually means a dependency cannot compile for the browser, which is the gate
-  working.
+The budget is 1.1 MiB, set with the console's first measured release
+bundle: 1068012 bytes on ferrohealth-ui 0.1.3 (2026-10-19, cargo-leptos
+0.3.11, wasm-bindgen 0.2.129, Rust 1.98.0), 1066218 on 0.1.2, 1025446 on
+0.1.1. The client-side reader and editor bundles it replaced were 534059 and
+798540 bytes gzipped. FerroTERM issue 733 tracks winning headroom back. A
+change that needs more raises the budget here, in its own pull request, with
+the measured size and the reason.

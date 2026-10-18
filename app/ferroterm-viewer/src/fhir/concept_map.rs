@@ -8,7 +8,7 @@
 //! are read here, so one screen draws a map from any of the four roots without
 //! claiming one version's element name for another.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::fhir::facts::Fact;
 use crate::fhir::facts::counted;
@@ -23,7 +23,7 @@ use crate::fhir::searchset::Published;
 /// Every field is optional so a server that omits one still renders. The
 /// viewer carries the elements it draws and nothing else: it never mirrors the
 /// whole resource, and it never translates a code in the browser.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct PublishedConceptMap {
     /// `resourceType`, which says what the entry actually carries.
     #[serde(rename = "resourceType")]
@@ -80,7 +80,7 @@ pub(crate) struct PublishedConceptMap {
 }
 
 /// One `ConceptMap.group`.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 struct Group {
     /// The code system the mapped codes come from.
     source: Option<String>,
@@ -91,11 +91,53 @@ struct Group {
     element: Vec<GroupElement>,
 }
 
-/// One `ConceptMap.group.element`, counted rather than listed.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+/// One `ConceptMap.group.element`.
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 struct GroupElement {
     /// The source code the element maps.
     code: Option<String>,
+    /// The source code's display.
+    display: Option<String>,
+    /// What the code maps to.
+    #[serde(default)]
+    target: Vec<ElementTarget>,
+}
+
+/// One `ConceptMap.group.element.target`.
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
+struct ElementTarget {
+    /// The target code.
+    code: Option<String>,
+    /// The target code's display.
+    display: Option<String>,
+    /// `equivalence`, which R4 and R4B name.
+    equivalence: Option<String>,
+    /// `relationship`, which R5 renamed it to
+    /// (<https://hl7.org/fhir/R5/conceptmap.html>).
+    relationship: Option<String>,
+    /// The publisher's comment on the mapping.
+    comment: Option<String>,
+}
+
+/// One mapping of a concept map: a source code, what it maps to and how.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct MappingRow {
+    /// The code system the source code belongs to.
+    pub(crate) source_system: Option<String>,
+    /// The source code.
+    pub(crate) source_code: String,
+    /// The source code's display, when the map wrote one.
+    pub(crate) source_display: Option<String>,
+    /// The code system the target code belongs to.
+    pub(crate) target_system: Option<String>,
+    /// The target code, absent for a code the map says maps to nothing.
+    pub(crate) target_code: Option<String>,
+    /// The target code's display, when the map wrote one.
+    pub(crate) target_display: Option<String>,
+    /// How the two relate, under whichever element the version names.
+    pub(crate) relationship: Option<String>,
+    /// The publisher's comment, when it wrote one.
+    pub(crate) comment: Option<String>,
 }
 
 /// One group of a concept map, as one row of the screen.
@@ -211,6 +253,52 @@ impl PublishedConceptMap {
             .collect()
     }
 
+    /// Every mapping the map writes, one row per target, in the order the
+    /// groups and elements declare them; a source code with no target is one
+    /// row saying so.
+    pub(crate) fn mappings(&self) -> Vec<MappingRow> {
+        let mut rows = Vec::new();
+        for group in &self.group {
+            let source_system = named(group.source.as_deref()).map(str::to_owned);
+            let target_system = named(group.target.as_deref()).map(str::to_owned);
+            for element in &group.element {
+                let Some(source_code) = named(element.code.as_deref()) else {
+                    continue;
+                };
+                let source = MappingRow {
+                    source_system: source_system.clone(),
+                    source_code: source_code.to_owned(),
+                    source_display: named(element.display.as_deref()).map(str::to_owned),
+                    target_system: target_system.clone(),
+                    ..MappingRow::default()
+                };
+                if element.target.is_empty() {
+                    rows.push(source);
+                    continue;
+                }
+                for target in &element.target {
+                    rows.push(MappingRow {
+                        target_code: named(target.code.as_deref()).map(str::to_owned),
+                        target_display: named(target.display.as_deref()).map(str::to_owned),
+                        relationship: first_named(&[
+                            target.relationship.as_deref(),
+                            target.equivalence.as_deref(),
+                        ])
+                        .map(str::to_owned),
+                        comment: named(target.comment.as_deref()).map(str::to_owned),
+                        ..source.clone()
+                    });
+                }
+            }
+        }
+        rows
+    }
+
+    /// The description, when it declared one.
+    pub(crate) fn description(&self) -> Option<&str> {
+        named(self.description.as_deref())
+    }
+
     /// How many groups the map declares.
     fn group_count(&self) -> Option<u32> {
         u32::try_from(self.group.len()).ok()
@@ -221,6 +309,27 @@ impl PublishedConceptMap {
 mod tests {
     use super::*;
     use crate::fhir::searchset::SearchSet;
+
+    #[test]
+    fn every_target_is_a_mapping_under_either_name_of_the_relationship() {
+        let r4 = parse(
+            r#"{"resourceType":"ConceptMap","group":[{"source":"urn:a","target":"urn:b",
+              "element":[{"code":"x","display":"Ex","target":[
+                {"code":"p","equivalence":"equivalent"},{"code":"q","equivalence":"wider"}]},
+                {"code":"y"}]}]}"#,
+        );
+        let rows = r4.mappings();
+        assert_eq!(rows.len(), 3, "two targets and one unmapped code");
+        assert_eq!(rows[0].target_code.as_deref(), Some("p"));
+        assert_eq!(rows[0].relationship.as_deref(), Some("equivalent"));
+        assert_eq!(rows[0].source_display.as_deref(), Some("Ex"));
+        assert_eq!(rows[2].target_code, None);
+        let r5 = parse(
+            r#"{"resourceType":"ConceptMap","group":[{"element":[{"code":"x","target":[
+                {"code":"p","relationship":"equivalent"}]}]}]}"#,
+        );
+        assert_eq!(r5.mappings()[0].relationship.as_deref(), Some("equivalent"));
+    }
 
     fn parse(json: &str) -> PublishedConceptMap {
         serde_json::from_str(json).expect("the fixture is valid JSON")

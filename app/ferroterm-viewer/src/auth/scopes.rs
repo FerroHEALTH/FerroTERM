@@ -35,6 +35,13 @@ pub(crate) enum Letter {
     /// Instance-level update, the `u` letter.
     Update,
     /// Instance-level delete, the `d` letter.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "no screen deletes a resource, as a published code is retired in place; the tests read the letter"
+        )
+    )]
     Delete,
 }
 
@@ -124,15 +131,6 @@ fn in_order(letters: &str) -> bool {
         .all(|letter| remaining.any(|known| known == letter))
 }
 
-/// The scopes a token grants, from the `scope` member of the token response.
-///
-/// RFC 6749 §3.3 makes it a space-delimited string.
-pub(crate) fn granted(scope: Option<&str>) -> Vec<String> {
-    scope
-        .map(|text| text.split_whitespace().map(str::to_owned).collect())
-        .unwrap_or_default()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -142,6 +140,14 @@ mod tests {
 
     /// The three write permissions.
     const WRITES: [Letter; 3] = [Letter::Create, Letter::Update, Letter::Delete];
+
+    /// The scopes a token grants, from the `scope` member of the token
+    /// response: RFC 6749 §3.3 makes it a space-delimited string.
+    fn granted(scope: Option<&str>) -> Vec<String> {
+        scope
+            .map(|text| text.split_whitespace().map(str::to_owned).collect())
+            .unwrap_or_default()
+    }
 
     /// The scopes of `text`, as a token response carries them.
     fn scopes(text: &str) -> Vec<String> {

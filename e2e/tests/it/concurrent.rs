@@ -6,8 +6,8 @@
 //! server answers a stale one with `412 Precondition Failed`
 //! (<https://hl7.org/fhir/R4B/http.html#concurrency>). The stub issuer grants
 //! only the authorization code flow, so the second writer is a second window
-//! in the same session: it shares the issuer's cookie and none of the first
-//! window's page state, which is where the token lives.
+//! in the same browser: it shares the console's session cookie and none of
+//! the first window's page state, which is where the draft lives.
 
 use thirtyfour::prelude::*;
 use thirtyfour::stringmatch::StringMatch;
@@ -22,7 +22,7 @@ use crate::harness::sign_in;
 use crate::harness::signed_in;
 
 /// The sidebar link into the code system authoring screen.
-const AUTHORING_LINK: &str = "//a[normalize-space()='Edit a code system']";
+const AUTHORING_LINK: &str = "//a[normalize-space()='Code system editor']";
 
 /// The stem of the canonical this journey authors under.
 const STEM: &str = "e2e-concurrent-edit";
@@ -49,7 +49,8 @@ fn system_link() -> String {
 }
 
 /// The code system screen's link into the editor.
-const EDIT_LINK: &str = "//a[normalize-space()='Edit this code system']";
+const EDIT_LINK: &str =
+    "//nav[@aria-label='Screens for this code system']//a[normalize-space()='Edit']";
 
 /// The canonical field of the metadata form.
 const URL_FIELD: &str = "#editor-url";
@@ -134,7 +135,7 @@ async fn save(journey: &Journey, needle: &str, what: &str) -> String {
 /// Signs in as a terminologist and authors the code system both windows edit.
 async fn author(journey: &Journey, deployment: &SignedIn) -> WebDriverResult<()> {
     journey
-        .element(By::Css("header a[href^='/ui']"), "the shell mark")
+        .element(By::Css("header a.fui-lockup"), "the shell mark")
         .await;
     choose(journey, deployment, "writer", "concurrent-edit").await;
     sign_in(journey, deployment).await;
@@ -185,18 +186,21 @@ async fn author(journey: &Journey, deployment: &SignedIn) -> WebDriverResult<()>
 
 /// Opens the same code system in a second window and saves a change there.
 ///
-/// The token lives in the page that signed in, so the second window signs in
-/// for itself and then moves by pressing links: a load would drop its token.
+/// The sign-in is the console's session, which the second window shares, so
+/// it opens the code system listing and moves by pressing links as a reader
+/// would.
 async fn replace_from_a_second_window(
     journey: &Journey,
     deployment: &SignedIn,
 ) -> WebDriverResult<()> {
     journey.open_window().await?;
-    sign_in(journey, deployment).await;
+    journey
+        .reopen(&format!("{}/systems", deployment.base))
+        .await;
     journey
         .element(
             By::Css(system_link()),
-            "the overview's row for the code system",
+            "the listing's row for the code system",
         )
         .await
         .click()
@@ -241,7 +245,7 @@ async fn a_save_over_a_replaced_version_is_refused_and_the_current_one_reloads()
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &deployment.base, "/ui/editor").await;
+            let journey = Journey::open(driver, &deployment.base, "/").await;
             author(&journey, &deployment).await?;
             let first = journey.window().await?;
 

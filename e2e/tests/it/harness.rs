@@ -24,6 +24,10 @@ pub const SIGNED_IN_BASE_URL_ENV: &str = "FERROTERM_UI_E2E_SIGNED_IN_BASE_URL";
 /// Names the stub identity provider that second server trusts.
 pub const ISSUER_ENV: &str = "FERROTERM_UI_E2E_ISSUER";
 
+/// Names the Chrome binary the session starts, when it is not where
+/// chromedriver looks for one.
+pub const CHROME_ENV: &str = "FERROTERM_UI_E2E_CHROME";
+
 /// The WebDriver endpoint used when [`WEBDRIVER_ENV`] is unset.
 const DEFAULT_WEBDRIVER: &str = "http://127.0.0.1:4444";
 
@@ -83,14 +87,19 @@ const CHROME_ARGS: [&str; 4] = [
     "--window-size=1280,900",
 ];
 
+/// The narrowest window Chrome draws, in CSS pixels; a narrower viewport is
+/// emulated.
+const NARROWEST_WINDOW: u32 = 500;
+
 /// The `fhirUser` the stub issuer signs everyone in as.
 const SIGNED_IN_AS: &str = "Practitioner/e2e-terminologist";
 
-/// The control that starts a sign-in, wherever the chrome puts it.
-const SIGN_IN_CONTROL: &str = "//button[normalize-space()='Sign in']";
+/// The control that starts a sign-in: a link to the console's own sign-in
+/// route, in the top bar.
+const SIGN_IN_CONTROL: &str = "//a[normalize-space()='Sign in']";
 
 /// The shell's own mark, which proves a bundle booted.
-const SHELL_MARK: &str = "header a[href^='/ui']";
+const SHELL_MARK: &str = "header a.fui-lockup";
 
 /// Opens the issuer's profile address, which decides what the sign-in grants.
 ///
@@ -113,13 +122,11 @@ pub async fn choose(journey: &Journey, deployment: &SignedIn, profile: &str, tag
 
 /// Presses the sign-in control and waits for the shell to name the reader.
 ///
-/// The sign-in happens in the editor bundle, because that is where the viewer
-/// offers one: a token lives in the page that holds it, and the reader bundle
-/// links here rather than signing in on a page that would then be left.
+/// The console signs the reader in on its own server: the control leads to
+/// its sign-in route, the issuer sends the browser back to the console's
+/// callback, and the page the console then draws names the reader.
 pub async fn sign_in(journey: &Journey, deployment: &SignedIn) -> String {
-    journey
-        .reopen(&format!("{}/ui/editor", deployment.base))
-        .await;
+    journey.reopen(&format!("{}/", deployment.base)).await;
     journey
         .element(By::Css(SHELL_MARK), "the shell mark on the overview")
         .await;
@@ -218,6 +225,13 @@ pub async fn session() -> WebDriver {
             .add_arg(argument)
             .expect("chrome accepts a command-line argument");
     }
+    if let Ok(binary) = std::env::var(CHROME_ENV)
+        && !binary.is_empty()
+    {
+        capabilities
+            .set_binary(&binary)
+            .expect("chrome accepts a binary path");
+    }
     // chromedriver records the browser log only for a session that asked for
     // it at creation, and that log is where an uncaught panic lands.
     capabilities
@@ -271,7 +285,38 @@ impl Journey {
             .goto(address.clone())
             .await
             .unwrap_or_else(|error| panic!("the browser could not open {address}: {error}"));
-        Self { driver }
+        let journey = Self { driver };
+        journey.hydrated().await;
+        journey
+    }
+
+    /// Waits, on a console page, until the browser half has attached to it.
+    ///
+    /// The server sends a whole page, so its controls are on screen before
+    /// their handlers are; a key typed in between reaches the field and never
+    /// the form's state. The console marks `<html>` with `data-hydrated` when
+    /// it is done. A page that is not the console's (the issuer's, a refusal
+    /// in plain text) carries no shell and is not waited on.
+    async fn hydrated(&self) {
+        let console = self
+            .driver
+            .find_all(By::Css(SHELL_MARK))
+            .await
+            .is_ok_and(|found| !found.is_empty());
+        if console
+            && let Err(error) = self
+                .driver
+                .query(By::Css("html[data-hydrated]"))
+                .wait(WAIT, POLL)
+                .first()
+                .await
+        {
+            panic!(
+                "{}",
+                self.failure("the page to hydrate", &error.to_string())
+                    .await
+            );
+        }
     }
 
     /// Opens `address` in the same session, as a fresh load.
@@ -283,6 +328,17 @@ impl Journey {
             .goto(address)
             .await
             .unwrap_or_else(|error| panic!("the browser could not open {address}: {error}"));
+        self.hydrated().await;
+    }
+
+    /// Drops every cookie the console set in this browser, so the next load
+    /// is a visitor's: the sign-in lives in the console's session cookie.
+    ///
+    /// # Errors
+    ///
+    /// Returns the WebDriver error when the browser refused.
+    pub async fn drop_cookies(&self) -> WebDriverResult<()> {
+        self.driver.delete_all_cookies().await
     }
 
     /// The window the journey is driving now.
@@ -321,12 +377,90 @@ impl Journey {
     /// The first element matching `selector`, once the bundle has rendered it.
     ///
     /// The wait is the library's own poller over the element condition, so
-    /// nothing here sleeps for a fixed time and hopes.
+    /// nothing here sleeps for a fixed time and hopes. A press may have loaded
+    /// a whole new page, so the wait starts with that page's hydration.
     pub async fn element(&self, selector: By, what: &str) -> WebElement {
-        match self.driver.query(selector).wait(WAIT, POLL).first().await {
+        self.hydrated().await;
+        let element = match self.driver.query(selector).wait(WAIT, POLL).first().await {
+            Ok(element) => element,
+            Err(error) => panic!("{}", self.failure(what, &error.to_string()).await),
+        };
+        // NOTE: WebDriver 2, Element Click: a press on an element whose centre
+        // is under the sticky top bar is refused, so the element is centred.
+        if let Err(error) = element.scroll_into_view().await {
+            panic!("{}", self.failure(what, &error.to_string()).await);
+        }
+        element
+    }
+
+    /// The first element matching `selector` once the browser draws it.
+    ///
+    /// An element the page holds hidden, such as a control in a closed menu,
+    /// is in the document before it is drawn, and a press on it is refused.
+    pub async fn visible(&self, selector: By, what: &str) -> WebElement {
+        self.hydrated().await;
+        match self
+            .driver
+            .query(selector)
+            .wait(WAIT, POLL)
+            .and_displayed()
+            .first()
+            .await
+        {
             Ok(element) => element,
             Err(error) => panic!("{}", self.failure(what, &error.to_string()).await),
         }
+    }
+
+    /// Presses the element matching `selector` once it is on the page.
+    ///
+    /// # Errors
+    ///
+    /// Returns the WebDriver error if the browser refused the press.
+    pub async fn press(&self, selector: By, what: &str) -> WebDriverResult<()> {
+        self.element(selector, what).await.click().await
+    }
+
+    /// Keeps one preference of the About screen's settings pane: `control`
+    /// takes `value`, the form is saved, and the console's answer is waited
+    /// for on `<html>`, where the theme and the density are drawn.
+    ///
+    /// The preferences are the console's cookies, so every screen opened
+    /// afterwards in this session reads them.
+    ///
+    /// # Errors
+    ///
+    /// Returns the WebDriver error if the browser refused a press.
+    pub async fn keep_setting(
+        &self,
+        base: &str,
+        control: &str,
+        value: &str,
+        drawn: Option<&str>,
+    ) -> WebDriverResult<()> {
+        self.reopen(&format!("{base}/about?tab=settings")).await;
+        self.visible(By::Css(control), "the settings control")
+            .await
+            .find(By::Css(format!("option[value='{value}']")))
+            .await?
+            .click()
+            .await?;
+        self.visible(
+            By::Css("#about-settings-heading form button[type='submit']"),
+            "the settings save button",
+        )
+        .await
+        .click()
+        .await?;
+        if let Some(attribute) = drawn {
+            self.count_becoming(
+                By::Css(format!("html[{attribute}='{value}']")),
+                1,
+                "the console to draw the kept setting",
+            )
+            .await;
+        }
+        Ok(())
     }
 
     /// The text of the element matching `selector` once `needle` matches it.
@@ -338,19 +472,25 @@ impl Journey {
     where
         N: Needle + Clone + Send + Sync + 'static,
     {
-        let found = self
-            .driver
-            .query(selector)
-            .wait(WAIT, POLL)
-            .with_text(needle)
-            .first()
-            .await;
-        match found {
-            Ok(element) => element
-                .text()
-                .await
-                .unwrap_or_else(|error| panic!("reading {what}: {error}")),
-            Err(error) => panic!("{}", self.failure(what, &error.to_string()).await),
+        self.hydrated().await;
+        let deadline = Instant::now() + WAIT;
+        loop {
+            // NOTE: a press that posts a form loads a new page under the poll,
+            // so an element read during the swap is stale and read again.
+            if let Ok(found) = self.driver.find_all(selector.clone()).await {
+                for element in found {
+                    if let Ok(text) = element.text().await
+                        && needle.is_match(&text)
+                    {
+                        return text;
+                    }
+                }
+            }
+            if Instant::now() >= deadline {
+                let reason = format!("no element matching {selector:?} carried the text");
+                panic!("{}", self.failure(what, &reason).await);
+            }
+            tokio::time::sleep(POLL).await;
         }
     }
 
@@ -394,6 +534,29 @@ impl Journey {
             if Instant::now() >= deadline {
                 let reason = format!("{found} elements match, not {wanted}");
                 panic!("{}", self.failure(what, &reason).await);
+            }
+            tokio::time::sleep(POLL).await;
+        }
+    }
+
+    /// Waits until the live region matching `selector` says `needle`, read
+    /// from `textContent` because a live region may be visually hidden and
+    /// WebDriver's element text leaves hidden text out
+    /// (<https://www.w3.org/TR/webdriver2/#get-element-text>).
+    pub async fn live_region_saying(&self, selector: By, needle: &str, what: &str) -> String {
+        let deadline = Instant::now() + WAIT;
+        loop {
+            let said = match self.driver.find(selector.clone()).await {
+                Ok(region) => region.prop("textContent").await.ok().flatten(),
+                Err(_absent) => None,
+            };
+            if let Some(said) = said.filter(|said| said.contains(needle)) {
+                return said;
+            }
+            if Instant::now() >= deadline {
+                let reason = format!("the live region never said `{needle}`");
+                let failure = self.failure(what, &reason).await;
+                panic!("{failure}");
             }
             tokio::time::sleep(POLL).await;
         }
@@ -651,27 +814,91 @@ impl Journey {
     /// The session starts at the size [`CHROME_ARGS`] fixes; a capture asks for
     /// a taller one so a whole screen lands in one image
     /// (<https://www.w3.org/TR/webdriver2/#set-window-rect>).
+    ///
+    /// Chrome keeps a window at least [`NARROWEST_WINDOW`] wide, so a phone
+    /// width is emulated over the Chrome `DevTools` Protocol instead
+    /// (<https://chromedevtools.github.io/devtools-protocol/tot/Emulation/#method-setDeviceMetricsOverride>).
     pub async fn resize(&self, width: u32, height: u32) {
+        let devtools = self.driver.cdp();
+        let window = width.max(NARROWEST_WINDOW);
         self.driver
-            .set_window_rect(0, 0, width, height)
+            .set_window_rect(0, 0, window, height)
             .await
             .unwrap_or_else(|error| panic!("resizing to {width}x{height}: {error}"));
+        let emulated = if width < NARROWEST_WINDOW {
+            devtools
+                .send_raw(
+                    "Emulation.setDeviceMetricsOverride",
+                    serde_json::json!({
+                        "width": width,
+                        "height": height,
+                        "deviceScaleFactor": 1,
+                        "mobile": true,
+                    }),
+                )
+                .await
+        } else {
+            devtools
+                .send_raw(
+                    "Emulation.clearDeviceMetricsOverride",
+                    serde_json::json!({}),
+                )
+                .await
+        };
+        emulated.unwrap_or_else(|error| panic!("emulating {width}x{height}: {error}"));
     }
 
-    /// How tall the rendered document is, in CSS pixels.
+    /// How tall the rendered document is, in CSS pixels: the root's scroll
+    /// height, which is the taller of the content and the viewport.
     ///
-    /// The body's own box is the measure, read over WebDriver
-    /// (<https://www.w3.org/TR/webdriver2/#get-element-rect>), so nothing here
-    /// runs a script in the page.
-    #[expect(
-        clippy::as_conversions,
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "a WebDriver rect is f64 and `as` is the only defined float-to-integer conversion; it saturates at both ends, the value is rounded and floored at zero here, and the caller clamps it into the shot bounds"
-    )]
+    /// The body's box is no measure here, since the shell sizes it to the
+    /// viewport and lets the content overflow it
+    /// (<https://drafts.csswg.org/cssom-view/#dom-element-scrollheight>).
     pub async fn page_height(&self) -> WebDriverResult<u32> {
-        let body = self.driver.find(By::Css("body")).await?;
-        Ok(body.rect().await?.height.round().max(0.0) as u32)
+        let height = self
+            .evaluate("return String(document.documentElement.scrollHeight);")
+            .await?;
+        Ok(height.trim().parse().unwrap_or_else(|error| {
+            panic!("the document reported a height `{height}` that is no number: {error}")
+        }))
+    }
+
+    /// Sets the cookie `name` to `value` on the page's own origin, the way a
+    /// form post of the console's preferences would.
+    ///
+    /// # Errors
+    ///
+    /// Returns the WebDriver error when the browser refused the cookie.
+    pub async fn set_cookie(&self, name: &str, value: &str) -> WebDriverResult<()> {
+        let mut cookie = Cookie::new(name.to_owned(), value.to_owned());
+        cookie.set_path("/");
+        self.driver.add_cookie(cookie).await
+    }
+
+    /// Moves the pointer onto the element matching `selector`, so a capture
+    /// shows its hover state.
+    ///
+    /// # Errors
+    ///
+    /// Returns the WebDriver error when the browser refused the move.
+    pub async fn hover(&self, selector: By, what: &str) -> WebDriverResult<()> {
+        let element = self.visible(selector, what).await;
+        self.driver
+            .action_chain()
+            .move_to_element_center(&element)
+            .perform()
+            .await
+    }
+
+    /// Waits until the page shows no spinner, skeleton or busy region, so a
+    /// capture is never of a screen still answering.
+    pub async fn settled(&self, what: &str) {
+        self.count_becoming(
+            By::Css(".fui-spinner-ring, .fui-skeleton, [aria-busy='true']"),
+            0,
+            what,
+        )
+        .await;
     }
 
     /// Writes a PNG of what the browser is showing to `path`.
@@ -709,8 +936,8 @@ mod tests {
             "a-code-system-card-on-the-overview"
         );
         assert_eq!(
-            slug("/ui/systems/x?fhir=r4b"),
-            "ui-systems-x-fhir-r4b",
+            slug("/systems/x?fhir=r4b"),
+            "systems-x-fhir-r4b",
             "a description carrying an address leaves no separator in the name"
         );
         assert_eq!(slug("..."), "failure", "a name is never empty");

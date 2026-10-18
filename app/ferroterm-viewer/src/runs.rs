@@ -6,16 +6,9 @@
 //! reader returns to it, so a remembered run can never show a stale answer
 //! beside a live one.
 //!
-//! The list lives in `localStorage`, like every other per-viewer value. The
-//! server is neither asked about it nor told about it.
-
-use serde::Deserialize;
-use serde::Serialize;
-
-use crate::storage;
-
-/// Where the list is stored.
-const KEY: &str = "ferroterm.viewer.runs";
+//! The list lives in the page for as long as it is open, and never in a URL
+//! or the browser's storage: the console keeps nothing of a reader's in the
+//! browser. The server is neither asked about it nor told about it.
 
 /// How many runs are kept.
 ///
@@ -24,7 +17,7 @@ const KEY: &str = "ferroterm.viewer.runs";
 const CAPACITY: usize = 12;
 
 /// One run a reader made.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Run {
     /// The runner it was made on, as a reader reads it.
     pub(crate) screen: String,
@@ -34,22 +27,11 @@ pub(crate) struct Run {
     pub(crate) address: String,
 }
 
-/// The runs this browser holds, newest first.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+/// The runs this page holds, newest first.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct Runs(Vec<Run>);
 
 impl Runs {
-    /// Reads a stored list, or an empty one when nothing usable is stored.
-    ///
-    /// A value that no longer parses is treated as absent rather than as an
-    /// error, because an old browser profile must never wedge a runner.
-    pub(crate) fn read(stored: Option<&str>) -> Self {
-        stored
-            .and_then(|text| serde_json::from_str::<Self>(text).ok())
-            .map(Self::capped)
-            .unwrap_or_default()
-    }
-
     /// This list with `run` at the front.
     ///
     /// A run already in the list moves to the front rather than appearing
@@ -82,24 +64,9 @@ impl Runs {
     }
 }
 
-/// The list this browser holds.
-pub(crate) fn stored() -> Runs {
-    Runs::read(storage::read(KEY).as_deref())
-}
-
-/// Puts `run` at the front of the list this browser holds.
-///
-/// Storage is the outside world, so a caller writes here from an `Effect`
-/// (<https://github.com/leptos-rs/book/blob/main/src/reactivity/working_with_signals.md>).
-/// A browser that refuses to store simply keeps no list, which is a reader
-/// with no history rather than a broken runner.
-pub(crate) fn remember(run: &Run) -> Runs {
-    let kept = stored().remembering(run);
-    if let Ok(text) = serde_json::to_string(&kept) {
-        storage::write(KEY, &text);
-    }
-    kept
-}
+/// The runs of the open page, shared by every runner through the context.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct RunList(pub(crate) leptos::prelude::RwSignal<Runs>);
 
 #[cfg(test)]
 mod tests {
@@ -110,26 +77,8 @@ mod tests {
         Run {
             screen: "Expand".to_owned(),
             subject: subject.to_owned(),
-            address: format!("/ui/expand?fhir=r5&url={subject}"),
+            address: format!("/expand?fhir=r5&url={subject}"),
         }
-    }
-
-    #[test]
-    fn nothing_stored_is_an_empty_list() {
-        assert!(Runs::read(None).is_empty());
-        assert!(
-            Runs::read(Some("")).is_empty(),
-            "an empty value is nothing stored"
-        );
-    }
-
-    #[test]
-    fn a_stored_value_that_no_longer_parses_is_treated_as_absent() {
-        assert!(
-            Runs::read(Some("{\"runs\":[]}")).is_empty(),
-            "an old shape must never wedge a runner"
-        );
-        assert!(Runs::read(Some("not json at all")).is_empty());
     }
 
     #[test]
@@ -175,32 +124,6 @@ mod tests {
             held.entries().last().map(|held| held.subject.as_str()),
             Some("3"),
             "the three oldest are gone, and in the order they were made"
-        );
-    }
-
-    #[test]
-    fn a_stored_list_longer_than_the_cap_is_read_back_capped() {
-        let long = Runs(
-            (0..CAPACITY + 5)
-                .map(|index| run(&index.to_string()))
-                .collect(),
-        );
-        let text = serde_json::to_string(&long).expect("the list serializes");
-        assert_eq!(
-            Runs::read(Some(&text)).entries().len(),
-            CAPACITY,
-            "a list written by an older build cannot grow this one"
-        );
-    }
-
-    #[test]
-    fn a_run_round_trips_through_storage_text() {
-        let held = Runs::default().remembering(&run("http://snomed.info/sct"));
-        let text = serde_json::to_string(&held).expect("the list serializes");
-        assert_eq!(
-            Runs::read(Some(&text)),
-            held,
-            "a reload shows the reader what they had"
         );
     }
 }

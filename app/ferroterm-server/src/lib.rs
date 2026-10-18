@@ -34,7 +34,6 @@ pub mod scope;
 pub mod smart;
 pub mod state;
 pub mod telemetry;
-pub mod ui;
 pub mod usage_report;
 pub mod version;
 pub mod wire;
@@ -61,59 +60,23 @@ pub const FHIR_BASES: [&str; 4] = ["/r4", "/r4b", "/r5", "/r6"];
 /// version prefix. Any other path is an `OperationOutcome` `not-found`, and
 /// that includes `/reload`, which only the admin listener serves.
 pub fn router(serving: Serving) -> Router {
-    router_with_bundles(serving, ui::BUNDLE, ui::EDITOR_BUNDLE)
-}
-
-/// Builds the HTTP application over `serving`, serving `bundle` as the viewer.
-///
-/// The viewer is mounted when the deployment asked for it and this binary
-/// carries a bundle; otherwise `/` and `/ui` are the `OperationOutcome`
-/// `not-found` every other unknown path answers. Taking the bundle as an
-/// argument is what lets a test drive the viewer routes without the release
-/// build's `dist/`.
-pub fn router_with_bundle(serving: Serving, bundle: &'static [ui::Asset]) -> Router {
-    router_with_bundles(serving, bundle, &[])
-}
-
-/// Builds the HTTP application over `serving`, serving both viewer bundles.
-///
-/// `editor` is the second bundle, mounted at `/ui/editor`; an empty one
-/// mounts nothing there, which is what a binary built without it carries.
-pub fn router_with_bundles(
-    serving: Serving,
-    bundle: &'static [ui::Asset],
-    editor: &'static [ui::Asset],
-) -> Router {
-    let viewer = serving.current().serves_viewer() && !bundle.is_empty();
     // The gate sits inside each version's router, so the path it reads is the
     // one under the version prefix that `nest` leaves.
     let gate = || axum::middleware::from_fn_with_state(serving.smart(), smart::guard::writes);
     let [r4, r4b, r5, r6] = FHIR_BASES;
-    let mut app = Router::new()
+    Router::new()
         .route("/health", get(health))
         .nest(r4, r4::router().layer(gate()))
         .nest(r4b, r4b::router().layer(gate()))
         .nest(r5, r5::router().layer(gate()))
         .nest(r6, r6::router().layer(gate()))
-        .route("/metrics", get(metrics_scrape));
-    if viewer {
-        app = app.route("/", get(ui::root));
-    }
-    let app = app
+        .route("/metrics", get(metrics_scrape))
         .fallback(outcome::not_found)
         .layer(axum::middleware::from_fn_with_state(
             serving.clone(),
             request_log::log,
-        ));
-    // NOTE: axum applies a layer only to the routes already added, so merging
-    // the viewer here keeps its assets out of the request log and the metrics
-    // (<https://docs.rs/axum/0.8/axum/struct.Router.html#method.layer>).
-    let app = if viewer {
-        app.merge(ui::router(bundle, editor))
-    } else {
-        app
-    };
-    app.with_state(serving)
+        ))
+        .with_state(serving)
 }
 
 /// Serves [`router`] on an already-bound listener until the process receives

@@ -26,11 +26,11 @@ commands (git diff, git log, grep, dry-run clippy). Read
 `.claude/rules/leptos-ui.md` in full first, because it is the checklist, and
 `docs/viewer.md` for the design the diff has to fit.
 
-**The viewer is client-side rendered.** There is no server-side rendering, no
-hydration, no `#[server]` function, and no `cargo-leptos`. A finding phrased in
-those terms is wrong here, and so is a suggestion to add any of them. Several
-memory entries are marked moot under CSR; read the classification before
-citing one.
+**The console is rendered on the server and hydrated**, built by cargo-leptos,
+its halves chosen by compilation target. Every server function is a `POST`
+that reads the session itself, and the browser never holds a token. Memory
+entries written while the viewer was client-side rendered may be moot; read
+the classification before citing one.
 
 Review priority (report in this order):
 
@@ -52,8 +52,11 @@ Review priority (report in this order):
 3. **Reactivity defects.** Signal-writes-signal `Effect`s. `<For>` keyed by an
    index, or UI state keyed positionally in a list that can reorder.
    `.get()` clones of collections. Overlapping read and write guards. Fetching
-   in an `Effect` instead of a `LocalResource`. A refetching resource read
-   under `<Suspense>` rather than `<Transition>`. A path or query param read
+   in an `Effect` instead of a resource. A `Resource` read outside every
+   `<Suspense>` or `<Transition>` (in a memo, a derived signal or an effect),
+   which breaks hydration and the browser's refetch. A refetching resource
+   read under `<Suspense>` rather than `<Transition>`. A hand-built component
+   where `ferrohealth-ui` has one. A path or query param read
    `get_untracked` at setup where a same-route navigation can change it. A
    tabbed screen whose inactive tabs fetch.
 4. **Build and size.** A dependency that will not compile for
