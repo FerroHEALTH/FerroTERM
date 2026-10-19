@@ -981,7 +981,7 @@ fn clause_card(
             <div>
                 <button
                     type="button"
-                    class=Variant::Destructive.class()
+                    class=Variant::Danger.class()
                     on:click=move |_| editing.change(move |draft| draft.remove_clause(key))
                 >
                     "Remove this clause"
