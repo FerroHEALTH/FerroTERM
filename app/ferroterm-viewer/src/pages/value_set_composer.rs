@@ -73,7 +73,7 @@ use crate::routes::VERSION_PARAM;
 use crate::routes::base_url;
 use crate::styles;
 use ferrohealth_ui::view::button::Variant;
-use ferrohealth_ui::view::form::field_flow;
+use ferrohealth_ui::view::form::{field_flow, keyed_field};
 use ferrohealth_ui::view::surface::stack;
 use serde_json::Value;
 
@@ -1481,13 +1481,11 @@ fn code_search(
                 })
         })
     };
-    // TODO(#730): draw the field with `form::field` once it takes an id made per clause
-    // (FerroHEALTH/FerroUI#98).
-    let search_row = field_flow(view! {
-        <div class="fui-field">
-            <label for=search_id.clone() class=styles::LABEL>
-                {label}
-            </label>
+    let search_field = keyed_field(
+        search_id.clone(),
+        label,
+        None,
+        view! {
             <input
                 id=search_id
                 name="q"
@@ -1496,7 +1494,10 @@ fn code_search(
                 node_ref=typed
                 disabled=move || system.with(String::is_empty)
             />
-        </div>
+        },
+    );
+    let search_row = field_flow(view! {
+        {search_field}
         <button type="submit" class=styles::BUTTON disabled=move || system.with(String::is_empty)>
             {ferrohealth_ui::icon::icon(icon::SEARCH, "16")}
             "Search"
