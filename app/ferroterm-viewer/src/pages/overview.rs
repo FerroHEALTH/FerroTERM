@@ -474,8 +474,7 @@ fn change_item(change: &Change, version: FhirVersion) -> AnyView {
     let when = change
         .when
         .as_deref()
-        .map(to_the_minute)
-        .unwrap_or_default();
+        .map(ferrohealth_ui::view::time::timestamp);
     let kind = change.resource_type.clone();
     let title = named.clone();
     view! {
@@ -490,18 +489,6 @@ fn change_item(change: &Change, version: FhirVersion) -> AnyView {
         </div>
     }
     .into_any()
-}
-
-/// A FHIR instant to the minute, the precision a reader scans a list by:
-/// `2026-10-18T18:31:52.42Z` reads `2026-10-18 18:31 UTC`. Anything shorter
-/// than a minute, or not an instant, is shown as the server sent it.
-fn to_the_minute(instant: &str) -> String {
-    let minute: String = instant.chars().take(16).collect();
-    if minute.chars().count() < 16 || !instant.contains('T') {
-        return instant.to_owned();
-    }
-    let zone = if instant.ends_with('Z') { " UTC" } else { "" };
-    format!("{}{zone}", minute.replace('T', " "))
 }
 
 /// The way into each operation.
@@ -529,22 +516,4 @@ fn operations_card(version: Signal<FhirVersion>) -> AnyView {
 fn failure(error: &FhirError) -> AnyView {
     let error = error.clone();
     panel_body(view! { <Failure error=Signal::stored(error) /> }).into_any()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::to_the_minute;
-
-    #[test]
-    fn an_instant_is_shown_to_the_minute() {
-        assert_eq!(
-            to_the_minute("2026-10-18T18:31:52.427842Z"),
-            "2026-10-18 18:31 UTC"
-        );
-        assert_eq!(
-            to_the_minute("2026-10-18T18:31:52+02:00"),
-            "2026-10-18 18:31"
-        );
-        assert_eq!(to_the_minute("2026-10-18"), "2026-10-18");
-    }
 }

@@ -73,6 +73,7 @@ use crate::routes::VERSION_PARAM;
 use crate::routes::base_url;
 use crate::styles;
 use ferrohealth_ui::view::button::Variant;
+use ferrohealth_ui::view::form::field_flow;
 use ferrohealth_ui::view::surface::stack;
 use serde_json::Value;
 
@@ -1480,31 +1481,30 @@ fn code_search(
                 })
         })
     };
+    // TODO(#730): draw the field with `form::field` once it takes an id made per clause
+    // (FerroHEALTH/FerroUI#98).
+    let search_row = field_flow(view! {
+        <div class="fui-field">
+            <label for=search_id.clone() class=styles::LABEL>
+                {label}
+            </label>
+            <input
+                id=search_id
+                name="q"
+                type="search"
+                class=styles::INPUT
+                node_ref=typed
+                disabled=move || system.with(String::is_empty)
+            />
+        </div>
+        <button type="submit" class=styles::BUTTON disabled=move || system.with(String::is_empty)>
+            {ferrohealth_ui::icon::icon(icon::SEARCH, "16")}
+            "Search"
+        </button>
+    });
     view! {
         <div class="grid gap-tight">
-            <form class="flex items-end gap-default" on:submit=submit>
-                <div class="grid min-w-0 flex-1 gap-tight">
-                    <label for=search_id.clone() class=styles::LABEL>
-                        {label}
-                    </label>
-                    <input
-                        id=search_id
-                        name="q"
-                        type="search"
-                        class=styles::INPUT
-                        node_ref=typed
-                        disabled=move || system.with(String::is_empty)
-                    />
-                </div>
-                <button
-                    type="submit"
-                    class=styles::BUTTON
-                    disabled=move || system.with(String::is_empty)
-                >
-                    {ferrohealth_ui::icon::icon(icon::SEARCH, "16")}
-                    "Search"
-                </button>
-            </form>
+            <form on:submit=submit>{search_row}</form>
             <Show when=move || offers.picking.get() == Some(key) fallback=|| ()>
                 <Reading label="Searching that code system">{results}</Reading>
             </Show>
