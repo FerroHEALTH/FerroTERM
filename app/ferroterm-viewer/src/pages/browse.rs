@@ -19,7 +19,7 @@ use ferrohealth_ui::table::model::filled_columns;
 use ferrohealth_ui::table::view::{Body, Column, DataTable, data_table};
 use ferrohealth_ui::view::button::Variant;
 use ferrohealth_ui::view::empty::empty_quiet;
-use ferrohealth_ui::view::form::{INPUT, MEDIUM, SELECT};
+use ferrohealth_ui::view::form::{INPUT, MEDIUM, SELECT, field, help_id};
 use ferrohealth_ui::view::layout::{Pane, divided_list, three_panes};
 use ferrohealth_ui::view::surface::{
     Crumb, Header, card, cluster, definitions, page_heading, stack,
@@ -514,27 +514,27 @@ fn language_view(
             .collect::<Vec<AnyView>>()
     };
     let picker = move || {
-        view! {
-            <div class="fui-field">
-                <label for="browse-language" class="fui-label">
-                    "Display language"
-                </label>
-                <select
-                    id="browse-language"
-                    name=DISPLAY_LANGUAGE_PARAMETER
-                    class=format!("{SELECT} {MEDIUM}")
-                    aria-describedby="browse-language-note"
-                    prop:value=move || params.with(|params| params.language.clone())
-                    on:change=change
-                >
-                    <option value="">"The server's own choice"</option>
-                    {options}
-                </select>
-                <p id="browse-language-note" class="fui-help">
-                    "The languages this version declares. The choice is sent as displayLanguage on every operation this screen calls."
-                </p>
-            </div>
-        }
+        let select = view! {
+            <select
+                id="browse-language"
+                name=DISPLAY_LANGUAGE_PARAMETER
+                class=format!("{SELECT} {MEDIUM}")
+                aria-describedby=help_id("browse-language")
+                prop:value=move || params.with(|params| params.language.clone())
+                on:change=change
+            >
+                <option value="">"The server's own choice"</option>
+                {options}
+            </select>
+        };
+        field(
+            "browse-language",
+            "Display language",
+            Some(
+                "The languages this version declares. The choice is sent as displayLanguage on every operation this screen calls.",
+            ),
+            select,
+        )
         .into_any()
     };
     view! {
@@ -611,28 +611,31 @@ fn search_section(
                 <h2 id="browse-search-heading" class="fui-card-title">
                     "Search"
                 </h2>
-                <form class="fui-field" role="search" on:submit=submit>
-                    <label for="browse-filter" class="fui-label">
-                        "Filter"
-                    </label>
-                    <div class="fui-search">
-                        <input
-                            id="browse-filter"
-                            name=FILTER_PARAMETER
-                            type="search"
-                            class=INPUT
-                            aria-describedby="browse-filter-note"
-                            node_ref=field
-                            prop:value=move || term.get()
-                        />
-                        <button type="submit" class=Variant::Primary.class()>
-                            {ferrohealth_ui::icon::icon(icon::SEARCH, "16")}
-                            "Search"
-                        </button>
-                    </div>
-                    <p id="browse-filter-note" class="fui-help">
-                        "Sent as the filter parameter of $expand over a value set that selects this code system. An empty filter lists the first concepts the server answers."
-                    </p>
+                <form role="search" on:submit=submit>
+                    {ferrohealth_ui::view::form::field(
+                        "browse-filter",
+                        "Filter",
+                        Some(
+                            "Sent as the filter parameter of $expand over a value set that selects this code system. An empty filter lists the first concepts the server answers.",
+                        ),
+                        view! {
+                            <div class="fui-search">
+                                <input
+                                    id="browse-filter"
+                                    name=FILTER_PARAMETER
+                                    type="search"
+                                    class=INPUT
+                                    aria-describedby=help_id("browse-filter")
+                                    node_ref=field
+                                    prop:value=move || term.get()
+                                />
+                                <button type="submit" class=Variant::Primary.class()>
+                                    {ferrohealth_ui::icon::icon(icon::SEARCH, "16")}
+                                    "Search"
+                                </button>
+                            </div>
+                        },
+                    )}
                 </form>
                 <p aria-live="polite" class="fui-muted fui-small">
                     <Transition fallback=|| ()>{announcement}</Transition>
@@ -1310,23 +1313,18 @@ fn system_picker(
                 .collect::<Vec<AnyView>>()
         })
     };
-    view! {
-        <div class="fui-field">
-            <label for="browse-system" class="fui-label">
-                "Code system"
-            </label>
-            <select
-                id="browse-system"
-                class=SELECT
-                prop:value=move || params.with(|params| params.system.clone())
-                on:change=choose
-            >
-                <option value="">"Choose a code system"</option>
-                {offered}
-            </select>
-        </div>
-    }
-    .into_any()
+    let select = view! {
+        <select
+            id="browse-system"
+            class=SELECT
+            prop:value=move || params.with(|params| params.system.clone())
+            on:change=choose
+        >
+            <option value="">"Choose a code system"</option>
+            {offered}
+        </select>
+    };
+    field("browse-system", "Code system", None, select).into_any()
 }
 
 /// A sentence stating what the server did not declare.
