@@ -119,13 +119,7 @@ pub(crate) fn ExpandPage() -> impl IntoView {
 
     let heading = view! {
         <Title text=tr(Msg::ExpandAValueSet) />
-        {page_header(
-            tr(Msg::ExpandAValueSet),
-            Some(
-                tr(Msg::WhichCodesValueSetHoldsFrom),
-            ),
-            (),
-        )}
+        {page_header(tr(Msg::ExpandAValueSet), Some(tr(Msg::WhichCodesValueSetHoldsFrom)), ())}
     }
     .into_any();
 
@@ -694,7 +688,9 @@ fn result_section(
                 {invitation()}
             </Show>
             <Show when=move || request.with(Option::is_some) fallback=|| ()>
-                <Reading label=&{tr(Msg::RunningTheExpansion)}>
+                <Reading label=&{
+                    tr(Msg::RunningTheExpansion)
+                }>
                     {move || {
                         let params = params.get();
                         let version = version.get();
@@ -865,7 +861,10 @@ fn concept_row(row: &ConceptRow, flagged: bool) -> AnyView {
                     {designation_list(&row.designations)}
                 </div>
             </td>
-            <td data-label=tr(Msg::System) class="fui-mono fui-small fui-muted sm:whitespace-nowrap">
+            <td
+                data-label=tr(Msg::System)
+                class="fui-mono fui-small fui-muted sm:whitespace-nowrap"
+            >
                 {system}
             </td>
             {flagged.then(|| view! { <td data-label=tr(Msg::Flags)>{flags}</td> })}
@@ -1002,11 +1001,7 @@ fn refusal_view(error: &FhirError) -> AnyView {
         .outcome()
         .is_some_and(|outcome| outcome.carries_code(TOO_COSTLY));
     let advice = if costly {
-        view! {
-            <p class="mt-default text-body">
-                {tr(Msg::ServerRefusedExpandSelectionLargeOne)}
-            </p>
-        }
+        view! { <p class="mt-default text-body">{tr(Msg::ServerRefusedExpandSelectionLargeOne)}</p> }
         .into_any()
     } else {
         ().into_any()

@@ -71,9 +71,7 @@ pub(crate) fn ValueSetsPage() -> impl IntoView {
         <Title text=tr(Msg::ValueSets) />
         {page_header(
             tr(Msg::ValueSets),
-            Some(
-                tr(Msg::ValuesetResourcesServerPublishesOpenOne),
-            ),
+            Some(tr(Msg::ValuesetResourcesServerPublishesOpenOne)),
             (),
         )}
     }
@@ -186,7 +184,9 @@ fn list_section(
                     <Transition fallback=|| ()>{announcement}</Transition>
                 </p>
             </div>
-            <Reading label=&{tr(Msg::ReadingTheValueSets)}>
+            <Reading label=&{
+                tr(Msg::ReadingTheValueSets)
+            }>
                 {move || {
                     let params = params.get();
                     let version = version.get();

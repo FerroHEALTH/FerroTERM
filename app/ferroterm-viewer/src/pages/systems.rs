@@ -80,9 +80,9 @@ pub(crate) fn SystemsPage() -> impl IntoView {
                 {tr(Msg::CodeSystemsRootServes)}
             </h2>
             {table_filter("systems-filter", tr(Msg::FilterNameCanonical), words, count.into())}
-            <Reading label=tr(Msg::ReadingTheTerminologyCapabilities)>
-                {move || listing().map(IntoAny::into_any)}
-            </Reading>
+            <Reading label=tr(
+                Msg::ReadingTheTerminologyCapabilities,
+            )>{move || listing().map(IntoAny::into_any)}</Reading>
         </section>
     }
 }

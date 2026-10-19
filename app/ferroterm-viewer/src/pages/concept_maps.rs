@@ -102,9 +102,7 @@ pub(crate) fn ConceptMapsPage() -> impl IntoView {
         <Title text=tr(Msg::ConceptMaps) />
         {page_header(
             tr(Msg::ConceptMaps),
-            Some(
-                tr(Msg::ConceptmapResourcesServerPublishesOpenOne),
-            ),
+            Some(tr(Msg::ConceptmapResourcesServerPublishesOpenOne)),
             (),
         )}
     }
@@ -248,7 +246,9 @@ fn list_section(
                     <Transition fallback=|| ()>{announcement}</Transition>
                 </p>
             </div>
-            <Reading label=&{tr(Msg::ReadingTheConceptMaps)}>
+            <Reading label=&{
+                tr(Msg::ReadingTheConceptMaps)
+            }>
                 {move || {
                     let params = params.get();
                     let version = version.get();

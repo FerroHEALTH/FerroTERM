@@ -396,8 +396,12 @@ fn tools_cell(card: &SystemCard, version: Signal<FhirVersion>) -> AnyView {
     let browse = walkable.then(|| link(BROWSE_PATH, tr(Msg::Browse)));
     // NOTE: no specification governs this: our own design; the screens a row
     // opens are links of the text's height, so a row stays one line tall.
-    view! { <span class="inline-flex gap-default">{browse} {link(VALIDATE_PATH, tr(Msg::Validate))}</span> }
-        .into_any()
+    view! {
+        <span class="inline-flex gap-default">
+            {browse} {link(VALIDATE_PATH, tr(Msg::Validate))}
+        </span>
+    }
+    .into_any()
 }
 
 /// The system, as the link onto its screen: the name a reader knows it by,

@@ -233,9 +233,7 @@ fn heading_section(subject: Memo<Subject>) -> AnyView {
             ferrohealth_ui::view::surface::page_heading(
                 ferrohealth_ui::view::surface::Header {
                     title: named(),
-                    subtitle: Some(
-                        tr(Msg::EveryVersionServerHoldsWhatAny),
-                    ),
+                    subtitle: Some(tr(Msg::EveryVersionServerHoldsWhatAny)),
                     crumbs: listing_crumb(&subject.get().resource_type).into_iter().collect(),
                     mono: true,
                 },
@@ -535,9 +533,10 @@ fn list_section(restoring: Restoring, opened: &Opened, writable: bool) -> AnyVie
     };
     let composed = if opened.support == Support::VersionRead {
         view! {
-            <p class=format!("mt-default {}", styles::HINT)>
-                {tr(Msg::ServerDeclaresVersionReadNotHistory)}
-            </p>
+            <p class=format!(
+                "mt-default {}",
+                styles::HINT,
+            )>{tr(Msg::ServerDeclaresVersionReadNotHistory)}</p>
         }
         .into_any()
     } else {
@@ -545,7 +544,10 @@ fn list_section(restoring: Restoring, opened: &Opened, writable: bool) -> AnyVie
     };
     let bounded = if opened.truncated {
         view! {
-            <p class=format!("mt-default {}", styles::HINT)>{tr(Msg::OnlyMostRecentVersionsListed)}</p>
+            <p class=format!(
+                "mt-default {}",
+                styles::HINT,
+            )>{tr(Msg::OnlyMostRecentVersionsListed)}</p>
         }
         .into_any()
     } else {
@@ -601,7 +603,10 @@ fn version_row(
                             disabled=move || restoring.in_flight.get()
                             on:click=restore_it
                         >
-                            {tr_with(Msg::RestoreVersion, &[("labelled", (labelled).clone().into())])}
+                            {tr_with(
+                                Msg::RestoreVersion,
+                                &[("labelled", (labelled).clone().into())],
+                            )}
                         </button>
                     }
                         .into_any()
@@ -633,9 +638,7 @@ fn unrestorable() -> AnyView {
         <span class=styles::ABSENT aria-hidden="true">
             {styles::ABSENT_MARK}
         </span>
-        <span class="sr-only">
-            {tr(Msg::VersionOneServerHoldsNowAccount)}
-        </span>
+        <span class="sr-only">{tr(Msg::VersionOneServerHoldsNowAccount)}</span>
     }
     .into_any()
 }
@@ -960,9 +963,7 @@ fn findings_section(client: &FhirClient, read: Resource<Result<Opened, FhirError
                     <h2 id="history-findings-heading" class="fui-card-title">
                         {tr(Msg::WhatLastSynchronisationFound)}
                     </h2>
-                    <p class="fui-muted">
-                        {tr(Msg::CodesResourceNamesReleaseSyncService)}
-                    </p>
+                    <p class="fui-muted">{tr(Msg::CodesResourceNamesReleaseSyncService)}</p>
                     <div class="mt-default overflow-x-auto">
                         <table class=styles::TABLE>
                             <thead>

@@ -67,7 +67,12 @@ pub(crate) fn FindPage() -> impl IntoView {
         {move || {
             let line = subject
                 .with(|subject| match subject {
-                    Some(subject) => tr_with(Msg::ReadFromShapeAlone, &[("subject", (subject.label()).clone().into())]),
+                    Some(subject) => {
+                        tr_with(
+                            Msg::ReadFromShapeAlone,
+                            &[("subject", (subject.label()).clone().into())],
+                        )
+                    }
                     None => tr(Msg::NothingWasTyped).clone(),
                 });
             page_header(tr(Msg::WhatDo), Some(line), ())

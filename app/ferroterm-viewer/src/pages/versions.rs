@@ -75,9 +75,9 @@ fn comparison_section(roots: [RootRead; 4]) -> AnyView {
                     {announcement}
                 </p>
             </div>
-            <Reading label=&{tr(Msg::ReadingFourCapabilityStatements)}>
-                {move || drawn(&answers(roots))}
-            </Reading>
+            <Reading label=&{
+                tr(Msg::ReadingFourCapabilityStatements)
+            }>{move || drawn(&answers(roots))}</Reading>
         </section>
     }
     .into_any()
@@ -283,12 +283,8 @@ fn root_notes_view(label: &str, notes: &[(String, String)]) -> AnyView {
         })
         .collect();
     let body = if count == 0 {
-        view! {
-            <p class="fui-muted">
-                {tr(Msg::RootAddedNothingDefinitionsReleasePublishes)}
-            </p>
-        }
-        .into_any()
+        view! { <p class="fui-muted">{tr(Msg::RootAddedNothingDefinitionsReleasePublishes)}</p> }
+            .into_any()
     } else {
         view! { <dl class="fui-facts">{lines}</dl> }.into_any()
     };

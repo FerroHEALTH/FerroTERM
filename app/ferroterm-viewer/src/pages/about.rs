@@ -48,13 +48,7 @@ pub(crate) fn AboutPage() -> impl IntoView {
     };
     view! {
         <Title text=tr(Msg::AboutThisServer) />
-        {page_header(
-            tr(Msg::AboutThisServer),
-            Some(
-                tr(Msg::WhatEachFhirRootDeclaresEvidence),
-            ),
-            (),
-        )}
+        {page_header(tr(Msg::AboutThisServer), Some(tr(Msg::WhatEachFhirRootDeclaresEvidence)), ())}
         {stack(
             view! {
                 {detail_tabs(tr(Msg::AboutThisServer), TABS, tab)}

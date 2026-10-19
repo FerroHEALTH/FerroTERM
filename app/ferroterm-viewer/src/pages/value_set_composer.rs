@@ -1509,7 +1509,7 @@ fn code_search(
         <div class="grid gap-tight">
             <form on:submit=submit>{search_row}</form>
             <Show when=move || offers.picking.get() == Some(key) fallback=|| ()>
-                <Reading label=&{tr(Msg::SearchingThatCodeSystem)}>{results}</Reading>
+                <Reading label=&{ tr(Msg::SearchingThatCodeSystem) }>{results}</Reading>
             </Show>
         </div>
     }
@@ -1638,9 +1638,7 @@ fn filter_rows(
                 when=move || !system.with(String::is_empty) && declared.with(Vec::is_empty)
                 fallback=|| ()
             >
-                <p class=styles::HINT>
-                    {tr(Msg::ServerDeclaresNoFilterCodeSystem)}
-                </p>
+                <p class=styles::HINT>{tr(Msg::ServerDeclaresNoFilterCodeSystem)}</p>
             </Show>
         </div>
     }
@@ -1908,7 +1906,7 @@ fn preview_section(
                 {tr(Msg::ThePreview)}
             </h2>
             {controls}
-            <Reading label=&{tr(Msg::ExpandingTheDefinition)}>{shown}</Reading>
+            <Reading label=&{ tr(Msg::ExpandingTheDefinition) }>{shown}</Reading>
         </section>
     }
     .into_any()
@@ -2130,8 +2128,16 @@ fn marked_expression(expression: &str, column: u32, editing: Editing) -> Option<
     Some(
         view! {
             <div class=format!("rounded-md p-loose {}", styles::NOTICE)>
-                <p class=styles::LABEL>{tr_with(Msg::AtCharacter, &[("form", (form).clone().into()), ("column", (column).to_string().into())])}</p>
-                <p class=format!("mt-tight {}", styles::CODE)>{before} <span class="font-semibold underline">{at}</span> {after}</p>
+                <p class=styles::LABEL>
+                    {tr_with(
+                        Msg::AtCharacter,
+                        &[("form", (form).clone().into()), ("column", (column).to_string().into())],
+                    )}
+                </p>
+                <p class=format!(
+                    "mt-tight {}",
+                    styles::CODE,
+                )>{before} <span class="font-semibold underline">{at}</span> {after}</p>
             </div>
         }
         .into_any(),

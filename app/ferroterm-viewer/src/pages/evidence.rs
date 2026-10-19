@@ -74,7 +74,10 @@ pub(crate) fn pane() -> AnyView {
     let stats = stat_grid(view! {
         {stat_card(Stat {
             glyph: Glyph::LIST_CHECKS,
-            value: tr_with(Msg::Of3, &[("passed", (passed).to_string().into()), ("ran", (ran).to_string().into())]),
+            value: tr_with(
+                Msg::Of3,
+                &[("passed", (passed).to_string().into()), ("ran", (ran).to_string().into())],
+            ),
             label: tr(Msg::EcosystemSuiteCasesPass).into(),
             href: None,
         })}
@@ -93,8 +96,7 @@ pub(crate) fn pane() -> AnyView {
     });
     view! {
         <p class="fui-muted">
-            {tr(Msg::ReadFromFilesRepositoryCommittedFerroterm)}
-            <strong>{evidence.release}</strong>
+            {tr(Msg::ReadFromFilesRepositoryCommittedFerroterm)} <strong>{evidence.release}</strong>
             {tr(Msg::NotFromServerAnsweringPageEach)}
         </p>
         {stats}

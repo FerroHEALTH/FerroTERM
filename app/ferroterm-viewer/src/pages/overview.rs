@@ -233,7 +233,10 @@ fn header(
             page_header(
                 tr(Msg::Dashboard),
                 Some(
-                    tr_with(Msg::CodeSystemsValueSetsConceptMaps, &[("version", (version.get().label()).to_string().into())]),
+                    tr_with(
+                        Msg::CodeSystemsValueSetsConceptMaps,
+                        &[("version", (version.get().label()).to_string().into())],
+                    ),
                 ),
                 (),
             )
@@ -293,9 +296,7 @@ fn stats(reads: Reads) -> AnyView {
             })}
         })
     };
-    view! {
-        <Transition fallback=|| skeleton(2, tr(Msg::ReadingWhatServerServes))>{cards}</Transition>
-    }
+    view! { <Transition fallback=|| skeleton(2, tr(Msg::ReadingWhatServerServes))>{cards}</Transition> }
     .into_any()
 }
 

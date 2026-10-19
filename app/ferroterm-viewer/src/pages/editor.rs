@@ -160,7 +160,9 @@ pub(crate) fn EditorPage() -> impl IntoView {
                     message(Msg::TitleCodeSystemEditor),
                     &mode(),
                     Header {
-                        subtitle: Some(tr(Msg::MetadataPropertiesDeclaresConceptsTheirDesignations)),
+                        subtitle: Some(
+                            tr(Msg::MetadataPropertiesDeclaresConceptsTheirDesignations),
+                        ),
                         crumbs: vec![Crumb::new(tr(Msg::CodeSystems), "/systems")],
                         ..Header::default()
                     },
@@ -404,7 +406,10 @@ fn standing_section(
     };
     view! {
         <Show when=move || readonly.get() fallback=|| ()>
-            <p class=format!("mt-default rounded-md p-default {}", styles::NOTICE)>{tr(Msg::ReadOnly)} {because}</p>
+            <p class=format!(
+                "mt-default rounded-md p-default {}",
+                styles::NOTICE,
+            )>{tr(Msg::ReadOnly)} {because}</p>
             {move || {
                 standing
                     .capability
@@ -509,9 +514,7 @@ fn validation_view(validation: &Validation) -> AnyView {
             <h2 id="editor-check-heading" class="fui-card-title">
                 {tr(Msg::WhatServerSaysAboutRetiredConcept)}
             </h2>
-            <p class="fui-muted">
-                {tr(Msg::CodesystemValidateCodeRunAgainstVersion)}
-            </p>
+            <p class="fui-muted">{tr(Msg::CodesystemValidateCodeRunAgainstVersion)}</p>
             <table class=format!("mt-default {}", styles::TABLE)>
                 <thead>
                     <tr>
@@ -670,36 +673,38 @@ fn properties_section(draft: RwSignal<Draft>, readonly: Signal<bool>, kinds: Cod
             <h2 id="editor-properties-heading" class="fui-card-title">
                 {tr(Msg::DeclaredProperties)}
             </h2>
-            <p class="fui-muted">
-                {tr(Msg::LifecyclePropertiesDeclaredEditorEverySave)}
-            </p>
+            <p class="fui-muted">{tr(Msg::LifecyclePropertiesDeclaredEditorEverySave)}</p>
             <Show
                 when=move || keys.with(|keys| !keys.is_empty())
-                fallback=|| empty_quiet(icon::CODE_SYSTEMS, tr(Msg::NoPropertiesTitle), tr(Msg::NoPropertiesLine))
+                fallback=|| empty_quiet(
+                    icon::CODE_SYSTEMS,
+                    tr(Msg::NoPropertiesTitle),
+                    tr(Msg::NoPropertiesLine),
+                )
             >
-            <table class=format!("mt-default {}", styles::TABLE)>
-                <thead>
-                    <tr>
-                        <th scope="col" class=styles::TH>
-                            {tr(Msg::Code)}
-                        </th>
-                        <th scope="col" class=styles::TH>
-                            {tr(Msg::IdentifierUri)}
-                        </th>
-                        <th scope="col" class=styles::TH>
-                            {tr(Msg::Type)}
-                        </th>
-                        <th scope="col" class=styles::TH>
-                            {tr(Msg::Remove)}
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <For each=move || keys.get() key=|key| *key let:key>
-                        {property_row(draft, key, readonly, kinds)}
-                    </For>
-                </tbody>
-            </table>
+                <table class=format!("mt-default {}", styles::TABLE)>
+                    <thead>
+                        <tr>
+                            <th scope="col" class=styles::TH>
+                                {tr(Msg::Code)}
+                            </th>
+                            <th scope="col" class=styles::TH>
+                                {tr(Msg::IdentifierUri)}
+                            </th>
+                            <th scope="col" class=styles::TH>
+                                {tr(Msg::Type)}
+                            </th>
+                            <th scope="col" class=styles::TH>
+                                {tr(Msg::Remove)}
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <For each=move || keys.get() key=|key| *key let:key>
+                            {property_row(draft, key, readonly, kinds)}
+                        </For>
+                    </tbody>
+                </table>
             </Show>
             <Show when=move || !readonly.get() fallback=|| ()>
                 <p class="mt-default">
@@ -876,18 +881,20 @@ fn concepts_section(draft: RwSignal<Draft>, readonly: Signal<bool>, kinds: Codes
             <h2 id="editor-concepts-heading" class="fui-card-title">
                 {tr(Msg::Concepts)}
             </h2>
-            <p class="fui-muted">
-                {tr(Msg::ConceptRetiredRatherThanRemovedSo)}
-            </p>
+            <p class="fui-muted">{tr(Msg::ConceptRetiredRatherThanRemovedSo)}</p>
             <Show
                 when=move || keys.with(|keys| !keys.is_empty())
-                fallback=|| empty_quiet(icon::CODE_SYSTEMS, tr(Msg::NoConceptsTitle), tr(Msg::NoConceptsLine))
+                fallback=|| empty_quiet(
+                    icon::CODE_SYSTEMS,
+                    tr(Msg::NoConceptsTitle),
+                    tr(Msg::NoConceptsLine),
+                )
             >
-            <div class="mt-default grid gap-default">
-                <For each=move || keys.get() key=|key| *key let:key>
-                    {concept_row(draft, key, readonly, kinds)}
-                </For>
-            </div>
+                <div class="mt-default grid gap-default">
+                    <For each=move || keys.get() key=|key| *key let:key>
+                        {concept_row(draft, key, readonly, kinds)}
+                    </For>
+                </div>
             </Show>
             <Show when=move || !readonly.get() fallback=|| ()>
                 <p class="mt-default">
@@ -1515,9 +1522,7 @@ fn save_section(
                 <h2 id="editor-save-heading" class="fui-card-title">
                     {tr(Msg::Save)}
                 </h2>
-                <p class="fui-muted">
-                    {tr(Msg::UpdateStatesVersionReplacesSoChange)}
-                </p>
+                <p class="fui-muted">{tr(Msg::UpdateStatesVersionReplacesSoChange)}</p>
                 <p class="mt-default">
                     <button
                         type="button"
@@ -1528,9 +1533,9 @@ fn save_section(
                     >
                         {move || {
                             if draft.read().id.is_empty() {
-                                {tr(Msg::CreateThisCodeSystem)}
+                                { tr(Msg::CreateThisCodeSystem) }
                             } else {
-                                {tr(Msg::SaveThisCodeSystem)}
+                                { tr(Msg::SaveThisCodeSystem) }
                             }
                         }}
                     </button>

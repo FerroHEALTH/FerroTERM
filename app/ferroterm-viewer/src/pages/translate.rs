@@ -111,13 +111,7 @@ pub(crate) fn TranslatePage() -> impl IntoView {
 
     let heading = view! {
         <Title text=tr(Msg::TranslateACode) />
-        {page_header(
-            tr(Msg::TranslateACode),
-            Some(
-                tr(Msg::OneCodeThroughConceptMapsServer),
-            ),
-            (),
-        )}
+        {page_header(tr(Msg::TranslateACode), Some(tr(Msg::OneCodeThroughConceptMapsServer)), ())}
     }
     .into_any();
 
@@ -259,7 +253,9 @@ fn runner_section(
             <h2 id="translate-heading" class="fui-card-title">
                 {tr(Msg::Parameters)}
             </h2>
-            <Reading label=&{tr(Msg::ReadingWhatRootCanDo)}>
+            <Reading label=&{
+                tr(Msg::ReadingWhatRootCanDo)
+            }>
                 {move || {
                     statement
                         .with(|answered| {
@@ -542,7 +538,9 @@ fn answer_block(
                     {move || announcement.get()}
                 </p>
             </div>
-            <Reading label=&{tr(Msg::RunningTheTranslation)}>
+            <Reading label=&{
+                tr(Msg::RunningTheTranslation)
+            }>
                 {move || {
                     translated
                         .with(|answered| {
@@ -632,7 +630,9 @@ fn match_row(found: &TranslationMatch) -> AnyView {
         .into_iter()
         .map(|relation| {
             view! {
-                <span title=tr(relation.label)>{badge(relationship_tone(Some(&relation.code)), &relation.code)}</span>
+                <span title=tr(
+                    relation.label,
+                )>{badge(relationship_tone(Some(&relation.code)), &relation.code)}</span>
             }
             .into_any()
         })

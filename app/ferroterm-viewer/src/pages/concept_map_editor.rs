@@ -324,7 +324,10 @@ fn standing_section(
     };
     view! {
         <Show when=move || readonly.get() fallback=|| ()>
-            <p class=format!("mt-default rounded-md p-default {}", styles::NOTICE)>{tr(Msg::ReadOnly)} {because}</p>
+            <p class=format!(
+                "mt-default rounded-md p-default {}",
+                styles::NOTICE,
+            )>{tr(Msg::ReadOnly)} {because}</p>
         </Show>
     }
     .into_any()
@@ -526,18 +529,29 @@ fn groups_section(
             <h2 id="map-groups-heading" class="fui-card-title">
                 {tr(Msg::Groups)}
             </h2>
-            <p class="fui-muted">
-                {tr(Msg::GroupMapsCodesOneSystemCodes)}
-            </p>
+            <p class="fui-muted">{tr(Msg::GroupMapsCodesOneSystemCodes)}</p>
             <Show
                 when=move || keys.with(|keys| !keys.is_empty())
-                fallback=|| empty_quiet(icon::CONCEPT_MAPS, tr(Msg::NoGroupsTitle), tr(Msg::NoGroupsLine))
+                fallback=|| empty_quiet(
+                    icon::CONCEPT_MAPS,
+                    tr(Msg::NoGroupsTitle),
+                    tr(Msg::NoGroupsLine),
+                )
             >
-            <div class="mt-default grid gap-default">
-                <For each=move || keys.get() key=|key| *key let:key>
-                    {group_panel(client, version, draft, key, readonly, options, preview, report)}
-                </For>
-            </div>
+                <div class="mt-default grid gap-default">
+                    <For each=move || keys.get() key=|key| *key let:key>
+                        {group_panel(
+                            client,
+                            version,
+                            draft,
+                            key,
+                            readonly,
+                            options,
+                            preview,
+                            report,
+                        )}
+                    </For>
+                </div>
             </Show>
             <Show when=move || !readonly.get() fallback=|| ()>
                 <p class="mt-default">
@@ -720,10 +734,7 @@ fn elements_view(
     view! {
         <div class="mt-default grid gap-default">
             <p class=styles::EYEBROW>{tr(Msg::Codes)}</p>
-            <Show
-                when=move || keys.with(Vec::is_empty)
-                fallback=|| ()
-            >
+            <Show when=move || keys.with(Vec::is_empty) fallback=|| ()>
                 {empty_quiet(icon::CONCEPT_MAPS, tr(Msg::NoElementsTitle), tr(Msg::NoElementsLine))}
             </Show>
             <For each=move || keys.get() key=|key| *key let:key>
@@ -1045,7 +1056,10 @@ fn target_row(
     );
     let fields = target_fields(draft, group, element, key, readonly, relationships, version);
     view! {
-        <div class=format!("p-default {}", styles::PANEL)>
+        <div class=format!(
+            "p-default {}",
+            styles::PANEL,
+        )>
             {fields} {picked} <Show when=move || !readonly.get() fallback=|| ()>
                 <p class="mt-default">
                     <button
@@ -1607,9 +1621,7 @@ fn save_section(
                 <h2 id="map-save-heading" class="fui-card-title">
                     {tr(Msg::Save)}
                 </h2>
-                <p class="fui-muted">
-                    {tr(Msg::UpdateStatesVersionReplacesSoChange)}
-                </p>
+                <p class="fui-muted">{tr(Msg::UpdateStatesVersionReplacesSoChange)}</p>
                 <Show when=move || !problems.read().is_empty() fallback=|| ()>
                     <ul class=format!("mt-default grid gap-tight {}", styles::MUTED)>{listed}</ul>
                 </Show>
@@ -1623,9 +1635,9 @@ fn save_section(
                     >
                         {move || {
                             if draft.read().id.is_empty() {
-                                {tr(Msg::CreateThisConceptMap)}
+                                { tr(Msg::CreateThisConceptMap) }
                             } else {
-                                {tr(Msg::SaveThisConceptMap)}
+                                { tr(Msg::SaveThisConceptMap) }
                             }
                         }}
                     </button>

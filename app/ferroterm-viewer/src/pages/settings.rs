@@ -77,9 +77,7 @@ pub(crate) fn pane() -> AnyView {
         {field(
             "viewer-display-language",
             tr(Msg::DisplayLanguage),
-            Some(
-                tr(Msg::Bcp47TagSentDisplaylanguageLeave),
-            ),
+            Some(tr(Msg::Bcp47TagSentDisplaylanguageLeave)),
             view! {
                 <input
                     id="viewer-display-language"

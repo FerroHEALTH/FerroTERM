@@ -304,7 +304,9 @@ fn overview_tab(search: Fetched<Document<CodeSystemSearch>>) -> AnyView {
             <h2 id="system-published-heading" class="fui-sr-only">
                 {tr(Msg::WhatCodeSystemSays)}
             </h2>
-            <Reading label=&{tr(Msg::ReadingThePublishedCodesystem)}>
+            <Reading label=&{
+                tr(Msg::ReadingThePublishedCodesystem)
+            }>
                 {move || {
                     search
                         .with(|answered| {
@@ -339,7 +341,9 @@ fn support_tab(system: Signal<String>, capabilities: Fetched<TerminologyCapabili
             <h2 id="system-capability-heading" class="fui-sr-only">
                 {tr(Msg::WhatServerCanDo)}
             </h2>
-            <Reading label=&{tr(Msg::ReadingTheTerminologyCapabilities)}>
+            <Reading label=&{
+                tr(Msg::ReadingTheTerminologyCapabilities)
+            }>
                 {move || {
                     capabilities
                         .with(|answered| {
@@ -365,7 +369,9 @@ fn support_tab(system: Signal<String>, capabilities: Fetched<TerminologyCapabili
 /// The published resources as the server sent them.
 fn json_tab(search: Fetched<Document<CodeSystemSearch>>) -> AnyView {
     view! {
-        <Reading label=&{tr(Msg::ReadingThePublishedCodesystem)}>
+        <Reading label=&{
+            tr(Msg::ReadingThePublishedCodesystem)
+        }>
             {move || {
                 search
                     .with(|answered| {

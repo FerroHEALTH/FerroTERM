@@ -48,7 +48,9 @@ pub(crate) fn health_indicator() -> impl IntoView {
                     health
                         .get()
                         .map(|answered| match answered {
-                            Ok(_code) => status(Tone::Ok, icon::SERVING, &tr(Msg::Serving), None).into_any(),
+                            Ok(_code) => {
+                                status(Tone::Ok, icon::SERVING, &tr(Msg::Serving), None).into_any()
+                            }
                             Err(error) => {
                                 let detail = error
                                     .status()

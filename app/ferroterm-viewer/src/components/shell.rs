@@ -323,7 +323,12 @@ fn operator(console: Console) -> AnyView {
 fn bar(version: Signal<FhirVersion>, back: Signal<String>, console: Console) -> AnyView {
     let start = view! {
         {drawer_button(NAV_ID)}
-        {lockup("/", brand_mark("/mark-light.svg", "/mark-dark.svg"), "FerroTERM", tr(Msg::Console))}
+        {lockup(
+            "/",
+            brand_mark("/mark-light.svg", "/mark-dark.svg"),
+            "FerroTERM",
+            tr(Msg::Console),
+        )}
     }
     .into_any();
     let end = view! {

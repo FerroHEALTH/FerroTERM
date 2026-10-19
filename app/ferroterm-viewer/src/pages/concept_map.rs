@@ -216,7 +216,9 @@ fn header(
 /// The facts the map declares and the groups it is made of.
 fn overview_tab(read: Fetched<Document<PublishedConceptMap>>) -> AnyView {
     view! {
-        <Reading label=&{tr(Msg::ReadingTheConceptMap)}>
+        <Reading label=&{
+            tr(Msg::ReadingTheConceptMap)
+        }>
             {move || {
                 read.with(|answered| {
                     answered
@@ -303,7 +305,9 @@ fn groups_view(groups: &[GroupRow]) -> AnyView {
 /// Every mapping the map writes, with a filter over them.
 fn mappings_tab(read: Fetched<Document<PublishedConceptMap>>) -> AnyView {
     view! {
-        <Reading label=&{tr(Msg::ReadingTheConceptMap)}>
+        <Reading label=&{
+            tr(Msg::ReadingTheConceptMap)
+        }>
             {move || {
                 read.with(|answered| {
                     answered
@@ -445,7 +449,9 @@ fn mapping_row(row: &MappingRow) -> AnyView {
 /// The resource as the server sent it.
 fn json_tab(read: Fetched<Document<PublishedConceptMap>>) -> AnyView {
     view! {
-        <Reading label=&{tr(Msg::ReadingTheConceptMap)}>
+        <Reading label=&{
+            tr(Msg::ReadingTheConceptMap)
+        }>
             {move || {
                 read.with(|answered| {
                     answered

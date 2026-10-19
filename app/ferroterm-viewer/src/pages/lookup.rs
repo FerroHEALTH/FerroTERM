@@ -154,9 +154,7 @@ pub(crate) fn LookupPage() -> impl IntoView {
         <Title text=tr(Msg::LookUpACode) />
         {page_header(
             tr(Msg::LookUpACode),
-            Some(
-                tr(Msg::CodeSDisplayDesignationsPropertiesFrom),
-            ),
+            Some(tr(Msg::CodeSDisplayDesignationsPropertiesFrom)),
             (),
         )}
         {stack(
@@ -341,7 +339,7 @@ fn answer_panel(
             <h2 id="lookup-answer-heading" class="fui-sr-only">
                 {tr(Msg::TheConcept)}
             </h2>
-            <Reading label=&{tr(Msg::LookingTheCodeUp)}>{drawn}</Reading>
+            <Reading label=&{ tr(Msg::LookingTheCodeUp) }>{drawn}</Reading>
         </section>
     }
     .into_any()
@@ -468,7 +466,9 @@ fn designations_table(designations: &[DesignationRow]) -> AnyView {
                             {uses
                                 .then(|| {
                                     view! {
-                                        <td data-label=tr(Msg::Use)>
+                                        <td data-label=tr(
+                                            Msg::Use,
+                                        )>
                                             {designation
                                                 .usage
                                                 .clone()

@@ -214,7 +214,9 @@ fn header(
 /// The facts the resource declares and the clauses its definition holds.
 fn overview_tab(read: Fetched<Document<PublishedValueSet>>) -> AnyView {
     view! {
-        <Reading label=&{tr(Msg::ReadingTheValueSet)}>
+        <Reading label=&{
+            tr(Msg::ReadingTheValueSet)
+        }>
             {move || {
                 read.with(|answered| {
                     answered
@@ -395,7 +397,7 @@ fn expansion_tab(
             })
         })
     };
-    view! { <Reading label=&{tr(Msg::ExpandingTheValueSet)}>{drawn}</Reading> }.into_any()
+    view! { <Reading label=&{ tr(Msg::ExpandingTheValueSet) }>{drawn}</Reading> }.into_any()
 }
 
 /// The preview table of an expansion, with the way into the runner.
@@ -483,7 +485,9 @@ fn preview(
 /// The resource as the server sent it.
 fn json_tab(read: Fetched<Document<PublishedValueSet>>) -> AnyView {
     view! {
-        <Reading label=&{tr(Msg::ReadingTheValueSet)}>
+        <Reading label=&{
+            tr(Msg::ReadingTheValueSet)
+        }>
             {move || {
                 read.with(|answered| {
                     answered

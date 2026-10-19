@@ -169,13 +169,7 @@ pub(crate) fn ValidatePage() -> impl IntoView {
 
     let heading = view! {
         <Title text=tr(Msg::CheckACode) />
-        {page_header(
-            tr(Msg::CheckACode),
-            Some(
-                tr(Msg::WhetherCodeValidCodeSystemValue),
-            ),
-            (),
-        )}
+        {page_header(tr(Msg::CheckACode), Some(tr(Msg::WhetherCodeValidCodeSystemValue)), ())}
     }
     .into_any();
 
@@ -446,7 +440,9 @@ fn root_section(
 
     let body = move || {
         view! {
-            <Reading label=&{tr(Msg::ReadingWhatRootDeclares)}>
+            <Reading label=&{
+                tr(Msg::ReadingWhatRootDeclares)
+            }>
                 {move || {
                     let refusal = capabilities
                         .with(|answered| answered.as_ref()?.as_ref().err().cloned())
@@ -472,11 +468,7 @@ fn root_section(
                 params
                     .with(|params| {
                         if params.system.is_empty() {
-                            view! {
-                                <p class="fui-muted">
-                                    {tr(Msg::NoCodeSystemNamedYetChoose)}
-                                </p>
-                            }
+                            view! { <p class="fui-muted">{tr(Msg::NoCodeSystemNamedYetChoose)}</p> }
                                 .into_any()
                         } else {
                             let target = system_link(&params.system, version.get());
@@ -583,7 +575,9 @@ fn validate_section(
                         <Transition fallback=|| ()>{announcement}</Transition>
                     </p>
                 </div>
-                <Reading label=&{tr(Msg::RunningTheValidation)}>
+                <Reading label=&{
+                    tr(Msg::RunningTheValidation)
+                }>
                     {move || {
                         answer
                             .with(|answered| {
@@ -591,9 +585,7 @@ fn validate_section(
                                     .as_ref()
                                     .map(|answer| match answer {
                                         None => {
-                                            invitation(
-                                                tr(Msg::NameCodeResourceCheckAgainstThen),
-                                            )
+                                            invitation(tr(Msg::NameCodeResourceCheckAgainstThen))
                                         }
                                         Some(Ok(value)) => validation_view(&value.validation()),
                                         Some(Err(error)) => failure_view(error),
@@ -620,9 +612,7 @@ fn validate_section(
                 if offered.get().declared {
                     body()
                 } else {
-                    note(
-                        tr(Msg::RootSCapabilityStatementDoesNot3),
-                    )
+                    note(tr(Msg::RootSCapabilityStatementDoesNot3))
                 }
             }}
         </section>
@@ -967,7 +957,9 @@ fn subsumes_section(
                         <Transition fallback=|| ()>{announcement}</Transition>
                     </p>
                 </div>
-                <Reading label=&{tr(Msg::RunningTheSubsumptionTest)}>
+                <Reading label=&{
+                    tr(Msg::RunningTheSubsumptionTest)
+                }>
                     {move || {
                         let (code_a, code_b) = params
                             .with(|params| (params.code_a.clone(), params.code_b.clone()));
@@ -976,9 +968,7 @@ fn subsumes_section(
                                 answered
                                     .as_ref()
                                     .map(|answer| match answer {
-                                        None => {
-                                            invitation(tr(Msg::NameTwoCodesSystemRunThem))
-                                        }
+                                        None => invitation(tr(Msg::NameTwoCodesSystemRunThem)),
                                         Some(Ok(value)) => outcome_view(value, &code_a, &code_b),
                                         Some(Err(error)) => failure_view(error),
                                     })
@@ -1002,15 +992,11 @@ fn subsumes_section(
             </h2>
             {move || {
                 if !offered.get().declared {
-                    note(
-                        tr(Msg::RootSCapabilityStatementDoesNot2),
-                    )
+                    note(tr(Msg::RootSCapabilityStatementDoesNot2))
                 } else if runs.get() {
                     panel()
                 } else {
-                    note(
-                        tr(Msg::RunnerOffersSubsumesOnlyCodeSystem),
-                    )
+                    note(tr(Msg::RunnerOffersSubsumesOnlyCodeSystem))
                 }
             }}
         </section>

@@ -52,11 +52,12 @@ impl History {
                         .with(|held| held.entries().iter().map(row).collect());
                     view! {
                         <details class="mt-loose rounded-md border border-edge text-small">
-                            <summary class=format!("cursor-pointer px-default py-tight font-medium {}", styles::MUTED)>{tr(Msg::RunsMadePage)}</summary>
+                            <summary class=format!(
+                                "cursor-pointer px-default py-tight font-medium {}",
+                                styles::MUTED,
+                            )>{tr(Msg::RunsMadePage)}</summary>
                             <div class="border-t border-edge px-default py-tight">
-                                <p class=styles::HINT>
-                                    {tr(Msg::EachOneAddressMadeTheyLive)}
-                                </p>
+                                <p class=styles::HINT>{tr(Msg::EachOneAddressMadeTheyLive)}</p>
                                 <ul class="mt-default grid gap-tight">{rows}</ul>
                             </div>
                         </details>

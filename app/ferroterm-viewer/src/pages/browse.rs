@@ -132,9 +132,7 @@ pub(crate) fn BrowsePage() -> impl IntoView {
             {page_heading(
                 Header {
                     title: tr(Msg::BrowseConcepts),
-                    subtitle: Some(
-                        tr(Msg::SearchCodeSystemReadConceptWalk),
-                    ),
+                    subtitle: Some(tr(Msg::SearchCodeSystemReadConceptWalk)),
                     crumbs: vec![Crumb::new(tr(Msg::CodeSystems), "/systems")],
                     mono: false,
                 },
@@ -423,7 +421,9 @@ fn system_section(
                             })
                     }}
                 </p>
-                <Reading label=&{tr(Msg::ReadingTheTerminologyCapabilities)}>
+                <Reading label=&{
+                    tr(Msg::ReadingTheTerminologyCapabilities)
+                }>
                     {move || {
                         capabilities
                             .with(|answered| {
@@ -434,11 +434,7 @@ fn system_section(
                                             declared
                                                 .with(|declared| match &declared.row {
                                                     Some(row) => version_view(row, &declared.hierarchy),
-                                                    None => {
-                                                        note(
-                                                            tr(Msg::RootSTerminologyCapabilitiesDeclareNo),
-                                                        )
-                                                    }
+                                                    None => note(tr(Msg::RootSTerminologyCapabilitiesDeclareNo)),
                                                 })
                                         }
                                         Err(error) => failure_view(error),
@@ -537,9 +533,7 @@ fn language_view(
     view! {
         {move || {
             if offered.with(Vec::is_empty) {
-                note(
-                    tr(Msg::VersionDeclaresNoDesignationLanguageSo),
-                )
+                note(tr(Msg::VersionDeclaresNoDesignationLanguageSo))
             } else {
                 picker()
             }
@@ -612,9 +606,7 @@ fn search_section(
                     {ferrohealth_ui::view::form::field(
                         "browse-filter",
                         tr(Msg::Filter),
-                        Some(
-                            tr(Msg::SentFilterParameterExpandOverValue),
-                        ),
+                        Some(tr(Msg::SentFilterParameterExpandOverValue)),
                         view! {
                             <div class="fui-search">
                                 <input
@@ -637,7 +629,9 @@ fn search_section(
                 <p aria-live="polite" class="fui-muted fui-small">
                     <Transition fallback=|| ()>{announcement}</Transition>
                 </p>
-                <Reading label=&{tr(Msg::SearchingTheCodeSystem)}>
+                <Reading label=&{
+                    tr(Msg::SearchingTheCodeSystem)
+                }>
                     {move || {
                         let params = params.get();
                         let version = version.get();
@@ -740,7 +734,9 @@ fn concept_section(
 
     let answered = move || {
         view! {
-            <Reading label=&{tr(Msg::ReadingTheConcept)}>
+            <Reading label=&{
+                tr(Msg::ReadingTheConcept)
+            }>
                 {move || {
                     let version = version.get();
                     let walked = declared.with(|declared| declared.hierarchy.walk().is_some());
@@ -749,7 +745,9 @@ fn concept_section(
                             answered
                                 .as_ref()
                                 .map(|answer| match answer {
-                                    None => busy(tr(Msg::ReadingTheConcept), Busy::Section).into_any(),
+                                    None => {
+                                        busy(tr(Msg::ReadingTheConcept), Busy::Section).into_any()
+                                    }
                                     Some((asked, Ok(value))) => {
                                         params
                                             .with(|params| {
@@ -780,9 +778,7 @@ fn concept_section(
                     if asked.get() {
                         answered()
                     } else {
-                        note(
-                            tr(Msg::ChooseConceptFromSearchResultsRead),
-                        )
+                        note(tr(Msg::ChooseConceptFromSearchResultsRead))
                     }
                 }}
             </section>
@@ -1193,7 +1189,9 @@ fn tree_pane(
                 {tr(Msg::BelowThisConcept)}
             </h2>
             <p class="fui-help">{tr(Msg::ArrowKeysWalkEnterReadsConcept)}</p>
-            <Reading label=&{tr(Msg::ReadingTheChildren)}>
+            <Reading label=&{
+                tr(Msg::ReadingTheChildren)
+            }>
                 {move || {
                     let Some(rows) = drawn.get() else {
                         return busy(tr(Msg::ReadingTheChildren), Busy::Section).into_any();
