@@ -139,6 +139,14 @@ stragglers to the next milestone). Every en-route issue goes in the CURRENT
 milestone, never the next. New `vX.Y.Z` milestones get a due date (the board's
 Roadmap view places items by it, via `scripts/gh/project.sh sync-dates`).
 
+**The release workflow enforces both ends.** Its `plan` job refuses a tag
+when no milestone is titled exactly as the tag or that milestone still holds
+an open issue or pull request, and names each one. Its last job closes the
+milestone once every leg has succeeded, crates.io included, so a published
+release never leaves its milestone open. Both call
+`scripts/release/milestone.sh` (`docs/release.md`). After a manual or
+recovery release, check that the milestone is closed.
+
 ## The fix-first cadence
 
 **An issue filed while working a unit is FIXED before the next unit starts.**

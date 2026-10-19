@@ -661,6 +661,7 @@ jobs:
           bash scripts/release/changelog.sh --self-test
           bash scripts/checks/changelog-guard.sh --self-test
           bash scripts/release/changelog.sh --check
+          bash scripts/release/milestone.sh --self-test
 
   # A pull request records its user-visible effect as a fragment under
   # changelog.d/, or as an edit of CHANGELOG.md while pull requests opened
