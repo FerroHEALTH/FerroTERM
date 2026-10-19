@@ -132,7 +132,7 @@ bundle.
 
 The budget is 1.1 MiB, set with the console's first measured release
 bundle: 1071380 bytes on ferrohealth-ui 0.1.4 (2026-10-19, cargo-leptos
-0.3.11, wasm-bindgen 0.2.129, Rust 1.98.0), 1068012 on 0.1.3, 1066218 on
+0.3.11, wasm-bindgen 0.2.129, Rust 1.98.0), 1071227 on 0.1.5, 1068012 on 0.1.3, 1066218 on
 0.1.2, 1025446 on 0.1.1. The client-side reader and editor bundles it replaced were 534059 and
 798540 bytes gzipped. FerroTERM issue 733 tracks winning headroom back. A
 change that needs more raises the budget here, in its own pull request, with
