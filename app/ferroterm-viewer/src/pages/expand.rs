@@ -12,17 +12,15 @@ use crate::components::NOT_DECLARED;
 use crate::components::failure::Failure;
 use crate::components::field::CANONICAL_WORDS;
 use crate::components::field::Field;
-use crate::components::field::Help;
+use crate::components::field::LANGUAGE_EXAMPLE;
 use crate::components::field::check_field;
 use crate::components::field::group;
-use crate::components::field::help_toggle;
 use crate::components::field::note;
 use crate::components::field::number_field;
 use crate::components::field::picked_field;
 use crate::components::field::text_field;
+use crate::components::field::text_field_showing;
 use crate::components::icon;
-use crate::components::icon::Glyph;
-use crate::components::icon::Icon;
 use crate::components::reading::Reading;
 use crate::components::runs::History;
 use crate::components::shell::SelectedVersion;
@@ -55,6 +53,19 @@ use crate::runs::Run;
 use crate::settings::Settings;
 use crate::settings::parse_page_size;
 use crate::styles;
+use ferrohealth_ui::table::model::filled_columns;
+use ferrohealth_ui::table::model::{Noun, OpenWindow, Paging, Window};
+use ferrohealth_ui::table::view::{
+    Body, Column, DataTable, Listing, Step, data_table, open_pager, step_label,
+};
+use ferrohealth_ui::tone::Tone;
+use ferrohealth_ui::view::button::Variant;
+use ferrohealth_ui::view::empty::empty_quiet;
+use ferrohealth_ui::view::layout::bullet_list;
+use ferrohealth_ui::view::notice::{Announce, notice};
+use ferrohealth_ui::view::status::badge;
+use ferrohealth_ui::view::surface::{card, page_header, panel_body, stack};
+use ferrohealth_ui::widget::help::help_switch;
 
 /// The runner's own path below the router base.
 const RUNNER_PATH: &str = "expand";
@@ -64,6 +75,14 @@ const RUNNER_PATH: &str = "expand";
 /// "The operation was refused because the value set is too costly to expand"
 /// (<https://hl7.org/fhir/R4B/valueset-issue-type.html>).
 const TOO_COSTLY: &str = "too-costly";
+
+/// The columns of the concept table.
+const CONCEPT_COLUMNS: [Column; 4] = [
+    Column::text("code", "Code"),
+    Column::text("display", "Display"),
+    Column::text("system", "System"),
+    Column::text("flags", "Flags"),
+];
 
 /// Runs `ValueSet/$expand` and walks the pages of its answer.
 ///
@@ -80,7 +99,7 @@ const TOO_COSTLY: &str = "too-costly";
 pub(crate) fn ExpandPage() -> impl IntoView {
     let client = expect_context::<FhirClient>();
     let SelectedVersion(version) = expect_context::<SelectedVersion>();
-    let settings = expect_context::<Settings>();
+    let page_size = expect_context::<Settings>().page_size;
 
     // A submit is a navigation onto this same path, which `leptos_router`
     // answers by updating the query without re-running this body, so the
@@ -89,17 +108,23 @@ pub(crate) fn ExpandPage() -> impl IntoView {
     // so an unrelated write to the stored page size would otherwise re-issue
     // an identical `$expand`.
     let query = use_query_map();
-    let params: Signal<RunnerParams> = Memo::new(move |_| {
-        query.with(|map| RunnerParams::read(&|name| map.get(name), settings.page_size.get()))
-    })
-    .into();
+    let params: Signal<RunnerParams> =
+        Memo::new(move |_| query.with(|map| RunnerParams::read(&|name| map.get(name), page_size)))
+            .into();
     let request: Signal<Option<ExpandRequest>> =
         Memo::new(move |_| params.with(RunnerParams::request)).into();
 
     let heading = view! {
-        <Title text="List a value set" />
-        <h1 class=styles::PAGE_TITLE>"List a value set"</h1>
-        <p class=styles::LEAD>"Which codes are in it, a page at a time."</p>
+        <Title text="Expand a value set" />
+        {page_header(
+            "Expand a value set",
+            Some(
+                String::from(
+                    "Which codes a value set holds, from this server's $expand, a page at a time.",
+                ),
+            ),
+            (),
+        )}
     }
     .into_any();
 
@@ -129,10 +154,13 @@ pub(crate) fn ExpandPage() -> impl IntoView {
     // happens in.
     view! {
         {heading}
-        <div class="mt-loose grid items-start gap-loose lg:grid-cols-[24rem_minmax(0,1fr)]">
-            <div class="min-w-0">{form} {history.view()}</div>
-            <div class="min-w-0">{results}</div>
-        </div>
+        {stack(
+            view! {
+                {form}
+                {results}
+                {history.view()}
+            },
+        )}
     }
 }
 
@@ -445,23 +473,23 @@ fn form_section(
         );
     };
 
-    provide_context(Help(RwSignal::new(false)));
+    let _help = ferrohealth_ui::widget::help::provide_help();
 
-    view! {
-        <form class="mt-loose grid gap-loose" on:submit=submit>
+    let form = view! {
+        <form class="fui-form" on:submit=submit>
             {value_set_group(canonical, seeds, value_sets)}
-            {selection_group(filter, active_only, seeds)}
-            {answer_group(count, language, designations, seeds, params)}
-            <div class="flex flex-wrap items-center gap-default">
-                <button type="submit" class=styles::SUBMIT>
-                    <Icon glyph=icon::EXPAND />
+            {selection_group(filter, language, active_only, seeds)}
+            {answer_group(count, designations, seeds, params)}
+            <div class="fui-cluster">
+                <button type="submit" class=Variant::Primary.class()>
+                    {ferrohealth_ui::icon::icon(icon::EXPAND, "16")}
                     "Run the expansion"
                 </button>
-                {help_toggle()}
+                {help_switch()}
             </div>
         </form>
-    }
-    .into_any()
+    };
+    card("Parameters", form).into_any()
 }
 
 /// Which value set the run expands.
@@ -470,27 +498,35 @@ fn value_set_group(
     seeds: Seeds,
     value_sets: Memo<Vec<Choice>>,
 ) -> AnyView {
-    group(
-        "Value set",
-        vec![picked_field(
-            Field {
-                id: "expand-url",
-                name: "url",
-                label: "Value set",
-                hint: "The url parameter of $expand. The list is what this root publishes; an implicit canonical carrying its own query string is typed, and the runner encodes the whole value.",
-            },
-            canonical,
-            seeds.url,
-            value_sets,
-            CANONICAL_WORDS,
-        )],
-    )
+    let picker = view! {
+        <div>
+            {picked_field(
+                Field {
+                    id: "expand-url",
+                    name: "url",
+                    label: "Value set",
+                    hint: "The url parameter of $expand. The list is what this root publishes; an implicit canonical carrying its own query string is typed, and the runner encodes the whole value.",
+                },
+                canonical,
+                seeds.url,
+                value_sets,
+                CANONICAL_WORDS,
+            )}
+        </div>
+    }
+    .into_any();
+    group("The value set", vec![picker])
 }
 
 /// What the run selects out of it.
-fn selection_group(filter: NodeRef<Input>, active_only: NodeRef<Input>, seeds: Seeds) -> AnyView {
+fn selection_group(
+    filter: NodeRef<Input>,
+    language: NodeRef<Input>,
+    active_only: NodeRef<Input>,
+    seeds: Seeds,
+) -> AnyView {
     let controls = view! {
-        <div class="grid gap-default sm:grid-cols-2">
+        <div class="fui-columns">
             {text_field(
                 Field {
                     id: "expand-filter",
@@ -501,6 +537,19 @@ fn selection_group(filter: NodeRef<Input>, active_only: NodeRef<Input>, seeds: S
                 filter,
                 seeds.filter,
             )}
+            {text_field_showing(
+                Field {
+                    id: "expand-display-language",
+                    name: "displayLanguage",
+                    label: "Display language",
+                    hint: "A BCP 47 tag. Left empty, the server picks its own display.",
+                },
+                language,
+                seeds.display_language,
+                Some(LANGUAGE_EXAMPLE),
+            )}
+        </div>
+        <div>
             {check_field(
                 Field {
                     id: "expand-active-only",
@@ -520,7 +569,6 @@ fn selection_group(filter: NodeRef<Input>, active_only: NodeRef<Input>, seeds: S
 /// How the answer is paged and written.
 fn answer_group(
     count: NodeRef<Input>,
-    language: NodeRef<Input>,
     designations: NodeRef<Input>,
     seeds: Seeds,
     params: Signal<RunnerParams>,
@@ -536,7 +584,7 @@ fn answer_group(
         })
     });
     let controls = view! {
-        <div class="grid gap-default sm:grid-cols-2">
+        <div class="fui-columns">
             {number_field(
                 Field {
                     id: "expand-count",
@@ -547,16 +595,6 @@ fn answer_group(
                 count,
                 seeds.count,
                 MAX_COUNT,
-            )}
-            {text_field(
-                Field {
-                    id: "expand-display-language",
-                    name: "displayLanguage",
-                    label: "Display language",
-                    hint: "A BCP 47 tag. Left empty, the server picks its own display.",
-                },
-                language,
-                seeds.display_language,
             )}
             {check_field(
                 Field {
@@ -588,21 +626,22 @@ fn result_section(
     request: Signal<Option<ExpandRequest>>,
 ) -> AnyView {
     let read_client = client.clone();
-    let expansion = LocalResource::new(move || {
-        let client = read_client.clone();
-        let version = version.get();
-        let request = request.get();
-        async move {
-            match request {
-                Some(request) => Some(client.expand(version, &request).await),
-                None => None,
+    let expansion = Resource::new(
+        move || (version.get(), request.get()),
+        move |(version, request)| {
+            let client = read_client.clone();
+            async move {
+                match request {
+                    Some(request) => Some(client.expand(version, &request).await),
+                    None => None,
+                }
             }
-        }
-    });
+        },
+    );
 
     // The live region is in the document before the read settles, which is
     // what lets a screen reader announce the count when it arrives.
-    let announcement = Memo::new(move |_| {
+    let announcement = move || {
         let params = params.get();
         expansion.with(|answered| {
             answered
@@ -613,16 +652,18 @@ fn result_section(
                 .map(|expansion| count_sentence(&expansion, &params))
                 .unwrap_or_default()
         })
-    });
+    };
 
     view! {
-        <section class="mt-section" aria-labelledby="expansion-heading">
-            <h2 id="expansion-heading" class=styles::SECTION_TITLE>
-                "The expansion"
-            </h2>
-            <p aria-live="polite" class="mt-default text-body text-muted">
-                {announcement}
-            </p>
+        <section class="fui-card fui-panel" aria-labelledby="expansion-heading">
+            <div class="fui-panel-head">
+                <h2 id="expansion-heading" class="fui-card-title">
+                    "The expansion"
+                </h2>
+                <p aria-live="polite" class="fui-muted fui-small">
+                    <Transition fallback=|| ()>{announcement}</Transition>
+                </p>
+            </div>
             <Show when=move || request.with(Option::is_none) fallback=|| ()>
                 {invitation()}
             </Show>
@@ -651,9 +692,12 @@ fn result_section(
 
 /// What the screen says before a canonical has been typed.
 fn invitation() -> AnyView {
-    crate::components::state::invitation(
+    panel_body(empty_quiet(
+        icon::EXPAND,
+        "No expansion yet",
         "Name a value set above and run it. The canonical is sent exactly as you type it, so an implicit form a code system defines works here too.",
-    )
+    ))
+    .into_any()
 }
 
 /// The page, the mark saying what it leaves out, and the echoed parameters.
@@ -663,11 +707,11 @@ fn expansion_view(
     version: FhirVersion,
 ) -> AnyView {
     let Some(expansion) = value.expansion() else {
-        return view! {
-            <p class="mt-default text-body text-muted">
-                "The server answered a ValueSet carrying no expansion, so there is nothing to page through."
-            </p>
-        }
+        return panel_body(empty_quiet(
+            icon::EXPAND,
+            "No expansion",
+            "The server answered a ValueSet carrying no expansion, so there is nothing to page through.",
+        ))
         .into_any();
     };
     let unclosed = expansion
@@ -693,8 +737,7 @@ fn expansion_view(
     view! {
         {unclosed}
         {table}
-        {pager}
-        {echoed}
+        <div class="fui-panel-body fui-stack">{pager} {echoed}</div>
     }
     .into_any()
 }
@@ -707,19 +750,22 @@ fn unclosed_view(unclosed: &Unclosed) -> AnyView {
         .map(|reason| view! { <li>{reason.clone()}</li> }.into_any())
         .collect();
     let stated = if reasons.is_empty() {
-        view! { <p class="mt-tight">"The server stated no reason for it."</p> }.into_any()
+        view! { <p>"The server stated no reason for it."</p> }.into_any()
     } else {
-        view! { <ul class="mt-tight ml-loose list-disc">{reasons}</ul> }.into_any()
+        bullet_list(reasons)
     };
-    view! {
-        <div role="note" class=format!("mt-default rounded-md p-default {}", styles::NOTICE)>
-            <p class="font-medium">"Unclosed expansion"</p>
-            <p class="mt-tight">
-                "This value set admits codes the expansion does not list, so a code missing from the table below is not a code this server rejects."
+    panel_body(notice(
+        Tone::Warn,
+        Announce::Status,
+        None,
+        view! {
+            <p>
+                <strong>"Unclosed expansion: "</strong>
+                "this value set admits codes the expansion does not list, so a code missing from the table below is not a code this server rejects."
             </p>
             {stated}
-        </div>
-    }
+        },
+    ))
     .into_any()
 }
 
@@ -730,43 +776,44 @@ fn unclosed_view(unclosed: &Unclosed) -> AnyView {
 /// key it retained would be moved rather than re-rendered, and a concept whose
 /// code repeats on the next page would keep the row it had.
 fn concepts_table(rows: &[ConceptRow]) -> AnyView {
-    if rows.is_empty() {
-        return view! {
-            <p class="mt-default text-body text-muted">
-                "This page holds no concepts. A page past the end of a selection is empty, and so is a filter nothing matches."
-            </p>
-        }
-        .into_any();
-    }
-    let body: Vec<AnyView> = rows.iter().map(concept_row).collect();
-    view! {
-        <div class="mt-default overflow-x-auto">
-            <table class="w-full border-collapse text-left text-body">
-                <thead>
-                    <tr class="border-b border-line-strong">
-                        <th scope="col" class="py-default pr-default font-medium">
-                            "Code"
-                        </th>
-                        <th scope="col" class="py-default pr-default font-medium">
-                            "Display"
-                        </th>
-                        <th scope="col" class="py-default pr-default font-medium">
-                            "System"
-                        </th>
-                        <th scope="col" class="py-default font-medium">
-                            "Flags"
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>{body}</tbody>
-            </table>
-        </div>
-    }
+    // No page flags every concept, so the column is drawn only when one does.
+    let columns = filled_columns(
+        &CONCEPT_COLUMNS,
+        rows,
+        &["code", "display", "system"],
+        |row, _| !flags(row).is_empty(),
+    );
+    let flagged = columns.iter().any(|column| column.key == "flags");
+    let body = if rows.is_empty() {
+        Body::Empty(
+            empty_quiet(
+                icon::EXPAND,
+                "No concept on this page",
+                "A page past the end of a selection is empty, and so is a filter nothing matches.",
+            )
+            .into_any(),
+        )
+    } else {
+        Body::Rows(
+            rows.iter()
+                .map(|row| concept_row(row, flagged))
+                .collect_view()
+                .into_any(),
+        )
+    };
+    data_table(DataTable {
+        caption: "The concepts of this page",
+        columns: &columns,
+        sort: None,
+        sort_href: &|_| String::new(),
+        body,
+    })
     .into_any()
 }
 
-/// One concept, with its designations under the display it was listed by.
-fn concept_row(row: &ConceptRow) -> AnyView {
+/// One concept, with its designations under the display it was listed by,
+/// and its flags when the table draws that column.
+fn concept_row(row: &ConceptRow, flagged: bool) -> AnyView {
     let nesting =
         (row.depth > 0).then(|| format!("nested at level {}", row.depth.saturating_add(1)));
     let system = match (row.system.as_str(), &row.version) {
@@ -774,21 +821,24 @@ fn concept_row(row: &ConceptRow) -> AnyView {
         (system, Some(version)) => format!("{system}|{version}"),
         (system, None) => system.to_owned(),
     };
+    let flags = flags(row);
+    let flags = (!flags.is_empty()).then(|| badge(Tone::Neutral, &flags));
     view! {
-        <tr class="border-b border-line align-top">
-            <td
-                class="py-default pr-default font-mono whitespace-nowrap"
-                style=format!("padding-left:{}rem", row.depth)
-            >
-                <span class="sr-only">{nesting}</span>
+        <tr>
+            <td class=format!("fui-mono sm:whitespace-nowrap {}", styles::depth(row.depth))>
+                <span class="fui-sr-only">{nesting}</span>
                 {row.code.clone()}
             </td>
-            <td class="py-default pr-default">
-                {row.display.clone().unwrap_or_else(|| NOT_DECLARED.to_owned())}
-                {designation_list(&row.designations)}
+            <td data-label="Display">
+                <div>
+                    {row.display.clone().unwrap_or_else(|| NOT_DECLARED.to_owned())}
+                    {designation_list(&row.designations)}
+                </div>
             </td>
-            <td class="py-default pr-default font-mono text-small wrap-break-word">{system}</td>
-            <td class="py-default">{flags(row)}</td>
+            <td data-label="System" class="fui-mono fui-small fui-muted sm:whitespace-nowrap">
+                {system}
+            </td>
+            {flagged.then(|| view! { <td data-label="Flags">{flags}</td> })}
         </tr>
     }
     .into_any()
@@ -801,9 +851,9 @@ fn designation_list(designations: &[DesignationRow]) -> AnyView {
     }
     let lines: Vec<AnyView> = designations
         .iter()
-        .map(|designation| view! { <li>{designation_line(designation)}</li> }.into_any())
+        .map(|designation| designation_line(designation).into_any())
         .collect();
-    view! { <ul class="mt-tight ml-loose list-disc text-small text-muted">{lines}</ul> }.into_any()
+    view! { <div class="fui-small fui-muted">{bullet_list(lines)}</div> }.into_any()
 }
 
 /// One designation, as the term and what the server said about it.
@@ -839,74 +889,78 @@ fn flags(row: &ConceptRow) -> String {
 /// with its back button, and the router turns the click into a navigation of
 /// its own.
 fn pager_view(pager: Pager, params: &RunnerParams, version: FhirVersion) -> AnyView {
-    let step = |target: Option<Page>, glyph: Glyph, label: &'static str| -> AnyView {
+    let size = pager.page.count();
+    let paging = Paging {
+        page: pager.page.number(),
+        size,
+    };
+    // NOTE: no specification governs this: our own design; the steps are this
+    // runner's own walk over offsets, so each leads where `Pager` says.
+    let step = |each: Step, _: Option<u32>| -> AnyView {
+        let target = match each {
+            Step::First => pager.first(),
+            Step::Previous => pager.previous(),
+            Step::Next => pager.next(),
+            Step::Last => pager.last(),
+        };
         match target {
-            Some(page) => {
-                let href = params.on(page).address(version);
-                view! {
-                    <a href=href class=styles::BUTTON>
-                        <Icon glyph=glyph />
-                        {label}
-                    </a>
-                }
-                .into_any()
+            Some(page) => view! {
+                <a
+                    href=params.on(page).address(version)
+                    class="fui-button fui-button-secondary fui-button-small"
+                >
+                    {step_label(each, true)}
+                </a>
             }
-            // An unavailable control says so in words: a tint alone carries
-            // no meaning (<https://www.w3.org/TR/WCAG22/#use-of-color>), and
-            // a `<span>` has no role for `aria-disabled` to qualify.
+            .into_any(),
             None => view! {
-                <span class=styles::BUTTON_DISABLED>
-                    <Icon glyph=glyph />
-                    {label}
-                    <span class="sr-only">", unavailable"</span>
+                <span class="fui-button fui-button-secondary fui-button-small" aria-disabled="true">
+                    {step_label(each, false)}
                 </span>
             }
             .into_any(),
         }
     };
-    view! {
-        <nav
-            aria-label="Expansion pages"
-            class="mt-default flex flex-wrap items-center gap-default"
-        >
-            {step(pager.first(), icon::PAGE_FIRST, "First page")}
-            {step(pager.previous(), icon::PAGE_PREVIOUS, "Previous page")}
-            <p class="text-body font-medium">{pager.position()}</p>
-            {step(pager.next(), icon::PAGE_NEXT, "Next page")}
-            {step(pager.last(), icon::PAGE_LAST, "Last page")}
-        </nav>
+    let no_sizes = |_: u32, _: bool| ().into_any();
+    let listing = Listing::new("Expansion pages")
+        .noun(Noun::new("concept", "concepts"))
+        .sizes(&[]);
+    match pager.total {
+        Some(total) => ferrohealth_ui::table::view::pager(
+            listing,
+            Window::over(total, paging),
+            &step,
+            &no_sizes,
+        ),
+        None => open_pager(
+            listing,
+            OpenWindow::of(paging, pager.rows),
+            &step,
+            &no_sizes,
+        ),
     }
-    .into_any()
 }
 
 /// The parameters the server says it applied, echoed back verbatim.
 fn parameters_view(lines: &[ParameterLine]) -> AnyView {
     if lines.is_empty() {
-        return view! {
-            <p class="mt-default text-small text-faint">
-                "The server echoed no parameters with this expansion."
-            </p>
-        }
-        .into_any();
+        return view! { <p class="fui-small fui-muted">"The server echoed no parameters with this expansion."</p> }
+            .into_any();
     }
     let rows: Vec<AnyView> = lines
         .iter()
         .map(|line| {
             view! {
-                <dt class="font-mono">{line.name.clone()}</dt>
+                <dt class="fui-mono">{line.name.clone()}</dt>
                 <dd class="break-all">{line.value.clone()}</dd>
             }
             .into_any()
         })
         .collect();
     view! {
-        <details class="mt-loose rounded-md border border-line text-small">
-            <summary class="cursor-pointer px-default py-default font-medium text-muted">
-                "The parameters the server says it applied"
-            </summary>
-            <dl class="grid gap-tight border-t border-line px-default py-default sm:grid-cols-[14rem_1fr]">
-                {rows}
-            </dl>
+        <details class="fui-disclosure">
+            <summary>"The parameters the server says it applied"</summary>
+            <dl class="fui-facts">{rows}</dl>
         </details>
     }
     .into_any()

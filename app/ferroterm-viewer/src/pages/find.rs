@@ -24,7 +24,9 @@ use crate::find::Offer;
 use crate::find::QUERY_PARAM;
 use crate::find::Subject;
 use crate::find::offers;
-use crate::styles;
+use ferrohealth_ui::icon::Glyph;
+use ferrohealth_ui::view::empty::empty_state;
+use ferrohealth_ui::view::surface::{facts_row, link_card, page_header, panel, stack};
 
 /// The `$expand` operation, as a capability statement names it.
 const EXPAND: &str = "expand";
@@ -51,34 +53,36 @@ pub(crate) fn FindPage() -> impl IntoView {
     let subject = Memo::new(move |_| typed.with(|typed| Subject::of(typed)));
 
     let read_client = client.clone();
-    let statement = LocalResource::new(move || {
-        let client = read_client.clone();
-        let version = version.get();
-        async move { client.capability_statement(version).await }
-    });
+    let statement = Resource::new(
+        move || version.get(),
+        move |version| {
+            let client = read_client.clone();
+            async move { client.capability_statement(version).await }
+        },
+    );
 
     let heading = view! {
         <Title text="Find" />
-        <h1 class=styles::PAGE_TITLE>"What to do with it"</h1>
-        <p class=styles::LEAD>
-            {move || {
-                subject
-                    .with(|subject| match subject {
-                        Some(subject) => {
-                            format!("Read as {} from its shape alone.", subject.label())
-                        }
-                        None => "Nothing was typed.".to_owned(),
-                    })
-            }}
-        </p>
+        {move || {
+            let line = subject
+                .with(|subject| match subject {
+                    Some(subject) => format!("Read as {} from its shape alone.", subject.label()),
+                    None => "Nothing was typed.".to_owned(),
+                });
+            page_header("What to do with it", Some(line), ())
+        }}
     }
     .into_any();
 
     let subject_view = move || {
         subject.with(|subject| {
             subject.as_ref().map(|subject| {
-                view! { <p class=format!("mt-default {}", styles::CODE)>{subject.typed().to_owned()}</p> }
-                    .into_any()
+                panel(facts_row(vec![(
+                    "What you typed",
+                    view! { <span class="fui-mono break-all">{subject.typed().to_owned()}</span> }
+                        .into_any(),
+                )]))
+                .into_any()
             })
         })
     };
@@ -94,12 +98,7 @@ pub(crate) fn FindPage() -> impl IntoView {
                 }),
                 Err(error) => {
                     let error = error.clone();
-                    view! {
-                        <div class="mt-default">
-                            <Failure error=Signal::stored(error) />
-                        </div>
-                    }
-                    .into_any()
+                    view! { <Failure error=Signal::stored(error) /> }.into_any()
                 }
             })
         })
@@ -107,13 +106,17 @@ pub(crate) fn FindPage() -> impl IntoView {
 
     view! {
         {heading}
-        {subject_view}
-        <section class="mt-loose" aria-labelledby="find-offers-heading">
-            <h2 id="find-offers-heading" class=styles::SECTION_TITLE>
-                "Where it goes"
-            </h2>
-            <Reading label="Reading what this root declares">{body}</Reading>
-        </section>
+        {stack(
+            view! {
+                {subject_view}
+                <section class="fui-stack" aria-labelledby="find-offers-heading">
+                    <h2 id="find-offers-heading" class="fui-card-title">
+                        "Where it goes"
+                    </h2>
+                    <Reading label="Reading what this root declares">{body}</Reading>
+                </section>
+            },
+        )}
     }
 }
 
@@ -130,31 +133,24 @@ fn declared_by(statement: &CapabilityStatement) -> Declared {
 /// The offers, as the list of links they are.
 fn offers_view(found: &[Offer]) -> AnyView {
     if found.is_empty() {
-        return view! {
-            <p class=format!(
-                "mt-default {}",
-                styles::MUTED,
-            )>"This root declares none of the operations that would apply to what you typed."</p>
-        }
+        return panel(empty_state(
+            Glyph::SEARCH_X,
+            "Nowhere to go",
+            "This root declares none of the operations that would apply to what you typed.",
+            (),
+        ))
         .into_any();
     }
     let rows: Vec<AnyView> = found
         .iter()
         .map(|offer| {
-            let href = offer.href.clone();
-            view! {
-                <li>
-                    <a href=href class=format!("block panel-p {}", styles::PANEL)>
-                        <span class=format!("block {}", styles::LINK)>{offer.label}</span>
-                        <span class=format!(
-                            "mt-tight block {}",
-                            styles::MUTED,
-                        )>{offer.detail}</span>
-                    </a>
-                </li>
-            }
-            .into_any()
+            let card = link_card(
+                offer.href.clone(),
+                offer.label,
+                view! { <p class="fui-muted">{offer.detail}</p> },
+            );
+            view! { <li class="grid">{card}</li> }.into_any()
         })
         .collect();
-    view! { <ul class="mt-default grid gap-default">{rows}</ul> }.into_any()
+    view! { <ul class="fui-grid sm:grid-cols-2 xl:grid-cols-4">{rows}</ul> }.into_any()
 }

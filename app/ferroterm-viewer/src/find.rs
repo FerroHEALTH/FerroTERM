@@ -16,6 +16,7 @@ use crate::routes::VALIDATE_PATH;
 use crate::routes::VERSION_PARAM;
 use crate::routes::base_url;
 use crate::routes::system_link;
+use serde::{Deserialize, Serialize};
 
 /// The query parameter the command bar carries what was typed in.
 pub(crate) const QUERY_PARAM: &str = "q";
@@ -29,7 +30,7 @@ pub(crate) const QUERY_PARAM: &str = "q";
 const LONGEST_CODE: usize = 64;
 
 /// What the viewer reads a typed string as.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub(crate) enum Subject {
     /// A canonical: something the FHIR specification would call a `uri`.
     Canonical(String),

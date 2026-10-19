@@ -456,8 +456,6 @@ pub struct AppState {
     /// The base URL clients reach this server at, when the deployment named
     /// one; the capability statements state it per version.
     base_url: Option<String>,
-    /// Whether the deployment asked for the viewer under `/ui`.
-    viewer: bool,
     /// The metrics a scrape reads, seeded with what this state loaded.
     metrics: Arc<crate::metrics::Metrics>,
 }
@@ -679,7 +677,6 @@ impl AppState {
             .security_services
             .clone_from(&config.security_services);
         state.base_url.clone_from(&config.base_url);
-        state.viewer = config.viewer;
         state.register_supplements(supplements)?;
         state.register_instances(&value_sets, &concept_maps)?;
         state.base.value_sets = value_sets;
@@ -903,7 +900,6 @@ impl AppState {
             software_version: env!("CARGO_PKG_VERSION"),
             security_services: Vec::new(),
             base_url: None,
-            viewer: false,
             metrics: Arc::new(crate::metrics::Metrics::new()),
         }
     }
@@ -919,13 +915,6 @@ impl AppState {
         self.core = core_terminology()?;
         self.reload_persisted().map_err(LoadError::Persisted)?;
         Ok(self)
-    }
-
-    /// This state serving, or not serving, the viewer under `/ui`.
-    #[must_use]
-    pub const fn with_viewer(mut self, on: bool) -> Self {
-        self.viewer = on;
-        self
     }
 
     /// Declares every loaded code system version to the metrics registry,
@@ -1284,14 +1273,6 @@ impl AppState {
     #[must_use]
     pub fn base_url(&self) -> Option<&str> {
         self.base_url.as_deref()
-    }
-
-    /// Whether the deployment asked for the viewer under `/ui`.
-    ///
-    /// The routes are mounted only when this binary also carries a bundle.
-    #[must_use]
-    pub const fn serves_viewer(&self) -> bool {
-        self.viewer
     }
 
     /// The default provider of a system, for callers that need one.

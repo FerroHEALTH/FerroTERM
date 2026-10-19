@@ -3,12 +3,12 @@ name: leptos-lookup
 description: >
   Finds and reads the authoritative Leptos guidance for a topic (signals,
   effects, <For>, LocalResource, Suspense and Transition, router, forms,
-  client-side rendering, binary size, Trunk) in the official Leptos book,
+  server rendering and hydration, binary size, cargo-leptos) in the official Leptos book,
   cached locally. Use before implementing or reviewing any viewer
   (app/ferroterm-viewer) behaviour the rule file does not fully settle, or
   when a "how does Leptos do X" question comes up.
 allowed-tools: Read, Grep, Glob, Bash
-argument-hint: "<signal / resource / router / form / trunk / bundle-size topic>"
+argument-hint: "<signal / resource / router / form / ssr / bundle-size topic>"
 ---
 
 # /leptos-lookup
@@ -69,7 +69,7 @@ and say so explicitly when you cite one.
 5. **Answer with citations** (`<chapter>.md` plus the heading). For API
    signatures beyond the book, follow its docs.rs links rather than guessing;
    Context7 is the preferred fetcher for a pinned crate's documentation.
-   Trunk questions go to the Trunk guide
-   (<https://github.com/trunk-rs/trunk/tree/main/guide/src>), not the book.
+   cargo-leptos questions go to its README
+   (<https://github.com/leptos-rs/cargo-leptos>), not the book.
    If the answer belongs in the standing rules, propose the
    `.claude/rules/leptos-ui.md` addition explicitly.

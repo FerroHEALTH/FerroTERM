@@ -13,7 +13,7 @@
 //! Reading lives here, outside every component, so the screen renders values
 //! plain unit tests can pin.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use serde_json::Number;
 use serde_json::Value;
@@ -174,7 +174,7 @@ pub(crate) fn chosen_version(card: &SystemCard, wanted: Option<&str>) -> Option<
 }
 
 /// The parameters one `CodeSystem/$lookup` sends.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub(crate) struct LookupRequest {
     /// The canonical of the code system the code belongs to.
     pub(crate) system: String,
@@ -342,7 +342,7 @@ pub(crate) fn value_parameter(name: &str, value_name: &str, value: Value) -> Val
 }
 
 /// The `Parameters` a `$lookup` answers, as the viewer reads it.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub(crate) struct LookupAnswer {
     /// `Parameters.parameter`, one per answered output.
     #[serde(default)]
@@ -350,7 +350,7 @@ pub(crate) struct LookupAnswer {
 }
 
 /// One `Parameters.parameter`, with every `value[x]` the outputs use.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 struct WireParameter {
     /// `parameter.name`.
     name: Option<String>,
@@ -384,7 +384,7 @@ struct WireParameter {
 }
 
 /// The parts of a `Coding` a designation's `use` is drawn from.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 struct WireCoding {
     /// The code.
     code: Option<String>,

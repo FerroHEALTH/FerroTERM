@@ -14,8 +14,7 @@
 //! systems of values, so the reader below keeps them apart and never renders
 //! one as the other.
 
-use serde::Deserialize;
-#[cfg(feature = "editor")]
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::fhir::version::FhirVersion;
@@ -28,7 +27,6 @@ const URL_PARAMETER: &str = "url";
 const MAP_VERSION_PARAMETER: &str = "conceptMapVersion";
 
 /// The `$translate` parameter carrying a concept map inline.
-#[cfg(feature = "editor")]
 const CONCEPT_MAP_PARAMETER: &str = "conceptMap";
 
 /// The names one FHIR version gives the parameters of `$translate`.
@@ -131,7 +129,6 @@ impl TranslateRequest {
     /// is what lets a map that has never been saved be translated through.
     /// `url` is left out: the two name the map two ways, and a server that
     /// took both would have to choose between them.
-    #[cfg(feature = "editor")]
     pub(crate) fn body(&self, version: FhirVersion, map: &serde_json::Value) -> String {
         let names = spelling(version);
         let mut parameters = vec![json!({"name": CONCEPT_MAP_PARAMETER, "resource": map})];
@@ -158,7 +155,7 @@ impl TranslateRequest {
 /// (<https://hl7.org/fhir/R4B/conceptmap-operation-translate.html>), which is
 /// a list of named parameters with nested parts, so it is read by name here
 /// rather than modelled per version.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub(crate) struct TranslateAnswer {
     /// `Parameters.parameter`, in the order the server sent it.
     #[serde(default)]
@@ -166,7 +163,7 @@ pub(crate) struct TranslateAnswer {
 }
 
 /// One `Parameters.parameter`, with the `value[x]` shapes the answer uses.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 struct WireParameter {
     /// `parameter.name`.
     name: Option<String>,
@@ -203,7 +200,7 @@ struct WireParameter {
 }
 
 /// A `Coding` as the screen draws one.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct Coding {
     /// `Coding.system`.
     pub(crate) system: Option<String>,
@@ -439,7 +436,6 @@ mod tests {
     /// The `conceptMap` parameter carries the map itself, and `url` is left
     /// out, because the two name the map two ways
     /// (<https://hl7.org/fhir/R4B/conceptmap-operation-translate.html>).
-    #[cfg(feature = "editor")]
     #[test]
     fn a_post_body_carries_the_map_inline_under_each_version_s_own_names() {
         let map = serde_json::json!({"resourceType": "ConceptMap", "status": "draft"});
@@ -471,7 +467,6 @@ mod tests {
 
     /// A parameter the reader left empty is left out, so the server's own
     /// default applies to it rather than an empty string the viewer invented.
-    #[cfg(feature = "editor")]
     #[test]
     fn a_post_body_leaves_out_every_parameter_that_was_not_set() {
         let map = serde_json::json!({"resourceType": "ConceptMap"});

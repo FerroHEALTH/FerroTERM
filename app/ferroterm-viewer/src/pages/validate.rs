@@ -25,17 +25,16 @@ use crate::components::NOT_DECLARED;
 use crate::components::failure::Failure;
 use crate::components::field::CANONICAL_WORDS;
 use crate::components::field::Field;
-use crate::components::field::Help;
+use crate::components::field::LANGUAGE_EXAMPLE;
 use crate::components::field::VERSION_WORDS;
 use crate::components::field::group;
-use crate::components::field::help_toggle;
 use crate::components::field::picked_field;
 use crate::components::field::row;
 use crate::components::field::select_field;
 use crate::components::field::text_field;
+use crate::components::field::text_field_showing;
 use crate::components::field::versioned_row;
 use crate::components::icon;
-use crate::components::icon::Icon;
 use crate::components::reading::Reading;
 use crate::components::runs::History;
 use crate::components::shell::SelectedVersion;
@@ -80,7 +79,16 @@ use crate::routes::VERSION_PARAM;
 use crate::routes::base_url;
 use crate::routes::system_link;
 use crate::runs::Run;
-use crate::styles;
+use ferrohealth_ui::tone::Tone;
+use ferrohealth_ui::view::button::Variant;
+use ferrohealth_ui::view::empty::empty_quiet;
+use ferrohealth_ui::view::layout::bullet_list;
+use ferrohealth_ui::view::notice::{Announce, notice};
+use ferrohealth_ui::view::refusal::{Issue, Severity, issue_list};
+use ferrohealth_ui::view::surface::{
+    card, chip, cluster, definitions, page_header, panel_body, stack,
+};
+use ferrohealth_ui::widget::help::help_switch;
 
 /// The address parameter carrying which resource type the code is checked in.
 const ON_PARAM: &str = "on";
@@ -114,7 +122,7 @@ pub(crate) fn ValidatePage() -> impl IntoView {
     let SelectedVersion(version) = expect_context::<SelectedVersion>();
     // Both runners on this screen share the one help switch, so a reader who
     // asks for the parameters to be explained gets both forms explained.
-    provide_context(Help(RwSignal::new(false)));
+    let _help = ferrohealth_ui::widget::help::provide_help();
     let query = use_query_map();
     let params: Signal<RunnerParams> =
         Memo::new(move |_| query.with(|map| RunnerParams::read(&|name| map.get(name)))).into();
@@ -161,8 +169,15 @@ pub(crate) fn ValidatePage() -> impl IntoView {
 
     let heading = view! {
         <Title text="Check a code" />
-        <h1 class=styles::PAGE_TITLE>"Check a code"</h1>
-        <p class=styles::LEAD>"Is this code valid, and how do two codes relate?"</p>
+        {page_header(
+            "Check a code",
+            Some(
+                String::from(
+                    "Whether a code is valid in a code system or a value set, from this server's $validate-code, and how two codes relate, from its $subsumes.",
+                ),
+            ),
+            (),
+        )}
     }
     .into_any();
 
@@ -203,10 +218,14 @@ pub(crate) fn ValidatePage() -> impl IntoView {
 
     view! {
         {heading}
-        {root}
-        {validate}
-        {subsumes}
-        {history.view()}
+        {stack(
+            view! {
+                {validate}
+                {root}
+                {subsumes}
+                {history.view()}
+            },
+        )}
     }
 }
 
@@ -447,8 +466,8 @@ fn root_section(
     };
 
     view! {
-        <section class="mt-loose" aria-labelledby="validate-root-heading">
-            <h2 id="validate-root-heading" class=styles::SECTION_TITLE>
+        <section class="fui-card" aria-labelledby="validate-root-heading">
+            <h2 id="validate-root-heading" class="fui-card-title">
                 "The code system this screen works over"
             </h2>
             {move || {
@@ -456,21 +475,16 @@ fn root_section(
                     .with(|params| {
                         if params.system.is_empty() {
                             view! {
-                                <p class=format!(
-                                    "mt-default {}",
-                                    styles::MUTED,
-                                )>
-                                    "No code system is named yet. Choose one below, name the code, and run it."
+                                <p class="fui-muted">
+                                    "No code system is named yet. Choose one above, name the code, and run it."
                                 </p>
                             }
                                 .into_any()
                         } else {
                             let target = system_link(&params.system, version.get());
                             view! {
-                                <p class="mt-tight text-body break-all">
-                                    <a href=target class=styles::LINK>
-                                        {params.system.clone()}
-                                    </a>
+                                <p class="fui-mono break-all">
+                                    <a href=target>{params.system.clone()}</a>
                                 </p>
                             }
                                 .into_any()
@@ -517,11 +531,14 @@ fn system_view(declared: &Declared) -> AnyView {
             "It declares no hierarchy filter operator, so its concepts are a flat list.",
         ),
     };
-    view! {
-        <p class="mt-default font-mono text-body break-all">{code}</p>
-        <p class=styles::LEAD>{subsumption}</p>
-        <p class=styles::LEAD>{hierarchy}</p>
-    }
+    definitions(vec![
+        (
+            "Version",
+            view! { <span class="fui-mono">{code}</span> }.into_any(),
+        ),
+        ("Subsumption", subsumption.into_any()),
+        ("Hierarchy", hierarchy.into_any()),
+    ])
     .into_any()
 }
 
@@ -554,7 +571,7 @@ fn validate_section(
 
     // The live region is in the document before the read settles, which is
     // what lets a screen reader announce the outcome when it arrives.
-    let announcement = Memo::new(move |_| {
+    let announcement = move || {
         answer.with(|answered| {
             answered
                 .as_ref()
@@ -563,51 +580,53 @@ fn validate_section(
                 .map(|answer| answer.validation().sentence())
                 .unwrap_or_default()
         })
-    });
+    };
 
     let body = move || {
         let form = validate_form(params, version, declared, offered, picks);
         let answered = view! {
-            <p aria-live="polite" class=format!("mt-default {}", styles::MUTED)>
-                {announcement}
-            </p>
-            <Reading label="Running the validation">
-                {move || {
-                    answer
-                        .with(|answered| {
-                            answered
-                                .as_ref()
-                                .map(|answer| match answer {
-                                    None => {
-                                        invitation(
-                                            "Name a code and the resource to check it against, then run it.",
-                                        )
-                                    }
-                                    Some(Ok(value)) => validation_view(&value.validation()),
-                                    Some(Err(error)) => failure_view(error),
-                                })
-                        })
-                }}
-            </Reading>
+            <section class="fui-card fui-panel" aria-labelledby="validate-answer-heading">
+                <div class="fui-panel-head">
+                    <h3 id="validate-answer-heading" class="fui-card-title">
+                        "The validation"
+                    </h3>
+                    <p aria-live="polite" class="fui-sr-only">
+                        <Transition fallback=|| ()>{announcement}</Transition>
+                    </p>
+                </div>
+                <Reading label="Running the validation">
+                    {move || {
+                        answer
+                            .with(|answered| {
+                                answered
+                                    .as_ref()
+                                    .map(|answer| match answer {
+                                        None => {
+                                            invitation(
+                                                "Name a code and the resource to check it against, then run it.",
+                                            )
+                                        }
+                                        Some(Ok(value)) => validation_view(&value.validation()),
+                                        Some(Err(error)) => failure_view(error),
+                                    })
+                            })
+                    }}
+                </Reading>
+            </section>
         }
             .into_any();
-        // The answer keeps its own column above the large breakpoint, so a
-        // parameter that lengthens the form never pushes it down the page.
         view! {
-            <div class="mt-default grid items-start gap-loose lg:grid-cols-[24rem_minmax(0,1fr)]">
-                <div class="min-w-0">{form}</div>
-                <div class="min-w-0">{answered}</div>
-            </div>
+            {form}
+            {answered}
         }
         .into_any()
     };
 
     view! {
-        <section class="mt-section" aria-labelledby="validate-heading">
-            <h2 id="validate-heading" class=styles::SECTION_TITLE>
+        <section class="fui-stack" aria-labelledby="validate-heading">
+            <h2 id="validate-heading" class="fui-sr-only">
                 "Is this code valid?"
             </h2>
-            <p class=styles::HINT>"$validate-code"</p>
             {move || {
                 if offered.get().declared {
                     body()
@@ -661,8 +680,8 @@ fn validate_form(
         navigate.with_value(|navigate| go(navigate, &target));
     };
 
-    view! {
-        <form class="mt-loose grid gap-loose" on:submit=submit>
+    let form = view! {
+        <form class="fui-form" on:submit=submit>
             {target_group(
                 params,
                 version,
@@ -678,16 +697,16 @@ fn validate_form(
                 },
             )}
             {code_group(params, code, display, language)}
-            <div class="flex flex-wrap items-center gap-default">
-                <button type="submit" class=styles::SUBMIT>
-                    <Icon glyph=icon::VALIDATE />
+            <div class="fui-cluster">
+                <button type="submit" class=Variant::Primary.class()>
+                    {ferrohealth_ui::icon::icon(icon::VALIDATE, "16")}
                     "Run the validation"
                 </button>
-                {help_toggle()}
+                {help_switch()}
             </div>
         </form>
-    }
-    .into_any()
+    };
+    card("Is this code valid?", form).into_any()
 }
 
 /// The controls one group of the form draws, by the value each carries.
@@ -836,7 +855,7 @@ fn code_group(
                     seeded(params, |params| params.display.clone()),
                 ),
             ]),
-            text_field(
+            text_field_showing(
                 Field {
                     id: "validate-display-language",
                     name: DISPLAY_LANGUAGE_PARAMETER,
@@ -845,6 +864,7 @@ fn code_group(
                 },
                 language,
                 seeded(params, |params| params.language.clone()),
+                Some(LANGUAGE_EXAMPLE),
             ),
         ],
     )
@@ -885,7 +905,15 @@ fn on_field(
         ]
         .into_iter()
         .filter(|(on, _)| operations.validate(*on).declared)
-        .map(|(on, label)| view! { <option value=on.segment()>{label}</option> }.into_any())
+        .map(|(on, label)| {
+            let selected = move || params.with(|params| params.on == on);
+            view! {
+                <option value=on.segment() selected=selected>
+                    {label}
+                </option>
+            }
+            .into_any()
+        })
         .collect::<Vec<AnyView>>()
     };
     select_field(
@@ -917,18 +945,19 @@ fn subsumes_section(
         Memo::new(move |_| params.with(|params| params.subsumption(offered.get()))).into();
 
     let read_client = client.clone();
-    let answer = LocalResource::new(move || {
-        let client = read_client.clone();
-        let version = version.get();
-        let request = if runs.get() { request.get() } else { None };
-        async move {
-            match request {
-                Some(request) => Some(client.subsumes(version, &request).await),
-                None => None,
+    let answer = Resource::new(
+        move || (version.get(), if runs.get() { request.get() } else { None }),
+        move |(version, request)| {
+            let client = read_client.clone();
+            async move {
+                match request {
+                    Some(request) => Some(client.subsumes(version, &request).await),
+                    None => None,
+                }
             }
-        }
-    });
-    let announcement = Memo::new(move |_| {
+        },
+    );
+    let announcement = move || {
         let (code_a, code_b) = params.with(|params| (params.code_a.clone(), params.code_b.clone()));
         answer.with(|answered| {
             answered
@@ -938,49 +967,53 @@ fn subsumes_section(
                 .map(|answer| outcome_sentence(answer, &code_a, &code_b))
                 .unwrap_or_default()
         })
-    });
+    };
 
     let panel = move || {
         let form = subsumes_form(params, version, offered);
         let answered = view! {
-            <p aria-live="polite" class=format!("mt-default {}", styles::MUTED)>
-                {announcement}
-            </p>
-            <Reading label="Running the subsumption test">
-                {move || {
-                    let (code_a, code_b) = params
-                        .with(|params| (params.code_a.clone(), params.code_b.clone()));
-                    answer
-                        .with(|answered| {
-                            answered
-                                .as_ref()
-                                .map(|answer| match answer {
-                                    None => {
-                                        invitation("Name two codes of this system and run them.")
-                                    }
-                                    Some(Ok(value)) => outcome_view(value, &code_a, &code_b),
-                                    Some(Err(error)) => failure_view(error),
-                                })
-                        })
-                }}
-            </Reading>
+            <section class="fui-card fui-panel" aria-labelledby="subsumes-answer-heading">
+                <div class="fui-panel-head">
+                    <h3 id="subsumes-answer-heading" class="fui-card-title">
+                        "The relation"
+                    </h3>
+                    <p aria-live="polite" class="fui-sr-only">
+                        <Transition fallback=|| ()>{announcement}</Transition>
+                    </p>
+                </div>
+                <Reading label="Running the subsumption test">
+                    {move || {
+                        let (code_a, code_b) = params
+                            .with(|params| (params.code_a.clone(), params.code_b.clone()));
+                        answer
+                            .with(|answered| {
+                                answered
+                                    .as_ref()
+                                    .map(|answer| match answer {
+                                        None => {
+                                            invitation("Name two codes of this system and run them.")
+                                        }
+                                        Some(Ok(value)) => outcome_view(value, &code_a, &code_b),
+                                        Some(Err(error)) => failure_view(error),
+                                    })
+                            })
+                    }}
+                </Reading>
+            </section>
         }
         .into_any();
         view! {
-            <div class="mt-default grid items-start gap-loose lg:grid-cols-[24rem_minmax(0,1fr)]">
-                <div class="min-w-0">{form}</div>
-                <div class="min-w-0">{answered}</div>
-            </div>
+            {form}
+            {answered}
         }
         .into_any()
     };
 
     view! {
-        <section class="mt-section" aria-labelledby="subsumes-heading">
-            <h2 id="subsumes-heading" class=styles::SECTION_TITLE>
+        <section class="fui-stack" aria-labelledby="subsumes-heading">
+            <h2 id="subsumes-heading" class="fui-sr-only">
                 "How do two codes relate?"
             </h2>
-            <p class=styles::HINT>"$subsumes"</p>
             {move || {
                 if !offered.get().declared {
                     note(
@@ -1068,33 +1101,44 @@ fn subsumes_form(
         ],
     );
 
-    view! {
-        <form class="mt-loose grid gap-loose" on:submit=submit>
+    let form = view! {
+        <form class="fui-form" on:submit=submit>
             {codes}
-            <div class="flex flex-wrap items-center gap-default">
-                <button type="submit" class=styles::SUBMIT>
-                    <Icon glyph=icon::BROWSE />
+            <div class="fui-cluster">
+                <button type="submit" class=Variant::Primary.class()>
+                    {ferrohealth_ui::icon::icon(icon::BROWSE, "16")}
                     "Run the subsumption test"
                 </button>
-                {help_toggle()}
+                {help_switch()}
             </div>
         </form>
-    }
-    .into_any()
+    };
+    card("How do two codes relate?", form).into_any()
 }
 
 /// The answer of one `$validate-code` run, in full.
 fn validation_view(read: &Validation) -> AnyView {
-    let verdict = match read.result {
-        Some(true) => "result: true",
-        Some(false) => "result: false",
-        None => "the server declared no result",
+    let (verdict, tone) = match read.result {
+        Some(true) => ("Valid: result true", Tone::Ok),
+        Some(false) => ("Not valid: result false", Tone::Bad),
+        None => ("The server declared no result", Tone::Neutral),
     };
     let message = read
         .message
         .clone()
-        .map(|message| view! { <p class="mt-default text-body">{message}</p> }.into_any());
-    let facts: Vec<AnyView> = [
+        .map(|message| view! { <p>{message}</p> });
+    let verdict = notice(
+        tone,
+        Announce::Status,
+        None,
+        view! {
+            <p>
+                <strong>{verdict}</strong>
+            </p>
+            {message}
+        },
+    );
+    let facts: Vec<(&'static str, AnyView)> = [
         ("Code", read.code.clone()),
         ("Code as the system spells it", read.normalized_code.clone()),
         ("System", read.system.clone()),
@@ -1108,34 +1152,28 @@ fn validation_view(read: &Validation) -> AnyView {
         ),
     ]
     .into_iter()
-    .filter_map(|(label, value)| value.map(|value| fact_row(label, &value)))
+    .filter_map(|(label, value)| {
+        value.map(|value| {
+            (
+                label,
+                view! { <span class="break-all">{value}</span> }.into_any(),
+            )
+        })
+    })
     .collect();
     let inactive = (read.inactive == Some(true)).then(|| {
-        view! {
-            <p role="note" class=format!("mt-default rounded-md p-default {}", styles::NOTICE)>
-                "This concept is inactive in its code system. The server served it and marked it, which is an answer rather than a refusal."
-            </p>
-        }
-        .into_any()
+        notice(
+            Tone::Warn,
+            Announce::Status,
+            None,
+            "This concept is inactive in its code system. The server served it and marked it, which is an answer rather than a refusal.",
+        )
     });
     view! {
-        <p class="mt-default text-body font-semibold">{verdict}</p>
-        {message}
-        {inactive}
-        <dl class="mt-default grid gap-tight text-body sm:grid-cols-[16rem_1fr]">{facts}</dl>
-        {concept_view(read)}
-        {unknown_systems_view(&read.unknown_systems)}
-        {issues_view(&read.issues)}
-    }
-    .into_any()
-}
-
-/// One fact of an answer, as a term and the value beside it.
-fn fact_row(label: &'static str, value: &str) -> AnyView {
-    let value = value.to_owned();
-    view! {
-        <dt class="font-medium">{label}</dt>
-        <dd class="break-all">{value}</dd>
+        <div class="fui-panel-body fui-stack">
+            {verdict} {inactive} {definitions(facts)} {concept_view(read)}
+            {unknown_systems_view(&read.unknown_systems)} {issues_view(&read.issues)}
+        </div>
     }
     .into_any()
 }
@@ -1158,15 +1196,15 @@ fn concept_view(read: &Validation) -> AnyView {
                 .clone()
                 .map(|version| format!(" (version {version})"))
                 .unwrap_or_default();
-            view! { <li class="font-mono break-all">{Coding::rendered(coding)} {version}</li> }
+            view! { <span class="fui-mono break-all">{Coding::rendered(coding)} {version}</span> }
                 .into_any()
         })
         .collect();
     view! {
-        <div class="mt-default text-body">
-            <p class="font-medium">"The concept the server echoed"</p>
-            <p class="mt-tight">"Text: " {text}</p>
-            <ul class="mt-tight ml-loose list-disc">{codings}</ul>
+        <div>
+            <p class="fui-label">"The concept the server echoed"</p>
+            <p>"Text: " {text}</p>
+            {bullet_list(codings)}
         </div>
     }
     .into_any()
@@ -1179,82 +1217,52 @@ fn unknown_systems_view(systems: &[String]) -> AnyView {
     }
     let listed: Vec<AnyView> = systems
         .iter()
-        .map(|system| view! { <li class="font-mono break-all">{system.clone()}</li> }.into_any())
+        .map(|system| chip(system.clone()).into_any())
         .collect();
     view! {
-        <div class="mt-default text-body">
-            <p class="font-medium">"Code systems this server does not hold"</p>
-            <ul class="mt-tight ml-loose list-disc">{listed}</ul>
+        <div>
+            <p class="fui-label">"Code systems this server does not hold"</p>
+            {cluster(listed)}
         </div>
     }
     .into_any()
 }
 
-/// The itemised issues of the answer, with the classification leading.
+/// The itemised issues of the answer, in FerroUI's issue list.
+///
+/// The coding of `issue.details` is each issue's detail codes, because the
+/// terminology ecosystem binds it as a `SHALL` and leaves `issue.code`
+/// unbound (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
 fn issues_view(issues: &[ValidationIssue]) -> AnyView {
     if issues.is_empty() {
         return ().into_any();
     }
-    let lines: Vec<AnyView> = issues.iter().map(issue_view).collect();
-    view! {
-        <div class="mt-loose rounded-md border border-line-strong p-default">
-            <p class="text-body font-medium">"The issues the server itemised"</p>
-            <ul class="mt-default space-y-default">{lines}</ul>
-        </div>
-    }
-    .into_any()
-}
-
-/// One issue: the classification the server had to state, then the rest.
-///
-/// The coding of `issue.details` leads, because the terminology ecosystem
-/// binds it as a `SHALL` and leaves `issue.code` unbound
-/// (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
-fn issue_view(issue: &ValidationIssue) -> AnyView {
-    let classifications: Vec<AnyView> = issue
-        .classifications
+    let listed: Vec<Issue> = issues
         .iter()
-        .map(|coding| {
-            let system = if coding.system.is_empty() {
-                String::new()
-            } else {
-                format!(" from {}", coding.system)
+        .map(|issue| {
+            let severity = match issue.severity.as_str() {
+                "fatal" => Severity::Fatal,
+                "warning" => Severity::Warning,
+                "information" => Severity::Information,
+                _ => Severity::Error,
             };
-            view! {
-                <span class="mr-default rounded bg-inset px-tight py-tight font-mono text-micro text-fg">
-                    {coding.code.clone()}
-                </span>
-                <span class="text-small break-all text-muted">{system}</span>
-            }
-            .into_any()
+            Issue::new(severity, issue.issue_code.clone())
+                .text(issue.text.clone())
+                .place(issue.expressions.join(", "))
+                .details(
+                    issue
+                        .classifications
+                        .iter()
+                        .map(|coding| coding.code.clone())
+                        .collect(),
+                )
         })
         .collect();
-    let stated = if classifications.is_empty() {
-        view! {
-            <p class="text-small text-muted">
-                "The server stated no classification coding for this issue."
-            </p>
-        }
-        .into_any()
-    } else {
-        view! { <p>{classifications}</p> }.into_any()
-    };
-    let expressions = (!issue.expressions.is_empty()).then(|| {
-        let paths = issue.expressions.join(", ");
-        view! { <p class="mt-tight font-mono text-small break-all text-muted">"at " {paths}</p> }
-            .into_any()
-    });
-    let severity = issue.severity.clone();
-    let issue_code = issue.issue_code.clone();
-    let text = issue.text.clone();
     view! {
-        <li class="text-body">
-            {stated} <p class="mt-tight">{text}</p>
-            <p class="mt-tight text-small text-muted">
-                "severity " <span class="font-mono">{severity}</span> ", issue.code "
-                <span class="font-mono">{issue_code}</span>
-            </p> {expressions}
-        </li>
+        <div>
+            <p class="fui-label">"The issues the server itemised"</p>
+            {issue_list(&listed)}
+        </div>
     }
     .into_any()
 }
@@ -1267,10 +1275,17 @@ fn outcome_view(answer: &ParametersAnswer, code_a: &str, code_b: &str) -> AnyVie
         );
     };
     let sentence = subsumption_sentence(&outcome, code_a, code_b);
-    view! {
-        <p class="mt-default font-mono text-body font-semibold break-all">{outcome}</p>
-        <p class="mt-tight text-body">{sentence}</p>
-    }
+    panel_body(notice(
+        Tone::Info,
+        Announce::Status,
+        None,
+        view! {
+            <p>
+                <strong class="fui-mono">{outcome}</strong>
+            </p>
+            <p>{sentence}</p>
+        },
+    ))
     .into_any()
 }
 
@@ -1289,7 +1304,7 @@ fn outcome_sentence(answer: &ParametersAnswer, code_a: &str, code_b: &str) -> St
 
 /// What a panel says before it has been given enough to run.
 fn invitation(text: &'static str) -> AnyView {
-    crate::components::state::invitation(text)
+    panel_body(empty_quiet(icon::VALIDATE, "Nothing run yet", text)).into_any()
 }
 
 /// A sentence stating what the server did not declare.
@@ -1300,12 +1315,7 @@ fn note(text: &'static str) -> AnyView {
 /// A refusal, in the server's own words.
 fn failure_view(error: &FhirError) -> AnyView {
     let error = error.clone();
-    view! {
-        <div class="mt-default">
-            <Failure error=Signal::stored(error) />
-        </div>
-    }
-    .into_any()
+    panel_body(view! { <Failure error=Signal::stored(error) /> }).into_any()
 }
 
 /// A control's own value, gated so an unrelated navigation cannot wipe an edit.

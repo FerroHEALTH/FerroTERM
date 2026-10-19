@@ -16,15 +16,12 @@ use crate::components::NOT_DECLARED;
 use crate::components::failure::Failure;
 use crate::components::field::CANONICAL_WORDS;
 use crate::components::field::Field;
-use crate::components::field::Help;
 use crate::components::field::VERSION_WORDS;
 use crate::components::field::group;
-use crate::components::field::help_toggle;
 use crate::components::field::picked_field;
 use crate::components::field::text_field;
 use crate::components::field::versioned_row;
 use crate::components::icon;
-use crate::components::icon::Icon;
 use crate::components::reading::Reading;
 use crate::components::runs::History;
 use crate::components::shell::SelectedVersion;
@@ -43,11 +40,22 @@ use crate::fhir::version::FhirVersion;
 use crate::offers::choices;
 use crate::offers::published;
 use crate::offers::versions;
+use crate::pages::concept_map::relationship_tone;
 use crate::routes::TRANSLATE_PATH;
 use crate::routes::VERSION_PARAM;
 use crate::routes::base_url;
 use crate::runs::Run;
-use crate::styles;
+use ferrohealth_ui::table::view::{Body, Column, DataTable, data_table};
+use ferrohealth_ui::tone::Tone;
+use ferrohealth_ui::view::button::Variant;
+use ferrohealth_ui::view::empty::empty_quiet;
+use ferrohealth_ui::view::layout::bullet_list;
+use ferrohealth_ui::view::notice::{Announce, notice};
+use ferrohealth_ui::view::status::badge;
+use ferrohealth_ui::view::surface::{
+    chip, cluster, definitions, page_header, panel_body, stack, titled_panel,
+};
+use ferrohealth_ui::widget::help::help_switch;
 
 /// The operation this screen runs.
 const TRANSLATE: &str = "translate";
@@ -70,6 +78,13 @@ const CODE_PARAM: &str = "code";
 /// The address parameter carrying the code system an answer is wanted in.
 const TARGET_PARAM: &str = "target";
 
+/// The columns of the match table.
+const MATCH_COLUMNS: [Column; 3] = [
+    Column::text("target", "Target"),
+    Column::text("relation", "Relationship"),
+    Column::text("about", "What came with it"),
+];
+
 /// Runs `ConceptMap/$translate` and renders what the server answered.
 ///
 /// Every parameter is read from the address rather than from a private signal,
@@ -85,16 +100,23 @@ const TARGET_PARAM: &str = "target";
 pub(crate) fn TranslatePage() -> impl IntoView {
     let client = expect_context::<FhirClient>();
     let SelectedVersion(version) = expect_context::<SelectedVersion>();
-    provide_context(Help(RwSignal::new(false)));
+    let _help = ferrohealth_ui::widget::help::provide_help();
 
     let query = use_query_map();
     let run: Signal<TranslateRequest> =
         Memo::new(move |_| query.with(|map| read_run(&|name| map.get(name)))).into();
 
     let heading = view! {
-        <Title text="Map a code" />
-        <h1 class=styles::PAGE_TITLE>"Map a code"</h1>
-        <p class=styles::LEAD>"One code through the maps this root holds."</p>
+        <Title text="Translate a code" />
+        {page_header(
+            "Translate a code",
+            Some(
+                String::from(
+                    "One code through the concept maps this server holds, from its $translate.",
+                ),
+            ),
+            (),
+        )}
     }
     .into_any();
 
@@ -118,10 +140,13 @@ pub(crate) fn TranslatePage() -> impl IntoView {
     // parameter that lengthens the form never pushes it down the page.
     view! {
         {heading}
-        <div class="mt-loose grid items-start gap-loose lg:grid-cols-[24rem_minmax(0,1fr)]">
-            <div class="min-w-0">{form} {history.view()}</div>
-            <div class="min-w-0">{answer}</div>
-        </div>
+        {stack(
+            view! {
+                {form}
+                {answer}
+                {history.view()}
+            },
+        )}
     }
 }
 
@@ -229,9 +254,9 @@ fn runner_section(
         })
     });
     view! {
-        <section class="mt-loose" aria-labelledby="translate-heading">
-            <h2 id="translate-heading" class="sr-only">
-                "The runner"
+        <section class="fui-card" aria-labelledby="translate-heading">
+            <h2 id="translate-heading" class="fui-card-title">
+                "Parameters"
             </h2>
             <Reading label="Reading what this root can do">
                 {move || {
@@ -317,16 +342,16 @@ fn runner_form(
         navigate(&address(&typed, version.get()), unresolved());
     };
     view! {
-        <form class="mt-loose grid gap-loose" on:submit=submit>
-            {map_group(run, map, map_version, picks)}
+        <form class="fui-form" on:submit=submit>
             {code_group(run, system, system_version, code, picks)}
+            {map_group(run, map, map_version, picks)}
             {target_group(run, target, picks)}
-            <div class="flex flex-wrap items-center gap-default">
-                <button type="submit" class=styles::SUBMIT>
-                    <Icon glyph=icon::CONCEPT_MAPS />
+            <div class="fui-cluster">
+                <button type="submit" class=Variant::Primary.class()>
+                    {ferrohealth_ui::icon::icon(icon::TRANSLATE, "16")}
                     "Translate"
                 </button>
-                {help_toggle()}
+                {help_switch()}
             </div>
         </form>
     }
@@ -452,18 +477,19 @@ fn answer_section(
     run: Signal<TranslateRequest>,
 ) -> AnyView {
     let read_client = client.clone();
-    let translated = LocalResource::new(move || {
-        let client = read_client.clone();
-        let version = version.get();
-        let request = run.get();
-        async move {
-            if request.runnable() {
-                Some(client.translate(version, &request).await)
-            } else {
-                None
+    let translated = Resource::new(
+        move || (version.get(), run.get()),
+        move |(version, request)| {
+            let client = read_client.clone();
+            async move {
+                if request.runnable() {
+                    Some(client.translate(version, &request).await)
+                } else {
+                    None
+                }
             }
-        }
-    });
+        },
+    );
 
     // The live region is mounted the moment the address names a run, which is
     // before the read settles, so a screen reader hears the count when it
@@ -480,7 +506,22 @@ fn answer_section(
     });
 
     view! {
-        <Show when=move || run.with(TranslateRequest::runnable) fallback=|| ()>
+        <Show
+            when=move || run.with(TranslateRequest::runnable)
+            fallback=|| {
+                titled_panel(
+                    "The translation",
+                    (),
+                    panel_body(
+                        empty_quiet(
+                            icon::TRANSLATE,
+                            "Nothing translated yet",
+                            "Name a code and the system it belongs to, then translate it.",
+                        ),
+                    ),
+                )
+            }
+        >
             {answer_block(translated, announcement)}
         </Show>
     }
@@ -489,17 +530,19 @@ fn answer_section(
 
 /// The heading, the live region, and the answer.
 fn answer_block(
-    translated: LocalResource<Option<Result<TranslateAnswer, FhirError>>>,
+    translated: Resource<Option<Result<TranslateAnswer, FhirError>>>,
     announcement: Memo<String>,
 ) -> AnyView {
     view! {
-        <section class="mt-loose" aria-labelledby="translate-answer-heading">
-            <h2 id="translate-answer-heading" class=styles::SECTION_TITLE>
-                "The translation"
-            </h2>
-            <p aria-live="polite" class="mt-default text-body text-muted">
-                {move || announcement.get()}
-            </p>
+        <section class="fui-card fui-panel" aria-labelledby="translate-answer-heading">
+            <div class="fui-panel-head">
+                <h2 id="translate-answer-heading" class="fui-card-title">
+                    "The translation"
+                </h2>
+                <p aria-live="polite" class="fui-muted fui-small">
+                    {move || announcement.get()}
+                </p>
+            </div>
             <Reading label="Running the translation">
                 {move || {
                     translated
@@ -521,82 +564,87 @@ fn answer_block(
 
 /// The result, the message, and one block per reported match.
 fn answer_view(answer: &TranslateAnswer) -> AnyView {
-    let result = match answer.result() {
-        Some(true) => "The server translated the code.".to_owned(),
-        Some(false) => "The server did not translate the code.".to_owned(),
-        None => format!("Result {NOT_DECLARED}."),
+    let (result, tone) = match answer.result() {
+        Some(true) => ("The server translated the code.".to_owned(), Tone::Ok),
+        Some(false) => (
+            "The server did not translate the code.".to_owned(),
+            Tone::Warn,
+        ),
+        None => (format!("Result {NOT_DECLARED}."), Tone::Neutral),
     };
-    let message = answer.message().map_or_else(
-        || ().into_any(),
-        |message| view! { <p class="mt-tight text-body">{message}</p> }.into_any(),
+    let message = answer.message().map(|message| view! { <p>{message}</p> });
+    let verdict = notice(
+        tone,
+        Announce::Status,
+        None,
+        view! {
+            <p>
+                <strong>{result}</strong>
+            </p>
+            {message}
+        },
     );
     let used = used_view(&answer.used_maps());
     let matches = answer.matches();
-    if matches.is_empty() {
-        return view! {
-            <p class="mt-default text-body font-medium">{result}</p>
-            {message}
-            <p class="mt-default text-body text-muted">
-                "The server reported no match for this code."
-            </p>
-            {used}
-        }
-        .into_any();
-    }
-    // The blocks are a plain `Vec`, which rebuilds every position when the
-    // next run settles. A `<For>` key it retained would be moved rather than
-    // re-rendered, so a target code that repeats across two runs would keep
-    // the block it had.
-    let blocks: Vec<AnyView> = matches.iter().map(match_view).collect();
+    let table = if matches.is_empty() {
+        panel_body(empty_quiet(
+            icon::TRANSLATE,
+            "No match",
+            "The server reported no match for this code.",
+        ))
+        .into_any()
+    } else {
+        data_table(DataTable {
+            caption: "The matches the server reported",
+            columns: &MATCH_COLUMNS,
+            sort: None,
+            sort_href: &|_| String::new(),
+            body: Body::Rows(matches.iter().map(match_row).collect_view().into_any()),
+        })
+        .into_any()
+    };
     view! {
-        <p class="mt-default text-body font-medium">{result}</p>
-        {message}
-        <div class="mt-default grid gap-loose">{blocks}</div>
+        <div class="fui-panel-body">{verdict}</div>
+        {table}
         {used}
     }
     .into_any()
 }
 
 /// One match: how it relates, what it points at, and what came with it.
-fn match_view(found: &TranslationMatch) -> AnyView {
+///
+/// The relation is labelled by the element that carried it: R4 and R4B answer
+/// `equivalence` and R5 and the R6 ballot `relationship`, over two different
+/// sets of codes.
+fn match_row(found: &TranslationMatch) -> AnyView {
     let target = found.target.as_ref().map_or_else(
         || {
-            if found.no_map {
+            let words = if found.no_map {
                 "This code maps to nothing in the target".to_owned()
             } else {
                 format!("Target {NOT_DECLARED}")
-            }
+            };
+            view! { <span class="fui-muted">{words}</span> }.into_any()
         },
-        Coding::rendered,
+        coding_cell,
     );
-    // The relation is labelled by the element that carried it: R4 and R4B
-    // answer `equivalence` and R5 and the R6 ballot `relationship`, over two
-    // different sets of codes.
     let relations: Vec<AnyView> = found
         .relations()
         .into_iter()
         .map(|relation| {
             view! {
-                <li>
-                    <span class="font-medium">{relation.label}</span>
-                    ": "
-                    <span class="font-mono">{relation.code}</span>
-                </li>
+                <span title=relation
+                    .label>{badge(relationship_tone(Some(&relation.code)), &relation.code)}</span>
             }
             .into_any()
         })
         .collect();
-    let stated = if relations.is_empty() {
-        view! {
-            <p class=styles::LEAD>
-                "The server stated no equivalence or relationship for this match."
-            </p>
-        }
-        .into_any()
+    let relations = if relations.is_empty() {
+        view! { <span class="fui-muted">"none stated"</span> }.into_any()
     } else {
-        view! { <ul class="mt-tight text-body">{relations}</ul> }.into_any()
+        cluster(relations).into_any()
     };
-    let facts: Vec<AnyView> = [
+    let facts: Vec<(&'static str, AnyView)> = [
         (
             "From concept",
             found.source_concept.as_ref().map(Coding::rendered),
@@ -608,27 +656,42 @@ fn match_view(found: &TranslationMatch) -> AnyView {
     .into_iter()
     .filter_map(|(label, value)| value.map(|value| (label, value)))
     .map(|(label, value)| {
-        view! {
-            <div class="grid gap-tight sm:grid-cols-[10rem_1fr]">
-                <dt class="font-medium">{label}</dt>
-                <dd class="font-mono break-all">{value}</dd>
-            </div>
-        }
-        .into_any()
+        (
+            label,
+            view! { <span class="wrap-break-word">{value}</span> }.into_any(),
+        )
     })
     .collect();
-    let products = values_view("Also produces", &found.products);
-    let depends = values_view("Depends on", &found.depends_on);
-    let properties = values_view("Properties", &found.properties);
+    let facts = (!facts.is_empty()).then(|| definitions(facts));
     view! {
-        <article class=format!("panel-p {}", styles::PANEL)>
-            <h4 class="font-mono text-body font-semibold break-all">{target}</h4>
-            {stated}
-            <dl class="mt-default text-small">{facts}</dl>
-            {products}
-            {depends}
-            {properties}
-        </article>
+        <tr>
+            <td>{target}</td>
+            <td data-label="Relationship">{relations}</td>
+            <td data-label="What came with it">
+                <div>
+                    {facts} {values_view("Also produces", &found.products)}
+                    {values_view("Depends on", &found.depends_on)}
+                    {values_view("Properties", &found.properties)}
+                </div>
+            </td>
+        </tr>
+    }
+    .into_any()
+}
+
+/// A coding as a cell: the code, its display under it, and its system.
+fn coding_cell(coding: &Coding) -> AnyView {
+    let version = coding
+        .version
+        .as_ref()
+        .map(|version| format!(" | {version}"))
+        .unwrap_or_default();
+    view! {
+        <span class="fui-mono">{coding.code.clone().unwrap_or_default()}</span>
+        <span class="block">{coding.display.clone().unwrap_or_default()}</span>
+        <span class="block font-normal fui-small fui-muted fui-mono sm:whitespace-nowrap">
+            {coding.system.clone().unwrap_or_default()} {version}
+        </span>
     }
     .into_any()
 }
@@ -646,18 +709,18 @@ fn values_view(label: &'static str, values: &[NamedValue]) -> AnyView {
                 .clone()
                 .unwrap_or_else(|| "a value shape this viewer draws no text for".to_owned());
             view! {
-                <li class="break-all">
-                    <span class="font-mono">{value.name.clone()}</span>
+                <span class="break-all">
+                    <span class="fui-mono">{value.name.clone()}</span>
                     ": "
                     {rendered}
-                </li>
+                </span>
             }
             .into_any()
         })
         .collect();
     view! {
-        <h5 class="mt-default text-small font-medium tracking-wide uppercase">{label}</h5>
-        <ul class="mt-tight ml-loose list-disc text-small">{items}</ul>
+        <p class="fui-label">{label}</p>
+        <div class="fui-small">{bullet_list(items)}</div>
     }
     .into_any()
 }
@@ -669,26 +732,19 @@ fn used_view(used: &[String]) -> AnyView {
     }
     let items: Vec<AnyView> = used
         .iter()
-        .map(|canonical| view! { <li class="break-all">{canonical.clone()}</li> }.into_any())
+        .map(|canonical| chip(canonical.clone()).into_any())
         .collect();
-    view! {
-        <h4 class="mt-loose text-small font-medium tracking-wide uppercase">
-            "The maps the server used"
-        </h4>
-        <ul class="mt-tight ml-loose list-disc font-mono text-small">{items}</ul>
-    }
+    panel_body(view! {
+        <p class="fui-label">"The maps the server used"</p>
+        {cluster(items)}
+    })
     .into_any()
 }
 
 /// A refused read, in the server's own words.
 fn failure_view(error: &FhirError) -> AnyView {
     let error = error.clone();
-    view! {
-        <div class="mt-default">
-            <Failure error=Signal::stored(error) />
-        </div>
-    }
-    .into_any()
+    panel_body(view! { <Failure error=Signal::stored(error) /> }).into_any()
 }
 
 /// How many matches a translation reported, as a sentence.

@@ -6,33 +6,36 @@
 use leptos::prelude::*;
 
 use crate::runs::Run;
+use crate::runs::RunList;
 use crate::runs::Runs;
-use crate::runs::remember;
-use crate::runs::stored;
 use crate::styles;
 
 /// The list a runner holds, and the recorder that keeps it current.
 ///
-/// The signal is what the list draws from, and `localStorage` is what it is
-/// read from and written to. A runner creates one of these and hands the
-/// `Memo` its own address reads.
+/// The signal is the page's own run list, which every runner shares. A runner
+/// creates one of these and hands the `Memo` its own address reads.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct History(RwSignal<Runs>);
 
 impl History {
-    /// A history that starts from what this browser already holds, and records
-    /// every run `made` names.
+    /// A history over the page's run list, which records every run `made`
+    /// names.
     ///
-    /// The effect exists to sync with `localStorage`, which is the outside
-    /// world and what an effect is for
-    /// (<https://github.com/leptos-rs/book/blob/main/src/reactivity/working_with_signals.md>).
-    /// The signal it writes is the list storage now holds, read back so the
-    /// screen draws what a reload would.
+    /// The list accumulates: each run is added to what earlier runs left, so
+    /// it is no value derived from `made` alone, and the effect is what keeps
+    /// it (<https://github.com/leptos-rs/book/blob/main/src/reactivity/working_with_signals.md>).
     pub(crate) fn recording(made: Memo<Option<Run>>) -> Self {
-        let held = RwSignal::new(stored());
+        let RunList(held) = use_context::<RunList>().unwrap_or_default();
+        let location = leptos_router::hooks::use_location();
         Effect::new(move |_| {
-            if let Some(run) = made.get() {
-                held.set(remember(&run));
+            // NOTE: no specification governs this: our own design; a run is
+            // remembered only while its screen is the one on the address, so a
+            // value read during a navigation away records no run of its own.
+            let here = location.pathname.get();
+            if let Some(run) = made.get()
+                && run.address.split('?').next() == Some(here.as_str())
+            {
+                held.update(|runs| *runs = runs.remembering(&run));
             }
         });
         Self(held)
@@ -47,14 +50,14 @@ impl History {
                     let rows: Vec<AnyView> = held
                         .with(|held| held.entries().iter().map(row).collect());
                     view! {
-                        <details class="mt-loose rounded-md border border-line text-small">
+                        <details class="mt-loose rounded-md border border-edge text-small">
                             <summary class=format!(
                                 "cursor-pointer px-default py-tight font-medium {}",
                                 styles::MUTED,
-                            )>"The runs this browser remembers"</summary>
-                            <div class="border-t border-line px-default py-tight">
+                            )>"The runs made on this page"</summary>
+                            <div class="border-t border-edge px-default py-tight">
                                 <p class=styles::HINT>
-                                    "Each one is the address that made it. They live in this browser and are never sent anywhere."
+                                    "Each one is the address that made it. They live in this page and are never sent anywhere."
                                 </p>
                                 <ul class="mt-default grid gap-tight">{rows}</ul>
                             </div>

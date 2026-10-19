@@ -16,7 +16,7 @@
 # Operate
 
 - [Install and run](operate/install.md)
-- [The viewer](operate/viewer.md)
+- [The console](operate/viewer.md)
 - [Configuration](operate/configuration.md)
 - [Loading code systems](operate/loading-snomed.md)
 - [Syncing from a national terminology service](operate/sync.md)

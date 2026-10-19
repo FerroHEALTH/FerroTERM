@@ -30,7 +30,7 @@ use crate::harness::sign_in;
 use crate::harness::signed_in;
 
 /// The sidebar link into the map authoring screen.
-const AUTHORING_LINK: &str = "//a[normalize-space()='Edit a concept map']";
+const AUTHORING_LINK: &str = "//a[normalize-space()='Concept map editor']";
 
 /// The code system the journeys map between.
 ///
@@ -129,17 +129,18 @@ async fn values(journey: &Journey, selector: &str) -> WebDriverResult<Vec<String
 
 /// Signs in as a terminologist and opens the map authoring screen.
 ///
-/// Every move after the sign-in is a press rather than a load, because a load
-/// would drop the token the sign-in just put in the page. `fhir` is the label
-/// of the version the journey runs on, reached through the switcher, which is
-/// a navigation the router handles; the sidebar link then carries it.
+/// `fhir` is the label of the version the journey runs on, reached through
+/// the switcher, whose post keeps it as the version an address naming none
+/// reads; the sidebar link then lands on it.
 async fn open_authoring(journey: &Journey, deployment: &SignedIn, tag: &str, fhir: &str) {
     journey
-        .element(By::Css("header a[href^='/ui']"), "the shell mark")
+        .element(By::Css("header a.fui-lockup"), "the shell mark")
         .await;
     choose(journey, deployment, "writer", tag).await;
     sign_in(journey, deployment).await;
-    let switch = format!("//nav[@aria-label='FHIR version']//a[normalize-space()='{fhir}']");
+    let switch = format!(
+        "//*[@role='group'][@aria-label='FHIR version']//button[normalize-space()='{fhir}']"
+    );
     journey
         .element(By::XPath(&switch), "the version this journey runs on")
         .await
@@ -148,9 +149,15 @@ async fn open_authoring(journey: &Journey, deployment: &SignedIn, tag: &str, fhi
         .unwrap_or_else(|error| panic!("the version switcher refused the press: {error}"));
     journey
         .text_becoming(
-            By::Css("nav[aria-label='FHIR version'] a[aria-current='page']"),
+            By::Css("[role='group'][aria-label='FHIR version'] button[aria-pressed='true']"),
             fhir.to_owned(),
             "the switcher to mark the version this journey runs on",
+        )
+        .await;
+    journey
+        .address_carrying(
+            &format!("fhir={}", fhir.to_lowercase()),
+            "the switcher's post to return to the page on that version",
         )
         .await;
     journey
@@ -273,27 +280,43 @@ const RAW_FAVICON: &str = "/favicon.ico - Failed to load resource";
 /// which element the save wrote, which no control on the screen can show.
 async fn stored_resource(journey: &Journey, base: &str, canonical: &str) -> String {
     journey
-        .reopen(&format!(
-            "{base}/r4b/ConceptMap?url={canonical}&_format=json"
-        ))
+        .reopen(&format!("{base}/conceptmaps?fhir=r4b&url={canonical}"))
         .await;
     journey
-        .element(By::Css("body"), "the resource the server holds")
+        .press(
+            By::Css("section[aria-labelledby='conceptmaps-heading'] tbody th a"),
+            "the stored map in the listing",
+        )
         .await
-        .text()
+        .unwrap_or_else(|error| panic!("opening the stored map: {error}"));
+    journey
+        .press(
+            By::XPath(
+                "//nav[@aria-label='Views of this concept map']//a[normalize-space()='JSON']",
+            ),
+            "the stored map's JSON tab",
+        )
         .await
-        .unwrap_or_else(|error| panic!("reading the stored resource: {error}"))
+        .unwrap_or_else(|error| panic!("opening the JSON tab: {error}"));
+    journey
+        .text_becoming(
+            By::Css("#conceptmap-json-highlighted"),
+            StringMatch::new("ConceptMap").partial(),
+            "the resource the server holds",
+        )
+        .await
 }
 
-/// Reads the saved map back on a fresh load, which holds no token.
+/// Reads the saved map back as a visitor, with the console's cookies dropped.
 ///
 /// What comes back is the server's own answer seen the way a reader who never
 /// signed in sees it, which is also what a built or national map looks like:
 /// the form is there and the save control is not.
 async fn the_map_comes_back_read_only(journey: &Journey, base: &str) -> WebDriverResult<()> {
+    journey.drop_cookies().await?;
     journey
         .reopen(&format!(
-            "{base}/ui/editor/conceptmap?fhir=r4b&map={}",
+            "{base}/conceptmap?fhir=r4b&map={}",
             r4b_canonical_param()
         ))
         .await;
@@ -313,7 +336,7 @@ async fn the_map_comes_back_read_only(journey: &Journey, base: &str) -> WebDrive
     assert_eq!(
         journey.count(By::XPath(SAVE)).await,
         0,
-        "a reader with no token is offered no save"
+        "a visitor is offered no save"
     );
 
     let stored = stored_resource(journey, base, &r4b_canonical_param()).await;
@@ -335,7 +358,7 @@ async fn the_map_comes_back_read_only(journey: &Journey, base: &str) -> WebDrive
 async fn the_runner_translates_through_it(journey: &Journey, base: &str) {
     journey
         .reopen(&format!(
-            "{base}/ui/editor/translate?fhir=r4b&map={}\
+            "{base}/translate?fhir=r4b&map={}\
              &system=https%3A%2F%2Fferroterm.eu%2Ffhir%2FCodeSystem%2Fe2e-taxonomy\
              &code={SOURCE_CODE}",
             r4b_canonical_param()
@@ -362,7 +385,7 @@ async fn a_local_concept_map_is_authored_previewed_and_saved_on_r4b() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &deployment.base, "/ui/editor").await;
+            let journey = Journey::open(driver, &deployment.base, "/").await;
             open_authoring(&journey, &deployment, "authors-a-map-r4b", "R4B").await;
 
             // `equivalent` is a code of the value set R4B binds
@@ -444,7 +467,7 @@ async fn the_same_map_writes_r5_s_own_relationship_element() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &deployment.base, "/ui/editor").await;
+            let journey = Journey::open(driver, &deployment.base, "/").await;
             open_authoring(&journey, &deployment, "authors-a-map-r5", "R5").await;
 
             author(&journey, &r5_canonical(), "source-is-narrower-than-target").await?;
@@ -497,7 +520,7 @@ async fn one_mapping_is_authored_with_the_keyboard_alone() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &deployment.base, "/ui/editor").await;
+            let journey = Journey::open(driver, &deployment.base, "/").await;
             open_authoring(&journey, &deployment, "keyboard-map", "R4B").await;
 
             journey.tab_to("map-url", "the canonical field").await;
@@ -567,33 +590,34 @@ async fn one_mapping_is_authored_with_the_keyboard_alone() {
     outcome.expect("the journey ran and the browser session ended cleanly");
 }
 
-/// The reader bundle carries no map authoring screen and no way to reach one.
+/// A console that offers no sign-in carries no map authoring screen and no
+/// way to reach one.
 #[tokio::test]
-async fn the_reader_bundle_carries_no_map_authoring_screen() {
+async fn a_console_without_a_sign_in_carries_no_map_authoring_screen() {
     let Some(base) = server() else {
         return;
     };
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &base, "/ui/conceptmap?fhir=r4b").await;
+            let journey = Journey::open(driver, &base, "/conceptmap?fhir=r4b").await;
             journey
-                .element(By::Css("h1"), "the reader's answer to an unknown address")
+                .element(By::Css("h1"), "the console's answer to an address it lacks")
                 .await;
             assert_eq!(
                 journey.count(By::Css(URL_FIELD)).await,
                 0,
-                "the reader bundle draws no map authoring form"
+                "a console without a sign-in draws no map authoring form"
             );
 
-            journey.reopen(&format!("{base}/ui?fhir=r4b")).await;
+            journey.reopen(&format!("{base}/?fhir=r4b")).await;
             journey
-                .element(By::Css("header a[href^='/ui']"), "the shell mark")
+                .element(By::Css("header a.fui-lockup"), "the shell mark")
                 .await;
             assert_eq!(
                 journey.count(By::XPath(AUTHORING_LINK)).await,
                 0,
-                "the reader's sidebar leads to no map authoring screen"
+                "the sidebar of a console without a sign-in leads to no map authoring screen"
             );
 
             journey.no_console_errors().await;

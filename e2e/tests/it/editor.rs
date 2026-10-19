@@ -1,16 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
-//! Authoring a local code system in the editor bundle, and what the reader
-//! bundle does not carry.
+//! Authoring a local code system, and what a console without a sign-in does
+//! not carry.
 //!
-//! The two bundles are two documents the one server serves, the reader's at
-//! `/ui` and the editor's at `/ui/editor`, so a journey names the bundle it
-//! drives in the address it opens.
-//!
-//! The write journeys sign in through the stub issuer against the deployment
-//! that configures one, because a write needs a token the server will take.
-//! The token lives in the page that holds it, so once signed in these journeys
-//! move between screens by pressing links the router intercepts; a fresh load
-//! holds no token, which is what the read-back below shows.
+//! The write journeys sign in through the stub issuer at the console that
+//! configures one, because a write needs a token the server will take. The
+//! console's server holds the token in the reader's session; the read-back
+//! below drops the console's cookies first, so it reads as a visitor.
 
 use thirtyfour::common::keys::TypingData;
 use thirtyfour::prelude::*;
@@ -27,7 +22,7 @@ use crate::harness::sign_in;
 use crate::harness::signed_in;
 
 /// The sidebar link into the authoring screen.
-const AUTHORING_LINK: &str = "//a[normalize-space()='Edit a code system']";
+const AUTHORING_LINK: &str = "//a[normalize-space()='Code system editor']";
 
 /// The canonical the round-trip journey authors under.
 ///
@@ -100,15 +95,13 @@ async fn values(journey: &Journey, selector: &str) -> WebDriverResult<Vec<String
 
 /// Signs in under `profile` and opens the authoring screen from the sidebar.
 ///
-/// The screen is reached by pressing the link rather than by loading its
-/// address, because a load would drop the token the sign-in just put in the
-/// page.
+/// The screen is reached by pressing the link, the way a reader reaches it.
 async fn open_authoring(journey: &Journey, deployment: &SignedIn, profile: &str, tag: &str) {
     // The page the journey opened on is left for the issuer's, so it is
     // waited for first: a bundle still fetching its own assets logs an
     // aborted request when the address changes under it.
     journey
-        .element(By::Css("header a[href^='/ui']"), "the shell mark")
+        .element(By::Css("header a.fui-lockup"), "the shell mark")
         .await;
     choose(journey, deployment, profile, tag).await;
     sign_in(journey, deployment).await;
@@ -203,13 +196,14 @@ async fn add_and_retire(journey: &Journey) -> WebDriverResult<()> {
 
 /// Reads the code system back off the server and checks the retirement stuck.
 ///
-/// This is a fresh page load, so the page holds no token and the form opens
-/// read-only: what it shows is the server's own answer, seen the way a reader
-/// who never signed in sees it.
+/// The console's cookies are dropped first, so the form opens read-only:
+/// what it shows is the server's own answer, seen the way a reader who never
+/// signed in sees it.
 async fn the_retirement_survives(journey: &Journey, base: &str) -> WebDriverResult<()> {
+    journey.drop_cookies().await?;
     journey
         .reopen(&format!(
-            "{base}/ui/editor/codesystem?fhir=r4b&system={}",
+            "{base}/codesystem?fhir=r4b&system={}",
             query_param(&canonical())
         ))
         .await;
@@ -254,7 +248,7 @@ async fn a_local_code_system_is_authored_retired_and_read_back() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &deployment.base, "/ui/editor").await;
+            let journey = Journey::open(driver, &deployment.base, "/").await;
             open_authoring(&journey, &deployment, "writer", "authors-a-code-system").await;
 
             author(&journey, &canonical(), FIRST, "Red").await?;
@@ -321,7 +315,7 @@ async fn a_write_without_the_scope_is_refused_in_the_server_s_own_words() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &deployment.base, "/ui/editor").await;
+            let journey = Journey::open(driver, &deployment.base, "/").await;
             open_authoring(&journey, &deployment, "response-only", "refused-write").await;
 
             author(&journey, &refused_canonical(), "refused", "Refused").await?;
@@ -388,7 +382,7 @@ async fn one_concept_is_authored_with_the_keyboard_alone() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &deployment.base, "/ui/editor").await;
+            let journey = Journey::open(driver, &deployment.base, "/").await;
             open_authoring(&journey, &deployment, "writer", "keyboard-authoring").await;
 
             journey.tab_to("editor-url", "the canonical field").await;
@@ -443,35 +437,34 @@ async fn one_concept_is_authored_with_the_keyboard_alone() {
     outcome.expect("the journey ran and the browser session ended cleanly");
 }
 
-/// The reader bundle carries no authoring screen and no way to reach one.
+/// A console that offers no sign-in carries no authoring screen and no way to
+/// reach one, since nobody there can save.
 #[tokio::test]
-async fn the_reader_bundle_carries_no_authoring_screen() {
+async fn a_console_without_a_sign_in_carries_no_authoring_screen() {
     let Some(base) = server() else {
         return;
     };
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &base, "/ui/codesystem?fhir=r4b").await;
-            // The reader's router has no such route, so its own not-found
-            // screen answers rather than an authoring form.
+            let journey = Journey::open(driver, &base, "/codesystem?fhir=r4b").await;
             journey
-                .element(By::Css("h1"), "the reader's answer to an unknown address")
+                .element(By::Css("h1"), "the console's answer to an address it lacks")
                 .await;
             assert_eq!(
                 journey.count(By::Css(URL_FIELD)).await,
                 0,
-                "the reader bundle draws no authoring form"
+                "a console without a sign-in draws no authoring form"
             );
 
-            journey.reopen(&format!("{base}/ui?fhir=r4b")).await;
+            journey.reopen(&format!("{base}/?fhir=r4b")).await;
             journey
-                .element(By::Css("header a[href^='/ui']"), "the shell mark")
+                .element(By::Css("header a.fui-lockup"), "the shell mark")
                 .await;
             assert_eq!(
                 journey.count(By::XPath(AUTHORING_LINK)).await,
                 0,
-                "the reader's sidebar leads to no authoring screen"
+                "the sidebar of a console without a sign-in leads to no authoring screen"
             );
 
             journey.no_console_errors().await;

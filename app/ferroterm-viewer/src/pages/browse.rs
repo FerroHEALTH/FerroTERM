@@ -11,12 +11,21 @@
 //! its children and each use of it monomorphizes the whole subtree
 //! (`.claude/rules/leptos-ui.md` §1, the bundle bar).
 
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
+use ferrohealth_ui::table::model::filled_columns;
+use ferrohealth_ui::table::view::{Body, Column, DataTable, data_table};
+use ferrohealth_ui::view::button::Variant;
+use ferrohealth_ui::view::empty::empty_quiet;
+use ferrohealth_ui::view::form::{INPUT, MEDIUM, SELECT};
+use ferrohealth_ui::view::layout::{Pane, divided_list, three_panes};
+use ferrohealth_ui::view::surface::{
+    Crumb, Header, card, cluster, definitions, page_heading, stack,
+};
+use ferrohealth_ui::widget::tree::{Tree, TreeNode, tree_view_collapsing};
 use leptos::ev::Event;
-use leptos::ev::FocusEvent;
-use leptos::ev::KeyboardEvent;
 use leptos::ev::SubmitEvent;
 use leptos::html::Input;
 use leptos::prelude::*;
@@ -24,15 +33,12 @@ use leptos_meta::Title;
 use leptos_router::NavigateOptions;
 use leptos_router::hooks::use_navigate;
 use leptos_router::hooks::use_query_map;
-use wasm_bindgen::JsCast;
 
 use crate::components::NOT_DECLARED;
 use crate::components::failure::Failure;
 use crate::components::icon;
-use crate::components::icon::Icon;
 use crate::components::reading::Reading;
 use crate::components::shell::SelectedVersion;
-use crate::components::spinner::Spinner;
 use crate::fhir::CODE_SYSTEM;
 use crate::fhir::FhirClient;
 use crate::fhir::concept::CHILD_OF_OPERATOR;
@@ -62,41 +68,18 @@ use crate::routes::VERSION_PARAM;
 use crate::routes::base_url;
 use crate::routes::system_link;
 use crate::settings::Settings;
-use crate::styles;
-use crate::tree::TreeAction;
 use crate::tree::TreeConcept;
 use crate::tree::TreeRow;
-use crate::tree::action;
 use crate::tree::decode_open;
 use crate::tree::encode_open;
 use crate::tree::rows;
+use ferrohealth_ui::view::empty::{Busy, busy};
 
 /// The address parameter carrying the concept the tree hangs from.
 const ROOT_PARAM: &str = "root";
 
 /// The address parameter carrying the open nodes of the tree.
 const OPEN_PARAM: &str = "open";
-
-/// The prefix of the element id every tree row carries.
-const ROW_ID: &str = "browse-tree-";
-
-/// The classes the twist that opens and closes a tree row carries.
-///
-/// The box is 24 by 24 CSS pixels around a smaller chevron, which is the
-/// minimum target WCAG 2.2 SC 2.5.8 sets
-/// (<https://www.w3.org/TR/WCAG22/#target-size-minimum>).
-const TWIST: &str = "state-change mr-tight inline-flex h-6 w-6 items-center justify-center \
-                     rounded text-accent hover:bg-inset";
-
-/// The classes a table cell carries.
-const CELL: &str = "py-tight pr-default text-left text-small font-normal wrap-break-word";
-
-/// How far one level of the tree is indented, in pixels.
-///
-/// The indent is written in whole pixels rather than in `rem`, because a
-/// fractional value would pull the whole floating-point formatter into a
-/// bundle that has no other use for it.
-const INDENT: u32 = 20;
 
 /// Browses one code system: search, one concept, and its hierarchy.
 ///
@@ -112,11 +95,11 @@ const INDENT: u32 = 20;
 pub(crate) fn BrowsePage() -> impl IntoView {
     let client = expect_context::<FhirClient>();
     let SelectedVersion(version) = expect_context::<SelectedVersion>();
-    let settings = expect_context::<Settings>();
+    let page_size = expect_context::<Settings>().page_size;
     let query = use_query_map();
     let params: Signal<BrowseParams> =
         Memo::new(move |_| query.with(|map| BrowseParams::read(&|name| map.get(name)))).into();
-    let count: Memo<u32> = Memo::new(move |_| settings.page_size.get().clamp(1, MAX_COUNT));
+    let count: Memo<u32> = Memo::new(move |_| page_size.clamp(1, MAX_COUNT));
     let named: Memo<bool> = Memo::new(move |_| params.with(|params| !params.system.is_empty()));
 
     let capability_client = client.clone();
@@ -144,12 +127,27 @@ pub(crate) fn BrowsePage() -> impl IntoView {
     });
 
     let heading = view! {
-        <Title text="Concept browser" />
-        <h1 class=styles::PAGE_TITLE>"Concept browser"</h1>
-        <p class=styles::LEAD>"Search a code system, read a concept, walk its hierarchy."</p>
-        {system_picker(version, params, choices(published(&client, version, CODE_SYSTEM)))}
+        <Title text="Browse concepts" />
+        <div>
+            {page_heading(
+                Header {
+                    title: String::from("Browse concepts"),
+                    subtitle: Some(
+                        String::from("Search a code system, read a concept, walk its hierarchy."),
+                    ),
+                    crumbs: vec![Crumb::new("Code systems", "/systems")],
+                    mono: false,
+                },
+                (),
+            )}
+        </div>
     }
     .into_any();
+    let picker = system_picker(
+        version,
+        params,
+        choices(published(&client, version, CODE_SYSTEM)),
+    );
 
     let system = system_section(version, params, capabilities, declared, named);
     let search = search_section(&client, version, params, count, named);
@@ -159,14 +157,25 @@ pub(crate) fn BrowsePage() -> impl IntoView {
     // Three panes side by side above the large breakpoint, each scrolling its
     // own content, and one stack below it. The order is the order of the work:
     // search for a concept, walk what is under it, read the one you landed on.
+    let settings = card(
+        "What is browsed",
+        view! {
+            {picker}
+            {system}
+        },
+    );
     view! {
-        {heading}
-        {system}
-        <div class="mt-section grid gap-loose lg:grid-cols-[20rem_minmax(0,1fr)_24rem]">
-            <div class="min-w-0 lg:pane-scroll">{search}</div>
-            <div class="min-w-0 lg:pane-scroll">{tree}</div>
-            <div class="min-w-0 lg:pane-scroll">{concept}</div>
-        </div>
+        {stack(
+            view! {
+                {heading}
+                {settings}
+                {three_panes(
+                    Pane::new("Search", search),
+                    Pane::new("Below this concept", tree),
+                    Pane::new("The concept", concept),
+                )}
+            },
+        )}
     }
 }
 
@@ -356,7 +365,7 @@ impl BrowseParams {
 }
 
 /// The walk one drawing of the tree performs.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 struct ChildWalk {
     /// The canonical of the system being walked.
     system: String,
@@ -401,20 +410,16 @@ fn system_section(
 ) -> AnyView {
     let body = move || {
         view! {
-            <section class="mt-loose" aria-labelledby="browse-system-heading">
-                <h2 id="browse-system-heading" class=styles::SECTION_TITLE>
+            <section class="fui-stack" aria-labelledby="browse-system-heading">
+                <h2 id="browse-system-heading" class="fui-sr-only">
                     "The code system being browsed"
                 </h2>
-                <p class="mt-tight text-body break-all">
+                <p class="fui-mono break-all">
                     {move || {
                         params
                             .with(|params| {
                                 let target = system_link(&params.system, version.get());
-                                view! {
-                                    <a href=target class=styles::LINK>
-                                        {params.system.clone()}
-                                    </a>
-                                }
+                                view! { <a href=target>{params.system.clone()}</a> }
                             })
                     }}
                 </p>
@@ -467,10 +472,13 @@ fn version_view(row: &VersionRow, hierarchy: &Hierarchy) -> AnyView {
             "This version declares no hierarchy filter operator, so its concepts are a flat list and there is no tree to walk.",
         ),
     };
-    view! {
-        <p class="mt-default font-mono text-body break-all">{code}</p>
-        <p class=styles::LEAD>{walk}</p>
-    }
+    definitions(vec![
+        (
+            "Version",
+            view! { <span class="fui-mono">{code}</span> }.into_any(),
+        ),
+        ("Hierarchy", walk.into_any()),
+    ])
     .into_any()
 }
 
@@ -507,14 +515,14 @@ fn language_view(
     };
     let picker = move || {
         view! {
-            <div class="mt-default grid max-w-xs gap-tight">
-                <label for="browse-language" class="text-body font-medium">
+            <div class="fui-field">
+                <label for="browse-language" class="fui-label">
                     "Display language"
                 </label>
                 <select
                     id="browse-language"
                     name=DISPLAY_LANGUAGE_PARAMETER
-                    class=styles::INPUT
+                    class=format!("{SELECT} {MEDIUM}")
                     aria-describedby="browse-language-note"
                     prop:value=move || params.with(|params| params.language.clone())
                     on:change=change
@@ -522,7 +530,7 @@ fn language_view(
                     <option value="">"The server's own choice"</option>
                     {options}
                 </select>
-                <p id="browse-language-note" class="text-small text-faint">
+                <p id="browse-language-note" class="fui-help">
                     "The languages this version declares. The choice is sent as displayLanguage on every operation this screen calls."
                 </p>
             </div>
@@ -554,23 +562,24 @@ fn search_section(
     let query: Memo<Option<ConceptQuery>> =
         Memo::new(move |_| params.with(|params| params.search(count.get())));
     let read_client = client.clone();
-    let matches = LocalResource::new(move || {
-        let client = read_client.clone();
-        let version = version.get();
-        let query = query.get();
-        async move {
-            match query {
-                Some(query) => Some(client.expand_inline(version, &query).await),
-                None => None,
+    let matches = Resource::new(
+        move || (version.get(), query.get()),
+        move |(version, query)| {
+            let client = read_client.clone();
+            async move {
+                match query {
+                    Some(query) => Some(client.expand_inline(version, &query).await),
+                    None => None,
+                }
             }
-        }
-    });
+        },
+    );
 
     // The live region is in the document before the read settles, which is
     // what lets a screen reader announce the count when it arrives. It is
     // derived from the answer, never from the address, because `<Transition>`
     // keeps the previous list on screen while the next one loads.
-    let announcement = Memo::new(move |_| {
+    let announcement = move || {
         matches.with(|answered| {
             answered
                 .as_ref()
@@ -579,7 +588,7 @@ fn search_section(
                 .map(|value| found_sentence(&concepts_of(value), count.get()))
                 .unwrap_or_default()
         })
-    });
+    };
 
     // The field is seeded from a memo over the term alone, because
     // `prop:value` writes the property on every notification with no equality
@@ -598,35 +607,35 @@ fn search_section(
 
     let body = move || {
         view! {
-            <section aria-labelledby="browse-search-heading">
-                <h2 id="browse-search-heading" class=styles::SECTION_TITLE>
+            <section class="fui-stack" aria-labelledby="browse-search-heading">
+                <h2 id="browse-search-heading" class="fui-card-title">
                     "Search"
                 </h2>
-                <form class="mt-default grid max-w-xl gap-tight" on:submit=submit>
-                    <label for="browse-filter" class="text-body font-medium">
+                <form class="fui-field" role="search" on:submit=submit>
+                    <label for="browse-filter" class="fui-label">
                         "Filter"
                     </label>
-                    <div class="flex gap-default">
+                    <div class="fui-search">
                         <input
                             id="browse-filter"
                             name=FILTER_PARAMETER
                             type="search"
-                            class=styles::INPUT
+                            class=INPUT
                             aria-describedby="browse-filter-note"
                             node_ref=field
                             prop:value=move || term.get()
                         />
-                        <button type="submit" class=styles::SUBMIT>
-                            <Icon glyph=icon::SEARCH />
+                        <button type="submit" class=Variant::Primary.class()>
+                            {ferrohealth_ui::icon::icon(icon::SEARCH, "16")}
                             "Search"
                         </button>
                     </div>
-                    <p id="browse-filter-note" class="text-small text-faint">
+                    <p id="browse-filter-note" class="fui-help">
                         "Sent as the filter parameter of $expand over a value set that selects this code system. An empty filter lists the first concepts the server answers."
                     </p>
                 </form>
-                <p aria-live="polite" class="mt-default text-body text-muted">
-                    {announcement}
+                <p aria-live="polite" class="fui-muted fui-small">
+                    <Transition fallback=|| ()>{announcement}</Transition>
                 </p>
                 <Reading label="Searching the code system">
                     {move || {
@@ -683,19 +692,13 @@ fn matches_view(concepts: &[ConceptRow], params: &BrowseParams, version: FhirVer
             let code = concept.code.clone();
             let inactive = concept.inactive.then(|| String::from(" (inactive)"));
             view! {
-                <li class="border-b border-line py-tight last:border-0">
-                    <a href=target class=styles::LINK>
-                        {display}
-                    </a>
-                    <span class="ml-default font-mono text-small break-all text-faint">
-                        {code} {inactive}
-                    </span>
-                </li>
+                <a href=target>{display}</a>
+                <span class="block fui-small fui-muted fui-mono break-all">{code} {inactive}</span>
             }
             .into_any()
         })
         .collect();
-    view! { <ul class="mt-default text-body">{items}</ul> }.into_any()
+    divided_list(Some("Concepts the search matched"), items)
 }
 
 /// The concept the address names, as `$lookup` answers it.
@@ -709,26 +712,27 @@ fn concept_section(
     let request: Memo<Option<LookupRequest>> =
         Memo::new(move |_| params.with(BrowseParams::lookup));
     let read_client = client.clone();
-    let looked_up = LocalResource::new(move || {
-        let client = read_client.clone();
-        let version = version.get();
-        let request = request.get();
-        async move {
-            // The request travels back with its answer, because a resource
-            // keeps its previous value while it refetches and `<Transition>`
-            // keeps the previous view mounted, so a closure reading both the
-            // address and the answer would pair the new code with the concept
-            // that was read before it
-            // (<https://github.com/leptos-rs/book/blob/main/src/async/12_transition.md>).
-            match request {
-                Some(request) => {
-                    let answer = client.lookup(version, &request).await;
-                    Some((request, answer))
+    let looked_up = Resource::new(
+        move || (version.get(), request.get()),
+        move |(version, request)| {
+            let client = read_client.clone();
+            async move {
+                // The request travels back with its answer, because a resource
+                // keeps its previous value while it refetches and `<Transition>`
+                // keeps the previous view mounted, so a closure reading both the
+                // address and the answer would pair the new code with the concept
+                // that was read before it
+                // (<https://github.com/leptos-rs/book/blob/main/src/async/12_transition.md>).
+                match request {
+                    Some(request) => {
+                        let answer = client.lookup(version, &request).await;
+                        Some((request, answer))
+                    }
+                    None => None,
                 }
-                None => None,
             }
-        }
-    });
+        },
+    );
     let asked: Memo<bool> = Memo::new(move |_| request.with(Option::is_some));
 
     let answered = move || {
@@ -742,14 +746,7 @@ fn concept_section(
                             answered
                                 .as_ref()
                                 .map(|answer| match answer {
-                                    None => {
-                                        // The pane is only rendered while the
-                                        // address names a concept, so an answer
-                                        // holding no request is one the reader has
-                                        // already navigated away from.
-                                        view! { <Spinner label="Reading the concept" /> }
-                                            .into_any()
-                                    }
+                                    None => busy("Reading the concept", Busy::Section).into_any(),
                                     Some((asked, Ok(value))) => {
                                         params
                                             .with(|params| {
@@ -772,8 +769,8 @@ fn concept_section(
     };
     let body = move || {
         view! {
-            <section aria-labelledby="browse-concept-heading">
-                <h2 id="browse-concept-heading" class=styles::SECTION_TITLE>
+            <section class="fui-stack" aria-labelledby="browse-concept-heading">
+                <h2 id="browse-concept-heading" class="fui-card-title">
                     "The concept"
                 </h2>
                 {move || {
@@ -865,9 +862,11 @@ fn concept_view(
         "This server answers no property for this concept.",
     );
     view! {
-        <h3 class="mt-default text-body font-semibold">{display}</h3>
-        <p class="font-mono text-small break-all text-faint">{code}</p>
-        <p class="text-small text-faint">{held}</p>
+        <div>
+            <h3 class="text-title font-semibold">{display}</h3>
+            <p class="fui-mono fui-small fui-muted break-all">{code}</p>
+            <p class="fui-small fui-muted">{held}</p>
+        </div>
         {parents}
         {children}
         {designations}
@@ -893,19 +892,17 @@ fn links_view(
             let target = params.rooted_at(related).address(version);
             let code = related.clone();
             view! {
-                <li>
-                    <a href=target class="font-mono text-small ".to_owned() + styles::LINK>
-                        {code}
-                    </a>
-                </li>
+                <a href=target class="fui-button fui-button-secondary fui-button-small fui-mono">
+                    {code}
+                </a>
             }
             .into_any()
         })
         .collect();
     view! {
-        <nav aria-label=format!("{label} of this concept") class="mt-default">
-            <h4 class="text-small font-medium tracking-wide uppercase">{label}</h4>
-            <ul class="mt-tight flex flex-wrap gap-default">{links}</ul>
+        <nav aria-label=format!("{label} of this concept") class="fui-stack">
+            <p class="fui-label">{label}</p>
+            {cluster(links)}
         </nav>
     }
     .into_any()
@@ -921,55 +918,58 @@ fn table_view(
     rows: Vec<[String; 3]>,
     absent: &'static str,
 ) -> AnyView {
-    if rows.is_empty() {
-        return note(absent);
-    }
     let [first, second, third] = headers;
-    let body: Vec<AnyView> = rows
-        .into_iter()
-        .map(|cells| {
-            let [head, middle, tail] = cells.map(|cell| {
-                if cell.is_empty() {
-                    NOT_DECLARED.to_owned()
-                } else {
-                    cell
-                }
-            });
-            view! {
-                <tr class="border-b border-line align-top last:border-0">
-                    <th scope="row" class=CELL>
-                        {head}
-                    </th>
-                    <td class=CELL>{middle}</td>
-                    <td class="py-tight text-small wrap-break-word text-faint">{tail}</td>
-                </tr>
-            }
-            .into_any()
-        })
-        .collect();
-    view! {
-        <div class="mt-default overflow-x-auto">
-            <table class="w-full border-collapse text-left">
-                <caption class="pb-tight text-left text-small font-medium tracking-wide uppercase">
-                    {caption}
-                </caption>
-                <thead>
-                    <tr class="border-b border-line">
-                        <th scope="col" class=CELL>
-                            {first}
-                        </th>
-                        <th scope="col" class=CELL>
-                            {second}
-                        </th>
-                        <th scope="col" class=CELL>
-                            {third}
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>{body}</tbody>
-            </table>
-        </div>
-    }
+    // A last column no row fills says nothing, so it is not drawn.
+    let columns = filled_columns(
+        &[
+            Column::text("first", first),
+            Column::text("second", second),
+            Column::text("third", third),
+        ],
+        &rows,
+        &["first", "second"],
+        |row, _| row.get(2).is_some_and(|cell| !cell.is_empty()),
+    );
+    let thirds = columns.len() == 3;
+    let body = if rows.is_empty() {
+        Body::Empty(empty_quiet(icon::BROWSE, "Nothing declared", absent).into_any())
+    } else {
+        Body::Rows(
+            rows.into_iter()
+                .map(|cells| {
+                    let [head, middle, tail] = cells.map(|cell| {
+                        if cell.is_empty() {
+                            NOT_DECLARED.to_owned()
+                        } else {
+                            cell
+                        }
+                    });
+                    view! {
+                        <tr>
+                            <th scope="row">{head}</th>
+                            <td data-label=second>{middle}</td>
+                            {thirds
+                                .then(|| {
+                                    view! {
+                                        <td data-label=third class="fui-muted">
+                                            {tail}
+                                        </td>
+                                    }
+                                })}
+                        </tr>
+                    }
+                })
+                .collect_view()
+                .into_any(),
+        )
+    };
+    data_table(DataTable {
+        caption,
+        columns: &columns,
+        sort: None,
+        sort_href: &|_| String::new(),
+        body,
+    })
     .into_any()
 }
 
@@ -996,7 +996,7 @@ fn child_walk(
 }
 
 /// One level of the tree, and whether the server listed all of it.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 struct Level {
     /// The children this level drew.
     children: Vec<TreeConcept>,
@@ -1011,7 +1011,7 @@ struct Level {
 /// view mounted, so rows built from the address over the last answer would
 /// claim the new anchor has no children before its level has been read
 /// (<https://github.com/leptos-rs/book/blob/main/src/async/12_transition.md>).
-type Levels = LocalResource<Option<(ChildWalk, Vec<(String, Result<Level, FhirError>)>)>>;
+type Levels = Resource<Option<(ChildWalk, Vec<(String, Result<Level, FhirError>)>)>>;
 
 /// Issues the reads one drawing of the tree needs.
 ///
@@ -1024,37 +1024,38 @@ fn child_levels(
     walk: Memo<Option<ChildWalk>>,
 ) -> Levels {
     let read_client = client.clone();
-    LocalResource::new(move || {
-        let client = read_client.clone();
-        let version = version.get();
-        let walk = walk.get();
-        async move {
-            let walk = walk?;
-            let mut answers: Vec<(String, Result<Level, FhirError>)> = Vec::new();
-            let mut frontier = vec![walk.root.clone()];
-            let mut asked: BTreeSet<String> = BTreeSet::new();
-            while let Some(code) = frontier.pop() {
-                if !asked.insert(code.clone()) {
-                    continue;
+    Resource::new(
+        move || (version.get(), walk.get()),
+        move |(version, walk)| {
+            let client = read_client.clone();
+            async move {
+                let walk = walk?;
+                let mut answers: Vec<(String, Result<Level, FhirError>)> = Vec::new();
+                let mut frontier = vec![walk.root.clone()];
+                let mut asked: BTreeSet<String> = BTreeSet::new();
+                while let Some(code) = frontier.pop() {
+                    if !asked.insert(code.clone()) {
+                        continue;
+                    }
+                    let answer = client
+                        .expand_inline(version, &walk.query(&code))
+                        .await
+                        .map(|value| children_of(&value));
+                    if let Ok(level) = &answer {
+                        frontier.extend(
+                            level
+                                .children
+                                .iter()
+                                .filter(|child| walk.open.contains(&child.code))
+                                .map(|child| child.code.clone()),
+                        );
+                    }
+                    answers.push((code, answer));
                 }
-                let answer = client
-                    .expand_inline(version, &walk.query(&code))
-                    .await
-                    .map(|value| children_of(&value));
-                if let Ok(level) = &answer {
-                    frontier.extend(
-                        level
-                            .children
-                            .iter()
-                            .filter(|child| walk.open.contains(&child.code))
-                            .map(|child| child.code.clone()),
-                    );
-                }
-                answers.push((code, answer));
+                Some((walk, answers))
             }
-            Some((walk, answers))
-        }
-    })
+        },
+    )
 }
 
 /// The hierarchy below the concept, one declared level at a time.
@@ -1074,15 +1075,15 @@ fn tree_section(
     // concept the server said has no children. `None` is that not-yet case:
     // the section is only rendered while a walk exists, so an answer holding
     // no walk belongs to an address the reader has already left.
-    let drawn = move || {
+    let drawn = Signal::derive(move || {
         levels.with(|answered| {
             answered
                 .as_ref()
                 .and_then(Option::as_ref)
                 .map(|(walk, answers)| rows(&walk.root, &walk.open, &known_children(answers)))
         })
-    };
-    let refusals = move || {
+    });
+    let refusals = Signal::derive(move || {
         levels.with(|answered| {
             answered
                 .as_ref()
@@ -1095,7 +1096,7 @@ fn tree_section(
                 })
                 .unwrap_or_default()
         })
-    };
+    });
     // A level the server counted higher than it listed is a partial answer,
     // and the tree says so on the node it hangs below rather than drawing a
     // short list as if it were the whole one.
@@ -1109,279 +1110,150 @@ fn tree_section(
         })
     };
 
-    let focused: RwSignal<String> = RwSignal::new(String::new());
-    // The pattern's invariant is that the row carrying `tabindex="0"` is the
-    // focused row, and a row is click-focusable at `tabindex="-1"`, so the tab
-    // stop follows the browser's own focus rather than only the arrow keys
-    // (<https://www.w3.org/WAI/ARIA/apg/patterns/treeview/>).
-    let entered = move |event: FocusEvent| {
-        let Some(key) = focused_row_key(&event) else {
+    let navigate = StoredValue::new(use_navigate());
+    // A node opened or closed is a navigation, so the open set is the address
+    // and a reader can send the walk they made.
+    let toggle = move |key: String, open: bool| {
+        let Some(code) = drawn
+            .get_untracked()
+            .unwrap_or_default()
+            .into_iter()
+            .find(|row| row.key == key)
+            .map(|row| row.concept.code)
+        else {
             return;
         };
-        if focused.with(|current| current != &key) {
-            focused.set(key);
-        }
+        let target = params.with_untracked(|params| {
+            params
+                .toggling(&code, open)
+                .address(version.get_untracked())
+        });
+        navigate.with_value(|navigate| go(navigate, &target));
     };
-    let pressed = tree_keys(version, params, focused, drawn);
-
-    let body = move || {
-        view! {
-            <section aria-labelledby="browse-tree-heading">
-                <h2 id="browse-tree-heading" class=styles::SECTION_TITLE>
-                    "Below this concept"
-                </h2>
-                <p class=styles::LEAD>"Arrow keys walk it. Enter reads the concept."</p>
-                // The rows are the only focusable part of the tree, so both a
-                // key press and a focus move arrive here by bubbling from the
-                // row that has focus.
-                <div on:keydown=pressed on:focusin=entered>
-                    <Reading label="Reading the children">
-                        {move || {
-                            let version = version.get();
-                            let Some(rows) = drawn() else {
-                                return view! { <Spinner label="Reading the children" /> }
-                                    .into_any();
-                            };
-                            let stop = tab_stop(&rows, &focused.get());
-                            let partial = partial();
-                            params
-                                .with(|params| {
-                                    let selected = selected_row(&rows, &stop, &params.code);
-                                    tree_view(
-                                        &rows,
-                                        &TreeChrome {
-                                            stop: &stop,
-                                            selected: &selected,
-                                            partial: &partial,
-                                            params,
-                                            version,
-                                        },
-                                    )
-                                })
-                        }}
-                        {move || { refusals().iter().map(failure_view).collect::<Vec<AnyView>>() }}
-                    </Reading>
-                </div>
-            </section>
-        }
-        .into_any()
+    let on_expand = Callback::new(move |key: String| toggle(key, true));
+    let on_collapse = Callback::new(move |key: String| toggle(key, false));
+    // NOTE: Leptos book, `async/11_suspense`: the tree is built inside the
+    // boundary from the rows the walk answered, so no read escapes it.
+    let draw = move |rows: Vec<TreeRow>| {
+        let version = version.get();
+        let partial = partial();
+        let (nodes, selected) = params.with(|params| {
+            (
+                nested(&rows, None, params, version, &partial),
+                selected_row(&rows, &params.code),
+            )
+        });
+        let open: BTreeSet<String> = rows
+            .iter()
+            .filter(|row| row.open)
+            .map(|row| row.key.clone())
+            .collect();
+        tree_view_collapsing(
+            Tree {
+                id: "browse-tree",
+                label: "The concepts below this one",
+                nodes: Signal::stored(nodes),
+                expanded: RwSignal::new(open),
+                selected: Signal::stored((!selected.is_empty()).then_some(selected)),
+                on_expand: Some(on_expand),
+                actions: None,
+            },
+            on_collapse,
+        )
     };
+    let draw = StoredValue::new(draw);
+    let body = move || tree_pane(drawn, refusals, draw);
     view! { {move || walkable.get().then(body)} }.into_any()
 }
 
-/// What one drawing of the tree needs beyond the rows themselves.
-///
-/// The two keys travel in a struct rather than as adjacent string parameters,
-/// because they are interchangeable at a call site and a swap would be silent.
-struct TreeChrome<'a> {
-    /// The key of the row holding the tree's one tab stop.
-    stop: &'a str,
-    /// The key of the row the tree announces as selected.
-    selected: &'a str,
-    /// The codes whose children the server did not list in full.
-    partial: &'a BTreeSet<String>,
-    /// The address every link on a row is built from.
-    params: &'a BrowseParams,
-    /// The FHIR version those links carry.
+/// The tree pane: the heading, the tree once its first level answered, and
+/// the levels the server refused.
+fn tree_pane(
+    drawn: Signal<Option<Vec<TreeRow>>>,
+    refusals: Signal<Vec<FhirError>>,
+    draw: StoredValue<impl Fn(Vec<TreeRow>) -> AnyView + Send + Sync + 'static>,
+) -> AnyView {
+    view! {
+        <section class="fui-stack" aria-labelledby="browse-tree-heading">
+            <h2 id="browse-tree-heading" class="fui-card-title">
+                "Below this concept"
+            </h2>
+            <p class="fui-help">"Arrow keys walk it. Enter reads the concept."</p>
+            <Reading label="Reading the children">
+                {move || {
+                    let Some(rows) = drawn.get() else {
+                        return busy("Reading the children", Busy::Section).into_any();
+                    };
+                    if rows.is_empty() {
+                        return view! {
+                            <div id="browse-tree-empty">
+                                {empty_quiet(
+                                    icon::BROWSE,
+                                    "Nothing below",
+                                    "This server answers no child for this concept.",
+                                )}
+                            </div>
+                        }
+                            .into_any();
+                    }
+                    draw.with_value(|draw| draw(rows))
+                }} {move || refusals.get().iter().map(failure_view).collect::<Vec<AnyView>>()}
+            </Reading>
+        </section>
+    }
+    .into_any()
+}
+
+/// The rows below `parent` (the top when `None`) as FerroUI's nested items,
+/// each a link that reads its concept; a level the server listed short says
+/// so in the item's words.
+fn nested(
+    rows: &[TreeRow],
+    parent: Option<&str>,
+    params: &BrowseParams,
     version: FhirVersion,
-}
-
-/// The tree, as the ARIA tree view pattern draws it.
-fn tree_view(rows: &[TreeRow], chrome: &TreeChrome) -> AnyView {
-    if rows.is_empty() {
-        return view! {
-            <p id="browse-tree-empty" class=format!("mt-default {}", styles::MUTED)>
-                "This server answers no child for this concept, so nothing hangs below it."
-            </p>
-        }
-        .into_any();
-    }
-    let items: Vec<AnyView> = rows.iter().map(|row| row_view(row, chrome)).collect();
-    view! {
-        <ul role="tree" aria-label="The concepts below this one" class="mt-default text-body">
-            {items}
-        </ul>
-    }
-    .into_any()
-}
-
-/// One row of the tree, with the state the pattern announces.
-///
-/// The rows are one flat list, so each carries its own level and set position,
-/// which is what WAI-ARIA defines those attributes for
-/// (<https://www.w3.org/TR/wai-aria-1.2/#aria-level>).
-fn row_view(row: &TreeRow, chrome: &TreeChrome) -> AnyView {
-    let params = chrome.params;
-    let version = chrome.version;
-    let selected = !chrome.selected.is_empty() && row.key == chrome.selected;
-    let toggle = params
-        .toggling(&row.concept.code, !row.open)
-        .address(version);
-    let select = params.selecting(&row.concept.code).address(version);
-    let display = row
-        .concept
-        .display
-        .clone()
-        .unwrap_or_else(|| format!("Display {NOT_DECLARED}"));
-    let code = row.concept.code.clone();
-    let level = row.depth.saturating_add(1).to_string();
-    // The row names itself, so the twist link and the truncation note stay out
-    // of what a screen reader reads for it
-    // (<https://www.w3.org/TR/accname-1.2/#computation-steps>).
-    let name = format!("{display}, {code}");
-    let short = (row.open && chrome.partial.contains(&row.concept.code)).then(|| {
-        view! {
-            <span class="ml-default inline-flex items-center gap-tight text-small text-muted">
-                <Icon glyph=icon::NOTICE class="h-3.5 w-3.5" />
-                "This server counts more children here than this page size asked for."
-            </span>
-        }
-        .into_any()
-    });
-    // The chevron is hidden and the word it replaced stays as `sr-only` text,
-    // so the control keeps the accessible name it had and the row's own
-    // `aria-expanded` remains the only announcement of the state.
-    let twist = row.expandable.then(|| {
-        let (glyph, mark) = if row.open {
-            (icon::TWIST_OPEN, "Close")
-        } else {
-            (icon::TWIST_CLOSED, "Open")
-        };
-        view! {
-            <a href=toggle tabindex="-1" class=TWIST>
-                <Icon glyph=glyph class="h-3.5 w-3.5" />
-                <span class="sr-only">{mark}</span>
-            </a>
-        }
-        .into_any()
-    });
-    view! {
-        <li
-            role="treeitem"
-            id=format!("{ROW_ID}{}", row.key)
-            tabindex=if row.key == chrome.stop { "0" } else { "-1" }
-            aria-label=name
-            aria-posinset=row.position.to_string()
-            aria-setsize=row.siblings.to_string()
-            aria-expanded=row.expandable.then_some(if row.open { "true" } else { "false" })
-            aria-selected=if selected { "true" } else { "false" }
-            class="py-tight"
-            // The weight carries the selection as well as the tint, because a
-            // reader who cannot tell the two backgrounds apart would otherwise
-            // have no cue at all (WCAG 2.2 SC 1.4.1).
-            class:font-semibold=selected
-            class:bg-inset=selected
-            style=format!("padding-left: {}px", row.depth.saturating_mul(INDENT))
-        >
-            {twist}
-            <a href=select tabindex="-1" class=styles::LINK>
-                {display}
-            </a>
-            <span class="ml-default font-mono text-small break-all text-faint">{code}</span>
-            {short}
-        </li>
-    }
-    .attr("aria-level", level)
-    .into_any()
-}
-
-/// The row that holds the tree's one tab stop.
-///
-/// A tab stop on a row that is no longer drawn would leave the tree
-/// unreachable by keyboard, so it falls back to the first row.
-fn tab_stop(rows: &[TreeRow], focused: &str) -> String {
+    partial: &BTreeSet<String>,
+) -> Vec<TreeNode> {
     rows.iter()
-        .find(|row| row.key == focused)
-        .or_else(|| rows.first())
-        .map(|row| row.key.clone())
-        .unwrap_or_default()
+        .filter(|row| row.parent.as_deref() == parent)
+        .map(|row| {
+            let display = row
+                .concept
+                .display
+                .clone()
+                .unwrap_or_else(|| format!("Display {NOT_DECLARED}"));
+            let label = if row.open && partial.contains(&row.concept.code) {
+                format!("{display} (more children than this page size asked for)")
+            } else {
+                display
+            };
+            let node = TreeNode::new(row.key.clone(), label)
+                .code(row.concept.code.clone())
+                .href(params.selecting(&row.concept.code).address(version));
+            let children = nested(rows, Some(&row.key), params, version, partial);
+            if !children.is_empty() {
+                node.children(children)
+            } else if row.expandable {
+                node.expandable()
+            } else {
+                node
+            }
+        })
+        .collect()
 }
 
-/// The tree's key handler: what each key the pattern names does to the tree.
-///
-/// Opening, closing, and selecting are navigations, so a walk the reader made
-/// is a link they can share; only moving the tab stop stays in the component,
-/// because focus is not shareable state.
-fn tree_keys(
-    version: Signal<FhirVersion>,
-    params: Signal<BrowseParams>,
-    focused: RwSignal<String>,
-    drawn: impl Fn() -> Option<Vec<TreeRow>> + Copy + 'static,
-) -> impl Fn(KeyboardEvent) + Copy + 'static {
-    let navigate = StoredValue::new(use_navigate());
-    move |event: KeyboardEvent| {
-        let rows = drawn().unwrap_or_default();
-        let stop = tab_stop(&rows, &focused.get());
-        let Some(action) = action(&rows, &stop, &event.key()) else {
-            return;
-        };
-        event.prevent_default();
-        let version = version.get();
-        let walk_to = |target: String| navigate.with_value(|navigate| go(navigate, &target));
-        match action {
-            TreeAction::Focus(key) => {
-                focused.set(key.clone());
-                focus_row(&key);
-            }
-            TreeAction::Open(code) => {
-                walk_to(params.with(|params| params.toggling(&code, true).address(version)));
-            }
-            TreeAction::Close(code) => {
-                walk_to(params.with(|params| params.toggling(&code, false).address(version)));
-            }
-            TreeAction::Select(code) => {
-                walk_to(params.with(|params| params.selecting(&code).address(version)));
-            }
-        }
-    }
-}
-
-/// The one row the tree announces as selected.
-///
-/// A hierarchy may be a graph, so one code can name more than one row, and a
-/// tree that sets no `aria-multiselectable` announces exactly one selected row
-/// (<https://www.w3.org/TR/wai-aria-1.2/#aria-selected>). The row the reader
-/// acted on holds the tab stop, so it wins; a link that arrives with no focus
-/// yet takes the first row drawing the code, because the address carries the
-/// concept rather than the path that reached it.
-fn selected_row(rows: &[TreeRow], stop: &str, code: &str) -> String {
+/// The one row the tree announces as selected: the first drawing the code
+/// the address reads, because the address carries the concept rather than
+/// the path that reached it, and a tree that sets no `aria-multiselectable`
+/// announces one (<https://www.w3.org/TR/wai-aria-1.2/#aria-selected>).
+fn selected_row(rows: &[TreeRow], code: &str) -> String {
     if code.is_empty() {
         return String::new();
     }
     rows.iter()
-        .find(|row| row.key == stop && row.concept.code == code)
-        .or_else(|| rows.iter().find(|row| row.concept.code == code))
+        .find(|row| row.concept.code == code)
         .map(|row| row.key.clone())
         .unwrap_or_default()
-}
-
-/// The row a focus event landed on, when it landed on one.
-fn focused_row_key(event: &FocusEvent) -> Option<String> {
-    let id = event
-        .target()?
-        .dyn_into::<web_sys::Element>()
-        .ok()
-        .map(|element| element.id())?;
-    id.strip_prefix(ROW_ID).map(str::to_owned)
-}
-
-/// Moves the browser's focus onto a tree row.
-///
-/// The tree keeps one tab stop, so walking it with the arrow keys has to move
-/// the focus itself (<https://www.w3.org/WAI/ARIA/apg/patterns/treeview/>).
-fn focus_row(key: &str) {
-    let found = web_sys::window()
-        .and_then(|window| window.document())
-        .and_then(|document| document.get_element_by_id(&format!("{ROW_ID}{key}")));
-    let Some(element) = found
-        .as_ref()
-        .and_then(|found| found.dyn_ref::<web_sys::HtmlElement>())
-    else {
-        return;
-    };
-    if element.focus().is_err() {
-        leptos::logging::warn!("this browser refused to focus a tree row");
-    }
 }
 
 /// Navigates to an address that already carries the router's base.
@@ -1424,8 +1296,12 @@ fn system_picker(
                 .map(|choice| {
                     let canonical = choice.canonical.clone();
                     let label = choice.label.clone();
+                    // The options arrive after the select is drawn, so each
+                    // says itself whether it is the one the address names.
+                    let named = canonical.clone();
+                    let selected = move || params.with(|params| params.system == named);
                     view! {
-                        <option value=canonical.clone() title=canonical>
+                        <option value=canonical.clone() title=canonical selected=selected>
                             {label}
                         </option>
                     }
@@ -1435,13 +1311,13 @@ fn system_picker(
         })
     };
     view! {
-        <div class="mt-loose grid max-w-xl gap-tight">
-            <label for="browse-system" class=styles::LABEL>
+        <div class="fui-field">
+            <label for="browse-system" class="fui-label">
                 "Code system"
             </label>
             <select
                 id="browse-system"
-                class=styles::INPUT
+                class=SELECT
                 prop:value=move || params.with(|params| params.system.clone())
                 on:change=choose
             >
@@ -1837,45 +1713,19 @@ mod tests {
         };
         let rows = vec![row("a,c", "c"), row("b,c", "c"), row("b,d", "d")];
         assert_eq!(
-            selected_row(&rows, "b,c", "c"),
-            "b,c",
-            "the row the reader acted on is the row the tree announces"
-        );
-        assert_eq!(
-            selected_row(&rows, "b,d", "c"),
+            selected_row(&rows, "c"),
             "a,c",
-            "a link that arrives with the focus elsewhere takes the first row drawing the code"
+            "the first row drawing the code is the one the tree announces"
         );
         assert_eq!(
-            selected_row(&rows, "a,c", ""),
+            selected_row(&rows, ""),
             "",
             "an address that reads no concept selects no row"
         );
         assert_eq!(
-            selected_row(&rows, "a,c", "gone"),
+            selected_row(&rows, "gone"),
             "",
             "a concept no row draws selects no row"
         );
-    }
-
-    #[test]
-    fn the_tab_stop_falls_back_to_the_first_row() {
-        let rows = vec![
-            TreeRow {
-                key: String::from("a"),
-                ..TreeRow::default()
-            },
-            TreeRow {
-                key: String::from("b"),
-                ..TreeRow::default()
-            },
-        ];
-        assert_eq!(tab_stop(&rows, "b"), "b");
-        assert_eq!(
-            tab_stop(&rows, "gone"),
-            "a",
-            "a tree with no tab stop cannot be reached by keyboard"
-        );
-        assert_eq!(tab_stop(&[], "a"), "");
     }
 }

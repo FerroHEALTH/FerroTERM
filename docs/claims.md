@@ -63,7 +63,7 @@ claim, not a test that merely touches the area.
 
 | Claim | Evidence |
 |---|---|
-| R4 under `/r4`, R4B under `/r4b`, R5 under `/r5`, R6 ballot under `/r6` | `app/ferroterm-server/src/lib.rs::router_with_bundle`; `app/ferroterm-server/tests/it/ecosystem.rs` drives all four (`VERSIONS`) |
+| R4 under `/r4`, R4B under `/r4b`, R5 under `/r5`, R6 ballot under `/r6` | `app/ferroterm-server/src/lib.rs::router`; `app/ferroterm-server/tests/it/ecosystem.rs` drives all four (`VERSIONS`) |
 | `CodeSystem/$lookup` | `app/ferroterm-server/src/version/mod.rs` router; `app/ferroterm-server/tests/it/operations.rs::lookup_by_get_and_post` |
 | `CodeSystem/$validate-code` | `app/ferroterm-server/tests/it/operations.rs::validate_code_at_type_and_instance_level` |
 | `CodeSystem/$subsumes` | `app/ferroterm-server/tests/it/operations.rs::subsumes_at_type_and_instance_level` |
@@ -341,7 +341,7 @@ Per system, the loader flag, the provider, and the test that exercises it:
 | Claim | Evidence |
 |---|---|
 | Four registry systems served with no configuration | `app/ferroterm-server/src/state.rs::build` |
-| `GET /health` | `app/ferroterm-server/src/lib.rs::router_with_bundle`; `app/ferroterm-server/tests/it/health.rs::health_answers_ok` |
+| `GET /health` | `app/ferroterm-server/src/lib.rs::router`; `app/ferroterm-server/tests/it/health.rs::health_answers_ok` |
 | The image runs as numeric user `65532` on a distroless base, with `FERROTERM_LISTEN=0.0.0.0:8080` | `docker/Dockerfile:14,28,33` |
 | Tags are `<version>`, `<major.minor>`, and `latest` | `.github/workflows/release-image.yml:124-126`; `latest` comes from `docker/metadata-action`'s default flavour |
 | The image carries a `HEALTHCHECK` running `ferroterm healthcheck`, which exits 0 against a serving instance and 1 against a stopped one | `docker/Dockerfile:36-45`; `app/ferroterm-server/src/healthcheck.rs`; `app/ferroterm-server/tests/it/healthcheck.rs` |
@@ -362,7 +362,7 @@ Per system, the loader flag, the provider, and the test that exercises it:
 
 | Claim | Evidence |
 |---|---|
-| `GET /metrics` answers a Prometheus scrape | `app/ferroterm-server/src/lib.rs::router_with_bundle`; `app/ferroterm-server/tests/it/metrics.rs::the_scrape_carries_the_loaded_systems_and_the_answered_requests` |
+| `GET /metrics` answers a Prometheus scrape | `app/ferroterm-server/src/lib.rs::router`; `app/ferroterm-server/tests/it/metrics.rs::the_scrape_carries_the_loaded_systems_and_the_answered_requests` |
 | The four metrics and their labels | `app/ferroterm-server/src/metrics.rs::the_exposition_carries_the_recorded_series` |
 | `route` is the matched route, never the URI | `app/ferroterm-server/src/request_log.rs`; `app/ferroterm-server/tests/it/metrics.rs::a_refusal_is_counted_under_its_own_status` |
 | The duration buckets start at half a millisecond and double | `app/ferroterm-server/src/metrics.rs::new` (`exponential_buckets(0.000_5, 2.0, 12)`) |
@@ -480,7 +480,7 @@ English either.
 (`website/book/src/evaluate/what-ferroterm-is.md`) and **"The server mounts the
 R4B module today"**, with the diagram label **"FHIR terminology API (R4B
 today)"** (`website/book/src/evaluate/architecture.md`). All four versions are
-mounted (`app/ferroterm-server/src/lib.rs::router_with_bundle`) and exercised on all four
+mounted (`app/ferroterm-server/src/lib.rs::router`) and exercised on all four
 (`app/ferroterm-server/tests/it/ecosystem.rs`). The architecture page
 contradicts itself inside one sentence: "The server mounts the R4B module
 today; the R4, R5, and R6 modules are served under `/r4`, `/r5`, and `/r6`."

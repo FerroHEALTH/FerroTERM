@@ -3,12 +3,14 @@
 use std::fmt;
 use std::str::FromStr;
 
+use serde::{Deserialize, Serialize};
+
 /// A FHIR release the server answers under its own path prefix.
 ///
 /// The server nests `/r4`, `/r4b`, `/r5`, and `/r6` on one process, so the
 /// version is part of every request URL rather than a build-time choice.
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
-pub(crate) enum FhirVersion {
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, Serialize, Deserialize)]
+pub enum FhirVersion {
     /// FHIR 4.0.1.
     R4,
     /// FHIR 4.3.0, the release the engine implemented first.
@@ -54,7 +56,7 @@ impl fmt::Display for FhirVersion {
 /// The error [`FhirVersion::from_str`] returns for an unknown name.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 #[error("`{0}` names no FHIR version this server serves")]
-pub(crate) struct UnknownFhirVersion(String);
+pub struct UnknownFhirVersion(String);
 
 impl FromStr for FhirVersion {
     type Err = UnknownFhirVersion;

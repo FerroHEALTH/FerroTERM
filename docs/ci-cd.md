@@ -23,7 +23,7 @@ exist.
 | `release.yml` | `v*` orchestrator: draft → per-arch build → image → verify assets → publish last | on tag |
 | `release-image.yml` | reusable SLSA Build L3 lane: the distroless static image from the attested musl binaries, pushed to GHCR with provenance and SBOM attestations on the index and on each platform manifest | on tag |
 | `ci.yml` (`hadolint` job) | `hadolint` over every `Dockerfile` in the tree, plus `docker/Dockerfile.sync` by name | now |
-| `ci.yml` (`viewer` job) | the viewer's WebAssembly lane, run over both bundles the crate builds: `cargo fmt` and `leptosfmt --check` over `app/ferroterm-viewer`, `cargo clippy --target wasm32-unknown-unknown -D warnings` with and without `--features editor`, `cargo nextest run -p ferroterm-viewer` in both, `trunk build --release --locked` for each, and the recorded bundle size of each (`scripts/checks/bundle-size.sh`) | on workspace |
+| `ci.yml` (`viewer` job) | the console's browser half: `cargo fmt` and `leptosfmt --check` over `app/ferroterm-viewer`, `cargo clippy --target wasm32-unknown-unknown -D warnings`, the release site bundle built by cargo-leptos (`scripts/release/viewer-site.sh --release`), its size against the budget (`scripts/checks/viewer-bundle.sh`) and no build-host path in it (`scripts/checks/viewer-paths.sh`) | on workspace |
 | `ci.yml` (`viewer-boundary` job) | the viewer's resolved dependency closure links no workspace crate (`scripts/checks/viewer-boundary.sh`) | on workspace |
 | `ci.yml` (`no-client-in-server` job) | the server binary's resolved dependency tree carries no HTTP client, so its only outbound call is the OIDC issuer the optional SMART gate reads (`scripts/checks/no-client-in-server.sh`) | on workspace |
 | `ci.yml` (`addon-boundary` job) | only `app/ferroterm-sync` links an `addons/*` crate, and an add-on links the syndication client and the leaf crates the script names (`scripts/checks/addon-boundary.sh`, run with `--self-test` first) | on workspace |
@@ -32,7 +32,7 @@ exist.
 | `ci.yml` (`bench-bars` job) | the four operations timed over a generated edition, each median compared to the claim in `bench/bars.json` (`scripts/checks/bench-bars.sh`) | on workspace |
 | `fuzz.yml` | weekly: every parser a client or a release reaches, fed arbitrary bytes under `cargo-fuzz` on nightly (`fuzz/README.md`) | weekly |
 | `ci.yml` (`tx-ecosystem` job) | the HL7 terminology ecosystem suite (`general` mode) against a release build through the FHIR Validator's `txTests`, gated by the committed pass list `conformance/tx-ecosystem/passing.txt` (`scripts/checks/tx-ecosystem.sh`) | on workspace |
-| `ci.yml` (`ui-e2e` job) | the viewer's browser journeys: the Trunk bundle embedded in the server, the image built from `docker/Dockerfile`, and a digest-pinned headless Chromium driving it over WebDriver (`scripts/ui-e2e.sh`) | on workspace |
+| `ci.yml` (`ui-e2e` job) | the console's browser journeys: the server, the console and the stub identity provider on loopback, driven by Chrome for Testing at the pinned release over WebDriver (`scripts/ui-e2e.sh`) | on workspace |
 | `differential.yml` | weekly: the request sample of `conformance/differential/` answered by FerroTERM and by Snowstorm over the same licensed edition (`scripts/checks/differential.sh`), an issue filed on divergence | when `SNOMED_RF2_URL` and `SNOWSTORM_URL` are set |
 
 Dependabot (`github-actions` + `cargo`) keeps `uses:` SHAs (the workflows and
@@ -69,78 +69,47 @@ writes it into the binary's `.dep-v0` section), a CycloneDX SBOM
 artifact digest and signed by the pinnable workflow identity, verifiable with
 `gh attestation verify`.
 
-## The viewer bundle
+## The console
 
-`app/ferroterm-viewer` compiles to WebAssembly and reaches a user as a bundle
-inside the `ferroterm` binary, so it has no image, no tarball, and no
-attestation subject of its own.
+`app/ferroterm-viewer` is the FerroTERM Console, its own binary and image
+(`ghcr.io/ferrohealth/ferroterm-viewer`), rendered on the server and hydrated
+in the browser. cargo-leptos builds the WebAssembly half and the site bundle;
+the Tailwind standalone CLI and Binaryen's `wasm-opt` are downloaded and
+checked against their SHA-256 by `scripts/release/viewer-tools.sh`, so there
+is no Node in any lane. `scripts/checks/versions.sh` fails when a tool pin of
+`docs/VERSIONS.md` and a workflow or script drift apart.
 
-On a pull request the `viewer` job is the static gate. It formats the crate
-(`cargo fmt` plus `leptosfmt --check`, which reads the `view!` macros rustfmt
-leaves alone), runs clippy against `wasm32-unknown-unknown`, runs the crate's
-tests, builds the release bundle with Trunk, and measures it.
-`scripts/checks/bundle-size.sh` gzips each emitted asset and compares it to the
-claim in `app/ferroterm-viewer/bundle-size.json`, the shape `bench-bars.sh`
-uses for latency: the bar is what the project claims, and a breach is bytes to
-justify or a claim to withdraw. The clippy pass carries the most weight, since
-the browser target is the only place a dependency that cannot compile for
-WebAssembly shows up. Trunk 0.21.14 and `leptosfmt` 0.1.33 are installed at the
-versions `docs/VERSIONS.md` pins, and Trunk downloads the Tailwind standalone
-CLI itself at the version `Trunk.toml` names, so there is no Node in the lane.
-`scripts/checks/versions.sh` fails when any of those three pins drift apart.
+On a pull request the workspace lanes build, lint and test the console's
+server half like any other crate, and the `viewer` job gates its browser half:
+`cargo fmt` plus `leptosfmt --check`, clippy against `wasm32-unknown-unknown`
+(the only place a dependency that cannot compile for WebAssembly shows up),
+the release site bundle, its brotli-compressed size against the budget in
+`.claude/rules/leptos-ui.md`, and a check that it names no build-host path.
 
-None of that proves the bundle renders, because the viewer is client-side
-rendered and the document is an empty `<body>` until the WebAssembly module
-boots. The `ui-e2e` job is where that is proved. `scripts/ui-e2e.sh` builds the
-bundle, embeds it in a server binary, builds the image from
-`docker/Dockerfile` the way the release lane stages it, and runs that image
-beside a headless Chromium pinned by index digest, both on a private container
-network. The journeys are plain `#[tokio::test]`s in `e2e/`, a crate the root
-manifest excludes: `thirtyfour` depends on `serde_json` with `preserve_order`,
-and cargo unifies features across one invocation, so holding it in the
-workspace would make the test run write FHIR JSON in a key order the shipped
-server does not. The job therefore also runs the formatting and clippy passes
-that crate would otherwise miss.
+The `ui-e2e` job proves what a reader sees. `scripts/ui-e2e.sh` builds the
+server, the console (both halves in release, the way the release lane builds
+them, since two halves built apart do not hydrate) and the stub identity
+provider from `e2e/src/bin/stub_issuer.rs`, starts two servers, the provider
+and two consoles on loopback, one console offering no sign-in and one signing
+in at the provider, and runs the journeys against them with Chrome for Testing
+and its chromedriver at the release `docs/VERSIONS.md` pins. Every address is
+loopback, so no certificate is needed and no check is turned off. The journeys
+are plain `#[tokio::test]`s in `e2e/`, a crate the root manifest excludes:
+`thirtyfour` depends on `serde_json` with `preserve_order`, and cargo unifies
+features across one invocation, so holding it in the workspace would make the
+test run write FHIR JSON in a key order the shipped server does not. The job
+therefore also runs the formatting and clippy passes that crate would
+otherwise miss.
 
-A sign-in cannot be driven against that one deployment, because a server either
-names an identity provider or does not and the read-only journeys assert the
-second shape. The script starts a second server beside it, a stub identity
-provider from `e2e/src/bin/stub_issuer.rs`, and a TLS terminator in front of
-the pair: the server refuses a non-loopback issuer over plain HTTP, and a
-browser gives `crypto.subtle` to a secure context alone, so both legs are
-`https`. The authority is generated per run and never committed. The server
-container takes it through `SSL_CERT_FILE`, which is how
-`rustls-native-certs` is told where its roots are, and the browser takes it
-through Chromium's `CACertificates` enterprise policy, so no certificate check
-is turned off anywhere.
-
-A failing journey leaves the page it failed on. The harness writes a
+A failing journey leaves the page it failed on: the harness writes a
 screenshot and the whole document into `target/ui-e2e-failures`, and the job
-uploads that directory as the `ui-e2e-failure` artifact when the run fails, so
-a failure that reproduces only on the runner is looked at rather than re-run. A
-passing run writes nothing there, and the capture itself never raises: a
-screenshot the browser cannot answer is reported in the failure message. The
-browser container is started with `SE_NODE_MAX_SESSIONS` raised to the runner's
-processor count and the journeys run with the same test-thread count, so they
-run beside each other rather than queueing on the grid's one default session.
+uploads that directory as the `ui-e2e-failure` artifact.
 
-On a tag, `release-build.yml` runs `trunk build --release --locked` twice
-before `cargo auditable build`, once for the reader bundle and once with
-`--features editor` for the editor bundle, and builds the server with the
-feature that embeds both directories into the binary. The bundle is architecture-independent, so the build
-is the same work in each per-architecture job; it happens inside the reusable
-lane because a bundle handed in by a caller job would put bytes the L3 builder
-did not produce inside the artifact it signs. The release therefore gains no
-new asset, no new attestation subject, and no change to the SLSA shape, and
-`docker/Dockerfile` gains no stage: the image copies the same two binaries it
-always did, one of which now carries the web UI. The feature name lives in one
-place, the `VIEWER_FEATURE` variable at the top of `release-build.yml`, and
-`scripts/checks/versions.sh` fails when the server stops declaring it. The lane
-also sets `FERROTERM_UI_BUNDLE` and `FERROTERM_UI_EDITOR_BUNDLE` to the
-directories Trunk just wrote, because the server's build script refuses a named
-directory that does not read and only warns when it falls back to the default.
-A release that lost a bundle therefore fails to build rather than shipping a
-binary with no viewer in it.
+On a tag, `release-viewer.yml` (called by `release.yml`) builds the console's
+binary per architecture and its site bundle once, attests both, and publishes
+the multi-platform image from `docker/viewer/Dockerfile`, which copies what
+the lane staged and compiles nothing. The terminology server's image carries
+no user interface.
 
 ## The container image
 

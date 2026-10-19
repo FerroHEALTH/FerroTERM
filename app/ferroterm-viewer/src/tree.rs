@@ -1,14 +1,14 @@
-//! The taxonomy tree's model: which rows are visible, and where a key moves.
+//! The taxonomy tree's model: which rows are visible.
 //!
 //! The model is a plain value so the tree's behaviour is pinned by unit tests
 //! rather than by a browser. It carries no code system knowledge: it is given
 //! a root concept, the set of open codes, and whatever children have been read
 //! for each of them, and it says what to draw.
 //!
-//! The tree view pattern it serves is the ARIA Authoring Practices one
-//! (<https://www.w3.org/WAI/ARIA/apg/patterns/treeview/>): one tab stop, the
-//! arrow keys walking and opening, and `Enter` selecting.
+//! The keyboard and the tree view pattern are FerroUI's tree widget; this
+//! model says which rows the address opens.
 
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
@@ -22,7 +22,7 @@ use crate::url::encode_query_component;
 const SEPARATOR: char = ',';
 
 /// One concept in the tree, as little of it as a row needs.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub(crate) struct TreeConcept {
     /// The code, which is the concept's identity in its system.
     pub(crate) code: String,
@@ -53,19 +53,6 @@ pub(crate) struct TreeRow {
     pub(crate) position: u32,
     /// How many siblings the row sits among.
     pub(crate) siblings: u32,
-}
-
-/// What a key press does to the tree.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum TreeAction {
-    /// Move the tree's one tab stop onto the row with this key.
-    Focus(String),
-    /// Open the node with this code.
-    Open(String),
-    /// Close the node with this code.
-    Close(String),
-    /// Select the concept with this code.
-    Select(String),
 }
 
 /// The rows to draw, in the order they appear on screen.
@@ -146,44 +133,6 @@ struct Pending {
     position: u32,
     /// How many siblings it sits among.
     siblings: u32,
-}
-
-/// What the key `pressed` does while the row `focused` holds the tab stop.
-///
-/// The moves are the ones the tree view pattern names: the arrows walk and
-/// open, `Home` and `End` jump to the ends, and `Enter` or `Space` selects.
-/// Anything else is left to the browser.
-pub(crate) fn action(rows: &[TreeRow], focused: &str, pressed: &str) -> Option<TreeAction> {
-    let index = rows.iter().position(|row| row.key == focused)?;
-    let row = rows.get(index)?;
-    let focus = |row: &TreeRow| TreeAction::Focus(row.key.clone());
-    match pressed {
-        "ArrowDown" => rows.get(index.saturating_add(1)).map(focus),
-        "ArrowUp" => index
-            .checked_sub(1)
-            .and_then(|above| rows.get(above))
-            .map(focus),
-        "ArrowRight" => {
-            if row.open {
-                rows.get(index.saturating_add(1)).map(focus)
-            } else if row.expandable {
-                Some(TreeAction::Open(row.concept.code.clone()))
-            } else {
-                None
-            }
-        }
-        "ArrowLeft" => {
-            if row.open {
-                Some(TreeAction::Close(row.concept.code.clone()))
-            } else {
-                row.parent.clone().map(TreeAction::Focus)
-            }
-        }
-        "Home" => rows.first().map(focus),
-        "End" => rows.last().map(focus),
-        "Enter" | " " => Some(TreeAction::Select(row.concept.code.clone())),
-        _ => None,
-    }
 }
 
 /// The path of codes as one value an address can carry.
@@ -363,109 +312,6 @@ mod tests {
         assert!(
             drawn.get(1).is_some_and(|row| !row.expandable),
             "a code already on its own path is drawn as a leaf, so the walk ends"
-        );
-    }
-
-    #[test]
-    fn the_arrows_walk_the_rows_that_are_showing() {
-        let drawn = rows("root", &BTreeSet::new(), &read(&[("root", &["a", "b"])]));
-        assert_eq!(
-            action(&drawn, "root,a", "ArrowDown"),
-            Some(TreeAction::Focus(String::from("root,b")))
-        );
-        assert_eq!(
-            action(&drawn, "root,b", "ArrowUp"),
-            Some(TreeAction::Focus(String::from("root,a")))
-        );
-        assert_eq!(
-            action(&drawn, "root,b", "ArrowDown"),
-            None,
-            "the last row has nothing below it"
-        );
-        assert_eq!(
-            action(&drawn, "root,a", "ArrowUp"),
-            None,
-            "the first row has nothing above it"
-        );
-    }
-
-    #[test]
-    fn the_right_arrow_opens_a_closed_node_and_then_walks_into_it() {
-        let closed = rows("root", &BTreeSet::new(), &read(&[("root", &["a"])]));
-        assert_eq!(
-            action(&closed, "root,a", "ArrowRight"),
-            Some(TreeAction::Open(String::from("a"))),
-            "the first press opens the node"
-        );
-        let opened = rows(
-            "root",
-            &open(&["a"]),
-            &read(&[("root", &["a"]), ("a", &["a1"])]),
-        );
-        assert_eq!(
-            action(&opened, "root,a", "ArrowRight"),
-            Some(TreeAction::Focus(String::from("root,a,a1"))),
-            "the second press moves to the first child"
-        );
-    }
-
-    #[test]
-    fn the_left_arrow_closes_an_open_node_and_then_walks_out_of_it() {
-        let opened = rows(
-            "root",
-            &open(&["a"]),
-            &read(&[("root", &["a"]), ("a", &["a1"])]),
-        );
-        assert_eq!(
-            action(&opened, "root,a", "ArrowLeft"),
-            Some(TreeAction::Close(String::from("a")))
-        );
-        assert_eq!(
-            action(&opened, "root,a,a1", "ArrowLeft"),
-            Some(TreeAction::Focus(String::from("root,a"))),
-            "a closed child moves the tab stop to its parent"
-        );
-        let closed = rows("root", &BTreeSet::new(), &read(&[("root", &["a"])]));
-        assert_eq!(
-            action(&closed, "root,a", "ArrowLeft"),
-            None,
-            "a closed row at the top of the tree has no parent to walk to"
-        );
-    }
-
-    #[test]
-    fn the_ends_of_the_tree_are_one_key_away() {
-        let drawn = rows("root", &BTreeSet::new(), &read(&[("root", &["a", "b"])]));
-        assert_eq!(
-            action(&drawn, "root,b", "Home"),
-            Some(TreeAction::Focus(String::from("root,a")))
-        );
-        assert_eq!(
-            action(&drawn, "root,a", "End"),
-            Some(TreeAction::Focus(String::from("root,b")))
-        );
-    }
-
-    #[test]
-    fn enter_and_space_select_the_concept_the_tab_stop_is_on() {
-        let drawn = rows("root", &BTreeSet::new(), &read(&[("root", &["a"])]));
-        for key in ["Enter", " "] {
-            assert_eq!(
-                action(&drawn, "root,a", key),
-                Some(TreeAction::Select(String::from("a"))),
-                "{key} selects"
-            );
-        }
-    }
-
-    #[test]
-    fn a_key_the_pattern_does_not_name_is_left_to_the_browser() {
-        let drawn = rows("root", &BTreeSet::new(), &read(&[("root", &["a"])]));
-        assert_eq!(action(&drawn, "root,a", "Tab"), None);
-        assert_eq!(
-            action(&drawn, "gone", "ArrowDown"),
-            None,
-            "a tab stop on a row that is no longer drawn moves nothing"
         );
     }
 

@@ -5,7 +5,7 @@
 //! envelope is the same whatever was searched for, so it is read once here and
 //! each resource module carries only the elements it draws.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// A resource type this viewer draws out of a `searchset`.
 ///
@@ -43,7 +43,7 @@ pub(crate) struct SearchFilter {
 /// The container carries the default, so a `Bundle` that states neither
 /// element reads as an empty answer rather than as a decode error, and a
 /// resource type that has no `Default` of its own can still be searched for.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(default)]
 pub(crate) struct SearchSet<T> {
     /// `Bundle.total`, the number of matches the server counted.
@@ -62,7 +62,7 @@ impl<T> Default for SearchSet<T> {
 }
 
 /// One `Bundle.entry`.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 struct Entry<T> {
     /// The resource the entry carries.
     resource: Option<T>,
@@ -102,7 +102,7 @@ mod tests {
 
     /// A stand-in resource, so the envelope is tested without a resource
     /// module's own reading rules.
-    #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+    #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
     struct Thing {
         #[serde(rename = "resourceType")]
         resource_type: Option<String>,

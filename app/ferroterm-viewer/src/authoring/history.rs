@@ -15,6 +15,7 @@
 //! comparison of the two JSON documents, path by path, so a reader sees which
 //! elements changed rather than which bytes moved.
 
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 use serde_json::Map;
@@ -56,7 +57,7 @@ const MAX_DEPTH: u32 = 64;
 const VALUE_CHARS: usize = 200;
 
 /// The interaction a root answers a resource's versions with.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub(crate) enum Support {
     /// The root declares `history-instance`, so one request answers the list.
     History,
@@ -100,7 +101,7 @@ impl Support {
 /// time. The address can change while the read for the previous one is still
 /// in flight, and a control built from the new address over the old answer
 /// would send one resource's document to another resource's id.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub(crate) struct Subject {
     /// The resource type, as the RESTful API spells it in a path.
     pub(crate) resource_type: String,
@@ -109,7 +110,7 @@ pub(crate) struct Subject {
 }
 
 /// One resource's history, as the screen draws it.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub(crate) struct Opened {
     /// The resource this answer was read for.
     pub(crate) subject: Subject,
@@ -165,7 +166,6 @@ pub(crate) async fn open(
     version: FhirVersion,
     support: Support,
     subject: Subject,
-    token: Option<&str>,
 ) -> Result<Opened, FhirError> {
     let empty = Opened {
         subject: subject.clone(),
@@ -177,22 +177,14 @@ pub(crate) async fn open(
     }
     let resource_type = subject.resource_type.as_str();
     let id = subject.id.as_str();
-    let current = Box::pin(client.resource(version, resource_type, id, token)).await?;
+    let current = Box::pin(client.resource(version, resource_type, id)).await?;
     let (versions, truncated) = match support {
         Support::History => {
-            let bundle = Box::pin(client.history(version, resource_type, id, token)).await?;
+            let bundle = Box::pin(client.history(version, resource_type, id)).await?;
             (bundle.versions(), false)
         }
         Support::VersionRead => {
-            Box::pin(version_reads(
-                client,
-                version,
-                resource_type,
-                id,
-                &current,
-                token,
-            ))
-            .await?
+            Box::pin(version_reads(client, version, resource_type, id, &current)).await?
         }
         Support::Neither => (Vec::new(), false),
     };
@@ -217,7 +209,6 @@ async fn version_reads(
     resource_type: &str,
     id: &str,
     current: &Value,
-    token: Option<&str>,
 ) -> Result<(Vec<Version>, bool), FhirError> {
     let newest = Version::of(Some(current.clone()), 0);
     let stated = newest.id.clone();
@@ -229,7 +220,7 @@ async fn version_reads(
     let mut wanted = counted.saturating_sub(1);
     while wanted >= floor && wanted > 0 {
         let at = wanted.to_string();
-        let answered = Box::pin(client.version_read(version, resource_type, id, &at, token)).await;
+        let answered = Box::pin(client.version_read(version, resource_type, id, &at)).await;
         let resource = match answered {
             Ok(resource) => resource,
             // NOTE: <https://hl7.org/fhir/R4B/http.html#vread> answers `410`

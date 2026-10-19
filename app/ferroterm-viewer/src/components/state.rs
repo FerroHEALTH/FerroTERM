@@ -8,9 +8,11 @@
 //! `OperationOutcome`. The two below are the states with nothing behind them:
 //! an answer that holds nothing, and a thing this root cannot do.
 
+use ferrohealth_ui::icon::Glyph;
+use ferrohealth_ui::tone::Tone;
+use ferrohealth_ui::view::empty::empty_quiet;
+use ferrohealth_ui::view::notice::{Announce, notice};
 use leptos::prelude::*;
-
-use crate::styles;
 
 /// An answer that holds nothing.
 ///
@@ -18,8 +20,7 @@ use crate::styles;
 /// answer rather than as a screen that failed to draw. The sentence says what
 /// was looked for, because "no results" says nothing a reader can act on.
 pub(crate) fn empty(sentence: &'static str) -> AnyView {
-    view! { <p class=format!("mt-default panel-p {} {}", styles::PANEL, styles::MUTED)>{sentence}</p> }
-    .into_any()
+    empty_quiet(Glyph::INBOX, "Nothing here", sentence).into_any()
 }
 
 /// Something this root does not declare, so the screen does not offer it.
@@ -29,8 +30,7 @@ pub(crate) fn empty(sentence: &'static str) -> AnyView {
 /// they cannot. It is never an error: a root that declares less is answering
 /// correctly (<https://hl7.org/fhir/R5/capabilitystatement.html>).
 pub(crate) fn undeclared(sentence: &'static str) -> AnyView {
-    view! { <p class=format!("mt-default rounded-md panel-p {}", styles::NOTICE)>{sentence}</p> }
-        .into_any()
+    notice(Tone::Info, Announce::Status, None, sentence).into_any()
 }
 
 /// What a screen says before it has been given enough to run.
@@ -39,5 +39,5 @@ pub(crate) fn undeclared(sentence: &'static str) -> AnyView {
 /// panel, because a panel here would draw the eye to the one place on the
 /// screen with nothing in it.
 pub(crate) fn invitation(sentence: &'static str) -> AnyView {
-    view! { <p class=format!("mt-default {}", styles::MUTED)>{sentence}</p> }.into_any()
+    view! { <p class="fui-muted">{sentence}</p> }.into_any()
 }

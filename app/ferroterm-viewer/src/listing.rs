@@ -7,24 +7,31 @@
 //! says so. The arithmetic and the address live here, outside every
 //! component, so plain unit tests pin them.
 
+use ferrohealth_ui::icon::Glyph;
+use ferrohealth_ui::table::model::{Direction, Paging, Sort};
+use ferrohealth_ui::table::view::{
+    ACTIONS, Body, Column, DataTable, Listing, data_table, link_pager,
+};
+use ferrohealth_ui::tone::Tone;
+use ferrohealth_ui::view::button::Variant;
+use ferrohealth_ui::view::empty::empty_quiet;
+use ferrohealth_ui::view::status::pill;
+use ferrohealth_ui::view::surface::{card, chip};
 use leptos::ev::SubmitEvent;
 use leptos::html::Input;
 use leptos::prelude::*;
 
 use crate::components::NOT_DECLARED;
 use crate::components::field::Field;
-use crate::components::field::help_toggle;
 use crate::components::field::row;
 use crate::components::field::text_field;
 use crate::components::icon;
-use crate::components::icon::Glyph;
-use crate::components::icon::Icon;
 use crate::fhir::searchset::SearchFilter;
 use crate::fhir::version::FhirVersion;
 use crate::paging::Page;
 use crate::routes::VERSION_PARAM;
 use crate::routes::base_url;
-use crate::styles;
+use ferrohealth_ui::widget::help::help_switch;
 
 /// The address parameter carrying the canonical the search filters on.
 const URL_PARAM: &str = "url";
@@ -38,6 +45,10 @@ const PAGE_PARAM: &str = "page";
 /// The address parameter carrying the id of the resource being read.
 const ID_PARAM: &str = "id";
 
+/// The address parameter carrying a page size the pager chose, which
+/// outranks the reader's stored one.
+const SIZE_PARAM: &str = "size";
+
 /// What a listing screen's address says: the filter, the page, and the read.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct ListParams {
@@ -47,8 +58,11 @@ pub(crate) struct ListParams {
     pub(crate) id: String,
     /// The 1-based page the reader asked for.
     page: u32,
-    /// How many rows a page holds, from the reader's stored preference.
+    /// How many rows a page holds, from the pager or the reader's stored
+    /// preference.
     size: u32,
+    /// Whether the address named the size, so a link keeps it.
+    sized: bool,
 }
 
 impl ListParams {
@@ -60,6 +74,9 @@ impl ListParams {
     /// page rather than refusing the whole screen.
     pub(crate) fn read(query: &dyn Fn(&str) -> Option<String>, size: u32) -> Self {
         let text = |name: &str| query(name).unwrap_or_default().trim().to_owned();
+        // NOTE: no specification governs this: our own design; a size that is no
+        // whole number from 1 to the bound is a typed link, read as not given.
+        let asked = query(SIZE_PARAM).and_then(|typed| crate::settings::parse_page_size(&typed));
         Self {
             filter: SearchFilter {
                 url: text(URL_PARAM),
@@ -70,7 +87,8 @@ impl ListParams {
                 .and_then(|typed| typed.trim().parse::<u32>().ok())
                 .filter(|page| *page > 0)
                 .unwrap_or(1),
-            size: size.max(1),
+            size: asked.unwrap_or(size).max(1),
+            sized: asked.is_some(),
         }
     }
 
@@ -95,10 +113,12 @@ impl ListParams {
             id: String::new(),
             page: 1,
             size: self.size,
+            sized: self.sized,
         }
     }
 
     /// These parameters, reading one resource by its id.
+    #[cfg(test)]
     pub(crate) fn reading(&self, id: &str) -> Self {
         Self {
             id: id.to_owned(),
@@ -106,10 +126,12 @@ impl ListParams {
         }
     }
 
-    /// These parameters, moved onto another page.
-    pub(crate) fn on(&self, page: u32) -> Self {
+    /// These parameters at the paging the pager asks for.
+    pub(crate) fn paged(&self, paging: Paging) -> Self {
         Self {
-            page: page.max(1),
+            page: paging.page.max(1),
+            sized: self.sized || paging.size != self.size,
+            size: paging.size.max(1),
             ..self.clone()
         }
     }
@@ -145,6 +167,9 @@ impl ListParams {
         }
         if self.page > 1 {
             url = url.query(PAGE_PARAM, &self.page.to_string());
+        }
+        if self.sized {
+            url = url.query(SIZE_PARAM, &self.size.to_string());
         }
         if !self.id.is_empty() {
             url = url.query(ID_PARAM, &self.id);
@@ -221,11 +246,24 @@ fn size_as_usize(size: u32) -> usize {
 }
 
 impl Window {
+    /// This window as FerroUI's pager reads it.
+    pub(crate) fn paging(self) -> ferrohealth_ui::table::model::Window {
+        let total = u32::try_from(self.matched).unwrap_or(u32::MAX);
+        ferrohealth_ui::table::model::Window::over(
+            total,
+            Paging {
+                page: self.page.number(),
+                size: self.page.count(),
+            },
+        )
+    }
+
     /// The indexes of the rows this page draws.
     pub(crate) fn indexes(self) -> impl Iterator<Item = usize> {
         (self.start..).take(self.rows)
     }
 
+    #[cfg(test)]
     /// Where this page sits in the walk.
     pub(crate) fn position(self) -> String {
         let total = u32::try_from(self.matched).unwrap_or(u32::MAX);
@@ -276,8 +314,8 @@ pub(crate) fn filter_form(
         label: "Version",
         hint: "The version search parameter. Left empty, every version this root holds matches.",
     };
-    view! {
-        <form class="mt-loose grid gap-loose" on:submit=submit>
+    let form = view! {
+        <form class="fui-form" role="search" aria-label="Search this root" on:submit=submit>
             {row(
                 vec![
                     text_field(
@@ -292,16 +330,16 @@ pub(crate) fn filter_form(
                     ),
                 ],
             )}
-            <div class="flex flex-wrap items-center gap-default">
-                <button type="submit" class=styles::SUBMIT>
-                    <Icon glyph=icon::SEARCH />
+            <div class="fui-cluster">
+                <button type="submit" class=Variant::Primary.class()>
+                    {ferrohealth_ui::icon::icon(icon::SEARCH, "16")}
                     "Search"
                 </button>
-                {help_toggle()}
+                {help_switch()}
             </div>
         </form>
-    }
-    .into_any()
+    };
+    card("Search", form).into_any()
 }
 
 /// The address parameter naming the column a list is ordered on.
@@ -379,6 +417,7 @@ impl SortOrder {
         }
     }
 
+    #[cfg(test)]
     /// The order a click on `column` asks for.
     fn toggled(self, column: SortColumn) -> Self {
         Self {
@@ -387,15 +426,30 @@ impl SortOrder {
         }
     }
 
-    /// What a screen reader announces about `column` on this order.
-    fn announced(self, column: SortColumn) -> &'static str {
-        if self.column != Some(column) {
-            "none"
-        } else if self.descending {
-            "descending"
-        } else {
-            "ascending"
+    /// This order as FerroUI's table reads it, which draws `aria-sort`.
+    fn sort(self) -> Option<Sort> {
+        self.column.map(|column| Sort {
+            column: column.key().to_owned(),
+            direction: if self.descending {
+                Direction::Descending
+            } else {
+                Direction::Ascending
+            },
+        })
+    }
+
+    /// The order FerroUI's `sort` asks for.
+    fn of_sort(sort: &Sort) -> Self {
+        Self {
+            column: SortColumn::read(&sort.column),
+            descending: sort.direction == Direction::Descending,
         }
+    }
+
+    /// What a screen reader announces about `column` on this order.
+    #[cfg(test)]
+    fn announced(self, column: SortColumn) -> &'static str {
+        Sort::aria(self.sort().as_ref(), column.key())
     }
 
     /// The address parameters this order is, for a link.
@@ -433,64 +487,48 @@ impl SortOrder {
     }
 }
 
-/// One heading a reader can order a publishing list by.
+/// The table a publishing list draws: the name, the version and the status
+/// a reader can order it by, and what a row hands its resource to.
 ///
-/// `aria-sort` on the header cell is what a screen reader announces, and the
-/// control inside it is a real link, so the order is shareable and the
-/// keyboard needs no handler of ours
+/// FerroUI draws each sortable header as a link carrying `aria-sort`, so the
+/// order is shareable and the keyboard needs no handler of ours
 /// (<https://www.w3.org/WAI/ARIA/apg/patterns/table/>).
-pub(crate) fn sortable(
-    column: SortColumn,
-    label: &'static str,
+pub(crate) fn published_table(
+    caption: &str,
+    noun: &'static str,
+    rows: Vec<AnyView>,
     order: SortOrder,
-    path: &'static str,
     params: &ListParams,
+    path: &'static str,
     version: FhirVersion,
 ) -> AnyView {
-    let asked = order.toggled(column);
-    let href = params.address_with(path, version, &asked.pairs());
-    let mark = match (order.column == Some(column), order.descending) {
-        (false, _) => "",
-        (true, false) => " \u{2191}",
-        (true, true) => " \u{2193}",
-    };
-    view! {
-        <th scope="col" class=styles::TH aria-sort=order.announced(column)>
-            <a href=href class="state-change hover:text-fg">
-                {label}
-                {mark}
-            </a>
-        </th>
-    }
-    .into_any()
-}
-
-/// A heading for a column that orders nothing.
-pub(crate) fn heading(label: &'static str) -> AnyView {
-    view! {
-        <th scope="col" class=styles::TH>
-            {label}
-        </th>
-    }
-    .into_any()
-}
-
-/// The table both publishing lists draw, in the overview's shape.
-///
-/// One panel, one table, the vocabulary's own cells, so a row follows the
-/// reader's density and the two lists cannot drift apart. The headings arrive
-/// built, because three of the four order the list and one does not.
-pub(crate) fn table(headings: Vec<AnyView>, rows: Vec<AnyView>) -> AnyView {
-    view! {
-        <div class=format!("mt-default overflow-x-auto {}", styles::PANEL)>
-            <table class=styles::TABLE>
-                <thead>
-                    <tr>{headings}</tr>
-                </thead>
-                <tbody>{rows}</tbody>
-            </table>
-        </div>
-    }
+    let columns = [
+        Column::text(SortColumn::Name.key(), noun).sortable(),
+        Column::text(SortColumn::Version.key(), "Version").sortable(),
+        Column::text(SortColumn::Status.key(), "Status").sortable(),
+        Column::text("open", "Actions"),
+    ];
+    let sort = order.sort();
+    let href =
+        |asked: &Sort| params.address_with(path, version, &SortOrder::of_sort(asked).pairs());
+    data_table(DataTable {
+        caption,
+        columns: &columns,
+        sort: sort.as_ref(),
+        sort_href: &href,
+        body: if rows.is_empty() {
+            Body::Empty(
+                empty_quiet(
+                    Glyph::SEARCH_X,
+                    "No match",
+                    "This root holds no resource matching the search.",
+                )
+                .into_any(),
+            )
+        } else {
+            Body::Rows(rows.collect_view().into_any())
+        },
+    })
     .into_any()
 }
 
@@ -510,38 +548,53 @@ pub(crate) fn published_row(
     let title = published.title.unwrap_or(NOT_DECLARED).to_owned();
     let canonical = published.canonical.unwrap_or(NOT_DECLARED).to_owned();
     let heading = match open {
-        Some(href) => view! {
-            <a href=href class=styles::LINK>
-                {title}
-            </a>
-        }
-        .into_any(),
+        Some(href) => view! { <a href=href>{title}</a> }.into_any(),
         None => view! {
             {title}
-            <span class="sr-only">", which carries no id to read it by"</span>
+            <span class="fui-sr-only">", which carries no id to read it by"</span>
         }
         .into_any(),
     };
     let action = run.map(|action| {
-        view! {
-            <a href=action.href class=styles::BUTTON_QUIET>
-                {action.label}
-            </a>
-        }
-        .into_any()
+        view! { <a href=action.href>{action.label}</a> }
     });
+    let version = match published.version {
+        Some(version) => chip(version.to_owned()).into_any(),
+        None => view! { <span class="fui-muted">"—"</span> }.into_any(),
+    };
     view! {
         <tr>
-            <th scope="row" class=format!("{} text-left font-medium", styles::TD)>
+            <th scope="row">
                 {heading}
-                <span class=format!("mt-tight block {}", styles::CODE_MUTED)>{canonical}</span>
+                <span class="fui-truncate font-normal fui-small fui-muted fui-mono">
+                    {canonical}
+                </span>
             </th>
-            <td class=styles::TD_TIGHT>{published.version.unwrap_or(NOT_DECLARED).to_owned()}</td>
-            <td class=styles::TD_TIGHT>{published.status.unwrap_or(NOT_DECLARED).to_owned()}</td>
-            <td class=styles::TD_TIGHT>{action}</td>
+            <td data-label="Version">{version}</td>
+            <td data-label="Status">{status_pill(published.status)}</td>
+            <td data-label="Actions" class=ACTIONS>
+                {action}
+            </td>
         </tr>
     }
     .into_any()
+}
+
+/// A publication status as a pill in the tone it reads in: active is in
+/// force, draft is not yet, retired no longer
+/// (<https://hl7.org/fhir/R4B/valueset-publication-status.html>).
+pub(crate) fn status_pill(status: Option<&str>) -> AnyView {
+    match status {
+        Some(status) => {
+            let tone = match status {
+                "active" => Tone::Ok,
+                "draft" => Tone::Warn,
+                _ => Tone::Neutral,
+            };
+            pill(tone, status).into_any()
+        }
+        None => view! { <span class="fui-muted">"—"</span> }.into_any(),
+    }
 }
 
 /// The four facts a publishing list draws about one resource.
@@ -566,55 +619,21 @@ pub(crate) struct Action {
     pub(crate) href: String,
 }
 
-/// The page controls, which are the address of another page.
-///
-/// Each control is a link, so a page is shareable and the browser walks the
-/// list with its back button. A control that leads nowhere reads "unavailable"
-/// in visible text, because a reader who cannot tell the two tints apart has
-/// nothing else to go on
-/// (<https://www.w3.org/TR/WCAG22/#use-of-color>).
+/// The page controls, FerroUI's pager over links: each step and each size is
+/// the address of another page, so a page is shareable and the browser walks
+/// the list with its back button. A step that leads nowhere says
+/// "(unavailable)" in visible text (<https://www.w3.org/TR/WCAG22/#use-of-color>).
 pub(crate) fn pager_view(
-    label: &'static str,
+    listing: Listing,
     view: Window,
     params: &ListParams,
     path: &'static str,
     version: FhirVersion,
     extra: &[(&str, &str)],
 ) -> AnyView {
-    let total = u32::try_from(view.matched).unwrap_or(u32::MAX);
-    let here = view.page.number();
-    let step = |target: Option<Page>, glyph: Glyph, text: &'static str| -> AnyView {
-        match target {
-            Some(page) if page.number() != here => {
-                let href = params.on(page.number()).address_with(path, version, extra);
-                view! {
-                    <a href=href class=styles::BUTTON>
-                        <Icon glyph=glyph />
-                        {text}
-                    </a>
-                }
-                .into_any()
-            }
-            Some(_) | None => view! {
-                <span class=styles::BUTTON_DISABLED>
-                    <Icon glyph=glyph />
-                    {text}
-                    " (unavailable)"
-                </span>
-            }
-            .into_any(),
-        }
-    };
-    view! {
-        <nav aria-label=label class="mt-default flex flex-wrap items-center gap-default">
-            {step(Some(Page::at(0, view.page.count())), icon::PAGE_FIRST, "First page")}
-            {step(view.page.previous(), icon::PAGE_PREVIOUS, "Previous page")}
-            <p class="text-body font-medium">{view.position()}</p>
-            {step(view.page.next(total), icon::PAGE_NEXT, "Next page")}
-            {step(Some(view.page.last(total)), icon::PAGE_LAST, "Last page")}
-        </nav>
-    }
-    .into_any()
+    let href = |paging: Paging| params.paged(paging).address_with(path, version, extra);
+    view! { <div class="fui-panel-body">{link_pager(listing, view.paging(), &href)}</div> }
+        .into_any()
 }
 
 #[cfg(test)]

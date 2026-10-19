@@ -15,7 +15,7 @@
 //! Reading lives here, outside every component, so the screen renders values
 //! plain unit tests can pin.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::fhir::CODE_SYSTEM;
 use crate::fhir::VALUE_SET;
@@ -279,7 +279,7 @@ impl SubsumesRequest {
 /// Both operations answer a `Parameters` resource, which is a list of named
 /// parameters (<https://hl7.org/fhir/R4B/operations.html#response>), so it is
 /// read by name here rather than modelled per version.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub(crate) struct ParametersAnswer {
     /// `Parameters.parameter`, in the order the server sent it.
     #[serde(default)]
@@ -287,7 +287,7 @@ pub(crate) struct ParametersAnswer {
 }
 
 /// One `Parameters.parameter`, with the shapes these two answers use.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 struct WireParameter {
     /// `parameter.name`.
     name: Option<String>,
@@ -314,7 +314,7 @@ struct WireParameter {
 }
 
 /// The `CodeableConcept` an answer echoes, as the screen draws it.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct WireConcept {
     /// `CodeableConcept.coding`, each with the elements the answer carried.
     #[serde(default)]

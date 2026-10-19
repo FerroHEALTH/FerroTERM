@@ -7,7 +7,7 @@
 //! Reading lives here, outside every component, so the screen renders a value
 //! plain unit tests can pin.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::fhir::facts::Fact;
 use crate::fhir::facts::fact;
@@ -20,7 +20,7 @@ use crate::fhir::searchset::Published;
 /// Every field is optional so a server that omits one still renders. The
 /// viewer carries the elements it draws and nothing else: it never mirrors the
 /// whole resource, and it never expands one in the browser.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct PublishedValueSet {
     /// `resourceType`, which says what the entry actually carries.
     #[serde(rename = "resourceType")]
@@ -54,7 +54,7 @@ pub(crate) struct PublishedValueSet {
 }
 
 /// `ValueSet.compose`.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 struct Compose {
     /// `compose.include`, the selections drawn in.
     #[serde(default)]
@@ -70,7 +70,7 @@ struct Compose {
 }
 
 /// One `compose.include` or `compose.exclude`.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 struct ComposeSet {
     /// `system`, the code system the codes come from.
     system: Option<String>,
@@ -88,14 +88,14 @@ struct ComposeSet {
 }
 
 /// One `compose.include.concept`, counted rather than listed.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 struct ComposeConcept {
     /// The code the clause names.
     code: Option<String>,
 }
 
 /// One `compose.include.filter`, as the screen states it.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 struct ComposeFilter {
     /// The property the filter is over.
     property: Option<String>,
@@ -149,6 +149,11 @@ impl PublishedValueSet {
     /// The publication status, when it declared one.
     pub(crate) fn status(&self) -> Option<&str> {
         named(self.status.as_deref())
+    }
+
+    /// The description, when it declared one.
+    pub(crate) fn description(&self) -> Option<&str> {
+        named(self.description.as_deref())
     }
 
     /// The name a reader recognises: the title, else the name.

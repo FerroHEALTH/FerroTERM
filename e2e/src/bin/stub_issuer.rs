@@ -10,9 +10,14 @@
 //! it exists so the journeys can drive a completed sign-in.
 //!
 //! It serves TLS, because FerroTERM refuses a non-loopback issuer over plain
-//! HTTP. The certificate authority is generated at start and written where the
-//! harness can install it in the server container and in the browser, so no key
-//! material is committed.
+//! HTTP, or plain HTTP with `--plain` for a run on loopback. The certificate
+//! authority is generated at start and written where the harness can install
+//! it, so no key material is committed.
+//!
+//! The console signs a reader in on its own server (authorization code with
+//! PKCE), so the identity token carries the `nonce` the authorization request
+//! sent and names the client it was asked for as its audience (OpenID Connect
+//! Core 1.0 §3.1.3.7).
 //!
 //! Which scopes a sign-in ends up with is chosen by the journey: it opens
 //! `/profile?name=<profile>&tag=<tag>` on this issuer first, which sets a
@@ -156,6 +161,10 @@ struct Pending {
     /// The `aud` the client sent, which is the FHIR base it will spend the
     /// token against.
     audience: String,
+    /// The `client_id` the client named, the identity token's audience.
+    client: String,
+    /// The `nonce` the identity token must carry back.
+    nonce: String,
     /// What the journey chose to be granted.
     profile: Profile,
     /// The journey's own tag, so its revocations are its own.
@@ -330,6 +339,8 @@ impl Stub {
                 .map(|scope| scope.split_whitespace().map(str::to_owned).collect())
                 .unwrap_or_default(),
             audience: asked.get("aud").cloned().unwrap_or_default(),
+            client: asked.get("client_id").cloned().unwrap_or_default(),
+            nonce: asked.get("nonce").cloned().unwrap_or_default(),
             profile,
             tag,
         };
@@ -391,14 +402,21 @@ impl Stub {
             "exp": expires,
             "scope": pending.profile.in_token(&pending.asked).join(" "),
         }))?;
-        let identity = self.keys.sign(&json!({
+        let mut identity_claims = json!({
             "iss": self.issuer,
             "sub": FHIR_USER,
-            "aud": "ferroterm-viewer",
+            "aud": pending.client,
             "iat": now,
             "exp": expires,
             "fhirUser": FHIR_USER,
-        }))?;
+            "preferred_username": FHIR_USER,
+        });
+        if !pending.nonce.is_empty()
+            && let Some(claims) = identity_claims.as_object_mut()
+        {
+            claims.insert(String::from("nonce"), Value::from(pending.nonce.clone()));
+        }
+        let identity = self.keys.sign(&identity_claims)?;
         self.minted
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
@@ -613,6 +631,8 @@ struct Options {
     serve_name: Option<String>,
     /// Where that second certificate and its key are written.
     serve_dir: Option<PathBuf>,
+    /// Whether the issuer serves plain HTTP, for a run on loopback.
+    plain: bool,
 }
 
 impl Options {
@@ -625,6 +645,7 @@ impl Options {
         let mut names = Vec::new();
         let mut serve_name = None;
         let mut serve_dir = None;
+        let mut plain = false;
         let mut arguments = arguments;
         while let Some(argument) = arguments.next() {
             let mut value = || {
@@ -632,6 +653,10 @@ impl Options {
                     .next()
                     .ok_or_else(|| Failure::from(format!("{argument} takes a value")))
             };
+            if argument == "--plain" {
+                plain = true;
+                continue;
+            }
             match argument.as_str() {
                 "--listen" => listen = value()?,
                 "--issuer" => issuer = value()?,
@@ -663,6 +688,7 @@ impl Options {
             names,
             serve_name,
             serve_dir,
+            plain,
         })
     }
 }
@@ -784,6 +810,9 @@ async fn main() -> Result<(), Failure> {
     // The harness waits for this line before it starts anything that talks to
     // the issuer.
     println!("listening on {} as {}", options.listen, options.issuer);
+    if options.plain {
+        return serve_plain(listener, issuer).await;
+    }
     loop {
         let (stream, _peer) = listener.accept().await?;
         let acceptor = acceptor.clone();
@@ -804,6 +833,28 @@ async fn main() -> Result<(), Failure> {
             });
             if let Err(error) = hyper::server::conn::http1::Builder::new()
                 .serve_connection(TokioIo::new(accepted), service)
+                .await
+            {
+                eprintln!("the connection ended: {error}");
+            }
+        });
+    }
+}
+
+/// Serves plain HTTP on `listener`, for a run on loopback.
+async fn serve_plain(listener: TcpListener, issuer: Arc<Stub>) -> Result<(), Failure> {
+    loop {
+        let (stream, _peer) = listener.accept().await?;
+        let issuer = Arc::clone(&issuer);
+        tokio::spawn(async move {
+            let service = service_fn(move |request: Request<Incoming>| {
+                let issuer = Arc::clone(&issuer);
+                async move {
+                    Ok::<_, std::convert::Infallible>(handle(&issuer, request).await.respond())
+                }
+            });
+            if let Err(error) = hyper::server::conn::http1::Builder::new()
+                .serve_connection(TokioIo::new(stream), service)
                 .await
             {
                 eprintln!("the connection ended: {error}");

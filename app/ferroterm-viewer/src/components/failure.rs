@@ -1,122 +1,119 @@
 //! Rendering a refused request, in the server's own words.
 
+use ferrohealth_ui::view::refusal::{Issue, Refusal, Severity, refusal};
 use leptos::prelude::*;
 
-use crate::components::icon;
-use crate::components::icon::Icon;
 use crate::fhir::error::FhirError;
 use crate::fhir::outcome::OperationOutcome;
-use crate::styles;
 
-/// Shows why a request failed, with the server's `OperationOutcome` verbatim.
+/// The severity a FHIR `issue.severity` code names (the `IssueSeverity` value
+/// set, <https://hl7.org/fhir/R4B/valueset-issue-severity.html>); a code it
+/// does not define is read as an error, never dropped.
+fn severity(code: &str) -> Severity {
+    match code {
+        "fatal" => Severity::Fatal,
+        "warning" => Severity::Warning,
+        "information" => Severity::Information,
+        _ => Severity::Error,
+    }
+}
+
+/// The issues `outcome` carries, each with the text the server wrote and the
+/// codes that classify it.
+fn issues(outcome: &OperationOutcome) -> Vec<Issue> {
+    outcome
+        .lines()
+        .into_iter()
+        .map(|line| Issue {
+            severity: severity(&line.severity),
+            code: line.code,
+            text: (!line.text.is_empty()).then_some(line.text),
+            place: String::new(),
+            details: line.details,
+        })
+        .collect()
+}
+
+/// The refusal `error` is, as FerroUI draws one.
+pub(crate) fn refusal_of(error: &FhirError) -> Refusal {
+    Refusal {
+        status: error.status().map(|status| status.as_u16()),
+        summary: match error {
+            FhirError::Refused { .. } | FhirError::Status { .. } => {
+                String::from("The server refused the request")
+            }
+            FhirError::Transport { .. } => String::from("The request got no answer"),
+            FhirError::Decode { .. } => String::from("The answer did not read"),
+        },
+        issues: error.outcome().map(issues).unwrap_or_default(),
+        request: Some(error.url().to_owned()),
+        evidence: match error {
+            FhirError::Status { body, .. } if !body.is_empty() => Some(body.clone()),
+            FhirError::Transport { message, .. } | FhirError::Decode { message, .. } => {
+                Some(message.clone())
+            }
+            FhirError::Status { .. } | FhirError::Refused { .. } => None,
+        },
+    }
+}
+
+/// Explains why a request failed, in the server's own words.
 ///
-/// A failure is never rendered as an empty section: the reader sees the URL
-/// that was asked for, the status that came back, and every issue the server
-/// reported, so they can reproduce the request themselves.
+/// The server's `OperationOutcome` is shown issue by issue, never
+/// paraphrased; a failure that carried none keeps the start of its body as
+/// the evidence, and the address asked is shown so a reader can repeat the
+/// request themselves.
 #[component]
 #[expect(
     unreachable_pub,
-    reason = "the leptos component macro emits a pub props type, and a binary crate has no reachable public API"
+    reason = "the leptos component macro emits a pub props type, and the module tree is private"
 )]
 pub(crate) fn Failure(
     /// The failure to explain.
     #[prop(into)]
     error: Signal<FhirError>,
 ) -> impl IntoView {
-    let status = move || {
-        error.with(|error| {
-            error
-                .status()
-                .map_or_else(|| "no answer".to_owned(), |status| status.to_string())
-        })
-    };
-    let url = move || error.with(|error| error.url().to_owned());
-    let issues = move || {
-        error.with(|error| {
-            error
-                .outcome()
-                .map(OperationOutcome::lines)
-                .unwrap_or_default()
-        })
-    };
-    let body = move || {
-        error.with(|error| match error {
-            FhirError::Status { body, .. } if !body.is_empty() => Some(body.clone()),
-            FhirError::Transport { message, .. } | FhirError::Decode { message, .. } => {
-                Some(message.clone())
-            }
-            FhirError::Status { .. } | FhirError::Refused { .. } => None,
-        })
-    };
-
-    let heading = view! {
-        <p class="flex items-center gap-tight font-medium text-danger">
-            <Icon glyph=icon::FAILURE />
-            "The request failed: "
-            {status}
-        </p>
-        <p class="mt-tight font-mono text-small break-all text-muted">{url}</p>
-    }
-    .into_any();
-
-    // The list is a whole-value replacement with no per-issue state, so it is
-    // a plain `Vec`, which rebuilds every position. A `<For>` key it retained
-    // would be moved rather than re-rendered, and the issue would keep its old
-    // wording after a second refusal at the same position.
-    let reported = view! {
-        <ul class="mt-default space-y-tight">
-            {move || {
-                issues()
-                    .into_iter()
-                    .map(|line| {
-                        view! {
-                            <li class="text-body">
-                                <span class="font-semibold">{line.severity}</span>
-                                " ("
-                                <span class="font-mono">{line.code}</span>
-                                "): "
-                                {line.text}
-                                {detail_codes(&line.details)}
-                            </li>
-                        }
-                            .into_any()
-                    })
-                    .collect::<Vec<AnyView>>()
-            }}
-        </ul>
-    }
-    .into_any();
-
-    let evidence = view! {
-        <Show when=move || body().is_some() fallback=|| ()>
-            <pre class="mt-default overflow-x-auto rounded-md bg-inset p-default text-small text-fg">
-                {body}
-            </pre>
-        </Show>
-    }
-    .into_any();
-
-    view! {
-        <div role="alert" class=styles::CALLOUT_DANGER>
-            {heading}
-            {reported}
-            {evidence}
-        </div>
-    }
+    move || error.with(|error| refusal(&refusal_of(error)).into_any())
 }
 
-/// The codes of `issue.details`, which classify the refusal.
-///
-/// A server states the class of a refusal as a coding beside the prose
-/// (<https://hl7.org/fhir/R4B/operationoutcome.html>), and a reader deciding
-/// what to do next needs the code, not only the sentence.
-fn detail_codes(details: &[String]) -> AnyView {
-    if details.is_empty() {
-        return ().into_any();
+#[cfg(test)]
+mod tests {
+    use ferrohealth_ui::view::refusal::Severity;
+    use http::StatusCode;
+
+    use super::refusal_of;
+    use crate::fhir::error::FhirError;
+    use crate::fhir::outcome::OperationOutcome;
+
+    #[test]
+    fn a_refusal_keeps_the_status_and_every_issue_in_the_server_s_words() {
+        let outcome: OperationOutcome = serde_json::from_str(
+            r#"{"resourceType":"OperationOutcome","issue":[
+                {"severity":"error","code":"not-found","diagnostics":"no such value set"},
+                {"severity":"warning","code":"informational","details":{"text":"a hint"}}]}"#,
+        )
+        .expect("an outcome");
+        let refused = refusal_of(&FhirError::Refused {
+            url: String::from("http://x/r4/ValueSet/$expand"),
+            status: StatusCode::NOT_FOUND,
+            outcome,
+        });
+        assert_eq!(Some(404), refused.status);
+        assert_eq!(2, refused.issues.len());
+        assert_eq!(Severity::Error, refused.issues[0].severity);
+        assert_eq!(Some("no such value set"), refused.issues[0].text.as_deref());
+        assert_eq!(Severity::Warning, refused.issues[1].severity);
     }
-    let drawn: Vec<AnyView> = details
-        .iter()
-        .map(|coding| view! { <li class="font-mono break-all">{coding.clone()}</li> }.into_any())
-        .collect();
-    view! { <ul class="mt-tight ml-loose text-small text-muted">{drawn}</ul> }.into_any()
+
+    #[test]
+    fn a_request_with_no_answer_has_no_status() {
+        let refused = refusal_of(&FhirError::Transport {
+            url: String::from("http://x/health"),
+            message: String::from("connection refused"),
+        });
+        assert_eq!(None, refused.status);
+        assert!(refused.issues.is_empty());
+        assert_eq!(Some("http://x/health"), refused.request.as_deref());
+        assert_eq!(Some("connection refused"), refused.evidence.as_deref());
+    }
 }

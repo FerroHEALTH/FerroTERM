@@ -45,29 +45,27 @@ use crate::harness::session;
 /// What this pass reads there is the heading, the sentence that says there are
 /// no versions, and the chrome around them; the table and the restore control
 /// are walked by the keyboard journey in `history`.
-const SCREENS: [&str; 13] = [
-    "/ui/",
-    "/ui/browse",
-    "/ui/expand",
-    "/ui/validate",
-    "/ui/valuesets",
-    "/ui/conceptmaps",
-    "/ui/translate",
-    "/ui/find",
-    "/ui/about",
-    "/ui/editor/codesystem?system=https%3A%2F%2Fferroterm.eu%2Ffhir%2FCodeSystem%2Fe2e-taxonomy",
-    "/ui/editor/compose",
-    "/ui/editor/conceptmap?map=https%3A%2F%2Fferroterm.eu%2Ffhir%2FConceptMap%2Fe2e-taxonomy-map",
-    "/ui/editor/history?type=CodeSystem",
+const SCREENS: [&str; 19] = [
+    "/",
+    "/systems",
+    "/systems/https%3A%2F%2Fferroterm.eu%2Ffhir%2FCodeSystem%2Fe2e-taxonomy",
+    "/valuesets/e2e-taxonomy-all",
+    "/conceptmaps/e2e-taxonomy-map",
+    "/lookup",
+    "/about?tab=settings",
+    "/browse",
+    "/expand",
+    "/validate",
+    "/valuesets",
+    "/conceptmaps",
+    "/translate",
+    "/find",
+    "/about",
+    "/codesystem?system=https%3A%2F%2Fferroterm.eu%2Ffhir%2FCodeSystem%2Fe2e-taxonomy",
+    "/compose",
+    "/conceptmap?map=https%3A%2F%2Fferroterm.eu%2Ffhir%2FConceptMap%2Fe2e-taxonomy-map",
+    "/history?type=CodeSystem",
 ];
-
-/// The refusal the version screen provokes on a deployment with no sync
-/// service behind it.
-///
-/// The screen asks the synchronisation service's admin listener for the newest
-/// run; nothing answers here, the browser logs that as a severe network entry,
-/// and the screen then draws no findings at all, which is what it is for.
-const NO_SYNC: &str = "/runs";
 
 /// The version every screen is opened on.
 ///
@@ -75,14 +73,6 @@ const NO_SYNC: &str = "/runs";
 /// and the walk covers the one control with a non-obvious keyboard contract
 /// (<https://www.w3.org/TR/WCAG22/#keyboard>).
 const VERSION: &str = "r5";
-
-/// The fragment naming the About screen's settings pane.
-///
-/// The panes are closed until an address names one, so the address the
-/// preference controls are reached by is the one a reader would use. It goes
-/// after the query, which is where a fragment belongs
-/// (<https://www.rfc-editor.org/rfc/rfc3986#section-3.5>).
-const SETTINGS_PANE: &str = "about-settings-heading";
 
 /// The theme control in that pane.
 const THEME_CONTROL: &str = "#viewer-theme";
@@ -394,52 +384,31 @@ fn address(base: &str, path: &str) -> String {
 /// this reads every screen the same way and none of it is pinned to a sentence.
 async fn announcement(journey: &Journey, what: &str) -> String {
     let region = journey.element(By::Css(ANNOUNCEMENT), what).await;
+    // NOTE: a live region may be visually hidden, which WebDriver's element
+    // text leaves out, so its words are read from `textContent` (DOM, Node).
     for _ in 0..SETTLE_TRIES {
-        match region.text().await {
-            Ok(said) if !said.trim().is_empty() => return said,
+        match region.prop("textContent").await {
+            Ok(Some(said)) if !said.trim().is_empty() => return said,
             Ok(_) | Err(_) => tokio::time::sleep(SETTLE).await,
         }
     }
     panic!("{what}: the live region stayed empty");
 }
 
-/// Puts the viewer in `mode`, which the settings screen is the one way to do.
-///
-/// The choice is remembered by the browser, so every screen opened afterwards
-/// in this session is drawn in it.
+/// Puts the console in `mode`, which the settings pane keeps in a cookie, so
+/// every screen opened afterwards in this session is drawn in it.
 async fn choose_theme(journey: &Journey, base: &str, mode: &str) -> WebDriverResult<()> {
     journey
-        .reopen(&format!("{}#{SETTINGS_PANE}", address(base, "/ui/about")))
-        .await;
-    let control = journey
-        .element(By::Css(THEME_CONTROL), "the theme control")
-        .await;
-    control
-        .find(By::Css(format!("option[value='{mode}']")))
-        .await?
-        .click()
-        .await?;
-    Ok(())
+        .keep_setting(base, THEME_CONTROL, mode, Some("data-theme"))
+        .await
 }
 
-/// Puts the viewer in `density`, which the settings screen is the one way to
-/// do.
-///
-/// The choice is remembered by the browser, so every screen opened afterwards
-/// in this session is drawn at it.
+/// Puts the console in `density`, which the settings pane keeps in a cookie,
+/// so every screen opened afterwards in this session is drawn at it.
 async fn choose_density(journey: &Journey, base: &str, density: &str) -> WebDriverResult<()> {
     journey
-        .reopen(&format!("{}#{SETTINGS_PANE}", address(base, "/ui/about")))
-        .await;
-    let control = journey
-        .element(By::Css(DENSITY_CONTROL), "the density control")
-        .await;
-    control
-        .find(By::Css(format!("option[value='{density}']")))
-        .await?
-        .click()
-        .await?;
-    Ok(())
+        .keep_setting(base, DENSITY_CONTROL, density, Some("data-density"))
+        .await
 }
 
 /// Opens every disclosure on the screen, so what is behind one is measured.
@@ -537,7 +506,7 @@ async fn every_control_on_every_screen_is_reached_by_the_keyboard_alone() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &base, &format!("/ui?fhir={VERSION}")).await;
+            let journey = Journey::open(driver, &base, &format!("/?fhir={VERSION}")).await;
             let mut findings = Vec::new();
             for density in DENSITIES {
                 choose_density(&journey, &base, density).await?;
@@ -556,7 +525,7 @@ async fn every_control_on_every_screen_is_reached_by_the_keyboard_alone() {
                 findings.len(),
                 findings.join("\n")
             );
-            journey.no_console_errors_but(&[NO_SYNC]).await;
+            journey.no_console_errors().await;
             Ok::<(), WebDriverError>(())
         })
         .await;
@@ -577,7 +546,7 @@ async fn every_screen_meets_the_aa_contrast_bar_in_both_themes() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &base, &format!("/ui?fhir={VERSION}")).await;
+            let journey = Journey::open(driver, &base, &format!("/?fhir={VERSION}")).await;
             let mut findings = Vec::new();
             for theme in ["light", "dark"] {
                 choose_theme(&journey, &base, theme).await?;
@@ -594,7 +563,7 @@ async fn every_screen_meets_the_aa_contrast_bar_in_both_themes() {
                 "text below the AA contrast bar:\n{}",
                 findings.join("\n")
             );
-            journey.no_console_errors_but(&[NO_SYNC]).await;
+            journey.no_console_errors().await;
             Ok::<(), WebDriverError>(())
         })
         .await;
@@ -616,7 +585,7 @@ async fn every_screen_renders_the_markup_a_screen_reader_needs() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &base, &format!("/ui?fhir={VERSION}")).await;
+            let journey = Journey::open(driver, &base, &format!("/?fhir={VERSION}")).await;
             let mut findings = Vec::new();
             for density in DENSITIES {
                 choose_density(&journey, &base, density).await?;
@@ -638,7 +607,7 @@ async fn every_screen_renders_the_markup_a_screen_reader_needs() {
                 "markup a screen reader cannot use:\n{}",
                 findings.join("\n")
             );
-            journey.no_console_errors_but(&[NO_SYNC]).await;
+            journey.no_console_errors().await;
             Ok::<(), WebDriverError>(())
         })
         .await;
@@ -660,10 +629,10 @@ async fn a_search_an_expansion_and_a_validation_are_each_announced() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &base, &format!("/ui?fhir={VERSION}")).await;
+            let journey = Journey::open(driver, &base, &format!("/?fhir={VERSION}")).await;
 
             journey
-                .reopen(&format!("{base}/ui/browse?fhir={VERSION}&system={SYSTEM}"))
+                .reopen(&format!("{base}/browse?fhir={VERSION}&system={SYSTEM}"))
                 .await;
             let searched = announcement(&journey, "the search to announce what it matched").await;
             assert!(
@@ -672,7 +641,7 @@ async fn a_search_an_expansion_and_a_validation_are_each_announced() {
             );
 
             journey
-                .reopen(&format!("{base}/ui/expand?fhir={VERSION}&url={EXPANDED}"))
+                .reopen(&format!("{base}/expand?fhir={VERSION}&url={EXPANDED}"))
                 .await;
             let expanded =
                 announcement(&journey, "the expansion to announce how much it answered").await;
@@ -683,7 +652,7 @@ async fn a_search_an_expansion_and_a_validation_are_each_announced() {
 
             journey
                 .reopen(&format!(
-                    "{base}/ui/validate?fhir={VERSION}&system={SYSTEM}&code={CODE}"
+                    "{base}/validate?fhir={VERSION}&system={SYSTEM}&code={CODE}"
                 ))
                 .await;
             let validated = announcement(&journey, "the validation to announce its verdict").await;
@@ -692,7 +661,7 @@ async fn a_search_an_expansion_and_a_validation_are_each_announced() {
                 "the validation announced nothing, so a reader is never told it ran"
             );
 
-            journey.no_console_errors_but(&[NO_SYNC]).await;
+            journey.no_console_errors().await;
             Ok::<(), WebDriverError>(())
         })
         .await;

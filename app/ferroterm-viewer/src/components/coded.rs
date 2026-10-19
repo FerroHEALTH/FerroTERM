@@ -95,12 +95,13 @@ pub(crate) fn codes_of(
     canonical: Signal<String>,
 ) -> Codes {
     let client = client.clone();
-    let expanded = LocalResource::new(move || {
-        let client = client.clone();
-        let version = version.get();
-        let canonical = canonical.get();
-        async move { client.value_set_codes(version, &canonical).await }
-    });
+    let expanded = Resource::new(
+        move || (version.get(), canonical.get()),
+        move |(version, canonical)| {
+            let client = client.clone();
+            async move { client.value_set_codes(version, &canonical).await }
+        },
+    );
     Codes {
         offered: Signal::derive(move || {
             expanded.with(|answered| {
@@ -203,7 +204,11 @@ pub(crate) fn coded_control(
         drawn
     };
     let named = StoredValue::new(id);
-    let label_class = if sr_only { "sr-only" } else { styles::LABEL };
+    let label_class = if sr_only {
+        "fui-sr-only"
+    } else {
+        styles::LABEL
+    };
     view! {
         <div class="grid gap-tight">
             <label for=move || named.with_value(Clone::clone) class=label_class>
@@ -212,7 +217,7 @@ pub(crate) fn coded_control(
             <select
                 id=move || named.with_value(Clone::clone)
                 name=name
-                class=styles::INPUT
+                class=ferrohealth_ui::view::form::SELECT
                 disabled=move || readonly.get()
                 prop:value=move || held.get()
                 on:change=move |event: Event| chose(event_target_value(&event))

@@ -8,7 +8,7 @@
 //! screen reads both and keeps them apart. Reading lives here, outside every
 //! component, so the screen renders a value plain unit tests can pin.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// The resource type an entry must declare to be drawn as a code system.
 ///
@@ -22,7 +22,7 @@ const CODE_SYSTEM: &str = "CodeSystem";
 /// Every field is optional so a server that omits one still renders. The
 /// viewer carries the elements it draws and nothing else: it never mirrors the
 /// whole resource.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct CodeSystemSearch {
     /// `Bundle.total`, the number of matches the server counted.
     total: Option<u32>,
@@ -32,14 +32,14 @@ pub(crate) struct CodeSystemSearch {
 }
 
 /// One `Bundle.entry`.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 struct SearchEntry {
     /// The resource the entry carries.
     resource: Option<PublishedCodeSystem>,
 }
 
 /// The `CodeSystem` a root publishes, as the detail screen draws it.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct PublishedCodeSystem {
     /// `resourceType`, which says what the entry actually carries.
     #[serde(rename = "resourceType")]
@@ -124,12 +124,28 @@ impl CodeSystemSearch {
 }
 
 impl PublishedCodeSystem {
+    /// The name a person reads: the title, else the computer-friendly name.
+    pub(crate) fn title(&self) -> Option<&str> {
+        named(self.title.as_deref()).or_else(|| named(self.name.as_deref()))
+    }
+
+    /// The publication status, when it declared one.
+    pub(crate) fn status(&self) -> Option<&str> {
+        named(self.status.as_deref())
+    }
+
+    /// The description, when it declared one.
+    pub(crate) fn description(&self) -> Option<&str> {
+        named(self.description.as_deref())
+    }
+
     /// The business version of the resource, when it declared one.
     pub(crate) fn version(&self) -> Option<&str> {
         named(self.version.as_deref())
     }
 
     /// The canonical the resource declares, when it declared one.
+    #[cfg(test)]
     pub(crate) fn url(&self) -> Option<&str> {
         named(self.url.as_deref())
     }

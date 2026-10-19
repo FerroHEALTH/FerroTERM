@@ -5,7 +5,7 @@
 //! answer lives here, outside every component, so the screen is a rendering of
 //! a value that plain unit tests can pin.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Number;
 
 use crate::url::RequestUrl;
@@ -94,14 +94,14 @@ impl ExpandRequest {
 }
 
 /// The `ValueSet` a `$expand` answers, as the viewer reads it.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub(crate) struct ExpandedValueSet {
     /// `ValueSet.expansion`, absent from a resource that carries none.
     expansion: Option<WireExpansion>,
 }
 
 /// `ValueSet.expansion`, with the elements the runner draws.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 struct WireExpansion {
     /// `expansion.total`, the size of the whole selection.
     total: Option<i32>,
@@ -119,7 +119,7 @@ struct WireExpansion {
 }
 
 /// One `expansion.parameter`, with every `value[x]` the element allows.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 struct WireParameter {
     /// `parameter.name`.
     name: Option<String>,
@@ -147,7 +147,7 @@ struct WireParameter {
 }
 
 /// One `expansion.contains`, which may itself carry nested entries.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 struct WireContains {
     /// `contains.system`.
     system: Option<String>,
@@ -171,7 +171,7 @@ struct WireContains {
 }
 
 /// One `contains.designation`.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 struct WireDesignation {
     /// The BCP 47 tag of the term.
     language: Option<String>,
@@ -183,7 +183,7 @@ struct WireDesignation {
 }
 
 /// The parts of a `Coding` the runner renders.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 struct WireCoding {
     /// The code.
     code: Option<String>,
@@ -192,7 +192,7 @@ struct WireCoding {
 }
 
 /// One extension on the expansion, read for the unclosed mark and its reason.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 struct WireExtension {
     /// The canonical that says what the extension means.
     url: Option<String>,
@@ -260,7 +260,7 @@ pub(crate) struct ParameterLine {
 }
 
 /// One concept of an expansion, as a row.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub(crate) struct ConceptRow {
     /// The system the code belongs to, empty when the server named none.
     pub(crate) system: String,
@@ -281,7 +281,7 @@ pub(crate) struct ConceptRow {
 }
 
 /// One designation of a concept, as a line.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub(crate) struct DesignationRow {
     /// The BCP 47 tag, absent when the server sent none.
     pub(crate) language: Option<String>,

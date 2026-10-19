@@ -536,35 +536,21 @@ async fn the_configuration_publishes_what_a_public_client_needs() {
     }
 }
 
-// The viewer is a public client and holds no secret, so the `client_id` the
-// operator registered reaches it from the same document that names the
-// endpoints; RFC 8414 §2 admits the additional member.
+// The console is a confidential client of its own (app/ferroterm-viewer) and
+// is configured with its client there, so the discovery document carries the
+// members SMART defines and no client of this server's.
 #[tokio::test]
-async fn the_configuration_names_the_client_the_viewer_signs_in_as() {
+async fn the_configuration_names_no_client_of_its_own() {
     let key = SigningKey::generate("k1");
     let mock = issuer_publishing(&key, public_discovery).await;
-    let registered = Server::start_persisting_with_smart_client(
-        &mock.uri(),
-        None,
-        None,
-        Some("ferroterm-viewer"),
-    )
-    .await;
-
+    let server = Server::start_persisting_with_smart(&mock.uri(), None, None).await;
     for version in ["r4", "r4b", "r5", "r6"] {
-        let document = configuration(&registered, version).await;
-        assert_eq!(
-            document["ferroterm_viewer_client_id"], "ferroterm-viewer",
-            "{version}"
+        let document = configuration(&server, version).await;
+        assert!(
+            document["ferroterm_viewer_client_id"].is_null(),
+            "{version}: the server publishes no viewer client: {document}"
         );
     }
-
-    let unregistered = Server::start_persisting_with_smart(&mock.uri(), None, None).await;
-    let document = configuration(&unregistered, "r4b").await;
-    assert!(
-        document["ferroterm_viewer_client_id"].is_null(),
-        "a deployment that registered no client offers no sign-in: {document}"
-    );
 }
 
 // An omitted member means its documented default, so an issuer that publishes

@@ -8,7 +8,7 @@
 //! (<https://hl7.org/fhir/R4B/http.html#concurrency>).
 
 use http::StatusCode;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::fhir::error::FhirError;
@@ -17,7 +17,7 @@ use crate::fhir::error::FhirError;
 ///
 /// The viewer never mirrors a whole FHIR resource; these are the elements a
 /// screen shows and the one an update needs.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct StoredResource {
     /// `resourceType`, mandatory in FHIR JSON
     /// (<https://hl7.org/fhir/R4B/json.html>).
@@ -42,7 +42,7 @@ pub(crate) struct StoredResource {
 }
 
 /// The `Resource.meta` elements the viewer reads.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct Meta {
     /// `meta.versionId`, the version an `If-Match` states
     /// (<https://hl7.org/fhir/R4B/http.html#concurrency>).
@@ -76,7 +76,7 @@ impl StoredResource {
 
 /// The `history` `Bundle` a `_history` read answers
 /// (<https://hl7.org/fhir/R4B/http.html#history>).
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(default)]
 pub(crate) struct History {
     /// `Bundle.total`, the number of versions the server counted.
@@ -86,7 +86,7 @@ pub(crate) struct History {
 }
 
 /// One version in a history `Bundle`.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(default)]
 pub(crate) struct HistoryEntry {
     /// The resource as it stood at that version; absent for a delete
@@ -104,15 +104,18 @@ pub(crate) struct HistoryEntry {
 }
 
 /// The `entry.request` elements a history entry carries.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(default)]
 pub(crate) struct HistoryRequest {
     /// `POST`, `PUT`, or `DELETE`.
     pub(crate) method: Option<String>,
+    /// `entry.request.url`, the resource the interaction was made on, which
+    /// names a deleted resource that carries no body.
+    pub(crate) url: Option<String>,
 }
 
 /// The `entry.response` elements a history entry carries.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(default)]
 pub(crate) struct HistoryResponse {
     /// `response.etag`, the version this entry is.
@@ -127,7 +130,7 @@ pub(crate) struct HistoryResponse {
 /// It is the same shape whichever interaction produced it, so a root that
 /// answers the history `Bundle` and one that answers only the version read
 /// draw the same table.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub(crate) struct Version {
     /// `meta.versionId`, which is also the row's key.
     pub(crate) id: String,

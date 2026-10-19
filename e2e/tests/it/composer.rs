@@ -8,10 +8,9 @@
 //! fixture the deployment loads from disk, which has no write path, so it also
 //! stands for the national content the editor never offers to change.
 //!
-//! The write journeys sign in through the stub issuer against the deployment
-//! that configures one, because a write needs a token the server will take.
-//! The token lives in the page that holds it, so once signed in these journeys
-//! move between screens by pressing links the router intercepts.
+//! The write journeys sign in through the stub issuer at the console that
+//! configures one, because a write needs a token the server will take; the
+//! console's server holds it in the reader's session.
 
 use thirtyfour::prelude::*;
 use thirtyfour::stringmatch::StringMatch;
@@ -27,7 +26,7 @@ use crate::harness::sign_in;
 use crate::harness::signed_in;
 
 /// The sidebar link into the composer.
-const COMPOSER_LINK: &str = "//a[normalize-space()='Compose a value set']";
+const COMPOSER_LINK: &str = "//a[normalize-space()='Value set composer']";
 
 /// The canonical the round-trip journey composes under.
 ///
@@ -106,14 +105,16 @@ const READ_ONLY: &str = "//p[contains(text(), 'read-only') or contains(text(), '
 ///
 /// The option itself is pressed, which is what a reader does and what fires
 /// the control's own `change`, so the journey drives the real widget rather
-/// than writing a property on it.
+/// than writing a property on it. The options arrive with the server's
+/// answer, after the control, so the option is waited for.
 async fn pick(journey: &Journey, selector: &str, index: usize, value: &str) -> WebDriverResult<()> {
     let controls = journey.all(By::Css(selector)).await?;
     let control = controls
         .get(index)
         .unwrap_or_else(|| panic!("the form draws a `{selector}` at position {index}"));
     let option = control
-        .find(By::Css(format!("option[value='{value}']")))
+        .query(By::Css(format!("option[value='{value}']")))
+        .first()
         .await
         .unwrap_or_else(|error| panic!("`{selector}` has no option `{value}`: {error}"));
     option.click().await?;
@@ -122,12 +123,10 @@ async fn pick(journey: &Journey, selector: &str, index: usize, value: &str) -> W
 
 /// Signs in under `profile` and opens the composer from the sidebar.
 ///
-/// The screen is reached by pressing the link rather than by loading its
-/// address, because a load would drop the token the sign-in just put in the
-/// page.
+/// The screen is reached by pressing the link, the way a reader reaches it.
 async fn open_composer(journey: &Journey, deployment: &SignedIn, profile: &str, tag: &str) {
     journey
-        .element(By::Css("header a[href^='/ui']"), "the shell mark")
+        .element(By::Css("header a.fui-lockup"), "the shell mark")
         .await;
     choose(journey, deployment, profile, tag).await;
     sign_in(journey, deployment).await;
@@ -228,14 +227,15 @@ async fn compose(journey: &Journey, canonical: &str) -> WebDriverResult<()> {
 
 /// Reads the value set back off the server and validates a code through it.
 ///
-/// This is a fresh page load, so the page holds no token and the form opens
-/// read-only: what it shows is the server's own answer, seen the way a reader
-/// who never signed in sees it.
+/// The console's cookies are dropped first, so the form opens read-only:
+/// what it shows is the server's own answer, seen the way a reader who never
+/// signed in sees it.
 async fn the_definition_survives(
     journey: &Journey,
     base: &str,
     address: &str,
 ) -> WebDriverResult<()> {
+    journey.drop_cookies().await?;
     journey.reopen(address).await;
     journey
         .count_becoming(
@@ -259,7 +259,7 @@ async fn the_definition_survives(
 
     journey
         .reopen(&format!(
-            "{base}/ui/editor/validate?fhir=r4b&on=valueset&valueSet={}&code={CODE}&system={SYSTEM_PARAM}",
+            "{base}/validate?fhir=r4b&on=valueset&valueSet={}&code={CODE}&system={SYSTEM_PARAM}",
             query_param(&canonical())
         ))
         .await;
@@ -286,7 +286,7 @@ async fn a_value_set_over_a_published_one_is_composed_previewed_and_saved() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &deployment.base, "/ui/editor").await;
+            let journey = Journey::open(driver, &deployment.base, "/").await;
             open_composer(&journey, &deployment, "writer", "composes-a-value-set").await;
             compose(&journey, &canonical()).await?;
 
@@ -338,9 +338,7 @@ async fn a_value_set_over_a_published_one_is_composed_previewed_and_saved() {
             );
 
             journey
-                .element(By::XPath(SAVE), "the control that saves")
-                .await
-                .click()
+                .press(By::XPath(SAVE), "the control that saves")
                 .await?;
             journey
                 .text_becoming(
@@ -377,7 +375,7 @@ async fn one_include_is_composed_with_the_keyboard_alone() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &deployment.base, "/ui/editor").await;
+            let journey = Journey::open(driver, &deployment.base, "/").await;
             open_composer(
                 &journey,
                 &deployment,
@@ -444,7 +442,7 @@ async fn a_reader_without_the_scope_composes_nothing() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &deployment.base, "/ui/editor").await;
+            let journey = Journey::open(driver, &deployment.base, "/").await;
             open_composer(&journey, &deployment, "reader", "composes-nothing").await;
 
             let said = journey
@@ -471,7 +469,7 @@ async fn a_reader_without_the_scope_composes_nothing() {
                 .await?;
             assert!(
                 enabled,
-                "a new draft is composed without a token, and only the save is gated"
+                "a new draft is composed without a write scope, and only the save is gated"
             );
 
             journey.no_console_errors().await;
@@ -481,36 +479,34 @@ async fn a_reader_without_the_scope_composes_nothing() {
     outcome.expect("the journey ran and the browser session ended cleanly");
 }
 
-/// The composer is not in the reader bundle at all.
-///
-/// The deployment this drives publishes no issuer, so it also shows that the
-/// editor bundle without a token offers nothing to save.
+/// A console that offers no sign-in carries no composer and no way to reach
+/// it, since nobody there can save.
 #[tokio::test]
-async fn the_reader_bundle_carries_no_composer() {
+async fn a_console_without_a_sign_in_carries_no_composer() {
     let Some(base) = server() else {
         return;
     };
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &base, "/ui").await;
+            let journey = Journey::open(driver, &base, "/").await;
             journey
-                .element(By::Css("header a[href^='/ui']"), "the shell mark")
+                .element(By::Css("header a.fui-lockup"), "the shell mark")
                 .await;
             assert_eq!(
                 journey.count(By::XPath(COMPOSER_LINK)).await,
                 0,
-                "the reader bundle's sidebar leads to no authoring screen"
+                "the sidebar of a console without a sign-in leads to no composer"
             );
 
-            journey.reopen(&format!("{base}/ui/editor/compose")).await;
+            journey.reopen(&format!("{base}/compose")).await;
             journey
-                .element(By::Css(URL_FIELD), "the composer in the editor bundle")
+                .element(By::Css("h1"), "the console's answer to an address it lacks")
                 .await;
             assert_eq!(
-                journey.count(By::XPath(SAVE)).await,
+                journey.count(By::Css(URL_FIELD)).await,
                 0,
-                "without a token the composer offers no save"
+                "a console without a sign-in draws no composer"
             );
 
             journey.no_console_errors().await;

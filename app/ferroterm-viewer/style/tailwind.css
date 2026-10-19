@@ -1,225 +1,115 @@
 /* SPDX-License-Identifier: BUSL-1.1 */
-/* The viewer's token layer. Tailwind 4 is configured in CSS, so there is no
-   JavaScript config file and no Node in this build.
-   https://tailwindcss.com/docs/upgrade-guide */
-/* `source(none)` turns off automatic detection, which would otherwise walk up
-   out of this crate and scan the whole workspace. The two sources below are
-   the only places a class name is written, and the paths are relative to this
-   file. https://tailwindcss.com/docs/detecting-classes-in-source-files */
-@import "tailwindcss" source(none);
+/* The console's own layout utilities. The components, the role tokens, the
+   base layer and the type and space steps are ferrohealth-ui.css, served at
+   /ferrohealth-ui.css, and the brand is /theme.css; this file adds the
+   utilities a screen lays itself out with, and nothing that resets an
+   element. Tailwind 4 is configured in CSS, so there is no JavaScript config
+   file and no Node in this build (https://tailwindcss.com/docs/upgrade-guide).
+
+   Only the theme variables and the utilities are imported: Tailwind's base
+   layer would reset the headings, links and controls the components'
+   stylesheet styles. `source(none)` turns off automatic detection, which
+   would walk the whole workspace; the screens are the one place a class name
+   is written (https://tailwindcss.com/docs/detecting-classes-in-source-files). */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
 @source "../src/**/*.rs";
-@source "../index.html";
 
-/* The theme follows an explicit choice, which app.rs puts on the document
-   element, rather than the operating system preference alone. */
-@custom-variant dark (&:where(.dark, .dark *));
-
-/* The FerroTERM brand palette (assets/brand/tokens.css). */
-@theme {
-  --color-brand-50: #f0fdfa;
-  --color-brand-100: #ccfbf1;
-  --color-brand-300: #5eead4;
-  --color-brand-400: #2dd4bf;
-  --color-brand-500: #14b8a6;
-  --color-brand-600: #0d9488;
-  --color-brand-700: #0f766e;
-  --color-brand-900: #134e4a;
-  --color-accent-400: #22d3ee;
-  --color-ink: #0f172a;
-  --color-mist: #f1f5f9;
-  --color-tile: #0b1220;
-}
-
-/* The role layer: what a colour is FOR, not what it is. A screen names a role
-   and never a palette entry, so the palette is measured once and a theme is
-   one place. Each role is a plain custom property here and reaches Tailwind
-   through `@theme inline` below, which is how a utility follows a variable
-   that changes under a selector
-   (https://tailwindcss.com/docs/colors#referencing-other-variables). */
-:root {
-  --role-fg: #0f172a;
-  --role-fg-muted: #475569;
-  --role-fg-faint: #64748b;
-  --role-surface: #f8fafc;
-  --role-raised: #ffffff;
-  --role-inset: #f1f5f9;
-  --role-line: #e2e8f0;
-  --role-line-strong: #cbd5e1;
-  --role-accent: #0f766e;
-  --role-accent-fg: #ffffff;
-  --role-accent-soft: #f0fdfa;
-  --role-accent-soft-fg: #115e59;
-  --role-ok-soft: #ecfdf5;
-  --role-ok-soft-fg: #14532d;
-  --role-warn-soft: #fffbeb;
-  --role-warn-soft-fg: #713f12;
-  --role-danger: #b91c1c;
-  --role-danger-soft: #fef2f2;
-  --role-danger-soft-fg: #7f1d1d;
-
-  /* The brand mark, which is artwork rather than a surface. The pairing is
-     the one assets/brand/README.md records: teal edges, teal-deep nodes, and
-     a cyan highlight on the top node. */
-  --role-mark: #0d9488;
-  --role-mark-node: #0f766e;
-  --role-mark-accent: #22d3ee;
-}
-
-/* `:root.dark` rather than `:where(.dark)`: a zero-specificity selector loses
-   to `:root` above, so the dark values never applied and a dark run drew the
-   light surfaces. */
-:root.dark {
-  --role-fg: #f1f5f9;
-  --role-fg-muted: #cbd5e1;
-  --role-fg-faint: #94a3b8;
-  --role-surface: #0b1220;
-  --role-raised: #0f172a;
-  --role-inset: #1e293b;
-  --role-line: #1e293b;
-  --role-line-strong: #334155;
-  --role-accent: #2dd4bf;
-  --role-accent-fg: #0f172a;
-  --role-accent-soft: #134e4a;
-  --role-accent-soft-fg: #ccfbf1;
-  --role-ok-soft: #052e2b;
-  --role-ok-soft-fg: #a7f3d0;
-  --role-warn-soft: #422006;
-  --role-warn-soft-fg: #fde68a;
-  --role-danger: #fca5a5;
-  --role-danger-soft: #450a0a;
-  --role-danger-soft-fg: #fecaca;
-
-  /* On a dark tile the mark brightens so it holds against the ground
-     (assets/brand/README.md). */
-  --role-mark: #14b8a6;
-  --role-mark-node: #2dd4bf;
-  --role-mark-accent: #22d3ee;
-}
-
-@theme inline {
-  --color-fg: var(--role-fg);
-  --color-muted: var(--role-fg-muted);
-  --color-faint: var(--role-fg-faint);
-  --color-surface: var(--role-surface);
-  --color-raised: var(--role-raised);
-  --color-inset: var(--role-inset);
-  --color-line: var(--role-line);
-  --color-line-strong: var(--role-line-strong);
-  --color-accent: var(--role-accent);
-  --color-accent-fg: var(--role-accent-fg);
-  --color-accent-soft: var(--role-accent-soft);
-  --color-accent-soft-fg: var(--role-accent-soft-fg);
-  --color-ok-soft: var(--role-ok-soft);
-  --color-ok-soft-fg: var(--role-ok-soft-fg);
-  --color-warn-soft: var(--role-warn-soft);
-  --color-warn-soft-fg: var(--role-warn-soft-fg);
-  --color-danger: var(--role-danger);
-  --color-danger-soft: var(--role-danger-soft);
-  --color-danger-soft-fg: var(--role-danger-soft-fg);
-  --color-mark: var(--role-mark);
-  --color-mark-node: var(--role-mark-node);
-  --color-mark-accent: var(--role-mark-accent);
-
-  /* Six steps. Weight carries the hierarchy below the top two; size carries
-     it above them. A screen names a step and never a raw size. */
-  --text-display: 1.75rem;
-  --text-display--line-height: 2.125rem;
-  --text-title: 1.25rem;
-  --text-title--line-height: 1.75rem;
-  --text-heading: 1rem;
-  --text-heading--line-height: 1.5rem;
-  --text-body: 0.9375rem;
-  --text-body--line-height: 1.4375rem;
-  --text-small: 0.8125rem;
-  --text-small--line-height: 1.1875rem;
-  --text-micro: 0.6875rem;
-  --text-micro--line-height: 1rem;
-
-  /* Four steps on an 8-point grid, and nothing between them. A screen names a
-     step, so the rhythm of one screen is the rhythm of every screen and a gap
-     is never re-decided in the file that needed it. The values follow the
-     density, which is why they reach Tailwind through a variable. */
-  --spacing-tight: var(--step-tight);
-  --spacing-default: var(--step-default);
-  --spacing-loose: var(--step-loose);
-  --spacing-section: var(--step-section);
-}
-
-/* Density is the reader's choice, and one block apart. The four spacing steps
-   follow it, so compact tightens the whole rhythm of a screen rather than the
-   rows alone, and a twenty-system deployment fits one screen. */
-:root {
-  --step-tight: 0.25rem;
-  --step-default: 0.5rem;
-  --step-loose: 1rem;
-  --step-section: 2rem;
-  --row-y: 0.5rem;
-  --panel-p: 1rem;
-
-  /* Motion marks a state change and nothing else, at one duration. Anything
-     longer reads as an animation the reader did not ask for. */
-  --motion-state: 120ms;
-}
-
-:root[data-density="compact"] {
-  --step-tight: 0.125rem;
-  --step-default: 0.375rem;
-  --step-loose: 0.625rem;
-  --step-section: 1rem;
-  --row-y: 0.25rem;
-  --panel-p: 0.625rem;
-}
-
-@layer base {
-  /* A visible focus indicator on every control, which WCAG 2.2 requires
-     (https://www.w3.org/TR/WCAG22/#focus-appearance). */
-  :focus-visible {
-    outline: 2px solid var(--role-accent);
-    outline-offset: 2px;
-  }
-
-  /* State changes only, and none of it for a reader who asks for less
-     (https://www.w3.org/TR/WCAG22/#animation-from-interactions). */
-  @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-    }
-  }
-}
-
-@utility row-y {
-  padding-block: var(--row-y);
-}
-
-@utility panel-p {
-  padding: var(--panel-p);
+/* A screen names a role of ferrohealth-ui.css, never a palette entry, so the
+   palette is measured once; each utility follows the variable the stylesheet
+   and the brand set under every theme
+   (https://tailwindcss.com/docs/colors#referencing-other-variables). The
+   block is `reference`: it emits no variable of its own, so none shadows the
+   stylesheet's, and `--text-display: var(--text-display)` names no cycle. The
+   font stacks are the stylesheet's too (https://tailwindcss.com/docs/theme). */
+@theme inline reference {
+  --font-*: initial;
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-edge: var(--edge);
+  --color-edge-strong: var(--edge-strong);
+  --color-edge-control: var(--edge-control);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-tint: var(--accent-tint);
+  --color-ok: var(--ok);
+  --color-ok-ground: var(--ok-ground);
+  --color-warn: var(--warn);
+  --color-warn-ground: var(--warn-ground);
+  --color-bad: var(--bad);
+  --color-bad-ground: var(--bad-ground);
+  --color-info: var(--info);
+  --color-info-ground: var(--info-ground);
+  --color-surface-head: var(--surface-head);
+  --text-display: var(--text-display);
+  --text-title: var(--text-title);
+  --text-heading: var(--text-heading);
+  --text-body: var(--text-body);
+  --text-small: var(--text-small);
+  --text-micro: var(--text-micro);
+  --spacing-tight: var(--space-tight);
+  --spacing-default: var(--space-default);
+  --spacing-loose: var(--space-loose);
+  --spacing-section: var(--space-section);
 }
 
 /* A pane of a reading surface scrolls its own content, so walking a tree does
-   not move the search beside it. The height follows the window between two
-   bounds: below the lower one a pane holds too few rows to walk, above the
-   upper one the eye loses the row it was on. */
+   not move the search beside it. */
 @utility pane-scroll {
   max-height: clamp(24rem, calc(100vh - 20rem), 48rem);
   overflow-y: auto;
 }
 
-@utility state-change {
-  transition-property: color, background-color, border-color;
-  transition-timing-function: ease-out;
-  transition-duration: var(--motion-state);
+/* A row of a hierarchy, indented one loose step per level past the 0.75rem
+   a FerroUI table cell starts at. FerroUI's depth
+   classes (FerroUI issue 37) take this over, which FerroTERM issue 730
+   tracks. */
+@utility depth-* {
+  padding-inline-start: calc(0.75rem + var(--space-loose) * --value(integer));
 }
 
-/* The inventory's first column. A name and the canonical beside it read on one
-   line, and the canonical is clipped rather than wrapped: a wrapped canonical
-   makes every row of the table two lines tall, which is the difference between
-   a deployment a reader compares on one screen and one they scroll. The whole
-   canonical is still selected and copied, and the row links to the screen that
-   spells it out. */
+/* The inventory's first column: the name and the clipped canonical read on
+   one line, so a row stays one line tall. */
 @utility system-cell {
-  max-width: 34rem;
+  max-width: 28rem;
+}
+
+/* A list the screen lays out itself (it carries a class) draws no bullet and
+   keeps no indent; a plain list keeps both. FerroUI's divided list (FerroUI
+   issue 37) takes this over, which FerroTERM issue 730 tracks. */
+@layer base {
+  :where(ul, ol)[class] {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+}
+
+/* A section that has nothing to say renders an empty element, which a stack
+   or a group would otherwise give a gap of its own; no specification
+   governs this: our own design. */
+.fui-stack > :empty,
+.fui-fieldset > :empty {
+  display: none;
+}
+
+/* On a phone the version switcher drops its "FHIR" prefix and the lockup
+   keeps its mark alone, so the brand stays whole in the top bar; no
+   specification governs this: our own design. */
+@media (width < 40rem) {
+  .fui-topbar .fui-segmented-prefix {
+    display: none;
+  }
+}
+
+@media (width < 30rem) {
+  .fui-topbar .fui-lockup-name {
+    display: none;
+  }
 }

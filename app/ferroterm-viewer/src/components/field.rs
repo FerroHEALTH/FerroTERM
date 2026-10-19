@@ -13,13 +13,22 @@ use leptos::ev::Event;
 use leptos::html::Input;
 use leptos::prelude::*;
 
+use ferrohealth_ui::view::form::{INPUT, NARROW, SELECT, check, fieldset, help_id};
+use ferrohealth_ui::view::layout::{FieldRow, field_row};
+use ferrohealth_ui::widget::combobox::{ComboOption, Combobox, combobox};
+use ferrohealth_ui::widget::help::{explained_field, help_line};
+
 use crate::fhir::named::Choice;
-use crate::styles;
 
 /// The option value that asks for the text field rather than a listed one.
 ///
 /// It is not a canonical, so no resource can collide with it.
 const TYPE_IT: &str = "\u{1}another";
+
+/// The name a combobox posts its choice under before the page hydrates: the
+/// text field beside it carries the value the run sends, so this one is
+/// ignored by every screen.
+const PICKED_NAME: &str = "picked";
 
 /// One control: what it is called on the wire, what a reader calls it, and the
 /// sentence that explains it.
@@ -35,93 +44,54 @@ pub(crate) struct Field {
     pub(crate) hint: &'static str,
 }
 
-/// Whether a screen is drawing the hints of its controls.
-///
-/// One switch governs a whole screen: a reader wants every parameter explained
-/// or none of them, and a screen with two runners on it explains both at once.
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct Help(pub(crate) RwSignal<bool>);
-
-/// The switch that draws the hints of the screen it is placed on.
-pub(crate) fn help_toggle() -> AnyView {
-    let Help(help) = expect_context::<Help>();
-    view! {
-        <button
-            type="button"
-            class=styles::BUTTON_QUIET
-            aria-pressed=move || if help.get() { "true" } else { "false" }
-            on:click=move |_| help.update(|shown| *shown = !*shown)
-        >
-            {move || if help.get() { "Hide help" } else { "Explain these parameters" }}
-        </button>
-    }
-    .into_any()
-}
-
-/// The hint under one control, drawn when the form's help is on and in the
-/// accessibility tree either way.
-fn hint(id: &str, text: &'static str) -> AnyView {
-    let Help(help) = expect_context::<Help>();
-    view! {
-        <p
-            id=id.to_owned()
-            class=move || {
-                if help.get() {
-                    styles::HINT.to_owned()
-                } else {
-                    format!("sr-only {}", styles::HINT)
-                }
-            }
-        >
-            {text}
-        </p>
-    }
-    .into_any()
-}
-
 /// One labelled text control, seeded from its own parameter.
 pub(crate) fn text_field(field: Field, node: NodeRef<Input>, value: Memo<String>) -> AnyView {
-    let described_by = format!("{}-note", field.id);
-    view! {
-        <div class="grid gap-tight">
-            <label for=field.id class=styles::LABEL>
-                {field.label}
-            </label>
-            <input
-                id=field.id
-                name=field.name
-                type="text"
-                class=styles::INPUT
-                aria-describedby=described_by.clone()
-                node_ref=node
-                prop:value=move || value.get()
-            />
-            {hint(&described_by, field.hint)}
-        </div>
-    }
-    .into_any()
+    text_field_showing(field, node, value, None)
+}
+
+/// The placeholder a display language field shows while it is empty.
+pub(crate) const LANGUAGE_EXAMPLE: &str = "for example en or nl-NL";
+
+/// One labelled text control with a placeholder showing the shape of what it
+/// takes while it is empty.
+pub(crate) fn text_field_showing(
+    field: Field,
+    node: NodeRef<Input>,
+    value: Memo<String>,
+    placeholder: Option<&'static str>,
+) -> AnyView {
+    let input = view! {
+        <input
+            id=field.id
+            name=field.name
+            type="text"
+            class=INPUT
+            placeholder=placeholder
+            aria-describedby=help_id(field.id)
+            node_ref=node
+            value=move || value.get()
+            prop:value=move || value.get()
+        />
+    };
+    explained_field(field.id, field.label, field.hint, input)
 }
 
 /// One labelled checkbox, seeded from its own parameter.
 pub(crate) fn check_field(field: Field, node: NodeRef<Input>, value: Memo<bool>) -> AnyView {
-    let described_by = format!("{}-note", field.id);
+    let checkbox = view! {
+        <input
+            id=field.id
+            name=field.name
+            type="checkbox"
+            aria-describedby=help_id(field.id)
+            node_ref=node
+            checked=move || value.get()
+            prop:checked=move || value.get()
+        />
+    };
     view! {
-        <div class="grid gap-tight">
-            <div class="flex items-center gap-default">
-                <input
-                    id=field.id
-                    name=field.name
-                    type="checkbox"
-                    class="h-4 w-4 accent-accent"
-                    aria-describedby=described_by.clone()
-                    node_ref=node
-                    prop:checked=move || value.get()
-                />
-                <label for=field.id class=styles::LABEL>
-                    {field.label}
-                </label>
-            </div>
-            {hint(&described_by, field.hint)}
+        <div class="fui-field">
+            {check(field.id, field.label, checkbox)} {help_line(field.id, field.hint)}
         </div>
     }
     .into_any()
@@ -134,27 +104,21 @@ pub(crate) fn number_field(
     value: Memo<String>,
     max: u32,
 ) -> AnyView {
-    let described_by = format!("{}-note", field.id);
-    view! {
-        <div class="grid gap-tight">
-            <label for=field.id class=styles::LABEL>
-                {field.label}
-            </label>
-            <input
-                id=field.id
-                name=field.name
-                type="number"
-                min="1"
-                max=max.to_string()
-                class=styles::INPUT
-                aria-describedby=described_by.clone()
-                node_ref=node
-                prop:value=move || value.get()
-            />
-            {hint(&described_by, field.hint)}
-        </div>
-    }
-    .into_any()
+    let input = view! {
+        <input
+            id=field.id
+            name=field.name
+            type="number"
+            min="1"
+            max=max.to_string()
+            class=format!("{INPUT} {NARROW}")
+            aria-describedby=help_id(field.id)
+            node_ref=node
+            value=move || value.get()
+            prop:value=move || value.get()
+        />
+    };
+    explained_field(field.id, field.label, field.hint, input)
 }
 
 /// One labelled choice control, seeded from its own parameter.
@@ -167,26 +131,19 @@ pub(crate) fn select_field(
     options: impl Fn() -> Vec<AnyView> + Send + Sync + 'static,
     change: impl FnMut(Event) + 'static,
 ) -> AnyView {
-    let described_by = format!("{}-note", field.id);
-    view! {
-        <div class="grid gap-tight">
-            <label for=field.id class=styles::LABEL>
-                {field.label}
-            </label>
-            <select
-                id=field.id
-                name=field.name
-                class=styles::INPUT
-                aria-describedby=described_by.clone()
-                prop:value=move || value.get()
-                on:change=change
-            >
-                {options}
-            </select>
-            {hint(&described_by, field.hint)}
-        </div>
-    }
-    .into_any()
+    let select = view! {
+        <select
+            id=field.id
+            name=field.name
+            class=SELECT
+            aria-describedby=help_id(field.id)
+            prop:value=move || value.get()
+            on:change=change
+        >
+            {options}
+        </select>
+    };
+    explained_field(field.id, field.label, field.hint, select)
 }
 
 /// A control and the narrower one beside it, for a value and its version.
@@ -195,12 +152,14 @@ pub(crate) fn select_field(
 /// do not deserve the same width: an even split truncates the name that the
 /// picker exists to show.
 pub(crate) fn versioned_row(fields: Vec<AnyView>) -> AnyView {
-    view! { <div class="grid gap-default sm:grid-cols-[2fr_1fr]">{fields}</div> }.into_any()
+    // NOTE: no specification governs this: our own design; FerroUI's rows put
+    // the narrow field first, so the canonical leads in two columns of its own.
+    field_row(FieldRow::Halves, fields)
 }
 
 /// Controls that sit side by side on a wide screen.
 pub(crate) fn row(fields: Vec<AnyView>) -> AnyView {
-    view! { <div class="grid gap-default sm:grid-cols-2">{fields}</div> }.into_any()
+    field_row(FieldRow::Halves, fields)
 }
 
 /// A note beside a control about the run that is showing.
@@ -209,7 +168,7 @@ pub(crate) fn row(fields: Vec<AnyView>) -> AnyView {
 /// so it does not hide behind the help switch.
 pub(crate) fn note(text: Memo<String>) -> AnyView {
     view! {
-        <p role="status" class=styles::HINT>
+        <p role="status" class="fui-help">
             {move || text.get()}
         </p>
     }
@@ -218,13 +177,7 @@ pub(crate) fn note(text: Memo<String>) -> AnyView {
 
 /// A labelled group of controls that belong together.
 pub(crate) fn group(label: &'static str, fields: Vec<AnyView>) -> AnyView {
-    view! {
-        <fieldset class="grid gap-default">
-            <legend class=format!("{} mb-tight", styles::EYEBROW)>{label}</legend>
-            {fields}
-        </fieldset>
-    }
-    .into_any()
+    fieldset(label, fields).into_any()
 }
 
 /// What one picker's own two options say.
@@ -237,12 +190,16 @@ pub(crate) struct Picker {
     pub(crate) empty: &'static str,
     /// What the option that asks for the text field says.
     pub(crate) other: &'static str,
+    /// Whether the list is long enough to filter as the reader types: a
+    /// combobox, where a short list stays a select.
+    pub(crate) searched: bool,
 }
 
 /// The words a picker over a canonical carries.
 pub(crate) const CANONICAL_WORDS: Picker = Picker {
     empty: "Choose one this server holds",
     other: "Another canonical",
+    searched: true,
 };
 
 /// The words a picker over a version carries.
@@ -254,6 +211,7 @@ pub(crate) const CANONICAL_WORDS: Picker = Picker {
 pub(crate) const VERSION_WORDS: Picker = Picker {
     empty: "The one this server resolves to",
     other: "Another version",
+    searched: false,
 };
 
 /// One labelled value, picked from what this root holds or typed.
@@ -274,11 +232,105 @@ pub(crate) fn picked_field(
     choices: Memo<Vec<Choice>>,
     words: Picker,
 ) -> AnyView {
+    if words.searched {
+        searched_field(field, node, value, choices, words)
+    } else {
+        selected_field(field, node, value, choices, words)
+    }
+}
+
+/// A long list of canonicals as a combobox the reader filters by typing,
+/// each offer its name over its canonical, with the text field behind the
+/// last option.
+fn searched_field(
+    field: Field,
+    node: NodeRef<Input>,
+    value: Memo<String>,
+    choices: Memo<Vec<Choice>>,
+    words: Picker,
+) -> AnyView {
+    let typing = RwSignal::new(false);
+    let unlisted = move || {
+        value.with(|value| {
+            !value.is_empty()
+                && choices.with(|choices| !choices.iter().any(|choice| &choice.canonical == value))
+        })
+    };
+    let typed = move || typing.get() || unlisted();
+    let picked = RwSignal::new(None::<String>);
+    // The address and the offers both move the chosen value, and the combobox
+    // follows them; a choice the reader makes writes the field the form reads.
+    Effect::new(move |_| {
+        let named = value.get();
+        picked.set((!named.is_empty()).then_some(named));
+    });
+    Effect::new(move |_| match picked.get() {
+        Some(chosen) if chosen == TYPE_IT => typing.set(true),
+        Some(chosen) => {
+            typing.set(false);
+            if let Some(input) = node.get_untracked() {
+                input.set_value(&chosen);
+            }
+        }
+        None => {}
+    });
+    let typed_id = format!("{}-typed", field.id);
+    let combo = move || {
+        let mut options: Vec<ComboOption> = choices.with(|choices| {
+            choices
+                .iter()
+                .map(|choice| {
+                    ComboOption::new(choice.canonical.clone(), choice.label.clone())
+                        .detail(choice.canonical.clone())
+                })
+                .collect()
+        });
+        options.push(ComboOption::new(TYPE_IT, words.other));
+        combobox(Combobox {
+            id: field.id,
+            name: PICKED_NAME,
+            label: field.label,
+            placeholder: words.empty,
+            options,
+            selected: picked,
+        })
+    };
+    view! {
+        <div class="fui-field">
+            <div hidden=typed>{combo}</div>
+            <label for=typed_id.clone() hidden=move || !typed() class="fui-label">
+                {field.label}
+            </label>
+            <input
+                id=typed_id
+                name=field.name
+                type="text"
+                class=INPUT
+                aria-describedby=help_id(field.id)
+                hidden=move || !typed()
+                node_ref=node
+                value=move || value.get()
+                prop:value=move || value.get()
+            />
+            {help_line(field.id, field.hint)}
+        </div>
+    }
+    .into_any()
+}
+
+/// A short list as a select, with the text field behind the last option.
+fn selected_field(
+    field: Field,
+    node: NodeRef<Input>,
+    value: Memo<String>,
+    choices: Memo<Vec<Choice>>,
+    words: Picker,
+) -> AnyView {
     // Whether the reader asked for the text field. It is a signal of this
     // control rather than of the screen, because one form can carry two
     // pickers and each is on its own choice.
     let typing = RwSignal::new(false);
-    let described_by = format!("{}-note", field.id);
+    let described_by = help_id(field.id);
     let picker = StoredValue::new(format!("{}-pick", field.id));
     let offered = move || {
         choices.with(|choices| {
@@ -287,8 +339,10 @@ pub(crate) fn picked_field(
                 .map(|choice| {
                     let canonical = choice.canonical.clone();
                     let label = choice.label.clone();
+                    let named = canonical.clone();
+                    let selected = move || value.with(|value| *value == named);
                     view! {
-                        <option value=canonical.clone() title=canonical>
+                        <option value=canonical.clone() title=canonical selected=selected>
                             {label}
                         </option>
                     }
@@ -326,20 +380,20 @@ pub(crate) fn picked_field(
         }
     };
     view! {
-        <div class="grid gap-tight">
+        <div class="fui-field">
             // Each control carries its own label, because a label points at
             // one control and only one of the two is ever showing. The label
             // of a hidden control is hidden with it, so a reader meets one
             // (<https://www.w3.org/TR/wai-aria-1.2/#namecalculation>).
-            <label for=move || picker.with_value(Clone::clone) hidden=typed class=styles::LABEL>
+            <label for=move || picker.with_value(Clone::clone) hidden=typed class="fui-label">
                 {field.label}
             </label>
-            <label for=field.id hidden=move || !typed() class=styles::LABEL>
+            <label for=field.id hidden=move || !typed() class="fui-label">
                 {field.label}
             </label>
             <select
                 id=move || picker.with_value(Clone::clone)
-                class=styles::INPUT
+                class=SELECT
                 aria-describedby=described_by.clone()
                 hidden=typed
                 prop:value=selected
@@ -353,13 +407,14 @@ pub(crate) fn picked_field(
                 id=field.id
                 name=field.name
                 type="text"
-                class=styles::INPUT
+                class=INPUT
                 aria-describedby=described_by.clone()
                 hidden=move || !typed()
                 node_ref=node
+                value=move || value.get()
                 prop:value=move || value.get()
             />
-            {hint(&described_by, field.hint)}
+            {help_line(field.id, field.hint)}
         </div>
     }
     .into_any()

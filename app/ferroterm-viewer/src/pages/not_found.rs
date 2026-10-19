@@ -1,11 +1,14 @@
-//! The screen an address inside `/ui` that names no page reaches.
+//! The screen an address that names no page reaches.
 
 use leptos::prelude::*;
 use leptos_meta::Title;
 
 use crate::components::shell::SelectedVersion;
 use crate::routes::ui_link;
-use crate::styles;
+use ferrohealth_ui::icon::Glyph;
+use ferrohealth_ui::view::button::Variant;
+use ferrohealth_ui::view::empty::empty_state;
+use ferrohealth_ui::view::surface::panel;
 
 /// Says that the address names no screen, and offers the way back.
 ///
@@ -18,14 +21,25 @@ use crate::styles;
 )]
 pub(crate) fn NotFoundPage() -> impl IntoView {
     let SelectedVersion(version) = expect_context::<SelectedVersion>();
+    let home = move || {
+        view! {
+            <a href=ui_link("", version.get()) class=Variant::Primary.class()>
+                "Back to the dashboard"
+            </a>
+        }
+    };
     view! {
         <Title text="Not found" />
-        <h1 class=styles::PAGE_TITLE>"No such screen"</h1>
-        <p class="mt-default text-body text-muted">"The viewer has no page at this address."</p>
-        <p class="mt-loose text-body">
-            <a href=move || ui_link("", version.get()) class="text-accent underline">
-                "Back to the overview"
-            </a>
-        </p>
+        <h1 class="fui-sr-only">"No such screen"</h1>
+        {move || {
+            panel(
+                empty_state(
+                    Glyph::SEARCH_X,
+                    "No such screen",
+                    "The console has no page at this address.",
+                    home(),
+                ),
+            )
+        }}
     }
 }

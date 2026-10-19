@@ -26,7 +26,7 @@ use crate::harness::sign_in;
 use crate::harness::signed_in;
 
 /// The sidebar link into the code system authoring screen.
-const AUTHORING_LINK: &str = "//a[normalize-space()='Edit a code system']";
+const AUTHORING_LINK: &str = "//a[normalize-space()='Code system editor']";
 
 /// The link each authoring screen carries to the versions of what it has open.
 const HISTORY_LINK: &str = "//a[normalize-space()='History of this resource']";
@@ -95,17 +95,13 @@ const FIRST_DISPLAY: &str = "Red";
 /// The display the second version carries.
 const SECOND_DISPLAY: &str = "Crimson";
 
-/// The refusal every journey provokes by asking a sync service that is not
-/// there for the newest run.
-const NO_SYNC: &str = "/runs";
-
 /// Signs in as a terminologist and opens the code system authoring screen.
 ///
 /// Every move after the sign-in is a press rather than a load, because a load
 /// would drop the token the sign-in just put in the page.
 async fn open_authoring(journey: &Journey, deployment: &SignedIn, tag: &str) {
     journey
-        .element(By::Css("header a[href^='/ui']"), "the shell mark")
+        .element(By::Css("header a.fui-lockup"), "the shell mark")
         .await;
     choose(journey, deployment, "writer", tag).await;
     sign_in(journey, deployment).await;
@@ -157,9 +153,7 @@ async fn author_and_save(journey: &Journey, canonical: &str) -> WebDriverResult<
 /// Presses save and waits for the screen to announce what the server took.
 async fn save(journey: &Journey, what: &str) {
     journey
-        .element(By::XPath(SAVE), "the control that saves")
-        .await
-        .click()
+        .press(By::XPath(SAVE), "the control that saves")
         .await
         .unwrap_or_else(|error| panic!("the save control refused the press: {error}"));
     journey
@@ -185,9 +179,7 @@ async fn change_the_display_and_save(journey: &Journey) -> WebDriverResult<()> {
 /// Opens the versions of the resource the authoring screen has open.
 async fn open_history(journey: &Journey) {
     journey
-        .element(By::XPath(HISTORY_LINK), "the way to the versions")
-        .await
-        .click()
+        .press(By::XPath(HISTORY_LINK), "the way to the versions")
         .await
         .unwrap_or_else(|error| panic!("the history link refused the press: {error}"));
     journey
@@ -233,7 +225,7 @@ async fn an_earlier_version_is_restored_and_the_resource_comes_back_as_it_was() 
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &deployment.base, "/ui/editor").await;
+            let journey = Journey::open(driver, &deployment.base, "/").await;
             open_authoring(&journey, &deployment, "restores-a-version").await;
             author_and_save(&journey, &restore_canonical()).await?;
             change_the_display_and_save(&journey).await?;
@@ -297,7 +289,7 @@ async fn an_earlier_version_is_restored_and_the_resource_comes_back_as_it_was() 
                 )
                 .await;
 
-            journey.no_console_errors_but(&[NO_SYNC]).await;
+            journey.no_console_errors().await;
             Ok::<(), WebDriverError>(())
         })
         .await;
@@ -313,7 +305,7 @@ async fn a_reader_sees_the_versions_and_no_restore_control() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &deployment.base, "/ui/editor").await;
+            let journey = Journey::open(driver, &deployment.base, "/").await;
             open_authoring(&journey, &deployment, "reads-the-versions").await;
             author_and_save(&journey, &reader_canonical()).await?;
             change_the_display_and_save(&journey).await?;
@@ -328,8 +320,8 @@ async fn a_reader_sees_the_versions_and_no_restore_control() {
             );
             let address = journey.address().await;
 
-            // A fresh load holds no token, which is what a reader who never
-            // signed in has.
+            // Without the console's cookies the load is a visitor's.
+            journey.drop_cookies().await?;
             journey.reopen(&address).await;
             journey
                 .count_becoming(
@@ -344,7 +336,7 @@ async fn a_reader_sees_the_versions_and_no_restore_control() {
                 "a reader sees what changed and is offered no way to change it"
             );
 
-            journey.no_console_errors_but(&[NO_SYNC]).await;
+            journey.no_console_errors().await;
             Ok::<(), WebDriverError>(())
         })
         .await;
@@ -360,7 +352,7 @@ async fn the_comparison_runs_from_the_keyboard_alone() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &deployment.base, "/ui/editor").await;
+            let journey = Journey::open(driver, &deployment.base, "/").await;
             open_authoring(&journey, &deployment, "compares-from-the-keyboard").await;
             author_and_save(&journey, &keyboard_canonical()).await?;
             change_the_display_and_save(&journey).await?;
@@ -399,7 +391,7 @@ async fn the_comparison_runs_from_the_keyboard_alone() {
                 "the keyboard reached the same comparison the pointer does: `{counted}`"
             );
 
-            journey.no_console_errors_but(&[NO_SYNC]).await;
+            journey.no_console_errors().await;
             Ok::<(), WebDriverError>(())
         })
         .await;

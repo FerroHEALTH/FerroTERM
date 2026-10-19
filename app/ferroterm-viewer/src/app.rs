@@ -1,4 +1,11 @@
-//! The application root: the theme, the router, and the shell.
+// SPDX-License-Identifier: BUSL-1.1
+//! The page tree the server renders and the browser hydrates.
+//!
+//! The document carries the reader's theme and density, written by the server
+//! from its cookies so the page arrives drawn in them; the three stylesheets
+//! are the components' (`ferrohealth-ui`), the FerroTERM brand, and the
+//! console's own layout utilities, all of this origin, so `style-src 'self'`
+//! holds.
 
 // The diagnostic lands on macro output rather than on an item written here,
 // so the expectation covers the module.
@@ -8,87 +15,114 @@
 )]
 
 use leptos::prelude::*;
-use leptos_meta::Title;
-use leptos_meta::provide_meta_context;
+use leptos_meta::{Stylesheet, Title, provide_meta_context};
 use leptos_router::components::Router;
+use serde::{Deserialize, Serialize};
 
-use crate::components::shell::Shell;
-use crate::density::Density;
+use crate::auth::{Operator, Session};
+use crate::components::shell::{Console, PRODUCT, console_shell};
 use crate::fhir::FhirClient;
-use crate::routes::UI_BASE;
+use crate::runs::RunList;
 use crate::settings::Settings;
-use crate::theme::ThemeMode;
 
-/// The class Tailwind's dark variant is defined against in `style/tailwind.css`.
-const DARK_CLASS: &str = "dark";
+/// The path of the stylesheet cargo-leptos writes into the site bundle.
+pub const STYLESHEET: &str = "/pkg/ferroterm-viewer.css";
 
-/// The attribute the compact density variables are selected on.
-const DENSITY_ATTRIBUTE: &str = "data-density";
+/// What the server tells the page about the request it renders: carried to
+/// the browser half serialized, so both halves draw the same page (the Leptos
+/// book, `ssr/22_life_cycle`).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Facts {
+    /// The terminology server's public root, which every request a screen
+    /// discloses starts with, without a final `/`.
+    pub root: String,
+    /// Whether the console offers a sign-in.
+    pub sign_in: bool,
+    /// Whether the console reaches a sync service, whose runs the history
+    /// screen reads.
+    pub sync: bool,
+    /// The signed-in reader, when there is one.
+    pub operator: Option<Operator>,
+    /// The reader's preferences.
+    pub settings: Settings,
+}
 
-/// Mounts the theme, the router, and everything below them.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type, and a binary crate has no reachable public API"
-)]
-pub(crate) fn App() -> impl IntoView {
-    provide_meta_context();
-
-    let settings = Settings::load();
-    settings.persist();
-    provide_context(settings);
-    provide_context(FhirClient::from_document());
-
-    // The document element is the outside world, which is what an Effect is
-    // for. The colour roles in `style/tailwind.css` are redefined under the
-    // class this writes, and the density variables under the attribute.
-    Effect::new(move |_| apply_document_theme(settings.theme.get()));
-    Effect::new(move |_| apply_document_density(settings.density.get()));
-
+/// The whole HTML document the server renders around [`App`], in the theme
+/// and density the request's cookies name.
+#[cfg(not(target_arch = "wasm32"))]
+#[must_use]
+pub fn shell(options: LeptosOptions) -> impl IntoView {
+    let settings = crate::settings::server::requested();
+    let theme = settings.theme.key();
+    let density = settings.density.key();
     view! {
-        <Router base=UI_BASE>
-            <Title formatter=|text| format!("{text} · FerroTERM viewer") />
-            <Shell />
-        </Router>
+        <!DOCTYPE html>
+        <html lang="en" data-theme=theme data-density=density>
+            <head>
+                <meta charset="utf-8" />
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
+                <meta name="color-scheme" content="light dark" />
+                <meta
+                    name="description"
+                    content="Browse and edit the code systems, value sets and concept maps a FerroTERM server serves."
+                />
+                <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+                <link rel="stylesheet" href=crate::server::COMPONENTS_CSS />
+                <link rel="stylesheet" href=crate::server::THEME_CSS />
+                <AutoReload options=options.clone() />
+                <HydrationScripts options />
+                <leptos_meta::MetaTags />
+            </head>
+            <body>
+                <App />
+            </body>
+        </html>
     }
 }
 
-/// Puts the theme on the document element so the Tailwind dark variant applies.
-fn apply_document_theme(mode: ThemeMode) {
-    let Some(root) = web_sys::window()
-        .and_then(|window| window.document())
-        .and_then(|document| document.document_element())
-    else {
-        return;
-    };
-    let classes = root.class_list();
-    let changed = match mode {
-        ThemeMode::Dark => classes.add_1(DARK_CLASS),
-        ThemeMode::Light => classes.remove_1(DARK_CLASS),
-    };
-    if changed.is_err() {
-        leptos::logging::warn!("this browser refused the theme class on the document element");
+/// What the server knows of the request: on the server half read from the
+/// configuration, the session and the cookies.
+fn facts() -> Facts {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let Some(state) = use_context::<crate::server::ViewerState>() else {
+            return Facts::default();
+        };
+        Facts {
+            root: state.settings().ferroterm.shown_root(),
+            sign_in: state.settings().oidc.is_some(),
+            sync: state.settings().ferroterm.sync.is_some(),
+            operator: crate::session::request::operator(),
+            settings: crate::settings::server::requested(),
+        }
+    }
+    // NOTE: the browser reads the value the server decided; this runs only if
+    // that value is missing, and then draws the page a visitor sees.
+    #[cfg(target_arch = "wasm32")]
+    {
+        Facts::default()
     }
 }
 
-/// Puts the density on the document element so the compact variables apply.
-///
-/// The comfortable density is the stylesheet's own `:root` block, so it is the
-/// absence of the attribute rather than a second value to keep in step.
-fn apply_document_density(density: Density) {
-    let Some(root) = web_sys::window()
-        .and_then(|window| window.document())
-        .and_then(|document| document.document_element())
-    else {
-        return;
+/// The root component: the stylesheet, the title, the contexts every screen
+/// reads, and the shell.
+#[component]
+pub fn App() -> impl IntoView {
+    provide_meta_context();
+    let facts = SharedValue::new(facts).into_inner();
+    provide_context(FhirClient::new(facts.root));
+    provide_context(Session::new(facts.operator));
+    provide_context(facts.settings);
+    let _help = ferrohealth_ui::widget::help::provide_help();
+    provide_context(RunList::default());
+    let console = Console {
+        sign_in: facts.sign_in,
+        sync: facts.sync,
     };
-    let changed = match density {
-        Density::Compact => root.set_attribute(DENSITY_ATTRIBUTE, density.key()),
-        Density::Comfortable => root.remove_attribute(DENSITY_ATTRIBUTE),
-    };
-    if changed.is_err() {
-        leptos::logging::warn!(
-            "this browser refused the density attribute on the document element"
-        );
+    provide_context(console);
+    view! {
+        <Stylesheet id="leptos" href=STYLESHEET />
+        <Title formatter=|text: String| format!("{text} · {PRODUCT}") />
+        <Router>{console_shell(console)}</Router>
     }
 }

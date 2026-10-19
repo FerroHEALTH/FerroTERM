@@ -73,26 +73,11 @@ pub const OIDC_AUDIENCE_ENV: &str = "FERROTERM_OIDC_AUDIENCE";
 /// token grants. No specification governs the admin surface, so the name is
 /// the deployment's own.
 pub const OIDC_ADMIN_SCOPE_ENV: &str = "FERROTERM_OIDC_ADMIN_SCOPE";
-/// The environment variable naming the OAuth client the viewer signs in as.
-///
-/// The viewer is a public client: it holds no secret, and the `client_id` it
-/// presents at the authorization endpoint is the one the operator registered
-/// with the identity provider. The server publishes the value in its own
-/// `.well-known/smart-configuration` under `ferroterm_viewer_client_id`, which
-/// RFC 8414 §2 admits as an additional metadata parameter, so the bundle stays
-/// one artifact and configures nothing at build time. Unset, the viewer offers
-/// no sign-in and shows no edit control.
-pub const VIEWER_CLIENT_ID_ENV: &str = "FERROTERM_VIEWER_CLIENT_ID";
-/// The environment variable switching the viewer on or off.
-///
-/// It reads `on` or `off` (`true`/`false`, `1`/`0`, and `yes`/`no` are taken
-/// too, in any case). Off, the server mounts no `/ui` routes at all, so an
-/// API-only deployment presents no viewer rather than a refusal.
-pub const UI_ENV: &str = "FERROTERM_UI";
 /// The environment variable switching the usage report to `FerroPULSE` on or
 /// off.
 ///
-/// It reads `on` or `off`, like [`UI_ENV`], and is on when unset. Off always
+/// It reads `on` or `off` (`true`/`false`, `1`/`0`, and `yes`/`no` are taken
+/// too, in any case), and is on when unset. Off always
 /// wins, and so does a CI environment ([`CI_ENVS`]): the switch can only turn
 /// the report off.
 pub const USAGE_REPORT_ENV: &str = "FERROTERM_USAGE_REPORT";
@@ -163,11 +148,6 @@ pub struct Config {
     pub oidc_audience: Option<String>,
     /// The scope the admin listener requires, compared verbatim.
     pub oidc_admin_scope: String,
-    /// The OAuth client the viewer signs in as; `None` when the deployment
-    /// registered none and the viewer offers no sign-in.
-    pub viewer_client_id: Option<String>,
-    /// Whether the server mounts the viewer under `/ui`.
-    pub viewer: bool,
     /// The usage report to `FerroPULSE`.
     pub usage_report: UsageReportConfig,
 }
@@ -183,9 +163,6 @@ pub enum ConfigError {
         "{SECURITY_SERVICE_ENV}: `{0}` is not a code of http://hl7.org/fhir/ValueSet/restful-security-service"
     )]
     SecurityService(String),
-    /// `FERROTERM_UI` names neither `on` nor `off`.
-    #[error("{UI_ENV}: `{0}` is neither `on` nor `off`")]
-    Viewer(String),
     /// `FERROTERM_USAGE_REPORT` names neither `on` nor `off`.
     #[error("{USAGE_REPORT_ENV}: `{0}` is neither `on` nor `off`")]
     UsageReport(String),
@@ -216,8 +193,6 @@ impl Default for Config {
             oidc_issuer: None,
             oidc_audience: None,
             oidc_admin_scope: String::from("ferroterm/admin"),
-            viewer_client_id: None,
-            viewer: true,
             usage_report: UsageReportConfig::default(),
         }
     }
@@ -267,11 +242,6 @@ impl Config {
                 .map(|scope| scope.trim().to_owned())
                 .filter(|scope| !scope.is_empty())
                 .unwrap_or(defaults.oidc_admin_scope),
-            viewer_client_id: std::env::var(VIEWER_CLIENT_ID_ENV)
-                .ok()
-                .map(|client| client.trim().to_owned())
-                .filter(|client| !client.is_empty()),
-            viewer: viewer(defaults.viewer)?,
             usage_report: UsageReportConfig::from_lookup(|name| std::env::var(name).ok())?,
         })
     }
@@ -310,18 +280,6 @@ fn services_of(value: &str) -> Result<Vec<String>, ConfigError> {
         out.push((*code).to_owned());
     }
     Ok(out)
-}
-
-/// Whether the viewer is on, `default` when `FERROTERM_UI` is unset.
-///
-/// # Errors
-///
-/// Returns [`ConfigError::Viewer`] when the variable names neither state.
-fn viewer(default: bool) -> Result<bool, ConfigError> {
-    let Ok(value) = std::env::var(UI_ENV) else {
-        return Ok(default);
-    };
-    switch_of(&value).ok_or(ConfigError::Viewer(value))
 }
 
 /// The state `value` names, or `None` when it names neither.
@@ -371,7 +329,7 @@ mod tests {
     }
 
     #[test]
-    fn the_viewer_switch_reads_both_states_and_refuses_anything_else() {
+    fn an_on_off_switch_reads_both_states_and_refuses_anything_else() {
         for on in ["on", "ON", " true ", "1", "yes"] {
             assert_eq!(switch_of(on), Some(true), "{on}");
         }

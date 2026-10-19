@@ -4,7 +4,7 @@
 //! a whole FHIR resource, because a viewer that re-models the specification
 //! stops being a demonstration that the public API is complete.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// The refusal a FHIR server returns, as the viewer reads it.
 ///
@@ -12,7 +12,7 @@ use serde::Deserialize;
 /// (<https://hl7.org/fhir/R4B/operationoutcome.html>), and a server that sends
 /// none still parses here, so a malformed refusal renders as an empty issue
 /// list rather than a decode error that hides the status.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct OperationOutcome {
     /// The issues the server reported.
     #[serde(default)]
@@ -20,7 +20,7 @@ pub(crate) struct OperationOutcome {
 }
 
 /// One `OperationOutcome.issue`.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct Issue {
     /// `fatal`, `error`, `warning`, or `information`.
     pub(crate) severity: Option<String>,
@@ -39,7 +39,7 @@ pub(crate) struct Issue {
 }
 
 /// One extension on an issue, with the two value types a position uses.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct Extension {
     /// The extension's canonical URL.
     pub(crate) url: String,
@@ -54,15 +54,12 @@ pub(crate) struct Extension {
 /// The extension stating the line of a fault inside the value
 /// `issue.expression` names
 /// (<https://hl7.org/fhir/extensions/StructureDefinition-operationoutcome-issue-line.html>).
-#[cfg(feature = "editor")]
 const ISSUE_LINE: &str = "http://hl7.org/fhir/StructureDefinition/operationoutcome-issue-line";
 
 /// The extension stating the column of that fault
 /// (<https://hl7.org/fhir/extensions/StructureDefinition-operationoutcome-issue-col.html>).
-#[cfg(feature = "editor")]
 const ISSUE_COL: &str = "http://hl7.org/fhir/StructureDefinition/operationoutcome-issue-col";
 
-#[cfg(feature = "editor")]
 impl Issue {
     /// The input the issue points into and the 1-based column of the fault
     /// in it, when the server stated both.
@@ -87,7 +84,7 @@ impl Issue {
 }
 
 /// The parts of a `CodeableConcept` the viewer renders.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct CodeableConcept {
     /// The codes classifying the issue, which a server states beside the text.
     #[serde(default)]
@@ -97,7 +94,7 @@ pub(crate) struct CodeableConcept {
 }
 
 /// One `Coding` of `issue.details`.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct Coding {
     /// The system the code is from.
     pub(crate) system: Option<String>,
@@ -298,7 +295,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "editor")]
     fn the_position_is_read_from_the_expression_and_the_column_extension() {
         let outcome = parse(
             r#"{"issue":[{"code":"invalid","diagnostics":"expected a focus concept",
@@ -318,7 +314,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "editor")]
     fn an_issue_without_a_readable_column_states_no_position() {
         let no_column = parse(
             r#"{"issue":[{"code":"invalid","diagnostics":"at byte 3","expression":["http.url"]}]}"#,

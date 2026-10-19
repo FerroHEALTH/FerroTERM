@@ -21,7 +21,7 @@ built once per release and read at startup. No JVM, no Elasticsearch, no
 database to run.
 
 [Five minutes to a running server](#five-minutes-to-a-running-server) ·
-[What it serves](#what-it-serves) · [The viewer](#the-viewer) ·
+[What it serves](#what-it-serves) · [The console](#the-console) ·
 [The API](#the-api) ·
 [Do you need a commercial licence?](#do-you-need-a-commercial-licence)
 
@@ -114,31 +114,35 @@ condition and the instrument behind each figure.
 Warm p50 over 200 HTTP round trips on one machine (Apple M2, 17.18 GB, macos/aarch64), FerroTERM 0.1.4 serving FHIR R4B, taken 2026-09-22. The records are under `bench/records/`; the [benchmarks page](https://ferroterm.eu/benchmarks.html) has the method, the cold and tail latencies, and how to reproduce a record.
 <!-- bench-table:end -->
 
-## The viewer
+## The console
 
-The same binary serves a web viewer at `/ui`, and `/` redirects onto it. Open
-`http://localhost:8080/ui` after the first command above and the server you just
-started is the one it reads.
+The FerroTERM Console is the browser interface, its own image beside the
+server. Start it with the quickstart's `viewer` profile and open
+`http://localhost:3000`:
 
-It is a FHIR client and nothing else: it reaches the server over the same public
-API any client uses, from the browser, same-origin. Anything it does, your own
-client can do.
+```console
+docker compose --profile viewer up
+```
 
-- **Check a code**, **List a value set**, and **Map a code** run
-  `$validate-code`, `$subsumes`, `$expand`, and `$translate`. Each control
-  offers the code systems, value sets, and concept maps this deployment
-  publishes, so nothing waits for a canonical to be typed, and a run puts every
-  parameter in the address, so it is a link you can send.
-- **The overview** is one table of what the deployment loaded, a row per served
-  version, leading with the name each code system was published under. It reads
-  a twenty-system deployment on one screen.
-- **The concept browser** walks a hierarchy with the keyboard, following the
-  ARIA tree view pattern, and offers only what the served version declares it
-  can do.
+It renders every page on its own server and reaches FerroTERM over the same
+public FHIR API any client uses, so anything it does, your own client can do.
+It is one of the FerroHEALTH consoles and draws with their shared components.
 
-It ships inside the binary, so there is nothing to deploy and no path reaches
-the filesystem. `FERROTERM_UI=off` removes the routes. The
-[viewer page](https://ferroterm.eu/docs/operate/viewer.html) has the screens.
+- **The dashboard** counts what the deployment serves, lists the writes it
+  recorded most recently, and leads into each operation.
+- **Code systems, value sets and concept maps** are listings you filter, sort
+  and page, each opening a detail screen with the definition, what the server
+  can do with it, and the resource as JSON.
+- **Look up, check, expand and translate** run `$lookup`, `$validate-code` and
+  `$subsumes`, `$expand`, and `$translate`, offering what the deployment
+  publishes and putting every parameter in the address.
+- **The concept browser** walks a hierarchy with the keyboard and offers only
+  what the served version declares it can do.
+
+Reading is open. Signing in, at your OpenID Provider through the console's
+own server, is for editing; the browser never holds a token. The
+[console page](https://ferroterm.eu/docs/operate/viewer.html) has the screens
+and the configuration.
 
 ## The API
 

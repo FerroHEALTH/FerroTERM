@@ -85,20 +85,23 @@ dependency to a crate with `dep.workspace = true`. The one crate this file also
 names is `fhir-types` above, because it carries the served FHIR model and its
 version is a conformance fact, not a build detail.
 
-## Viewer toolchain
+## Console toolchain
 
-The viewer (`app/ferroterm-viewer`) compiles to WebAssembly and is built by
-Trunk, not by `cargo` alone. Its crate versions live in the root
-`Cargo.toml` like every other dependency; the pins below are the tools.
+The console (`app/ferroterm-viewer`) is a Leptos app rendered on the server
+and hydrated in the browser. cargo-leptos builds its WebAssembly half and the
+site bundle; the server half is an ordinary `cargo build`. Its crate versions
+live in the root `Cargo.toml` like every other dependency, `ferrohealth-ui`
+among them; the pins below are the tools.
 
 | Item | Pin |
 |---|---|
 | Compilation target | `wasm32-unknown-unknown` (`rustup target add wasm32-unknown-unknown`) |
-| Trunk | 0.21.14, required by `app/ferroterm-viewer/Trunk.toml` `trunk-version` |
-| Tailwind CSS standalone CLI | 4.3.3, pinned in `Trunk.toml` `[tools] tailwindcss`; Trunk downloads it, so there is no Node and no npm |
-| `wasm-bindgen` CLI | taken from `Cargo.lock`, which pins the `wasm-bindgen` crate |
+| cargo-leptos | 0.3.11, installed by `ci.yml` and `release-viewer.yml` |
+| `wasm-bindgen` CLI | 0.2.129, the version of the `wasm-bindgen` crate the root `Cargo.toml` pins |
+| Tailwind CSS standalone CLI | 4.3.3, downloaded and checked against its SHA-256 by `scripts/release/viewer-tools.sh`, so there is no Node and no npm |
+| Binaryen `wasm-opt` | version_133, downloaded and checked the same way |
 | `leptosfmt` | 0.1.33, the `view!` macro formatter |
-| Headless browser | `selenium/standalone-chromium:4.48.0-20260905`, pinned by index digest in `scripts/ui-e2e.sh`; the image carries Chromium and the chromedriver built against it, so the journeys never depend on a runner image's own browser |
+| Chrome for Testing | 155.0.8059.79 with its chromedriver, installed by `browser-actions/setup-chrome` in the `ui-e2e` job of `ci.yml` |
 
 ## GitHub Actions pins
 

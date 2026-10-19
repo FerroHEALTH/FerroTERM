@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
 //! What a reader who signs in gets, driven through a real identity provider.
 //!
-//! The deployment here is the second server the harness starts: one with
-//! `FERROTERM_OIDC_ISSUER` naming the stub issuer and
-//! `FERROTERM_VIEWER_CLIENT_ID` naming the client the viewer presents, so the
-//! served `.well-known/smart-configuration` carries everything a standalone
-//! launch of a public client needs
-//! (<https://hl7.org/fhir/smart-app-launch/app-launch.html>). The journeys in
-//! `sign_in` drive the other server, which configures no issuer.
+//! The deployment here is the second console the harness starts: one whose
+//! `[oidc]` names the stub issuer, over a server that trusts the same issuer,
+//! so the console signs the reader in on its own server with the
+//! authorization code flow and PKCE and calls the server with the token
+//! (<https://openid.net/specs/openid-connect-core-1_0.html#CodeFlowAuth>).
+//! The journeys in `sign_in` drive the other console, which offers none.
 //!
 //! Each journey chooses what it is granted by opening the issuer's `/profile`
 //! address first, and tags itself so its own revocations are what it reads
 //! back. The sign-in itself shows nothing and asks nothing: the issuer
 //! redirects straight back with a code, because what these journeys are about
-//! is what the viewer does with what comes back.
+//! is what the console does with what comes back.
 
 use thirtyfour::prelude::*;
 use thirtyfour::stringmatch::StringMatch;
@@ -25,10 +24,31 @@ use crate::harness::sign_in;
 use crate::harness::signed_in;
 
 /// The control that starts a sign-in.
-const SIGN_IN: &str = "//button[normalize-space()='Sign in']";
+const SIGN_IN: &str = "//a[normalize-space()='Sign in']";
 
-/// The control that ends one.
+/// The button that opens the signed-in reader's menu.
+const MENU: &str = "button[popovertarget='operator-menu']";
+
+/// The line under the reader's name in that menu, which says what they may
+/// change.
+const STANDING: &str = "#operator-menu .fui-muted";
+
+/// The control that ends a sign-in, inside the menu.
 const SIGN_OUT: &str = "//button[normalize-space()='Sign out']";
+
+/// A control that saves a resource, on any authoring screen.
+const SAVE: &str = "//button[starts-with(normalize-space(), 'Save this') \
+                    or starts-with(normalize-space(), 'Create this')]";
+
+/// Opens the signed-in reader's menu.
+async fn open_menu(journey: &Journey) {
+    journey
+        .element(By::Css(MENU), "the signed-in reader's menu button")
+        .await
+        .click()
+        .await
+        .unwrap_or_else(|error| panic!("the menu button refused the press: {error}"));
+}
 
 /// The `fhirUser` the stub issuer signs everyone in as.
 const WHO: &str = "Practitioner/e2e-terminologist";
@@ -47,16 +67,17 @@ async fn a_completed_sign_in_names_the_reader_and_what_they_may_edit() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &deployment.base, "/ui").await;
+            let journey = Journey::open(driver, &deployment.base, "/").await;
             choose(&journey, &deployment, "writer", "names-the-reader").await;
             let named = sign_in(&journey, &deployment).await;
             assert!(named.contains(WHO), "the shell names the reader: `{named}`");
 
+            open_menu(&journey).await;
             let editable = journey
                 .text_becoming(
-                    By::XPath("//*[contains(text(), 'May edit')]"),
+                    By::Css(STANDING),
                     StringMatch::new("May edit").partial(),
-                    "the shell to say what this account may change",
+                    "the menu to say what this account may change",
                 )
                 .await;
             for resource_type in ["CodeSystem", "ValueSet", "ConceptMap"] {
@@ -81,7 +102,7 @@ async fn a_completed_sign_in_names_the_reader_and_what_they_may_edit() {
 /// A reader the issuer grants no write scope is told so, and is offered
 /// nothing to change.
 ///
-/// The viewer draws a control only where the granted scopes open it, so a
+/// The console draws a control only where the granted scopes open it, so a
 /// grant of `openid` and `fhirUser` alone leaves the chrome read-only
 /// (<https://hl7.org/fhir/smart-app-launch/scopes-and-launch-context.html>).
 #[tokio::test]
@@ -92,28 +113,33 @@ async fn a_reader_without_a_write_scope_is_offered_nothing_to_change() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &deployment.base, "/ui").await;
+            let journey = Journey::open(driver, &deployment.base, "/").await;
             choose(&journey, &deployment, "reader", "no-write-scope").await;
             let named = sign_in(&journey, &deployment).await;
             assert!(named.contains(WHO), "the reader is signed in: `{named}`");
 
+            open_menu(&journey).await;
             let said = journey
                 .text_becoming(
-                    By::XPath("//*[contains(text(), 'Read only')]"),
+                    By::Css(STANDING),
                     StringMatch::new("Read only").partial(),
-                    "the shell to say this account changes nothing",
+                    "the menu to say this account changes nothing",
                 )
                 .await;
             assert!(
                 said.contains("no editing permission"),
                 "the reader is told why: `{said}`"
             );
+            journey
+                .reopen(&format!("{}/codesystem", deployment.base))
+                .await;
+            journey
+                .element(By::Css("#editor-url"), "the authoring form")
+                .await;
             assert_eq!(
-                journey
-                    .count(By::XPath("//*[contains(text(), 'May edit')]"))
-                    .await,
+                journey.count(By::XPath(SAVE)).await,
                 0,
-                "nothing claims this account may edit"
+                "nothing offers this account a save"
             );
 
             journey.no_console_errors().await;
@@ -123,12 +149,11 @@ async fn a_reader_without_a_write_scope_is_offered_nothing_to_change() {
     outcome.expect("the journey ran and the browser session ended cleanly");
 }
 
-/// Signing out revokes the token at the issuer and drops it here.
+/// Signing out revokes the token at the issuer and ends the session here.
 ///
 /// RFC 7009 §2.1 has the client tell the issuer the credential is finished
-/// with, and the viewer holds the token in memory alone, so dropping it is the
-/// whole of signing out. The issuer's own count is what proves the revocation
-/// left the page.
+/// with. The console's server holds the token, so it sends the revocation as
+/// it ends the session; the issuer's own count is what proves it was sent.
 #[tokio::test]
 async fn signing_out_revokes_the_token_and_drops_it() {
     let Some(deployment) = signed_in() else {
@@ -137,7 +162,7 @@ async fn signing_out_revokes_the_token_and_drops_it() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &deployment.base, "/ui").await;
+            let journey = Journey::open(driver, &deployment.base, "/").await;
             // The count below is exact, so the tag is this run's own: an
             // issuer left running from an earlier run still holds the last
             // one's revocations, and nextest gives each test its own process.
@@ -147,8 +172,9 @@ async fn signing_out_revokes_the_token_and_drops_it() {
             let named = sign_in(&journey, &deployment).await;
             assert!(named.contains(WHO), "the reader is signed in: `{named}`");
 
+            open_menu(&journey).await;
             let out = journey
-                .element(By::XPath(SIGN_OUT), "the sign-out control")
+                .visible(By::XPath(SIGN_OUT), "the sign-out control")
                 .await;
             out.click().await.unwrap_or_else(|error| {
                 panic!("the sign-out control refused the press: {error}");
@@ -157,7 +183,7 @@ async fn signing_out_revokes_the_token_and_drops_it() {
                 .text_becoming(
                     By::XPath(SIGN_IN),
                     StringMatch::new("Sign in").partial(),
-                    "the sign-in control to come back, which is the token being dropped",
+                    "the sign-in control to come back, which is the session ending",
                 )
                 .await;
             assert_eq!(
@@ -190,35 +216,35 @@ async fn signing_out_revokes_the_token_and_drops_it() {
     outcome.expect("the journey ran and the browser session ended cleanly");
 }
 
-/// The reader bundle offers no sign-in of its own, and says where to go.
+/// A visitor reads without signing in, is offered the sign-in, and is
+/// offered no control that writes.
 ///
-/// Signing in is what an editing session begins with and the editing screens
-/// live in the other bundle, so the reader bundle's control is a link into it
-/// rather than a sign-in that would end on the wrong page.
+/// The server's read surface asks for no token, so the console reads every
+/// screen for a visitor; a save would be refused, so none is drawn.
 #[tokio::test]
-async fn the_reader_bundle_sends_a_sign_in_to_the_editor_bundle() {
+async fn a_visitor_is_offered_the_sign_in_and_nothing_that_writes() {
     let Some(deployment) = signed_in() else {
         return;
     };
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &deployment.base, "/ui").await;
+            let journey = Journey::open(driver, &deployment.base, "/codesystem").await;
+            journey
+                .element(By::Css("#editor-url"), "the authoring form")
+                .await;
             let offered = journey
-                .element(
-                    By::XPath("//a[normalize-space()='Sign in to edit']"),
-                    "the way into the bundle that signs in",
-                )
+                .element(By::XPath(SIGN_IN), "the sign-in control")
                 .await;
             let href = offered.attr("href").await?.unwrap_or_default();
-            assert!(
-                href.starts_with("/ui/editor"),
-                "the link opens the editor bundle: `{href}`"
+            assert_eq!(
+                href, "/login",
+                "the control starts the console's own sign-in"
             );
             assert_eq!(
-                journey.count(By::XPath(SIGN_IN)).await,
+                journey.count(By::XPath(SAVE)).await,
                 0,
-                "the reader bundle starts no sign-in of its own"
+                "a visitor is offered no save"
             );
 
             journey.no_console_errors().await;

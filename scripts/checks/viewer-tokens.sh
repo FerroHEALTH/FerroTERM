@@ -7,9 +7,10 @@
 #
 #   scripts/checks/viewer-tokens.sh
 #
-# The tokens themselves live in `app/ferroterm-viewer/style/tailwind.css`, and
-# the class strings built on them in `app/ferroterm-viewer/src/styles.rs`, which
-# is the one file allowed to spell a palette entry.
+# The roles and the steps are ferrohealth-ui's (its stylesheet, served by the
+# console), the brand is `app/ferroterm-viewer/style/theme.css`, the utilities
+# that name them `app/ferroterm-viewer/style/tailwind.css`, and the class
+# strings a screen paints with `app/ferroterm-viewer/src/styles.rs`.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -39,11 +40,11 @@ report() {
 
 palette='(slate|gray|zinc|neutral|stone|teal|cyan|emerald|amber|red|sky|indigo)-[0-9]{2,3}'
 report "a screen names a palette entry" \
-  "a colour role: text-fg, text-muted, bg-surface, bg-raised, border-line, text-accent" \
+  "a colour role: text-ink, text-muted, bg-surface, bg-surface-raised, border-edge, text-accent" \
   "$(grep -rnE "\b$palette\b" --include='*.rs' "$SOURCE_DIR" || true)"
 
 report "a screen carries a per-element dark variant" \
-  "one role, redefined once under :root.dark in style/tailwind.css" \
+  "one role, redefined once per theme by ferrohealth-ui and style/theme.css" \
   "$(grep -rnE '\bdark:[a-z-]' --include='*.rs' "$SOURCE_DIR" || true)"
 
 report "a screen names a raw type size" \

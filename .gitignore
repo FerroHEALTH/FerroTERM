@@ -34,11 +34,8 @@ der2_*
 *.redb
 *.fst
 
-# Every directory Trunk writes a viewer bundle into, whatever `--dist` names
-# it. The bundles are built by the release lane and ride inside the server
-# binary; a checkout never carries one.
-/app/ferroterm-viewer/dist*/
-/app/ferroterm-viewer/.trunk/
+# The console's site bundle is written under target/site by cargo-leptos and
+# staged by the release lane; a checkout never carries one.
 
 # RustRover
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can

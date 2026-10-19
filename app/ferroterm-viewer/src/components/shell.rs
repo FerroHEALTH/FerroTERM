@@ -1,149 +1,216 @@
 //! The chrome around every screen, and the routes it wraps.
 //!
-//! The screens are reached from a left sidebar; the top bar carries what is
-//! true of every screen at once, which is the FHIR version the reader is
-//! looking through, the server's health, and the theme.
+//! The screens are reached from FerroUI's navigation; the top bar carries
+//! what is true of every screen at once: the command bar, the FHIR version
+//! the reader is looking through, the server's health, the theme, and who is
+//! signed in.
 
-use leptos::ev::SubmitEvent;
-use leptos::html::Input;
+use ferrohealth_ui::icon::{Glyph, icon};
+use ferrohealth_ui::view::button::Variant;
+use ferrohealth_ui::view::menu::{OperatorMenu, operator_menu};
+use ferrohealth_ui::view::search::{SearchBox, search_box};
+use ferrohealth_ui::view::segmented::{SegmentedForm, segmented_form};
+use ferrohealth_ui::view::shell::{
+    Footer, Shell, brand_mark, drawer_button, lockup, shell, topbar_with,
+};
+use ferrohealth_ui::view::theme_switch::theme_toggle;
+use ferrohealth_ui::widget::nav::{Entry, Group, sidebar};
 use leptos::prelude::*;
-use leptos_router::MatchNestedRoutes;
-use leptos_router::NavigateOptions;
-use leptos_router::components::Route;
-use leptos_router::components::Routes;
-use leptos_router::hooks::use_location;
-use leptos_router::hooks::use_navigate;
-use leptos_router::hooks::use_query;
+use leptos::server_fn::ServerFn as _;
+use leptos_router::components::{Redirect, Route, Routes};
+use leptos_router::hooks::{use_location, use_query, use_query_map};
 use leptos_router::params::Params;
-use leptos_router::path;
+use leptos_router::{SsrMode, path};
 
 use crate::auth::Session;
-use crate::components::health::HealthIndicator;
+use crate::components::health::health_indicator;
 use crate::components::icon;
-use crate::components::icon::Glyph;
-use crate::components::icon::Icon;
-use crate::components::mark::Lockup;
-use crate::components::sign_in::SignInControl;
-use crate::components::spinner::Spinner;
-use crate::components::theme_toggle::ThemeToggle;
-use crate::components::version_switcher::VersionSwitcher;
 use crate::fhir::version::FhirVersion;
 use crate::find::QUERY_PARAM;
-use crate::pages::about::AboutPage;
+use crate::pages::about::{AboutPage, PANE_PARAM};
 use crate::pages::browse::BrowsePage;
-use crate::pages::callback::CallbackPage;
 use crate::pages::code_system::CodeSystemPage;
+use crate::pages::concept_map::ConceptMapPage;
+use crate::pages::concept_map_editor::ConceptMapEditorPage;
 use crate::pages::concept_maps::ConceptMapsPage;
+use crate::pages::editor::EditorPage;
 use crate::pages::expand::ExpandPage;
 use crate::pages::find::FindPage;
+use crate::pages::history::HistoryPage;
+use crate::pages::lookup::LookupPage;
 use crate::pages::not_found::NotFoundPage;
 use crate::pages::overview::OverviewPage;
+use crate::pages::systems::SystemsPage;
 use crate::pages::translate::TranslatePage;
 use crate::pages::validate::ValidatePage;
-#[cfg(feature = "editor")]
+use crate::pages::value_set::ValueSetPage;
 use crate::pages::value_set_composer::ValueSetComposerPage;
 use crate::pages::value_sets::ValueSetsPage;
-use crate::routes::ABOUT_PATH;
-#[cfg(feature = "editor")]
-use crate::routes::CODE_SYSTEM_EDITOR_PATH;
-#[cfg(feature = "editor")]
-use crate::routes::COMPOSE_PATH;
-#[cfg(feature = "editor")]
-use crate::routes::CONCEPT_MAP_EDITOR_PATH;
-use crate::routes::CONCEPT_MAPS_PATH;
-use crate::routes::EXPAND_PATH;
-use crate::routes::FIND_PATH;
-use crate::routes::OVERVIEW_PATH;
-use crate::routes::TRANSLATE_PATH;
-use crate::routes::VALIDATE_PATH;
-use crate::routes::VALUE_SETS_PATH;
-use crate::routes::VERSION_PARAM;
-use crate::routes::base_url;
-use crate::routes::nav_section;
-use crate::routes::ui_link;
-use crate::settings::Settings;
-use crate::styles;
+use crate::routes::{ABOUT_PATH, FIND_PATH, ui_link};
+use crate::settings::{SetTheme, SetVersion, Settings};
+
+/// The product name as a reader reads it.
+pub(crate) const PRODUCT: &str = "FerroTERM Console";
+
+/// The console's version, which the footer and the About page name.
+pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// The path of the sign-in route the server serves.
+pub(crate) const SIGN_IN: &str = "/login";
+
+/// The path of the sign-out route the server serves.
+pub(crate) const SIGN_OUT: &str = "/logout";
 
 /// The FHIR version the current address selects, for every screen to read.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct SelectedVersion(pub(crate) Signal<FhirVersion>);
 
-/// The element the navigation toggle opens and closes.
-const NAV_ID: &str = "screen-nav";
+/// What the console's server told the page about itself.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Console {
+    /// Whether the console offers a sign-in: an OpenID Provider is configured.
+    pub(crate) sign_in: bool,
+    /// Whether the console reaches a sync service.
+    pub(crate) sync: bool,
+}
+
+/// The id of the navigation, which the drawer button opens.
+const NAV_ID: &str = "screens";
 
 /// The command bar's own control, which its label points at.
 const COMMAND_ID: &str = "command-bar";
 
-/// One screen in the sidebar: its path segment below the base, the label a
-/// reader reads, and the glyph they recognise it by.
-struct NavItem(&'static str, &'static str, Glyph);
-
-/// One labelled group of the sidebar.
-struct NavGroup(&'static str, &'static [NavItem]);
-
-/// The screens a reader reads what this server holds on.
-///
-/// The concept browser is not among them. It browses one code system, and the
-/// address of a browser with no system named is a screen that can only send a
-/// reader to the overview, so the overview is where it is reached from.
-const EXPLORE: [NavItem; 1] = [NavItem(OVERVIEW_PATH, "Overview", icon::OVERVIEW)];
-
-/// The screens a reader asks this server a question on.
-///
-/// Each is named for the question rather than the operation that answers it.
-/// A reader who wants to know whether a code is valid does not know that
-/// `$validate-code` is the one to open.
-const RUN: [NavItem; 3] = [
-    NavItem(VALIDATE_PATH, "Check a code", icon::VALIDATE),
-    NavItem(EXPAND_PATH, "List a value set", icon::EXPAND),
-    NavItem(TRANSLATE_PATH, "Map a code", icon::CONCEPT_MAPS),
+/// The screens that read what this server holds.
+const BROWSE: [Entry; 4] = [
+    Entry {
+        href: "/",
+        label: "Dashboard",
+        glyph: icon::OVERVIEW,
+        exact: true,
+    },
+    Entry {
+        href: "/systems",
+        label: "Code systems",
+        glyph: icon::CODE_SYSTEMS,
+        exact: false,
+    },
+    Entry {
+        href: "/valuesets",
+        label: "Value sets",
+        glyph: icon::VALUE_SETS,
+        exact: false,
+    },
+    Entry {
+        href: "/conceptmaps",
+        label: "Concept maps",
+        glyph: icon::CONCEPT_MAPS,
+        exact: false,
+    },
 ];
 
-/// The screens that list what this server publishes.
-#[cfg(not(feature = "editor"))]
-const PUBLISH: [NavItem; 2] = [
-    NavItem(VALUE_SETS_PATH, "Value sets", icon::VALUE_SETS),
-    NavItem(CONCEPT_MAPS_PATH, "Concept maps", icon::CONCEPT_MAPS),
+/// The screens that run one terminology operation, each named for the
+/// question it answers.
+const OPERATIONS: [Entry; 4] = [
+    Entry {
+        href: "/lookup",
+        label: "Look up a code",
+        glyph: icon::LOOKUP,
+        exact: false,
+    },
+    Entry {
+        href: "/validate",
+        label: "Check a code",
+        glyph: icon::VALIDATE,
+        exact: false,
+    },
+    Entry {
+        href: "/expand",
+        label: "Expand a value set",
+        glyph: icon::EXPAND,
+        exact: false,
+    },
+    Entry {
+        href: "/translate",
+        label: "Translate a code",
+        glyph: icon::TRANSLATE,
+        exact: false,
+    },
 ];
 
-/// The screens that list what this server publishes, and the ones that write.
-///
-/// Only the editor bundle carries the authoring screens, so only that bundle's
-/// sidebar leads to them.
-#[cfg(feature = "editor")]
-const PUBLISH: [NavItem; 5] = [
-    NavItem(VALUE_SETS_PATH, "Value sets", icon::VALUE_SETS),
-    NavItem(CONCEPT_MAPS_PATH, "Concept maps", icon::CONCEPT_MAPS),
-    NavItem(CODE_SYSTEM_EDITOR_PATH, "Edit a code system", icon::EDIT),
-    NavItem(COMPOSE_PATH, "Compose a value set", icon::EDIT),
-    NavItem(CONCEPT_MAP_EDITOR_PATH, "Edit a concept map", icon::EDIT),
+/// The screens that write, on a console that offers a sign-in.
+const AUTHORING: [Entry; 3] = [
+    Entry {
+        href: "/codesystem",
+        label: "Code system editor",
+        glyph: icon::EDIT,
+        exact: false,
+    },
+    Entry {
+        href: "/compose",
+        label: "Value set composer",
+        glyph: icon::EDIT,
+        exact: false,
+    },
+    Entry {
+        href: "/conceptmap",
+        label: "Concept map editor",
+        glyph: icon::EDIT,
+        exact: false,
+    },
 ];
 
-/// The one screen about this server and this viewer, rather than about a code.
-const ABOUT: [NavItem; 1] = [NavItem(ABOUT_PATH, "About this server", icon::EVIDENCE)];
+/// The one screen about this server and this console.
+const ABOUT: [Entry; 1] = [Entry {
+    href: "/about",
+    label: "About this server",
+    glyph: icon::ABOUT,
+    exact: false,
+}];
 
-/// The sidebar, as the four groups in the order it renders them.
-///
-/// The order lives here rather than in the markup, so one table decides it and
-/// the rendered sidebar cannot drift from it. The groups are what a reader
-/// came to do: read what the server holds, ask it something, see what it
-/// publishes, or ask about the server itself.
-const NAV_GROUPS: [NavGroup; 4] = [
-    NavGroup("Explore", &EXPLORE),
-    NavGroup("Run", &RUN),
-    NavGroup("Publish", &PUBLISH),
-    NavGroup("About this server", &ABOUT),
+/// The navigation of a console that offers a sign-in: read, run, write, and
+/// the server itself.
+const NAV_GROUPS: [Group; 4] = [
+    Group {
+        id: "screens-browse",
+        title: "Browse",
+        entries: &BROWSE,
+    },
+    Group {
+        id: "screens-operations",
+        title: "Operations",
+        entries: &OPERATIONS,
+    },
+    Group {
+        id: "screens-authoring",
+        title: "Authoring",
+        entries: &AUTHORING,
+    },
+    Group {
+        id: "screens-server",
+        title: "Server",
+        entries: &ABOUT,
+    },
 ];
 
-/// The classes every sidebar link carries, whichever screen it leads to.
-const ENTRY_BASE: &str =
-    "flex items-center gap-default rounded-md px-default py-tight text-small font-medium";
-
-/// The classes the entry for the screen being read carries.
-const ENTRY_ACTIVE: &str = "bg-accent-soft text-accent-soft-fg";
-
-/// The classes every other entry carries.
-const ENTRY_RESTING: &str = "state-change text-muted hover:bg-inset hover:text-fg";
+/// The navigation of a console that offers no sign-in: the same groups, with
+/// no entry onto a screen that writes, since nobody there can save.
+const READER_GROUPS: [Group; 3] = [
+    Group {
+        id: "screens-browse",
+        title: "Browse",
+        entries: &BROWSE,
+    },
+    Group {
+        id: "screens-operations",
+        title: "Operations",
+        entries: &OPERATIONS,
+    },
+    Group {
+        id: "screens-server",
+        title: "Server",
+        entries: &ABOUT,
+    },
+];
 
 /// The shell's own query parameters.
 #[derive(Clone, Debug, Params, PartialEq)]
@@ -152,266 +219,189 @@ struct ShellQuery {
     fhir: Option<String>,
 }
 
-/// One sidebar `<li>`: the link, the mark on the screen being read, and the
-/// styling of both.
-///
-/// Every entry draws through this one function, so two of them cannot drift
-/// apart and only one place decides what a sidebar link looks like. Only the
-/// path decides which entry is marked: the FHIR version travels in the query
-/// and every link carries it.
-fn nav_entry(
-    section: Memo<Option<&'static str>>,
-    version: Signal<FhirVersion>,
-    segment: &'static str,
-    label: &'static str,
-    glyph: Glyph,
-) -> AnyView {
-    let active = move || section.get() == Some(segment);
-    view! {
-        <li>
-            <a
-                href=move || ui_link(segment, version.get())
-                aria-current=move || active().then_some("page")
-                class=move || {
-                    let state = if active() { ENTRY_ACTIVE } else { ENTRY_RESTING };
-                    format!("{ENTRY_BASE} {state}")
-                }
-            >
-                <Icon glyph=glyph />
-                {label}
-            </a>
-        </li>
-    }
-    .into_any()
-}
-
-/// One labelled group of the sidebar.
-///
-/// The label is the group's accessible name through `aria-labelledby`, so a
-/// screen reader announces which group a link is in rather than reading twelve
-/// links in a row (<https://www.w3.org/WAI/ARIA/apg/patterns/landmarks/>).
-fn nav_group(
-    section: Memo<Option<&'static str>>,
-    version: Signal<FhirVersion>,
-    group: &'static NavGroup,
-) -> AnyView {
-    let NavGroup(label, items) = group;
-    let id = format!("screen-nav-{}", label.split(' ').next().unwrap_or(label)).to_lowercase();
-    let entries: Vec<AnyView> = items
-        .iter()
-        .map(|NavItem(segment, name, glyph)| nav_entry(section, version, segment, name, *glyph))
-        .collect();
-    view! {
-        <li>
-            <p id=id.clone() class=format!("px-default pt-default pb-tight {}", styles::EYEBROW)>
-                {*label}
-            </p>
-            <ul aria-labelledby=id class="flex flex-col gap-tight">
-                {entries}
-            </ul>
-        </li>
-    }
-    .into_any()
-}
-
-/// The sidebar every screen is reached from.
-///
-/// It is a landmark with its own name, and it stays in the document at every
-/// width: below the `md` breakpoint it is hidden until the top bar's toggle
-/// opens it, and from `md` up it is always shown. It scrolls on its own, so a
-/// reader walking a long screen keeps every place they can go in view.
-fn sidebar(version: Signal<FhirVersion>, open: RwSignal<bool>) -> AnyView {
+/// The address the reader is on, path and query, which a preference post
+/// returns to.
+fn here() -> Signal<String> {
     let location = use_location();
-    let section = Memo::new(move |_| location.pathname.with(|path| nav_section(path)));
-    let groups: Vec<AnyView> = NAV_GROUPS
-        .iter()
-        .map(|group| nav_group(section, version, group))
-        .collect();
+    Signal::derive(move || {
+        let path = location.pathname.get();
+        let search = location.search.get();
+        if search.is_empty() {
+            path
+        } else {
+            format!("{path}?{}", search.trim_start_matches('?'))
+        }
+    })
+}
+
+/// The command bar, on every screen: what a reader types is read by its
+/// shape alone, in `crate::find`, and the screen it opens offers what this
+/// root can do with it.
+fn command_bar() -> AnyView {
+    let query = use_query_map();
+    let typed = move || query.with(|query| query.get(QUERY_PARAM).unwrap_or_default());
     view! {
-        <aside
-            id=NAV_ID
-            class="w-full shrink-0 overflow-y-auto border-b border-line bg-raised md:block md:w-56 md:border-r md:border-b-0"
-            class:hidden=move || !open.get()
-        >
-            <nav aria-label="Screens" class="p-default">
-                <ul class="flex flex-col">{groups}</ul>
-            </nav>
-        </aside>
+        {move || {
+            search_box(SearchBox {
+                id: COMMAND_ID,
+                name: QUERY_PARAM,
+                label: "Find a code, a canonical or a phrase",
+                placeholder: "A code, a canonical or a phrase",
+                action: format!("/{FIND_PATH}"),
+                value: typed(),
+            })
+        }}
     }
     .into_any()
 }
 
-/// The command bar, on every screen.
-///
-/// It is centred in what the top bar has left between the mark and the
-/// controls, where a reader looks for it. One field. What a reader types is read by its shape alone, in
-/// `crate::find`, and the screen it opens offers what this root can do with
-/// it. The bar is a form rather than a listbox that suggests as you type, so
-/// every offer is a real link, the keyboard needs no handler of ours, and a
-/// reader who has not seen the screen before can send the address of what they
-/// found.
-fn command_bar(version: Signal<FhirVersion>) -> AnyView {
-    let typed: NodeRef<Input> = NodeRef::new();
-    let navigate = StoredValue::new(use_navigate());
-    let submit = move |event: SubmitEvent| {
-        event.prevent_default();
-        let asked = typed
-            .get()
-            .map(|input| input.value())
-            .unwrap_or_default()
-            .trim()
-            .to_owned();
-        let target = base_url()
-            .segment(FIND_PATH)
-            .query(VERSION_PARAM, version.get().segment())
-            .query(QUERY_PARAM, &asked)
-            .render("");
-        // NOTE: the router resolves a navigation against its base, so an
-        // address that already carries the base is passed unresolved
-        // (`leptos_router` 0.8.15 `matching/resolve_path.rs`).
-        navigate.with_value(|navigate| {
-            navigate(
-                &target,
-                NavigateOptions {
-                    resolve: false,
-                    ..NavigateOptions::default()
-                },
-            );
-        });
-    };
+/// The switch over the four FHIR roots the server mounts: each segment posts
+/// its version to the console, which keeps it as the one an address naming
+/// none reads and returns the reader to the same page on it.
+fn version_switch(version: Signal<FhirVersion>, back: Signal<String>) -> AnyView {
     view! {
-        <form
-            class="flex min-w-0 flex-1 items-center justify-center gap-default"
-            on:submit=submit
-            role="search"
-        >
-            <label for=COMMAND_ID class="sr-only">
-                "Find a code, a canonical, or a phrase"
-            </label>
-            <input
-                id=COMMAND_ID
-                name="q"
-                type="search"
-                placeholder="A code, a canonical, or a phrase"
-                class=format!("w-full min-w-0 max-w-md {}", styles::INPUT)
-                node_ref=typed
-            />
-            <button type="submit" class=styles::BUTTON>
-                <Icon glyph=icon::SEARCH />
-                "Find"
-            </button>
-        </form>
+        {move || {
+            segmented_form(SegmentedForm {
+                name: "fhir",
+                label: "FHIR version",
+                prefix: Some((icon::VERSION, "FHIR")),
+                choices: FhirVersion::ALL
+                    .into_iter()
+                    .map(|choice| (choice.segment().to_owned(), choice.label().to_owned()))
+                    .collect(),
+                current: version.get().segment().to_owned(),
+                action: SetVersion::url().to_owned(),
+                back: back.get(),
+            })
+        }}
     }
     .into_any()
 }
 
-/// The top bar: the mark, the command bar, and the FHIR version.
-///
-/// The version switcher sits here because it is not a screen a reader goes
-/// to: it changes which server root every screen reads from, so it belongs
-/// with the chrome that is true everywhere rather than in the list of places.
-fn topbar(version: Signal<FhirVersion>, open: RwSignal<bool>) -> AnyView {
-    view! {
-        <header class="shrink-0 border-b border-line bg-raised">
-            <div class="flex flex-wrap items-center gap-default px-loose py-default">
-                <button
-                    type="button"
-                    aria-controls=NAV_ID
-                    aria-expanded=move || if open.get() { "true" } else { "false" }
-                    class=format!("{} md:hidden", styles::BUTTON)
-                    on:click=move |_| open.update(|shown| *shown = !*shown)
-                >
-                    "Screens"
-                </button>
-                <a href=move || ui_link(OVERVIEW_PATH, version.get())>
-                    <Lockup />
+/// Who is signed in, or the way to sign in, on a console that offers it.
+fn operator(console: Console) -> AnyView {
+    let session = expect_context::<Session>();
+    if !console.sign_in {
+        return ().into_any();
+    }
+    let drawn = move || {
+        if !session.signed_in() {
+            return view! {
+                <a href=SIGN_IN rel="external" class=Variant::Secondary.class()>
+                    {icon(Glyph::LOG_IN, "16")}
+                    "Sign in"
                 </a>
-                {command_bar(version)}
-                <div class="flex items-center gap-default">
-                    <VersionSwitcher selected=version />
-                    <HealthIndicator />
-                    <SignInControl />
-                    <ThemeToggle />
-                </div>
-            </div>
-        </header>
-    }
-    .into_any()
+            }
+            .into_any();
+        }
+        let menu = OperatorMenu {
+            id: "operator-menu",
+            name: session.who().unwrap_or_else(|| String::from("Signed in")),
+            subtitle: session.standing(),
+            sign_out: Some(String::from(SIGN_OUT)),
+        };
+        operator_menu(menu, ()).into_any()
+    };
+    drawn.into_any()
 }
 
-/// The authoring routes, which only the editor bundle carries.
-///
-/// A transparent component returns the routing value itself rather than a
-/// view, which is what a `<Routes>` child has to be
-/// (<https://docs.rs/leptos/0.8/leptos/attr.component.html>). In the reader
-/// bundle it returns `()`, which matches nothing and adds no arm to the
-/// router's dispatcher, so the reader's route table does not grow.
-#[component(transparent)]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type, and a binary crate has no reachable public API"
-)]
-pub(crate) fn EditorRoute() -> impl MatchNestedRoutes + Clone {
-    #[cfg(feature = "editor")]
-    {
-        view! {
+/// The top bar: the lockup, the command bar in the middle, and the version,
+/// the server's health, the reader and the theme at the end.
+fn bar(version: Signal<FhirVersion>, back: Signal<String>, console: Console) -> AnyView {
+    let start = view! {
+        {drawer_button(NAV_ID)}
+        {lockup("/", brand_mark("/mark-light.svg", "/mark-dark.svg"), "FerroTERM", "Console")}
+    }
+    .into_any();
+    let end = view! {
+        {version_switch(version, back)}
+        {health_indicator()}
+        {operator(console)}
+        {move || theme_toggle(SetTheme::url().to_owned(), back.get())}
+    }
+    .into_any();
+    topbar_with(start, command_bar(), end)
+}
+
+/// The routes, every screen rendered whole on the server before it is sent
+/// (the Leptos book, `ssr/23_ssr_modes`), so no content waits on a script.
+fn routes(console: Console) -> AnyView {
+    view! {
+        <Routes fallback=|| view! { <NotFoundPage /> }>
+            <Route path=path!("/") view=OverviewPage ssr=SsrMode::Async />
+            <Route path=path!("/browse") view=BrowsePage ssr=SsrMode::Async />
+            <Route path=path!("/expand") view=ExpandPage ssr=SsrMode::Async />
+            <Route path=path!("/lookup") view=LookupPage ssr=SsrMode::Async />
+            <Route path=path!("/validate") view=ValidatePage ssr=SsrMode::Async />
+            <Route path=path!("/about") view=AboutPage ssr=SsrMode::Async />
+            <Route path=path!("/systems") view=SystemsPage ssr=SsrMode::Async />
+            <Route path=path!("/systems/:url") view=CodeSystemPage ssr=SsrMode::Async />
+            <Route path=path!("/conceptmaps") view=ConceptMapsPage ssr=SsrMode::Async />
+            <Route path=path!("/conceptmaps/:id") view=ConceptMapPage ssr=SsrMode::Async />
+            <Route path=path!("/translate") view=TranslatePage ssr=SsrMode::Async />
+            <Route path=path!("/valuesets") view=ValueSetsPage ssr=SsrMode::Async />
+            <Route path=path!("/valuesets/:id") view=ValueSetPage ssr=SsrMode::Async />
+            <Route path=path!("/find") view=FindPage ssr=SsrMode::Async />
             <Route
                 path=path!("/codesystem")
-                view=|| crate::pages::editor::EditorPage().into_any()
+                view=move || writes(console, || view! { <EditorPage /> }.into_any())
+                ssr=SsrMode::Async
             />
-            <Route path=path!("/compose") view=|| ValueSetComposerPage().into_any() />
+            <Route
+                path=path!("/compose")
+                view=move || writes(console, || view! { <ValueSetComposerPage /> }.into_any())
+                ssr=SsrMode::Async
+            />
             <Route
                 path=path!("/conceptmap")
-                view=|| crate::pages::concept_map_editor::ConceptMapEditorPage().into_any()
+                view=move || writes(console, || view! { <ConceptMapEditorPage /> }.into_any())
+                ssr=SsrMode::Async
             />
-            <Route path=path!("/history") view=|| crate::pages::history::HistoryPage().into_any() />
-        }
-        .into_inner()
+            <Route path=path!("/history") view=HistoryPage ssr=SsrMode::Async />
+            // The three panes were three screens. A link written then still
+            // opens the pane it named.
+            <Route path=path!("/versions") view=|| moved_to("versions") />
+            <Route path=path!("/evidence") view=|| moved_to("evidence") />
+            <Route path=path!("/settings") view=|| moved_to("settings") />
+        </Routes>
     }
-    #[cfg(not(feature = "editor"))]
-    {}
+    .into_any()
 }
 
-/// Sends an address a pane used to have to the pane it named.
-///
-/// A replacing navigation rather than a push, so the browser's back button
-/// leaves the viewer the way it came in rather than bouncing off the address
-/// that redirected (`leptos_router` 0.8.15 `NavigateOptions::replace`).
+/// An authoring screen, on a console that offers a sign-in; elsewhere nobody
+/// can save, so the address answers as one the console does not have.
+fn writes(console: Console, page: impl FnOnce() -> AnyView) -> AnyView {
+    if console.sign_in {
+        page()
+    } else {
+        view! { <NotFoundPage /> }.into_any()
+    }
+}
+
+/// Sends an address a pane used to have to the pane it named: a redirect the
+/// server answers before the page renders, or a replacing navigation once it
+/// has hydrated (`leptos_router`, `Redirect`).
 fn moved_to(pane: &'static str) -> impl IntoView {
     let SelectedVersion(version) = expect_context::<SelectedVersion>();
-    let navigate = StoredValue::new(use_navigate());
-    Effect::new(move |_| {
-        let target = format!("{}#{pane}", ui_link(ABOUT_PATH, version.get()));
-        navigate.with_value(|navigate| {
-            navigate(
-                &target,
-                NavigateOptions {
-                    resolve: false,
-                    replace: true,
-                    ..NavigateOptions::default()
-                },
-            );
-        });
-    });
-    view! { <Spinner label="Opening the pane this address names" /> }
+    let target = format!(
+        "{}&{PANE_PARAM}={pane}",
+        ui_link(ABOUT_PATH, version.get_untracked())
+    );
+    view! { <Redirect path=target /> }
 }
 
-/// The chrome, the routed screen, and the sidebar beside it.
+/// The chrome, the routed screen, and the navigation beside it.
 ///
 /// The version is read reactively from the query on every render, because a
-/// switcher link is a navigation that matches this same route: `leptos_router`
-/// then updates the params without re-running this body, so an untracked read
-/// taken at setup would go stale.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type, and a binary crate has no reachable public API"
-)]
-pub(crate) fn Shell() -> impl IntoView {
+/// link to another version is a navigation that matches the same route:
+/// `leptos_router` then updates the params without re-running this body, so
+/// an untracked read taken at setup would go stale.
+pub(crate) fn console_shell(console: Console) -> AnyView {
     let settings = expect_context::<Settings>();
     let query = use_query::<ShellQuery>();
+    let default = settings.version;
     // NOTE: A `?fhir=` value naming no served version is a link a reader typed,
-    // so it reads as absent and the stored default applies.
+    // so it reads as absent and the reader's own default applies.
     let version = Signal::derive(move || {
         query
             .read()
@@ -419,167 +409,105 @@ pub(crate) fn Shell() -> impl IntoView {
             .ok()
             .and_then(|query| query.fhir.as_deref())
             .and_then(|text| text.parse::<FhirVersion>().ok())
-            .unwrap_or_else(|| settings.version.get())
+            .unwrap_or(default)
     });
     provide_context(SelectedVersion(version));
-    provide_context(Session::new());
-
-    let nav_open = RwSignal::new(false);
-    let bar = topbar(version, nav_open);
-    let nav = sidebar(version, nav_open);
-
-    let screens = view! {
-        <Routes fallback=NotFoundPage>
-            <Route path=path!("/") view=|| OverviewPage().into_any() />
-            <Route path=path!("/browse") view=|| BrowsePage().into_any() />
-            <Route path=path!("/expand") view=|| ExpandPage().into_any() />
-            <Route path=path!("/validate") view=|| ValidatePage().into_any() />
-            <Route path=path!("/about") view=|| AboutPage().into_any() />
-            <Route path=path!("/systems/:url") view=|| CodeSystemPage().into_any() />
-            <Route path=path!("/conceptmaps") view=|| ConceptMapsPage().into_any() />
-            <Route path=path!("/translate") view=|| TranslatePage().into_any() />
-            <Route path=path!("/valuesets") view=|| ValueSetsPage().into_any() />
-            <Route path=path!("/find") view=|| FindPage().into_any() />
-            <Route path=path!("/callback") view=|| CallbackPage().into_any() />
-            <EditorRoute />
-            // The three panes were three screens. A link written then still
-            // opens the pane it named, which is the fragment each carries.
-            <Route path=path!("/versions") view=|| moved_to("about-versions-heading").into_any() />
-            <Route path=path!("/evidence") view=|| moved_to("about-evidence-heading").into_any() />
-            <Route path=path!("/settings") view=|| moved_to("about-settings-heading").into_any() />
-        </Routes>
-    }
-    .into_any();
-
-    view! {
-        <div class=format!(
-            "flex h-screen flex-col overflow-hidden {}",
-            styles::PAGE,
-        )>
-            {bar}
-            <div class="flex min-h-0 flex-1 flex-col md:flex-row">
-                {nav} <main class="min-w-0 flex-1 overflow-y-auto px-loose py-loose">
-                    <div class="mx-auto max-w-6xl">{screens}</div>
-                </main>
-            </div>
-        </div>
-    }
+    let back = here();
+    shell(Shell {
+        topbar: bar(version, back, console),
+        banner: None,
+        sidebar: sidebar(
+            NAV_ID,
+            "Screens",
+            if console.sign_in {
+                &NAV_GROUPS
+            } else {
+                &READER_GROUPS
+            },
+        ),
+        content: routes(console),
+        footer: Footer {
+            product: PRODUCT,
+            version: VERSION,
+            about: "/about",
+        },
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::ABOUT;
-    use super::EXPLORE;
-    use super::NAV_GROUPS;
-    use super::NavItem;
-    use crate::routes::CALLBACK_PATH;
-    use crate::routes::UI_BASE;
-    use crate::routes::nav_section;
+    use super::{ABOUT, BROWSE, NAV_GROUPS, READER_GROUPS};
 
-    /// The path segment of every entry, in the order the sidebar draws them.
-    ///
-    /// The editor bundle's own groups are in it, because the same test runs in
-    /// both feature sets and a screen the sidebar offers has to be reachable
-    /// in the bundle that draws it.
+    /// The path of every entry, in the order the navigation draws them.
     fn entries() -> Vec<&'static str> {
         NAV_GROUPS
             .iter()
-            .flat_map(|group| group.1.iter().map(|NavItem(segment, _, _)| *segment))
+            .flat_map(|group| group.entries.iter().map(|entry| entry.href))
             .collect()
     }
 
     #[test]
-    fn the_sidebar_opens_on_the_overview_and_ends_on_the_server_itself() {
+    fn the_navigation_opens_on_the_overview_and_ends_on_the_server_itself() {
         let listed = entries();
-        assert_eq!(
-            listed.first().copied(),
-            Some(""),
-            "the base itself is the first entry: {listed:?}"
-        );
-        assert_eq!(
-            listed.last().copied(),
-            Some("about"),
-            "the questions about the server come after the questions about a code: {listed:?}"
-        );
+        assert_eq!(listed.first().copied(), Some("/"), "{listed:?}");
+        assert_eq!(listed.last().copied(), Some("/about"), "{listed:?}");
     }
 
     #[test]
     fn no_two_entries_lead_to_the_same_screen() {
         let listed = entries();
-        for (index, segment) in listed.iter().enumerate() {
+        for (index, href) in listed.iter().enumerate() {
             assert!(
-                !listed.iter().skip(index + 1).any(|other| other == segment),
-                "two entries lead to `{segment}`: {listed:?}"
+                !listed.iter().skip(index + 1).any(|other| other == href),
+                "two entries lead to `{href}`: {listed:?}"
             );
         }
     }
 
     #[test]
-    fn the_editor_bundle_offers_the_composer_and_the_reader_bundle_does_not() {
+    fn a_console_without_a_sign_in_leads_to_no_screen_that_writes() {
+        let listed: Vec<&str> = READER_GROUPS
+            .iter()
+            .flat_map(|group| group.entries.iter().map(|entry| entry.href))
+            .collect();
+        for href in ["/codesystem", "/compose", "/conceptmap"] {
+            assert!(!listed.contains(&href), "{href}: {listed:?}");
+        }
+        assert_eq!(
+            listed.len() + 3,
+            entries().len(),
+            "it leaves out the three authoring screens and nothing else"
+        );
+    }
+
+    #[test]
+    fn the_navigation_offers_the_authoring_screens() {
         let listed = entries();
-        #[cfg(feature = "editor")]
-        assert!(
-            listed.contains(&crate::routes::COMPOSE_PATH),
-            "the editor bundle reaches its own screens from the sidebar: {listed:?}"
-        );
-        #[cfg(not(feature = "editor"))]
-        assert!(
-            !listed.contains(&"compose"),
-            "the reader bundle carries no authoring screen: {listed:?}"
-        );
+        for href in ["/codesystem", "/compose", "/conceptmap"] {
+            assert!(listed.contains(&href), "{href}: {listed:?}");
+        }
     }
 
     #[test]
     fn every_group_is_labelled_and_holds_a_screen() {
         for group in &NAV_GROUPS {
             assert!(
-                !group.0.is_empty(),
+                !group.title.is_empty(),
                 "a group with no label reads as a run of links"
             );
             assert!(
-                !group.1.is_empty(),
-                "the `{}` group draws a label over nothing",
-                group.0
+                !group.entries.is_empty(),
+                "the `{}` group is empty",
+                group.title
             );
         }
-    }
-
-    #[test]
-    fn the_server_facts_are_the_last_group_and_the_reading_screens_the_first() {
         assert_eq!(
-            NAV_GROUPS.first().map(|group| group.1.len()),
-            Some(EXPLORE.len()),
-            "a reader arrives to read what the server holds"
+            NAV_GROUPS.first().map(|group| group.entries.len()),
+            Some(BROWSE.len())
         );
         assert_eq!(
-            NAV_GROUPS.last().map(|group| group.1.len()),
-            Some(ABOUT.len()),
-            "the screens about the server come after the screens about a code"
+            NAV_GROUPS.last().map(|group| group.entries.len()),
+            Some(ABOUT.len())
         );
-    }
-
-    #[test]
-    fn the_sign_in_callback_is_not_one_of_the_places_a_reader_goes() {
-        assert!(
-            !entries().contains(&CALLBACK_PATH),
-            "the issuer sends a reader through the callback; nobody navigates to it"
-        );
-        assert_eq!(
-            nav_section(&format!("{UI_BASE}/{CALLBACK_PATH}")),
-            None,
-            "a screen reached through a redirect marks no entry"
-        );
-    }
-
-    #[test]
-    fn every_entry_marks_itself_when_a_reader_is_on_it() {
-        for segment in entries() {
-            let address = format!("{UI_BASE}/{segment}");
-            assert_eq!(
-                nav_section(&address),
-                Some(segment),
-                "the entry for `{address}` marks some other screen"
-            );
-        }
     }
 }

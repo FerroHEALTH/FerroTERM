@@ -1,35 +1,13 @@
-//! The FerroTERM viewer: a FHIR terminology browser that runs in the browser.
-//!
-//! The bundle is served by the FerroTERM server it queries, and every request
-//! it makes is an ordinary FHIR request to that server's public API. It links
-//! no crate from this workspace, so anything the viewer can do, a client can
-//! do.
+// SPDX-License-Identifier: BUSL-1.1
+//! The `ferroterm-viewer` binary: a thin entry point over the library run
+//! path.
 
-mod app;
-mod auth;
-#[cfg(feature = "editor")]
-mod authoring;
-mod comparison;
-mod components;
-mod density;
-mod evidence;
-mod fhir;
-mod find;
-mod listing;
-mod offers;
-mod pages;
-mod paging;
-mod routes;
-mod runs;
-mod settings;
-mod storage;
-mod styles;
-mod theme;
-mod tree;
-mod url;
-
-/// Installs the panic hook and mounts the application.
-fn main() {
-    console_error_panic_hook::set_once();
-    leptos::mount::mount_to_body(app::App);
+#[cfg(not(target_arch = "wasm32"))]
+fn main() -> std::process::ExitCode {
+    ferroterm_viewer::command::run(std::env::args())
 }
+
+// NOTE: no specification governs this: our own design; the browser half
+// starts at `ferroterm_viewer::hydrate`, so the binary is empty on wasm32.
+#[cfg(target_arch = "wasm32")]
+fn main() {}

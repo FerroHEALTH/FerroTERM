@@ -482,17 +482,13 @@ jobs:
           persist-credentials: false
       - run: bash scripts/checks/viewer-tokens.sh
 
-  # The viewer ships to a browser, so the target it must compile for is
-  # wasm32-unknown-unknown and no ordinary workspace lane covers it. The wasm
-  # clippy pass is the load-bearing gate here: it is the only place a
-  # dependency that cannot compile for the browser shows up. The bundle build
-  # and the size bar follow it, so a fatter download is a decision someone
-  # makes rather than a drift nobody sees.
-  #
-  # Three tool pins, each from its recorded home (docs/VERSIONS.md):
-  # Trunk 0.21.14 below, leptosfmt 0.1.33 below, and the Tailwind standalone
-  # CLI 4.3.3 in app/ferroterm-viewer/Trunk.toml `[tools] tailwindcss`, which
-  # Trunk downloads itself at that version. There is no Node in this build.
+  # The console, app/ferroterm-viewer: a Leptos app rendered on the server and
+  # hydrated, halves chosen by target (no specification governs it: our own
+  # design). The workspace lanes build, lint and test its server half on the
+  # host; this job lints its browser half on the target it ships to, so a
+  # dependency that cannot compile for wasm32 fails here, and builds the
+  # release site bundle with the tools docs/VERSIONS.md pins, against the
+  # budget of .claude/rules/leptos-ui.md. There is no Node in this build.
   viewer:
     name: viewer
     needs: detect
@@ -502,21 +498,15 @@ jobs:
     permissions:
       contents: read
     steps:
-      # Full history: the bundle's per-change budget is measured against the
-      # figure the MERGE BASE recorded, which the guard reads out of git.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0
       - uses: ./.github/actions/setup-rust
         with:
           components: clippy, rustfmt
           cache-key: viewer
       - name: Add the WebAssembly target
         run: rustup target add wasm32-unknown-unknown
-      - uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
-        with:
-          tool: trunk@0.21.14, cargo-nextest
       # leptosfmt is not in install-action's manifest, so install-action would
       # fall back to cargo-binstall guessing an asset name. A version-pinned
       # `cargo install --locked` is the deterministic build of the same tool.
@@ -527,53 +517,39 @@ jobs:
           set -euo pipefail
           cargo fmt -p ferroterm-viewer --check
           leptosfmt --check app/ferroterm-viewer/src
-      # Both feature sets, because the crate ships as two bundles and the
-      # reader's build is the one a feature-gated screen could break without
-      # anyone noticing.
-      - name: Clippy on the target the crate ships to
+      - name: Clippy on the target the browser half ships to
+        run: cargo clippy -p ferroterm-viewer --locked --lib --target wasm32-unknown-unknown -- -D warnings
+      - name: Install cargo-leptos
+        uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+        with:
+          tool: cargo-leptos@0.3.11
+      - name: Install the wasm-bindgen CLI
+        uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+        with:
+          tool: wasm-bindgen@0.2.129
+      # Pinned and checked against their SHA-256 before use, so cargo-leptos
+      # finds both on PATH and downloads neither itself.
+      - name: Install the Tailwind CSS CLI and wasm-opt
         run: |
-          set -euo pipefail
-          cargo clippy -p ferroterm-viewer --locked --target wasm32-unknown-unknown --all-targets -- -D warnings
-          cargo clippy -p ferroterm-viewer --locked --target wasm32-unknown-unknown --all-targets --all-features -- -D warnings
-      - name: Tests
-        run: |
-          set -euo pipefail
-          cargo nextest run -p ferroterm-viewer --locked --no-tests=pass
-          cargo nextest run -p ferroterm-viewer --locked --features editor --no-tests=pass
-      # `locked = true` in Trunk.toml already refuses a stale lock file; the
-      # flag says so at the call site too. The editor build is the same crate
-      # with the feature on, into its own directory and under its own mount
-      # (trunk 0.21.14 `build --features/--dist/--public-url`).
-      - name: Build both release bundles
-        working-directory: app/ferroterm-viewer
-        run: |
-          set -euo pipefail
-          trunk build --release --locked
-          trunk build --release --locked --features editor --dist dist-editor --public-url /ui/editor/
-      # BASE is empty outside a pull request, and the guard then checks only
-      # the ceilings and says so. Only a pull request reaches `main`.
-      - name: Each bundle is inside its ceiling and its per-change budget
-        env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-        run: |
-          set -euo pipefail
-          reader=(--bars app/ferroterm-viewer/bundle-size.json --dist app/ferroterm-viewer/dist)
-          editor=(--bars app/ferroterm-viewer/bundle-size-editor.json --dist app/ferroterm-viewer/dist-editor)
-          if [[ -n "${BASE:-}" ]]; then
-            bash scripts/checks/bundle-size.sh "${reader[@]}" --base "$BASE"
-            bash scripts/checks/bundle-size.sh "${editor[@]}" --base "$BASE"
-          else
-            bash scripts/checks/bundle-size.sh "${reader[@]}"
-            bash scripts/checks/bundle-size.sh "${editor[@]}"
-          fi
+          bash scripts/release/viewer-tools.sh "$RUNNER_TEMP/viewer-tools"
+          echo "$RUNNER_TEMP/viewer-tools/bin" >> "$GITHUB_PATH"
+      - run: bash scripts/release/viewer-site.sh --release
+      # The bundle's raw and compressed sizes go to the job summary, and the
+      # step fails above the budget of .claude/rules/leptos-ui.md.
+      - name: Measure the bundle against its budget
+        run: bash scripts/checks/viewer-bundle.sh
+      # The bundle names no home, runner, registry or toolchain directory of
+      # the build host.
+      - name: Check the bundle names no build-host path
+        run: bash scripts/checks/viewer-paths.sh
 
-  # The viewer is client-side rendered, so a unit test sees none of what a
-  # reader sees: the document is an empty <body> until the WebAssembly bundle
-  # boots. This job is the only place the bundle is proved to render at all. It
-  # builds the bundle, embeds it in the server, builds the image from
-  # docker/Dockerfile the way the release lane stages it, and drives that image
-  # with a pinned headless Chromium. Rust only: Playwright is JavaScript, and
-  # the no-JavaScript mandate covers the test suite as well as the product.
+  # The console's browser journeys (no specification governs them: our own
+  # design). A unit test sees none of what a reader sees: a page the server
+  # rendered and the browser hydrated. This job builds the server, the console
+  # and its site bundle the way the release lane does, starts them on loopback
+  # with the stub identity provider, and drives Chrome for Testing at the
+  # release docs/VERSIONS.md pins through chromedriver. Rust only: the
+  # no-JavaScript mandate covers the test suite as well as the product.
   #
   # The journeys live in e2e/, outside the workspace for the reason that
   # manifest records, so the fmt and clippy passes the workspace lanes give
@@ -583,7 +559,7 @@ jobs:
     needs: detect
     if: needs.detect.outputs.cargo == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     permissions:
       contents: read
     steps:
@@ -596,25 +572,31 @@ jobs:
           cache-key: ui-e2e
       - name: Add the WebAssembly target
         run: rustup target add wasm32-unknown-unknown
-      # The image base is distroless/static, so the binaries the journeys drive
-      # are linked against musl, as release-build.yml links the ones it ships.
-      - name: Install musl tooling
-        run: sudo apt-get update && sudo apt-get install -y musl-tools
       - uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
         with:
-          tool: trunk@0.21.14, cargo-nextest
+          tool: cargo-leptos@0.3.11, wasm-bindgen@0.2.129, cargo-nextest
+      - name: Install the Tailwind CSS CLI and wasm-opt
+        run: |
+          bash scripts/release/viewer-tools.sh "$RUNNER_TEMP/viewer-tools"
+          echo "$RUNNER_TEMP/viewer-tools/bin" >> "$GITHUB_PATH"
+      - name: Install Chrome and chromedriver
+        id: chrome
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # v2.2.0
+        with:
+          chrome-version: 155.0.8059.79
+          install-chromedriver: true
       - name: The journeys hold the same formatting and lint bar
         run: |
           set -euo pipefail
           cargo fmt --manifest-path e2e/Cargo.toml --check
           cargo clippy --manifest-path e2e/Cargo.toml --locked --all-targets -- -D warnings
-      # The browser is a container pinned by digest inside the script, so the
-      # runner image's own Chrome never decides what the journeys drive.
       - run: bash scripts/ui-e2e.sh
+        env:
+          FERROTERM_UI_E2E_CHROME: ${{ steps.chrome.outputs.chrome-path }}
+          FERROTERM_UI_E2E_CHROMEDRIVER: ${{ steps.chrome.outputs.chromedriver-path }}
       # What the browser was looking at when a journey failed: a screenshot and
       # the whole document, per failed wait. A passing run writes nothing, so
-      # this attaches only where there is something to look at, and a run that
-      # failed before the journeys started attaches nothing either.
+      # this attaches only where there is something to look at.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:

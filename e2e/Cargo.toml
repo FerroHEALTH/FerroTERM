@@ -61,6 +61,7 @@ tokio-rustls = "0.26.5"
 
 [dev-dependencies]
 thirtyfour = { version = "0.37.5", default-features = false, features = [
+  "cdp",
   "reqwest",
   "rustls",
 ] }

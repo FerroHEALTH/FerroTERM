@@ -7,7 +7,7 @@
 
 use std::collections::BTreeMap;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// The canonical FerroTERM declares a served version's artifact under.
 ///
@@ -42,7 +42,7 @@ const IMPLICIT_ARGUMENT: &str = "argument";
 /// Every field is optional so a server that omits one still renders. The
 /// viewer carries the elements it draws and nothing else: it never mirrors the
 /// whole resource.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct TerminologyCapabilities {
     /// `TerminologyCapabilities.codeSystem`, one entry per served system.
     #[serde(default, rename = "codeSystem")]
@@ -50,7 +50,7 @@ pub(crate) struct TerminologyCapabilities {
 }
 
 /// One `TerminologyCapabilities.codeSystem`.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 struct CodeSystem {
     /// `codeSystem.uri`, the canonical of the system.
     uri: Option<String>,
@@ -64,7 +64,7 @@ struct CodeSystem {
 }
 
 /// One `TerminologyCapabilities.codeSystem.version`.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 struct Version {
     /// `version.code` in R4, R4B, and R5.
     code: Option<String>,
@@ -90,7 +90,7 @@ struct Version {
 }
 
 /// One `TerminologyCapabilities.codeSystem.version.filter`.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 struct Filter {
     /// The filter property.
     code: Option<String>,
@@ -105,7 +105,7 @@ struct Filter {
 /// A complex extension carries its parts as child extensions
 /// (<https://hl7.org/fhir/R4B/extensibility.html>); the parts read here carry
 /// a `valueString` or a `valueCode`.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 struct Extension {
     /// The canonical that says what the extension means.
     url: Option<String>,
@@ -194,7 +194,6 @@ impl ImplicitArgument {
 
 // NOTE: only the composer fills a template, and the reader bundle carries no
 // composer, so the filling is editor-only (no FHIR/SNOMED spec governs this: our own design).
-#[cfg(feature = "editor")]
 impl ImplicitForm {
     /// The names of the bracketed placeholders, in template order.
     pub(crate) fn placeholders(&self) -> Vec<String> {
@@ -849,7 +848,6 @@ mod tests {
     }
 
     /// The filling of a template, which only the editor bundle carries.
-    #[cfg(feature = "editor")]
     mod filling {
         use super::*;
 

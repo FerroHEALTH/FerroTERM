@@ -12,7 +12,6 @@ use std::sync::Arc;
 use leptos::prelude::*;
 use leptos_router::NavigateOptions;
 use leptos_router::hooks::use_navigate;
-use wasm_bindgen::JsCast;
 
 use crate::fhir::error::FhirError;
 use crate::fhir::outcome::OperationOutcome;
@@ -95,18 +94,7 @@ pub(crate) fn reload_offer(
 /// The control that asked for the reload is gone once the refusal clears, so
 /// the focus goes where the answer is announced rather than back to the page.
 pub(crate) fn focus_report(id: &str) {
-    let found = web_sys::window()
-        .and_then(|window| window.document())
-        .and_then(|document| document.get_element_by_id(id));
-    let Some(element) = found
-        .as_ref()
-        .and_then(|found| found.dyn_ref::<web_sys::HtmlElement>())
-    else {
-        return;
-    };
-    if element.focus().is_err() {
-        leptos::logging::warn!("this browser refused to focus the live region");
-    }
+    crate::components::focus(id);
 }
 
 /// What the live region of a form rebuilt by a reload says.
@@ -148,9 +136,10 @@ impl Reload {
         }
     }
 
-    /// Subscribes the caller to every reload, so the read reruns on one.
-    pub(crate) fn track(self) {
-        self.count.track();
+    /// How many reloads were asked for, read reactively, so a read whose
+    /// source names it reruns on each.
+    pub(crate) fn generation(self) -> u32 {
+        self.count.get()
     }
 
     /// Reads the resource `named` names again.

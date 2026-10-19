@@ -18,12 +18,6 @@ path = "src/lib.rs"
 name = "ferroterm"
 path = "src/main.rs"
 
-[features]
-# The viewer bundle rides inside the binary, so Trunk runs before the server
-# builds. A fresh clone has no `dist/`, so the feature is off by default and
-# the release lane turns it on.
-ui = []
-
 [dependencies]
 anyhow.workspace = true
 axum.workspace = true

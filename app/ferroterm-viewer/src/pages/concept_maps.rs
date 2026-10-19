@@ -10,17 +10,15 @@ use leptos::html::Input;
 use leptos::prelude::*;
 use leptos_meta::Title;
 use leptos_router::NavigateOptions;
+use leptos_router::components::Redirect;
 use leptos_router::hooks::use_navigate;
 use leptos_router::hooks::use_query_map;
 
-use crate::components::NOT_DECLARED;
 use crate::components::failure::Failure;
-use crate::components::field::Help;
 use crate::components::reading::Reading;
 use crate::components::shell::SelectedVersion;
 use crate::components::state::empty;
 use crate::fhir::FhirClient;
-use crate::fhir::concept_map::GroupRow;
 use crate::fhir::concept_map::PublishedConceptMap;
 use crate::fhir::error::FhirError;
 use crate::fhir::searchset::SearchFilter;
@@ -30,20 +28,20 @@ use crate::fhir::version::FhirVersion;
 use crate::listing::Action;
 use crate::listing::ListParams;
 use crate::listing::Published;
-use crate::listing::SortColumn;
 use crate::listing::SortOrder;
 use crate::listing::count_sentence;
 use crate::listing::filter_form;
-use crate::listing::heading;
 use crate::listing::pager_view;
 use crate::listing::published_row;
-use crate::listing::sortable;
-use crate::listing::table;
+use crate::listing::published_table;
 use crate::listing::window;
 use crate::pages::translate;
 use crate::routes::CONCEPT_MAPS_PATH;
+use crate::routes::resource_link;
 use crate::settings::Settings;
-use crate::styles;
+use ferrohealth_ui::table::model::Noun;
+use ferrohealth_ui::table::view::Listing;
+use ferrohealth_ui::view::surface::{page_header, stack};
 
 /// The address parameter carrying the concept map the runner translates with.
 const MAP_PARAM: &str = "map";
@@ -79,14 +77,13 @@ const TARGET_PARAM: &str = "target";
 pub(crate) fn ConceptMapsPage() -> impl IntoView {
     let client = expect_context::<FhirClient>();
     let SelectedVersion(version) = expect_context::<SelectedVersion>();
-    let settings = expect_context::<Settings>();
-    provide_context(Help(RwSignal::new(false)));
+    let page_size = expect_context::<Settings>().page_size;
+    let _help = ferrohealth_ui::widget::help::provide_help();
 
     let query = use_query_map();
-    let params: Signal<ListParams> = Memo::new(move |_| {
-        query.with(|map| ListParams::read(&|name| map.get(name), settings.page_size.get()))
-    })
-    .into();
+    let params: Signal<ListParams> =
+        Memo::new(move |_| query.with(|map| ListParams::read(&|name| map.get(name), page_size)))
+            .into();
     // An address written before the runner had its own screen still names a
     // run, so it is sent to the screen that answers it rather than listing
     // maps and dropping what the link asked for.
@@ -102,8 +99,15 @@ pub(crate) fn ConceptMapsPage() -> impl IntoView {
 
     let heading = view! {
         <Title text="Concept maps" />
-        <h1 class=styles::PAGE_TITLE>"Concept maps"</h1>
-        <p class=styles::LEAD>"What this root publishes. Open one to see the groups it maps."</p>
+        {page_header(
+            "Concept maps",
+            Some(
+                String::from(
+                    "The ConceptMap resources this server publishes. Open one to see what it maps.",
+                ),
+            ),
+            (),
+        )}
     }
     .into_any();
 
@@ -111,13 +115,26 @@ pub(crate) fn ConceptMapsPage() -> impl IntoView {
     // The order lives in the address, so an ordered list is a link.
     let order = Memo::new(move |_| query.with(|map| SortOrder::read(&|name| map.get(name))));
     let list = list_section(&client, version, params, order);
-    let detail = detail_section(&client, version, params);
+    // NOTE: no specification governs this: our own design; an address from
+    // before the detail screen named the resource as `?id=`, now its path.
+    let moved = move || {
+        params.with(|params| {
+            (!params.id.is_empty()).then(|| {
+                let target = resource_link(CONCEPT_MAPS_PATH, &params.id, version.get());
+                view! { <Redirect path=target /> }
+            })
+        })
+    };
 
     view! {
+        {moved}
         {heading}
-        {form}
-        {list}
-        {detail}
+        {stack(
+            view! {
+                {form}
+                {list}
+            },
+        )}
     }
 }
 
@@ -194,12 +211,13 @@ fn list_section(
 ) -> AnyView {
     let read_client = client.clone();
     let filter = Memo::new(move |_| params.with(|params| params.filter.clone()));
-    let found = LocalResource::new(move || {
-        let client = read_client.clone();
-        let version = version.get();
-        let filter = filter.get();
-        async move { client.concept_map_search(version, &filter).await }
-    });
+    let found = Resource::new(
+        move || (version.get(), filter.get()),
+        move |(version, filter)| {
+            let client = read_client.clone();
+            async move { client.concept_map_search(version, &filter).await }
+        },
+    );
 
     // The live region is in the document before the read settles, which is
     // what lets a screen reader announce the count when it arrives. Every
@@ -207,7 +225,7 @@ fn list_section(
     // the transition boundary keeps the previous rows on screen while the next
     // read runs and a sentence built from the address would describe rows that
     // are not there yet.
-    let announcement = Memo::new(move |_| {
+    let announcement = move || {
         let params = params.get();
         found.with(|answered| {
             answered
@@ -219,16 +237,18 @@ fn list_section(
                 })
                 .unwrap_or_default()
         })
-    });
+    };
 
     view! {
-        <section class="mt-section" aria-labelledby="conceptmaps-heading">
-            <h2 id="conceptmaps-heading" class=styles::SECTION_TITLE>
-                "What this root holds"
-            </h2>
-            <p aria-live="polite" class="mt-default text-body text-muted">
-                {announcement}
-            </p>
+        <section class="fui-card fui-panel" aria-labelledby="conceptmaps-heading">
+            <div class="fui-panel-head">
+                <h2 id="conceptmaps-heading" class="fui-card-title">
+                    "What this root holds"
+                </h2>
+                <p aria-live="polite" class="fui-muted fui-small">
+                    <Transition fallback=|| ()>{announcement}</Transition>
+                </p>
+            </div>
             <Reading label="Reading the concept maps">
                 {move || {
                     let params = params.get();
@@ -275,10 +295,10 @@ fn list_view(
         .indexes()
         .filter_map(|index| ordered.get(index))
         .filter_map(|(_, index)| resources.get(*index))
-        .map(|resource| row_view(resource, params, version))
+        .map(|resource| row_view(resource, version))
         .collect();
     let pager = pager_view(
-        "Concept map pages",
+        Listing::new("Concept map pages").noun(Noun::new("concept map", "concept maps")),
         view,
         params,
         CONCEPT_MAPS_PATH,
@@ -286,21 +306,14 @@ fn list_view(
         &[],
     );
     view! {
-        {table(
-            vec![
-                sortable(
-                    SortColumn::Name,
-                    "Concept map",
-                    order,
-                    CONCEPT_MAPS_PATH,
-                    params,
-                    version,
-                ),
-                sortable(SortColumn::Version, "Version", order, CONCEPT_MAPS_PATH, params, version),
-                sortable(SortColumn::Status, "Status", order, CONCEPT_MAPS_PATH, params, version),
-                heading("Open in"),
-            ],
+        {published_table(
+            "Concept maps this root holds",
+            "Concept map",
             rows,
+            order,
+            params,
+            CONCEPT_MAPS_PATH,
+            version,
         )}
         {pager}
     }
@@ -318,7 +331,7 @@ fn facts(resource: &PublishedConceptMap) -> Published<'_> {
 }
 
 /// One published concept map, as a row that opens it and one that runs it.
-fn row_view(resource: &PublishedConceptMap, params: &ListParams, version: FhirVersion) -> AnyView {
+fn row_view(resource: &PublishedConceptMap, version: FhirVersion) -> AnyView {
     // The runner is handed the map and the source system this resource
     // already names, so a reader never retypes a canonical the row shows them.
     let filled = resource.url().map(|canonical| TranslateRequest {
@@ -331,177 +344,12 @@ fn row_view(resource: &PublishedConceptMap, params: &ListParams, version: FhirVe
         &facts(resource),
         resource
             .id()
-            .map(|id| address(&params.reading(id), version)),
+            .map(|id| resource_link(CONCEPT_MAPS_PATH, id, version)),
         filled.map(|run| Action {
             label: "Translate",
             href: translate::address(&run, version),
         }),
     )
-}
-
-/// One concept map read by its id, with the groups it maps.
-fn detail_section(
-    client: &FhirClient,
-    version: Signal<FhirVersion>,
-    params: Signal<ListParams>,
-) -> AnyView {
-    let read_client = client.clone();
-    let id = Memo::new(move |_| params.with(|params| params.id.clone()));
-    let resource = LocalResource::new(move || {
-        let client = read_client.clone();
-        let version = version.get();
-        let id = id.get();
-        async move {
-            if id.is_empty() {
-                None
-            } else {
-                Some(client.concept_map_read(version, &id).await)
-            }
-        }
-    });
-
-    view! {
-        <Show when=move || id.with(|id| !id.is_empty()) fallback=|| ()>
-            <section class="mt-section" aria-labelledby="conceptmap-detail-heading">
-                <h2 id="conceptmap-detail-heading" class=styles::SECTION_TITLE>
-                    "The concept map you opened"
-                </h2>
-                <Reading label="Reading the concept map">
-                    {move || {
-                        let version = version.get();
-                        resource
-                            .with(|answered| {
-                                answered
-                                    .as_ref()
-                                    .map(|answer| match answer {
-                                        None => ().into_any(),
-                                        Some(Ok(resource)) => resource_view(resource, version),
-                                        Some(Err(error)) => failure_view(error),
-                                    })
-                            })
-                    }}
-                </Reading>
-            </section>
-        </Show>
-    }
-    .into_any()
-}
-
-/// One resource: its facts, its groups, and the link that runs a code
-/// through it.
-fn resource_view(resource: &PublishedConceptMap, version: FhirVersion) -> AnyView {
-    let rows: Vec<AnyView> = resource
-        .facts()
-        .into_iter()
-        .map(|fact| {
-            let value = fact.value.unwrap_or_else(|| NOT_DECLARED.to_owned());
-            view! {
-                <div class="grid gap-tight border-b border-line py-tight last:border-0 sm:grid-cols-[16rem_1fr]">
-                    <dt class="font-medium">{fact.label}</dt>
-                    <dd class="wrap-break-word">{value}</dd>
-                </div>
-            }
-            .into_any()
-        })
-        .collect();
-    let heading = resource
-        .url()
-        .map_or_else(|| format!("Canonical {NOT_DECLARED}"), str::to_owned);
-    let prefill = resource.url().map_or_else(
-        || {
-            view! {
-                <p class="mt-default text-body text-muted">
-                    "This resource declares no canonical, so there is no url to name it by in a run."
-                </p>
-            }
-            .into_any()
-        },
-        |canonical| {
-            // The link hands the runner what this resource already says, so a
-            // reader never retypes a canonical the screen is showing them.
-            let filled = TranslateRequest {
-                concept_map: canonical.to_owned(),
-                concept_map_version: resource.version().unwrap_or_default().to_owned(),
-                system: resource.only_source_system().unwrap_or_default(),
-                ..TranslateRequest::default()
-            };
-            let href = translate::address(&filled, version);
-            view! {
-                <p class="mt-default">
-                    <a href=href class="text-accent underline">
-                        "Translate with this concept map"
-                    </a>
-                </p>
-            }
-            .into_any()
-        },
-    );
-    let groups = groups_view(&resource.groups());
-    view! {
-        <article class=format!("mt-default panel-p {}", styles::PANEL)>
-            <h3 class="font-mono text-body font-semibold break-all">{heading}</h3>
-            {prefill}
-            <dl class="mt-default text-body">{rows}</dl>
-            {groups}
-        </article>
-    }
-    .into_any()
-}
-
-/// What the map maps, one group at a time.
-fn groups_view(groups: &[GroupRow]) -> AnyView {
-    if groups.is_empty() {
-        return view! {
-            <p class="mt-default text-body text-muted">
-                "This resource declares no group, so what it maps is whatever the server holds for it rather than a table written here."
-            </p>
-        }
-        .into_any();
-    }
-    let rows: Vec<AnyView> = groups
-        .iter()
-        .map(|group| {
-            view! {
-                <tr class="border-b border-line align-top last:border-0">
-                    <th
-                        scope="row"
-                        class="py-tight pr-default font-mono text-small font-normal break-all"
-                    >
-                        {group.source.clone().unwrap_or_else(|| NOT_DECLARED.to_owned())}
-                    </th>
-                    <td class="py-tight pr-default font-mono text-small break-all">
-                        {group.target.clone().unwrap_or_else(|| NOT_DECLARED.to_owned())}
-                    </td>
-                    <td class="py-tight text-small">{group.elements.to_string()}</td>
-                </tr>
-            }
-            .into_any()
-        })
-        .collect();
-    view! {
-        <div class="mt-loose overflow-x-auto">
-            <table class="w-full border-collapse text-left text-body">
-                <caption class="pb-tight text-left text-small font-medium tracking-wide uppercase">
-                    "What the map maps"
-                </caption>
-                <thead>
-                    <tr class="border-b border-line">
-                        <th scope="col" class="py-tight pr-default text-small font-medium">
-                            "From"
-                        </th>
-                        <th scope="col" class="py-tight pr-default text-small font-medium">
-                            "To"
-                        </th>
-                        <th scope="col" class="py-tight text-small font-medium">
-                            "Codes mapped"
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>{rows}</tbody>
-            </table>
-        </div>
-    }
-    .into_any()
 }
 
 /// What a control holds now, trimmed, or the empty string when it is gone.

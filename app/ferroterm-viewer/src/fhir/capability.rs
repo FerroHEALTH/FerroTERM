@@ -1,6 +1,6 @@
 //! The part of a `CapabilityStatement` the shell renders.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// The canonical a root declares an operation's invocation levels under.
 ///
@@ -19,7 +19,7 @@ const OPERATION_LEVEL: &str = "https://ferroterm.eu/fhir/StructureDefinition/ope
 /// (<https://hl7.org/fhir/R4B/http.html#capabilities>), and the viewer reads
 /// only the elements it draws. Every field is optional here so a server that
 /// omits one still renders.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct CapabilityStatement {
     /// `CapabilityStatement.fhirVersion`, the release this root speaks.
     #[serde(rename = "fhirVersion")]
@@ -33,12 +33,8 @@ pub(crate) struct CapabilityStatement {
     rest: Vec<Rest>,
 }
 
-/// The `restful-security-service` code a SMART server declares
-/// (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
-const SMART_ON_FHIR: &str = "SMART-on-FHIR";
-
 /// One `CapabilityStatement.rest`.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 struct Rest {
     /// `rest.resource`, one per resource type this root serves.
     #[serde(default)]
@@ -51,7 +47,7 @@ struct Rest {
 }
 
 /// `CapabilityStatement.rest.security`.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 struct Security {
     /// `security.service`, as codes of the FHIR `restful-security-service`
     /// value set (<https://hl7.org/fhir/R4B/valueset-restful-security-service.html>).
@@ -60,7 +56,7 @@ struct Security {
 }
 
 /// One `security.service`, read for the codes it carries.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 struct SecurityService {
     /// The codings that name the service.
     #[serde(default)]
@@ -68,14 +64,14 @@ struct SecurityService {
 }
 
 /// One coding of `security.service`.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 struct ServiceCoding {
     /// The code itself.
     code: Option<String>,
 }
 
 /// One `CapabilityStatement.rest.resource`.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 struct RestResource {
     /// `resource.type`, the resource type it describes.
     r#type: Option<String>,
@@ -84,7 +80,6 @@ struct RestResource {
     /// Only the editor bundle reads it, and a field serde does not know is
     /// passed over, so the reader bundle carries neither the element nor the
     /// decoder for it.
-    #[cfg(feature = "editor")]
     #[serde(default)]
     interaction: Vec<RestInteraction>,
     /// `resource.operation`, the operations this root answers on that type.
@@ -93,8 +88,7 @@ struct RestResource {
 }
 
 /// One `CapabilityStatement.rest.resource.interaction`.
-#[cfg(feature = "editor")]
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 struct RestInteraction {
     /// `interaction.code`, a code of the type-restful-interaction value set
     /// (<https://hl7.org/fhir/R4B/capabilitystatement.html>).
@@ -102,7 +96,7 @@ struct RestInteraction {
 }
 
 /// One `CapabilityStatement.rest.resource.operation`.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 struct RestOperation {
     /// `operation.name`, as the statement wrote it.
     name: Option<String>,
@@ -116,7 +110,7 @@ struct RestOperation {
 }
 
 /// One `Extension`, read only for the invocation levels it may carry.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 struct Extension {
     /// The canonical that says what the extension means.
     url: Option<String>,
@@ -141,7 +135,7 @@ pub(crate) struct OperationDeclaration {
 }
 
 /// `CapabilityStatement.software`.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct Software {
     /// The software's own name.
     pub(crate) name: Option<String>,
@@ -159,27 +153,6 @@ impl CapabilityStatement {
             (Some(fhir), None) => Some(format!("FHIR {fhir}")),
             (None, software) => software,
         }
-    }
-
-    /// Whether this root declares SMART App Launch in front of it.
-    ///
-    /// A SMART server declares `SMART-on-FHIR` in
-    /// `CapabilityStatement.rest.security.service` and serves its discovery
-    /// document at `[base]/.well-known/smart-configuration`
-    /// (<https://hl7.org/fhir/smart-app-launch/conformance.html>). Asking the
-    /// statement first is what keeps the viewer from probing a deployment that
-    /// configured no issuer for a document it does not serve.
-    pub(crate) fn declares_smart(&self) -> bool {
-        self.rest.iter().any(|rest| {
-            rest.security.iter().any(|security| {
-                security.service.iter().any(|service| {
-                    service
-                        .coding
-                        .iter()
-                        .any(|coding| coding.code.as_deref() == Some(SMART_ON_FHIR))
-                })
-            })
-        })
     }
 
     /// The name of the running software, with its version where it gave one.
@@ -245,7 +218,6 @@ impl CapabilityStatement {
     /// an affordance only where the statement declares the interaction behind
     /// it, so a root that counts versions one way and a root that counts them
     /// another are both read for what they say they answer.
-    #[cfg(feature = "editor")]
     pub(crate) fn declares_interaction(&self, resource_type: &str, interaction: &str) -> bool {
         self.rest
             .iter()
@@ -292,7 +264,6 @@ mod tests {
         serde_json::from_str(json).expect("the fixture is valid JSON")
     }
 
-    #[cfg(feature = "editor")]
     #[test]
     fn an_interaction_is_declared_only_where_the_statement_declares_it() {
         let statement = parse(
@@ -310,36 +281,6 @@ mod tests {
             "an interaction is declared per resource type"
         );
         assert!(!statement.declares_interaction("ConceptMap", "read"));
-    }
-
-    #[test]
-    fn a_root_that_declares_smart_is_the_one_asked_for_a_discovery_document() {
-        // <https://hl7.org/fhir/smart-app-launch/conformance.html>: a SMART
-        // server names `SMART-on-FHIR` in `rest.security.service`.
-        let declared = parse(
-            r#"{"resourceType":"CapabilityStatement","rest":[{"mode":"server",
-                "security":{"service":[{"coding":[
-                  {"system":"http://terminology.hl7.org/CodeSystem/restful-security-service",
-                   "code":"SMART-on-FHIR"}]}]}}]}"#,
-        );
-        assert!(declared.declares_smart());
-    }
-
-    #[test]
-    fn a_root_that_declares_another_service_or_none_is_not_asked() {
-        for json in [
-            r#"{"resourceType":"CapabilityStatement"}"#,
-            r#"{"resourceType":"CapabilityStatement","rest":[{"mode":"server"}]}"#,
-            r#"{"resourceType":"CapabilityStatement","rest":[{"mode":"server",
-                "security":{"service":[{"coding":[{"code":"Basic"}]}]}}]}"#,
-            r#"{"resourceType":"CapabilityStatement","rest":[{"mode":"server",
-                "security":{"service":[{"text":"OAuth of some kind"}]}}]}"#,
-        ] {
-            assert!(
-                !parse(json).declares_smart(),
-                "probing this root would put a 404 in every reader's console: {json}"
-            );
-        }
     }
 
     #[test]
