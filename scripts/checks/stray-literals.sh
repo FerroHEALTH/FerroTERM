@@ -2,8 +2,8 @@
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # Stray-literal guard: a string a reader sees belongs in a catalog under
-# locales/, never in the code (.claude/rules/leptos-ui.md §13; no
-# specification governs this: our own design).
+# locales/, never in the code (no specification governs this: our own
+# design).
 #
 # It reads the hand-written .rs files under each ROOT, up to the file's
 # `#[cfg(test)]` module, and reports every string literal that reads as
@@ -169,7 +169,7 @@ found="$(
         if (!allowed) print FILENAME ":" FNR ": \"" lit "\""
       }
     }
-  ' "${files[@]}"
+  ' ${files[@]+"${files[@]}"}
 )"
 
 counts="$(printf '%s\n' "$found" | sed -n 's/^\([^:]*\):[0-9]*:.*/\1/p' | LC_ALL=C sort | uniq -c | awk '{print $1, $2}')"
