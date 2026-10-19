@@ -171,6 +171,22 @@ jobs:
           persist-credentials: false
       - run: bash scripts/checks/comment-style.sh --all
 
+  # stray-literals: a string the console draws belongs in its catalog under
+  # app/ferroterm-viewer/locales/, and a file holds no more stray literals
+  # than its baseline while the strings move (#749). It reads the checkout
+  # and needs no toolchain, so it sits in tier 1.
+  stray-literals:
+    name: stray-literals
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: bash scripts/checks/stray-literals.sh app/ferroterm-viewer/src
+
   # dockerfile-lint — hadolint over the container recipe. The image copies a
   # prebuilt binary onto a digest-pinned base, so the rules that matter are
   # the pinned FROM, the numeric non-root USER, and the exec-form ENTRYPOINT.
@@ -867,6 +883,7 @@ jobs:
       - workflow-lint
       - shellcheck
       - comment-style
+      - stray-literals
       - tree-guards
       - dockerfile-lint
       - versions

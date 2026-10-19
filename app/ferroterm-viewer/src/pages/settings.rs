@@ -62,7 +62,7 @@ pub(crate) fn pane() -> AnyView {
             "density",
             "Density",
             Some("Compact tightens every space and row, so more of a listing fits one screen."),
-            &[(Density::Comfortable.key(), "Comfortable"), (Density::Compact.key(), "Compact")],
+            &Density::ALL.map(|density| (density.key(), density.label())),
             settings.density.key(),
         )}
         {choice_field(
@@ -70,7 +70,7 @@ pub(crate) fn pane() -> AnyView {
             "fhir",
             "Default FHIR version",
             Some("Used when an address carries no version of its own."),
-            &FhirVersion::ALL.map(|version| (version.segment(), version.label())),
+            &FhirVersion::ALL.map(|version| (version.segment(), version.label().to_owned())),
             settings.version.segment(),
         )}
         {field(
@@ -135,7 +135,7 @@ fn choice_field(
     name: &'static str,
     label: &'static str,
     help: Option<&'static str>,
-    choices: &[(&'static str, &'static str)],
+    choices: &[(&'static str, String)],
     current: &str,
 ) -> AnyView {
     let options = choices
@@ -144,7 +144,7 @@ fn choice_field(
             let selected = *value == current;
             view! {
                 <option value=*value selected=selected>
-                    {*words}
+                    {words.clone()}
                 </option>
             }
         })

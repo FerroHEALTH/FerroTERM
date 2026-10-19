@@ -4,6 +4,7 @@ use leptos::prelude::*;
 use leptos_meta::Title;
 
 use crate::components::shell::SelectedVersion;
+use crate::locale::{Msg, tr};
 use crate::routes::ui_link;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::view::button::Variant;
@@ -24,19 +25,19 @@ pub(crate) fn NotFoundPage() -> impl IntoView {
     let home = move || {
         view! {
             <a href=ui_link("", version.get()) class=Variant::Primary.class()>
-                "Back to the dashboard"
+                {tr(Msg::NotFoundBack)}
             </a>
         }
     };
     view! {
-        <Title text="Not found" />
-        <h1 class="fui-sr-only">"No such screen"</h1>
+        <Title text=tr(Msg::NotFoundTitle) />
+        <h1 class="fui-sr-only">{tr(Msg::NotFoundHeading)}</h1>
         {move || {
             panel(
                 empty_state(
                     Glyph::SEARCH_X,
-                    "No such screen",
-                    "The console has no page at this address.",
+                    tr(Msg::NotFoundHeading),
+                    tr(Msg::NotFoundBody),
                     home(),
                 ),
             )

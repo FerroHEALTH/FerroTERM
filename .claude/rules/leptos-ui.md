@@ -132,8 +132,33 @@ bundle.
 
 The budget is 1.1 MiB, set with the console's first measured release
 bundle: 1071380 bytes on ferrohealth-ui 0.1.4 (2026-10-19, cargo-leptos
-0.3.11, wasm-bindgen 0.2.129, Rust 1.98.0), 1069909 on 0.1.6, 1071227 on 0.1.5, 1068012 on 0.1.3, 1066218 on
+0.3.11, wasm-bindgen 0.2.129, Rust 1.98.0), 1122043 on 0.1.7 (its Fluent catalogs: the parser, the CLDR plural rules and the catalogs), 1069909 on 0.1.6, 1071227 on 0.1.5, 1068012 on 0.1.3, 1066218 on
 0.1.2, 1025446 on 0.1.1. The client-side reader and editor bundles it replaced were 534059 and
 798540 bytes gzipped. FerroTERM issue 733 tracks winning headroom back. A
 change that needs more raises the budget here, in its own pull request, with
 the measured size and the reason.
+
+## 8. Strings and locales
+
+The catalog rule is FerroUI's (its `.claude/rules/leptos-ui.md` §13): no
+string the console draws lives outside a catalog, and a language joins as a
+catalog file with no code change. What is particular here:
+
+- The console's catalog is
+  `app/ferroterm-viewer/locales/<tag>/ferroterm-viewer.ftl`, embedded by
+  `fluent_templates::static_loader!` in `crate::locale`, where each message
+  is one `Msg`. A test holds every catalog directory to the full message
+  set, and a throwaway catalog under `tests/locales/` shows the words change
+  with no code change.
+- The server chooses the locale once per request (`crate::locale::requested`):
+  the best language of `Accept-Language` the console's catalog holds, else
+  `[server] locale`. The tag travels in `Facts` to the browser half, `App`
+  provides it with `ferrohealth_ui::i18n::provide_locale` so the console's
+  words and the components' switch together, and the document writes it as
+  `<html lang>`.
+- `scripts/checks/stray-literals.sh app/ferroterm-viewer/src` runs in CI
+  against `scripts/checks/stray-literals.baseline`: a file may hold no more
+  stray literals than its count, and a change that moves strings into the
+  catalog lowers the count with `--update`. Most of the remaining strings
+  reach a component that takes a `&'static str`, which FerroHEALTH/FerroUI#114
+  widens.

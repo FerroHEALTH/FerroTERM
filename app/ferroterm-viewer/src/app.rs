@@ -2,7 +2,8 @@
 //! The page tree the server renders and the browser hydrates.
 //!
 //! The document carries the reader's theme and density, written by the server
-//! from its cookies so the page arrives drawn in them; the three stylesheets
+//! from its cookies so the page arrives drawn in them, and the request's
+//! locale as `lang` (`crate::locale`); the three stylesheets
 //! are the components' (`ferrohealth-ui`), the FerroTERM brand, and the
 //! console's own layout utilities, all of this origin, so `style-src 'self'`
 //! holds.
@@ -14,6 +15,7 @@
     reason = "leptos::component derives a TypedBuilder whose `builder` shadows a trait method"
 )]
 
+use ferrohealth_ui::i18n::{Locale, provide_locale};
 use leptos::prelude::*;
 use leptos_meta::{Stylesheet, Title, provide_meta_context};
 use leptos_router::components::Router;
@@ -45,6 +47,8 @@ pub struct Facts {
     pub operator: Option<Operator>,
     /// The reader's preferences.
     pub settings: Settings,
+    /// The tag of the locale the request is served in (`crate::locale`).
+    pub locale: String,
 }
 
 /// The whole HTML document the server renders around [`App`], in the theme
@@ -55,17 +59,21 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
     let settings = crate::settings::server::requested();
     let theme = settings.theme.key();
     let density = settings.density.key();
+    let locale = crate::locale::requested();
+    let lang = locale.tag();
+    let description = crate::locale::tr_in(
+        crate::locale::catalog(),
+        &locale,
+        crate::locale::Msg::Description,
+    );
     view! {
         <!DOCTYPE html>
-        <html lang="en" data-theme=theme data-density=density>
+        <html lang=lang data-theme=theme data-density=density>
             <head>
                 <meta charset="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <meta name="color-scheme" content="light dark" />
-                <meta
-                    name="description"
-                    content="Browse and edit the code systems, value sets and concept maps a FerroTERM server serves."
-                />
+                <meta name="description" content=description />
                 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
                 <link rel="stylesheet" href=crate::server::COMPONENTS_CSS />
                 <link rel="stylesheet" href=crate::server::THEME_CSS />
@@ -94,6 +102,7 @@ fn facts() -> Facts {
             sync: state.settings().ferroterm.sync.is_some(),
             operator: crate::session::request::operator(),
             settings: crate::settings::server::requested(),
+            locale: crate::locale::requested().tag(),
         }
     }
     // NOTE: the browser reads the value the server decided; this runs only if
@@ -113,6 +122,7 @@ pub fn App() -> impl IntoView {
     provide_context(FhirClient::new(facts.root));
     provide_context(Session::new(facts.operator));
     provide_context(facts.settings);
+    provide_locale(Locale::parse(&facts.locale).unwrap_or_default());
     let _help = ferrohealth_ui::widget::help::provide_help();
     provide_context(RunList::default());
     let console = Console {
