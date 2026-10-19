@@ -27,6 +27,7 @@ use crate::fhir::error::FhirError;
 use crate::fhir::version::FhirVersion;
 use crate::fhir::write::StoredResource;
 use crate::fhir::write::Version;
+use crate::locale::{Msg, tr, tr_with};
 
 /// `Resource.meta`, whose two server-assigned elements a comparison drops.
 const META: &str = "meta";
@@ -83,14 +84,10 @@ impl Support {
     }
 
     /// The sentence a screen puts beside an empty version list.
-    pub(crate) fn why_empty(self) -> &'static str {
+    pub(crate) fn why_empty(self) -> String {
         match self {
-            Self::History | Self::VersionRead => {
-                "This server holds no earlier version of this resource."
-            }
-            Self::Neither => {
-                "This server's capability statement declares neither the history interaction nor the version read for this resource type, so it offers no versions to read."
-            }
+            Self::History | Self::VersionRead => tr(Msg::ServerHoldsNoEarlierVersionResource),
+            Self::Neither => tr(Msg::ServerSCapabilityStatementDeclaresNeither),
         }
     }
 }
@@ -289,14 +286,12 @@ impl Comparison {
     /// The sentence the screen announces about the comparison.
     pub(crate) fn sentence(&self) -> String {
         match self {
-            Self::Unasked => String::from("Choose two versions above to compare them."),
-            Self::Unread => String::from(
-                "One of these two versions carries no resource, so there is nothing to compare.",
-            ),
+            Self::Unasked => tr(Msg::ChooseTwoVersionsAboveCompareThem),
+            Self::Unread => tr(Msg::OneTheseTwoVersionsCarriesNo),
             Self::Differences(found) => match found.len() {
-                0 => String::from("These two versions state the same elements."),
-                1 => String::from("1 element differs."),
-                more => format!("{more} elements differ."),
+                0 => tr(Msg::TheseTwoVersionsStateSameElements),
+                1 => tr(Msg::N1ElementDiffers),
+                more => tr_with(Msg::ElementsDiffer, &[("more", (more).to_string().into())]),
             },
         }
     }

@@ -62,6 +62,7 @@ use crate::fhir::version::FhirVersion;
 use crate::fhir::write::History;
 use crate::fhir::write::Written;
 use crate::fhir::write::if_match;
+use crate::locale::{Msg, tr, tr_with};
 use crate::url::RequestUrl;
 
 /// The media type a FHIR JSON request asks for.
@@ -1015,7 +1016,7 @@ impl FhirClient {
             .map(str::to_owned)
             .ok_or_else(|| FhirError::Transport {
                 url: url.to_owned(),
-                message: String::from("the address is not below the server's root"),
+                message: tr(Msg::AddressNotBelowServerSRoot),
             })
     }
 
@@ -1092,7 +1093,10 @@ fn transport(url: &str, error: &ExchangeError) -> FhirError {
 fn status_of(answer: &Answer, url: &str) -> Result<StatusCode, FhirError> {
     StatusCode::from_u16(answer.status).map_err(|_invalid| FhirError::Transport {
         url: url.to_owned(),
-        message: format!("the server answered a status of {}", answer.status),
+        message: tr_with(
+            Msg::ServerAnsweredStatus,
+            &[("status", (answer.status).to_string().into())],
+        ),
     })
 }
 

@@ -24,6 +24,7 @@ use crate::find::Offer;
 use crate::find::QUERY_PARAM;
 use crate::find::Subject;
 use crate::find::offers;
+use crate::locale::{Msg, tr, tr_with};
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::view::empty::empty_state;
 use ferrohealth_ui::view::surface::{facts_row, link_card, page_header, panel, stack};
@@ -62,14 +63,14 @@ pub(crate) fn FindPage() -> impl IntoView {
     );
 
     let heading = view! {
-        <Title text="Find" />
+        <Title text=tr(Msg::TitleFind) />
         {move || {
             let line = subject
                 .with(|subject| match subject {
-                    Some(subject) => format!("Read as {} from its shape alone.", subject.label()),
-                    None => "Nothing was typed.".to_owned(),
+                    Some(subject) => tr_with(Msg::ReadFromShapeAlone, &[("subject", (subject.label()).clone().into())]),
+                    None => tr(Msg::NothingWasTyped).clone(),
                 });
-            page_header("What to do with it", Some(line), ())
+            page_header(tr(Msg::WhatDo), Some(line), ())
         }}
     }
     .into_any();
@@ -78,7 +79,7 @@ pub(crate) fn FindPage() -> impl IntoView {
         subject.with(|subject| {
             subject.as_ref().map(|subject| {
                 panel(facts_row(vec![(
-                    "What you typed",
+                    tr(Msg::WhatYouTyped),
                     view! { <span class="fui-mono break-all">{subject.typed().to_owned()}</span> }
                         .into_any(),
                 )]))
@@ -111,9 +112,9 @@ pub(crate) fn FindPage() -> impl IntoView {
                 {subject_view}
                 <section class="fui-stack" aria-labelledby="find-offers-heading">
                     <h2 id="find-offers-heading" class="fui-card-title">
-                        "Where it goes"
+                        {tr(Msg::WhereItGoes)}
                     </h2>
-                    <Reading label="Reading what this root declares">{body}</Reading>
+                    <Reading label=tr(Msg::ReadingWhatRootDeclares)>{body}</Reading>
                 </section>
             },
         )}
@@ -135,8 +136,8 @@ fn offers_view(found: &[Offer]) -> AnyView {
     if found.is_empty() {
         return panel(empty_state(
             Glyph::SEARCH_X,
-            "Nowhere to go",
-            "This root declares none of the operations that would apply to what you typed.",
+            tr(Msg::NowhereToGo),
+            tr(Msg::RootDeclaresNoneOperationsWouldApply),
             (),
         ))
         .into_any();
@@ -146,8 +147,8 @@ fn offers_view(found: &[Offer]) -> AnyView {
         .map(|offer| {
             let card = link_card(
                 offer.href.clone(),
-                offer.label,
-                view! { <p class="fui-muted">{offer.detail}</p> },
+                offer.label.clone(),
+                view! { <p class="fui-muted">{offer.detail.clone()}</p> },
             );
             view! { <li class="grid">{card}</li> }.into_any()
         })

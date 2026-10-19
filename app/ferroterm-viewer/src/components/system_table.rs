@@ -33,6 +33,7 @@ use crate::fhir::terminology::Artifact;
 use crate::fhir::terminology::SystemCard;
 use crate::fhir::terminology::VersionRow;
 use crate::fhir::version::FhirVersion;
+use crate::locale::{Msg, message, tr, tr_with};
 use crate::routes::BROWSE_PATH;
 use crate::routes::SYSTEMS_PATH;
 use crate::routes::VALIDATE_PATH;
@@ -77,11 +78,11 @@ impl Column {
     }
 
     /// The heading a reader reads on it.
-    fn label(self) -> &'static str {
+    fn label(self) -> Msg {
         match self {
-            Self::System => "Code system",
-            Self::Content => "Content",
-            Self::Subsumes => "Subsumes",
+            Self::System => Msg::CodeSystem2,
+            Self::Content => Msg::Content,
+            Self::Subsumes => Msg::Subsumes,
         }
     }
 
@@ -235,10 +236,9 @@ fn ordered(
 }
 
 /// The noun the pager names the rows by.
-const NOUN: Noun = Noun {
-    one: "code system",
-    many: "code systems",
-};
+fn noun() -> Noun {
+    Noun::new(message(Msg::NounCodeSystems))
+}
 
 /// The served systems: a filter over them, one row per system, and the pager.
 #[component]
@@ -285,9 +285,12 @@ pub(crate) fn SystemTable(
         let held = declared.with_value(Vec::len);
         let shown = kept.with(Vec::len);
         count.set(if shown == held {
-            format!("{held} {}", if held == 1 { NOUN.one } else { NOUN.many })
+            tr_with(Msg::SystemsHeld, &[("held", held.into())])
         } else {
-            format!("{shown} of {held} {}", NOUN.many)
+            tr_with(
+                Msg::SystemsKept,
+                &[("shown", shown.into()), ("held", held.into())],
+            )
         });
     });
     let table = move || {
@@ -300,8 +303,8 @@ pub(crate) fn SystemTable(
             Body::Empty(
                 empty_quiet(
                     Glyph::SEARCH_X,
-                    "No match",
-                    "No code system this root serves matches the filter.",
+                    tr(Msg::NoMatch),
+                    tr(Msg::NoCodeSystemRootServesMatches),
                 )
                 .into_any(),
             )
@@ -316,25 +319,25 @@ pub(crate) fn SystemTable(
             }))
         };
         let columns = [
-            TableColumn::text(Column::System.key(), Column::System.label()).sortable(),
-            TableColumn::text("version", "Versions"),
-            TableColumn::text(Column::Content.key(), Column::Content.label()).sortable(),
-            TableColumn::text(Column::Subsumes.key(), Column::Subsumes.label()).sortable(),
-            TableColumn::text("artifact", "Read from"),
-            TableColumn::text("open", "Actions"),
+            TableColumn::text(Column::System.key(), tr(Column::System.label())).sortable(),
+            TableColumn::text("version", tr(Msg::Versions)),
+            TableColumn::text(Column::Content.key(), tr(Column::Content.label())).sortable(),
+            TableColumn::text(Column::Subsumes.key(), tr(Column::Subsumes.label())).sortable(),
+            TableColumn::text("artifact", tr(Msg::ReadFrom)),
+            TableColumn::text("open", tr(Msg::Actions)),
         ];
         let sort = order.sort();
         let sort_href = |asked: &Sort| Order::of_sort(asked).address(at, Paging::default());
         let page_href = |asked: Paging| order.address(at, asked);
         view! {
             {data_table(DataTable {
-                caption: "The code systems this root serves",
+                caption: &tr(Msg::CodeSystemsRootServes),
                 columns: &columns,
                 sort: sort.as_ref(),
                 sort_href: &sort_href,
                 body,
             })}
-            {link_pager(Listing::new("Pages of code systems").noun(NOUN), window, &page_href)}
+            {link_pager(Listing::new(tr(Msg::PagesOfCodeSystems)).noun(noun()), window, &page_href)}
         }
         .into_any()
     };
@@ -351,15 +354,15 @@ fn system_row(card: &SystemCard, version: Signal<FhirVersion>, name: Option<&str
     view! {
         <tr>
             <td>{system_cell(card, version, name)}</td>
-            <td data-label="Versions" class="sm:whitespace-nowrap">
+            <td data-label=tr(Msg::Versions) class="sm:whitespace-nowrap">
                 {versions_cell(&card.versions)}
             </td>
-            <td data-label="Content" class="sm:whitespace-nowrap">
+            <td data-label=tr(Msg::Content) class="sm:whitespace-nowrap">
                 {word_cell(card.content.clone())}
             </td>
-            <td data-label="Subsumes">{yes_no_cell(card.subsumption)}</td>
-            <td data-label="Read from">{artifact_cell(artifact.as_ref())}</td>
-            <td data-label="Actions" class=ACTIONS>
+            <td data-label=tr(Msg::Subsumes)>{yes_no_cell(card.subsumption)}</td>
+            <td data-label=tr(Msg::ReadFrom)>{artifact_cell(artifact.as_ref())}</td>
+            <td data-label=tr(Msg::Actions) class=ACTIONS>
                 {tools_cell(card, version)}
             </td>
         </tr>
@@ -375,7 +378,7 @@ fn system_row(card: &SystemCard, version: Signal<FhirVersion>, name: Option<&str
 /// (<https://hl7.org/fhir/R5/codesystem-filter-operator.html>).
 fn tools_cell(card: &SystemCard, version: Signal<FhirVersion>) -> AnyView {
     if card.url.is_empty() {
-        return absent("a screen needs the canonical this system was declared without");
+        return absent(tr(Msg::ScreenNeedsCanonicalSystemWasDeclared));
     }
     let served = card
         .versions
@@ -384,16 +387,16 @@ fn tools_cell(card: &SystemCard, version: Signal<FhirVersion>) -> AnyView {
         .or_else(|| card.versions.first());
     let code = served.and_then(|served| served.code.clone());
     let walkable = served.is_some_and(|served| Hierarchy::of(served).walk().is_some());
-    let link = |path: &'static str, label: &'static str| {
+    let link = |path: &'static str, label: String| {
         let system = card.url.clone();
         let code = code.clone();
         let href = move || system_tool_link(path, &system, code.as_deref(), version.get());
         view! { <a href=href>{label}</a> }.into_any()
     };
-    let browse = walkable.then(|| link(BROWSE_PATH, "Browse"));
+    let browse = walkable.then(|| link(BROWSE_PATH, tr(Msg::Browse)));
     // NOTE: no specification governs this: our own design; the screens a row
     // opens are links of the text's height, so a row stays one line tall.
-    view! { <span class="inline-flex gap-default">{browse} {link(VALIDATE_PATH, "Validate")}</span> }
+    view! { <span class="inline-flex gap-default">{browse} {link(VALIDATE_PATH, tr(Msg::Validate))}</span> }
         .into_any()
 }
 
@@ -401,7 +404,7 @@ fn tools_cell(card: &SystemCard, version: Signal<FhirVersion>) -> AnyView {
 /// the canonical under it.
 fn system_cell(card: &SystemCard, version: Signal<FhirVersion>, name: Option<&str>) -> AnyView {
     if card.url.is_empty() {
-        return view! { <span class="fui-muted">"Declared without a canonical URI"</span> }
+        return view! { <span class="fui-muted">{tr(Msg::DeclaredWithoutCanonicalUri)}</span> }
             .into_any();
     }
     let target = card.url.clone();
@@ -447,7 +450,7 @@ fn versions_cell(versions: &[VersionRow]) -> AnyView {
         })
         .collect();
     if chips.is_empty() {
-        return absent("this server declared no version for the code system");
+        return absent(tr(Msg::ServerDeclaredNoVersionCodeSystem));
     }
     view! { <div class="inline-flex flex-col gap-tight">{chips}</div> }.into_any()
 }
@@ -456,16 +459,16 @@ fn versions_cell(versions: &[VersionRow]) -> AnyView {
 fn word_cell(word: Option<String>) -> AnyView {
     match word.filter(|word| !word.is_empty()) {
         Some(word) => view! { <span>{word}</span> }.into_any(),
-        None => absent("this FHIR version has no such element, or the server declared none"),
+        None => absent(tr(Msg::FhirVersionHasNoSuchElement)),
     }
 }
 
 /// A flag the server stated, or the mark for one it did not.
 fn yes_no_cell(flag: Option<bool>) -> AnyView {
     match flag {
-        Some(true) => view! { <span>"yes"</span> }.into_any(),
-        Some(false) => view! { <span class="fui-muted">"no"</span> }.into_any(),
-        None => absent("the server declared neither yes nor no"),
+        Some(true) => view! { <span>{tr(Msg::Yes)}</span> }.into_any(),
+        Some(false) => view! { <span class="fui-muted">{tr(Msg::No)}</span> }.into_any(),
+        None => absent(tr(Msg::ServerDeclaredNeitherYesNorNo)),
     }
 }
 
@@ -476,7 +479,7 @@ fn yes_no_cell(flag: Option<bool>) -> AnyView {
 /// the artifact's own name is on the wire, so no path is shown.
 fn artifact_cell(artifact: Option<&Artifact>) -> AnyView {
     let Some(artifact) = artifact else {
-        return absent("this version was not read from a built artifact");
+        return absent(tr(Msg::VersionWasNotReadFromBuilt));
     };
     let name = artifact.name.clone();
     let release = artifact.release.clone();
@@ -488,7 +491,7 @@ fn artifact_cell(artifact: Option<&Artifact>) -> AnyView {
             {release_line}
         }
         .into_any(),
-        None => absent("the server named no artifact for this version"),
+        None => absent(tr(Msg::ServerNamedNoArtifactVersion)),
     }
 }
 
@@ -496,7 +499,7 @@ fn artifact_cell(artifact: Option<&Artifact>) -> AnyView {
 ///
 /// A cell that spells absence out in prose makes "not" the densest word on the
 /// screen; the reader who wants the sentence hovers or focuses the mark.
-fn absent(why: &'static str) -> AnyView {
+fn absent(why: String) -> AnyView {
     view! {
         <span class="fui-muted" title=why>
             "—"

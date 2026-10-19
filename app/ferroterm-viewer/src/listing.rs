@@ -21,13 +21,14 @@ use leptos::ev::SubmitEvent;
 use leptos::html::Input;
 use leptos::prelude::*;
 
-use crate::components::NOT_DECLARED;
 use crate::components::field::Field;
 use crate::components::field::row;
 use crate::components::field::text_field;
 use crate::components::icon;
+use crate::components::not_declared;
 use crate::fhir::searchset::SearchFilter;
 use crate::fhir::version::FhirVersion;
+use crate::locale::{Msg, tr, tr_with};
 use crate::paging::Page;
 use crate::routes::VERSION_PARAM;
 use crate::routes::base_url;
@@ -193,15 +194,32 @@ impl ListParams {
 pub(crate) fn count_sentence(view: Window, noun: &str, counted: Option<u32>) -> String {
     let shown = view.summary(noun);
     let Some(total) = counted else {
-        return format!("{shown} This root counted {NOT_DECLARED}.");
+        return tr_with(
+            Msg::ThisRootCounted,
+            &[
+                ("not_declared", not_declared().into()),
+                ("shown", (shown).clone().into()),
+            ],
+        );
     };
     let carried = u32::try_from(view.matched).unwrap_or(u32::MAX);
     if total > carried {
-        return format!(
-            "{shown} This root counted {total} and sent {carried}, so this is part of the answer."
+        return tr_with(
+            Msg::RootCountedSentSoPartAnswer,
+            &[
+                ("shown", (shown).clone().into()),
+                ("total", (total).to_string().into()),
+                ("carried", (carried).to_string().into()),
+            ],
         );
     }
-    format!("{shown} This root counted {total}.")
+    tr_with(
+        Msg::ThisRootCounted2,
+        &[
+            ("shown", (shown).clone().into()),
+            ("total", (total).to_string().into()),
+        ],
+    )
 }
 
 /// The rows one page draws, and what the reader is told about them.
@@ -279,11 +297,19 @@ impl Window {
     /// `noun` is the plural a reader reads, in the middle of a sentence.
     pub(crate) fn summary(self, noun: &str) -> String {
         if self.rows == 0 {
-            return format!("No {noun} on this page.");
+            return tr_with(Msg::NoOnThisPage, &[("noun", (noun).to_string().into())]);
         }
         let first = self.start.saturating_add(1);
         let last = self.start.saturating_add(self.rows);
-        format!("Showing {noun} {first} to {last} of {}.", self.matched)
+        tr_with(
+            Msg::ShowingToOf,
+            &[
+                ("noun", (noun).to_string().into()),
+                ("first", (first).to_string().into()),
+                ("last", (last).to_string().into()),
+                ("matched", (self.matched).to_string().into()),
+            ],
+        )
     }
 }
 
@@ -296,7 +322,7 @@ impl Window {
 /// address through `prop:value`, which follows a back navigation and leaves
 /// what the reader is typing alone, and is read back at submit.
 pub(crate) fn filter_form(
-    canonical_hint: &'static str,
+    canonical_hint: &str,
     canonical: NodeRef<Input>,
     resource_version: NodeRef<Input>,
     params: Signal<ListParams>,
@@ -305,17 +331,17 @@ pub(crate) fn filter_form(
     let canonical_field = Field {
         id: "filter-url",
         name: "url",
-        label: "Canonical",
-        hint: canonical_hint,
+        label: tr(Msg::Canonical),
+        hint: canonical_hint.to_owned(),
     };
     let version_field = Field {
         id: "filter-version",
         name: "version",
-        label: "Version",
-        hint: "The version search parameter. Left empty, every version this root holds matches.",
+        label: tr(Msg::Version),
+        hint: tr(Msg::VersionSearchParameterLeftEmptyEvery),
     };
     let form = view! {
-        <form class="fui-form" role="search" aria-label="Search this root" on:submit=submit>
+        <form class="fui-form" role="search" aria-label=tr(Msg::SearchThisRoot) on:submit=submit>
             {row(
                 vec![
                     text_field(
@@ -333,13 +359,13 @@ pub(crate) fn filter_form(
             <div class="fui-cluster">
                 <button type="submit" class=Variant::Primary.class()>
                     {ferrohealth_ui::icon::icon(icon::SEARCH, "16")}
-                    "Search"
+                    {tr(Msg::Search)}
                 </button>
                 {help_switch()}
             </div>
         </form>
     };
-    card("Search", form).into_any()
+    card(tr(Msg::Search), form).into_any()
 }
 
 /// The address parameter naming the column a list is ordered on.
@@ -495,7 +521,7 @@ impl SortOrder {
 /// (<https://www.w3.org/WAI/ARIA/apg/patterns/table/>).
 pub(crate) fn published_table(
     caption: &str,
-    noun: &'static str,
+    noun: String,
     rows: Vec<AnyView>,
     order: SortOrder,
     params: &ListParams,
@@ -504,9 +530,9 @@ pub(crate) fn published_table(
 ) -> AnyView {
     let columns = [
         Column::text(SortColumn::Name.key(), noun).sortable(),
-        Column::text(SortColumn::Version.key(), "Version").sortable(),
-        Column::text(SortColumn::Status.key(), "Status").sortable(),
-        Column::text("open", "Actions"),
+        Column::text(SortColumn::Version.key(), tr(Msg::Version)).sortable(),
+        Column::text(SortColumn::Status.key(), tr(Msg::Status)).sortable(),
+        Column::text("open", tr(Msg::Actions)),
     ];
     let sort = order.sort();
     let href =
@@ -520,8 +546,8 @@ pub(crate) fn published_table(
             Body::Empty(
                 empty_quiet(
                     Glyph::SEARCH_X,
-                    "No match",
-                    "This root holds no resource matching the search.",
+                    tr(Msg::NoMatch),
+                    tr(Msg::RootHoldsNoResourceMatchingSearch),
                 )
                 .into_any(),
             )
@@ -545,13 +571,13 @@ pub(crate) fn published_row(
     open: Option<String>,
     run: Option<Action>,
 ) -> AnyView {
-    let title = published.title.unwrap_or(NOT_DECLARED).to_owned();
-    let canonical = published.canonical.unwrap_or(NOT_DECLARED).to_owned();
+    let title = published.title.map_or_else(not_declared, str::to_owned);
+    let canonical = published.canonical.map_or_else(not_declared, str::to_owned);
     let heading = match open {
         Some(href) => view! { <a href=href>{title}</a> }.into_any(),
         None => view! {
             {title}
-            <span class="fui-sr-only">", which carries no id to read it by"</span>
+            <span class="fui-sr-only">{tr(Msg::WhichCarriesNoIdRead)}</span>
         }
         .into_any(),
     };
@@ -570,9 +596,9 @@ pub(crate) fn published_row(
                     {canonical}
                 </span>
             </th>
-            <td data-label="Version">{version}</td>
-            <td data-label="Status">{status_pill(published.status)}</td>
-            <td data-label="Actions" class=ACTIONS>
+            <td data-label=tr(Msg::Version)>{version}</td>
+            <td data-label=tr(Msg::Status)>{status_pill(published.status)}</td>
+            <td data-label=tr(Msg::Actions) class=ACTIONS>
                 {action}
             </td>
         </tr>
@@ -614,7 +640,7 @@ pub(crate) struct Published<'a> {
 #[derive(Clone, Debug)]
 pub(crate) struct Action {
     /// What the runner does, as a reader reads it.
-    pub(crate) label: &'static str,
+    pub(crate) label: String,
     /// The address that opens it with the subject already filled in.
     pub(crate) href: String,
 }

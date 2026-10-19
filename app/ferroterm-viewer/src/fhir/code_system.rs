@@ -8,6 +8,7 @@
 //! screen reads both and keeps them apart. Reading lives here, outside every
 //! component, so the screen renders a value plain unit tests can pin.
 
+use crate::locale::Msg;
 use serde::{Deserialize, Serialize};
 
 /// The resource type an entry must declare to be drawn as a code system.
@@ -84,8 +85,8 @@ pub(crate) struct PublishedCodeSystem {
 /// One fact of a published resource: a term and the value beside it.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Fact {
-    /// The term a reader reads.
-    pub(crate) label: &'static str,
+    /// The term a reader reads, by its message in the catalog.
+    pub(crate) label: Msg,
     /// The value, absent when the resource declared none.
     pub(crate) value: Option<String>,
 }
@@ -157,27 +158,27 @@ impl PublishedCodeSystem {
     /// server omitted still gets a row that states the absence.
     pub(crate) fn facts(&self) -> Vec<Fact> {
         vec![
-            fact("Name", self.name.as_deref()),
-            fact("Title", self.title.as_deref()),
-            fact("Version", self.version.as_deref()),
-            fact("Status", self.status.as_deref()),
-            fact("Experimental", flag(self.experimental)),
-            fact("Publisher", self.publisher.as_deref()),
-            fact("Last changed", self.date.as_deref()),
-            fact("Description", self.description.as_deref()),
-            fact("Content", self.content.as_deref()),
-            fact("A code needs its version", flag(self.version_needed)),
-            fact("Case sensitive", flag(self.case_sensitive)),
-            fact("Hierarchy meaning", self.hierarchy_meaning.as_deref()),
-            fact("Compositional grammar", flag(self.compositional)),
-            fact("Supplements", self.supplements.as_deref()),
-            fact("Concepts defined", counted(self.count).as_deref()),
+            fact(Msg::Name, self.name.as_deref()),
+            fact(Msg::Title, self.title.as_deref()),
+            fact(Msg::Version, self.version.as_deref()),
+            fact(Msg::Status, self.status.as_deref()),
+            fact(Msg::Experimental, flag(self.experimental)),
+            fact(Msg::Publisher, self.publisher.as_deref()),
+            fact(Msg::LastChanged, self.date.as_deref()),
+            fact(Msg::Description2, self.description.as_deref()),
+            fact(Msg::Content, self.content.as_deref()),
+            fact(Msg::CodeNeedsVersion, flag(self.version_needed)),
+            fact(Msg::CaseSensitive, flag(self.case_sensitive)),
+            fact(Msg::HierarchyMeaning, self.hierarchy_meaning.as_deref()),
+            fact(Msg::CompositionalGrammar, flag(self.compositional)),
+            fact(Msg::Supplements, self.supplements.as_deref()),
+            fact(Msg::ConceptsDefined, counted(self.count).as_deref()),
         ]
     }
 }
 
 /// One fact, with a value that names nothing read as absent.
-fn fact(label: &'static str, value: Option<&str>) -> Fact {
+fn fact(label: Msg, value: Option<&str>) -> Fact {
     Fact {
         label,
         value: named(value).map(str::to_owned),
@@ -214,7 +215,7 @@ mod tests {
         resource
             .facts()
             .into_iter()
-            .find(|fact| fact.label == label)
+            .find(|fact| crate::locale::tr(fact.label) == label)
             .expect("the screen draws a row for every fact it names")
             .value
     }
@@ -289,20 +290,20 @@ mod tests {
             resource
                 .facts()
                 .iter()
-                .any(|fact| fact.label == "Supplements"),
+                .any(|fact| crate::locale::tr(fact.label) == "Supplements"),
             "the row is drawn so the screen can state the absence"
         );
     }
 
     #[test]
     fn the_facts_render_in_the_same_order_for_every_resource() {
-        let rich: Vec<&'static str> = parse(ONE_MATCH)
+        let rich: Vec<Msg> = parse(ONE_MATCH)
             .published()
             .iter()
             .flat_map(PublishedCodeSystem::facts)
             .map(|fact| fact.label)
             .collect();
-        let bare: Vec<&'static str> = PublishedCodeSystem::default()
+        let bare: Vec<Msg> = PublishedCodeSystem::default()
             .facts()
             .into_iter()
             .map(|fact| fact.label)

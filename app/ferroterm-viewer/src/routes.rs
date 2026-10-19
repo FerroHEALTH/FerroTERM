@@ -4,6 +4,7 @@
 //! copies reproduces exactly what they were looking at.
 
 use crate::fhir::version::FhirVersion;
+use crate::locale::{Msg, tr};
 use crate::url::RequestUrl;
 
 /// Where the console's router is based: the console is its own server, so
@@ -106,18 +107,18 @@ pub(crate) fn screen_link(
     canonical: &str,
     id: &str,
     version: FhirVersion,
-) -> Option<(String, &'static str)> {
+) -> Option<(String, String)> {
     match resource_type {
         "CodeSystem" if !canonical.is_empty() => {
-            Some((system_link(canonical, version), "Back to the code system"))
+            Some((system_link(canonical, version), tr(Msg::BackCodeSystem)))
         }
         "ValueSet" if !id.is_empty() => Some((
             resource_link(VALUE_SETS_PATH, id, version),
-            "Back to the value set",
+            tr(Msg::BackValueSet),
         )),
         "ConceptMap" if !id.is_empty() => Some((
             resource_link(CONCEPT_MAPS_PATH, id, version),
-            "Back to the concept map",
+            tr(Msg::BackConceptMap),
         )),
         _ => None,
     }

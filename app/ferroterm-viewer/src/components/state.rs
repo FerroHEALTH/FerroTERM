@@ -8,6 +8,7 @@
 //! `OperationOutcome`. The two below are the states with nothing behind them:
 //! an answer that holds nothing, and a thing this root cannot do.
 
+use crate::locale::{Msg, tr};
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::empty::empty_quiet;
@@ -19,8 +20,8 @@ use leptos::prelude::*;
 /// The same panel a listing draws its rows in, so an empty answer reads as an
 /// answer rather than as a screen that failed to draw. The sentence says what
 /// was looked for, because "no results" says nothing a reader can act on.
-pub(crate) fn empty(sentence: &'static str) -> AnyView {
-    empty_quiet(Glyph::INBOX, "Nothing here", sentence).into_any()
+pub(crate) fn empty(sentence: String) -> AnyView {
+    empty_quiet(Glyph::INBOX, tr(Msg::NothingHere), sentence).into_any()
 }
 
 /// Something this root does not declare, so the screen does not offer it.
@@ -29,7 +30,7 @@ pub(crate) fn empty(sentence: &'static str) -> AnyView {
 /// about the answer, and a reader who came to do the thing needs to see why
 /// they cannot. It is never an error: a root that declares less is answering
 /// correctly (<https://hl7.org/fhir/R5/capabilitystatement.html>).
-pub(crate) fn undeclared(sentence: &'static str) -> AnyView {
+pub(crate) fn undeclared(sentence: String) -> AnyView {
     notice(Tone::Info, Announce::Status, None, sentence).into_any()
 }
 
@@ -38,6 +39,6 @@ pub(crate) fn undeclared(sentence: &'static str) -> AnyView {
 /// Not an empty answer: nothing was asked yet. It is quiet prose rather than a
 /// panel, because a panel here would draw the eye to the one place on the
 /// screen with nothing in it.
-pub(crate) fn invitation(sentence: &'static str) -> AnyView {
+pub(crate) fn invitation(sentence: String) -> AnyView {
     view! { <p class="fui-muted">{sentence}</p> }.into_any()
 }

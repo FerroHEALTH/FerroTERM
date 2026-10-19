@@ -1,4 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
+
 //! The page tree the server renders and the browser hydrates.
 //!
 //! The document carries the reader's theme and density, written by the server

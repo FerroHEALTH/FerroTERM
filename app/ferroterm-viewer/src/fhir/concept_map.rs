@@ -17,6 +17,7 @@ use crate::fhir::facts::first_named;
 use crate::fhir::facts::flag;
 use crate::fhir::facts::named;
 use crate::fhir::searchset::Published;
+use crate::locale::Msg;
 
 /// The `ConceptMap` a root publishes, as the screen draws it.
 ///
@@ -219,18 +220,18 @@ impl PublishedConceptMap {
     /// The facts the screen draws, in a fixed order.
     pub(crate) fn facts(&self) -> Vec<Fact> {
         vec![
-            fact("Name", self.name.as_deref()),
-            fact("Title", self.title.as_deref()),
-            fact("Version", self.version.as_deref()),
-            fact("Status", self.status.as_deref()),
-            fact("Experimental", flag(self.experimental)),
-            fact("Publisher", self.publisher.as_deref()),
-            fact("Last changed", self.date.as_deref()),
-            fact("Description", self.description.as_deref()),
-            fact("Purpose", self.purpose.as_deref()),
-            fact("Translates from", self.source_scope()),
-            fact("Translates to", self.target_scope()),
-            fact("Groups", counted(self.group_count()).as_deref()),
+            fact(Msg::Name, self.name.as_deref()),
+            fact(Msg::Title, self.title.as_deref()),
+            fact(Msg::Version, self.version.as_deref()),
+            fact(Msg::Status, self.status.as_deref()),
+            fact(Msg::Experimental, flag(self.experimental)),
+            fact(Msg::Publisher, self.publisher.as_deref()),
+            fact(Msg::LastChanged, self.date.as_deref()),
+            fact(Msg::Description2, self.description.as_deref()),
+            fact(Msg::Purpose, self.purpose.as_deref()),
+            fact(Msg::TranslatesFrom, self.source_scope()),
+            fact(Msg::TranslatesTo, self.target_scope()),
+            fact(Msg::Groups, counted(self.group_count()).as_deref()),
         ]
     }
 
@@ -339,7 +340,7 @@ mod tests {
         resource
             .facts()
             .into_iter()
-            .find(|fact| fact.label == label)
+            .find(|fact| crate::locale::tr(fact.label) == label)
             .expect("the screen draws a row for every fact it names")
             .value
     }
@@ -408,19 +409,22 @@ mod tests {
         let resource = parse(R5_SHAPE);
         assert_eq!(value_of(&resource, "Purpose"), None);
         assert!(
-            resource.facts().iter().any(|fact| fact.label == "Purpose"),
+            resource
+                .facts()
+                .iter()
+                .any(|fact| crate::locale::tr(fact.label) == "Purpose"),
             "the row is drawn so the screen can state the absence"
         );
     }
 
     #[test]
     fn the_facts_render_in_the_same_order_for_every_resource() {
-        let rich: Vec<&'static str> = parse(R4_SHAPE)
+        let rich: Vec<Msg> = parse(R4_SHAPE)
             .facts()
             .into_iter()
             .map(|f| f.label)
             .collect();
-        let bare: Vec<&'static str> = PublishedConceptMap::default()
+        let bare: Vec<Msg> = PublishedConceptMap::default()
             .facts()
             .into_iter()
             .map(|f| f.label)

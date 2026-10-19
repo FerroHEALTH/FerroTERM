@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::fhir::error::FhirError;
+use crate::locale::{Msg, tr_with};
 
 /// The resource elements the viewer reads back off a write or a history read.
 ///
@@ -256,7 +257,7 @@ fn strong_tag_of(etag: &str) -> &str {
 
 /// The `If-Match` header value for a resource at `version_id`.
 pub(crate) fn if_match(version_id: &str) -> String {
-    format!("W/\"{version_id}\"")
+    tr_with(Msg::W, &[("version_id", (version_id).to_string().into())])
 }
 
 /// Why a write did not happen, in the terms a screen acts on.
@@ -302,15 +303,13 @@ impl Refusal {
     ///
     /// The server's wording is rendered verbatim either way; this says what
     /// the reader can do about it, which the outcome does not.
-    pub(crate) fn what_to_do(self) -> &'static str {
+    pub(crate) fn what_to_do(self) -> Msg {
         match self {
-            Self::SignInRequired => "Sign in again to make this change.",
-            Self::NotPermitted => "This account does not carry the permission for this change.",
-            Self::ConcurrentEdit => {
-                "Someone else changed this resource since it was opened. Reload it and apply the change again."
-            }
-            Self::Rejected => "The server refused the change, in its own words below.",
-            Self::NoAnswer => "The server did not answer. The request is below, to retry by hand.",
+            Self::SignInRequired => Msg::SignAgainMakeChange,
+            Self::NotPermitted => Msg::AccountDoesNotCarryPermissionChange,
+            Self::ConcurrentEdit => Msg::SomeoneElseChangedResourceSinceWas,
+            Self::Rejected => Msg::ServerRefusedChangeOwnWordsBelow,
+            Self::NoAnswer => Msg::ServerDidNotAnswerRequestBelow,
         }
     }
 }
@@ -377,7 +376,7 @@ mod tests {
             Refusal::NoAnswer,
         ] {
             assert!(
-                !refusal.what_to_do().is_empty(),
+                !crate::locale::tr(refusal.what_to_do()).is_empty(),
                 "{refusal:?} renders as nothing"
             );
         }

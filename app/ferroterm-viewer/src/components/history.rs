@@ -9,6 +9,7 @@
 use leptos::prelude::*;
 
 use crate::fhir::version::FhirVersion;
+use crate::locale::{Msg, tr};
 use crate::routes::history_link;
 use crate::styles;
 
@@ -26,7 +27,7 @@ pub(crate) fn history_offer(
         <Show when=move || !id.read().trim().is_empty() fallback=|| ()>
             <p class="mt-default">
                 <a href=address class=styles::LINK>
-                    "History of this resource"
+                    {tr(Msg::HistoryOfThisResource)}
                 </a>
             </p>
         </Show>

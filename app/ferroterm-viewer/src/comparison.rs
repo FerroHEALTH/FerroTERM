@@ -12,6 +12,7 @@ use crate::fhir::capability::CapabilityStatement;
 use crate::fhir::capability::OperationDeclaration;
 use crate::fhir::error::FhirError;
 use crate::fhir::version::FhirVersion;
+use crate::locale::{Msg, tr, tr_with};
 
 /// What one root answered when the screen asked for its capability statement.
 #[derive(Clone, Debug)]
@@ -59,18 +60,20 @@ impl RootAnswer {
     }
 
     /// The one word a column header carries about this root's state.
-    fn state(&self) -> &'static str {
+    fn state(&self) -> String {
         match self {
-            Self::Declared(_) => ANSWERED,
-            Self::Absent => "not served",
-            Self::Refused(_) => "refused",
-            Self::Unread => "not read",
+            Self::Declared(_) => tr(Msg::StateAnswered),
+            Self::Absent => tr(Msg::NotServed),
+            Self::Refused(_) => tr(Msg::StateRefusedWord),
+            Self::Unread => tr(Msg::NotRead),
         }
     }
-}
 
-/// The word a column carries when its root answered its capability statement.
-const ANSWERED: &str = "answered";
+    /// Whether the root answered.
+    const fn answered(&self) -> bool {
+        matches!(self, Self::Declared(_))
+    }
+}
 
 /// One cell of the comparison, in the words the reader sees.
 ///
@@ -95,7 +98,7 @@ pub(crate) struct RootColumn {
     /// The release the root declared, absent when it declared none.
     pub(crate) fhir_version: Option<String>,
     /// The one word the header carries about the read.
-    pub(crate) state: &'static str,
+    pub(crate) state: String,
 }
 
 /// One row of the comparison, with one cell per root, in column order.
@@ -152,8 +155,8 @@ fn facts(answers: &[(FhirVersion, RootAnswer)]) -> Vec<Row> {
             .collect(),
     };
     vec![
-        row("Software", &CapabilityStatement::software_line),
-        row("What the root says it serves", &|statement| {
+        row(&tr(Msg::Software), &CapabilityStatement::software_line),
+        row(&tr(Msg::WhatRootSaysServes), &|statement| {
             statement.description.clone()
         }),
     ]
@@ -221,7 +224,7 @@ fn operation_label(resource: &str, code: &str) -> String {
 /// The levels one declared operation is answered at, as a reader reads them.
 fn levels_of(operation: &OperationDeclaration) -> String {
     if operation.levels.is_empty() {
-        return "declared".to_owned();
+        return tr(Msg::StateDeclared);
     }
     operation.levels.join(", ")
 }
@@ -230,12 +233,18 @@ fn levels_of(operation: &OperationDeclaration) -> String {
 pub(crate) fn state_sentence(answers: &[(FhirVersion, RootAnswer)]) -> String {
     let answered = answers
         .iter()
-        .filter(|(_, answer)| answer.state() == ANSWERED)
+        .filter(|(_, answer)| answer.answered())
         .count();
-    let sentence = format!("{answered} of {} roots answered", answers.len());
+    let sentence = tr_with(
+        Msg::OfRootsAnswered,
+        &[
+            ("answered", (answered).to_string().into()),
+            ("answers", (answers.len()).to_string().into()),
+        ],
+    );
     let rest: Vec<String> = answers
         .iter()
-        .filter(|(_, answer)| answer.state() != ANSWERED)
+        .filter(|(_, answer)| !answer.answered())
         .map(|(version, answer)| format!("{} {}", version.label(), answer.state()))
         .collect();
     if rest.is_empty() {

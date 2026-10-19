@@ -34,14 +34,13 @@ use leptos_router::NavigateOptions;
 use leptos_router::hooks::use_navigate;
 use leptos_router::hooks::use_query_map;
 
-use crate::components::NOT_DECLARED;
 use crate::components::failure::Failure;
 use crate::components::icon;
+use crate::components::not_declared;
 use crate::components::reading::Reading;
 use crate::components::shell::SelectedVersion;
 use crate::fhir::CODE_SYSTEM;
 use crate::fhir::FhirClient;
-use crate::fhir::concept::CHILD_OF_OPERATOR;
 use crate::fhir::concept::CODE_PARAMETER;
 use crate::fhir::concept::ChildOf;
 use crate::fhir::concept::Concept;
@@ -58,6 +57,7 @@ use crate::fhir::named::Choice;
 use crate::fhir::terminology::TerminologyCapabilities;
 use crate::fhir::terminology::VersionRow;
 use crate::fhir::version::FhirVersion;
+use crate::locale::{Msg, tr, tr_with};
 use crate::offers::choices;
 use crate::offers::published;
 use crate::paging::MAX_COUNT;
@@ -127,15 +127,15 @@ pub(crate) fn BrowsePage() -> impl IntoView {
     });
 
     let heading = view! {
-        <Title text="Browse concepts" />
+        <Title text=tr(Msg::BrowseConcepts) />
         <div>
             {page_heading(
                 Header {
-                    title: String::from("Browse concepts"),
+                    title: tr(Msg::BrowseConcepts),
                     subtitle: Some(
-                        String::from("Search a code system, read a concept, walk its hierarchy."),
+                        tr(Msg::SearchCodeSystemReadConceptWalk),
                     ),
-                    crumbs: vec![Crumb::new("Code systems", "/systems")],
+                    crumbs: vec![Crumb::new(tr(Msg::CodeSystems), "/systems")],
                     mono: false,
                 },
                 (),
@@ -158,7 +158,7 @@ pub(crate) fn BrowsePage() -> impl IntoView {
     // own content, and one stack below it. The order is the order of the work:
     // search for a concept, walk what is under it, read the one you landed on.
     let settings = card(
-        "What is browsed",
+        tr(Msg::WhatIsBrowsed),
         view! {
             {picker}
             {system}
@@ -170,9 +170,9 @@ pub(crate) fn BrowsePage() -> impl IntoView {
                 {heading}
                 {settings}
                 {three_panes(
-                    Pane::new("Search", search),
-                    Pane::new("Below this concept", tree),
-                    Pane::new("The concept", concept),
+                    Pane::new(tr(Msg::Search), search),
+                    Pane::new(tr(Msg::BelowThisConcept), tree),
+                    Pane::new(tr(Msg::TheConcept), concept),
                 )}
             },
         )}
@@ -412,7 +412,7 @@ fn system_section(
         view! {
             <section class="fui-stack" aria-labelledby="browse-system-heading">
                 <h2 id="browse-system-heading" class="fui-sr-only">
-                    "The code system being browsed"
+                    {tr(Msg::CodeSystemBeingBrowsed)}
                 </h2>
                 <p class="fui-mono break-all">
                     {move || {
@@ -423,7 +423,7 @@ fn system_section(
                             })
                     }}
                 </p>
-                <Reading label="Reading the terminology capabilities">
+                <Reading label=&{tr(Msg::ReadingTheTerminologyCapabilities)}>
                     {move || {
                         capabilities
                             .with(|answered| {
@@ -436,7 +436,7 @@ fn system_section(
                                                     Some(row) => version_view(row, &declared.hierarchy),
                                                     None => {
                                                         note(
-                                                            "This root's terminology capabilities declare no such code system, or no such version of it. Another FHIR version may serve it, so try the version switcher above.",
+                                                            tr(Msg::RootSTerminologyCapabilitiesDeclareNo),
                                                         )
                                                     }
                                                 })
@@ -459,25 +459,24 @@ fn version_view(row: &VersionRow, hierarchy: &Hierarchy) -> AnyView {
     let code = row
         .code
         .clone()
-        .unwrap_or_else(|| format!("Version {NOT_DECLARED}"));
+        .unwrap_or_else(|| tr_with(Msg::Version2, &[("not_declared", not_declared().into())]));
     let walk = match hierarchy {
-        Hierarchy::Walkable { property } => format!(
-            "This version declares the {CHILD_OF_OPERATOR} operator on the {property} filter, so the tree below walks one level at a time."
+        Hierarchy::Walkable { property } => tr_with(
+            Msg::VersionDeclaresOperatorFilterSoTree,
+            &[("property", (property).clone().into())],
         ),
-        Hierarchy::WithoutChildren { operators } => format!(
-            "This version declares the hierarchy operators {}, and none of them selects the direct children of a code, so the concepts read as a flat list.",
-            operators.join(", ")
+        Hierarchy::WithoutChildren { operators } => tr_with(
+            Msg::VersionDeclaresHierarchyOperatorsNoneThem,
+            &[("operators", (operators.join(", ")).clone().into())],
         ),
-        Hierarchy::Absent => String::from(
-            "This version declares no hierarchy filter operator, so its concepts are a flat list and there is no tree to walk.",
-        ),
+        Hierarchy::Absent => tr(Msg::VersionDeclaresNoHierarchyFilterOperator),
     };
     definitions(vec![
         (
-            "Version",
+            tr(Msg::Version),
             view! { <span class="fui-mono">{code}</span> }.into_any(),
         ),
-        ("Hierarchy", walk.into_any()),
+        (tr(Msg::Hierarchy), walk.into_any()),
     ])
     .into_any()
 }
@@ -523,16 +522,14 @@ fn language_view(
                 prop:value=move || params.with(|params| params.language.clone())
                 on:change=change
             >
-                <option value="">"The server's own choice"</option>
+                <option value="">{tr(Msg::ServerSOwnChoice)}</option>
                 {options}
             </select>
         };
         field(
             "browse-language",
-            "Display language",
-            Some(
-                "The languages this version declares. The choice is sent as displayLanguage on every operation this screen calls.",
-            ),
+            tr(Msg::DisplayLanguage),
+            Some(tr(Msg::LanguagesVersionDeclaresChoiceSentDisplaylanguage)),
             select,
         )
         .into_any()
@@ -541,7 +538,7 @@ fn language_view(
         {move || {
             if offered.with(Vec::is_empty) {
                 note(
-                    "This version declares no designation language, so the server chooses the display and no language is sent.",
+                    tr(Msg::VersionDeclaresNoDesignationLanguageSo),
                 )
             } else {
                 picker()
@@ -609,14 +606,14 @@ fn search_section(
         view! {
             <section class="fui-stack" aria-labelledby="browse-search-heading">
                 <h2 id="browse-search-heading" class="fui-card-title">
-                    "Search"
+                    {tr(Msg::Search)}
                 </h2>
                 <form role="search" on:submit=submit>
                     {ferrohealth_ui::view::form::field(
                         "browse-filter",
-                        "Filter",
+                        tr(Msg::Filter),
                         Some(
-                            "Sent as the filter parameter of $expand over a value set that selects this code system. An empty filter lists the first concepts the server answers.",
+                            tr(Msg::SentFilterParameterExpandOverValue),
                         ),
                         view! {
                             <div class="fui-search">
@@ -631,7 +628,7 @@ fn search_section(
                                 />
                                 <button type="submit" class=Variant::Primary.class()>
                                     {ferrohealth_ui::icon::icon(icon::SEARCH, "16")}
-                                    "Search"
+                                    {tr(Msg::Search)}
                                 </button>
                             </div>
                         },
@@ -640,7 +637,7 @@ fn search_section(
                 <p aria-live="polite" class="fui-muted fui-small">
                     <Transition fallback=|| ()>{announcement}</Transition>
                 </p>
-                <Reading label="Searching the code system">
+                <Reading label=&{tr(Msg::SearchingTheCodeSystem)}>
                     {move || {
                         let params = params.get();
                         let version = version.get();
@@ -670,11 +667,15 @@ fn found_sentence(concepts: &[ConceptRow], count: u32) -> String {
     let found = concepts.len();
     let whole = u32::try_from(found).unwrap_or(u32::MAX) >= count;
     match (found, whole) {
-        (0, _) => String::from("No concept matched."),
-        (1, _) => String::from("1 concept matched."),
-        (found, false) => format!("{found} concepts matched."),
-        (found, true) => format!(
-            "{found} concepts, which is the whole page this screen asked for. Narrow the filter to see fewer."
+        (0, _) => tr(Msg::NoConceptMatched),
+        (1, _) => tr(Msg::N1ConceptMatched),
+        (found, false) => tr_with(
+            Msg::ConceptsMatched,
+            &[("found", (found).to_string().into())],
+        ),
+        (found, true) => tr_with(
+            Msg::ConceptsWhichWholePageScreenAsked,
+            &[("found", (found).to_string().into())],
         ),
     }
 }
@@ -682,16 +683,15 @@ fn found_sentence(concepts: &[ConceptRow], count: u32) -> String {
 /// The concepts a search answered, as a list that reads each one.
 fn matches_view(concepts: &[ConceptRow], params: &BrowseParams, version: FhirVersion) -> AnyView {
     if concepts.is_empty() {
-        return note("No concept matched this filter in this code system.");
+        return note(tr(Msg::NoConceptMatchedFilterCodeSystem));
     }
     let items: Vec<AnyView> = concepts
         .iter()
         .map(|concept| {
             let target = params.rooted_at(&concept.code).address(version);
-            let display = concept
-                .display
-                .clone()
-                .unwrap_or_else(|| format!("Display {NOT_DECLARED}"));
+            let display = concept.display.clone().unwrap_or_else(|| {
+                tr_with(Msg::Display2, &[("not_declared", not_declared().into())])
+            });
             let code = concept.code.clone();
             let inactive = concept.inactive.then(|| String::from(" (inactive)"));
             view! {
@@ -701,7 +701,7 @@ fn matches_view(concepts: &[ConceptRow], params: &BrowseParams, version: FhirVer
             .into_any()
         })
         .collect();
-    divided_list(Some("Concepts the search matched"), items)
+    divided_list(Some(tr(Msg::ConceptsTheSearchMatched).into()), items)
 }
 
 /// The concept the address names, as `$lookup` answers it.
@@ -740,7 +740,7 @@ fn concept_section(
 
     let answered = move || {
         view! {
-            <Reading label="Reading the concept">
+            <Reading label=&{tr(Msg::ReadingTheConcept)}>
                 {move || {
                     let version = version.get();
                     let walked = declared.with(|declared| declared.hierarchy.walk().is_some());
@@ -749,7 +749,7 @@ fn concept_section(
                             answered
                                 .as_ref()
                                 .map(|answer| match answer {
-                                    None => busy("Reading the concept", Busy::Section).into_any(),
+                                    None => busy(tr(Msg::ReadingTheConcept), Busy::Section).into_any(),
                                     Some((asked, Ok(value))) => {
                                         params
                                             .with(|params| {
@@ -774,14 +774,14 @@ fn concept_section(
         view! {
             <section class="fui-stack" aria-labelledby="browse-concept-heading">
                 <h2 id="browse-concept-heading" class="fui-card-title">
-                    "The concept"
+                    {tr(Msg::TheConcept)}
                 </h2>
                 {move || {
                     if asked.get() {
                         answered()
                     } else {
                         note(
-                            "Choose a concept from the search results to read its designations and properties.",
+                            tr(Msg::ChooseConceptFromSearchResultsRead),
                         )
                     }
                 }}
@@ -810,31 +810,41 @@ fn concept_view(
     let display = concept
         .display
         .clone()
-        .unwrap_or_else(|| format!("Display {NOT_DECLARED}"));
+        .unwrap_or_else(|| tr_with(Msg::Display3, &[("not_declared", not_declared().into())]));
     let code = code.to_owned();
     let held = concept.version.clone().map_or_else(
-        || format!("Read from a version this server did not name, of the system {NOT_DECLARED}"),
-        |version| format!("Read from version {version}"),
+        || {
+            tr_with(
+                Msg::ReadFromVersionServerDidNot,
+                &[("not_declared", not_declared().into())],
+            )
+        },
+        |version| {
+            tr_with(
+                Msg::ReadFromVersion,
+                &[("version", (version).clone().into())],
+            )
+        },
     );
     let parents = links_view(
-        "Parents",
-        "This server declares no parent for this concept.",
+        tr(Msg::Parents),
+        tr(Msg::ServerDeclaresNoParentConcept),
         &concept.parents(),
         params,
         version,
     );
     let children = (!walked).then(|| {
         links_view(
-            "Children",
-            "This server declares no child for this concept.",
+            tr(Msg::Children),
+            tr(Msg::ServerDeclaresNoChildConcept),
             &concept.children(),
             params,
             version,
         )
     });
     let designations = table_view(
-        "Designations",
-        ["Term", "Language", "Use"],
+        &tr(Msg::Designations),
+        [tr(Msg::Term), tr(Msg::Language), tr(Msg::Use)],
         concept
             .designations
             .iter()
@@ -846,11 +856,11 @@ fn concept_view(
                 ]
             })
             .collect(),
-        "This server holds no designation for this concept.",
+        tr(Msg::ServerHoldsNoDesignationConcept),
     );
     let properties = table_view(
-        "Properties",
-        ["Property", "Value", "Meaning"],
+        &tr(Msg::Properties),
+        [tr(Msg::Property), tr(Msg::Value), tr(Msg::Meaning)],
         concept
             .properties
             .iter()
@@ -862,7 +872,7 @@ fn concept_view(
                 ]
             })
             .collect(),
-        "This server answers no property for this concept.",
+        tr(Msg::ServerAnswersNoPropertyConcept),
     );
     view! {
         <div>
@@ -880,8 +890,8 @@ fn concept_view(
 
 /// A set of related codes, as links that move the tree onto each one.
 fn links_view(
-    label: &'static str,
-    absent: &'static str,
+    label: String,
+    absent: String,
     codes: &[String],
     params: &BrowseParams,
     version: FhirVersion,
@@ -902,8 +912,9 @@ fn links_view(
             .into_any()
         })
         .collect();
+    let named = tr_with(Msg::OfThisConcept, &[("label", label.clone().into())]);
     view! {
-        <nav aria-label=format!("{label} of this concept") class="fui-stack">
+        <nav aria-label=named class="fui-stack">
             <p class="fui-label">{label}</p>
             {cluster(links)}
         </nav>
@@ -916,18 +927,18 @@ fn links_view(
 /// A cell the server left empty states its absence rather than reading as a
 /// gap the screen failed to fill.
 fn table_view(
-    caption: &'static str,
-    headers: [&'static str; 3],
+    caption: &str,
+    headers: [String; 3],
     rows: Vec<[String; 3]>,
-    absent: &'static str,
+    absent: String,
 ) -> AnyView {
     let [first, second, third] = headers;
     // A last column no row fills says nothing, so it is not drawn.
     let columns = filled_columns(
         &[
             Column::text("first", first),
-            Column::text("second", second),
-            Column::text("third", third),
+            Column::text("second", second.clone()),
+            Column::text("third", third.clone()),
         ],
         &rows,
         &["first", "second"],
@@ -935,14 +946,14 @@ fn table_view(
     );
     let thirds = columns.len() == 3;
     let body = if rows.is_empty() {
-        Body::Empty(empty_quiet(icon::BROWSE, "Nothing declared", absent).into_any())
+        Body::Empty(empty_quiet(icon::BROWSE, tr(Msg::NothingDeclared), absent).into_any())
     } else {
         Body::Rows(
             rows.into_iter()
                 .map(|cells| {
                     let [head, middle, tail] = cells.map(|cell| {
                         if cell.is_empty() {
-                            NOT_DECLARED.to_owned()
+                            not_declared().clone()
                         } else {
                             cell
                         }
@@ -950,11 +961,11 @@ fn table_view(
                     view! {
                         <tr>
                             <th scope="row">{head}</th>
-                            <td data-label=second>{middle}</td>
+                            <td data-label=second.clone()>{middle}</td>
                             {thirds
                                 .then(|| {
                                     view! {
-                                        <td data-label=third class="fui-muted">
+                                        <td data-label=third.clone() class="fui-muted">
                                             {tail}
                                         </td>
                                     }
@@ -1154,7 +1165,7 @@ fn tree_section(
         tree_view_collapsing(
             Tree {
                 id: "browse-tree",
-                label: "The concepts below this one",
+                label: tr(Msg::ConceptsBelowOne).into(),
                 nodes: Signal::stored(nodes),
                 expanded: RwSignal::new(open),
                 selected: Signal::stored((!selected.is_empty()).then_some(selected)),
@@ -1179,21 +1190,21 @@ fn tree_pane(
     view! {
         <section class="fui-stack" aria-labelledby="browse-tree-heading">
             <h2 id="browse-tree-heading" class="fui-card-title">
-                "Below this concept"
+                {tr(Msg::BelowThisConcept)}
             </h2>
-            <p class="fui-help">"Arrow keys walk it. Enter reads the concept."</p>
-            <Reading label="Reading the children">
+            <p class="fui-help">{tr(Msg::ArrowKeysWalkEnterReadsConcept)}</p>
+            <Reading label=&{tr(Msg::ReadingTheChildren)}>
                 {move || {
                     let Some(rows) = drawn.get() else {
-                        return busy("Reading the children", Busy::Section).into_any();
+                        return busy(tr(Msg::ReadingTheChildren), Busy::Section).into_any();
                     };
                     if rows.is_empty() {
                         return view! {
                             <div id="browse-tree-empty">
                                 {empty_quiet(
                                     icon::BROWSE,
-                                    "Nothing below",
-                                    "This server answers no child for this concept.",
+                                    tr(Msg::NothingBelow),
+                                    tr(Msg::ServerAnswersNoChildConcept),
                                 )}
                             </div>
                         }
@@ -1220,13 +1231,14 @@ fn nested(
     rows.iter()
         .filter(|row| row.parent.as_deref() == parent)
         .map(|row| {
-            let display = row
-                .concept
-                .display
-                .clone()
-                .unwrap_or_else(|| format!("Display {NOT_DECLARED}"));
+            let display = row.concept.display.clone().unwrap_or_else(|| {
+                tr_with(Msg::Display4, &[("not_declared", not_declared().into())])
+            });
             let label = if row.open && partial.contains(&row.concept.code) {
-                format!("{display} (more children than this page size asked for)")
+                tr_with(
+                    Msg::MoreChildrenThanPageSizeAsked,
+                    &[("display", (display).clone().into())],
+                )
             } else {
                 display
             };
@@ -1320,15 +1332,15 @@ fn system_picker(
             prop:value=move || params.with(|params| params.system.clone())
             on:change=choose
         >
-            <option value="">"Choose a code system"</option>
+            <option value="">{tr(Msg::ChooseACodeSystem)}</option>
             {offered}
         </select>
     };
-    field("browse-system", "Code system", None, select).into_any()
+    field("browse-system", tr(Msg::CodeSystem2), None, select).into_any()
 }
 
 /// A sentence stating what the server did not declare.
-fn note(text: &'static str) -> AnyView {
+fn note(text: String) -> AnyView {
     crate::components::state::invitation(text)
 }
 

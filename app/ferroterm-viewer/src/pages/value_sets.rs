@@ -35,6 +35,7 @@ use crate::listing::pager_view;
 use crate::listing::published_row;
 use crate::listing::published_table;
 use crate::listing::window;
+use crate::locale::{Msg, message, tr};
 use crate::routes::VALUE_SETS_PATH;
 use crate::routes::expansion_link;
 use crate::routes::resource_link;
@@ -67,13 +68,11 @@ pub(crate) fn ValueSetsPage() -> impl IntoView {
             .into();
 
     let heading = view! {
-        <Title text="Value sets" />
+        <Title text=tr(Msg::ValueSets) />
         {page_header(
-            "Value sets",
+            tr(Msg::ValueSets),
             Some(
-                String::from(
-                    "The ValueSet resources this server publishes. Open one to see what it selects.",
-                ),
+                tr(Msg::ValuesetResourcesServerPublishesOpenOne),
             ),
             (),
         )}
@@ -132,7 +131,7 @@ fn search_form(params: Signal<ListParams>, version: Signal<FhirVersion>) -> AnyV
         );
     };
     filter_form(
-        "The url search parameter, matched against ValueSet.url.",
+        &tr(Msg::UrlSearchParameterMatchedAgainstValueset),
         canonical,
         resource_version,
         params,
@@ -171,7 +170,7 @@ fn list_section(
                 .and_then(|result| result.as_ref().ok())
                 .map(|found| {
                     let view = window(params.page(), params.size(), found.matched());
-                    count_sentence(view, "value sets", found.total())
+                    count_sentence(view, &tr(Msg::ValueSets2), found.total())
                 })
                 .unwrap_or_default()
         })
@@ -181,13 +180,13 @@ fn list_section(
         <section class="fui-card fui-panel" aria-labelledby="valuesets-heading">
             <div class="fui-panel-head">
                 <h2 id="valuesets-heading" class="fui-card-title">
-                    "What this root holds"
+                    {tr(Msg::WhatThisRootHolds)}
                 </h2>
                 <p aria-live="polite" class="fui-muted fui-small">
                     <Transition fallback=|| ()>{announcement}</Transition>
                 </p>
             </div>
-            <Reading label="Reading the value sets">
+            <Reading label=&{tr(Msg::ReadingTheValueSets)}>
                 {move || {
                     let params = params.get();
                     let version = version.get();
@@ -216,9 +215,7 @@ fn list_view(
 ) -> AnyView {
     let resources = found.found();
     if resources.is_empty() {
-        return empty(
-            "This root holds no ValueSet resource matching the filter above. A value set a code system defines implicitly is not published as a resource, and the expansion runner takes its canonical directly.",
-        );
+        return empty(tr(Msg::RootHoldsNoValuesetResourceMatching));
     }
     // The whole answer is ordered before it is paged, so a walk through the
     // pages walks the order the reader asked for rather than the server's.
@@ -236,7 +233,7 @@ fn list_view(
         .map(|resource| row_view(resource, version))
         .collect();
     let pager = pager_view(
-        Listing::new("Value set pages").noun(Noun::new("value set", "value sets")),
+        Listing::new(tr(Msg::ValueSetPages)).noun(Noun::new(message(Msg::NounValueSets))),
         view,
         params,
         VALUE_SETS_PATH,
@@ -245,8 +242,8 @@ fn list_view(
     );
     view! {
         {published_table(
-            "Value sets this root holds",
-            "Value set",
+            &tr(Msg::ValueSetsRootHolds),
+            tr(Msg::ValueSet),
             rows,
             order,
             params,
@@ -278,7 +275,7 @@ fn row_view(resource: &PublishedValueSet, version: FhirVersion) -> AnyView {
         // The runner takes the canonical as its `url` parameter, so a row
         // hands its subject on rather than making a reader retype one.
         resource.url().map(|canonical| Action {
-            label: "Expand",
+            label: tr(Msg::Expand),
             href: expansion_link(canonical, version),
         }),
     )

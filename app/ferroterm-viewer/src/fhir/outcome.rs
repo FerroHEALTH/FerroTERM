@@ -4,6 +4,7 @@
 //! a whole FHIR resource, because a viewer that re-models the specification
 //! stops being a demonstration that the public API is complete.
 
+use crate::locale::{Msg, tr};
 use serde::{Deserialize, Serialize};
 
 /// The refusal a FHIR server returns, as the viewer reads it.
@@ -135,7 +136,7 @@ impl OperationOutcome {
                     .as_ref()
                     .and_then(|details| details.text.clone())
                     .or_else(|| issue.diagnostics.clone())
-                    .unwrap_or_else(|| "the server sent no diagnostic".to_owned()),
+                    .unwrap_or_else(|| tr(Msg::ServerSentNoDiagnostic).clone()),
                 details: issue
                     .details
                     .as_ref()

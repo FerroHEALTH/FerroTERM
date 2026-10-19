@@ -5,6 +5,7 @@ use leptos::prelude::*;
 
 use crate::fhir::error::FhirError;
 use crate::fhir::outcome::OperationOutcome;
+use crate::locale::{Msg, tr};
 
 /// The severity a FHIR `issue.severity` code names (the `IssueSeverity` value
 /// set, <https://hl7.org/fhir/R4B/valueset-issue-severity.html>); a code it
@@ -39,11 +40,9 @@ pub(crate) fn refusal_of(error: &FhirError) -> Refusal {
     Refusal {
         status: error.status().map(|status| status.as_u16()),
         summary: match error {
-            FhirError::Refused { .. } | FhirError::Status { .. } => {
-                String::from("The server refused the request")
-            }
-            FhirError::Transport { .. } => String::from("The request got no answer"),
-            FhirError::Decode { .. } => String::from("The answer did not read"),
+            FhirError::Refused { .. } | FhirError::Status { .. } => tr(Msg::ServerRefusedRequest),
+            FhirError::Transport { .. } => tr(Msg::RequestGotNoAnswer),
+            FhirError::Decode { .. } => tr(Msg::AnswerDidNotRead),
         },
         issues: error.outcome().map(issues).unwrap_or_default(),
         request: Some(error.url().to_owned()),

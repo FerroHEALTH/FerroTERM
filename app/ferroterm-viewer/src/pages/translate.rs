@@ -12,16 +12,16 @@ use leptos_router::NavigateOptions;
 use leptos_router::hooks::use_navigate;
 use leptos_router::hooks::use_query_map;
 
-use crate::components::NOT_DECLARED;
 use crate::components::failure::Failure;
-use crate::components::field::CANONICAL_WORDS;
 use crate::components::field::Field;
-use crate::components::field::VERSION_WORDS;
+use crate::components::field::canonical_words;
 use crate::components::field::group;
 use crate::components::field::picked_field;
 use crate::components::field::text_field;
+use crate::components::field::version_words;
 use crate::components::field::versioned_row;
 use crate::components::icon;
+use crate::components::not_declared;
 use crate::components::reading::Reading;
 use crate::components::runs::History;
 use crate::components::shell::SelectedVersion;
@@ -37,6 +37,7 @@ use crate::fhir::translate::TranslateAnswer;
 use crate::fhir::translate::TranslateRequest;
 use crate::fhir::translate::TranslationMatch;
 use crate::fhir::version::FhirVersion;
+use crate::locale::{Msg, tr, tr_with};
 use crate::offers::choices;
 use crate::offers::published;
 use crate::offers::versions;
@@ -79,11 +80,13 @@ const CODE_PARAM: &str = "code";
 const TARGET_PARAM: &str = "target";
 
 /// The columns of the match table.
-const MATCH_COLUMNS: [Column; 3] = [
-    Column::text("target", "Target"),
-    Column::text("relation", "Relationship"),
-    Column::text("about", "What came with it"),
-];
+fn match_columns() -> [Column; 3] {
+    [
+        Column::text("target", tr(Msg::Target)),
+        Column::text("relation", tr(Msg::Relationship)),
+        Column::text("about", tr(Msg::WhatCameWithIt)),
+    ]
+}
 
 /// Runs `ConceptMap/$translate` and renders what the server answered.
 ///
@@ -107,13 +110,11 @@ pub(crate) fn TranslatePage() -> impl IntoView {
         Memo::new(move |_| query.with(|map| read_run(&|name| map.get(name)))).into();
 
     let heading = view! {
-        <Title text="Translate a code" />
+        <Title text=tr(Msg::TranslateACode) />
         {page_header(
-            "Translate a code",
+            tr(Msg::TranslateACode),
             Some(
-                String::from(
-                    "One code through the concept maps this server holds, from its $translate.",
-                ),
+                tr(Msg::OneCodeThroughConceptMapsServer),
             ),
             (),
         )}
@@ -125,7 +126,7 @@ pub(crate) fn TranslatePage() -> impl IntoView {
     let made = Memo::new(move |_| {
         run.with(|run| {
             run.runnable().then(|| Run {
-                screen: "Translate".to_owned(),
+                screen: tr(Msg::Translate).clone(),
                 subject: run.code.clone(),
                 address: address(run, version.get()),
             })
@@ -256,9 +257,9 @@ fn runner_section(
     view! {
         <section class="fui-card" aria-labelledby="translate-heading">
             <h2 id="translate-heading" class="fui-card-title">
-                "Parameters"
+                {tr(Msg::Parameters)}
             </h2>
-            <Reading label="Reading what this root can do">
+            <Reading label=&{tr(Msg::ReadingWhatRootCanDo)}>
                 {move || {
                     statement
                         .with(|answered| {
@@ -287,9 +288,7 @@ fn runner_section(
 
 /// The statement that this root does not declare the operation.
 fn undeclared_view() -> AnyView {
-    undeclared(
-        "This root's capability statement does not declare $translate on ConceptMap, so the runner is not offered here. Another FHIR version may declare it, so try the version switcher above.",
-    )
+    undeclared(tr(Msg::RootSCapabilityStatementDoesNot))
 }
 
 /// A control's own value, gated so an unrelated navigation cannot wipe an edit.
@@ -349,7 +348,7 @@ fn runner_form(
             <div class="fui-cluster">
                 <button type="submit" class=Variant::Primary.class()>
                     {ferrohealth_ui::icon::icon(icon::TRANSLATE, "16")}
-                    "Translate"
+                    {tr(Msg::Translate)}
                 </button>
                 {help_switch()}
             </div>
@@ -366,31 +365,31 @@ fn map_group(
     picks: Picks,
 ) -> AnyView {
     group(
-        "The map",
+        tr(Msg::TheMap),
         vec![versioned_row(vec![
             picked_field(
                 Field {
                     id: "translate-map",
                     name: MAP_PARAM,
-                    label: "Concept map",
-                    hint: "Sent as the url parameter. The list is what this root publishes. Left empty, the server picks the maps it holds for the code.",
+                    label: tr(Msg::ConceptMap),
+                    hint: tr(Msg::SentUrlParameterListWhatRoot),
                 },
                 map,
                 seeded(run, |run| run.concept_map.clone()),
                 picks.maps,
-                CANONICAL_WORDS,
+                canonical_words(),
             ),
             picked_field(
                 Field {
                     id: "translate-map-version",
                     name: MAP_VERSION_PARAM,
-                    label: "Concept map version",
-                    hint: "Sent as conceptMapVersion. The list is the versions this root published of the map named beside it.",
+                    label: tr(Msg::ConceptMapVersion),
+                    hint: tr(Msg::SentConceptmapversionListVersionsRootPublished),
                 },
                 map_version,
                 seeded(run, |run| run.concept_map_version.clone()),
                 picks.map_versions,
-                VERSION_WORDS,
+                version_words(),
             ),
         ])],
     )
@@ -405,40 +404,40 @@ fn code_group(
     picks: Picks,
 ) -> AnyView {
     group(
-        "The code",
+        tr(Msg::TheCode),
         vec![
             versioned_row(vec![
                 picked_field(
                     Field {
                         id: "translate-system",
                         name: SYSTEM_PARAM,
-                        label: "Code system",
-                        hint: "The system the code belongs to. The list is what this root publishes. The operation requires one with a code.",
+                        label: tr(Msg::CodeSystem2),
+                        hint: tr(Msg::SystemCodeBelongsListWhatRoot),
                     },
                     system,
                     seeded(run, |run| run.system.clone()),
                     picks.systems,
-                    CANONICAL_WORDS,
+                    canonical_words(),
                 ),
                 picked_field(
                     Field {
                         id: "translate-system-version",
                         name: SYSTEM_VERSION_PARAM,
-                        label: "Code system version",
-                        hint: "The list is the versions this root published of the code system named beside it. Left unnamed, the server resolves the code against its default version.",
+                        label: tr(Msg::CodeSystemVersion),
+                        hint: tr(Msg::ListVersionsRootPublishedCodeSystem),
                     },
                     system_version,
                     seeded(run, |run| run.system_version.clone()),
                     picks.system_versions,
-                    VERSION_WORDS,
+                    version_words(),
                 ),
             ]),
             text_field(
                 Field {
                     id: "translate-code",
                     name: CODE_PARAM,
-                    label: "Code",
-                    hint: "The code to translate, sent exactly as you type it. The operation needs this and the system together.",
+                    label: tr(Msg::Code),
+                    hint: tr(Msg::CodeTranslateSentExactlyYouType),
                 },
                 code,
                 seeded(run, |run| run.code.clone()),
@@ -450,18 +449,18 @@ fn code_group(
 /// Where the answer is allowed to land.
 fn target_group(run: Signal<TranslateRequest>, target: NodeRef<Input>, picks: Picks) -> AnyView {
     group(
-        "The target",
+        tr(Msg::TheTarget),
         vec![picked_field(
             Field {
                 id: "translate-target",
                 name: TARGET_PARAM,
-                label: "Target code system",
-                hint: "Narrows the answer to matches in this system. The list is what this root publishes. Left empty, every target the map reaches is returned.",
+                label: tr(Msg::TargetCodeSystem),
+                hint: tr(Msg::NarrowsAnswerMatchesSystemListWhat),
             },
             target,
             seeded(run, |run| run.target_system.clone()),
             picks.systems,
-            CANONICAL_WORDS,
+            canonical_words(),
         )],
     )
 }
@@ -510,13 +509,13 @@ fn answer_section(
             when=move || run.with(TranslateRequest::runnable)
             fallback=|| {
                 titled_panel(
-                    "The translation",
+                    tr(Msg::TheTranslation),
                     (),
                     panel_body(
                         empty_quiet(
                             icon::TRANSLATE,
-                            "Nothing translated yet",
-                            "Name a code and the system it belongs to, then translate it.",
+                            tr(Msg::NothingTranslatedYet),
+                            tr(Msg::NameCodeSystemBelongsThenTranslate),
                         ),
                     ),
                 )
@@ -537,13 +536,13 @@ fn answer_block(
         <section class="fui-card fui-panel" aria-labelledby="translate-answer-heading">
             <div class="fui-panel-head">
                 <h2 id="translate-answer-heading" class="fui-card-title">
-                    "The translation"
+                    {tr(Msg::TheTranslation)}
                 </h2>
                 <p aria-live="polite" class="fui-muted fui-small">
                     {move || announcement.get()}
                 </p>
             </div>
-            <Reading label="Running the translation">
+            <Reading label=&{tr(Msg::RunningTheTranslation)}>
                 {move || {
                     translated
                         .with(|answered| {
@@ -565,12 +564,12 @@ fn answer_block(
 /// The result, the message, and one block per reported match.
 fn answer_view(answer: &TranslateAnswer) -> AnyView {
     let (result, tone) = match answer.result() {
-        Some(true) => ("The server translated the code.".to_owned(), Tone::Ok),
-        Some(false) => (
-            "The server did not translate the code.".to_owned(),
-            Tone::Warn,
+        Some(true) => (tr(Msg::ServerTranslatedCode).clone(), Tone::Ok),
+        Some(false) => (tr(Msg::ServerDidNotTranslateCode).clone(), Tone::Warn),
+        None => (
+            tr_with(Msg::Result, &[("not_declared", not_declared().into())]),
+            Tone::Neutral,
         ),
-        None => (format!("Result {NOT_DECLARED}."), Tone::Neutral),
     };
     let message = answer.message().map(|message| view! { <p>{message}</p> });
     let verdict = notice(
@@ -589,14 +588,14 @@ fn answer_view(answer: &TranslateAnswer) -> AnyView {
     let table = if matches.is_empty() {
         panel_body(empty_quiet(
             icon::TRANSLATE,
-            "No match",
-            "The server reported no match for this code.",
+            tr(Msg::NoMatch),
+            tr(Msg::ServerReportedNoMatchCode),
         ))
         .into_any()
     } else {
         data_table(DataTable {
-            caption: "The matches the server reported",
-            columns: &MATCH_COLUMNS,
+            caption: &tr(Msg::MatchesServerReported),
+            columns: &match_columns(),
             sort: None,
             sort_href: &|_| String::new(),
             body: Body::Rows(matches.iter().map(match_row).collect_view().into_any()),
@@ -620,9 +619,9 @@ fn match_row(found: &TranslationMatch) -> AnyView {
     let target = found.target.as_ref().map_or_else(
         || {
             let words = if found.no_map {
-                "This code maps to nothing in the target".to_owned()
+                tr(Msg::CodeMapsNothingTarget).clone()
             } else {
-                format!("Target {NOT_DECLARED}")
+                tr_with(Msg::Target2, &[("not_declared", not_declared().into())])
             };
             view! { <span class="fui-muted">{words}</span> }.into_any()
         },
@@ -633,25 +632,24 @@ fn match_row(found: &TranslationMatch) -> AnyView {
         .into_iter()
         .map(|relation| {
             view! {
-                <span title=relation
-                    .label>{badge(relationship_tone(Some(&relation.code)), &relation.code)}</span>
+                <span title=tr(relation.label)>{badge(relationship_tone(Some(&relation.code)), &relation.code)}</span>
             }
             .into_any()
         })
         .collect();
     let relations = if relations.is_empty() {
-        view! { <span class="fui-muted">"none stated"</span> }.into_any()
+        view! { <span class="fui-muted">{tr(Msg::NoneStated)}</span> }.into_any()
     } else {
         cluster(relations).into_any()
     };
-    let facts: Vec<(&'static str, AnyView)> = [
+    let facts: Vec<(String, AnyView)> = [
         (
-            "From concept",
+            tr(Msg::FromConcept),
             found.source_concept.as_ref().map(Coding::rendered),
         ),
-        ("From map", found.origin_map.clone()),
-        ("Source comment", found.source_comment.clone()),
-        ("Target comment", found.target_comment.clone()),
+        (tr(Msg::FromMap), found.origin_map.clone()),
+        (tr(Msg::SourceComment), found.source_comment.clone()),
+        (tr(Msg::TargetComment), found.target_comment.clone()),
     ]
     .into_iter()
     .filter_map(|(label, value)| value.map(|value| (label, value)))
@@ -666,12 +664,12 @@ fn match_row(found: &TranslationMatch) -> AnyView {
     view! {
         <tr>
             <td>{target}</td>
-            <td data-label="Relationship">{relations}</td>
-            <td data-label="What came with it">
+            <td data-label=tr(Msg::Relationship)>{relations}</td>
+            <td data-label=tr(Msg::WhatCameWithIt)>
                 <div>
-                    {facts} {values_view("Also produces", &found.products)}
-                    {values_view("Depends on", &found.depends_on)}
-                    {values_view("Properties", &found.properties)}
+                    {facts} {values_view(tr(Msg::AlsoProduces), &found.products)}
+                    {values_view(tr(Msg::DependsOn), &found.depends_on)}
+                    {values_view(tr(Msg::Properties), &found.properties)}
                 </div>
             </td>
         </tr>
@@ -697,7 +695,7 @@ fn coding_cell(coding: &Coding) -> AnyView {
 }
 
 /// One list of named values a match carried, or nothing when it carried none.
-fn values_view(label: &'static str, values: &[NamedValue]) -> AnyView {
+fn values_view(label: String, values: &[NamedValue]) -> AnyView {
     if values.is_empty() {
         return ().into_any();
     }
@@ -705,7 +703,7 @@ fn values_view(label: &'static str, values: &[NamedValue]) -> AnyView {
         .iter()
         .map(|value| {
             let rendered = value.value.clone().map_or_else(
-                || "a value shape this viewer draws no text for".into_any(),
+                || tr(Msg::ValueShapeViewerDrawsNoText).into_any(),
                 crate::components::stated,
             );
             view! {
@@ -735,7 +733,7 @@ fn used_view(used: &[String]) -> AnyView {
         .map(|canonical| chip(canonical.clone()).into_any())
         .collect();
     panel_body(view! {
-        <p class="fui-label">"The maps the server used"</p>
+        <p class="fui-label">{tr(Msg::MapsServerUsed)}</p>
         {cluster(items)}
     })
     .into_any()
@@ -750,9 +748,9 @@ fn failure_view(error: &FhirError) -> AnyView {
 /// How many matches a translation reported, as a sentence.
 fn match_sentence(answer: &TranslateAnswer) -> String {
     match answer.matches().len() {
-        0 => "No matches.".to_owned(),
-        1 => "1 match.".to_owned(),
-        matches => format!("{matches} matches."),
+        0 => tr(Msg::NoMatches).clone(),
+        1 => tr(Msg::N1Match).clone(),
+        matches => tr_with(Msg::Matches, &[("matches", (matches).to_string().into())]),
     }
 }
 

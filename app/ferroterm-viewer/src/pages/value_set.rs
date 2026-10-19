@@ -15,10 +15,10 @@ use leptos_meta::Title;
 use leptos_router::hooks::use_params;
 use leptos_router::params::Params;
 
-use crate::components::NOT_DECLARED;
 use crate::components::detail::{current_tab, detail_tabs, json_pane};
 use crate::components::failure::Failure;
 use crate::components::icon;
+use crate::components::not_declared;
 use crate::components::reading::Reading;
 use crate::components::shell::{Console, SelectedVersion};
 use crate::fhir::error::FhirError;
@@ -27,31 +27,36 @@ use crate::fhir::value_set::{ClauseRow, PublishedValueSet};
 use crate::fhir::version::FhirVersion;
 use crate::fhir::{Document, FhirClient, VALUE_SET};
 use crate::listing::status_pill;
+use crate::locale::{Msg, tr, tr_with};
 use crate::routes::{editing_link, expansion_link, history_link};
 
 /// The tabs of the screen.
-const TABS: &[(&str, &str)] = &[
-    ("overview", "Definition"),
-    ("expansion", "Expansion"),
-    ("json", "JSON"),
+const TABS: &[(&str, Msg)] = &[
+    ("overview", Msg::Definition),
+    ("expansion", Msg::Expansion),
+    ("json", Msg::Json),
 ];
 
 /// How many codes the expansion tab shows before it leads to the runner.
 const PREVIEW_CODES: u32 = 25;
 
 /// The columns of the definition's clause table.
-const CLAUSE_COLUMNS: [Column; 3] = [
-    Column::text("clause", "Clause"),
-    Column::text("system", "Code system"),
-    Column::text("selects", "Selects"),
-];
+fn clause_columns() -> [Column; 3] {
+    [
+        Column::text("clause", tr(Msg::Clause)),
+        Column::text("system", tr(Msg::CodeSystem2)),
+        Column::text("selects", tr(Msg::Selects)),
+    ]
+}
 
 /// The columns of the expansion preview.
-const CODE_COLUMNS: [Column; 3] = [
-    Column::text("code", "Code"),
-    Column::text("display", "Display"),
-    Column::text("system", "System"),
-];
+fn code_columns() -> [Column; 3] {
+    [
+        Column::text("code", tr(Msg::Code)),
+        Column::text("display", tr(Msg::Display)),
+        Column::text("system", tr(Msg::System)),
+    ]
+}
 
 /// The path parameter this screen is addressed by.
 #[derive(Clone, Debug, Params, PartialEq)]
@@ -99,11 +104,11 @@ pub(crate) fn ValueSetPage() -> impl IntoView {
         _ => overview_tab(read),
     };
     view! {
-        <Title text=move || format!("Value set {}", id.get()) />
+        <Title text=move || tr_with(Msg::ValueSet3, &[("id", (id.get()).clone().into())]) />
         {stack(
             view! {
                 <Transition fallback=move || { heading(id.get(), None, ()) }>{header}</Transition>
-                {detail_tabs("Views of this value set", TABS, tab)}
+                {detail_tabs(tr(Msg::ViewsValueSet), TABS, tab)}
                 {body}
             },
         )}
@@ -118,7 +123,7 @@ fn heading(title: String, subtitle: Option<String>, actions: impl IntoView) -> A
                 Header {
                     title,
                     subtitle,
-                    crumbs: vec![Crumb::new("Value sets", "/valuesets")],
+                    crumbs: vec![Crumb::new(tr(Msg::ValueSets), "/valuesets")],
                     mono: false,
                 },
                 actions,
@@ -154,7 +159,7 @@ fn header(
         view! {
             <a href=expansion_link(&canonical, at) class=Variant::Primary.class()>
                 {ferrohealth_ui::icon::icon(icon::EXPAND, "16")}
-                "Expand"
+                {tr(Msg::Expand)}
             </a>
         }
     });
@@ -174,30 +179,30 @@ fn header(
             view! {
                 <a href=href class=Variant::Secondary.class()>
                     {ferrohealth_ui::icon::icon(icon::EDIT, "16")}
-                    "Compose"
+                    {tr(Msg::Compose)}
                 </a>
             }
         });
     let history = view! {
         <a href=history_link(VALUE_SET, &id.get(), at) class=Variant::Secondary.class()>
             {ferrohealth_ui::icon::icon(ferrohealth_ui::icon::Glyph::FILE_CLOCK, "16")}
-            "Versions"
+            {tr(Msg::Versions)}
         </a>
     };
     let actions = view! { <div class="fui-cluster">{expand} {edit} {history}</div> };
     let facts = facts_row(vec![
         (
-            "Canonical",
+            tr(Msg::Canonical),
             view! { <span class="fui-mono break-all">{canonical.unwrap_or_else(|| String::from("—"))}</span> }
                 .into_any(),
         ),
         (
-            "Version",
+            tr(Msg::Version),
             view! { <span class="fui-mono">{resource.version().unwrap_or("—").to_owned()}</span> }
                 .into_any(),
         ),
-        ("Status", status_pill(resource.status())),
-        ("Clauses", resource.clauses().len().to_string().into_any()),
+        (tr(Msg::Status), status_pill(resource.status())),
+        (tr(Msg::Clauses), resource.clauses().len().to_string().into_any()),
     ]);
     view! {
         {heading(title, subtitle, actions)}
@@ -209,7 +214,7 @@ fn header(
 /// The facts the resource declares and the clauses its definition holds.
 fn overview_tab(read: Fetched<Document<PublishedValueSet>>) -> AnyView {
     view! {
-        <Reading label="Reading the value set">
+        <Reading label=&{tr(Msg::ReadingTheValueSet)}>
             {move || {
                 read.with(|answered| {
                     answered
@@ -233,18 +238,18 @@ fn definition_view(resource: &PublishedValueSet) -> AnyView {
         .map(|fact| {
             let value = match fact.value {
                 Some(value) => crate::components::stated(value),
-                None => view! { <span class="fui-muted">{NOT_DECLARED}</span> }.into_any(),
+                None => view! { <span class="fui-muted">{not_declared()}</span> }.into_any(),
             };
-            (fact.label, value)
+            (tr(fact.label), value)
         })
         .collect();
     let facts = titled_panel(
-        "What it declares",
+        tr(Msg::WhatItDeclares),
         (),
         view! { <div class="fui-panel-body">{definitions(rows)}</div> },
     );
     let clauses = titled_panel(
-        "What the definition selects",
+        tr(Msg::WhatTheDefinitionSelects),
         (),
         clauses_view(&resource.clauses()),
     );
@@ -261,8 +266,8 @@ fn clauses_view(clauses: &[ClauseRow]) -> AnyView {
         Body::Empty(
             empty_quiet(
                 icon::VALUE_SETS,
-                "No compose element",
-                "Its content is whatever the server holds for it, not a selection written here.",
+                tr(Msg::NoComposeElement),
+                tr(Msg::ContentWhateverServerHoldsNotSelection),
             )
             .into_any(),
         )
@@ -270,8 +275,8 @@ fn clauses_view(clauses: &[ClauseRow]) -> AnyView {
         Body::Rows(clauses.iter().map(clause_row).collect_view().into_any())
     };
     data_table(DataTable {
-        caption: "What the definition selects",
-        columns: &CLAUSE_COLUMNS,
+        caption: &tr(Msg::WhatTheDefinitionSelects),
+        columns: &clause_columns(),
         sort: None,
         sort_href: &|_| String::new(),
         body,
@@ -294,10 +299,10 @@ fn clause_row(clause: &ClauseRow) -> AnyView {
     view! {
         <tr>
             <td>{kind}</td>
-            <td data-label="Code system" class="fui-mono break-all">
+            <td data-label=tr(Msg::CodeSystem2) class="fui-mono break-all">
                 {system}
             </td>
-            <td data-label="Selects">{selection_view(clause)}</td>
+            <td data-label=tr(Msg::Selects)>{selection_view(clause)}</td>
         </tr>
     }
     .into_any()
@@ -309,8 +314,11 @@ fn selection_view(clause: &ClauseRow) -> AnyView {
     if clause.codes > 0 {
         lines.push(
             match clause.codes {
-                1 => String::from("1 code named one by one"),
-                codes => format!("{codes} codes named one by one"),
+                1 => tr(Msg::N1CodeNamedOneOne),
+                codes => tr_with(
+                    Msg::CodesNamedOneOne,
+                    &[("codes", (codes).to_string().into())],
+                ),
             }
             .into_any(),
         );
@@ -323,13 +331,13 @@ fn selection_view(clause: &ClauseRow) -> AnyView {
     );
     lines.extend(clause.value_sets.iter().map(|url| {
         view! {
-            "every code in "
+            {tr(Msg::EveryCodeIn)}
             <span class="fui-mono break-all">{url.clone()}</span>
         }
         .into_any()
     }));
     if lines.is_empty() {
-        return "the whole code system".into_any();
+        return tr(Msg::TheWholeCodeSystem).into_any();
     }
     view! { <div class="fui-stack">{lines}</div> }.into_any()
 }
@@ -377,8 +385,8 @@ fn expansion_tab(
             answered.as_ref().map(|answer| match answer {
                 None => panel(empty_state(
                     icon::EXPAND,
-                    "No canonical",
-                    "This resource declares no canonical, so there is nothing to expand.",
+                    tr(Msg::NoCanonical),
+                    tr(Msg::ResourceDeclaresNoCanonicalSoThere),
                     (),
                 ))
                 .into_any(),
@@ -387,7 +395,7 @@ fn expansion_tab(
             })
         })
     };
-    view! { <Reading label="Expanding the value set">{drawn}</Reading> }.into_any()
+    view! { <Reading label=&{tr(Msg::ExpandingTheValueSet)}>{drawn}</Reading> }.into_any()
 }
 
 /// The preview table of an expansion, with the way into the runner.
@@ -399,19 +407,29 @@ fn preview(
     let Some(expansion) = expanded.expansion() else {
         return panel(empty_state(
             icon::EXPAND,
-            "No expansion",
-            "The server answered without an expansion.",
+            tr(Msg::NoExpansion),
+            tr(Msg::ServerAnsweredWithoutExpansion),
             (),
         ))
         .into_any();
     };
     let listed = expansion.listed();
     let total = expansion.total.map_or_else(
-        || format!("{listed} codes shown"),
-        |total| format!("{listed} of {total} codes"),
+        || tr_with(Msg::CodesShown, &[("listed", (listed).to_string().into())]),
+        |total| {
+            tr_with(
+                Msg::OfCodes,
+                &[
+                    ("listed", (listed).to_string().into()),
+                    ("total", (total).to_string().into()),
+                ],
+            )
+        },
     );
     let body = if expansion.concepts.is_empty() {
-        Body::Empty(empty_quiet(icon::EXPAND, "No code", "The expansion lists no code.").into_any())
+        Body::Empty(
+            empty_quiet(icon::EXPAND, tr(Msg::NoCode), tr(Msg::ExpansionListsNoCode)).into_any(),
+        )
     } else {
         Body::Rows(
             expansion
@@ -422,9 +440,9 @@ fn preview(
                     view! {
                         <tr>
                             <td class="fui-mono">{concept.code.clone()}</td>
-                            <td data-label="Display">{display}</td>
+                            <td data-label=tr(Msg::Display)>{display}</td>
                             <td
-                                data-label="System"
+                                data-label=tr(Msg::System)
                                 class="fui-mono fui-small fui-muted sm:whitespace-nowrap"
                             >
                                 {concept.system.clone()}
@@ -442,13 +460,13 @@ fn preview(
                 href=expansion_link(&canonical, version)
                 class="fui-button fui-button-ghost fui-button-small"
             >
-                "Open in the runner"
+                {tr(Msg::OpenInTheRunner)}
             </a>
         }
     });
     let table = data_table(DataTable {
-        caption: "The codes the value set expands to",
-        columns: &CODE_COLUMNS,
+        caption: &tr(Msg::CodesValueSetExpands),
+        columns: &code_columns(),
         sort: None,
         sort_href: &|_| String::new(),
         body,
@@ -459,13 +477,13 @@ fn preview(
             {all}
         </span>
     };
-    view! { {titled_panel("The expansion", aside, table)} }.into_any()
+    view! { {titled_panel(tr(Msg::TheExpansion), aside, table)} }.into_any()
 }
 
 /// The resource as the server sent it.
 fn json_tab(read: Fetched<Document<PublishedValueSet>>) -> AnyView {
     view! {
-        <Reading label="Reading the value set">
+        <Reading label=&{tr(Msg::ReadingTheValueSet)}>
             {move || {
                 read.with(|answered| {
                     answered
@@ -474,7 +492,7 @@ fn json_tab(read: Fetched<Document<PublishedValueSet>>) -> AnyView {
                             Ok(document) => {
                                 json_pane(
                                     "valueset-json",
-                                    "The ValueSet, as the server sent it",
+                                    tr(Msg::ValuesetServerSent),
                                     document.text.clone(),
                                 )
                             }

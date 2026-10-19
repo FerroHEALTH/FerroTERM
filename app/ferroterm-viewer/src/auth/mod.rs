@@ -14,6 +14,7 @@ use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::auth::scopes::Letter;
+use crate::locale::{Msg, tr};
 
 /// The signed-in reader, as the page is told of them.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -62,10 +63,10 @@ impl Session {
 
     /// What the reader may change, as the line under their name says it,
     /// read reactively.
-    pub(crate) fn standing(&self) -> &'static str {
+    pub(crate) fn standing(&self) -> String {
         self.0.with(|held| {
             held.as_ref()
-                .map_or(READ_ONLY, |operator| standing(&operator.scopes))
+                .map_or_else(read_only, |operator| standing(&operator.scopes))
         })
     }
 
@@ -77,25 +78,27 @@ impl Session {
 }
 
 /// The line under the name of a reader whose scopes open no write.
-const READ_ONLY: &str = "Read only: this account has no editing permission";
+fn read_only() -> String {
+    tr(Msg::ReadOnlyAccountHasNoEditing)
+}
 
 /// What `granted` lets a reader change, as one line under their name: the
 /// three resource types the console writes, each one a create or an update
 /// opens (SMART App Launch 2.x, scopes and launch context).
-pub(crate) fn standing(granted: &[String]) -> &'static str {
+pub(crate) fn standing(granted: &[String]) -> String {
     let edits = |resource_type: &str| {
         scopes::can_any(granted, resource_type, Letter::Create)
             || scopes::can_any(granted, resource_type, Letter::Update)
     };
     match (edits("CodeSystem"), edits("ValueSet"), edits("ConceptMap")) {
-        (true, true, true) => "May edit CodeSystem, ValueSet and ConceptMap",
-        (true, true, false) => "May edit CodeSystem and ValueSet",
-        (true, false, true) => "May edit CodeSystem and ConceptMap",
-        (false, true, true) => "May edit ValueSet and ConceptMap",
-        (true, false, false) => "May edit CodeSystem",
-        (false, true, false) => "May edit ValueSet",
-        (false, false, true) => "May edit ConceptMap",
-        (false, false, false) => READ_ONLY,
+        (true, true, true) => tr(Msg::MayEditCodesystemValuesetConceptmap),
+        (true, true, false) => tr(Msg::MayEditCodesystemValueset),
+        (true, false, true) => tr(Msg::MayEditCodesystemConceptmap),
+        (false, true, true) => tr(Msg::MayEditValuesetConceptmap),
+        (true, false, false) => tr(Msg::MayEditCodesystem),
+        (false, true, false) => tr(Msg::MayEditValueset),
+        (false, false, true) => tr(Msg::MayEditConceptmap),
+        (false, false, false) => read_only(),
     }
 }
 
@@ -103,7 +106,7 @@ pub(crate) fn standing(granted: &[String]) -> &'static str {
 mod tests {
     use leptos::prelude::Owner;
 
-    use super::{Operator, READ_ONLY, Session, standing};
+    use super::{Operator, Session, read_only, standing};
     use crate::auth::scopes::Letter;
 
     #[test]
@@ -121,8 +124,8 @@ mod tests {
             "May edit ValueSet",
             standing(&granted(&["openid", "system/ValueSet.u"]))
         );
-        assert_eq!(READ_ONLY, standing(&granted(&["openid", "fhirUser"])));
-        assert_eq!(READ_ONLY, standing(&granted(&["user/CodeSystem.rs"])));
+        assert_eq!(read_only(), standing(&granted(&["openid", "fhirUser"])));
+        assert_eq!(read_only(), standing(&granted(&["user/CodeSystem.rs"])));
     }
 
     #[test]

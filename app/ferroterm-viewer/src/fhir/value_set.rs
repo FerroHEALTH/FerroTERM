@@ -14,6 +14,7 @@ use crate::fhir::facts::fact;
 use crate::fhir::facts::flag;
 use crate::fhir::facts::named;
 use crate::fhir::searchset::Published;
+use crate::locale::Msg;
 
 /// The `ValueSet` a root publishes, as the screen draws it.
 ///
@@ -174,18 +175,18 @@ impl PublishedValueSet {
     pub(crate) fn facts(&self) -> Vec<Fact> {
         let compose = self.compose.clone().unwrap_or_default();
         vec![
-            fact("Name", self.name.as_deref()),
-            fact("Title", self.title.as_deref()),
-            fact("Version", self.version.as_deref()),
-            fact("Status", self.status.as_deref()),
-            fact("Experimental", flag(self.experimental)),
-            fact("Publisher", self.publisher.as_deref()),
-            fact("Last changed", self.date.as_deref()),
-            fact("Description", self.description.as_deref()),
-            fact("Purpose", self.purpose.as_deref()),
-            fact("Immutable", flag(self.immutable)),
-            fact("Inactive codes selected", flag(compose.inactive)),
-            fact("Locked to date", compose.locked_date.as_deref()),
+            fact(Msg::Name, self.name.as_deref()),
+            fact(Msg::Title, self.title.as_deref()),
+            fact(Msg::Version, self.version.as_deref()),
+            fact(Msg::Status, self.status.as_deref()),
+            fact(Msg::Experimental, flag(self.experimental)),
+            fact(Msg::Publisher, self.publisher.as_deref()),
+            fact(Msg::LastChanged, self.date.as_deref()),
+            fact(Msg::Description2, self.description.as_deref()),
+            fact(Msg::Purpose, self.purpose.as_deref()),
+            fact(Msg::Immutable, flag(self.immutable)),
+            fact(Msg::InactiveCodesSelected, flag(compose.inactive)),
+            fact(Msg::LockedToDate, compose.locked_date.as_deref()),
         ]
     }
 
@@ -248,7 +249,7 @@ mod tests {
         resource
             .facts()
             .into_iter()
-            .find(|fact| fact.label == label)
+            .find(|fact| crate::locale::tr(fact.label) == label)
             .expect("the screen draws a row for every fact it names")
             .value
     }
@@ -323,15 +324,18 @@ mod tests {
             "an undeclared boolean is not the same claim as a declared `no`"
         );
         assert!(
-            resource.facts().iter().any(|fact| fact.label == "Purpose"),
+            resource
+                .facts()
+                .iter()
+                .any(|fact| crate::locale::tr(fact.label) == "Purpose"),
             "the row is drawn so the screen can state the absence"
         );
     }
 
     #[test]
     fn the_facts_render_in_the_same_order_for_every_resource() {
-        let rich: Vec<&'static str> = parse(ONE).facts().into_iter().map(|f| f.label).collect();
-        let bare: Vec<&'static str> = PublishedValueSet::default()
+        let rich: Vec<Msg> = parse(ONE).facts().into_iter().map(|f| f.label).collect();
+        let bare: Vec<Msg> = PublishedValueSet::default()
             .facts()
             .into_iter()
             .map(|f| f.label)

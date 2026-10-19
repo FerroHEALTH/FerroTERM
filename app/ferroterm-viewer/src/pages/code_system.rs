@@ -21,10 +21,10 @@ use leptos_meta::Title;
 use leptos_router::hooks::use_params;
 use leptos_router::params::Params;
 
-use crate::components::NOT_DECLARED;
 use crate::components::detail::{current_tab, detail_tabs, json_pane};
 use crate::components::failure::Failure;
 use crate::components::icon;
+use crate::components::not_declared;
 use crate::components::reading::Reading;
 use crate::components::shell::{Console, SelectedVersion};
 use crate::components::state::undeclared;
@@ -34,22 +34,25 @@ use crate::fhir::error::FhirError;
 use crate::fhir::terminology::{SystemCard, TerminologyCapabilities, VersionRow};
 use crate::fhir::version::FhirVersion;
 use crate::fhir::{Document, FhirClient, resources_text};
+use crate::locale::{Msg, tr, tr_with};
 use crate::routes::{
     BROWSE_PATH, CODE_SYSTEM_EDITOR_PATH, EXPAND_PATH, VALIDATE_PATH, system_tool_link,
 };
 
 /// The tabs of the screen: the definition, the server's support, the JSON.
-const TABS: &[(&str, &str)] = &[
-    ("overview", "Definition"),
-    ("support", "Server support"),
-    ("json", "JSON"),
+const TABS: &[(&str, Msg)] = &[
+    ("overview", Msg::Definition),
+    ("support", Msg::ServerSupport),
+    ("json", Msg::Json),
 ];
 
 /// The columns of a version's filter table.
-const FILTER_COLUMNS: [Column; 2] = [
-    Column::text("property", "Property"),
-    Column::text("operators", "Operators"),
-];
+fn filter_columns() -> [Column; 2] {
+    [
+        Column::text("property", tr(Msg::Property)),
+        Column::text("operators", tr(Msg::Operators)),
+    ]
+}
 
 /// The path parameter this screen is addressed by.
 #[derive(Clone, Debug, Params, PartialEq)]
@@ -121,7 +124,7 @@ pub(crate) fn CodeSystemPage() -> impl IntoView {
         {stack(
             view! {
                 {header}
-                {detail_tabs("Views of this code system", TABS, tab)}
+                {detail_tabs(tr(Msg::ViewsCodeSystem), TABS, tab)}
                 {body}
             },
         )}
@@ -131,7 +134,7 @@ pub(crate) fn CodeSystemPage() -> impl IntoView {
 /// The document title for one canonical.
 fn title_of(system: &str) -> String {
     if system.is_empty() {
-        "Code system".to_owned()
+        tr(Msg::CodeSystem2).clone()
     } else {
         system.to_owned()
     }
@@ -140,7 +143,7 @@ fn title_of(system: &str) -> String {
 /// The heading for one canonical.
 fn heading_of(system: &str) -> String {
     if system.is_empty() {
-        "This address names no code system".to_owned()
+        tr(Msg::AddressNamesNoCodeSystem).clone()
     } else {
         system.to_owned()
     }
@@ -158,7 +161,7 @@ fn heading(
         Header {
             title,
             subtitle,
-            crumbs: vec![Crumb::new("Code systems", "/systems")],
+            crumbs: vec![Crumb::new(tr(Msg::CodeSystems), "/systems")],
             mono,
         },
         actions,
@@ -229,16 +232,16 @@ fn facts(
     };
     facts_row(vec![
         (
-            "Canonical",
+            tr(Msg::Canonical),
             view! { <span class="fui-mono break-all">{canonical.to_owned()}</span> }.into_any(),
         ),
         (
-            "Default version",
+            tr(Msg::DefaultVersion),
             view! { <span class="fui-mono">{default}</span> }.into_any(),
         ),
-        ("Status", status.into_any()),
-        ("Content", content.into_any()),
-        ("Subsumption", subsumes),
+        (tr(Msg::Status), status.into_any()),
+        (tr(Msg::Content), content.into_any()),
+        (tr(Msg::Subsumption), subsumes),
     ])
     .into_any()
 }
@@ -255,7 +258,7 @@ fn actions(card: &SystemCard, version: FhirVersion) -> AnyView {
     let served = chosen_version(card, None);
     let code = served.as_ref().and_then(|row| row.code.clone());
     let walkable = served.is_some_and(|row| Hierarchy::of(&row).walk().is_some());
-    let link = |path: &str, variant: Variant, glyph, label: &'static str| {
+    let link = |path: &str, variant: Variant, glyph, label: String| {
         let href = system_tool_link(path, &card.url, code.as_deref(), version);
         view! {
             <a href=href class=variant.class()>
@@ -270,7 +273,7 @@ fn actions(card: &SystemCard, version: FhirVersion) -> AnyView {
             BROWSE_PATH,
             Variant::Primary,
             icon::BROWSE,
-            "Browse concepts",
+            tr(Msg::BrowseConcepts),
         )
     });
     // NOTE: no specification governs this: our own design; a console without
@@ -280,14 +283,14 @@ fn actions(card: &SystemCard, version: FhirVersion) -> AnyView {
             CODE_SYSTEM_EDITOR_PATH,
             Variant::Secondary,
             icon::EDIT,
-            "Edit",
+            tr(Msg::Edit),
         )
     });
     view! {
-        <nav aria-label="Screens for this code system" class="fui-cluster">
+        <nav aria-label=tr(Msg::ScreensCodeSystem) class="fui-cluster">
             {browse}
-            {link(VALIDATE_PATH, Variant::Secondary, icon::VALIDATE, "Check a code")}
-            {link(EXPAND_PATH, Variant::Secondary, icon::EXPAND, "Expand")}
+            {link(VALIDATE_PATH, Variant::Secondary, icon::VALIDATE, tr(Msg::CheckACode))}
+            {link(EXPAND_PATH, Variant::Secondary, icon::EXPAND, tr(Msg::Expand))}
             {edit}
         </nav>
     }
@@ -299,9 +302,9 @@ fn overview_tab(search: Fetched<Document<CodeSystemSearch>>) -> AnyView {
     view! {
         <section aria-labelledby="system-published-heading">
             <h2 id="system-published-heading" class="fui-sr-only">
-                "What the code system says it is"
+                {tr(Msg::WhatCodeSystemSays)}
             </h2>
-            <Reading label="Reading the published CodeSystem">
+            <Reading label=&{tr(Msg::ReadingThePublishedCodesystem)}>
                 {move || {
                     search
                         .with(|answered| {
@@ -334,9 +337,9 @@ fn support_tab(system: Signal<String>, capabilities: Fetched<TerminologyCapabili
     view! {
         <section aria-labelledby="system-capability-heading">
             <h2 id="system-capability-heading" class="fui-sr-only">
-                "What this server can do with it"
+                {tr(Msg::WhatServerCanDo)}
             </h2>
-            <Reading label="Reading the terminology capabilities">
+            <Reading label=&{tr(Msg::ReadingTheTerminologyCapabilities)}>
                 {move || {
                     capabilities
                         .with(|answered| {
@@ -362,7 +365,7 @@ fn support_tab(system: Signal<String>, capabilities: Fetched<TerminologyCapabili
 /// The published resources as the server sent them.
 fn json_tab(search: Fetched<Document<CodeSystemSearch>>) -> AnyView {
     view! {
-        <Reading label="Reading the published CodeSystem">
+        <Reading label=&{tr(Msg::ReadingThePublishedCodesystem)}>
             {move || {
                 search
                     .with(|answered| {
@@ -372,7 +375,7 @@ fn json_tab(search: Fetched<Document<CodeSystemSearch>>) -> AnyView {
                                 Ok(document) => {
                                     json_pane(
                                         "system-json",
-                                        "The CodeSystem, as the server sent it",
+                                        tr(Msg::CodesystemServerSent),
                                         resources_text(&document.text),
                                     )
                                 }
@@ -387,9 +390,7 @@ fn json_tab(search: Fetched<Document<CodeSystemSearch>>) -> AnyView {
 
 /// The statement that this root's capabilities do not name the system.
 fn undeclared_view() -> AnyView {
-    undeclared(
-        "This root's terminology capabilities do not name this code system. Another FHIR version may serve it, so try the version switcher above; otherwise this deployment has not loaded it.",
-    )
+    undeclared(tr(Msg::RootSTerminologyCapabilitiesDoNot))
 }
 
 /// A refused read, in the server's own words.
@@ -407,8 +408,8 @@ fn support_view(card: &SystemCard) -> AnyView {
     if card.versions.is_empty() {
         return empty_quiet(
             icon::VERSION,
-            "No version declared",
-            "This server declares no version for this code system.",
+            tr(Msg::NoVersionDeclared),
+            tr(Msg::ServerDeclaresNoVersionCodeSystem),
         )
         .into_any();
     }
@@ -420,30 +421,32 @@ fn support_view(card: &SystemCard) -> AnyView {
 /// and what it answers.
 fn version_view(row: &VersionRow) -> AnyView {
     let code = row.code.clone().map_or_else(
-        || format!("Version {NOT_DECLARED}"),
-        |code| format!("Version {code}"),
+        || tr_with(Msg::Version3, &[("not_declared", not_declared().into())]),
+        |code| tr_with(Msg::Version4, &[("code", (code).clone().into())]),
     );
-    let mark = row.is_default.then(|| badge(Tone::Accent, "default"));
+    let mark = row
+        .is_default
+        .then(|| badge(Tone::Accent, &tr(Msg::DefaultMark)));
     let compositional = match row.compositional {
-        Some(true) => "read",
-        Some(false) => "not read",
-        None => NOT_DECLARED,
+        Some(true) => tr(Msg::StateRead),
+        Some(false) => tr(Msg::NotRead),
+        None => not_declared(),
     };
     let resolves = if row.is_default {
-        "an unversioned request"
+        tr(Msg::AnUnversionedRequest)
     } else {
-        "a request naming this version"
+        tr(Msg::RequestNamingVersion)
     };
     let rows = vec![
-        ("Answers", resolves.into_any()),
-        ("Compositional grammar", compositional.into_any()),
+        (tr(Msg::Answers), resolves.into_any()),
+        (tr(Msg::CompositionalGrammar), compositional.into_any()),
         (
-            "Designation languages",
-            chips(&row.languages, "none declared"),
+            tr(Msg::DesignationLanguages),
+            chips(&row.languages, tr(Msg::NoneDeclared)),
         ),
         (
-            "$lookup properties",
-            chips(&row.properties, "none declared"),
+            tr(Msg::LookupProperties),
+            chips(&row.properties, tr(Msg::NoneDeclared)),
         ),
     ];
     let filters = filter_view(row);
@@ -452,7 +455,7 @@ fn version_view(row: &VersionRow) -> AnyView {
 }
 
 /// `values` as chips, or the words `absent` when there are none.
-fn chips(values: &[String], absent: &'static str) -> AnyView {
+fn chips(values: &[String], absent: String) -> AnyView {
     if values.is_empty() {
         return view! { <span class="fui-muted">{absent}</span> }.into_any();
     }
@@ -471,8 +474,8 @@ fn filter_view(row: &VersionRow) -> AnyView {
         Body::Empty(
             empty_quiet(
                 icon::EXPAND,
-                "No filter",
-                "This version declares no $expand filter.",
+                tr(Msg::NoFilter),
+                tr(Msg::VersionDeclaresNoExpandFilter),
             )
             .into_any(),
         )
@@ -482,15 +485,15 @@ fn filter_view(row: &VersionRow) -> AnyView {
                 .iter()
                 .map(|filter| {
                     let code = if filter.code.is_empty() {
-                        format!("Filter {NOT_DECLARED}")
+                        tr_with(Msg::Filter2, &[("not_declared", not_declared().into())])
                     } else {
                         filter.code.clone()
                     };
-                    let operators = chips(&filter.operators, "no operator declared");
+                    let operators = chips(&filter.operators, tr(Msg::NoOperatorDeclared));
                     view! {
                         <tr>
                             <td class="fui-mono">{code}</td>
-                            <td data-label="Operators">{operators}</td>
+                            <td data-label=tr(Msg::Operators)>{operators}</td>
                         </tr>
                     }
                 })
@@ -499,8 +502,8 @@ fn filter_view(row: &VersionRow) -> AnyView {
         )
     };
     data_table(DataTable {
-        caption: "Filters $expand accepts",
-        columns: &FILTER_COLUMNS,
+        caption: &tr(Msg::FiltersExpandAccepts),
+        columns: &filter_columns(),
         sort: None,
         sort_href: &|_| String::new(),
         body,
@@ -515,13 +518,32 @@ fn filter_view(row: &VersionRow) -> AnyView {
 /// means the search was paged.
 fn match_sentence(drawn: usize, total: Option<u32>) -> String {
     let counted = total.map_or_else(
-        || format!("this root counted {NOT_DECLARED}"),
-        |total| format!("this root counted {total}"),
+        || {
+            tr_with(
+                Msg::ThisRootCounted3,
+                &[("not_declared", not_declared().into())],
+            )
+        },
+        |total| {
+            tr_with(
+                Msg::ThisRootCounted4,
+                &[("total", (total).to_string().into())],
+            )
+        },
     );
     if drawn == 1 {
-        format!("1 published resource, and {counted}")
+        tr_with(
+            Msg::N1PublishedResourceAnd,
+            &[("counted", (counted).clone().into())],
+        )
     } else {
-        format!("{drawn} published resources, and {counted}")
+        tr_with(
+            Msg::PublishedResourcesAnd,
+            &[
+                ("drawn", (drawn).to_string().into()),
+                ("counted", (counted).clone().into()),
+            ],
+        )
     }
 }
 
@@ -537,8 +559,8 @@ fn resources_view(published: &[PublishedCodeSystem]) -> AnyView {
     if published.is_empty() {
         return panel(empty_state(
             icon::CODE_SYSTEMS,
-            "Not published as a resource",
-            "This root publishes no CodeSystem resource for this canonical. A system served from a built index is declared under Server support and need not be published.",
+            tr(Msg::NotPublishedResource),
+            tr(Msg::RootPublishesNoCodesystemResourceCanonical),
             (),
         ))
         .into_any();
@@ -550,8 +572,8 @@ fn resources_view(published: &[PublishedCodeSystem]) -> AnyView {
 /// One published resource, as a definition grid of its declared facts.
 fn resource_view(resource: &PublishedCodeSystem) -> AnyView {
     let heading = resource.version().map_or_else(
-        || format!("Version {NOT_DECLARED}"),
-        |version| format!("Version {version}"),
+        || tr_with(Msg::Version5, &[("not_declared", not_declared().into())]),
+        |version| tr_with(Msg::Version6, &[("version", (version).to_string().into())]),
     );
     let rows = resource
         .facts()
@@ -559,9 +581,9 @@ fn resource_view(resource: &PublishedCodeSystem) -> AnyView {
         .map(|fact| {
             let value = match fact.value {
                 Some(value) => crate::components::stated(value),
-                None => view! { <span class="fui-muted">{NOT_DECLARED}</span> }.into_any(),
+                None => view! { <span class="fui-muted">{not_declared()}</span> }.into_any(),
             };
-            (fact.label, value)
+            (tr(fact.label), value)
         })
         .collect();
     titled_panel(

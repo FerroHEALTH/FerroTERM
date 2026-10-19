@@ -16,10 +16,10 @@ use leptos_meta::Title;
 use leptos_router::hooks::use_params;
 use leptos_router::params::Params;
 
-use crate::components::NOT_DECLARED;
 use crate::components::detail::{current_tab, detail_tabs, json_pane};
 use crate::components::failure::Failure;
 use crate::components::icon;
+use crate::components::not_declared;
 use crate::components::reading::Reading;
 use crate::components::shell::{Console, SelectedVersion};
 use crate::fhir::concept_map::{GroupRow, MappingRow, PublishedConceptMap};
@@ -28,29 +28,34 @@ use crate::fhir::translate::TranslateRequest;
 use crate::fhir::version::FhirVersion;
 use crate::fhir::{CONCEPT_MAP, Document, FhirClient};
 use crate::listing::status_pill;
+use crate::locale::{Msg, tr, tr_with};
 use crate::pages::translate;
 use crate::routes::{editing_link, history_link};
 
 /// The tabs of the screen.
-const TABS: &[(&str, &str)] = &[
-    ("overview", "Definition"),
-    ("mappings", "Mappings"),
-    ("json", "JSON"),
+const TABS: &[(&str, Msg)] = &[
+    ("overview", Msg::Definition),
+    ("mappings", Msg::Mappings),
+    ("json", Msg::Json),
 ];
 
 /// The columns of the group table.
-const GROUP_COLUMNS: [Column; 3] = [
-    Column::text("source", "From"),
-    Column::text("target", "To"),
-    Column::text("codes", "Codes mapped").numeric(),
-];
+fn group_columns() -> [Column; 3] {
+    [
+        Column::text("source", tr(Msg::From)),
+        Column::text("target", tr(Msg::To)),
+        Column::text("codes", tr(Msg::CodesMapped)).numeric(),
+    ]
+}
 
 /// The columns of the mapping table.
-const MAPPING_COLUMNS: [Column; 3] = [
-    Column::text("source", "Source code"),
-    Column::text("relationship", "Relationship"),
-    Column::text("target", "Target code"),
-];
+fn mapping_columns() -> [Column; 3] {
+    [
+        Column::text("source", tr(Msg::SourceCode)),
+        Column::text("relationship", tr(Msg::Relationship)),
+        Column::text("target", tr(Msg::TargetCode)),
+    ]
+}
 
 /// The path parameter this screen is addressed by.
 #[derive(Clone, Debug, Params, PartialEq)]
@@ -95,11 +100,11 @@ pub(crate) fn ConceptMapPage() -> impl IntoView {
         _ => overview_tab(read),
     };
     view! {
-        <Title text=move || format!("Concept map {}", id.get()) />
+        <Title text=move || tr_with(Msg::ConceptMap3, &[("id", (id.get()).clone().into())]) />
         {stack(
             view! {
                 <Transition fallback=move || heading(id.get(), None, ())>{header}</Transition>
-                {detail_tabs("Views of this concept map", TABS, tab)}
+                {detail_tabs(tr(Msg::ViewsConceptMap), TABS, tab)}
                 {body}
             },
         )}
@@ -114,7 +119,7 @@ fn heading(title: String, subtitle: Option<String>, actions: impl IntoView) -> A
                 Header {
                     title,
                     subtitle,
-                    crumbs: vec![Crumb::new("Concept maps", "/conceptmaps")],
+                    crumbs: vec![Crumb::new(tr(Msg::ConceptMaps), "/conceptmaps")],
                     mono: false,
                 },
                 actions,
@@ -158,7 +163,7 @@ fn header(
         view! {
             <a href=translate::address(&filled, at) class=Variant::Primary.class()>
                 {ferrohealth_ui::icon::icon(icon::TRANSLATE, "16")}
-                "Translate a code"
+                {tr(Msg::TranslateACode)}
             </a>
         }
     });
@@ -177,14 +182,14 @@ fn header(
             view! {
                 <a href=href class=Variant::Secondary.class()>
                     {ferrohealth_ui::icon::icon(icon::EDIT, "16")}
-                    "Edit"
+                    {tr(Msg::Edit)}
                 </a>
             }
         });
     let history = view! {
         <a href=history_link(CONCEPT_MAP, &id.get(), at) class=Variant::Secondary.class()>
             {ferrohealth_ui::icon::icon(ferrohealth_ui::icon::Glyph::FILE_CLOCK, "16")}
-            "Versions"
+            {tr(Msg::Versions)}
         </a>
     };
     let actions = view! { <div class="fui-cluster">{run} {edit} {history}</div> };
@@ -193,10 +198,13 @@ fn header(
             .into_any()
     };
     let facts = facts_row(vec![
-        ("Canonical", scope(resource.url())),
-        ("Version", scope(resource.version())),
-        ("Status", status_pill(resource.status())),
-        ("Mappings", resource.mappings().len().to_string().into_any()),
+        (tr(Msg::Canonical), scope(resource.url())),
+        (tr(Msg::Version), scope(resource.version())),
+        (tr(Msg::Status), status_pill(resource.status())),
+        (
+            tr(Msg::Mappings),
+            resource.mappings().len().to_string().into_any(),
+        ),
     ]);
     view! {
         {heading(title, subtitle, actions)}
@@ -208,7 +216,7 @@ fn header(
 /// The facts the map declares and the groups it is made of.
 fn overview_tab(read: Fetched<Document<PublishedConceptMap>>) -> AnyView {
     view! {
-        <Reading label="Reading the concept map">
+        <Reading label=&{tr(Msg::ReadingTheConceptMap)}>
             {move || {
                 read.with(|answered| {
                     answered
@@ -232,15 +240,15 @@ fn definition_view(resource: &PublishedConceptMap) -> AnyView {
         .map(|fact| {
             let value = match fact.value {
                 Some(value) => crate::components::stated(value),
-                None => view! { <span class="fui-muted">{NOT_DECLARED}</span> }.into_any(),
+                None => view! { <span class="fui-muted">{not_declared()}</span> }.into_any(),
             };
-            (fact.label, value)
+            (tr(fact.label), value)
         })
         .collect();
     view! {
-        {titled_panel("What the map maps", (), groups_view(&resource.groups()))}
+        {titled_panel(tr(Msg::WhatTheMapMaps), (), groups_view(&resource.groups()))}
         {titled_panel(
-            "What it declares",
+            tr(Msg::WhatItDeclares),
             (),
             view! { <div class="fui-panel-body">{definitions(rows)}</div> },
         )}
@@ -254,8 +262,8 @@ fn groups_view(groups: &[GroupRow]) -> AnyView {
         Body::Empty(
             empty_quiet(
                 icon::CONCEPT_MAPS,
-                "No group",
-                "What it maps is whatever the server holds for it, not a table written here.",
+                tr(Msg::NoGroup),
+                tr(Msg::WhatMapsWhateverServerHoldsNot),
             )
             .into_any(),
         )
@@ -269,10 +277,10 @@ fn groups_view(groups: &[GroupRow]) -> AnyView {
                             <td class="fui-mono break-all">
                                 {group.source.clone().unwrap_or_else(|| String::from("—"))}
                             </td>
-                            <td data-label="To" class="fui-mono break-all">
+                            <td data-label=tr(Msg::To) class="fui-mono break-all">
                                 {group.target.clone().unwrap_or_else(|| String::from("—"))}
                             </td>
-                            <td data-label="Codes mapped" class="fui-num">
+                            <td data-label=tr(Msg::CodesMapped) class="fui-num">
                                 {group.elements.to_string()}
                             </td>
                         </tr>
@@ -283,8 +291,8 @@ fn groups_view(groups: &[GroupRow]) -> AnyView {
         )
     };
     data_table(DataTable {
-        caption: "What the map maps",
-        columns: &GROUP_COLUMNS,
+        caption: &tr(Msg::WhatTheMapMaps),
+        columns: &group_columns(),
         sort: None,
         sort_href: &|_| String::new(),
         body,
@@ -295,7 +303,7 @@ fn groups_view(groups: &[GroupRow]) -> AnyView {
 /// Every mapping the map writes, with a filter over them.
 fn mappings_tab(read: Fetched<Document<PublishedConceptMap>>) -> AnyView {
     view! {
-        <Reading label="Reading the concept map">
+        <Reading label=&{tr(Msg::ReadingTheConceptMap)}>
             {move || {
                 read.with(|answered| {
                     answered
@@ -342,31 +350,42 @@ fn mappings_view(rows: Vec<MappingRow>) -> AnyView {
         let all = held.with_value(Vec::len);
         let shown = kept.with(Vec::len);
         if all == shown {
-            format!("{all} mappings")
+            tr_with(Msg::Mappings2, &[("all", (all).to_string().into())])
         } else {
-            format!("{shown} of {all} mappings")
+            tr_with(
+                Msg::OfMappings,
+                &[
+                    ("shown", (shown).to_string().into()),
+                    ("all", (all).to_string().into()),
+                ],
+            )
         }
     });
     let table = move || {
         let body = kept.with(|kept| {
             if kept.is_empty() {
                 Body::Empty(
-                    empty_quiet(icon::CONCEPT_MAPS, "No mapping", "No mapping matches.").into_any(),
+                    empty_quiet(
+                        icon::CONCEPT_MAPS,
+                        tr(Msg::NoMapping),
+                        tr(Msg::NoMappingMatches),
+                    )
+                    .into_any(),
                 )
             } else {
                 Body::Rows(kept.iter().map(mapping_row).collect_view().into_any())
             }
         });
         data_table(DataTable {
-            caption: "Every mapping the map writes",
-            columns: &MAPPING_COLUMNS,
+            caption: &tr(Msg::EveryMappingMapWrites),
+            columns: &mapping_columns(),
             sort: None,
             sort_href: &|_| String::new(),
             body,
         })
     };
     view! {
-        {table_filter("mappings-filter", "Filter by code or display", words, count)}
+        {table_filter("mappings-filter", tr(Msg::FilterCodeDisplay), words, count)}
         {table}
     }
     .into_any()
@@ -392,7 +411,7 @@ fn mapping_row(row: &MappingRow) -> AnyView {
         .unwrap_or_else(|| String::from("—"));
     let code = |code: Option<String>, display: Option<String>, system: Option<String>| {
         view! {
-            <span class="fui-mono">{code.unwrap_or_else(|| String::from("no target"))}</span>
+            <span class="fui-mono">{code.unwrap_or_else(|| tr(Msg::NoTarget))}</span>
             <span class="block">{display.unwrap_or_default()}</span>
             <span class="block font-normal fui-small fui-muted fui-mono sm:whitespace-nowrap">
                 {system.unwrap_or_default()}
@@ -408,8 +427,8 @@ fn mapping_row(row: &MappingRow) -> AnyView {
                     row.source_system.clone(),
                 )}
             </td>
-            <td data-label="Relationship">{badge(tone, &relationship)}</td>
-            <td data-label="Target code">
+            <td data-label=tr(Msg::Relationship)>{badge(tone, &relationship)}</td>
+            <td data-label=tr(Msg::TargetCode)>
                 <div>
                     {code(
                         row.target_code.clone(),
@@ -426,7 +445,7 @@ fn mapping_row(row: &MappingRow) -> AnyView {
 /// The resource as the server sent it.
 fn json_tab(read: Fetched<Document<PublishedConceptMap>>) -> AnyView {
     view! {
-        <Reading label="Reading the concept map">
+        <Reading label=&{tr(Msg::ReadingTheConceptMap)}>
             {move || {
                 read.with(|answered| {
                     answered
@@ -435,7 +454,7 @@ fn json_tab(read: Fetched<Document<PublishedConceptMap>>) -> AnyView {
                             Ok(document) => {
                                 json_pane(
                                     "conceptmap-json",
-                                    "The ConceptMap, as the server sent it",
+                                    tr(Msg::ConceptmapServerSent),
                                     document.text.clone(),
                                 )
                             }

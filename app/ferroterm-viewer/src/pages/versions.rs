@@ -17,14 +17,15 @@ use crate::comparison::Row;
 use crate::comparison::compare;
 use crate::comparison::notes;
 use crate::comparison::state_sentence;
-use crate::components::NOT_DECLARED;
 use crate::components::failure::Failure;
 use crate::components::icon;
+use crate::components::not_declared;
 use crate::components::reading::Reading;
 use crate::fhir::FhirClient;
 use crate::fhir::capability::CapabilityStatement;
 use crate::fhir::error::FhirError;
 use crate::fhir::version::FhirVersion;
+use crate::locale::{Msg, tr, tr_with};
 use ferrohealth_ui::table::view::{Body, Column, DataTable, data_table};
 use ferrohealth_ui::view::empty::empty_quiet;
 use ferrohealth_ui::view::surface::{card, disclosure, panel_body, titled_panel};
@@ -68,13 +69,13 @@ fn comparison_section(roots: [RootRead; 4]) -> AnyView {
         <section class="fui-stack" aria-labelledby="comparison-heading">
             <div>
                 <h3 id="comparison-heading" class="fui-card-title">
-                    "What each root declares"
+                    {tr(Msg::WhatEachRootDeclares)}
                 </h3>
                 <p aria-live="polite" class="fui-muted fui-small">
                     {announcement}
                 </p>
             </div>
-            <Reading label="Reading the four capability statements">
+            <Reading label=&{tr(Msg::ReadingFourCapabilityStatements)}>
                 {move || drawn(&answers(roots))}
             </Reading>
         </section>
@@ -105,8 +106,8 @@ fn drawn(answers: &[(FhirVersion, RootAnswer)]) -> AnyView {
     let comparison = compare(answers);
     let refused = refusals_view(answers);
     let facts = table_view(
-        "What each root says about itself",
-        "Declaration",
+        &tr(Msg::WhatEachRootSaysAboutItself),
+        &tr(Msg::Declaration),
         &comparison.columns,
         &comparison.facts,
     );
@@ -114,7 +115,7 @@ fn drawn(answers: &[(FhirVersion, RootAnswer)]) -> AnyView {
     let added = notes_view(answers);
     view! {
         {refused}
-        {titled_panel("What each root says about itself", (), facts)}
+        {titled_panel(tr(Msg::WhatEachRootSaysAboutItself), (), facts)}
         {operations}
         {added}
     }
@@ -133,7 +134,7 @@ fn refusals_view(answers: &[(FhirVersion, RootAnswer)]) -> AnyView {
             Some(
                 view! {
                     <div>
-                        <p class="fui-label">{version.label()} " did not answer"</p>
+                        <p class="fui-label">{version.label()} {tr(Msg::DidNotAnswer)}</p>
                         <Failure error=Signal::stored(error) />
                     </div>
                 }
@@ -152,19 +153,19 @@ fn operations_view(comparison: &Comparison) -> AnyView {
     let table = if comparison.operations.is_empty() {
         panel_body(empty_quiet(
             icon::VERSION,
-            "No operation",
-            "No root that answered declares an operation.",
+            tr(Msg::NoOperation),
+            tr(Msg::NoRootAnsweredDeclaresOperation),
         ))
         .into_any()
     } else {
         table_view(
-            "Operations, and the levels each answers at",
-            "Operation",
+            &tr(Msg::OperationsLevelsEachAnswers),
+            &tr(Msg::Operation),
             &comparison.columns,
             &comparison.operations,
         )
     };
-    titled_panel("Operations, and the levels each answers at", (), table).into_any()
+    titled_panel(tr(Msg::OperationsLevelsEachAnswers), (), table).into_any()
 }
 
 /// One comparison table: a row heading, then one cell per root.
@@ -179,13 +180,16 @@ fn table_view(caption: &str, corner: &str, columns: &[RootColumn], rows: &[Row])
         let release = column
             .fhir_version
             .clone()
-            .unwrap_or_else(|| NOT_DECLARED.to_owned());
+            .unwrap_or_else(|| not_declared().clone());
         Column::owned(
             column.version.segment(),
-            format!(
-                "{} · FHIR {release}, {}",
-                column.version.label(),
-                column.state
+            tr_with(
+                Msg::Fhir4,
+                &[
+                    ("column", (column.version.label()).to_string().into()),
+                    ("release", (release).clone().into()),
+                    ("state", (column.state).clone().into()),
+                ],
             ),
         )
     }));
@@ -247,8 +251,8 @@ fn cell_view(cell: &Cell) -> AnyView {
 fn cell_text(cell: &Cell) -> String {
     match cell {
         Cell::Stated(text) => text.clone(),
-        Cell::NotDeclared => NOT_DECLARED.to_owned(),
-        Cell::Unread => "no answer".to_owned(),
+        Cell::NotDeclared => not_declared().clone(),
+        Cell::Unread => tr(Msg::NoAnswer).clone(),
     }
 }
 
@@ -259,14 +263,14 @@ fn notes_view(answers: &[(FhirVersion, RootAnswer)]) -> AnyView {
         .map(|(version, answer)| root_notes_view(version.label(), &notes(answer)))
         .collect();
     let body = view! {
-        <p class="fui-muted">"One root's own operation.documentation, as it sent it."</p>
+        <p class="fui-muted">{tr(Msg::OneRootSOwnOperationDocumentation)}</p>
         <div class="fui-stack">{drawn}</div>
     };
-    card("What each root adds to its own definition", body).into_any()
+    card(tr(Msg::WhatEachRootAddsOwnDefinition), body).into_any()
 }
 
 /// One root's notes, closed until a reader opens them.
-fn root_notes_view(label: &'static str, notes: &[(String, String)]) -> AnyView {
+fn root_notes_view(label: &str, notes: &[(String, String)]) -> AnyView {
     let count = notes.len();
     let lines: Vec<AnyView> = notes
         .iter()
@@ -281,7 +285,7 @@ fn root_notes_view(label: &'static str, notes: &[(String, String)]) -> AnyView {
     let body = if count == 0 {
         view! {
             <p class="fui-muted">
-                "This root added nothing to the definitions its release publishes, or did not answer."
+                {tr(Msg::RootAddedNothingDefinitionsReleasePublishes)}
             </p>
         }
         .into_any()
@@ -294,8 +298,11 @@ fn root_notes_view(label: &'static str, notes: &[(String, String)]) -> AnyView {
 /// How many operations one root wrote a note on, as a phrase.
 fn note_count(count: usize) -> String {
     if count == 1 {
-        "1 operation with a note".to_owned()
+        tr(Msg::N1OperationNote).clone()
     } else {
-        format!("{count} operations with a note")
+        tr_with(
+            Msg::OperationsWithANote,
+            &[("count", (count).to_string().into())],
+        )
     }
 }

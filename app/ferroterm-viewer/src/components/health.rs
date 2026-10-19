@@ -9,6 +9,7 @@ use leptos::prelude::*;
 use crate::components::icon;
 use crate::components::reading::Reading;
 use crate::fhir::FhirClient;
+use crate::locale::{Msg, tr};
 
 /// How often the indicator asks the server whether it is still up.
 const POLL: Duration = Duration::from_secs(15);
@@ -42,17 +43,17 @@ pub(crate) fn health_indicator() -> impl IntoView {
     // bar holds the version and the theme on one row, so the status yields.
     view! {
         <span class="hidden sm:contents">
-            <Reading inline=true label="Checking the server">
+            <Reading inline=true label=tr(Msg::CheckingTheServer)>
                 {move || {
                     health
                         .get()
                         .map(|answered| match answered {
-                            Ok(_code) => status(Tone::Ok, icon::SERVING, "Serving", None).into_any(),
+                            Ok(_code) => status(Tone::Ok, icon::SERVING, &tr(Msg::Serving), None).into_any(),
                             Err(error) => {
                                 let detail = error
                                     .status()
                                     .map(|status| status.as_u16().to_string());
-                                status(Tone::Bad, icon::UNREACHABLE, "Unreachable", detail)
+                                status(Tone::Bad, icon::UNREACHABLE, &tr(Msg::Unreachable), detail)
                                     .into_any()
                             }
                         })

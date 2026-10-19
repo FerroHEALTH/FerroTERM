@@ -35,6 +35,7 @@ use crate::listing::pager_view;
 use crate::listing::published_row;
 use crate::listing::published_table;
 use crate::listing::window;
+use crate::locale::{Msg, message, tr};
 use crate::pages::translate;
 use crate::routes::CONCEPT_MAPS_PATH;
 use crate::routes::resource_link;
@@ -98,13 +99,11 @@ pub(crate) fn ConceptMapsPage() -> impl IntoView {
     });
 
     let heading = view! {
-        <Title text="Concept maps" />
+        <Title text=tr(Msg::ConceptMaps) />
         {page_header(
-            "Concept maps",
+            tr(Msg::ConceptMaps),
             Some(
-                String::from(
-                    "The ConceptMap resources this server publishes. Open one to see what it maps.",
-                ),
+                tr(Msg::ConceptmapResourcesServerPublishesOpenOne),
             ),
             (),
         )}
@@ -172,7 +171,7 @@ fn search_form(params: Signal<ListParams>, version: Signal<FhirVersion>) -> AnyV
         navigate(&address(&searched, version.get()), unresolved());
     };
     filter_form(
-        "The url search parameter, matched against ConceptMap.url.",
+        &tr(Msg::UrlSearchParameterMatchedAgainstConceptmap),
         canonical,
         resource_version,
         params,
@@ -233,7 +232,7 @@ fn list_section(
                 .and_then(|result| result.as_ref().ok())
                 .map(|found| {
                     let view = window(params.page(), params.size(), found.matched());
-                    count_sentence(view, "concept maps", found.total())
+                    count_sentence(view, &tr(Msg::ConceptMaps2), found.total())
                 })
                 .unwrap_or_default()
         })
@@ -243,13 +242,13 @@ fn list_section(
         <section class="fui-card fui-panel" aria-labelledby="conceptmaps-heading">
             <div class="fui-panel-head">
                 <h2 id="conceptmaps-heading" class="fui-card-title">
-                    "What this root holds"
+                    {tr(Msg::WhatThisRootHolds)}
                 </h2>
                 <p aria-live="polite" class="fui-muted fui-small">
                     <Transition fallback=|| ()>{announcement}</Transition>
                 </p>
             </div>
-            <Reading label="Reading the concept maps">
+            <Reading label=&{tr(Msg::ReadingTheConceptMaps)}>
                 {move || {
                     let params = params.get();
                     let version = version.get();
@@ -278,9 +277,7 @@ fn list_view(
 ) -> AnyView {
     let resources = found.found();
     if resources.is_empty() {
-        return empty(
-            "This root holds no ConceptMap resource matching the filter above. The translate runner still works: a server may translate through a map it holds without publishing it as a resource.",
-        );
+        return empty(tr(Msg::RootHoldsNoConceptmapResourceMatching));
     }
     // The whole answer is ordered before it is paged, so a walk through the
     // pages walks the order the reader asked for rather than the server's.
@@ -298,7 +295,7 @@ fn list_view(
         .map(|resource| row_view(resource, version))
         .collect();
     let pager = pager_view(
-        Listing::new("Concept map pages").noun(Noun::new("concept map", "concept maps")),
+        Listing::new(tr(Msg::ConceptMapPages)).noun(Noun::new(message(Msg::NounConceptMaps))),
         view,
         params,
         CONCEPT_MAPS_PATH,
@@ -307,8 +304,8 @@ fn list_view(
     );
     view! {
         {published_table(
-            "Concept maps this root holds",
-            "Concept map",
+            &tr(Msg::ConceptMapsRootHolds),
+            tr(Msg::ConceptMap),
             rows,
             order,
             params,
@@ -346,7 +343,7 @@ fn row_view(resource: &PublishedConceptMap, version: FhirVersion) -> AnyView {
             .id()
             .map(|id| resource_link(CONCEPT_MAPS_PATH, id, version)),
         filled.map(|run| Action {
-            label: "Translate",
+            label: tr(Msg::Translate),
             href: translate::address(&run, version),
         }),
     )

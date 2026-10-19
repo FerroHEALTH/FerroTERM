@@ -40,8 +40,10 @@ use crate::components::coded::coded_control;
 use crate::components::coded::codes_of;
 use crate::components::coded::fixed;
 use crate::components::coded::gated;
+use crate::components::editor_mode;
 use crate::components::failure::Failure;
 use crate::components::history::history_offer;
+use crate::components::icon;
 use crate::components::reload::Reload;
 use crate::components::reload::announced;
 use crate::components::reload::diagnostics;
@@ -58,9 +60,11 @@ use crate::fhir::translate::TranslateAnswer;
 use crate::fhir::translate::TranslateRequest;
 use crate::fhir::version::FhirVersion;
 use crate::fhir::write::Refusal;
+use crate::locale::{Msg, message, tr, tr_with};
 use crate::routes::editing_link;
 use crate::styles;
-use ferrohealth_ui::view::empty::{Busy, busy};
+use ferrohealth_ui::view::empty::{Busy, busy, empty_quiet};
+use ferrohealth_ui::view::surface::{Crumb, Header, editor_heading, editor_title};
 
 /// The value set whose codes `ConceptMap.status` is bound to.
 ///
@@ -146,31 +150,29 @@ pub(crate) fn ConceptMapEditorPage() -> impl IntoView {
         Signal::derive(move || dialect(version.get()).relationship_value_set.to_owned()),
     );
 
+    let mode = move || editor_mode(&canonical.get());
     let heading = view! {
-        <Title text=move || title_of(&canonical.get()) />
+        <Title text=move || editor_title(message(Msg::TitleConceptMapEditor), &mode()) />
         <div>
-            {ferrohealth_ui::view::surface::page_heading(
-                ferrohealth_ui::view::surface::Header {
-                    title: String::from("Edit a concept map"),
-                    subtitle: Some(
-                        String::from(
-                            "Its metadata, the systems each group maps between, and every code with what it maps to.",
-                        ),
-                    ),
-                    crumbs: vec![
-                        ferrohealth_ui::view::surface::Crumb::new("Concept maps", "/conceptmaps"),
-                    ],
-                    mono: false,
-                },
-                (),
-            )}
+            {move || {
+                editor_heading(
+                    message(Msg::TitleConceptMapEditor),
+                    &mode(),
+                    Header {
+                        subtitle: Some(tr(Msg::MetadataSystemsEachGroupMapsBetween)),
+                        crumbs: vec![Crumb::new(tr(Msg::ConceptMaps), "/conceptmaps")],
+                        ..Header::default()
+                    },
+                    (),
+                )
+            }}
         </div>
     }
     .into_any();
 
     let form = view! {
         <Transition fallback=|| {
-            busy("Reading the concept map", Busy::Section)
+            busy(tr(Msg::ReadingTheConceptMap), Busy::Section)
         }>
             {move || {
                 let client = client.clone();
@@ -212,15 +214,6 @@ struct Options {
     statuses: Codes,
     /// The codes a target's relationship element admits on this version.
     relationships: Codes,
-}
-
-/// The document title for the concept map being edited.
-fn title_of(canonical: &str) -> String {
-    if canonical.trim().is_empty() {
-        "New concept map".to_owned()
-    } else {
-        format!("Edit {canonical}")
-    }
 }
 
 /// What one preview ran, and what came back.
@@ -322,19 +315,16 @@ fn standing_section(
 ) -> AnyView {
     let because = move || {
         if !managed {
-            "The server states no version for this resource, so it is one this deployment loaded rather than one written through the API, and there is nothing an update could state in If-Match."
+            tr(Msg::ServerStatesNoVersionResourceSo)
         } else if session.can(CONCEPT_MAP, letter.get()) {
-            ""
+            String::new()
         } else {
-            "This account carries no permission to change a concept map. Sign in with one that does."
+            tr(Msg::AccountCarriesNoPermissionChangeConcept)
         }
     };
     view! {
         <Show when=move || readonly.get() fallback=|| ()>
-            <p class=format!(
-                "mt-default rounded-md p-default {}",
-                styles::NOTICE,
-            )>"Read only. " {because}</p>
+            <p class=format!("mt-default rounded-md p-default {}", styles::NOTICE)>{tr(Msg::ReadOnly)} {because}</p>
         </Show>
     }
     .into_any()
@@ -377,7 +367,7 @@ fn outcome_section(
                     {move || {
                         refusal
                             .with(|held| {
-                                held.as_ref().map(|error| Refusal::of(error).what_to_do())
+                                held.as_ref().map(|error| tr(Refusal::of(error).what_to_do()))
                             })
                     }}
                 </p>
@@ -403,6 +393,12 @@ fn outcome_section(
     .into_any()
 }
 
+/// The label of a scope control: `msg`, naming the `element` the version in
+/// force writes the scope under.
+fn scope_label(msg: Msg, element: &str) -> String {
+    tr_with(msg, &[("element", element.into())])
+}
+
 /// The metadata every request about this concept map names it by.
 fn metadata_section(
     draft: RwSignal<MapDraft>,
@@ -413,17 +409,17 @@ fn metadata_section(
     let seed = draft.read_untracked().clone();
     // The element each scope is written under differs per version, so the
     // label says which element this control fills on the root being read.
-    let source_label = move || format!("Source scope ({})", dialect(version.get()).source_scope);
-    let target_label = move || format!("Target scope ({})", dialect(version.get()).target_scope);
+    let source_label = move || scope_label(Msg::SourceScope, dialect(version.get()).source_scope);
+    let target_label = move || scope_label(Msg::TargetScope, dialect(version.get()).target_scope);
     view! {
         <section class="fui-card" aria-labelledby="map-metadata-heading">
             <h2 id="map-metadata-heading" class="fui-card-title">
-                "Metadata"
+                {tr(Msg::Metadata)}
             </h2>
             <div class="mt-default grid gap-default sm:grid-cols-2">
                 <div class="grid gap-tight">
                     <label for="map-url" class=styles::LABEL>
-                        "Canonical (url)"
+                        {tr(Msg::CanonicalUrl)}
                     </label>
                     <input
                         id="map-url"
@@ -440,7 +436,7 @@ fn metadata_section(
                 </div>
                 <div class="grid gap-tight">
                     <label for="map-version" class=styles::LABEL>
-                        "Business version"
+                        {tr(Msg::BusinessVersion)}
                     </label>
                     <input
                         id="map-version"
@@ -459,7 +455,7 @@ fn metadata_section(
                     Control {
                         id: String::from("map-status"),
                         name: "map-status",
-                        label: fixed("Publication status"),
+                        label: fixed(tr(Msg::PublicationStatus)),
                         sr_only: false,
                     },
                     statuses,
@@ -528,16 +524,21 @@ fn groups_section(
     view! {
         <section class="fui-card" aria-labelledby="map-groups-heading">
             <h2 id="map-groups-heading" class="fui-card-title">
-                "Groups"
+                {tr(Msg::Groups)}
             </h2>
             <p class="fui-muted">
-                "A group maps codes of one system to codes of another, and carries at least one code."
+                {tr(Msg::GroupMapsCodesOneSystemCodes)}
             </p>
+            <Show
+                when=move || keys.with(|keys| !keys.is_empty())
+                fallback=|| empty_quiet(icon::CONCEPT_MAPS, tr(Msg::NoGroupsTitle), tr(Msg::NoGroupsLine))
+            >
             <div class="mt-default grid gap-default">
                 <For each=move || keys.get() key=|key| *key let:key>
                     {group_panel(client, version, draft, key, readonly, options, preview, report)}
                 </For>
             </div>
+            </Show>
             <Show when=move || !readonly.get() fallback=|| ()>
                 <p class="mt-default">
                     <button
@@ -556,7 +557,7 @@ fn groups_section(
                                 });
                         }
                     >
-                        "Add a group"
+                        {tr(Msg::AddAGroup)}
                     </button>
                 </p>
             </Show>
@@ -584,9 +585,15 @@ fn group_panel(
         let source = group_of(draft, key, |group| group.source.clone());
         let target = group_of(draft, key, |group| group.target.clone());
         if source.trim().is_empty() && target.trim().is_empty() {
-            "A group with no systems yet".to_owned()
+            tr(Msg::GroupNoSystemsYet).clone()
         } else {
-            format!("{source} to {target}")
+            tr_with(
+                Msg::To2,
+                &[
+                    ("source", (source).clone().into()),
+                    ("target", (target).clone().into()),
+                ],
+            )
         }
     };
     let elements = elements_view(
@@ -622,7 +629,7 @@ fn group_panel(
                                 });
                         }
                     >
-                        "Add a code"
+                        {tr(Msg::AddACode)}
                     </button>
                     <button
                         type="button"
@@ -631,7 +638,7 @@ fn group_panel(
                             draft.update(|draft| draft.groups.retain(|group| group.key != key));
                         }
                     >
-                        "Remove this group"
+                        {tr(Msg::RemoveThisGroup)}
                     </button>
                 </p>
             </Show>
@@ -653,7 +660,7 @@ fn systems_view(draft: RwSignal<MapDraft>, key: Key, readonly: Signal<bool>) -> 
             {driven_control(
                 format!("group-{id}-source"),
                 "group-source",
-                "Source system",
+                tr(Msg::SourceSystem),
                 readonly,
                 gated(Box::new(move || group_of(draft, key, |group| group.source.clone()))),
                 Box::new(move |typed| with_group(draft, key, |group| group.source = typed)),
@@ -661,7 +668,7 @@ fn systems_view(draft: RwSignal<MapDraft>, key: Key, readonly: Signal<bool>) -> 
             {driven_control(
                 format!("group-{id}-source-version"),
                 "group-source-version",
-                "Source system version",
+                tr(Msg::SourceSystemVersion),
                 readonly,
                 gated(Box::new(move || group_of(draft, key, |group| group.source_version.clone()))),
                 Box::new(move |typed| with_group(draft, key, |group| group.source_version = typed)),
@@ -669,7 +676,7 @@ fn systems_view(draft: RwSignal<MapDraft>, key: Key, readonly: Signal<bool>) -> 
             {driven_control(
                 format!("group-{id}-target"),
                 "group-target",
-                "Target system",
+                tr(Msg::TargetSystem),
                 readonly,
                 gated(Box::new(move || group_of(draft, key, |group| group.target.clone()))),
                 Box::new(move |typed| with_group(draft, key, |group| group.target = typed)),
@@ -677,7 +684,7 @@ fn systems_view(draft: RwSignal<MapDraft>, key: Key, readonly: Signal<bool>) -> 
             {driven_control(
                 format!("group-{id}-target-version"),
                 "group-target-version",
-                "Target system version",
+                tr(Msg::TargetSystemVersion),
                 readonly,
                 gated(Box::new(move || group_of(draft, key, |group| group.target_version.clone()))),
                 Box::new(move |typed| with_group(draft, key, |group| group.target_version = typed)),
@@ -712,7 +719,13 @@ fn elements_view(
     });
     view! {
         <div class="mt-default grid gap-default">
-            <p class=styles::EYEBROW>"Codes"</p>
+            <p class=styles::EYEBROW>{tr(Msg::Codes)}</p>
+            <Show
+                when=move || keys.with(Vec::is_empty)
+                fallback=|| ()
+            >
+                {empty_quiet(icon::CONCEPT_MAPS, tr(Msg::NoElementsTitle), tr(Msg::NoElementsLine))}
+            </Show>
             <For each=move || keys.get() key=|key| *key let:key>
                 {element_panel(
                     client,
@@ -741,7 +754,7 @@ fn elements_view(
 fn driven_control(
     id: String,
     name: &'static str,
-    label: &'static str,
+    label: String,
     readonly: Signal<bool>,
     held: Signal<String>,
     mut typed: Box<dyn FnMut(String)>,
@@ -805,7 +818,7 @@ fn element_panel(
         client,
         version,
         format!("element-{id}"),
-        "source code",
+        &tr(Msg::SourceCode2),
         source_system,
         readonly,
         Arc::new(move |code, display| {
@@ -822,7 +835,7 @@ fn element_panel(
             <legend>
                 {move || {
                     let code = element_of(draft, group, key, |element| element.code.clone());
-                    if code.trim().is_empty() { "A code not chosen yet".to_owned() } else { code }
+                    if code.trim().is_empty() { tr(Msg::CodeNotChosenYet).clone() } else { code }
                 }}
             </legend>
             {fields}
@@ -838,7 +851,7 @@ fn element_panel(
                         run_preview(client, version, draft, group, key, preview, report);
                     }
                 >
-                    "Preview this code through $translate"
+                    {tr(Msg::PreviewCodeThroughTranslate)}
                 </button>
             </p>
             {preview_view(preview, key)}
@@ -855,7 +868,7 @@ fn element_panel(
                             );
                         }
                     >
-                        "Remove this code"
+                        {tr(Msg::RemoveThisCode)}
                     </button>
                 </p>
             </Show>
@@ -877,7 +890,7 @@ fn element_fields(
             {driven_control(
                 format!("element-{id}-code"),
                 "element-code",
-                "Code",
+                tr(Msg::Code),
                 readonly,
                 gated(Box::new(move || element_of(draft, group, key, |held| held.code.clone()))),
                 Box::new(move |code| with_element(draft, group, key, |held| held.code = code)),
@@ -885,7 +898,7 @@ fn element_fields(
             {driven_control(
                 format!("element-{id}-display"),
                 "element-display",
-                "Display",
+                tr(Msg::Display),
                 readonly,
                 gated(Box::new(move || element_of(draft, group, key, |held| held.display.clone()))),
                 Box::new(move |display| with_element(
@@ -930,7 +943,7 @@ fn no_map_control(
                     }
                 />
                 <label for=format!("element-{id}-nomap") class=styles::LABEL>
-                    "This code maps to nothing (noMap)"
+                    {tr(Msg::CodeMapsNothingNomap)}
                 </label>
             </div>
         </Show>
@@ -958,7 +971,7 @@ fn targets_view(
     });
     view! {
         <div class="mt-default grid gap-default">
-            <p class=styles::EYEBROW>"Maps to"</p>
+            <p class=styles::EYEBROW>{tr(Msg::MapsTo)}</p>
             <For each=move || keys.get() key=|key| *key let:key>
                 {target_row(client, version, draft, group, element, key, readonly, relationships)}
             </For>
@@ -988,7 +1001,7 @@ fn targets_view(
                                 });
                         }
                     >
-                        "Add a target"
+                        {tr(Msg::AddATarget)}
                     </button>
                 </p>
             </Show>
@@ -1020,7 +1033,7 @@ fn target_row(
         client,
         version,
         format!("target-{id}"),
-        "target code",
+        &tr(Msg::TargetCode2),
         target_system,
         readonly,
         Arc::new(move |code, display| {
@@ -1032,10 +1045,7 @@ fn target_row(
     );
     let fields = target_fields(draft, group, element, key, readonly, relationships, version);
     view! {
-        <div class=format!(
-            "p-default {}",
-            styles::PANEL,
-        )>
+        <div class=format!("p-default {}", styles::PANEL)>
             {fields} {picked} <Show when=move || !readonly.get() fallback=|| ()>
                 <p class="mt-default">
                     <button
@@ -1050,7 +1060,7 @@ fn target_row(
                             );
                         }
                     >
-                        "Remove this target"
+                        {tr(Msg::RemoveThisTarget)}
                     </button>
                 </p>
             </Show>
@@ -1075,7 +1085,7 @@ fn target_fields(
             {driven_control(
                 format!("target-{id}-code"),
                 "target-code",
-                "Target code",
+                tr(Msg::TargetCode),
                 readonly,
                 gated(
                     Box::new(move || target_of(
@@ -1097,7 +1107,7 @@ fn target_fields(
             {driven_control(
                 format!("target-{id}-display"),
                 "target-display",
-                "Target display",
+                tr(Msg::TargetDisplay),
                 readonly,
                 gated(
                     Box::new(move || target_of(
@@ -1115,7 +1125,7 @@ fn target_fields(
             {driven_control(
                 format!("target-{id}-comment"),
                 "target-comment",
-                "Comment",
+                tr(Msg::Comment),
                 readonly,
                 gated(
                     Box::new(move || target_of(
@@ -1154,7 +1164,13 @@ fn relationship_control(
     // sighted reader sees is also the control's accessible name
     // (<https://www.w3.org/TR/WCAG22/#label-in-name>).
     let label = gated(Box::new(move || {
-        format!("Relationship ({})", dialect(version.get()).relationship)
+        tr_with(
+            Msg::Relationship2,
+            &[(
+                "value0",
+                (dialect(version.get()).relationship).to_string().into(),
+            )],
+        )
     }));
     coded_control(
         Control {
@@ -1189,7 +1205,7 @@ fn picker(
     client: StoredValue<FhirClient>,
     version: Signal<FhirVersion>,
     id: String,
-    what: &'static str,
+    what: &str,
     system: Signal<String>,
     readonly: Signal<bool>,
     chose: Chosen,
@@ -1243,9 +1259,18 @@ fn picker(
             return String::new();
         }
         found.with(|answered| match answered.as_ref() {
-            None => format!("Searching for {asked}"),
-            Some(Err(_refused)) => format!("The search for {asked} did not answer."),
-            Some(Ok(rows)) => format!("{} codes match {asked}.", rows.len()),
+            None => tr_with(Msg::SearchingFor, &[("asked", (asked).clone().into())]),
+            Some(Err(_refused)) => tr_with(
+                Msg::SearchDidNotAnswer,
+                &[("asked", (asked).clone().into())],
+            ),
+            Some(Ok(rows)) => tr_with(
+                Msg::CodesMatch,
+                &[
+                    ("rows", (rows.len()).to_string().into()),
+                    ("asked", (asked).clone().into()),
+                ],
+            ),
         })
     };
     view! {
@@ -1253,7 +1278,7 @@ fn picker(
             <form class="flex flex-wrap items-end gap-default" on:submit=search>
                 <div class="grid grow gap-tight">
                     <label for=field class=styles::LABEL>
-                        {format!("Find a {what} in this system")}
+                        {tr_with(Msg::FindSystem, &[("what", what.into())])}
                     </label>
                     <input
                         id=field
@@ -1266,7 +1291,7 @@ fn picker(
                     />
                 </div>
                 <button type="submit" class=styles::BUTTON disabled=move || readonly.get()>
-                    "Search"
+                    {tr(Msg::Search)}
                 </button>
             </form>
             <p id=region aria-live="polite" class=styles::HINT>
@@ -1275,7 +1300,7 @@ fn picker(
             // A picker that has not been searched has nothing to wait for, so a
             // saved map with twenty codes does not paint twenty spinners.
             <Transition fallback=move || {
-                (!asked.read().trim().is_empty()).then(|| busy("Searching", Busy::Section))
+                (!asked.read().trim().is_empty()).then(|| busy(tr(Msg::Searching), Busy::Section))
             }>{results}</Transition>
         </div>
     }
@@ -1334,14 +1359,14 @@ fn preview_view(preview: RwSignal<Option<Preview>>, element: Key) -> AnyView {
 /// The matches one preview reported, as the table a reader reads.
 fn matches_view(answer: &TranslateAnswer, inline: bool) -> AnyView {
     let source = if inline {
-        "Translated through the map on this screen, sent with the request."
+        tr(Msg::TranslatedThroughMapScreenSentRequest)
     } else {
-        "This server did not take the map inline, so the preview ran against the saved map."
+        tr(Msg::ServerDidNotTakeMapInline)
     };
     let result = match answer.result() {
-        Some(true) => "The server translated the code.",
-        Some(false) => "The server translated nothing for this code.",
-        None => "The server stated no result.",
+        Some(true) => tr(Msg::ServerTranslatedCode),
+        Some(false) => tr(Msg::ServerTranslatedNothingCode),
+        None => tr(Msg::ServerStatedNoResult),
     };
     let message = answer.message().unwrap_or_default();
     let rows: Vec<AnyView> = answer
@@ -1380,16 +1405,16 @@ fn matches_view(answer: &TranslateAnswer, inline: bool) -> AnyView {
                 <thead>
                     <tr>
                         <th scope="col" class=styles::TH>
-                            "Code"
+                            {tr(Msg::Code)}
                         </th>
                         <th scope="col" class=styles::TH>
-                            "Display"
+                            {tr(Msg::Display)}
                         </th>
                         <th scope="col" class=styles::TH>
-                            "Relationship"
+                            {tr(Msg::Relationship)}
                         </th>
                         <th scope="col" class=styles::TH>
-                            "System"
+                            {tr(Msg::System)}
                         </th>
                     </tr>
                 </thead>
@@ -1423,17 +1448,15 @@ fn run_preview(
     let problems = held.problems(version);
     if let Some(first) = problems.first() {
         preview.set(None);
-        report.set(format!(
-            "The map has to be complete before it can be translated through. {}",
-            first.text()
+        report.set(tr_with(
+            Msg::MapHasCompleteBeforeCanTranslated,
+            &[("first", (first.text()).clone().into())],
         ));
         return;
     }
     let Some(request) = request_for(&held, group, element) else {
         preview.set(None);
-        report.set(String::from(
-            "This code has no system to translate from yet.",
-        ));
+        report.set(tr(Msg::CodeHasNoSystemTranslateFrom));
         return;
     };
     let resource = held.resource(version);
@@ -1445,7 +1468,7 @@ fn run_preview(
             ..request.clone()
         });
     let client = client.get_value();
-    report.set(String::from("Translating"));
+    report.set(tr(Msg::Translating));
     spawn_local(async move {
         let inline = Box::pin(client.translate_inline(version, &request, &resource)).await;
         let (inline_used, answer) = match (inline, saved) {
@@ -1486,16 +1509,22 @@ fn unsupported(error: &FhirError) -> bool {
 /// What the live region says after a preview.
 fn previewed_text(inline: bool, answer: Result<&TranslateAnswer, &FhirError>) -> String {
     match answer {
-        Err(error) => format!("The preview did not answer: {}", diagnostics(error)),
+        Err(error) => tr_with(
+            Msg::PreviewDidNotAnswer,
+            &[("value0", (diagnostics(error)).clone().into())],
+        ),
         Ok(answer) => {
             let through = if inline {
-                "the map on this screen"
+                tr(Msg::MapScreen)
             } else {
-                "the saved map, because this server did not take the map inline"
+                tr(Msg::SavedMapBecauseServerDidNot)
             };
-            format!(
-                "Translated through {through}: {} matches.",
-                answer.matches().len()
+            tr_with(
+                Msg::TranslatedThroughMatches,
+                &[
+                    ("through", (through).clone().into()),
+                    ("answer", (answer.matches().len()).to_string().into()),
+                ],
             )
         }
     }
@@ -1546,7 +1575,7 @@ fn save_section(
         }
         saving.set(true);
         refusal.set(None);
-        report.set(String::from("Saving"));
+        report.set(tr(Msg::Saving));
         let client = client.get_value();
         spawn_local(async move {
             send_it(
@@ -1576,10 +1605,10 @@ fn save_section(
         <Show when=move || !readonly.get() fallback=|| ()>
             <section class="fui-card" aria-labelledby="map-save-heading">
                 <h2 id="map-save-heading" class="fui-card-title">
-                    "Save"
+                    {tr(Msg::Save)}
                 </h2>
                 <p class="fui-muted">
-                    "An update states the version it replaces, so a change made elsewhere since this form was opened is refused rather than overwritten."
+                    {tr(Msg::UpdateStatesVersionReplacesSoChange)}
                 </p>
                 <Show when=move || !problems.read().is_empty() fallback=|| ()>
                     <ul class=format!("mt-default grid gap-tight {}", styles::MUTED)>{listed}</ul>
@@ -1594,9 +1623,9 @@ fn save_section(
                     >
                         {move || {
                             if draft.read().id.is_empty() {
-                                "Create this concept map"
+                                {tr(Msg::CreateThisConceptMap)}
                             } else {
-                                "Save this concept map"
+                                {tr(Msg::SaveThisConceptMap)}
                             }
                         }}
                     </button>
@@ -1666,9 +1695,12 @@ async fn send_it(client: &FhirClient, version: FhirVersion, held: &MapDraft, int
 /// What the live region says after a save the server took.
 fn saved_text(version_id: &str) -> String {
     if version_id.is_empty() {
-        String::from("Saved. The server stated no version for it.")
+        tr(Msg::SavedServerStatedNoVersion)
     } else {
-        format!("Saved. The server now holds version {version_id}.")
+        tr_with(
+            Msg::SavedServerNowHoldsVersion,
+            &[("version_id", (version_id).to_string().into())],
+        )
     }
 }
 
@@ -1775,9 +1807,15 @@ mod tests {
 
     #[test]
     fn a_new_concept_map_and_an_edited_one_title_the_page_apart() {
-        assert_eq!(title_of("  "), "New concept map");
         assert_eq!(
-            title_of("https://terminology.example/colour-map"),
+            editor_title(message(Msg::TitleConceptMapEditor), &editor_mode("  ")),
+            "New concept map"
+        );
+        assert_eq!(
+            editor_title(
+                message(Msg::TitleConceptMapEditor),
+                &editor_mode("https://terminology.example/colour-map")
+            ),
             "Edit https://terminology.example/colour-map"
         );
     }

@@ -9,6 +9,7 @@
 //! is a link rather than a command.
 
 use crate::fhir::version::FhirVersion;
+use crate::locale::{Msg, tr};
 use crate::routes::BROWSE_PATH;
 use crate::routes::EXPAND_PATH;
 use crate::routes::TRANSLATE_PATH;
@@ -63,11 +64,11 @@ impl Subject {
     }
 
     /// What a reader is told this string was read as.
-    pub(crate) fn label(&self) -> &'static str {
+    pub(crate) fn label(&self) -> String {
         match self {
-            Self::Canonical(_) => "a canonical",
-            Self::Code(_) => "a code",
-            Self::Text(_) => "a phrase",
+            Self::Canonical(_) => tr(Msg::ACanonical),
+            Self::Code(_) => tr(Msg::ACode),
+            Self::Text(_) => tr(Msg::APhrase),
         }
     }
 
@@ -103,9 +104,9 @@ fn looks_like_uri(typed: &str) -> bool {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Offer {
     /// What the offer does, as a reader reads it.
-    pub(crate) label: &'static str,
+    pub(crate) label: String,
     /// Which operation or screen answers it, in one sentence.
-    pub(crate) detail: &'static str,
+    pub(crate) detail: String,
     /// The address it opens, which the reader could have typed.
     pub(crate) href: String,
 }
@@ -146,26 +147,26 @@ pub(crate) fn offers(subject: &Subject, declared: Declared, version: FhirVersion
 /// says which it treats the canonical as.
 fn canonical_offers(canonical: &str, declared: Declared, version: FhirVersion) -> Vec<Offer> {
     let mut found = vec![Offer {
-        label: "Open the code system",
-        detail: "Reads what this root declares about it, and the CodeSystem it publishes for it.",
+        label: tr(Msg::OpenTheCodeSystem),
+        detail: tr(Msg::ReadsWhatRootDeclaresAboutCodesystem),
         href: system_link(canonical, version),
     }];
     found.push(Offer {
-        label: "Browse its concepts",
-        detail: "Walks the hierarchy, where the served version declares an operator to walk it by.",
+        label: tr(Msg::BrowseItsConcepts),
+        detail: tr(Msg::WalksHierarchyWhereServedVersionDeclares),
         href: screen_with(BROWSE_PATH, "system", canonical, version),
     });
     if declared.expand {
         found.push(Offer {
-            label: "Expand it as a value set",
-            detail: "Sends the canonical as the url parameter of ValueSet/$expand.",
+            label: tr(Msg::ExpandValueSet),
+            detail: tr(Msg::SendsCanonicalUrlParameterValuesetExpand),
             href: screen_with(EXPAND_PATH, "url", canonical, version),
         });
     }
     if declared.validate {
         found.push(Offer {
-            label: "Validate a code in it",
-            detail: "Opens the runner with the canonical filled in, ready for a code.",
+            label: tr(Msg::ValidateCode),
+            detail: tr(Msg::OpensRunnerCanonicalFilledReadyCode),
             href: screen_with(VALIDATE_PATH, "system", canonical, version),
         });
     }
@@ -181,21 +182,21 @@ fn code_offers(code: &str, declared: Declared, version: FhirVersion) -> Vec<Offe
     let mut found = Vec::new();
     if declared.validate {
         found.push(Offer {
-            label: "Validate this code",
-            detail: "Opens the runner with the code filled in. Name the system it belongs to.",
+            label: tr(Msg::ValidateThisCode),
+            detail: tr(Msg::OpensRunnerCodeFilledNameSystem),
             href: screen_with(VALIDATE_PATH, "code", code, version),
         });
     }
     if declared.translate {
         found.push(Offer {
-            label: "Translate this code",
-            detail: "Opens the runner with the code filled in. Name the system it belongs to.",
+            label: tr(Msg::TranslateThisCode),
+            detail: tr(Msg::OpensRunnerCodeFilledNameSystem),
             href: screen_with(TRANSLATE_PATH, "code", code, version),
         });
     }
     found.push(Offer {
-        label: "Find it in a hierarchy",
-        detail: "Searches the concept browser for it, in the code system you pick there.",
+        label: tr(Msg::FindHierarchy),
+        detail: tr(Msg::SearchesConceptBrowserCodeSystemYou),
         href: screen_with(BROWSE_PATH, "filter", code, version),
     });
     found
@@ -204,8 +205,8 @@ fn code_offers(code: &str, declared: Declared, version: FhirVersion) -> Vec<Offe
 /// What a phrase can be: a search, in the one place that searches designations.
 fn text_offers(text: &str, version: FhirVersion) -> Vec<Offer> {
     vec![Offer {
-        label: "Search the designations",
-        detail: "Sends the phrase as the filter parameter, in the code system you pick there.",
+        label: tr(Msg::SearchTheDesignations),
+        detail: tr(Msg::SendsPhraseFilterParameterCodeSystem),
         href: screen_with(BROWSE_PATH, "filter", text, version),
     }]
 }

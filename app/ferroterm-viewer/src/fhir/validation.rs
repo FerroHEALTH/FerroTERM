@@ -27,6 +27,7 @@ use crate::fhir::expansion::DISPLAY_LANGUAGE_PARAMETER;
 use crate::fhir::expansion::URL_PARAMETER;
 use crate::fhir::outcome::OperationOutcome;
 use crate::fhir::translate::Coding;
+use crate::locale::{Msg, tr, tr_with};
 use crate::url::RequestUrl;
 
 /// The `$validate-code` parameter carrying the display the client asserts.
@@ -464,7 +465,7 @@ fn itemised(outcome: &OperationOutcome) -> Vec<ValidationIssue> {
                 .as_ref()
                 .and_then(|details| details.text.clone())
                 .or_else(|| issue.diagnostics.clone())
-                .unwrap_or_else(|| "the server sent no diagnostic".to_owned()),
+                .unwrap_or_else(|| tr(Msg::ServerSentNoDiagnostic).clone()),
             expressions: issue.expression.clone(),
         })
         .collect()
@@ -489,12 +490,12 @@ impl Validation {
     /// (<https://www.w3.org/TR/WCAG22/#use-of-color>).
     pub(crate) fn sentence(&self) -> String {
         let mut said = match self.result {
-            Some(true) => String::from("The server answered result true: the code is valid."),
-            Some(false) => String::from("The server answered result false: the code is not valid."),
-            None => String::from("The server answered no result."),
+            Some(true) => tr(Msg::ServerAnsweredResultTrueCodeValid),
+            Some(false) => tr(Msg::ServerAnsweredResultFalseCodeNot),
+            None => tr(Msg::ServerAnsweredNoResult),
         };
         if self.inactive == Some(true) {
-            said.push_str(" The concept is inactive in its code system.");
+            said.push_str(&tr(Msg::ConceptInactiveCodeSystem));
         }
         if let Some(message) = &self.message {
             said.push(' ');
@@ -512,18 +513,37 @@ impl Validation {
 /// server that answers something new is not misreported.
 pub(crate) fn subsumption_sentence(outcome: &str, code_a: &str, code_b: &str) -> String {
     match outcome {
-        "equivalent" => format!("{code_a} and {code_b} are the same concept."),
-        "subsumes" => {
-            format!("{code_a} subsumes {code_b}: {code_b} is a descendant of {code_a}.")
-        }
-        "subsumed-by" => {
-            format!("{code_a} is subsumed by {code_b}: {code_a} is a descendant of {code_b}.")
-        }
-        "not-subsumed" => {
-            format!("Neither {code_a} nor {code_b} subsumes the other.")
-        }
-        other => format!(
-            "The server answered the outcome `{other}`, which is not one of the four this viewer has wording for."
+        "equivalent" => tr_with(
+            Msg::SameConcept,
+            &[
+                ("code_a", (code_a).to_string().into()),
+                ("code_b", (code_b).to_string().into()),
+            ],
+        ),
+        "subsumes" => tr_with(
+            Msg::SubsumesDescendant,
+            &[
+                ("code_a", (code_a).to_string().into()),
+                ("code_b", (code_b).to_string().into()),
+            ],
+        ),
+        "subsumed-by" => tr_with(
+            Msg::SubsumedDescendant,
+            &[
+                ("code_a", (code_a).to_string().into()),
+                ("code_b", (code_b).to_string().into()),
+            ],
+        ),
+        "not-subsumed" => tr_with(
+            Msg::NeitherNorSubsumesOther,
+            &[
+                ("code_a", (code_a).to_string().into()),
+                ("code_b", (code_b).to_string().into()),
+            ],
+        ),
+        other => tr_with(
+            Msg::ServerAnsweredOutcomeWhichNotOne,
+            &[("other", (other).to_string().into())],
         ),
     }
 }

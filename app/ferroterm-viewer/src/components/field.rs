@@ -20,6 +20,7 @@ use ferrohealth_ui::widget::help::{explained_check_field, explained_field, help_
 use ferrohealth_ui::widget::pick_or_type::{PickOrType, Picker as PickerControl, pick_or_type};
 
 use crate::fhir::named::Choice;
+use crate::locale::{Msg, tr};
 
 /// The option value that asks for the text field rather than a listed one.
 ///
@@ -33,16 +34,16 @@ const PICKED_NAME: &str = "picked";
 
 /// One control: what it is called on the wire, what a reader calls it, and the
 /// sentence that explains it.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct Field {
     /// The `id` the label points at.
     pub(crate) id: &'static str,
     /// The `name` the control carries.
     pub(crate) name: &'static str,
     /// The label a reader reads.
-    pub(crate) label: &'static str,
+    pub(crate) label: String,
     /// The sentence that explains the parameter.
-    pub(crate) hint: &'static str,
+    pub(crate) hint: String,
 }
 
 /// One labelled text control, seeded from its own parameter.
@@ -51,7 +52,9 @@ pub(crate) fn text_field(field: Field, node: NodeRef<Input>, value: Memo<String>
 }
 
 /// The placeholder a display language field shows while it is empty.
-pub(crate) const LANGUAGE_EXAMPLE: &str = "for example en or nl-NL";
+pub(crate) fn language_example() -> String {
+    tr(Msg::ExampleEnNlNl)
+}
 
 /// One labelled text control with a placeholder showing the shape of what it
 /// takes while it is empty.
@@ -59,7 +62,7 @@ pub(crate) fn text_field_showing(
     field: Field,
     node: NodeRef<Input>,
     value: Memo<String>,
-    placeholder: Option<&'static str>,
+    placeholder: Option<String>,
 ) -> AnyView {
     let input = view! {
         <input
@@ -172,7 +175,7 @@ pub(crate) fn note(text: Memo<String>) -> AnyView {
 }
 
 /// A labelled group of controls that belong together.
-pub(crate) fn group(label: &'static str, fields: Vec<AnyView>) -> AnyView {
+pub(crate) fn group(label: String, fields: Vec<AnyView>) -> AnyView {
     fieldset(label, fields).into_any()
 }
 
@@ -180,23 +183,25 @@ pub(crate) fn group(label: &'static str, fields: Vec<AnyView>) -> AnyView {
 ///
 /// The words are the control's, because "the version this server defaults to"
 /// and "another canonical" are the same option in two different forms.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct Picker {
     /// What the option that names nothing says.
-    pub(crate) empty: &'static str,
+    pub(crate) empty: String,
     /// What the option that asks for the text field says.
-    pub(crate) other: &'static str,
+    pub(crate) other: String,
     /// Whether the list is long enough to filter as the reader types: a
     /// combobox, where a short list stays a select.
     pub(crate) searched: bool,
 }
 
 /// The words a picker over a canonical carries.
-pub(crate) const CANONICAL_WORDS: Picker = Picker {
-    empty: "Choose one this server holds",
-    other: "Another canonical",
-    searched: true,
-};
+pub(crate) fn canonical_words() -> Picker {
+    Picker {
+        empty: tr(Msg::ChooseOneServerHolds),
+        other: tr(Msg::AnotherCanonical),
+        searched: true,
+    }
+}
 
 /// The words a picker over a version carries.
 ///
@@ -204,11 +209,13 @@ pub(crate) const CANONICAL_WORDS: Picker = Picker {
 /// resolves to, which is what the empty option says rather than leaving a
 /// reader to guess what an empty box means
 /// (<https://hl7.org/fhir/R5/terminology-module.html#version>).
-pub(crate) const VERSION_WORDS: Picker = Picker {
-    empty: "The one this server resolves to",
-    other: "Another version",
-    searched: false,
-};
+pub(crate) fn version_words() -> Picker {
+    Picker {
+        empty: tr(Msg::OneServerResolves),
+        other: tr(Msg::AnotherVersion),
+        searched: false,
+    }
+}
 
 /// One labelled value, picked from what this root holds or typed.
 ///
@@ -271,6 +278,7 @@ fn searched_field(
         None => {}
     });
     let typed_id = format!("{}-typed", field.id);
+    let label = field.label.clone();
     let combo = move || {
         let mut options: Vec<ComboOption> = choices.with(|choices| {
             choices
@@ -281,12 +289,12 @@ fn searched_field(
                 })
                 .collect()
         });
-        options.push(ComboOption::new(TYPE_IT, words.other));
+        options.push(ComboOption::new(TYPE_IT, words.other.clone()));
         combobox(Combobox {
             id: field.id,
             name: PICKED_NAME,
-            label: field.label,
-            placeholder: words.empty,
+            label: label.clone().into(),
+            placeholder: words.empty.clone().into(),
             options,
             selected: picked,
         })
@@ -304,7 +312,7 @@ fn searched_field(
         />
     };
     pick_or_type(PickOrType {
-        label: field.label.to_owned(),
+        label: field.label.clone(),
         picker: PickerControl::Labelled(combo.into_any()),
         typed_id,
         typed: input.into_any(),
@@ -402,7 +410,7 @@ fn selected_field(
     // Each control carries its own label, hidden with it, so a reader meets
     // one (<https://www.w3.org/TR/wai-aria-1.2/#namecalculation>).
     pick_or_type(PickOrType {
-        label: field.label.to_owned(),
+        label: field.label.clone(),
         picker: PickerControl::Control {
             id: picker,
             control: select.into_any(),

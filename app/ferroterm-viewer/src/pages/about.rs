@@ -13,6 +13,7 @@ use leptos::prelude::*;
 use leptos_meta::Title;
 
 use crate::components::detail::{TAB_PARAM, current_tab, detail_tabs};
+use crate::locale::{Msg, tr};
 use crate::pages::evidence;
 use crate::pages::settings;
 use crate::pages::versions;
@@ -22,10 +23,10 @@ pub(crate) const PANE_PARAM: &str = TAB_PARAM;
 
 /// The tabs, in the order the screen draws them; the first is what a reader
 /// who named none of them gets.
-const TABS: &[(&str, &str)] = &[
-    ("versions", "The four FHIR versions"),
-    ("evidence", "The evidence this build ships"),
-    ("settings", "Settings"),
+const TABS: &[(&str, Msg)] = &[
+    ("versions", Msg::TheFourFhirVersions),
+    ("evidence", Msg::EvidenceBuildShips),
+    ("settings", Msg::Settings),
 ];
 
 /// Shows the three tabs about this server and this console.
@@ -39,26 +40,24 @@ pub(crate) fn AboutPage() -> impl IntoView {
     let body = move || {
         let key = tab.get();
         let (label, body) = match key {
-            "evidence" => ("The evidence this build ships", evidence::pane()),
-            "settings" => ("Settings", settings::pane()),
-            _ => ("The four FHIR versions", versions::pane()),
+            "evidence" => (tr(Msg::EvidenceBuildShips), evidence::pane()),
+            "settings" => (tr(Msg::Settings), settings::pane()),
+            _ => (tr(Msg::TheFourFhirVersions), versions::pane()),
         };
         pane(key, label, body)
     };
     view! {
-        <Title text="About this server" />
+        <Title text=tr(Msg::AboutThisServer) />
         {page_header(
-            "About this server",
+            tr(Msg::AboutThisServer),
             Some(
-                String::from(
-                    "What each FHIR root declares, the evidence this build ships, and this console's settings.",
-                ),
+                tr(Msg::WhatEachFhirRootDeclaresEvidence),
             ),
             (),
         )}
         {stack(
             view! {
-                {detail_tabs("About this server", TABS, tab)}
+                {detail_tabs(tr(Msg::AboutThisServer), TABS, tab)}
                 {body}
             },
         )}
@@ -71,7 +70,7 @@ fn anchor(id: &str) -> String {
 }
 
 /// One pane, named by its tab.
-fn pane(id: &str, label: &'static str, body: AnyView) -> AnyView {
+fn pane(id: &str, label: String, body: AnyView) -> AnyView {
     let heading = anchor(id);
     view! {
         <section id=heading.clone() aria-labelledby=format!("{heading}-name") class="fui-stack">
