@@ -14,25 +14,6 @@ fragments here under the version and its date.
 
 ## [Unreleased]
 
-### Changed
-
-- The console takes FerroUI 0.2.0 and reads every word it hands FerroUI
-  from its catalog at run time (#749): table captions, column headers,
-  pager nouns with their plurals, navigation, tabs, fields, dialogs and
-  page titles come from `locales/en/ferroterm-viewer.ftl`, and the
-  stray-literal baseline drops from 1388 to 115 literals. English remains
-  the only locale.
-
-### Fixed
-
-- The code system and concept map editors and the value set composer name
-  their mode in the header and the page title (#756): "New code system",
-  "New concept map" or "New value set" when they create, "Edit <name>" when
-  they edit.
-- An editor table with no rows draws FerroUI's shared empty state in place
-  of a bare header row (#757).
-- Two console source files carry their SPDX header (#760).
-
 ## [0.1.8] - 2026-10-16
 
 ### Added
