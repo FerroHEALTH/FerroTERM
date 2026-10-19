@@ -8,6 +8,7 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use ferrohealth_ui::i18n::Locale;
 use secrecy::SecretString;
 use url::Url;
 
@@ -21,6 +22,9 @@ pub struct Settings {
     pub listen: SocketAddr,
     /// The directory holding the site bundle.
     pub site_root: PathBuf,
+    /// The locale a page renders in when the request names none the
+    /// console's catalog holds.
+    pub locale: Locale,
     /// The terminology server the console is a client of.
     pub ferroterm: FerrotermSettings,
     /// The server-side sign-in sessions.
@@ -116,6 +120,7 @@ impl Config {
     ///
     /// # Errors
     /// Returns [`Error::Address`] for a listen address that does not parse,
+    /// [`Error::Locale`] for a `server.locale` that is no language tag,
     /// [`Error::Missing`], [`Error::Url`] and [`Error::UrlShape`] for a URL
     /// that is absent, does not parse or is not one its key admits,
     /// [`Error::Zero`] for a zero timeout or pool bound, [`Error::Scope`] for
@@ -131,6 +136,10 @@ impl Config {
                 key: String::from("server.listen"),
                 source,
             })?;
+        let locale = Locale::parse(&self.server.locale).map_err(|source| Error::Locale {
+            key: String::from("server.locale"),
+            source,
+        })?;
         let base = base_url("ferroterm.base_url", &self.ferroterm.base_url)?;
         let public = self
             .ferroterm
@@ -172,6 +181,7 @@ impl Config {
         Ok(Settings {
             listen,
             site_root: self.server.site_root.clone(),
+            locale,
             ferroterm: FerrotermSettings {
                 base,
                 public,
@@ -353,5 +363,37 @@ fn is_loopback(url: &Url) -> bool {
         Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
         Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
         None => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use crate::config::Config;
+    use crate::config::error::Error;
+
+    #[test]
+    fn the_locale_is_english_unless_configured_and_a_bad_tag_is_refused_by_key() {
+        let settings = Config::from_sources(None, &BTreeMap::new())
+            .expect("the defaults read")
+            .resolve()
+            .expect("the defaults resolve");
+        assert_eq!("en", settings.locale.tag());
+        let configured =
+            Config::from_sources(Some("[server]\nlocale = \"en-GB\"\n"), &BTreeMap::new())
+                .expect("the tree reads")
+                .resolve()
+                .expect("a language tag resolves");
+        assert_eq!("en-GB", configured.locale.tag());
+        let refused =
+            Config::from_sources(Some("[server]\nlocale = \"not a tag\"\n"), &BTreeMap::new())
+                .expect("the tree reads")
+                .resolve()
+                .expect_err("no language tag");
+        assert!(
+            matches!(&refused, Error::Locale { key, .. } if key == "server.locale"),
+            "{refused:?}"
+        );
     }
 }

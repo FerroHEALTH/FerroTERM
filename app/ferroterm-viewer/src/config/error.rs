@@ -169,6 +169,15 @@ pub enum Error {
         #[source]
         source: std::net::AddrParseError,
     },
+    /// A locale that is no BCP 47 language tag.
+    #[error("`{key}` is not a language tag")]
+    Locale {
+        /// The key.
+        key: String,
+        /// What parsing it failed with.
+        #[source]
+        source: ferrohealth_ui::i18n::UnknownLanguage,
+    },
     /// A URL that does not parse.
     #[error("`{key}` is not a URL")]
     Url {

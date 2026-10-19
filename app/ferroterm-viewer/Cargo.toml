@@ -40,6 +40,8 @@ serde_json.workspace = true
 # when an edge into the engine appears.
 [dependencies]
 ferrohealth-ui.workspace = true
+# The console's own string catalogs under locales/, in both halves.
+fluent-templates.workspace = true
 http.workspace = true
 leptos.workspace = true
 leptos_meta.workspace = true

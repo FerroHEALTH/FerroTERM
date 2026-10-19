@@ -863,6 +863,37 @@ impl Journey {
         }))
     }
 
+    /// Waits until the page's fonts have loaded and its height holds over
+    /// three readings in a row, so a capture measures the page whole and not
+    /// a list still arriving; fails the journey after [`WAIT`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the WebDriver error when the browser refused a reading.
+    pub async fn steady_height(&self, what: &str) -> WebDriverResult<u32> {
+        let deadline = Instant::now() + WAIT;
+        let mut last = None;
+        let mut held = 0_u8;
+        loop {
+            let fonts = self.evaluate("return document.fonts.status;").await?;
+            let height = self.page_height().await?;
+            if fonts.trim() == "loaded" && last == Some(height) {
+                held = held.saturating_add(1);
+                if held >= 2 {
+                    return Ok(height);
+                }
+            } else {
+                held = 0;
+            }
+            last = Some(height);
+            if Instant::now() >= deadline {
+                let reason = format!("the page height never held, last {height}");
+                panic!("{}", self.failure(what, &reason).await);
+            }
+            tokio::time::sleep(POLL).await;
+        }
+    }
+
     /// Sets the cookie `name` to `value` on the page's own origin, the way a
     /// form post of the console's preferences would.
     ///

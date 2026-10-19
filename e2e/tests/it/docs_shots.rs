@@ -198,12 +198,16 @@ fn themed(dir: &Path, theme: &str) -> PathBuf {
 ///
 /// The window grows until the document is no taller than the viewport, a
 /// few rounds at most, because a pane sized to the viewport grows with it.
+/// Each round measures the page only once its height holds, so a list that
+/// arrives after the resize (the concept browser's) is in the shot.
 async fn fitted(journey: &Journey, width: u32, path: &Path) -> WebDriverResult<()> {
     journey.resize(width, PROBE_WINDOW).await;
     let frame = PROBE_WINDOW.saturating_sub(pixels(journey.viewport_height().await?));
     let mut viewport = PROBE_WINDOW.saturating_sub(frame);
     for _round in 0..FIT_ROUNDS {
-        let content = journey.page_height().await?;
+        let content = journey
+            .steady_height(&format!("{} to hold its height", path.display()))
+            .await?;
         let wanted = content.clamp(HEIGHT_BOUNDS.0, HEIGHT_BOUNDS.1);
         if wanted == viewport {
             break;

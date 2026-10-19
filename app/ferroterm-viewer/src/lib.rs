@@ -39,6 +39,7 @@ mod evidence;
 pub mod fhir;
 mod find;
 mod listing;
+mod locale;
 mod offers;
 mod pages;
 mod paging;

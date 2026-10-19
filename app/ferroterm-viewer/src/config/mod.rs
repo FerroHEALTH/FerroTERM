@@ -78,6 +78,9 @@ pub struct Server {
     /// The directory holding the site bundle cargo-leptos builds: the
     /// WebAssembly, its JavaScript glue and the stylesheet under `pkg/`.
     pub site_root: PathBuf,
+    /// The BCP 47 tag of the locale a page renders in when the request's
+    /// `Accept-Language` names no language the console's catalog holds.
+    pub locale: String,
 }
 
 impl Default for Server {
@@ -85,6 +88,7 @@ impl Default for Server {
         Self {
             listen: String::from("127.0.0.1:3000"),
             site_root: PathBuf::from("target/site"),
+            locale: String::from("en"),
         }
     }
 }
