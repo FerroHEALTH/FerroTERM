@@ -35,3 +35,4 @@
 - [FerroHEALTH org move](ferrohealth-org-move.md), repo is FerroHEALTH/FerroTERM since 2026-10-01; attestations and the old GHCR package stay under rubentalstra, image path lowercase ghcr.io/ferrohealth, crates.io Trusted Publishing must name FerroHEALTH
 - [Native issue types and priority](native-issue-types-and-priority.md), type, priority and effort are the org's native issue type and Priority/Effort fields via scripts/gh/fields.sh since 2026-10-05 (#704); the owner runs migrate-fields.sh apply and labels.sh by hand
 - [FerroUI](ferroui.md), every console draws in FerroUI; uniform design, shared components, all four consoles move in lockstep with each FerroUI release
+- [Release closes milestone](release-closes-milestone.md), release.yml refuses a tag whose milestone is missing or not empty and closes it after every leg; check it after a manual or recovery release; owner 2026-10-19 (#758)

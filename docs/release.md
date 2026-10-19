@@ -9,7 +9,10 @@ cut follows, in order.
 
 1. **The milestone is empty.** `gh issue list --milestone vX.Y.Z --state open`
    answers nothing, or the owner calls the cut and moves the stragglers to the
-   next milestone.
+   next milestone. The `plan` job of `release.yml` refuses the tag otherwise,
+   naming each open issue or pull request, and
+   `GITHUB_REPOSITORY=FerroHEALTH/FerroTERM bash scripts/release/milestone.sh
+   check vX.Y.Z` asks the same question before you tag.
 2. **The version moves everywhere**, not only in the manifests: the workspace
    `version`, `CITATION.cff`, the README, the landing page, the book.
    `scripts/checks/versions.sh` fails on any file left behind.
@@ -55,8 +58,13 @@ cut follows, in order.
 The signed tag is the owner's: `git tag -s vX.Y.Z -m "vX.Y.Z" <commit>` on the
 merged release commit, then `git push origin vX.Y.Z`. `release.yml` takes it
 from there: the draft release, the four per-architecture builds, the image, the
-asset verification, the publish, and the crates.io leg behind the `crates-io`
-environment's required reviewer.
+asset verification, the publish, the crates.io leg behind the `crates-io`
+environment's required reviewer, and last the `milestone` job, which closes
+the milestone titled as the tag once every other leg has succeeded. When a
+leg fails or the crates.io approval is refused, that job names the leg in its
+log and leaves the milestone open; a re-run of the failed jobs closes it. An
+already-closed milestone counts as done, and a pre-release tag finishes no
+milestone, so neither milestone step reads or changes one for it.
 
 ## After the tag
 
@@ -73,3 +81,7 @@ environment's required reviewer.
    for this on 2026-09-22, starting with v0.1.4.
 4. **A bad cut is a new patch version**, never a retag: the platform freezes a
    published release.
+5. **The milestone is closed.** The `milestone` job closes it; after a manual
+   or recovery release (a re-run, a `publish-crates.yml` dispatch), check that
+   it is, and close it with `GITHUB_REPOSITORY=FerroHEALTH/FerroTERM bash
+   scripts/release/milestone.sh close vX.Y.Z` when it is not.
