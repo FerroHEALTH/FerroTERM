@@ -84,7 +84,7 @@ jobs:
       # syft/trivy/grype/osv-scanner even when the release page's SBOM never
       # travelled with it (https://github.com/rust-secure-code/cargo-auditable).
       - name: Install cargo-auditable
-        uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
         with:
           tool: cargo-auditable@0.7.5
 
@@ -129,7 +129,7 @@ jobs:
       # actionable. Generated from the release commit's own Cargo.lock with
       # `--locked`, so it describes the graph that was actually built.
       - name: Install cargo-cyclonedx
-        uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
         with:
           tool: cargo-cyclonedx
       - name: Generate the dependency SBOM
