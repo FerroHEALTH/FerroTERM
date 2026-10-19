@@ -558,7 +558,7 @@ fn resource_view(resource: &PublishedCodeSystem) -> AnyView {
         .into_iter()
         .map(|fact| {
             let value = match fact.value {
-                Some(value) => value.into_any(),
+                Some(value) => crate::components::stated(value),
                 None => view! { <span class="fui-muted">{NOT_DECLARED}</span> }.into_any(),
             };
             (fact.label, value)

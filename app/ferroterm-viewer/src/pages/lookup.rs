@@ -515,10 +515,16 @@ fn properties_table(concept: &Concept) -> AnyView {
                 .properties
                 .iter()
                 .map(|property| {
-                    let value = property
-                        .value
-                        .clone()
-                        .map_or_else(|| NOT_DECLARED.into_any(), |value| chip(value).into_any());
+                    let value = property.value.clone().map_or_else(
+                        || NOT_DECLARED.into_any(),
+                        |value| {
+                            if crate::components::is_date_time(&value) {
+                                crate::components::stated(value)
+                            } else {
+                                chip(value).into_any()
+                            }
+                        },
+                    );
                     view! {
                         <tr>
                             <td class="fui-mono">{property.code.clone()}</td>

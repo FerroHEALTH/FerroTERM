@@ -704,10 +704,10 @@ fn values_view(label: &'static str, values: &[NamedValue]) -> AnyView {
     let items: Vec<AnyView> = values
         .iter()
         .map(|value| {
-            let rendered = value
-                .value
-                .clone()
-                .unwrap_or_else(|| "a value shape this viewer draws no text for".to_owned());
+            let rendered = value.value.clone().map_or_else(
+                || "a value shape this viewer draws no text for".into_any(),
+                crate::components::stated,
+            );
             view! {
                 <span class="break-all">
                     <span class="fui-mono">{value.name.clone()}</span>

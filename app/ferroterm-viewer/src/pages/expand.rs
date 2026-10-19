@@ -952,7 +952,7 @@ fn parameters_view(lines: &[ParameterLine]) -> AnyView {
         .map(|line| {
             view! {
                 <dt class="fui-mono">{line.name.clone()}</dt>
-                <dd class="break-all">{line.value.clone()}</dd>
+                <dd class="break-all">{crate::components::stated(line.value.clone())}</dd>
             }
             .into_any()
         })

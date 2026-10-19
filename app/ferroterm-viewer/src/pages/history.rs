@@ -656,7 +656,10 @@ fn absent_or(stated: Option<String>) -> AnyView {
         Some(text) if text.is_empty() => {
             view! { <span class=styles::CODE_MUTED>"\u{201c}\u{201d}"</span> }.into_any()
         }
-        Some(text) => view! { <span class=styles::CODE_MUTED>{text}</span> }.into_any(),
+        Some(text) => {
+            view! { <span class=styles::CODE_MUTED>{crate::components::stated(text)}</span> }
+                .into_any()
+        }
         None => view! {
             <span class=styles::ABSENT title="The server states nothing here.">
                 {styles::ABSENT_MARK}

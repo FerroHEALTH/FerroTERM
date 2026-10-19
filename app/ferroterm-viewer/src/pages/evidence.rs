@@ -284,7 +284,10 @@ fn system_view(system: &SystemRun) -> AnyView {
         ("Served as", format!("/{}", system.fhir).into_any()),
         ("Answered by", system.built_by.into_any()),
         ("Machine", system.machine.into_any()),
-        ("Taken at", mono(system.taken_at)),
+        (
+            "Taken at",
+            ferrohealth_ui::view::time::timestamp(system.taken_at).into_any(),
+        ),
         ("Record", mono(system.source)),
     ]);
     let title = format!("{} {}", system.system, system.system_version);
