@@ -13,10 +13,11 @@ use leptos::ev::Event;
 use leptos::html::Input;
 use leptos::prelude::*;
 
-use ferrohealth_ui::view::form::{INPUT, NARROW, SELECT, check, fieldset, help_id};
+use ferrohealth_ui::view::form::{INPUT, NARROW, SELECT, fieldset, help_id};
 use ferrohealth_ui::view::layout::{FieldRow, field_row};
 use ferrohealth_ui::widget::combobox::{ComboOption, Combobox, combobox};
-use ferrohealth_ui::widget::help::{explained_field, help_line};
+use ferrohealth_ui::widget::help::{explained_check_field, explained_field, help_line};
+use ferrohealth_ui::widget::pick_or_type::{PickOrType, Picker as PickerControl, pick_or_type};
 
 use crate::fhir::named::Choice;
 
@@ -89,12 +90,7 @@ pub(crate) fn check_field(field: Field, node: NodeRef<Input>, value: Memo<bool>)
             prop:checked=move || value.get()
         />
     };
-    view! {
-        <div class="fui-field">
-            {check(field.id, field.label, checkbox)} {help_line(field.id, field.hint)}
-        </div>
-    }
-    .into_any()
+    explained_check_field(field.id, field.label, field.hint, checkbox)
 }
 
 /// One labelled whole-number control, seeded from its own parameter.
@@ -295,27 +291,26 @@ fn searched_field(
             selected: picked,
         })
     };
-    view! {
-        <div class="fui-field">
-            <div hidden=typed>{combo}</div>
-            <label for=typed_id.clone() hidden=move || !typed() class="fui-label">
-                {field.label}
-            </label>
-            <input
-                id=typed_id
-                name=field.name
-                type="text"
-                class=INPUT
-                aria-describedby=help_id(field.id)
-                hidden=move || !typed()
-                node_ref=node
-                value=move || value.get()
-                prop:value=move || value.get()
-            />
-            {help_line(field.id, field.hint)}
-        </div>
-    }
-    .into_any()
+    let input = view! {
+        <input
+            id=typed_id.clone()
+            name=field.name
+            type="text"
+            class=INPUT
+            aria-describedby=help_id(field.id)
+            node_ref=node
+            value=move || value.get()
+            prop:value=move || value.get()
+        />
+    };
+    pick_or_type(PickOrType {
+        label: field.label.to_owned(),
+        picker: PickerControl::Labelled(combo.into_any()),
+        typed_id,
+        typed: input.into_any(),
+        typing: Signal::derive(typed),
+        after: Some(help_line(field.id, field.hint)),
+    })
 }
 
 /// A short list as a select, with the text field behind the last option.
@@ -331,7 +326,7 @@ fn selected_field(
     // pickers and each is on its own choice.
     let typing = RwSignal::new(false);
     let described_by = help_id(field.id);
-    let picker = StoredValue::new(format!("{}-pick", field.id));
+    let picker = format!("{}-pick", field.id);
     let offered = move || {
         choices.with(|choices| {
             choices
@@ -379,43 +374,42 @@ fn selected_field(
             input.set_value(&canonical);
         }
     };
-    view! {
-        <div class="fui-field">
-            // Each control carries its own label, because a label points at
-            // one control and only one of the two is ever showing. The label
-            // of a hidden control is hidden with it, so a reader meets one
-            // (<https://www.w3.org/TR/wai-aria-1.2/#namecalculation>).
-            <label for=move || picker.with_value(Clone::clone) hidden=typed class="fui-label">
-                {field.label}
-            </label>
-            <label for=field.id hidden=move || !typed() class="fui-label">
-                {field.label}
-            </label>
-            <select
-                id=move || picker.with_value(Clone::clone)
-                class=SELECT
-                aria-describedby=described_by.clone()
-                hidden=typed
-                prop:value=selected
-                on:change=choose
-            >
-                <option value="">{words.empty}</option>
-                {offered}
-                <option value=TYPE_IT>{words.other}</option>
-            </select>
-            <input
-                id=field.id
-                name=field.name
-                type="text"
-                class=INPUT
-                aria-describedby=described_by.clone()
-                hidden=move || !typed()
-                node_ref=node
-                value=move || value.get()
-                prop:value=move || value.get()
-            />
-            {help_line(field.id, field.hint)}
-        </div>
-    }
-    .into_any()
+    let select = view! {
+        <select
+            id=picker.clone()
+            class=SELECT
+            aria-describedby=described_by.clone()
+            prop:value=selected
+            on:change=choose
+        >
+            <option value="">{words.empty}</option>
+            {offered}
+            <option value=TYPE_IT>{words.other}</option>
+        </select>
+    };
+    let input = view! {
+        <input
+            id=field.id
+            name=field.name
+            type="text"
+            class=INPUT
+            aria-describedby=described_by
+            node_ref=node
+            value=move || value.get()
+            prop:value=move || value.get()
+        />
+    };
+    // Each control carries its own label, hidden with it, so a reader meets
+    // one (<https://www.w3.org/TR/wai-aria-1.2/#namecalculation>).
+    pick_or_type(PickOrType {
+        label: field.label.to_owned(),
+        picker: PickerControl::Control {
+            id: picker,
+            control: select.into_any(),
+        },
+        typed_id: field.id.to_owned(),
+        typed: input.into_any(),
+        typing: Signal::derive(typed),
+        after: Some(help_line(field.id, field.hint)),
+    })
 }
