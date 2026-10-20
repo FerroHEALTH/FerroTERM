@@ -21,8 +21,6 @@ pub mod guard;
 use std::sync::Arc;
 
 use axum::body::Body;
-use axum::extract::Request;
-use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use ferrohealth_smart::basic::PasswordStore;
 use ferrohealth_smart::config::ConfigError;
@@ -31,6 +29,7 @@ use ferrohealth_smart::guard::{Gate, Render};
 use ferrohealth_smart::metadata::ServerMetadata;
 use ferrohealth_smart::refusal::Refusal;
 use ferrohealth_smart::resource::{IssuerSet, ResourceError, ResourceServer, Settings};
+use http::request::Parts;
 use http::{HeaderMap, StatusCode};
 
 use crate::config::Config;
@@ -281,21 +280,13 @@ impl Smart {
         self.metadata().revocation_endpoint.as_deref()
     }
 
-    /// The SMART capabilities this deployment offers, sorted.
-    #[must_use]
-    pub fn capabilities(&self) -> Vec<String> {
-        discovery::capabilities(self.metadata(), &self.capabilities)
-    }
-
     /// The `.well-known/smart-configuration` document of this deployment.
     #[must_use]
     pub fn configuration(&self) -> serde_json::Value {
-        discovery::document(
-            self.metadata(),
-            &self.token_endpoint,
+        self.primary.smart_configuration(&discovery::options(
             &self.scopes_supported,
             &self.capabilities,
-        )
+        ))
     }
 
     /// The renderer of a refusal on the FHIR surface.
@@ -400,13 +391,9 @@ const fn diagnostics(refusal: &Refusal) -> (&'static str, &'static str) {
     }
 }
 
-/// The refusal a response answers, left for [`outcome`] to write its body.
-#[derive(Debug, Clone)]
-struct Refused(Refusal);
-
 /// The renderer of a refusal on the FHIR surface: the crate's status and
-/// challenge, and an `OperationOutcome` body [`outcome`] writes in the format
-/// the request asked for.
+/// challenge, and an `OperationOutcome` body in the format the request asks
+/// for.
 #[derive(Debug, Clone)]
 pub struct Challenge {
     /// The status and the challenge.
@@ -414,34 +401,20 @@ pub struct Challenge {
 }
 
 impl Render for Challenge {
-    fn render(&self, refusal: &Refusal) -> Response {
-        let mut response = self.header.respond(refusal, Body::empty());
-        response.extensions_mut().insert(Refused(refusal.clone()));
-        response
-    }
-}
-
-/// Writes the `OperationOutcome` of a refused request in the format its
-/// headers ask for.
-///
-/// The layer's renderer sees the refusal and never the request, so the body is
-/// written here, outside the layer, where the `Accept` header is read.
-pub async fn outcome(request: Request, next: Next) -> Response {
-    // NOTE: an `Accept` this server does not speak is a second fault on a
-    // request already refused, so the outcome answers in the default format.
-    let wire = crate::wire::Wire::negotiate(&[], request.headers()).unwrap_or_default();
-    let response = next.run(request).await;
-    let Some(Refused(refusal)) = response.extensions().get::<Refused>().cloned() else {
-        return response;
-    };
-    let (code, text) = diagnostics(&refusal);
-    let mut answered = Failure::new(refusal.status(), code, text).respond(wire);
-    if let Some(challenge) = response.headers().get(http::header::WWW_AUTHENTICATE) {
+    fn render(&self, refusal: &Refusal, parts: &Parts) -> Response {
+        // NOTE: an `Accept` this server does not speak is a second fault on a
+        // request already refused, so the outcome answers in the default format.
+        let wire = crate::wire::Wire::negotiate(&[], &parts.headers).unwrap_or_default();
+        let (code, text) = diagnostics(refusal);
+        let mut answered = Failure::new(refusal.status(), code, text).respond(wire);
+        let challenged = self.header.respond(refusal, Body::empty());
+        if let Some(challenge) = challenged.headers().get(http::header::WWW_AUTHENTICATE) {
+            answered
+                .headers_mut()
+                .insert(http::header::WWW_AUTHENTICATE, challenge.clone());
+        }
         answered
-            .headers_mut()
-            .insert(http::header::WWW_AUTHENTICATE, challenge.clone());
     }
-    answered
 }
 
 /// The renderer of a refusal on the admin listener, which answers plain JSON
@@ -453,7 +426,7 @@ pub struct AdminRefusal {
 }
 
 impl Render for AdminRefusal {
-    fn render(&self, refusal: &Refusal) -> Response {
+    fn render(&self, refusal: &Refusal, _parts: &Parts) -> Response {
         let (_, text) = diagnostics(refusal);
         let body = serde_json::json!({
             "outcome": crate::metrics::Outcome::Failed.as_str(),
