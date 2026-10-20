@@ -24,6 +24,7 @@ use crate::fhir::expansion::DesignationRow;
 use crate::fhir::expansion::FILTER_PARAMETER;
 use crate::fhir::terminology::SystemCard;
 use crate::fhir::terminology::VersionRow;
+use crate::locale::{Msg, tr};
 use crate::url::RequestUrl;
 
 /// The `$lookup` parameter naming the code system.
@@ -270,7 +271,7 @@ impl ConceptQuery {
         let mut body = Map::new();
         body.insert(
             String::from("resourceType"),
-            Value::String(String::from("Parameters")),
+            Value::String(tr(Msg::Parameters)),
         );
         body.insert(String::from("parameter"), Value::Array(parameters));
         Value::Object(body).to_string()

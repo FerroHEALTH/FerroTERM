@@ -9,3 +9,8 @@ skip app/ferroterm-viewer/src/locale.rs   # the catalog mechanism: message ids
 allow ^(ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Home|End|Enter|Escape|Tab)$   # UI Events KeyboardEvent.key values
 allow ^Ferro(BRIDGE|FED|EHR|TERM|HEALTH)   # product names, the same in every language
 allow ^Cadasto B\.V\.$                      # the maker's legal name
+allow ^[a-z]+[A-Z][A-Za-z]*$                # a JSON member name (resourceType, valueString)
+allow ^[A-Z][a-z]+[A-Z][A-Za-z]+$           # a FHIR resource type name (OperationOutcome)
+allow ^https?://                            # a canonical URL
+allow ^(GET|PUT|POST|DELETE)$               # an HTTP method
+allow ^R(4|4B|5|6)$                         # a FHIR release name

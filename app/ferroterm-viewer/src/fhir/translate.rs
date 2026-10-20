@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::fhir::version::FhirVersion;
+use crate::locale::{Msg, tr};
 use crate::url::RequestUrl;
 
 /// The `$translate` parameter naming the concept map to translate through.
@@ -145,7 +146,7 @@ impl TranslateRequest {
                 parameters.push(json!({"name": name, kind: value}));
             }
         }
-        json!({"resourceType": "Parameters", "parameter": parameters}).to_string()
+        json!({"resourceType": tr(Msg::Parameters), "parameter": parameters}).to_string()
     }
 }
 
@@ -256,7 +257,7 @@ pub(crate) struct NamedValue {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Relation {
     /// The element that carried it, which differs by FHIR version.
-    pub(crate) label: &'static str,
+    pub(crate) label: Msg,
     /// The code, as the server wrote it.
     pub(crate) code: String,
 }
@@ -313,13 +314,13 @@ impl TranslationMatch {
         let mut stated = Vec::new();
         if let Some(code) = self.equivalence.clone() {
             stated.push(Relation {
-                label: "Equivalence",
+                label: Msg::Equivalence,
                 code,
             });
         }
         if let Some(code) = self.relationship.clone() {
             stated.push(Relation {
-                label: "Relationship",
+                label: Msg::Relationship,
                 code,
             });
         }
@@ -575,7 +576,7 @@ mod tests {
         assert_eq!(
             first.relations(),
             vec![Relation {
-                label: "Equivalence",
+                label: Msg::Equivalence,
                 code: "wider".to_owned(),
             }],
             "`wider` is a ConceptMapEquivalence code and means nothing as a relationship"
@@ -590,7 +591,7 @@ mod tests {
         assert_eq!(
             first.relations(),
             vec![Relation {
-                label: "Relationship",
+                label: Msg::Relationship,
                 code: "source-is-narrower-than-target".to_owned(),
             }]
         );

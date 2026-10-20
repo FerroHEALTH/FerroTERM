@@ -14,42 +14,49 @@ use ferrohealth_ui::view::surface::{
 };
 use leptos::prelude::*;
 
-use crate::components::NOT_DECLARED;
+use crate::components::not_declared;
 use crate::evidence::Conformance;
 use crate::evidence::Latency;
 use crate::evidence::Run;
 use crate::evidence::SystemRun;
 use crate::evidence::embedded;
 use crate::evidence::relative_width;
+use crate::locale::{Msg, tr, tr_with};
 
 /// The columns of the conformance table.
-const MODE_COLUMNS: [Column; 5] = [
-    Column::text("mode", "Mode"),
-    Column::text("surface", "Surface"),
-    Column::text("passed", "Passed").numeric(),
-    Column::text("share", "Share"),
-    Column::text("from", "From"),
-];
+fn mode_columns() -> [Column; 5] {
+    [
+        Column::text("mode", tr(Msg::Mode)),
+        Column::text("surface", tr(Msg::Surface)),
+        Column::text("passed", tr(Msg::Passed)).numeric(),
+        Column::text("share", tr(Msg::Share)),
+        Column::text("from", tr(Msg::From)),
+    ]
+}
 
 /// The columns of the latency table.
-const BAR_COLUMNS: [Column; 5] = [
-    Column::text("bench", "Benchmark"),
-    Column::text("bar", "Bar").numeric(),
-    Column::text("measured", "Measured"),
-    Column::text("room", "Room"),
-    Column::text("claim", "What the bar claims"),
-];
+fn bar_columns() -> [Column; 5] {
+    [
+        Column::text("bench", tr(Msg::Benchmark)),
+        Column::text("bar", tr(Msg::Bar)).numeric(),
+        Column::text("measured", tr(Msg::Measured)),
+        Column::text("room", tr(Msg::Room)),
+        Column::text("claim", tr(Msg::WhatTheBarClaims)),
+    ]
+}
 
 /// The columns of one system's timing table.
-const TIMING_COLUMNS: [Column; 7] = [
-    Column::text("operation", "Operation"),
-    Column::text("status", "Status").numeric(),
-    Column::text("cold", "Cold").numeric(),
-    Column::text("p50", "Median").numeric(),
-    Column::text("p95", "95th").numeric(),
-    Column::text("p99", "99th").numeric(),
-    Column::text("warm", "Warm requests").numeric(),
-];
+fn timing_columns() -> [Column; 7] {
+    [
+        Column::text("operation", tr(Msg::Operation)),
+        Column::text("status", tr(Msg::Status)).numeric(),
+        Column::text("cold", tr(Msg::Cold)).numeric(),
+        Column::text("p50", tr(Msg::Median)).numeric(),
+        Column::text("p95", "95th").numeric(),
+        Column::text("p99", "99th").numeric(),
+        Column::text("warm", tr(Msg::WarmRequests)).numeric(),
+    ]
+}
 
 /// Draws the conformance and benchmark evidence the bundle carries.
 ///
@@ -67,28 +74,30 @@ pub(crate) fn pane() -> AnyView {
     let stats = stat_grid(view! {
         {stat_card(Stat {
             glyph: Glyph::LIST_CHECKS,
-            value: format!("{passed} of {ran}"),
-            label: "Ecosystem suite cases pass".into(),
+            value: tr_with(
+                Msg::Of3,
+                &[("passed", (passed).to_string().into()), ("ran", (ran).to_string().into())],
+            ),
+            label: tr(Msg::EcosystemSuiteCasesPass).into(),
             href: None,
         })}
         {stat_card(Stat {
             glyph: Glyph::GAUGE,
             value: evidence.latency.bars.len().to_string(),
-            label: "Latency bars the project claims".into(),
+            label: tr(Msg::LatencyBarsProjectClaims).into(),
             href: None,
         })}
         {stat_card(Stat {
             glyph: Glyph::DATABASE,
             value: evidence.run.systems.len().to_string(),
-            label: "Code systems in the newest run".into(),
+            label: tr(Msg::CodeSystemsNewestRun).into(),
             href: None,
         })}
     });
     view! {
         <p class="fui-muted">
-            "Read from files this repository committed for FerroTERM "
-            <strong>{evidence.release}</strong>
-            ", not from the server answering this page. Each figure names its file."
+            {tr(Msg::ReadFromFilesRepositoryCommittedFerroterm)} <strong>{evidence.release}</strong>
+            {tr(Msg::NotFromServerAnsweringPageEach)}
         </p>
         {stats}
         {conformance_section(evidence.conformance)}
@@ -102,10 +111,10 @@ pub(crate) fn pane() -> AnyView {
 /// and the files the figures came from.
 fn section(
     id: &'static str,
-    title: &'static str,
+    title: String,
     lead: AnyView,
     summary: String,
-    caption: &'static str,
+    caption: String,
     table: AnyView,
     sources: AnyView,
 ) -> AnyView {
@@ -130,21 +139,21 @@ fn conformance_section(conformance: Conformance) -> AnyView {
                     <th scope="row" class="fui-mono">
                         {mode.name}
                     </th>
-                    <td data-label="Surface" class="fui-mono">
+                    <td data-label=tr(Msg::Surface) class="fui-mono">
                         {mode.surface}
                     </td>
-                    <td data-label="Passed" class=NUM>
+                    <td data-label=tr(Msg::Passed) class=NUM>
                         {mode.passed}
-                        " of "
+                        {tr(Msg::Of)}
                         {mode.ran}
                     </td>
-                    <td data-label="Share">
+                    <td data-label=tr(Msg::Share)>
                         <div class="grid gap-tight">
                             <span class="tabular-nums">{share} "%"</span>
                             {proportion(u8::try_from(share.min(100)).unwrap_or(100), None)}
                         </div>
                     </td>
-                    <td data-label="From" class="fui-mono fui-small fui-muted break-all">
+                    <td data-label=tr(Msg::From) class="fui-mono fui-small fui-muted break-all">
                         {mode.source}
                     </td>
                 </tr>
@@ -153,8 +162,8 @@ fn conformance_section(conformance: Conformance) -> AnyView {
         .collect_view()
         .into_any();
     let table = data_table(DataTable {
-        caption: "The cases each mode passes",
-        columns: &MODE_COLUMNS,
+        caption: &tr(Msg::CasesEachModePasses),
+        columns: &mode_columns(),
         sort: None,
         sort_href: &|_| String::new(),
         body: Body::Rows(rows),
@@ -162,16 +171,16 @@ fn conformance_section(conformance: Conformance) -> AnyView {
     .into_any();
     let sources = view! {
         <span class="fui-mono">{conformance.table_source}</span>
-        " and "
+        {tr(Msg::And2)}
         <span class="fui-mono">{conformance.total_source}</span>
     }
     .into_any();
     section(
         "conformance",
-        "The HL7 terminology ecosystem suite",
+        tr(Msg::Hl7TerminologyEcosystemSuite),
         ().into_any(),
         conformance.summary(),
-        "The cases each mode passes, from the committed pass lists",
+        tr(Msg::CasesEachModePassesFromCommitted),
         table,
         sources,
     )
@@ -190,8 +199,8 @@ fn latency_section(latency: Latency) -> AnyView {
         .iter()
         .map(|bar| {
             let headroom = bar.headroom().map_or_else(
-                || "faster than the run could time".to_owned(),
-                |times| format!("{times} times under it"),
+                || tr(Msg::FasterThanRunCouldTime).clone(),
+                |times| tr_with(Msg::TimesUnderIt, &[("times", (times).to_string().into())]),
             );
             let width = relative_width(bar.measured_us, widest).min(100);
             view! {
@@ -199,11 +208,11 @@ fn latency_section(latency: Latency) -> AnyView {
                     <th scope="row" class="fui-mono">
                         {bar.bench}
                     </th>
-                    <td data-label="Bar" class=NUM>
+                    <td data-label=tr(Msg::Bar) class=NUM>
                         {bar.max_us}
-                        " µs"
+                        {tr(Msg::S)}
                     </td>
-                    <td data-label="Measured">
+                    <td data-label=tr(Msg::Measured)>
                         <div class="grid gap-tight">
                             <span class="tabular-nums whitespace-nowrap">
                                 {bar.measured_us} " µs"
@@ -211,37 +220,37 @@ fn latency_section(latency: Latency) -> AnyView {
                             {proportion(u8::try_from(width).unwrap_or(100), None)}
                         </div>
                     </td>
-                    <td data-label="Room" class="whitespace-nowrap">
+                    <td data-label=tr(Msg::Room) class="whitespace-nowrap">
                         {headroom}
                     </td>
-                    <td data-label="What the bar claims">{bar.claim}</td>
+                    <td data-label=tr(Msg::WhatTheBarClaims)>{bar.claim}</td>
                 </tr>
             }
         })
         .collect_view()
         .into_any();
     let table = data_table(DataTable {
-        caption: "Each benchmark, its bar, and the run recorded against it",
-        columns: &BAR_COLUMNS,
+        caption: &tr(Msg::EachBenchmarkBarRunRecordedAgainst),
+        columns: &bar_columns(),
         sort: None,
         sort_href: &|_| String::new(),
         body: Body::Rows(rows),
     })
     .into_any();
     let lead =
-        view! { <p class="fui-muted">"Recorded on " <strong>{latency.machine}</strong> "."</p> }
+        view! { <p class="fui-muted">{tr(Msg::RecordedOn)} <strong>{latency.machine}</strong> "."</p> }
             .into_any();
     let sources = view! {
         <span class="fui-mono">{latency.source}</span>
-        ". A bar is drawn against the slowest measurement beside it."
+        {tr(Msg::BarDrawnAgainstSlowestMeasurementBeside)}
     }
     .into_any();
     section(
         "latency",
-        "The latency the project claims",
+        tr(Msg::LatencyProjectClaims),
         lead,
         latency.summary(),
-        "Each benchmark, its bar, and the run recorded against it",
+        tr(Msg::EachBenchmarkBarRunRecordedAgainst),
         table,
         sources,
     )
@@ -251,14 +260,14 @@ fn latency_section(latency: Latency) -> AnyView {
 fn run_section(run: Run) -> AnyView {
     let systems: Vec<AnyView> = run.systems.iter().map(system_view).collect();
     let lead =
-        view! { <p class="fui-muted">"From " <span class="fui-mono">{run.source}</span> "."</p> }
+        view! { <p class="fui-muted">{tr(Msg::From2)} <span class="fui-mono">{run.source}</span> "."</p> }
             .into_any();
     section(
         "run",
-        "The newest benchmark run",
+        tr(Msg::TheNewestBenchmarkRun),
         lead,
         run.summary(),
-        "One record per code system the run loaded",
+        tr(Msg::OneRecordPerCodeSystemRun),
         view! { <div class="fui-stack">{systems}</div> }.into_any(),
         ().into_any(),
     )
@@ -266,29 +275,35 @@ fn run_section(run: Run) -> AnyView {
 
 /// One code system's record within the run.
 fn system_view(system: &SystemRun) -> AnyView {
-    let ingest = system
-        .ingest_seconds
-        .map_or_else(|| NOT_DECLARED.to_owned(), |seconds| format!("{seconds} s"));
-    let release = system.release.unwrap_or("built outside this run");
-    let mono =
-        |text: &'static str| view! { <span class="fui-mono break-all">{text}</span> }.into_any();
+    let ingest = system.ingest_seconds.map_or_else(
+        || not_declared().clone(),
+        |seconds| tr_with(Msg::S2, &[("seconds", (seconds).to_string().into())]),
+    );
+    let release = system
+        .release
+        .map_or_else(|| tr(Msg::BuiltOutsideThisRun), str::to_owned);
+    let mono = |text: String| view! { <span class="fui-mono break-all">{text}</span> }.into_any();
     let facts = definitions(vec![
-        ("Concepts", system.concepts.into_any()),
-        ("Offline build", ingest.into_any()),
-        ("Built from", mono(release)),
+        (tr(Msg::Concepts), system.concepts.into_any()),
+        (tr(Msg::OfflineBuild), ingest.into_any()),
+        (tr(Msg::BuiltFrom), mono(release.clone())),
         (
-            "Ready after",
-            format!("{} s", system.ready_seconds).into_any(),
+            tr(Msg::ReadyAfter),
+            tr_with(
+                Msg::S3,
+                &[("ready_seconds", (system.ready_seconds).to_string().into())],
+            )
+            .into_any(),
         ),
-        ("Resident memory", system.resident_memory.into_any()),
-        ("Served as", format!("/{}", system.fhir).into_any()),
-        ("Answered by", system.built_by.into_any()),
-        ("Machine", system.machine.into_any()),
+        (tr(Msg::ResidentMemory), system.resident_memory.into_any()),
+        (tr(Msg::ServedAs), format!("/{}", system.fhir).into_any()),
+        (tr(Msg::AnsweredBy), system.built_by.into_any()),
+        (tr(Msg::Machine), system.machine.into_any()),
         (
-            "Taken at",
+            tr(Msg::TakenAt),
             ferrohealth_ui::view::time::timestamp(system.taken_at).into_any(),
         ),
-        ("Record", mono(system.source)),
+        (tr(Msg::Record), mono(system.source.to_owned())),
     ]);
     let title = format!("{} {}", system.system, system.system_version);
     let body = view! {
@@ -305,7 +320,12 @@ fn system_view(system: &SystemRun) -> AnyView {
 fn timings_view(system: &SystemRun) -> AnyView {
     let body = if system.operations.is_empty() {
         Body::Empty(
-            empty_quiet(Glyph::GAUGE, "No timing", "This record timed no operation.").into_any(),
+            empty_quiet(
+                Glyph::GAUGE,
+                tr(Msg::NoTiming),
+                tr(Msg::RecordTimedNoOperation),
+            )
+            .into_any(),
         )
     } else {
         Body::Rows(
@@ -318,22 +338,22 @@ fn timings_view(system: &SystemRun) -> AnyView {
                             <th scope="row" class="fui-mono">
                                 {timing.operation}
                             </th>
-                            <td data-label="Status" class=NUM>
+                            <td data-label=tr(Msg::Status) class=NUM>
                                 {timing.status}
                             </td>
-                            <td data-label="Cold" class=NUM>
+                            <td data-label=tr(Msg::Cold) class=NUM>
                                 {timing.cold_ms}
                             </td>
-                            <td data-label="Median" class=NUM>
+                            <td data-label=tr(Msg::Median) class=NUM>
                                 {timing.p50_ms}
                             </td>
-                            <td data-label="95th" class=NUM>
+                            <td data-label=tr(Msg::N95th) class=NUM>
                                 {timing.p95_ms}
                             </td>
-                            <td data-label="99th" class=NUM>
+                            <td data-label=tr(Msg::N99th) class=NUM>
                                 {timing.p99_ms}
                             </td>
-                            <td data-label="Warm requests" class=NUM>
+                            <td data-label=tr(Msg::WarmRequests) class=NUM>
                                 {timing.warm_requests}
                             </td>
                         </tr>
@@ -344,8 +364,8 @@ fn timings_view(system: &SystemRun) -> AnyView {
         )
     };
     data_table(DataTable {
-        caption: "What the system answered, in milliseconds",
-        columns: &TIMING_COLUMNS,
+        caption: &tr(Msg::WhatSystemAnsweredMilliseconds),
+        columns: &timing_columns(),
         sort: None,
         sort_href: &|_| String::new(),
         body,

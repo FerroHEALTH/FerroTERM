@@ -32,14 +32,15 @@ use leptos_router::hooks::use_query_map;
 
 use crate::auth::Session;
 use crate::auth::scopes::Letter;
+use crate::components::editor_mode;
 use crate::components::failure::Failure;
 use crate::components::field::group;
 use crate::components::history::history_offer;
 use crate::components::icon;
 use crate::components::reading::Reading;
-use crate::components::reload::READING_AGAIN;
 use crate::components::reload::announced;
 use crate::components::reload::focus_report;
+use crate::components::reload::reading_again;
 use crate::components::reload::reload_offer;
 use crate::components::shell::SelectedVersion;
 use crate::fhir::FhirClient;
@@ -63,6 +64,7 @@ use crate::fhir::terminology::TerminologyCapabilities;
 use crate::fhir::terminology::VersionRow;
 use crate::fhir::version::FhirVersion;
 use crate::fhir::write::Refusal;
+use crate::locale::{Msg, message, tr, tr_with};
 use crate::offers::choices;
 use crate::offers::published;
 use crate::paging::MAX_COUNT;
@@ -75,6 +77,7 @@ use crate::styles;
 use ferrohealth_ui::view::button::Variant;
 use ferrohealth_ui::view::form::{field_flow, keyed_field};
 use ferrohealth_ui::view::surface::stack;
+use ferrohealth_ui::view::surface::{Crumb, Header, editor_heading, editor_title};
 use serde_json::Value;
 
 /// The query parameter carrying the preview's text filter.
@@ -115,9 +118,9 @@ struct Named {
     /// The `name` the control carries.
     name: &'static str,
     /// What a reader calls it.
-    label: &'static str,
+    label: String,
     /// The sentence under it.
-    note: &'static str,
+    note: String,
 }
 
 /// Composes a local `ValueSet`, previews it, and saves it.
@@ -194,7 +197,7 @@ pub(crate) fn ValueSetComposerPage() -> impl IntoView {
     };
 
     let expansion = previewing(&client, version, previewed, page);
-    let heading = heading(report, announcing(expansion));
+    let heading = heading(id, report, announcing(expansion));
 
     let editable = editable(id, writable);
     let versions = history_offer(VALUE_SET, id.into(), version);
@@ -243,7 +246,8 @@ type Reading = LocalResource<Option<Result<Value, FhirError>>>;
 /// hears the count, the refusal, and the save in one place
 /// (<https://www.w3.org/TR/wai-aria-1.2/#aria-live>). What an event wrote
 /// wins until the next preview is asked for, which clears it.
-fn heading(report: RwSignal<String>, announcement: Memo<String>) -> AnyView {
+fn heading(id: Memo<String>, report: RwSignal<String>, announcement: Memo<String>) -> AnyView {
+    let mode = move || editor_mode(&id.get());
     let said = move || {
         let written = report.get();
         if written.is_empty() {
@@ -253,23 +257,20 @@ fn heading(report: RwSignal<String>, announcement: Memo<String>) -> AnyView {
         }
     };
     view! {
-        <Title text="Compose a value set" />
+        <Title text=move || editor_title(message(Msg::TitleValueSetComposer), &mode()) />
         <div>
-            {ferrohealth_ui::view::surface::page_heading(
-                ferrohealth_ui::view::surface::Header {
-                    title: String::from("Compose a value set"),
-                    subtitle: Some(
-                        String::from(
-                            "Draw in a published value set, add your own codes, and see what the selection holds.",
-                        ),
-                    ),
-                    crumbs: vec![
-                        ferrohealth_ui::view::surface::Crumb::new("Value sets", "/valuesets"),
-                    ],
-                    mono: false,
-                },
-                (),
-            )}
+            {move || {
+                editor_heading(
+                    message(Msg::TitleValueSetComposer),
+                    &mode(),
+                    Header {
+                        subtitle: Some(tr(Msg::DrawPublishedValueSetAddYour)),
+                        crumbs: vec![Crumb::new(tr(Msg::ValueSets), "/valuesets")],
+                        ..Header::default()
+                    },
+                    (),
+                )
+            }}
         </div>
         <p
             id=REPORT_ID
@@ -637,7 +638,7 @@ fn text_control(
 fn select_control(
     named: Named,
     chosen: Signal<String>,
-    empty: &'static str,
+    empty: String,
     options: Options,
     change: OnEvent,
 ) -> AnyView {
@@ -649,7 +650,7 @@ fn select_control(
 fn select_with(
     named: Named,
     chosen: Signal<String>,
-    empty: &'static str,
+    empty: String,
     options: Options,
     change: OnEvent,
     beside: Option<AnyView>,
@@ -692,7 +693,7 @@ fn select_with(
 }
 
 /// A control that changes the draft without leaving the page.
-fn act(label: &'static str, click: OnClick) -> AnyView {
+fn act(label: String, click: OnClick) -> AnyView {
     view! {
         <button type="button" class=styles::BUTTON on:click=click>
             {label}
@@ -707,7 +708,7 @@ fn removable(control: AnyView, remove: OnClick) -> AnyView {
         <div class="flex items-end gap-default">
             <div class="min-w-0 flex-1">{control}</div>
             <button type="button" class=styles::BUTTON_QUIET on:click=remove>
-                "Remove"
+                {tr(Msg::Remove)}
             </button>
         </div>
     }
@@ -715,8 +716,8 @@ fn removable(control: AnyView, remove: OnClick) -> AnyView {
 }
 
 /// A fixed sentence, as the signal a control takes for its label or its note.
-fn fixed(text: &'static str) -> Signal<String> {
-    Signal::stored(String::from(text))
+fn fixed(text: String) -> Signal<String> {
+    Signal::stored(text)
 }
 
 /// The notice a screen that cannot be saved carries.
@@ -724,12 +725,12 @@ fn read_only_banner(writable: Memo<bool>, id: Memo<String>, session: Session) ->
     let sentence = move || {
         if id.with(String::is_empty) {
             if session.signed_in() {
-                "This account carries no permission to create a value set, so nothing here can be saved. Composing and previewing work anyway."
+                tr(Msg::AccountCarriesNoPermissionCreateValue)
             } else {
-                "Sign in to save. Composing and previewing work without one."
+                tr(Msg::SignSaveComposingPreviewingWorkWithout)
             }
         } else {
-            "This value set has no write path on this server, or this account carries no permission to change it, so it opens read-only."
+            tr(Msg::ValueSetHasNoWritePath)
         }
     };
     view! {
@@ -746,8 +747,8 @@ fn identity_section(editing: Editing, editable: Memo<bool>) -> AnyView {
         text_control(
             String::from("compose-url"),
             "url",
-            fixed("Canonical"),
-            fixed("ValueSet.url, what everything else refers to this value set by."),
+            fixed(tr(Msg::Canonical)),
+            fixed(tr(Msg::ValuesetUrlWhatEverythingElseRefers)),
             editing.text(|draft| draft.url.clone()),
             Box::new(move |event| {
                 let typed = event_target_value(&event);
@@ -757,8 +758,8 @@ fn identity_section(editing: Editing, editable: Memo<bool>) -> AnyView {
         text_control(
             String::from("compose-name"),
             "name",
-            fixed("Name"),
-            fixed("ValueSet.name, the computer-friendly name."),
+            fixed(tr(Msg::Name)),
+            fixed(tr(Msg::ValuesetNameComputerFriendlyName)),
             editing.text(|draft| draft.name.clone()),
             Box::new(move |event| {
                 let typed = event_target_value(&event);
@@ -768,8 +769,8 @@ fn identity_section(editing: Editing, editable: Memo<bool>) -> AnyView {
         text_control(
             String::from("compose-title"),
             "title",
-            fixed("Title"),
-            fixed("ValueSet.title, the name written for a person."),
+            fixed(tr(Msg::Title)),
+            fixed(tr(Msg::ValuesetTitleNameWrittenPerson)),
             editing.text(|draft| draft.title.clone()),
             Box::new(move |event| {
                 let typed = event_target_value(&event);
@@ -782,7 +783,7 @@ fn identity_section(editing: Editing, editable: Memo<bool>) -> AnyView {
     view! {
         <section class="fui-card" aria-labelledby="compose-identity-heading">
             <h2 id="compose-identity-heading" class="fui-card-title">
-                "The value set"
+                {tr(Msg::TheValueSet)}
             </h2>
             <fieldset
                 class="fui-fieldset mt-default"
@@ -802,11 +803,11 @@ fn status_control(editing: Editing) -> AnyView {
         Named {
             id: String::from("compose-status"),
             name: "status",
-            label: "Status",
-            note: "ValueSet.status, which every definitional resource carries.",
+            label: tr(Msg::Status),
+            note: tr(Msg::ValuesetStatusWhichEveryDefinitionalResource),
         },
         editing.text(|draft| draft.status.clone()),
-        "Choose a status",
+        tr(Msg::ChooseAStatus),
         options_of(|| {
             STATUSES
                 .into_iter()
@@ -843,20 +844,20 @@ fn inactive_control(editing: Editing) -> AnyView {
         Named {
             id: String::from("compose-inactive"),
             name: "inactive",
-            label: "Inactive codes",
-            note: "compose.inactive. Left to the server, the expansion parameters decide.",
+            label: tr(Msg::InactiveCodes),
+            note: tr(Msg::ComposeInactiveLeftServerExpansionParameters),
         },
         shown,
-        "Leave it to the server",
+        tr(Msg::LeaveServer),
         options_of(|| {
             vec![
                 Choice {
                     canonical: String::from("true"),
-                    label: String::from("Include them"),
+                    label: tr(Msg::IncludeThem),
                 },
                 Choice {
                     canonical: String::from("false"),
-                    label: String::from("Leave them out"),
+                    label: tr(Msg::LeaveThemOut),
                 },
             ]
         }),
@@ -890,16 +891,20 @@ fn clause_section(
     included: bool,
 ) -> AnyView {
     let keys: Memo<Vec<u32>> = editing.part(move |draft| draft.clause_keys(included));
-    let heading = if included { "Includes" } else { "Excludes" };
+    let heading = if included {
+        tr(Msg::Includes)
+    } else {
+        tr(Msg::Excludes)
+    };
     let heading_id = if included {
         "compose-includes-heading"
     } else {
         "compose-excludes-heading"
     };
     let rule = if included {
-        "Every include adds to the selection: the value set is the union of them all."
+        tr(Msg::EveryIncludeAddsSelectionValueSet)
     } else {
-        "Every exclude takes codes back out of that union, whichever include drew them in."
+        tr(Msg::EveryExcludeTakesCodesBackOut)
     };
     let cards = view! {
         <For
@@ -927,7 +932,7 @@ fn clause_section(
                         });
                 }
             >
-                {if included { "Add an include" } else { "Add an exclude" }}
+                {if included { tr(Msg::AddAnInclude) } else { tr(Msg::AddAnExclude) }}
             </button>
         </section>
     }
@@ -955,7 +960,7 @@ fn clause_card(
                 format!(
                     "{}: {}",
                     broken.defect.constraint(),
-                    broken.defect.sentence()
+                    tr(broken.defect.sentence())
                 )
             })
     });
@@ -968,7 +973,7 @@ fn clause_card(
 
     view! {
         <fieldset class="fui-fieldset fui-well" disabled=move || !editable.get()>
-            <legend>{if included { "Include" } else { "Exclude" }}</legend>
+            <legend>{if included { tr(Msg::Include) } else { tr(Msg::Exclude) }}</legend>
             <p class=styles::MUTED>{move || clause.with(Clause::rule)}</p>
             <Show when=move || defect.with(Option::is_some) fallback=|| ()>
                 <p role="status" class=format!("rounded-md p-loose {}", styles::NOTICE)>
@@ -985,7 +990,7 @@ fn clause_card(
                     class=Variant::Danger.class()
                     on:click=move |_| editing.change(move |draft| draft.remove_clause(key))
                 >
-                    "Remove this clause"
+                    {tr(Msg::RemoveThisClause)}
                 </button>
             </div>
         </fieldset>
@@ -1007,7 +1012,7 @@ fn value_set_rows(editing: Editing, offers: Offers, key: u32, clause: Memo<Claus
     }
     .into_any();
     group(
-        "Value sets",
+        tr(Msg::ValueSets),
         vec![
             view! { <div class="grid gap-default">{listed}</div> }.into_any(),
             add_published_value_set(editing, offers, key),
@@ -1036,8 +1041,8 @@ fn value_set_row(editing: Editing, key: u32, row: u32, clause: Memo<Clause>) -> 
     let control = text_control(
         format!("compose-valueset-{key}-{row}"),
         "valueSet",
-        fixed("Canonical"),
-        fixed("compose.include.valueSet, which draws the whole of that value set in."),
+        fixed(tr(Msg::Canonical)),
+        fixed(tr(Msg::ComposeIncludeValuesetWhichDrawsWhole)),
         canonical.into(),
         Box::new(move |event| {
             let typed = event_target_value(&event);
@@ -1058,7 +1063,7 @@ fn value_set_row(editing: Editing, key: u32, row: u32, clause: Memo<Clause>) -> 
 fn add_published_value_set(editing: Editing, offers: Offers, key: u32) -> AnyView {
     let picked = RwSignal::new(String::new());
     let add = act(
-        "Add",
+        tr(Msg::Add),
         Box::new(move |_| {
             let canonical = picked.get_untracked();
             if !canonical.is_empty() {
@@ -1071,11 +1076,11 @@ fn add_published_value_set(editing: Editing, offers: Offers, key: u32) -> AnyVie
         Named {
             id: format!("compose-add-vs-{key}"),
             name: "addValueSet",
-            label: "Add a published value set",
-            note: "compose.include.valueSet, which draws the whole of that value set in.",
+            label: tr(Msg::AddPublishedValueSet),
+            note: tr(Msg::ComposeIncludeValuesetWhichDrawsWhole),
         },
         picked.into(),
-        "Choose one this server holds",
+        tr(Msg::ChooseOneServerHolds),
         options_of(move || offers.value_sets.get()),
         Box::new(move |event| picked.set(event_target_value(&event))),
         Some(add),
@@ -1113,11 +1118,11 @@ fn add_implicit_value_set(
         Named {
             id: format!("compose-implicit-{key}"),
             name: "implicitValueSet",
-            label: "Add a value set the code system defines",
-            note: "An implicit value set, named by a URL template the code system publishes.",
+            label: tr(Msg::AddValueSetCodeSystemDefines),
+            note: tr(Msg::ImplicitValueSetNamedUrlTemplate),
         },
         chosen.into(),
-        "Choose a template",
+        tr(Msg::ChooseATemplate),
         options_of(move || {
             forms
                 .get()
@@ -1158,7 +1163,7 @@ fn add_implicit_value_set(
                     disabled=move || url.with(Option::is_none)
                     on:click=add
                 >
-                    "Add"
+                    {tr(Msg::Add)}
                 </button>
             </div>
         </div>
@@ -1218,7 +1223,7 @@ fn argument_control(
         format!("compose-implicit-{key}-{index}"),
         "implicitArgument",
         Signal::stored(format!("[{placeholder}]")),
-        fixed("What replaces that placeholder in the template."),
+        fixed(tr(Msg::WhatReplacesPlaceholderTemplate)),
         Signal::derive(move || arguments.with(|held| held.get(index).cloned().unwrap_or_default())),
         Box::new(move |event| {
             let typed = event_target_value(&event);
@@ -1248,11 +1253,11 @@ fn system_picker(editing: Editing, offers: Offers, key: u32, clause: Memo<Clause
         Named {
             id: format!("compose-system-{key}"),
             name: "system",
-            label: "Code system",
-            note: "compose.include.system, the code system the codes below are read from.",
+            label: tr(Msg::CodeSystem2),
+            note: tr(Msg::ComposeIncludeSystemCodeSystemCodes),
         },
         Signal::derive(move || clause.with(|clause| clause.system.clone())),
-        "Choose one this server serves",
+        tr(Msg::ChooseOneServerServes),
         options_of(move || offers.systems()),
         Box::new(move |event| {
             let chosen = event_target_value(&event);
@@ -1262,8 +1267,8 @@ fn system_picker(editing: Editing, offers: Offers, key: u32, clause: Memo<Clause
     let version = text_control(
         format!("compose-system-version-{key}"),
         "systemVersion",
-        fixed("Code system version"),
-        fixed("compose.include.version. Left empty, the server resolves the version itself."),
+        fixed(tr(Msg::CodeSystemVersion)),
+        fixed(tr(Msg::ComposeIncludeVersionLeftEmptyServer)),
         Signal::derive(move || clause.with(|clause| clause.system_version.clone())),
         Box::new(move |event| {
             let typed = event_target_value(&event);
@@ -1293,7 +1298,7 @@ fn concept_rows(
     }
     .into_any();
     group(
-        "Codes",
+        tr(Msg::Codes),
         vec![
             view! { <div class="grid gap-default">{listed}</div> }.into_any(),
             concept_search(editing, offers, key, clause),
@@ -1327,8 +1332,8 @@ fn concept_row(
         text_control(
             format!("compose-display-{key}-{row}"),
             "display",
-            fixed("The display this value set gives that code"),
-            fixed("compose.include.concept.display, which overrides the code system's own."),
+            fixed(tr(Msg::DisplayValueSetGivesCode)),
+            fixed(tr(Msg::ComposeIncludeConceptDisplayWhichOverrides)),
             Signal::derive(move || {
                 clause.with(|clause| {
                     clause
@@ -1417,13 +1422,10 @@ fn code_search(
     into: PickInto,
 ) -> AnyView {
     let (search_id, label) = match into {
-        PickInto::Concepts => (
-            format!("compose-search-{key}"),
-            "Find a code in that code system",
-        ),
+        PickInto::Concepts => (format!("compose-search-{key}"), tr(Msg::FindCodeCodeSystem)),
         PickInto::Argument(_) => (
             format!("compose-implicit-search-{key}"),
-            "Find the code for that template",
+            tr(Msg::FindCodeTemplate),
         ),
     };
     let client = expect_context::<FhirClient>();
@@ -1500,14 +1502,14 @@ fn code_search(
         {search_field}
         <button type="submit" class=styles::BUTTON disabled=move || system.with(String::is_empty)>
             {ferrohealth_ui::icon::icon(icon::SEARCH, "16")}
-            "Search"
+            {tr(Msg::Search)}
         </button>
     });
     view! {
         <div class="grid gap-tight">
             <form on:submit=submit>{search_row}</form>
             <Show when=move || offers.picking.get() == Some(key) fallback=|| ()>
-                <Reading label="Searching that code system">{results}</Reading>
+                <Reading label=&{ tr(Msg::SearchingThatCodeSystem) }>{results}</Reading>
             </Show>
         </div>
     }
@@ -1517,14 +1519,10 @@ fn code_search(
 /// The concepts a search answered, each with the control that picks it.
 fn found_view(editing: Editing, key: u32, value: &ExpandedValueSet, into: PickInto) -> AnyView {
     let Some(expansion) = value.expansion() else {
-        return crate::components::state::empty(
-            "The server answered no expansion for that search.",
-        );
+        return crate::components::state::empty(tr(Msg::ServerAnsweredNoExpansionSearch));
     };
     if expansion.concepts.is_empty() {
-        return crate::components::state::empty(
-            "No concept of that code system matches that text.",
-        );
+        return crate::components::state::empty(tr(Msg::NoConceptCodeSystemMatchesText));
     }
     let rows: Vec<AnyView> = expansion
         .concepts
@@ -1536,7 +1534,7 @@ fn found_view(editing: Editing, key: u32, value: &ExpandedValueSet, into: PickIn
             let shown_display = display.clone();
             let add = match into {
                 PickInto::Concepts => act(
-                    "Add",
+                    tr(Msg::Add),
                     Box::new(move |_| {
                         let code = code.clone();
                         let display = display.clone();
@@ -1544,7 +1542,7 @@ fn found_view(editing: Editing, key: u32, value: &ExpandedValueSet, into: PickIn
                     }),
                 ),
                 PickInto::Argument(arguments) => act(
-                    "Use",
+                    tr(Msg::Use),
                     Box::new(move |_| {
                         let code = code.clone();
                         arguments.update(|held| fill(held, 0, code));
@@ -1593,7 +1591,7 @@ fn filter_rows(
     .into_any();
     let chosen = RwSignal::new(String::new());
     let add = act(
-        "Add",
+        tr(Msg::Add),
         Box::new(move |_| {
             let picked = chosen.get_untracked();
             let Some((property, operator)) = picked.split_once(' ') else {
@@ -1609,11 +1607,11 @@ fn filter_rows(
         Named {
             id: format!("compose-add-filter-{key}"),
             name: "addFilter",
-            label: "Add a filter this server declares",
-            note: "compose.include.filter, over a property this code system version declares.",
+            label: tr(Msg::AddFilterServerDeclares),
+            note: tr(Msg::ComposeIncludeFilterOverPropertyCode),
         },
         chosen.into(),
-        "Choose a property and an operator",
+        tr(Msg::ChoosePropertyOperator),
         options_of(move || {
             declared
                 .get()
@@ -1640,15 +1638,13 @@ fn filter_rows(
                 when=move || !system.with(String::is_empty) && declared.with(Vec::is_empty)
                 fallback=|| ()
             >
-                <p class=styles::HINT>
-                    "This server declares no filter for that code system version."
-                </p>
+                <p class=styles::HINT>{tr(Msg::ServerDeclaresNoFilterCodeSystem)}</p>
             </Show>
         </div>
     }
     .into_any();
     group(
-        "Filters",
+        tr(Msg::Filters),
         vec![
             view! { <div class="grid gap-default">{listed}</div> }.into_any(),
             adder,
@@ -1680,7 +1676,7 @@ fn filter_row(editing: Editing, key: u32, row: u32, clause: Memo<Clause>) -> Any
         Signal::derive(move || {
             held.with(|(property, operator, _)| format!("{property} {operator}"))
         }),
-        fixed("The value the operator is applied with."),
+        fixed(tr(Msg::ValueOperatorApplied)),
         Signal::derive(move || held.with(|(_, _, value)| value.clone())),
         Box::new(move |event| {
             let typed = event_target_value(&event);
@@ -1727,7 +1723,7 @@ fn save_section(
         }
         saving.set(true);
         refusal.set(None);
-        report.set(String::from("Saving"));
+        report.set(tr(Msg::Saving));
         let client = client.clone();
         let version = version.get_untracked();
         let draft = editing.draft();
@@ -1757,7 +1753,7 @@ fn save_section(
                         .as_ref()
                         .and_then(|resource| resource.id.clone())
                         .unwrap_or_else(|| draft.id.clone());
-                    report.set(String::from("Saved."));
+                    report.set(tr(Msg::Saved));
                     editing.reopen();
                     previewed.set(None);
                     saves.update(|counted| *counted = counted.saturating_add(1));
@@ -1802,12 +1798,12 @@ fn save_section(
                     disabled=move || !savable.get() || saving.get()
                     on:click=save.clone()
                 >
-                    {move || if saving.get() { "Saving" } else { "Save this value set" }}
+                    {move || if saving.get() { tr(Msg::Saving) } else { tr(Msg::SaveThisValueSet) }}
                 </button>
             </Show>
             <Show when=move || writable.get() && !savable.get() fallback=|| ()>
                 <p role="status" class=styles::HINT>
-                    "A canonical and a clause that selects something are what a save needs."
+                    {tr(Msg::CanonicalClauseSelectsSomethingWhatSave)}
                 </p>
             </Show>
         </div>
@@ -1834,7 +1830,7 @@ fn refusal_section(
     };
     let press: Arc<dyn Fn() + Send + Sync> = Arc::new(move || {
         editing.reopen();
-        report.set(String::from(READING_AGAIN));
+        report.set(reading_again());
         saves.update(|counted| *counted = counted.saturating_add(1));
         focus_report(REPORT_ID);
     });
@@ -1895,9 +1891,9 @@ fn preview_section(
     let shown = move || {
         expansion.with(|answered| {
             answered.as_ref().map(|answered| match answered {
-                None => crate::components::state::invitation(
-                    "Run the preview to see what this definition selects. It expands the definition on screen, saved or not.",
-                ),
+                None => crate::components::state::invitation(tr(
+                    Msg::RunPreviewSeeWhatDefinitionSelects,
+                )),
                 Some(Ok(value)) => preview_view(value, page, id),
                 Some(Err(error)) => expansion_refusal(error, editing),
             })
@@ -1907,10 +1903,10 @@ fn preview_section(
     view! {
         <section class="fui-card" aria-labelledby="compose-preview-heading">
             <h2 id="compose-preview-heading" class="fui-card-title">
-                "The preview"
+                {tr(Msg::ThePreview)}
             </h2>
             {controls}
-            <Reading label="Expanding the definition">{shown}</Reading>
+            <Reading label=&{ tr(Msg::ExpandingTheDefinition) }>{shown}</Reading>
         </section>
     }
     .into_any()
@@ -1956,7 +1952,7 @@ fn preview_controls(
         <form class="mt-default flex items-end gap-default" on:submit=run>
             <div class="grid min-w-0 flex-1 gap-tight">
                 <label for="compose-preview-filter" class=styles::LABEL>
-                    "Filter the preview"
+                    {tr(Msg::FilterThePreview)}
                 </label>
                 <input
                     id="compose-preview-filter"
@@ -1969,7 +1965,7 @@ fn preview_controls(
             </div>
             <button type="submit" class=styles::SUBMIT>
                 {ferrohealth_ui::icon::icon(icon::EXPAND, "16")}
-                "Run the preview"
+                {tr(Msg::RunThePreview)}
             </button>
         </form>
     }
@@ -1997,9 +1993,9 @@ fn address(id: &str, version: FhirVersion, page: &Preview) -> String {
 /// The page the preview answered, with the walk through the rest of it.
 fn preview_view(value: &ExpandedValueSet, page: Memo<Preview>, id: Memo<String>) -> AnyView {
     let Some(expansion) = value.expansion() else {
-        return crate::components::state::empty(
-            "The server answered a ValueSet carrying no expansion.",
-        );
+        return crate::components::state::empty(tr(
+            Msg::ServerAnsweredValuesetCarryingNoExpansion2,
+        ));
     };
     let rows: Vec<AnyView> = expansion
         .concepts
@@ -2024,10 +2020,10 @@ fn preview_view(value: &ExpandedValueSet, page: Memo<Preview>, id: Memo<String>)
             <thead>
                 <tr>
                     <th scope="col" class=styles::TH>
-                        "Code"
+                        {tr(Msg::Code)}
                     </th>
                     <th scope="col" class=styles::TH>
-                        "Display"
+                        {tr(Msg::Display)}
                     </th>
                 </tr>
             </thead>
@@ -2060,7 +2056,7 @@ fn pager(
         None => (rows >= at.count())
             .then(|| Page::at(at.offset().saturating_add(at.count()), at.count())),
     };
-    let link = move |target: Page, label: &'static str| {
+    let link = move |target: Page, label: String| {
         let address = address(
             &id,
             version.get(),
@@ -2078,13 +2074,22 @@ fn pager(
         .into_any()
     };
     let counted = match total {
-        Some(total) => format!("{rows} of {total} concepts on this page."),
-        None => format!("{rows} concepts on this page. The server declared no total."),
+        Some(total) => tr_with(
+            Msg::ConceptsPage2,
+            &[
+                ("rows", (rows).to_string().into()),
+                ("total", (total).to_string().into()),
+            ],
+        ),
+        None => tr_with(
+            Msg::ConceptsPageServerDeclaredNoTotal,
+            &[("rows", (rows).to_string().into())],
+        ),
     };
     view! {
         <div class="mt-default flex items-center gap-default">
-            {previous.map(|target| link(target, "Previous"))}
-            {next.map(|target| link(target, "Next"))} <p class=styles::MUTED>{counted}</p>
+            {previous.map(|target| link(target, tr(Msg::Previous)))}
+            {next.map(|target| link(target, tr(Msg::Next)))} <p class=styles::MUTED>{counted}</p>
         </div>
     }
     .into_any()
@@ -2123,7 +2128,12 @@ fn marked_expression(expression: &str, column: u32, editing: Editing) -> Option<
     Some(
         view! {
             <div class=format!("rounded-md p-loose {}", styles::NOTICE)>
-                <p class=styles::LABEL>{format!("{form}, at character {column}")}</p>
+                <p class=styles::LABEL>
+                    {tr_with(
+                        Msg::AtCharacter,
+                        &[("form", (form).clone().into()), ("column", (column).to_string().into())],
+                    )}
+                </p>
                 <p class=format!(
                     "mt-tight {}",
                     styles::CODE,
@@ -2137,13 +2147,16 @@ fn marked_expression(expression: &str, column: u32, editing: Editing) -> Option<
 /// What a preview answered, as the sentence the live region reads out.
 fn count_sentence(value: &ExpandedValueSet) -> String {
     let Some(expansion) = value.expansion() else {
-        return String::from("The server answered no expansion for this definition.");
+        return tr(Msg::ServerAnsweredNoExpansionDefinition);
     };
     match expansion.total {
-        Some(total) => format!("This definition selects {total} concepts."),
-        None => format!(
-            "{} concepts on this page. The server declared no total.",
-            expansion.listed()
+        Some(total) => tr_with(
+            Msg::ThisDefinitionSelectsConcepts,
+            &[("total", (total).to_string().into())],
+        ),
+        None => tr_with(
+            Msg::ConceptsPageServerDeclaredNoTotal2,
+            &[("expansion", (expansion.listed()).to_string().into())],
         ),
     }
 }
@@ -2159,15 +2172,30 @@ fn summary_of(error: &FhirError) -> String {
         .collect::<Vec<String>>()
         .join(" ");
     if said.is_empty() {
-        String::from("The server refused the preview.")
+        tr(Msg::ServerRefusedPreview)
     } else {
-        format!("The server refused the preview: {said}")
+        tr_with(
+            Msg::ServerRefusedPreview2,
+            &[("said", (said).clone().into())],
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_new_value_set_and_an_edited_one_title_the_page_apart() {
+        assert_eq!(
+            editor_title(message(Msg::TitleValueSetComposer), &editor_mode("")),
+            "New value set"
+        );
+        assert_eq!(
+            editor_title(message(Msg::TitleValueSetComposer), &editor_mode("colours")),
+            "Edit colours"
+        );
+    }
 
     #[test]
     fn the_preview_address_carries_the_page_it_shows() {

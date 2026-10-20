@@ -5,6 +5,7 @@
 
 use leptos::prelude::*;
 
+use crate::locale::{Msg, tr};
 use crate::runs::Run;
 use crate::runs::RunList;
 use crate::runs::Runs;
@@ -54,11 +55,9 @@ impl History {
                             <summary class=format!(
                                 "cursor-pointer px-default py-tight font-medium {}",
                                 styles::MUTED,
-                            )>"The runs made on this page"</summary>
+                            )>{tr(Msg::RunsMadePage)}</summary>
                             <div class="border-t border-edge px-default py-tight">
-                                <p class=styles::HINT>
-                                    "Each one is the address that made it. They live in this page and are never sent anywhere."
-                                </p>
+                                <p class=styles::HINT>{tr(Msg::EachOneAddressMadeTheyLive)}</p>
                                 <ul class="mt-default grid gap-tight">{rows}</ul>
                             </div>
                         </details>

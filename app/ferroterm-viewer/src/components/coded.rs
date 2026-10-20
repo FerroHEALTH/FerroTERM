@@ -13,6 +13,7 @@ use crate::components::failure::Failure;
 use crate::fhir::FhirClient;
 use crate::fhir::error::FhirError;
 use crate::fhir::version::FhirVersion;
+use crate::locale::{Msg, tr};
 use crate::styles;
 
 /// One code offered by a coded control.
@@ -59,8 +60,8 @@ pub(crate) struct Control {
 }
 
 /// A label that is the same whatever the served version is.
-pub(crate) fn fixed(label: &'static str) -> Signal<String> {
-    Signal::derive(move || label.to_owned())
+pub(crate) fn fixed(label: String) -> Signal<String> {
+    Signal::derive(move || label.clone())
 }
 
 /// One value of an authoring draft, as a signal that only fires when it
@@ -168,7 +169,7 @@ pub(crate) fn coded_control(
             .with(|codes| codes.iter().any(|coded| coded.code == held));
         if !listed {
             let text = if held.is_empty() {
-                "Choose one".to_owned()
+                tr(Msg::ChooseOne).clone()
             } else {
                 held.clone()
             };
@@ -226,7 +227,7 @@ pub(crate) fn coded_control(
             </select>
             <Show when=move || codes.refused.with(Option::is_some) fallback=|| ()>
                 <p role="status" class=styles::HINT>
-                    "This server did not expand the value set this control's codes come from, so it offers only what the resource already carries."
+                    {tr(Msg::ServerDidNotExpandValueSet)}
                 </p>
                 {move || {
                     codes

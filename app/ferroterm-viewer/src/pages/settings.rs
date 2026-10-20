@@ -11,6 +11,7 @@ use leptos_router::hooks::use_location;
 use crate::components::shell::SelectedVersion;
 use crate::fhir::FhirClient;
 use crate::fhir::version::FhirVersion;
+use crate::locale::{Msg, tr};
 use crate::paging::MAX_COUNT;
 use crate::settings::{SaveSettings, Settings};
 use ferrohealth_ui::view::form::columns;
@@ -43,7 +44,7 @@ pub(crate) fn pane() -> AnyView {
     };
 
     let in_use = definitions(vec![(
-        "FHIR base in use",
+        tr(Msg::FhirBaseInUse),
         view! { <span class="fui-mono break-all">{base}</span> }.into_any(),
     )])
     .into_any();
@@ -52,39 +53,37 @@ pub(crate) fn pane() -> AnyView {
         {choice_field(
             "viewer-theme",
             "theme",
-            "Theme",
-            Some("System follows the colour scheme this device asks for."),
+            tr(Msg::Theme),
+            Some(tr(Msg::SystemFollowsColourSchemeDeviceAsks)),
             &Theme::ALL.map(|theme| (theme.key(), theme.label())),
             settings.theme.key(),
         )}
         {choice_field(
             "viewer-density",
             "density",
-            "Density",
-            Some("Compact tightens every space and row, so more of a listing fits one screen."),
+            tr(Msg::Density),
+            Some(tr(Msg::CompactTightensEverySpaceRowSo)),
             &Density::ALL.map(|density| (density.key(), density.label())),
             settings.density.key(),
         )}
         {choice_field(
             "viewer-fhir-version",
             "fhir",
-            "Default FHIR version",
-            Some("Used when an address carries no version of its own."),
+            tr(Msg::DefaultFhirVersion),
+            Some(tr(Msg::UsedWhenAddressCarriesNoVersion)),
             &FhirVersion::ALL.map(|version| (version.segment(), version.label().to_owned())),
             settings.version.segment(),
         )}
         {field(
             "viewer-display-language",
-            "Display language",
-            Some(
-                "A BCP 47 tag sent as displayLanguage. Leave it empty to take the server default.",
-            ),
+            tr(Msg::DisplayLanguage),
+            Some(tr(Msg::Bcp47TagSentDisplaylanguageLeave)),
             view! {
                 <input
                     id="viewer-display-language"
                     name="language"
                     type="text"
-                    placeholder="for example nl-NL"
+                    placeholder=tr(Msg::ForExampleNlNl)
                     class=INPUT
                     aria-describedby=help_id("viewer-display-language")
                     value=settings.language.clone()
@@ -93,8 +92,8 @@ pub(crate) fn pane() -> AnyView {
         )}
         {field(
             "viewer-page-size",
-            "Page size",
-            Some("How many rows a paged screen asks for, from 1 to 1000."),
+            tr(Msg::PageSize),
+            Some(tr(Msg::HowManyRowsPagedScreenAsks)),
             view! {
                 <input
                     id="viewer-page-size"
@@ -113,19 +112,19 @@ pub(crate) fn pane() -> AnyView {
     .into_any();
 
     let body = view! {
-        <p class="fui-muted">"Kept by this console for this browser, in its own cookies."</p>
+        <p class="fui-muted">{tr(Msg::KeptConsoleBrowserOwnCookies)}</p>
         {in_use}
         <form method="post" action=SaveSettings::url() class=FORM>
             <input type="hidden" name="back" value=back />
             {columns(fields)}
             <div class="fui-cluster">
                 <button type="submit" class=Variant::Primary.class()>
-                    {label(Some(Glyph::SAVE), "Save the settings")}
+                    {label(Some(Glyph::SAVE), tr(Msg::SaveTheSettings))}
                 </button>
             </div>
         </form>
     };
-    card("Preferences", body).into_any()
+    card(tr(Msg::Preferences), body).into_any()
 }
 
 /// One labelled select over `choices` (each a value and its words), with
@@ -133,8 +132,8 @@ pub(crate) fn pane() -> AnyView {
 fn choice_field(
     id: &'static str,
     name: &'static str,
-    label: &'static str,
-    help: Option<&'static str>,
+    label: String,
+    help: Option<String>,
     choices: &[(&'static str, String)],
     current: &str,
 ) -> AnyView {
@@ -149,7 +148,7 @@ fn choice_field(
             }
         })
         .collect_view();
-    let described = help.map(|_| help_id(id));
+    let described = help.as_ref().map(|_| help_id(id));
     field(
         id,
         label,

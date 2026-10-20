@@ -24,6 +24,7 @@ use crate::fhir::authoring::StoredMapElement;
 use crate::fhir::authoring::StoredMapGroup;
 use crate::fhir::authoring::StoredMapTarget;
 use crate::fhir::version::FhirVersion;
+use crate::locale::{Msg, tr, tr_with};
 
 /// The resource type this form authors.
 const CONCEPT_MAP: &str = "ConceptMap";
@@ -288,28 +289,32 @@ impl Problem {
     /// The sentence the screen shows for this problem.
     pub(crate) fn text(&self) -> String {
         match self {
-            Self::NoCanonical => {
-                String::from("A concept map needs a canonical before it can be saved.")
-            }
-            Self::NoStatus => String::from("A concept map needs a publication status."),
-            Self::GrouplessSystems => {
-                String::from("Every group names the system it maps from and the system it maps to.")
-            }
-            Self::GroupWithoutCodes => {
-                String::from("Every group carries at least one code, which is what a group is for.")
-            }
+            Self::NoCanonical => tr(Msg::ConceptMapNeedsCanonicalBeforeCan),
+            Self::NoStatus => tr(Msg::ConceptMapNeedsPublicationStatus),
+            Self::GrouplessSystems => tr(Msg::EveryGroupNamesSystemMapsFrom),
+            Self::GroupWithoutCodes => tr(Msg::EveryGroupCarriesLeastOneCode),
             Self::CommentRequired {
                 element,
                 code,
                 relationship,
-            } => format!(
-                "The target `{code}` of `{element}` is `{relationship}`, and this FHIR version requires a comment on a target that says so."
+            } => tr_with(
+                Msg::TargetFhirVersionRequiresCommentTarget,
+                &[
+                    ("code", (code).clone().into()),
+                    ("element", (element).clone().into()),
+                    ("relationship", (relationship).clone().into()),
+                ],
             ),
-            Self::RelationshipMissing { element, code } => format!(
-                "The target `{code}` of `{element}` states no relationship to its source, which every served version makes mandatory."
+            Self::RelationshipMissing { element, code } => tr_with(
+                Msg::TargetStatesNoRelationshipSourceWhich,
+                &[
+                    ("code", (code).clone().into()),
+                    ("element", (element).clone().into()),
+                ],
             ),
-            Self::MappedAndUnmapped { element } => format!(
-                "`{element}` is marked as mapping to nothing and carries a target as well. Untick that mark to see the target, or clear the mark."
+            Self::MappedAndUnmapped { element } => tr_with(
+                Msg::MarkedMappingNothingCarriesTargetWell,
+                &[("element", (element).clone().into())],
             ),
         }
     }

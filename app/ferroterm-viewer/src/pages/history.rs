@@ -36,9 +36,9 @@ use crate::authoring::history::Support;
 use crate::authoring::history::open;
 use crate::authoring::history::restore;
 use crate::components::failure::Failure;
-use crate::components::reload::READING_AGAIN;
 use crate::components::reload::announced;
 use crate::components::reload::focus_report;
+use crate::components::reload::reading_again;
 use crate::components::reload::reload_offer;
 use crate::components::shell::Console;
 use crate::components::shell::SelectedVersion;
@@ -52,6 +52,7 @@ use crate::fhir::version::FhirVersion;
 use crate::fhir::write::Refusal;
 use crate::fhir::write::Version;
 use crate::fhir::write::Written;
+use crate::locale::{Msg, tr, tr_with};
 use crate::routes::HISTORY_PATH;
 use crate::routes::ID_PARAM;
 use crate::routes::TYPE_PARAM;
@@ -177,7 +178,7 @@ pub(crate) fn HistoryPage() -> impl IntoView {
     let finder = client.clone();
     let body = view! {
         <Transition fallback=|| {
-            busy("Reading the versions", Busy::Section)
+            busy(tr(Msg::ReadingTheVersions), Busy::Section)
         }>
             {move || {
                 read.with(|answered| {
@@ -221,7 +222,7 @@ fn heading_section(subject: Memo<Subject>) -> AnyView {
     let named = move || {
         let held = subject.get();
         if held.id.is_empty() {
-            "Versions".to_owned()
+            tr(Msg::Versions).clone()
         } else {
             format!("{}/{}", held.resource_type, held.id)
         }
@@ -232,11 +233,7 @@ fn heading_section(subject: Memo<Subject>) -> AnyView {
             ferrohealth_ui::view::surface::page_heading(
                 ferrohealth_ui::view::surface::Header {
                     title: named(),
-                    subtitle: Some(
-                        String::from(
-                            "Every version the server holds, what any two of them differ by, and putting an earlier one back.",
-                        ),
-                    ),
+                    subtitle: Some(tr(Msg::EveryVersionServerHoldsWhatAny)),
                     crumbs: listing_crumb(&subject.get().resource_type).into_iter().collect(),
                     mono: true,
                 },
@@ -250,9 +247,9 @@ fn heading_section(subject: Memo<Subject>) -> AnyView {
 /// The listing a resource of `resource_type` is found in, as a crumb.
 fn listing_crumb(resource_type: &str) -> Option<ferrohealth_ui::view::surface::Crumb> {
     let (label, href) = match resource_type {
-        "CodeSystem" => ("Code systems", "/systems"),
-        "ValueSet" => ("Value sets", "/valuesets"),
-        "ConceptMap" => ("Concept maps", "/conceptmaps"),
+        "CodeSystem" => (tr(Msg::CodeSystems), "/systems"),
+        "ValueSet" => (tr(Msg::ValueSets), "/valuesets"),
+        "ConceptMap" => (tr(Msg::ConceptMaps), "/conceptmaps"),
         _ => return None,
     };
     Some(ferrohealth_ui::view::surface::Crumb::new(label, href))
@@ -261,10 +258,12 @@ fn listing_crumb(resource_type: &str) -> Option<ferrohealth_ui::view::surface::C
 /// What the screen says about a resource type it does not write.
 fn unwritten_section(resource_type: &str) -> AnyView {
     let named = if resource_type.is_empty() {
-        "The address names no resource type, so there is nothing to read the versions of."
-            .to_owned()
+        { tr(Msg::AddressNamesNoResourceTypeSo) }.clone()
     } else {
-        format!("This editor does not write {resource_type}, so it reads no versions of one.")
+        tr_with(
+            Msg::EditorDoesNotWriteSoReads,
+            &[("resource_type", (resource_type).to_string().into())],
+        )
     };
     ferrohealth_ui::view::notice::notice(
         ferrohealth_ui::tone::Tone::Info,
@@ -362,14 +361,12 @@ impl Restoring {
                 return;
             }
             let Some(chosen) = chosen.clone() else {
-                self.report.set(String::from(
-                    "This version carries no resource to put back.",
-                ));
+                self.report.set(tr(Msg::VersionCarriesNoResourcePutBack));
                 return;
             };
             self.in_flight.set(true);
             self.refusal.set(None);
-            self.report.set(String::from("Restoring"));
+            self.report.set(tr(Msg::Restoring));
             let sent = restore(&chosen, &subject.id, &current);
             let client = self.client.get_value();
             let version = self.version.get_untracked();
@@ -444,7 +441,7 @@ fn outcome_section(restoring: Restoring) -> AnyView {
     // The region stands outside the list a reload rebuilds, so the keyboard
     // moves to it as soon as the reading starts.
     let press: Arc<dyn Fn() + Send + Sync> = Arc::new(move || {
-        report.set(String::from(READING_AGAIN));
+        report.set(reading_again());
         reloads.update(|count| *count = count.saturating_add(1));
         focus_report(REPORT_ID);
     });
@@ -456,7 +453,7 @@ fn outcome_section(restoring: Restoring) -> AnyView {
                     {move || {
                         refusal
                             .with(|held| {
-                                held.as_ref().map(|error| Refusal::of(error).what_to_do())
+                                held.as_ref().map(|error| tr(Refusal::of(error).what_to_do()))
                             })
                     }}
                 </p>
@@ -512,19 +509,19 @@ fn list_section(restoring: Restoring, opened: &Opened, writable: bool) -> AnyVie
                     <thead>
                         <tr>
                             <th scope="col" class=styles::TH>
-                                "Version"
+                                {tr(Msg::Version)}
                             </th>
                             <th scope="col" class=styles::TH>
-                                "Changed"
+                                {tr(Msg::Changed)}
                             </th>
                             <th scope="col" class=styles::TH>
-                                "Interaction"
+                                {tr(Msg::Interaction)}
                             </th>
                             <th scope="col" class=styles::TH>
-                                "Source system"
+                                {tr(Msg::SourceSystem)}
                             </th>
                             <th scope="col" class=styles::TH>
-                                "Restore"
+                                {tr(Msg::Restore)}
                             </th>
                         </tr>
                     </thead>
@@ -539,9 +536,7 @@ fn list_section(restoring: Restoring, opened: &Opened, writable: bool) -> AnyVie
             <p class=format!(
                 "mt-default {}",
                 styles::HINT,
-            )>
-                "This server declares the version read and not the history interaction, so the list is built by reading each earlier version back. A version identifier is opaque in FHIR, so a server that does not count its versions shows only the one it states."
-            </p>
+            )>{tr(Msg::ServerDeclaresVersionReadNotHistory)}</p>
         }
         .into_any()
     } else {
@@ -552,7 +547,7 @@ fn list_section(restoring: Restoring, opened: &Opened, writable: bool) -> AnyVie
             <p class=format!(
                 "mt-default {}",
                 styles::HINT,
-            )>"Only the most recent versions are listed."</p>
+            )>{tr(Msg::OnlyMostRecentVersionsListed)}</p>
         }
         .into_any()
     } else {
@@ -561,7 +556,7 @@ fn list_section(restoring: Restoring, opened: &Opened, writable: bool) -> AnyVie
     view! {
         <section class="fui-card" aria-labelledby="history-versions-heading">
             <h2 id="history-versions-heading" class="fui-card-title">
-                "Versions"
+                {tr(Msg::Versions)}
             </h2>
             {listed}
             {composed}
@@ -608,7 +603,10 @@ fn version_row(
                             disabled=move || restoring.in_flight.get()
                             on:click=restore_it
                         >
-                            {format!("Restore version {labelled}")}
+                            {tr_with(
+                                Msg::RestoreVersion,
+                                &[("labelled", (labelled).clone().into())],
+                            )}
                         </button>
                     }
                         .into_any()
@@ -624,7 +622,8 @@ fn version_row(
 /// The mark on the version the server holds now, where this row is it.
 fn marked(is_current: bool) -> AnyView {
     if is_current {
-        view! { <span class=format!("ml-tight {}", styles::BADGE)>"current"</span> }.into_any()
+        view! { <span class=format!("ml-tight {}", styles::BADGE)>{tr(Msg::Current)}</span> }
+            .into_any()
     } else {
         ().into_any()
     }
@@ -639,9 +638,7 @@ fn unrestorable() -> AnyView {
         <span class=styles::ABSENT aria-hidden="true">
             {styles::ABSENT_MARK}
         </span>
-        <span class="sr-only">
-            "This version is the one the server holds now, or this account cannot write this resource."
-        </span>
+        <span class="sr-only">{tr(Msg::VersionOneServerHoldsNowAccount)}</span>
     }
     .into_any()
 }
@@ -661,7 +658,7 @@ fn absent_or(stated: Option<String>) -> AnyView {
                 .into_any()
         }
         None => view! {
-            <span class=styles::ABSENT title="The server states nothing here.">
+            <span class=styles::ABSENT title=tr(Msg::ServerStatesNothingHere)>
                 {styles::ABSENT_MARK}
             </span>
         }
@@ -672,9 +669,18 @@ fn absent_or(stated: Option<String>) -> AnyView {
 /// What the live region says after a restore the server took.
 fn restored_text(chosen: &str, now: &str) -> String {
     if now.is_empty() {
-        format!("Restored version {chosen}. The server stated no version for the write.")
+        tr_with(
+            Msg::RestoredVersionServerStatedNoVersion,
+            &[("chosen", (chosen).to_string().into())],
+        )
     } else {
-        format!("Restored version {chosen}. The server now holds version {now}.")
+        tr_with(
+            Msg::RestoredVersionServerNowHoldsVersion,
+            &[
+                ("chosen", (chosen).to_string().into()),
+                ("now", (now).to_string().into()),
+            ],
+        )
     }
 }
 
@@ -734,7 +740,7 @@ fn compare_section(
             <form class="mt-default flex flex-wrap items-end gap-default" on:submit=submitted>
                 <div class="grid gap-tight">
                     <label for="history-from" class=styles::LABEL>
-                        "Earlier version"
+                        {tr(Msg::EarlierVersion)}
                     </label>
                     <select
                         id="history-from"
@@ -748,7 +754,7 @@ fn compare_section(
                 </div>
                 <div class="grid gap-tight">
                     <label for="history-to" class=styles::LABEL>
-                        "Later version"
+                        {tr(Msg::LaterVersion)}
                     </label>
                     <select
                         id="history-to"
@@ -761,7 +767,7 @@ fn compare_section(
                     </select>
                 </div>
                 <button type="submit" class=styles::SUBMIT>
-                    "Compare these versions"
+                    {tr(Msg::CompareTheseVersions)}
                 </button>
             </form>
         }
@@ -770,7 +776,7 @@ fn compare_section(
     view! {
         <section class="fui-card" aria-labelledby="history-compare-heading">
             <h2 id="history-compare-heading" class="fui-card-title">
-                "Compare two versions"
+                {tr(Msg::CompareTwoVersions)}
             </h2>
             {form}
         </section>
@@ -788,7 +794,7 @@ fn options(ids: &[String], chosen: &str) -> Vec<AnyView> {
     let mut drawn = vec![
         view! {
             <option value="" selected=chosen.is_empty()>
-                "Choose a version"
+                {tr(Msg::ChooseAVersion)}
             </option>
         }
         .into_any(),
@@ -796,7 +802,7 @@ fn options(ids: &[String], chosen: &str) -> Vec<AnyView> {
     drawn.extend(ids.iter().map(|id| {
         let selected = id == chosen;
         let id = id.clone();
-        let label = format!("Version {id}");
+        let label = tr_with(Msg::Version7, &[("id", (id).clone().into())]);
         view! {
             <option value=id selected=selected>
                 {label}
@@ -840,16 +846,16 @@ fn difference_section(opened: &Opened, compared: Memo<Compared>) -> AnyView {
                     <thead>
                         <tr>
                             <th scope="col" class=styles::TH>
-                                "Element"
+                                {tr(Msg::Element)}
                             </th>
                             <th scope="col" class=styles::TH>
-                                "Change"
+                                {tr(Msg::Change)}
                             </th>
                             <th scope="col" class=styles::TH>
-                                "Earlier"
+                                {tr(Msg::Earlier)}
                             </th>
                             <th scope="col" class=styles::TH>
-                                "Later"
+                                {tr(Msg::Later)}
                             </th>
                         </tr>
                     </thead>
@@ -862,7 +868,7 @@ fn difference_section(opened: &Opened, compared: Memo<Compared>) -> AnyView {
     view! {
         <section class="fui-card" aria-labelledby="history-difference-heading">
             <h2 id="history-difference-heading" class="fui-card-title">
-                "What changed"
+                {tr(Msg::WhatChanged)}
             </h2>
             // The region is in the document before the first comparison runs,
             // because a region inserted along with its first message is not
@@ -955,26 +961,24 @@ fn findings_section(client: &FhirClient, read: Resource<Result<Opened, FhirError
             <Show when=move || !concerning.read().is_empty() fallback=|| ()>
                 <section class="fui-card" aria-labelledby="history-findings-heading">
                     <h2 id="history-findings-heading" class="fui-card-title">
-                        "What the last synchronisation found"
+                        {tr(Msg::WhatLastSynchronisationFound)}
                     </h2>
-                    <p class="fui-muted">
-                        "Codes this resource names that the release the sync service last activated changed."
-                    </p>
+                    <p class="fui-muted">{tr(Msg::CodesResourceNamesReleaseSyncService)}</p>
                     <div class="mt-default overflow-x-auto">
                         <table class=styles::TABLE>
                             <thead>
                                 <tr>
                                     <th scope="col" class=styles::TH>
-                                        "Code"
+                                        {tr(Msg::Code)}
                                     </th>
                                     <th scope="col" class=styles::TH>
-                                        "System"
+                                        {tr(Msg::System)}
                                     </th>
                                     <th scope="col" class=styles::TH>
-                                        "What the release did"
+                                        {tr(Msg::WhatTheReleaseDid)}
                                     </th>
                                     <th scope="col" class=styles::TH>
-                                        "Release"
+                                        {tr(Msg::Release)}
                                     </th>
                                 </tr>
                             </thead>

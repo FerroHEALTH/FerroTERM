@@ -21,7 +21,8 @@ use ferrohealth_ui::view::empty::{Busy, busy};
 )]
 pub(crate) fn Reading(
     /// What the section is waiting on, read out while it waits.
-    label: &'static str,
+    #[prop(into)]
+    label: String,
     /// Draws the indicator at the size of the surrounding text, for a section
     /// that sits inside a line rather than under a heading of its own.
     #[prop(optional)]

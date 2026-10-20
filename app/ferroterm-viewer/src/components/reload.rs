@@ -16,13 +16,18 @@ use leptos_router::hooks::use_navigate;
 use crate::fhir::error::FhirError;
 use crate::fhir::outcome::OperationOutcome;
 use crate::fhir::write::Refusal;
+use crate::locale::{Msg, tr, tr_with};
 use crate::styles;
 
 /// The words on the control, the same on every screen that offers it.
-pub(crate) const RELOAD_LABEL: &str = "Reload the current version";
+pub(crate) fn reload_label() -> String {
+    tr(Msg::ReloadTheCurrentVersion)
+}
 
 /// What a live region that outlives the reload says while it reads.
-pub(crate) const READING_AGAIN: &str = "Reading the current version from the server.";
+pub(crate) fn reading_again() -> String {
+    tr(Msg::ReadingCurrentVersionFromServer)
+}
 
 /// A navigation, boxed so a `Copy` handle can hold it.
 type Navigate = Arc<dyn Fn(&str, NavigateOptions) + Send + Sync>;
@@ -33,9 +38,9 @@ type Navigate = Arc<dyn Fn(&str, NavigateOptions) + Send + Sync>;
 /// server's own wording, so what is announced is never a paraphrase of it.
 pub(crate) fn announced(error: &FhirError) -> String {
     let said = diagnostics(error);
-    let what_to_do = Refusal::of(error).what_to_do();
+    let what_to_do = tr(Refusal::of(error).what_to_do());
     if said.is_empty() {
-        what_to_do.to_owned()
+        what_to_do.clone()
     } else {
         format!("{what_to_do} {said}")
     }
@@ -81,7 +86,7 @@ pub(crate) fn reload_offer(
                         press.with_value(|press| press());
                     }
                 >
-                    {RELOAD_LABEL}
+                    {reload_label()}
                 </button>
             </p>
         </Show>
@@ -100,9 +105,12 @@ pub(crate) fn focus_report(id: &str) {
 /// What the live region of a form rebuilt by a reload says.
 pub(crate) fn reloaded_text(version_id: &str) -> String {
     if version_id.is_empty() {
-        String::from("Reloaded. The server stated no version for it.")
+        tr(Msg::ReloadedServerStatedNoVersion)
     } else {
-        format!("Reloaded. The form now shows version {version_id}, the one the server holds.")
+        tr_with(
+            Msg::ReloadedFormNowShowsVersionOne,
+            &[("version_id", (version_id).to_string().into())],
+        )
     }
 }
 
@@ -185,7 +193,7 @@ mod tests {
             status: StatusCode::PRECONDITION_FAILED,
             body: String::new(),
         };
-        assert_eq!(announced(&error), Refusal::ConcurrentEdit.what_to_do());
+        assert_eq!(announced(&error), tr(Refusal::ConcurrentEdit.what_to_do()));
     }
 
     #[test]

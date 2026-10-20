@@ -20,13 +20,13 @@ use leptos_meta::Title;
 use leptos_router::NavigateOptions;
 use leptos_router::hooks::{use_navigate, use_query_map};
 
-use crate::components::NOT_DECLARED;
 use crate::components::failure::Failure;
 use crate::components::field::{
-    CANONICAL_WORDS, Field, LANGUAGE_EXAMPLE, VERSION_WORDS, group, picked_field, text_field,
-    text_field_showing, versioned_row,
+    Field, canonical_words, group, language_example, picked_field, text_field, text_field_showing,
+    version_words, versioned_row,
 };
 use crate::components::icon;
+use crate::components::not_declared;
 use crate::components::reading::Reading;
 use crate::components::runs::History;
 use crate::components::shell::SelectedVersion;
@@ -34,6 +34,7 @@ use crate::fhir::concept::{Concept, LookupAnswer, LookupRequest};
 use crate::fhir::expansion::DesignationRow;
 use crate::fhir::version::FhirVersion;
 use crate::fhir::{CODE_SYSTEM, FhirClient};
+use crate::locale::{Msg, tr};
 use crate::offers::{choices, published, versions};
 use crate::routes::{LOOKUP_PATH, VERSION_PARAM, base_url};
 use crate::runs::Run;
@@ -51,18 +52,22 @@ const CODE_PARAM: &str = "code";
 const LANGUAGE_PARAM: &str = "displayLanguage";
 
 /// The columns of the designation table.
-const DESIGNATION_COLUMNS: [Column; 3] = [
-    Column::text("value", "Designation"),
-    Column::text("language", "Language"),
-    Column::text("use", "Use"),
-];
+fn designation_columns() -> [Column; 3] {
+    [
+        Column::text("value", tr(Msg::Designation)),
+        Column::text("language", tr(Msg::Language)),
+        Column::text("use", tr(Msg::Use)),
+    ]
+}
 
 /// The columns of the property table.
-const PROPERTY_COLUMNS: [Column; 3] = [
-    Column::text("code", "Property"),
-    Column::text("value", "Value"),
-    Column::text("description", "Meaning"),
-];
+fn property_columns() -> [Column; 3] {
+    [
+        Column::text("code", tr(Msg::Property)),
+        Column::text("value", tr(Msg::Value)),
+        Column::text("description", tr(Msg::Meaning)),
+    ]
+}
 
 /// One run, as the address carries it.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -136,7 +141,7 @@ pub(crate) fn LookupPage() -> impl IntoView {
     let made = Memo::new(move |_| {
         run.with(|run| {
             run.request().map(|_| Run {
-                screen: "Look up".to_owned(),
+                screen: tr(Msg::LookUp).clone(),
                 subject: run.code.clone(),
                 address: run.address(version.get()),
             })
@@ -146,14 +151,10 @@ pub(crate) fn LookupPage() -> impl IntoView {
     let form = form_card(&client, version, run);
     let answer = answer_panel(&client, version, run);
     view! {
-        <Title text="Look up a code" />
+        <Title text=tr(Msg::LookUpACode) />
         {page_header(
-            "Look up a code",
-            Some(
-                String::from(
-                    "A code's display, designations and properties, from this server's $lookup.",
-                ),
-            ),
+            tr(Msg::LookUpACode),
+            Some(tr(Msg::CodeSDisplayDesignationsPropertiesFrom)),
             (),
         )}
         {stack(
@@ -200,7 +201,7 @@ fn form_card(client: &FhirClient, version: Signal<FhirVersion>, run: Signal<Look
         <form class="fui-form" on:submit=submit>
             {system_group(system, system_version, run, systems, system_versions)}
             {group(
-                "The code",
+                tr(Msg::TheCode),
                 vec![
                     view! {
                         <div class="fui-columns">
@@ -208,8 +209,8 @@ fn form_card(client: &FhirClient, version: Signal<FhirVersion>, run: Signal<Look
                                 Field {
                                     id: "lookup-code",
                                     name: "code",
-                                    label: "Code",
-                                    hint: "The code to read, exactly as the system writes it.",
+                                    label: tr(Msg::Code),
+                                    hint: tr(Msg::CodeReadExactlySystemWrites),
                                 },
                                 code,
                                 seeded(|run| run.code.clone()),
@@ -218,12 +219,12 @@ fn form_card(client: &FhirClient, version: Signal<FhirVersion>, run: Signal<Look
                                 Field {
                                     id: "lookup-display-language",
                                     name: "displayLanguage",
-                                    label: "Display language",
-                                    hint: "A BCP 47 tag. Left empty, the server picks its own display.",
+                                    label: tr(Msg::DisplayLanguage),
+                                    hint: tr(Msg::Bcp47TagLeftEmptyServer),
                                 },
                                 language,
                                 seeded(|run| run.display_language.clone()),
-                                Some(LANGUAGE_EXAMPLE),
+                                Some(language_example()),
                             )}
                         </div>
                     }
@@ -233,13 +234,13 @@ fn form_card(client: &FhirClient, version: Signal<FhirVersion>, run: Signal<Look
             <div class="fui-cluster">
                 <button type="submit" class=Variant::Primary.class()>
                     {ferrohealth_ui::icon::icon(icon::LOOKUP, "16")}
-                    "Look up"
+                    {tr(Msg::LookUp)}
                 </button>
                 {help_switch()}
             </div>
         </form>
     };
-    card("Parameters", form).into_any()
+    card(tr(Msg::Parameters), form).into_any()
 }
 
 /// Which code system the code is read in, and its version.
@@ -258,31 +259,31 @@ fn system_group(
                     Field {
                         id: "lookup-system",
                         name: "system",
-                        label: "Code system",
-                        hint: "The system parameter of $lookup. The list is what this root publishes.",
+                        label: tr(Msg::CodeSystem2),
+                        hint: tr(Msg::SystemParameterLookupListWhatRoot),
                     },
                     system,
                     seeded(|run| run.system.clone()),
                     systems,
-                    CANONICAL_WORDS,
+                    canonical_words(),
                 ),
                 picked_field(
                     Field {
                         id: "lookup-system-version",
                         name: "systemVersion",
-                        label: "Version",
-                        hint: "The version parameter. Left on the first choice, the server answers from the version it resolves to.",
+                        label: tr(Msg::Version),
+                        hint: tr(Msg::VersionParameterLeftFirstChoiceServer),
                     },
                     system_version,
                     seeded(|run| run.system_version.clone()),
                     system_versions,
-                    VERSION_WORDS,
+                    version_words(),
                 ),
             ],
         )}
     }
     .into_any();
-    group("The code system", vec![row])
+    group(tr(Msg::TheCodeSystem), vec![row])
 }
 
 /// The answer: the concept the server read, or why it read none.
@@ -311,12 +312,12 @@ fn answer_panel(
         answer.with(|answered| {
             answered.as_ref().map(|answer| match answer {
                 None => titled_panel(
-                    "The concept",
+                    tr(Msg::TheConcept),
                     (),
                     panel_body(empty_quiet(
                         icon::LOOKUP,
-                        "No code read yet",
-                        "Choose a code system, type a code and look it up.",
+                        tr(Msg::NoCodeReadYet),
+                        tr(Msg::ChooseCodeSystemTypeCodeLook),
                     )),
                 )
                 .into_any(),
@@ -324,7 +325,7 @@ fn answer_panel(
                 Some(Err(error)) => {
                     let error = error.clone();
                     titled_panel(
-                        "The concept",
+                        tr(Msg::TheConcept),
                         (),
                         panel_body(view! { <Failure error=Signal::stored(error) /> }),
                     )
@@ -336,9 +337,9 @@ fn answer_panel(
     view! {
         <section aria-labelledby="lookup-answer-heading" class="fui-stack">
             <h2 id="lookup-answer-heading" class="fui-sr-only">
-                "The concept"
+                {tr(Msg::TheConcept)}
             </h2>
-            <Reading label="Looking the code up">{drawn}</Reading>
+            <Reading label=&{ tr(Msg::LookingTheCodeUp) }>{drawn}</Reading>
         </section>
     }
     .into_any()
@@ -350,12 +351,12 @@ fn concept_view(answer: &LookupAnswer, asked: &LookupRun, version: FhirVersion) 
     let display = concept
         .display
         .clone()
-        .unwrap_or_else(|| String::from("The server answered no display"));
+        .unwrap_or_else(|| tr(Msg::ServerAnsweredNoDisplay));
     let facts = facts_row(vec![
-        ("Code", view! { <span class="fui-mono">{asked.code.clone()}</span> }.into_any()),
-        ("Code system", concept.name.clone().unwrap_or_else(|| asked.system.clone()).into_any()),
+        (tr(Msg::Code), view! { <span class="fui-mono">{asked.code.clone()}</span> }.into_any()),
+        (tr(Msg::CodeSystem2), concept.name.clone().unwrap_or_else(|| asked.system.clone()).into_any()),
         (
-            "Version",
+            tr(Msg::Version),
             view! { <span class="fui-mono">{concept.version.clone().unwrap_or_else(|| String::from("—"))}</span> }
                 .into_any(),
         ),
@@ -371,9 +372,9 @@ fn concept_view(answer: &LookupAnswer, asked: &LookupRun, version: FhirVersion) 
         </div>
     };
     view! {
-        {titled_panel("The concept", (), summary)}
-        {titled_panel("Designations", (), designations_table(&concept.designations))}
-        {titled_panel("Properties", (), properties_table(&concept))}
+        {titled_panel(tr(Msg::TheConcept), (), summary)}
+        {titled_panel(tr(Msg::Designations), (), designations_table(&concept.designations))}
+        {titled_panel(tr(Msg::Properties), (), properties_table(&concept))}
     }
     .into_any()
 }
@@ -400,7 +401,7 @@ fn relatives_view(concept: &Concept, asked: &LookupRun, version: FhirVersion) ->
     if parents.is_empty() && children.is_empty() {
         return ().into_any();
     }
-    let row = |label: &'static str, codes: Vec<AnyView>| {
+    let row = |label: String, codes: Vec<AnyView>| {
         (!codes.is_empty()).then(|| {
             view! {
                 <div class="fui-cluster">
@@ -411,9 +412,9 @@ fn relatives_view(concept: &Concept, asked: &LookupRun, version: FhirVersion) ->
         })
     };
     view! {
-        <nav aria-label="Relatives of this concept" class="fui-stack">
-            {row("Parents", parents)}
-            {row("Children", children)}
+        <nav aria-label=tr(Msg::RelativesOfThisConcept) class="fui-stack">
+            {row(tr(Msg::Parents), parents)}
+            {row(tr(Msg::Children), children)}
         </nav>
     }
     .into_any()
@@ -423,7 +424,7 @@ fn relatives_view(concept: &Concept, asked: &LookupRun, version: FhirVersion) ->
 fn designations_table(designations: &[DesignationRow]) -> AnyView {
     // A column no designation fills says nothing, so it is not drawn.
     let columns = filled_columns(
-        &DESIGNATION_COLUMNS,
+        &designation_columns(),
         designations,
         &["value"],
         |row, key| match key {
@@ -438,8 +439,8 @@ fn designations_table(designations: &[DesignationRow]) -> AnyView {
         Body::Empty(
             empty_quiet(
                 icon::LOOKUP,
-                "No designation",
-                "The server answered no designation.",
+                tr(Msg::NoDesignation),
+                tr(Msg::ServerAnsweredNoDesignation),
             )
             .into_any(),
         )
@@ -454,7 +455,7 @@ fn designations_table(designations: &[DesignationRow]) -> AnyView {
                             {languages
                                 .then(|| {
                                     view! {
-                                        <td data-label="Language" class="fui-mono">
+                                        <td data-label=tr(Msg::Language) class="fui-mono">
                                             {designation
                                                 .language
                                                 .clone()
@@ -465,7 +466,9 @@ fn designations_table(designations: &[DesignationRow]) -> AnyView {
                             {uses
                                 .then(|| {
                                     view! {
-                                        <td data-label="Use">
+                                        <td data-label=tr(
+                                            Msg::Use,
+                                        )>
                                             {designation
                                                 .usage
                                                 .clone()
@@ -481,7 +484,7 @@ fn designations_table(designations: &[DesignationRow]) -> AnyView {
         )
     };
     data_table(DataTable {
-        caption: "Designations",
+        caption: &tr(Msg::Designations),
         columns: &columns,
         sort: None,
         sort_href: &|_| String::new(),
@@ -494,7 +497,7 @@ fn designations_table(designations: &[DesignationRow]) -> AnyView {
 fn properties_table(concept: &Concept) -> AnyView {
     // A column no property fills says nothing, so it is not drawn.
     let columns = filled_columns(
-        &PROPERTY_COLUMNS,
+        &property_columns(),
         &concept.properties,
         &["code", "value"],
         |row, key| key != "description" || row.description.is_some(),
@@ -504,8 +507,8 @@ fn properties_table(concept: &Concept) -> AnyView {
         Body::Empty(
             empty_quiet(
                 icon::LOOKUP,
-                "No property",
-                "The server answered no property.",
+                tr(Msg::NoProperty),
+                tr(Msg::ServerAnsweredNoProperty),
             )
             .into_any(),
         )
@@ -516,7 +519,7 @@ fn properties_table(concept: &Concept) -> AnyView {
                 .iter()
                 .map(|property| {
                     let value = property.value.clone().map_or_else(
-                        || NOT_DECLARED.into_any(),
+                        || not_declared().into_any(),
                         |value| {
                             if crate::components::is_date_time(&value) {
                                 crate::components::stated(value)
@@ -528,11 +531,11 @@ fn properties_table(concept: &Concept) -> AnyView {
                     view! {
                         <tr>
                             <td class="fui-mono">{property.code.clone()}</td>
-                            <td data-label="Value">{cluster(value)}</td>
+                            <td data-label=tr(Msg::Value)>{cluster(value)}</td>
                             {meanings
                                 .then(|| {
                                     view! {
-                                        <td data-label="Meaning" class="fui-muted">
+                                        <td data-label=tr(Msg::Meaning) class="fui-muted">
                                             {property.description.clone().unwrap_or_default()}
                                         </td>
                                     }
@@ -545,7 +548,7 @@ fn properties_table(concept: &Concept) -> AnyView {
         )
     };
     data_table(DataTable {
-        caption: "Properties",
+        caption: &tr(Msg::Properties),
         columns: &columns,
         sort: None,
         sort_href: &|_| String::new(),

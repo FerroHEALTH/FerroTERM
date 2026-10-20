@@ -7,11 +7,25 @@
     reason = "leptos::component derives a TypedBuilder whose `builder` shadows a trait method"
 )]
 
+use crate::locale::{Msg, tr};
+
+/// What an editor does with the resource the address names: creates one when
+/// it names none (blank), changes the one it names otherwise.
+pub(crate) fn editor_mode(named: &str) -> ferrohealth_ui::view::surface::Mode {
+    if named.trim().is_empty() {
+        ferrohealth_ui::view::surface::Mode::Creating
+    } else {
+        ferrohealth_ui::view::surface::Mode::Editing(named.trim().to_owned())
+    }
+}
+
 /// The wording every screen uses for a fact the server did not declare.
 ///
 /// Absence is stated rather than left blank: a reader cannot tell a fact the
 /// server omitted from a cell the page failed to fill.
-pub(crate) const NOT_DECLARED: &str = "not declared";
+pub(crate) fn not_declared() -> String {
+    tr(Msg::NotDeclared)
+}
 
 /// Whether FerroUI reads `value` as a date-time, which it then draws as a
 /// timestamp rather than as the server's text.

@@ -5,17 +5,19 @@
 //! differs; how a blank, absent, or boolean value reads does not, so those
 //! rules are written once here and every reader shares them.
 
+use crate::locale::Msg;
+
 /// One fact of a published resource: a term and the value beside it.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Fact {
-    /// The term a reader reads.
-    pub(crate) label: &'static str,
+    /// The term a reader reads, by its message in the catalog.
+    pub(crate) label: Msg,
     /// The value, absent when the resource declared none.
     pub(crate) value: Option<String>,
 }
 
 /// One fact, with a value that names nothing read as absent.
-pub(crate) fn fact(label: &'static str, value: Option<&str>) -> Fact {
+pub(crate) fn fact(label: Msg, value: Option<&str>) -> Fact {
     Fact {
         label,
         value: named(value).map(str::to_owned),
@@ -75,9 +77,9 @@ mod tests {
     #[test]
     fn a_blank_fact_carries_its_label_and_no_value() {
         assert_eq!(
-            fact("Status", Some("")),
+            fact(Msg::Status, Some("")),
             Fact {
-                label: "Status",
+                label: Msg::Status,
                 value: None,
             },
             "the row is still drawn, so the screen can state the absence"

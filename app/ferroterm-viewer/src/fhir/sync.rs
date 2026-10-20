@@ -15,6 +15,7 @@
 //! a screen draws. Only those five are read: the record carries its counts as
 //! pointer-sized integers, and WebAssembly is 32-bit.
 
+use crate::locale::{Msg, tr};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -40,12 +41,10 @@ impl Finding {
     /// run that records a kind this bundle predates still says something.
     pub(crate) fn what_happened(&self) -> String {
         match self.kind.as_str() {
-            "inactive" => String::from("the release made this code inactive"),
-            "absent" => String::from("the release no longer carries this code"),
-            "outside-value-set" => String::from(
-                "the code no longer falls inside the value set it was included through",
-            ),
-            "" => String::from("the run recorded no kind for this finding"),
+            "inactive" => tr(Msg::ReleaseMadeCodeInactive),
+            "absent" => tr(Msg::ReleaseNoLongerCarriesCode),
+            "outside-value-set" => tr(Msg::CodeNoLongerFallsInsideValue),
+            "" => tr(Msg::RunRecordedNoKindFinding),
             other => other.to_owned(),
         }
     }

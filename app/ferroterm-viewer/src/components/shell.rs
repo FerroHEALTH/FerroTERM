@@ -27,6 +27,7 @@ use crate::components::health::health_indicator;
 use crate::components::icon;
 use crate::fhir::version::FhirVersion;
 use crate::find::QUERY_PARAM;
+use crate::locale::{Msg, tr};
 use crate::pages::about::{AboutPage, PANE_PARAM};
 use crate::pages::browse::BrowsePage;
 use crate::pages::code_system::CodeSystemPage;
@@ -81,136 +82,148 @@ const NAV_ID: &str = "screens";
 const COMMAND_ID: &str = "command-bar";
 
 /// The screens that read what this server holds.
-const BROWSE: [Entry; 4] = [
-    Entry {
-        href: "/",
-        label: "Dashboard",
-        glyph: icon::OVERVIEW,
-        exact: true,
-    },
-    Entry {
-        href: "/systems",
-        label: "Code systems",
-        glyph: icon::CODE_SYSTEMS,
-        exact: false,
-    },
-    Entry {
-        href: "/valuesets",
-        label: "Value sets",
-        glyph: icon::VALUE_SETS,
-        exact: false,
-    },
-    Entry {
-        href: "/conceptmaps",
-        label: "Concept maps",
-        glyph: icon::CONCEPT_MAPS,
-        exact: false,
-    },
-];
+fn browse() -> [Entry; 4] {
+    [
+        Entry {
+            href: "/",
+            label: tr(Msg::Dashboard).into(),
+            glyph: icon::OVERVIEW,
+            exact: true,
+        },
+        Entry {
+            href: "/systems",
+            label: tr(Msg::CodeSystems).into(),
+            glyph: icon::CODE_SYSTEMS,
+            exact: false,
+        },
+        Entry {
+            href: "/valuesets",
+            label: tr(Msg::ValueSets).into(),
+            glyph: icon::VALUE_SETS,
+            exact: false,
+        },
+        Entry {
+            href: "/conceptmaps",
+            label: tr(Msg::ConceptMaps).into(),
+            glyph: icon::CONCEPT_MAPS,
+            exact: false,
+        },
+    ]
+}
 
 /// The screens that run one terminology operation, each named for the
 /// question it answers.
-const OPERATIONS: [Entry; 4] = [
-    Entry {
-        href: "/lookup",
-        label: "Look up a code",
-        glyph: icon::LOOKUP,
-        exact: false,
-    },
-    Entry {
-        href: "/validate",
-        label: "Check a code",
-        glyph: icon::VALIDATE,
-        exact: false,
-    },
-    Entry {
-        href: "/expand",
-        label: "Expand a value set",
-        glyph: icon::EXPAND,
-        exact: false,
-    },
-    Entry {
-        href: "/translate",
-        label: "Translate a code",
-        glyph: icon::TRANSLATE,
-        exact: false,
-    },
-];
+fn operations() -> [Entry; 4] {
+    [
+        Entry {
+            href: "/lookup",
+            label: tr(Msg::LookUpACode).into(),
+            glyph: icon::LOOKUP,
+            exact: false,
+        },
+        Entry {
+            href: "/validate",
+            label: tr(Msg::CheckACode).into(),
+            glyph: icon::VALIDATE,
+            exact: false,
+        },
+        Entry {
+            href: "/expand",
+            label: tr(Msg::ExpandAValueSet).into(),
+            glyph: icon::EXPAND,
+            exact: false,
+        },
+        Entry {
+            href: "/translate",
+            label: tr(Msg::TranslateACode).into(),
+            glyph: icon::TRANSLATE,
+            exact: false,
+        },
+    ]
+}
 
 /// The screens that write, on a console that offers a sign-in.
-const AUTHORING: [Entry; 3] = [
-    Entry {
-        href: "/codesystem",
-        label: "Code system editor",
-        glyph: icon::EDIT,
-        exact: false,
-    },
-    Entry {
-        href: "/compose",
-        label: "Value set composer",
-        glyph: icon::EDIT,
-        exact: false,
-    },
-    Entry {
-        href: "/conceptmap",
-        label: "Concept map editor",
-        glyph: icon::EDIT,
-        exact: false,
-    },
-];
+fn authoring() -> [Entry; 3] {
+    [
+        Entry {
+            href: "/codesystem",
+            label: tr(Msg::CodeSystemEditor).into(),
+            glyph: icon::EDIT,
+            exact: false,
+        },
+        Entry {
+            href: "/compose",
+            label: tr(Msg::ValueSetComposer).into(),
+            glyph: icon::EDIT,
+            exact: false,
+        },
+        Entry {
+            href: "/conceptmap",
+            label: tr(Msg::ConceptMapEditor).into(),
+            glyph: icon::EDIT,
+            exact: false,
+        },
+    ]
+}
 
 /// The one screen about this server and this console.
-const ABOUT: [Entry; 1] = [Entry {
-    href: "/about",
-    label: "About this server",
-    glyph: icon::ABOUT,
-    exact: false,
-}];
+fn about() -> [Entry; 1] {
+    [Entry {
+        href: "/about",
+        label: tr(Msg::AboutThisServer).into(),
+        glyph: icon::ABOUT,
+        exact: false,
+    }]
+}
 
 /// The navigation of a console that offers a sign-in: read, run, write, and
 /// the server itself.
-const NAV_GROUPS: [Group; 4] = [
-    Group {
-        id: "screens-browse",
-        title: "Browse",
-        entries: &BROWSE,
-    },
-    Group {
-        id: "screens-operations",
-        title: "Operations",
-        entries: &OPERATIONS,
-    },
-    Group {
-        id: "screens-authoring",
-        title: "Authoring",
-        entries: &AUTHORING,
-    },
-    Group {
-        id: "screens-server",
-        title: "Server",
-        entries: &ABOUT,
-    },
-];
+fn nav_groups() -> Vec<Group> {
+    vec![
+        Group {
+            id: "screens-browse",
+            title: tr(Msg::Browse).into(),
+            entries: browse().into(),
+        },
+        Group {
+            id: "screens-operations",
+            title: tr(Msg::Operations).into(),
+            entries: operations().into(),
+        },
+        Group {
+            id: "screens-authoring",
+            title: tr(Msg::Authoring).into(),
+            entries: authoring().into(),
+        },
+        Group {
+            id: "screens-server",
+            title: tr(Msg::Server).into(),
+            entries: about().into(),
+        },
+    ]
+}
 
 /// The navigation of a console that offers no sign-in: the same groups, with
 /// no entry onto a screen that writes, since nobody there can save.
-const READER_GROUPS: [Group; 3] = [
-    Group {
-        id: "screens-browse",
-        title: "Browse",
-        entries: &BROWSE,
-    },
-    Group {
-        id: "screens-operations",
-        title: "Operations",
-        entries: &OPERATIONS,
-    },
-    Group {
-        id: "screens-server",
-        title: "Server",
-        entries: &ABOUT,
-    },
-];
+fn reader_groups() -> Vec<Group> {
+    vec![
+        Group {
+            id: "screens-browse",
+            title: tr(Msg::Browse).into(),
+            entries: browse().into(),
+        },
+        Group {
+            id: "screens-operations",
+            title: tr(Msg::Operations).into(),
+            entries: operations().into(),
+        },
+        Group {
+            id: "screens-server",
+            title: tr(Msg::Server).into(),
+            entries: about().into(),
+        },
+    ]
+}
 
 /// The shell's own query parameters.
 #[derive(Clone, Debug, Params, PartialEq)]
@@ -245,8 +258,8 @@ fn command_bar() -> AnyView {
             search_box(SearchBox {
                 id: COMMAND_ID,
                 name: QUERY_PARAM,
-                label: "Find a code, a canonical or a phrase",
-                placeholder: "A code, a canonical or a phrase",
+                label: tr(Msg::FindCodeCanonicalPhrase).into(),
+                placeholder: tr(Msg::CodeCanonicalPhrase).into(),
                 action: format!("/{FIND_PATH}"),
                 value: typed(),
             })
@@ -263,8 +276,8 @@ fn version_switch(version: Signal<FhirVersion>, back: Signal<String>) -> AnyView
         {move || {
             segmented_form(SegmentedForm {
                 name: "fhir",
-                label: "FHIR version",
-                prefix: Some((icon::VERSION, "FHIR")),
+                label: tr(Msg::FhirVersion).into(),
+                prefix: Some((icon::VERSION, tr(Msg::Fhir).into())),
                 choices: FhirVersion::ALL
                     .into_iter()
                     .map(|choice| (choice.segment().to_owned(), choice.label().to_owned()))
@@ -289,15 +302,15 @@ fn operator(console: Console) -> AnyView {
             return view! {
                 <a href=SIGN_IN rel="external" class=Variant::Secondary.class()>
                     {icon(Glyph::LOG_IN, "16")}
-                    "Sign in"
+                    {tr(Msg::SignIn)}
                 </a>
             }
             .into_any();
         }
         let menu = OperatorMenu {
             id: "operator-menu",
-            name: session.who().unwrap_or_else(|| String::from("Signed in")),
-            subtitle: session.standing(),
+            name: session.who().unwrap_or_else(|| tr(Msg::SignedIn)),
+            subtitle: session.standing().into(),
             sign_out: Some(String::from(SIGN_OUT)),
         };
         operator_menu(menu, ()).into_any()
@@ -310,7 +323,12 @@ fn operator(console: Console) -> AnyView {
 fn bar(version: Signal<FhirVersion>, back: Signal<String>, console: Console) -> AnyView {
     let start = view! {
         {drawer_button(NAV_ID)}
-        {lockup("/", brand_mark("/mark-light.svg", "/mark-dark.svg"), "FerroTERM", "Console")}
+        {lockup(
+            "/",
+            brand_mark("/mark-light.svg", "/mark-dark.svg"),
+            "FerroTERM",
+            tr(Msg::Console),
+        )}
     }
     .into_any();
     let end = view! {
@@ -418,16 +436,16 @@ pub(crate) fn console_shell(console: Console) -> AnyView {
         banner: None,
         sidebar: sidebar(
             NAV_ID,
-            "Screens",
+            tr(Msg::Screens),
             if console.sign_in {
-                &NAV_GROUPS
+                nav_groups()
             } else {
-                &READER_GROUPS
+                reader_groups()
             },
         ),
         content: routes(console),
         footer: Footer {
-            product: PRODUCT,
+            product: PRODUCT.into(),
             version: VERSION,
             about: "/about",
         },
@@ -436,11 +454,11 @@ pub(crate) fn console_shell(console: Console) -> AnyView {
 
 #[cfg(test)]
 mod tests {
-    use super::{ABOUT, BROWSE, NAV_GROUPS, READER_GROUPS};
+    use super::{about, browse, nav_groups, reader_groups};
 
     /// The path of every entry, in the order the navigation draws them.
     fn entries() -> Vec<&'static str> {
-        NAV_GROUPS
+        nav_groups()
             .iter()
             .flat_map(|group| group.entries.iter().map(|entry| entry.href))
             .collect()
@@ -466,7 +484,7 @@ mod tests {
 
     #[test]
     fn a_console_without_a_sign_in_leads_to_no_screen_that_writes() {
-        let listed: Vec<&str> = READER_GROUPS
+        let listed: Vec<&str> = reader_groups()
             .iter()
             .flat_map(|group| group.entries.iter().map(|entry| entry.href))
             .collect();
@@ -490,7 +508,7 @@ mod tests {
 
     #[test]
     fn every_group_is_labelled_and_holds_a_screen() {
-        for group in &NAV_GROUPS {
+        for group in &nav_groups() {
             assert!(
                 !group.title.is_empty(),
                 "a group with no label reads as a run of links"
@@ -502,12 +520,12 @@ mod tests {
             );
         }
         assert_eq!(
-            NAV_GROUPS.first().map(|group| group.entries.len()),
-            Some(BROWSE.len())
+            nav_groups().first().map(|group| group.entries.len()),
+            Some(browse().len())
         );
         assert_eq!(
-            NAV_GROUPS.last().map(|group| group.entries.len()),
-            Some(ABOUT.len())
+            nav_groups().last().map(|group| group.entries.len()),
+            Some(about().len())
         );
     }
 }

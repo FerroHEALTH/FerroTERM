@@ -1,5 +1,6 @@
 //! The part of a `CapabilityStatement` the shell renders.
 
+use crate::locale::{Msg, tr_with};
 use serde::{Deserialize, Serialize};
 
 /// The canonical a root declares an operation's invocation levels under.
@@ -149,8 +150,14 @@ impl CapabilityStatement {
     pub(crate) fn summary(&self) -> Option<String> {
         let software = self.software_line();
         match (self.fhir_version.as_deref(), software) {
-            (Some(fhir), Some(software)) => Some(format!("FHIR {fhir}, {software}")),
-            (Some(fhir), None) => Some(format!("FHIR {fhir}")),
+            (Some(fhir), Some(software)) => Some(tr_with(
+                Msg::Fhir2,
+                &[
+                    ("fhir", (fhir).to_string().into()),
+                    ("software", (software).clone().into()),
+                ],
+            )),
+            (Some(fhir), None) => Some(tr_with(Msg::Fhir3, &[("fhir", (fhir).to_string().into())])),
             (None, software) => software,
         }
     }

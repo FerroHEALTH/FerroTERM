@@ -6,6 +6,8 @@ use ferrohealth_ui::highlight::Language;
 use ferrohealth_ui::view::tabs::{KeyedTab, keyed_tabs};
 use ferrohealth_ui::widget::document::{DocumentPane, document_pane};
 use leptos::prelude::*;
+
+use crate::locale::{Msg, tr};
 use leptos_router::hooks::{use_location, use_query_map};
 
 /// The address parameter naming the tab a detail screen shows.
@@ -13,7 +15,7 @@ pub(crate) const TAB_PARAM: &str = "tab";
 
 /// The tab the address names, or `default` when it names none of `tabs`.
 pub(crate) fn current_tab(
-    tabs: &'static [(&'static str, &'static str)],
+    tabs: &'static [(&'static str, Msg)],
     default: &'static str,
 ) -> Memo<&'static str> {
     let query = use_query_map();
@@ -46,8 +48,8 @@ pub(crate) fn tab_link(pathname: &str, search: &str, key: &str) -> String {
 /// marked; each is a link onto this same screen, so the server renders the
 /// tab an address names and the browser goes back to it.
 pub(crate) fn detail_tabs(
-    label: &'static str,
-    tabs: &'static [(&'static str, &'static str)],
+    label: String,
+    tabs: &'static [(&'static str, Msg)],
     current: Memo<&'static str>,
 ) -> AnyView {
     let location = use_location();
@@ -61,10 +63,10 @@ pub(crate) fn detail_tabs(
                 .map(|(key, words)| KeyedTab {
                     key,
                     href: tab_link(&pathname, &search, key),
-                    label: words,
+                    label: tr(*words).into(),
                 })
                 .collect();
-            keyed_tabs(label, links, current.get())
+            keyed_tabs(label.clone(), links, current.get())
         }}
     }
     .into_any()
@@ -72,12 +74,12 @@ pub(crate) fn detail_tabs(
 
 /// The resource `text` as the server sent it, highlighted or raw, with a
 /// copy, in the pane `id` named `label`.
-pub(crate) fn json_pane(id: &'static str, label: &'static str, text: String) -> AnyView {
+pub(crate) fn json_pane(id: &'static str, label: String, text: String) -> AnyView {
     document_pane(
         DocumentPane {
             id,
-            label,
-            formats: &[],
+            label: label.into(),
+            formats: Vec::new(),
             format: Signal::stored("json"),
             text: Signal::stored(text),
             language: Signal::stored(Language::Json),

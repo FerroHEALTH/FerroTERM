@@ -26,6 +26,7 @@ use crate::fhir::concept::value_parameter;
 use crate::fhir::expansion::COUNT_PARAMETER;
 use crate::fhir::expansion::FILTER_PARAMETER;
 use crate::fhir::expansion::OFFSET_PARAMETER;
+use crate::locale::{Msg, tr, tr_with};
 
 /// The `ValueSet.status` codes a draft can be in.
 ///
@@ -64,17 +65,11 @@ impl Defect {
     }
 
     /// What the invariant says, in the terms of this form.
-    pub(crate) const fn sentence(self) -> &'static str {
+    pub(crate) const fn sentence(self) -> Msg {
         match self {
-            Self::NoSystemOrValueSet => {
-                "This clause names neither a value set nor a code system, so it selects nothing."
-            }
-            Self::CriteriaWithoutSystem => {
-                "This clause lists codes or filters, which name a code system to be read from."
-            }
-            Self::ConceptsAndFilters => {
-                "This clause lists codes and filters at once. Split it into two clauses: they union."
-            }
+            Self::NoSystemOrValueSet => Msg::ClauseNamesNeitherValueSetNor,
+            Self::CriteriaWithoutSystem => Msg::ClauseListsCodesFiltersWhichName,
+            Self::ConceptsAndFilters => Msg::ClauseListsCodesFiltersOnceSplit,
         }
     }
 }
@@ -497,7 +492,7 @@ impl Draft {
         let mut body = Map::new();
         body.insert(
             String::from("resourceType"),
-            Value::String(String::from("Parameters")),
+            Value::String(tr(Msg::Parameters)),
         );
         body.insert(String::from("parameter"), Value::Array(parameters));
         Value::Object(body).to_string()
@@ -549,35 +544,36 @@ impl Clause {
         let mut criteria: Vec<String> = Vec::new();
         match self.value_sets.len() {
             0 => {}
-            1 => criteria.push(String::from("is in the value set named here")),
-            several => criteria.push(format!(
-                "is in every one of the {several} value sets named here"
+            1 => criteria.push(tr(Msg::ValueSetNamedHere)),
+            several => criteria.push(tr_with(
+                Msg::EveryOneValueSetsNamedHere,
+                &[("several", (several).to_string().into())],
             )),
         }
         if !self.system.trim().is_empty() {
-            criteria.push(String::from("comes from the code system named here"));
+            criteria.push(tr(Msg::ComesFromCodeSystemNamedHere));
         }
         if !self.concepts.is_empty() {
-            criteria.push(format!(
-                "is one of the {} codes listed",
-                self.concepts.len()
+            criteria.push(tr_with(
+                Msg::OneCodesListed,
+                &[("concepts", (self.concepts.len()).to_string().into())],
             ));
         }
         if !self.filters.is_empty() {
-            criteria.push(format!(
-                "matches every one of the {} filters",
-                self.filters.len()
+            criteria.push(tr_with(
+                Msg::MatchesEveryOneFilters,
+                &[("filters", (self.filters.len()).to_string().into())],
             ));
         }
         let verb = if self.included {
-            "This clause draws in every code that"
+            tr(Msg::ClauseDrawsEveryCode)
         } else {
-            "This clause takes back out every code that"
+            tr(Msg::ClauseTakesBackOutEveryCode)
         };
         if criteria.is_empty() {
-            return format!("{verb} nothing selects yet.");
+            return tr_with(Msg::NothingSelectsYet, &[("verb", (verb).clone().into())]);
         }
-        format!("{verb} {}.", criteria.join(", and "))
+        format!("{verb} {}.", criteria.join(&tr(Msg::And)))
     }
 
     /// This clause as `compose.include` or `compose.exclude`.

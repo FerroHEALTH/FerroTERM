@@ -8,19 +8,19 @@ use leptos_router::NavigateOptions;
 use leptos_router::hooks::use_navigate;
 use leptos_router::hooks::use_query_map;
 
-use crate::components::NOT_DECLARED;
 use crate::components::failure::Failure;
-use crate::components::field::CANONICAL_WORDS;
 use crate::components::field::Field;
-use crate::components::field::LANGUAGE_EXAMPLE;
+use crate::components::field::canonical_words;
 use crate::components::field::check_field;
 use crate::components::field::group;
+use crate::components::field::language_example;
 use crate::components::field::note;
 use crate::components::field::number_field;
 use crate::components::field::picked_field;
 use crate::components::field::text_field;
 use crate::components::field::text_field_showing;
 use crate::components::icon;
+use crate::components::not_declared;
 use crate::components::reading::Reading;
 use crate::components::runs::History;
 use crate::components::shell::SelectedVersion;
@@ -43,6 +43,7 @@ use crate::fhir::expansion::URL_PARAMETER;
 use crate::fhir::expansion::Unclosed;
 use crate::fhir::named::Choice;
 use crate::fhir::version::FhirVersion;
+use crate::locale::{Msg, message, tr, tr_with};
 use crate::offers::choices;
 use crate::offers::published;
 use crate::paging::MAX_COUNT;
@@ -77,12 +78,14 @@ const RUNNER_PATH: &str = "expand";
 const TOO_COSTLY: &str = "too-costly";
 
 /// The columns of the concept table.
-const CONCEPT_COLUMNS: [Column; 4] = [
-    Column::text("code", "Code"),
-    Column::text("display", "Display"),
-    Column::text("system", "System"),
-    Column::text("flags", "Flags"),
-];
+fn concept_columns() -> [Column; 4] {
+    [
+        Column::text("code", tr(Msg::Code)),
+        Column::text("display", tr(Msg::Display)),
+        Column::text("system", tr(Msg::System)),
+        Column::text("flags", tr(Msg::Flags)),
+    ]
+}
 
 /// Runs `ValueSet/$expand` and walks the pages of its answer.
 ///
@@ -115,16 +118,8 @@ pub(crate) fn ExpandPage() -> impl IntoView {
         Memo::new(move |_| params.with(RunnerParams::request)).into();
 
     let heading = view! {
-        <Title text="Expand a value set" />
-        {page_header(
-            "Expand a value set",
-            Some(
-                String::from(
-                    "Which codes a value set holds, from this server's $expand, a page at a time.",
-                ),
-            ),
-            (),
-        )}
+        <Title text=tr(Msg::ExpandAValueSet) />
+        {page_header(tr(Msg::ExpandAValueSet), Some(tr(Msg::WhichCodesValueSetHoldsFrom)), ())}
     }
     .into_any();
 
@@ -133,7 +128,7 @@ pub(crate) fn ExpandPage() -> impl IntoView {
     let made = Memo::new(move |_| {
         params.with(|params| {
             params.request().map(|_| Run {
-                screen: "Expand".to_owned(),
+                screen: tr(Msg::Expand).clone(),
                 subject: params.url.clone(),
                 address: params.address(version.get()),
             })
@@ -399,27 +394,48 @@ impl Pager {
     fn summary(self) -> String {
         if self.rows == 0 {
             return match self.total {
-                Some(total) => format!("No concepts on this page, of {total} in the selection."),
-                None => "No concepts on this page.".to_owned(),
+                Some(total) => tr_with(
+                    Msg::NoConceptsPageSelection,
+                    &[("total", (total).to_string().into())],
+                ),
+                None => tr(Msg::NoConceptsPage).clone(),
             };
         }
         let first = self.page.offset().saturating_add(1);
         let last = self.page.offset().saturating_add(self.rows);
         match self.total {
-            Some(total) => format!("Concepts {first} to {last} of {total}."),
-            None => format!("Concepts {first} to {last}. The server declared no total."),
+            Some(total) => tr_with(
+                Msg::ConceptsToOf,
+                &[
+                    ("first", (first).to_string().into()),
+                    ("last", (last).to_string().into()),
+                    ("total", (total).to_string().into()),
+                ],
+            ),
+            None => tr_with(
+                Msg::ConceptsServerDeclaredNoTotal,
+                &[
+                    ("first", (first).to_string().into()),
+                    ("last", (last).to_string().into()),
+                ],
+            ),
         }
     }
 
     /// Where this page sits in the walk.
     fn position(self) -> String {
         match self.total {
-            Some(total) => format!(
-                "Page {} of {}",
-                self.page.number(),
-                self.page.total_pages(total)
+            Some(total) => tr_with(
+                Msg::PageOf2,
+                &[
+                    ("page", (self.page.number()).to_string().into()),
+                    ("pages", (self.page.total_pages(total)).to_string().into()),
+                ],
             ),
-            None => format!("Page {}", self.page.number()),
+            None => tr_with(
+                Msg::Page,
+                &[("page", (self.page.number()).to_string().into())],
+            ),
         }
     }
 }
@@ -483,13 +499,13 @@ fn form_section(
             <div class="fui-cluster">
                 <button type="submit" class=Variant::Primary.class()>
                     {ferrohealth_ui::icon::icon(icon::EXPAND, "16")}
-                    "Run the expansion"
+                    {tr(Msg::RunTheExpansion)}
                 </button>
                 {help_switch()}
             </div>
         </form>
     };
-    card("Parameters", form).into_any()
+    card(tr(Msg::Parameters), form).into_any()
 }
 
 /// Which value set the run expands.
@@ -504,18 +520,18 @@ fn value_set_group(
                 Field {
                     id: "expand-url",
                     name: "url",
-                    label: "Value set",
-                    hint: "The url parameter of $expand. The list is what this root publishes; an implicit canonical carrying its own query string is typed, and the runner encodes the whole value.",
+                    label: tr(Msg::ValueSet),
+                    hint: tr(Msg::UrlParameterExpandListWhatRoot),
                 },
                 canonical,
                 seeds.url,
                 value_sets,
-                CANONICAL_WORDS,
+                canonical_words(),
             )}
         </div>
     }
     .into_any();
-    group("The value set", vec![picker])
+    group(tr(Msg::TheValueSet), vec![picker])
 }
 
 /// What the run selects out of it.
@@ -531,8 +547,8 @@ fn selection_group(
                 Field {
                     id: "expand-filter",
                     name: "filter",
-                    label: "Filter",
-                    hint: "Text the server matches against the designations it holds.",
+                    label: tr(Msg::Filter),
+                    hint: tr(Msg::TextServerMatchesAgainstDesignationsHolds),
                 },
                 filter,
                 seeds.filter,
@@ -541,12 +557,12 @@ fn selection_group(
                 Field {
                     id: "expand-display-language",
                     name: "displayLanguage",
-                    label: "Display language",
-                    hint: "A BCP 47 tag. Left empty, the server picks its own display.",
+                    label: tr(Msg::DisplayLanguage),
+                    hint: tr(Msg::Bcp47TagLeftEmptyServer),
                 },
                 language,
                 seeds.display_language,
-                Some(LANGUAGE_EXAMPLE),
+                Some(language_example()),
             )}
         </div>
         <div>
@@ -554,8 +570,8 @@ fn selection_group(
                 Field {
                     id: "expand-active-only",
                     name: "activeOnly",
-                    label: "Active concepts only",
-                    hint: "Sends activeOnly=true, which asks the server to leave inactive concepts out of the selection.",
+                    label: tr(Msg::ActiveConceptsOnly),
+                    hint: tr(Msg::SendsActiveonlyTrueWhichAsksServer),
                 },
                 active_only,
                 seeds.active_only,
@@ -563,7 +579,7 @@ fn selection_group(
         </div>
     }
     .into_any();
-    group("Selection", vec![controls])
+    group(tr(Msg::Selection), vec![controls])
 }
 
 /// How the answer is paged and written.
@@ -577,8 +593,12 @@ fn answer_group(
     // help, so it is a note beside the control rather than its hint.
     let refused = Memo::new(move |_| {
         params.with(|params| match (&params.refused_count, params.count) {
-            (Some(refused), Some(used)) => format!(
-                "Not used: the address asked for a page size of `{refused}`, which is not a whole number from 1 to {MAX_COUNT}. This run asked for {used}."
+            (Some(refused), Some(used)) => tr_with(
+                Msg::NotUsedAddressAskedPageSize,
+                &[
+                    ("refused", (refused).clone().into()),
+                    ("used", (used).to_string().into()),
+                ],
             ),
             _ => String::new(),
         })
@@ -589,8 +609,8 @@ fn answer_group(
                 Field {
                     id: "expand-count",
                     name: "count",
-                    label: "Page size",
-                    hint: "The count parameter. Left empty, the run asks for no page and the server may refuse a selection it considers too costly.",
+                    label: tr(Msg::PageSize),
+                    hint: tr(Msg::CountParameterLeftEmptyRunAsks),
                 },
                 count,
                 seeds.count,
@@ -600,8 +620,8 @@ fn answer_group(
                 Field {
                     id: "expand-include-designations",
                     name: "includeDesignations",
-                    label: "Include designations",
-                    hint: "Sends includeDesignations=true, which asks for every designation the server holds for a listed concept.",
+                    label: tr(Msg::IncludeDesignations),
+                    hint: tr(Msg::SendsIncludedesignationsTrueWhichAsksEvery),
                 },
                 designations,
                 seeds.include_designations,
@@ -615,7 +635,7 @@ fn answer_group(
         </Show>
     }
     .into_any();
-    group("Answer", vec![controls, refusal])
+    group(tr(Msg::Answer), vec![controls, refusal])
 }
 
 /// The answer: the page, what it leaves out, and the request that fetched it.
@@ -658,7 +678,7 @@ fn result_section(
         <section class="fui-card fui-panel" aria-labelledby="expansion-heading">
             <div class="fui-panel-head">
                 <h2 id="expansion-heading" class="fui-card-title">
-                    "The expansion"
+                    {tr(Msg::TheExpansion)}
                 </h2>
                 <p aria-live="polite" class="fui-muted fui-small">
                     <Transition fallback=|| ()>{announcement}</Transition>
@@ -668,7 +688,9 @@ fn result_section(
                 {invitation()}
             </Show>
             <Show when=move || request.with(Option::is_some) fallback=|| ()>
-                <Reading label="Running the expansion">
+                <Reading label=&{
+                    tr(Msg::RunningTheExpansion)
+                }>
                     {move || {
                         let params = params.get();
                         let version = version.get();
@@ -694,8 +716,8 @@ fn result_section(
 fn invitation() -> AnyView {
     panel_body(empty_quiet(
         icon::EXPAND,
-        "No expansion yet",
-        "Name a value set above and run it. The canonical is sent exactly as you type it, so an implicit form a code system defines works here too.",
+        tr(Msg::NoExpansionYet),
+        tr(Msg::NameValueSetAboveRunCanonical),
     ))
     .into_any()
 }
@@ -709,8 +731,8 @@ fn expansion_view(
     let Some(expansion) = value.expansion() else {
         return panel_body(empty_quiet(
             icon::EXPAND,
-            "No expansion",
-            "The server answered a ValueSet carrying no expansion, so there is nothing to page through.",
+            tr(Msg::NoExpansion),
+            tr(Msg::ServerAnsweredValuesetCarryingNoExpansion),
         ))
         .into_any();
     };
@@ -750,7 +772,7 @@ fn unclosed_view(unclosed: &Unclosed) -> AnyView {
         .map(|reason| view! { <li>{reason.clone()}</li> }.into_any())
         .collect();
     let stated = if reasons.is_empty() {
-        view! { <p>"The server stated no reason for it."</p> }.into_any()
+        view! { <p>{tr(Msg::ServerStatedNoReason)}</p> }.into_any()
     } else {
         bullet_list(reasons)
     };
@@ -760,8 +782,8 @@ fn unclosed_view(unclosed: &Unclosed) -> AnyView {
         None,
         view! {
             <p>
-                <strong>"Unclosed expansion: "</strong>
-                "this value set admits codes the expansion does not list, so a code missing from the table below is not a code this server rejects."
+                <strong>{tr(Msg::UnclosedExpansion)}</strong>
+                {tr(Msg::ValueSetAdmitsCodesExpansionDoes)}
             </p>
             {stated}
         },
@@ -778,7 +800,7 @@ fn unclosed_view(unclosed: &Unclosed) -> AnyView {
 fn concepts_table(rows: &[ConceptRow]) -> AnyView {
     // No page flags every concept, so the column is drawn only when one does.
     let columns = filled_columns(
-        &CONCEPT_COLUMNS,
+        &concept_columns(),
         rows,
         &["code", "display", "system"],
         |row, _| !flags(row).is_empty(),
@@ -788,8 +810,8 @@ fn concepts_table(rows: &[ConceptRow]) -> AnyView {
         Body::Empty(
             empty_quiet(
                 icon::EXPAND,
-                "No concept on this page",
-                "A page past the end of a selection is empty, and so is a filter nothing matches.",
+                tr(Msg::NoConceptPage),
+                tr(Msg::PagePastEndSelectionEmptySo),
             )
             .into_any(),
         )
@@ -802,7 +824,7 @@ fn concepts_table(rows: &[ConceptRow]) -> AnyView {
         )
     };
     data_table(DataTable {
-        caption: "The concepts of this page",
+        caption: &tr(Msg::ConceptsPage),
         columns: &columns,
         sort: None,
         sort_href: &|_| String::new(),
@@ -814,10 +836,14 @@ fn concepts_table(rows: &[ConceptRow]) -> AnyView {
 /// One concept, with its designations under the display it was listed by,
 /// and its flags when the table draws that column.
 fn concept_row(row: &ConceptRow, flagged: bool) -> AnyView {
-    let nesting =
-        (row.depth > 0).then(|| format!("nested at level {}", row.depth.saturating_add(1)));
+    let nesting = (row.depth > 0).then(|| {
+        tr_with(
+            Msg::NestedAtLevel,
+            &[("row", (row.depth.saturating_add(1)).to_string().into())],
+        )
+    });
     let system = match (row.system.as_str(), &row.version) {
-        ("", _) => NOT_DECLARED.to_owned(),
+        ("", _) => not_declared().clone(),
         (system, Some(version)) => format!("{system}|{version}"),
         (system, None) => system.to_owned(),
     };
@@ -829,16 +855,19 @@ fn concept_row(row: &ConceptRow, flagged: bool) -> AnyView {
                 <span class="fui-sr-only">{nesting}</span>
                 {row.code.clone()}
             </td>
-            <td data-label="Display">
+            <td data-label=tr(Msg::Display)>
                 <div>
-                    {row.display.clone().unwrap_or_else(|| NOT_DECLARED.to_owned())}
+                    {row.display.clone().unwrap_or_else(|| not_declared().clone())}
                     {designation_list(&row.designations)}
                 </div>
             </td>
-            <td data-label="System" class="fui-mono fui-small fui-muted sm:whitespace-nowrap">
+            <td
+                data-label=tr(Msg::System)
+                class="fui-mono fui-small fui-muted sm:whitespace-nowrap"
+            >
                 {system}
             </td>
-            {flagged.then(|| view! { <td data-label="Flags">{flags}</td> })}
+            {flagged.then(|| view! { <td data-label=tr(Msg::Flags)>{flags}</td> })}
         </tr>
     }
     .into_any()
@@ -922,8 +951,8 @@ fn pager_view(pager: Pager, params: &RunnerParams, version: FhirVersion) -> AnyV
         }
     };
     let no_sizes = |_: u32, _: bool| ().into_any();
-    let listing = Listing::new("Expansion pages")
-        .noun(Noun::new("concept", "concepts"))
+    let listing = Listing::new(tr(Msg::ExpansionPages))
+        .noun(Noun::new(message(Msg::NounConcepts)))
         .sizes(&[]);
     match pager.total {
         Some(total) => ferrohealth_ui::table::view::pager(
@@ -944,7 +973,7 @@ fn pager_view(pager: Pager, params: &RunnerParams, version: FhirVersion) -> AnyV
 /// The parameters the server says it applied, echoed back verbatim.
 fn parameters_view(lines: &[ParameterLine]) -> AnyView {
     if lines.is_empty() {
-        return view! { <p class="fui-small fui-muted">"The server echoed no parameters with this expansion."</p> }
+        return view! { <p class="fui-small fui-muted">{tr(Msg::ServerEchoedNoParametersExpansion)}</p> }
             .into_any();
     }
     let rows: Vec<AnyView> = lines
@@ -959,7 +988,7 @@ fn parameters_view(lines: &[ParameterLine]) -> AnyView {
         .collect();
     view! {
         <details class="fui-disclosure">
-            <summary>"The parameters the server says it applied"</summary>
+            <summary>{tr(Msg::ParametersServerSaysApplied)}</summary>
             <dl class="fui-facts">{rows}</dl>
         </details>
     }
@@ -972,11 +1001,7 @@ fn refusal_view(error: &FhirError) -> AnyView {
         .outcome()
         .is_some_and(|outcome| outcome.carries_code(TOO_COSTLY));
     let advice = if costly {
-        view! {
-            <p class="mt-default text-body">
-                "The server refused to expand a selection this large in one answer. Ask for a page size and the runner walks it a page at a time."
-            </p>
-        }
+        view! { <p class="mt-default text-body">{tr(Msg::ServerRefusedExpandSelectionLargeOne)}</p> }
         .into_any()
     } else {
         ().into_any()
@@ -1020,14 +1045,19 @@ fn count_sentence(expansion: &Expansion, params: &RunnerParams) -> String {
         return format!("{} {}.", pager.summary(), pager.position());
     }
     let counted = match expansion.total {
-        Some(total) if total != rows => {
-            format!("{rows} concepts, of {total} in the selection.")
-        }
-        Some(_) | None => format!("{rows} concepts."),
+        Some(total) if total != rows => tr_with(
+            Msg::ConceptsSelection,
+            &[
+                ("rows", (rows).to_string().into()),
+                ("total", (total).to_string().into()),
+            ],
+        ),
+        Some(_) | None => tr_with(Msg::Concepts2, &[("rows", (rows).to_string().into())]),
     };
     if expansion.hierarchical() && params.count.is_some() {
-        return format!(
-            "{counted} The answer nests, and $expand pages flat expansions only, so this run was not paged."
+        return tr_with(
+            Msg::AnswerNestsExpandPagesFlatExpansions,
+            &[("counted", (counted).clone().into())],
         );
     }
     counted

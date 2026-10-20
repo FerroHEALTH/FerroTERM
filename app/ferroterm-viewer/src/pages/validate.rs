@@ -21,20 +21,20 @@ use leptos_router::NavigateOptions;
 use leptos_router::hooks::use_navigate;
 use leptos_router::hooks::use_query_map;
 
-use crate::components::NOT_DECLARED;
 use crate::components::failure::Failure;
-use crate::components::field::CANONICAL_WORDS;
 use crate::components::field::Field;
-use crate::components::field::LANGUAGE_EXAMPLE;
-use crate::components::field::VERSION_WORDS;
+use crate::components::field::canonical_words;
 use crate::components::field::group;
+use crate::components::field::language_example;
 use crate::components::field::picked_field;
 use crate::components::field::row;
 use crate::components::field::select_field;
 use crate::components::field::text_field;
 use crate::components::field::text_field_showing;
+use crate::components::field::version_words;
 use crate::components::field::versioned_row;
 use crate::components::icon;
+use crate::components::not_declared;
 use crate::components::reading::Reading;
 use crate::components::runs::History;
 use crate::components::shell::SelectedVersion;
@@ -43,7 +43,6 @@ use crate::fhir::CODE_SYSTEM;
 use crate::fhir::FhirClient;
 use crate::fhir::VALUE_SET;
 use crate::fhir::capability::CapabilityStatement;
-use crate::fhir::concept::CHILD_OF_OPERATOR;
 use crate::fhir::concept::CODE_PARAMETER;
 use crate::fhir::concept::Hierarchy;
 use crate::fhir::concept::chosen_version;
@@ -69,6 +68,7 @@ use crate::fhir::validation::ValidationIssue;
 use crate::fhir::validation::offered;
 use crate::fhir::validation::subsumption_sentence;
 use crate::fhir::version::FhirVersion;
+use crate::locale::{Msg, tr, tr_with};
 use crate::offers::choices;
 use crate::offers::published;
 use crate::offers::versions;
@@ -168,16 +168,8 @@ pub(crate) fn ValidatePage() -> impl IntoView {
     });
 
     let heading = view! {
-        <Title text="Check a code" />
-        {page_header(
-            "Check a code",
-            Some(
-                String::from(
-                    "Whether a code is valid in a code system or a value set, from this server's $validate-code, and how two codes relate, from its $subsumes.",
-                ),
-            ),
-            (),
-        )}
+        <Title text=tr(Msg::CheckACode) />
+        {page_header(tr(Msg::CheckACode), Some(tr(Msg::WhetherCodeValidCodeSystemValue)), ())}
     }
     .into_any();
 
@@ -189,7 +181,7 @@ pub(crate) fn ValidatePage() -> impl IntoView {
         params.with(|params| {
             let offered = declared.with(|d| d.operations.validate(params.on));
             params.validation(offered).map(|_| Run {
-                screen: "Validate".to_owned(),
+                screen: tr(Msg::Validate).clone(),
                 subject: params.code.clone(),
                 address: params.address(version.get()),
             })
@@ -448,7 +440,9 @@ fn root_section(
 
     let body = move || {
         view! {
-            <Reading label="Reading what this root declares">
+            <Reading label=&{
+                tr(Msg::ReadingWhatRootDeclares)
+            }>
                 {move || {
                     let refusal = capabilities
                         .with(|answered| answered.as_ref()?.as_ref().err().cloned())
@@ -468,17 +462,13 @@ fn root_section(
     view! {
         <section class="fui-card" aria-labelledby="validate-root-heading">
             <h2 id="validate-root-heading" class="fui-card-title">
-                "The code system this screen works over"
+                {tr(Msg::CodeSystemScreenWorksOver)}
             </h2>
             {move || {
                 params
                     .with(|params| {
                         if params.system.is_empty() {
-                            view! {
-                                <p class="fui-muted">
-                                    "No code system is named yet. Choose one above, name the code, and run it."
-                                </p>
-                            }
+                            view! { <p class="fui-muted">{tr(Msg::NoCodeSystemNamedYetChoose)}</p> }
                                 .into_any()
                         } else {
                             let target = system_link(&params.system, version.get());
@@ -500,44 +490,35 @@ fn root_section(
 /// What the served version holds, and what it says it can answer about it.
 fn system_view(declared: &Declared) -> AnyView {
     let Some(row) = declared.row.as_ref() else {
-        return note(
-            "This root's terminology capabilities declare no such code system, or no such version of it. Another FHIR version may serve it, so try the version switcher above.",
-        );
+        return note(tr(Msg::RootSTerminologyCapabilitiesDeclareNo));
     };
     let code = row
         .code
         .clone()
-        .unwrap_or_else(|| format!("Version {NOT_DECLARED}"));
+        .unwrap_or_else(|| tr_with(Msg::Version8, &[("not_declared", not_declared().into())]));
     let subsumption = match declared.subsumption {
-        Some(true) => String::from(
-            "This system declares subsumption, so the $subsumes panel below runs against it.",
-        ),
-        Some(false) => String::from(
-            "This system declares that it does not answer subsumption, so no $subsumes form is offered for it.",
-        ),
-        None => String::from(
-            "This root declares nothing about subsumption for this system, so no $subsumes form is offered for it.",
-        ),
+        Some(true) => tr(Msg::SystemDeclaresSubsumptionSoSubsumesPanel),
+        Some(false) => tr(Msg::SystemDeclaresDoesNotAnswerSubsumption),
+        None => tr(Msg::RootDeclaresNothingAboutSubsumptionSystem),
     };
     let hierarchy = match &declared.hierarchy {
-        Hierarchy::Walkable { property } => format!(
-            "It declares the {CHILD_OF_OPERATOR} operator on the {property} filter, so it has a hierarchy to subsume over."
+        Hierarchy::Walkable { property } => tr_with(
+            Msg::DeclaresOperatorFilterSoHasHierarchy,
+            &[("property", (property).clone().into())],
         ),
-        Hierarchy::WithoutChildren { operators } => format!(
-            "It declares the hierarchy operators {}, none of which selects the direct children of a code.",
-            operators.join(", ")
+        Hierarchy::WithoutChildren { operators } => tr_with(
+            Msg::DeclaresHierarchyOperatorsNoneWhichSelects,
+            &[("operators", (operators.join(", ")).clone().into())],
         ),
-        Hierarchy::Absent => String::from(
-            "It declares no hierarchy filter operator, so its concepts are a flat list.",
-        ),
+        Hierarchy::Absent => tr(Msg::DeclaresNoHierarchyFilterOperatorSo),
     };
     definitions(vec![
         (
-            "Version",
+            tr(Msg::Version),
             view! { <span class="fui-mono">{code}</span> }.into_any(),
         ),
-        ("Subsumption", subsumption.into_any()),
-        ("Hierarchy", hierarchy.into_any()),
+        (tr(Msg::Subsumption), subsumption.into_any()),
+        (tr(Msg::Hierarchy), hierarchy.into_any()),
     ])
     .into_any()
 }
@@ -588,13 +569,15 @@ fn validate_section(
             <section class="fui-card fui-panel" aria-labelledby="validate-answer-heading">
                 <div class="fui-panel-head">
                     <h3 id="validate-answer-heading" class="fui-card-title">
-                        "The validation"
+                        {tr(Msg::TheValidation)}
                     </h3>
                     <p aria-live="polite" class="fui-sr-only">
                         <Transition fallback=|| ()>{announcement}</Transition>
                     </p>
                 </div>
-                <Reading label="Running the validation">
+                <Reading label=&{
+                    tr(Msg::RunningTheValidation)
+                }>
                     {move || {
                         answer
                             .with(|answered| {
@@ -602,9 +585,7 @@ fn validate_section(
                                     .as_ref()
                                     .map(|answer| match answer {
                                         None => {
-                                            invitation(
-                                                "Name a code and the resource to check it against, then run it.",
-                                            )
+                                            invitation(tr(Msg::NameCodeResourceCheckAgainstThen))
                                         }
                                         Some(Ok(value)) => validation_view(&value.validation()),
                                         Some(Err(error)) => failure_view(error),
@@ -614,7 +595,7 @@ fn validate_section(
                 </Reading>
             </section>
         }
-            .into_any();
+        .into_any();
         view! {
             {form}
             {answered}
@@ -625,15 +606,13 @@ fn validate_section(
     view! {
         <section class="fui-stack" aria-labelledby="validate-heading">
             <h2 id="validate-heading" class="fui-sr-only">
-                "Is this code valid?"
+                {tr(Msg::IsThisCodeValid)}
             </h2>
             {move || {
                 if offered.get().declared {
                     body()
                 } else {
-                    note(
-                        "This root's capability statement does not declare $validate-code on the resource type selected, so the runner offers no form for it.",
-                    )
+                    note(tr(Msg::RootSCapabilityStatementDoesNot3))
                 }
             }}
         </section>
@@ -700,13 +679,13 @@ fn validate_form(
             <div class="fui-cluster">
                 <button type="submit" class=Variant::Primary.class()>
                     {ferrohealth_ui::icon::icon(icon::VALIDATE, "16")}
-                    "Run the validation"
+                    {tr(Msg::RunTheValidation)}
                 </button>
                 {help_switch()}
             </div>
         </form>
     };
-    card("Is this code valid?", form).into_any()
+    card(tr(Msg::IsThisCodeValid), form).into_any()
 }
 
 /// The controls one group of the form draws, by the value each carries.
@@ -740,25 +719,25 @@ fn target_group(
                     Field {
                         id: "validate-value-set",
                         name: "url",
-                        label: "Value set",
-                        hint: "The url parameter of ValueSet/$validate-code. The list is what this root publishes; an implicit canonical carrying its own query string is typed, and the runner encodes the whole value.",
+                        label: tr(Msg::ValueSet),
+                        hint: tr(Msg::UrlParameterValuesetValidateCodeList),
                     },
                     nodes.value_set,
                     seeded(params, |params| params.value_set.clone()),
                     picks.value_sets,
-                    CANONICAL_WORDS,
+                    canonical_words(),
                 ),
                 picked_field(
                     Field {
                         id: "validate-value-set-version",
                         name: VALUE_SET_VERSION_PARAMETER,
-                        label: "Value set version",
-                        hint: "The valueSetVersion parameter. The list is the versions this root published of the value set named beside it.",
+                        label: tr(Msg::ValueSetVersion),
+                        hint: tr(Msg::ValuesetversionParameterListVersionsRootPublished),
                     },
                     nodes.value_set_version,
                     seeded(params, |params| params.value_set_version.clone()),
                     picks.value_set_versions,
-                    VERSION_WORDS,
+                    version_words(),
                 ),
             ])
         })
@@ -769,8 +748,8 @@ fn target_group(
                 Field {
                     id: "validate-id",
                     name: ID_PARAM,
-                    label: "Resource id (instance level)",
-                    hint: "This root declares the instance level of $validate-code, so a stored resource's id can stand in for the canonical. Filled in, the run addresses that resource and sends no url.",
+                    label: tr(Msg::ResourceIdInstanceLevel),
+                    hint: tr(Msg::RootDeclaresInstanceLevelValidateCode),
                 },
                 nodes.id,
                 seeded(params, |params| params.id.clone()),
@@ -784,7 +763,7 @@ fn target_group(
     .into_any();
 
     group(
-        "What the code is checked against",
+        tr(Msg::WhatCodeCheckedAgainst),
         vec![
             on_field(params, version, declared),
             system_fields(params, picks, nodes),
@@ -800,25 +779,25 @@ fn system_fields(params: Signal<RunnerParams>, picks: Picks, nodes: Nodes) -> An
             Field {
                 id: "validate-system",
                 name: "system",
-                label: "Code system",
-                hint: "The code system the code belongs to. The list is what this root publishes, and a canonical it does not is typed. It is the url of a CodeSystem run and the system of a value set run, and the $subsumes panel below reads it too.",
+                label: tr(Msg::CodeSystem2),
+                hint: tr(Msg::CodeSystemCodeBelongsListWhat),
             },
             nodes.system,
             seeded(params, |params| params.system.clone()),
             picks.systems,
-            CANONICAL_WORDS,
+            canonical_words(),
         ),
         picked_field(
             Field {
                 id: "validate-system-version",
                 name: "version",
-                label: "Code system version",
-                hint: "The list is the versions this root published of the code system named beside it. Left unnamed, the server resolves the version an unversioned request goes to.",
+                label: tr(Msg::CodeSystemVersion),
+                hint: tr(Msg::ListVersionsRootPublishedCodeSystem2),
             },
             nodes.system_version,
             seeded(params, |params| params.system_version.clone()),
             picks.system_versions,
-            VERSION_WORDS,
+            version_words(),
         ),
     ])
 }
@@ -831,15 +810,15 @@ fn code_group(
     language: NodeRef<Input>,
 ) -> AnyView {
     group(
-        "The code",
+        tr(Msg::TheCode),
         vec![
             row(vec![
                 text_field(
                     Field {
                         id: "validate-code",
                         name: CODE_PARAMETER,
-                        label: "Code",
-                        hint: "The code to check. Nothing is sent until this is filled in.",
+                        label: tr(Msg::Code),
+                        hint: tr(Msg::CodeCheckNothingSentUntilFilled),
                     },
                     code,
                     seeded(params, |params| params.code.clone()),
@@ -848,8 +827,8 @@ fn code_group(
                     Field {
                         id: "validate-display",
                         name: DISPLAY_PARAMETER,
-                        label: "Display",
-                        hint: "The display you assert for the code. A wrong one comes back with the display the system prefers.",
+                        label: tr(Msg::Display),
+                        hint: "The display you assert for the code. A wrong one comes back with the display the system prefers.".to_owned(),
                     },
                     display,
                     seeded(params, |params| params.display.clone()),
@@ -859,12 +838,12 @@ fn code_group(
                 Field {
                     id: "validate-display-language",
                     name: DISPLAY_LANGUAGE_PARAMETER,
-                    label: "Display language",
-                    hint: "A BCP 47 tag the display is asserted in. Left empty, the server picks its own display.",
+                    label: tr(Msg::DisplayLanguage),
+                    hint: "A BCP 47 tag the display is asserted in. Left empty, the server picks its own display.".to_owned(),
                 },
                 language,
                 seeded(params, |params| params.language.clone()),
-                Some(LANGUAGE_EXAMPLE),
+                Some(language_example()),
             ),
         ],
     )
@@ -896,12 +875,9 @@ fn on_field(
         [
             (
                 ValidateOn::CodeSystem,
-                "A code system (CodeSystem/$validate-code)",
+                tr(Msg::CodeSystemCodesystemValidateCode),
             ),
-            (
-                ValidateOn::ValueSet,
-                "A value set (ValueSet/$validate-code)",
-            ),
+            (ValidateOn::ValueSet, tr(Msg::ValueSetValuesetValidateCode)),
         ]
         .into_iter()
         .filter(|(on, _)| operations.validate(*on).declared)
@@ -920,8 +896,8 @@ fn on_field(
         Field {
             id: "validate-on",
             name: ON_PARAM,
-            label: "Validate against",
-            hint: "Only the resource types this root's capability statement declares $validate-code on are offered.",
+            label: tr(Msg::ValidateAgainst),
+            hint: tr(Msg::OnlyResourceTypesRootSCapability),
         },
         Memo::new(move |_| params.with(|params| params.on.segment().to_owned())),
         options,
@@ -975,13 +951,15 @@ fn subsumes_section(
             <section class="fui-card fui-panel" aria-labelledby="subsumes-answer-heading">
                 <div class="fui-panel-head">
                     <h3 id="subsumes-answer-heading" class="fui-card-title">
-                        "The relation"
+                        {tr(Msg::TheRelation)}
                     </h3>
                     <p aria-live="polite" class="fui-sr-only">
                         <Transition fallback=|| ()>{announcement}</Transition>
                     </p>
                 </div>
-                <Reading label="Running the subsumption test">
+                <Reading label=&{
+                    tr(Msg::RunningTheSubsumptionTest)
+                }>
                     {move || {
                         let (code_a, code_b) = params
                             .with(|params| (params.code_a.clone(), params.code_b.clone()));
@@ -990,9 +968,7 @@ fn subsumes_section(
                                 answered
                                     .as_ref()
                                     .map(|answer| match answer {
-                                        None => {
-                                            invitation("Name two codes of this system and run them.")
-                                        }
+                                        None => invitation(tr(Msg::NameTwoCodesSystemRunThem)),
                                         Some(Ok(value)) => outcome_view(value, &code_a, &code_b),
                                         Some(Err(error)) => failure_view(error),
                                     })
@@ -1012,19 +988,15 @@ fn subsumes_section(
     view! {
         <section class="fui-stack" aria-labelledby="subsumes-heading">
             <h2 id="subsumes-heading" class="fui-sr-only">
-                "How do two codes relate?"
+                {tr(Msg::HowDoTwoCodesRelate)}
             </h2>
             {move || {
                 if !offered.get().declared {
-                    note(
-                        "This root's capability statement does not declare $subsumes on CodeSystem, so the runner offers no form for it.",
-                    )
+                    note(tr(Msg::RootSCapabilityStatementDoesNot2))
                 } else if runs.get() {
                     panel()
                 } else {
-                    note(
-                        "The runner offers $subsumes only for a code system whose terminology capabilities declare subsumption. Name one above that does, and the form appears here.",
-                    )
+                    note(tr(Msg::RunnerOffersSubsumesOnlyCodeSystem))
                 }
             }}
         </section>
@@ -1063,8 +1035,8 @@ fn subsumes_form(
                 Field {
                     id: "subsumes-id",
                     name: SUBSUMES_ID_PARAM,
-                    label: "CodeSystem id (instance level)",
-                    hint: "This root declares the instance level of $subsumes, so a stored CodeSystem's id can stand in for the canonical. Filled in, the run addresses that resource and sends no system.",
+                    label: tr(Msg::CodesystemIdInstanceLevel),
+                    hint: tr(Msg::RootDeclaresInstanceLevelSubsumesSo),
                 },
                 id,
                 seeded(params, |params| params.subsumes_id.clone()),
@@ -1073,15 +1045,15 @@ fn subsumes_form(
     };
 
     let codes = group(
-        "The two codes",
+        tr(Msg::TheTwoCodes),
         vec![
             row(vec![
                 text_field(
                     Field {
                         id: "subsumes-code-a",
                         name: CODE_A_PARAMETER,
-                        label: "Code A",
-                        hint: "The first code. The answer says how it relates to code B.",
+                        label: tr(Msg::CodeA),
+                        hint: tr(Msg::FirstCodeAnswerSaysHowRelates),
                     },
                     code_a,
                     seeded(params, |params| params.code_a.clone()),
@@ -1090,8 +1062,8 @@ fn subsumes_form(
                     Field {
                         id: "subsumes-code-b",
                         name: CODE_B_PARAMETER,
-                        label: "Code B",
-                        hint: "The second code. Both codes are read in the code system named above.",
+                        label: tr(Msg::CodeB),
+                        hint: tr(Msg::SecondCodeBothCodesReadCode),
                     },
                     code_b,
                     seeded(params, |params| params.code_b.clone()),
@@ -1107,21 +1079,21 @@ fn subsumes_form(
             <div class="fui-cluster">
                 <button type="submit" class=Variant::Primary.class()>
                     {ferrohealth_ui::icon::icon(icon::BROWSE, "16")}
-                    "Run the subsumption test"
+                    {tr(Msg::RunTheSubsumptionTest)}
                 </button>
                 {help_switch()}
             </div>
         </form>
     };
-    card("How do two codes relate?", form).into_any()
+    card(tr(Msg::HowDoTwoCodesRelate), form).into_any()
 }
 
 /// The answer of one `$validate-code` run, in full.
 fn validation_view(read: &Validation) -> AnyView {
     let (verdict, tone) = match read.result {
-        Some(true) => ("Valid: result true", Tone::Ok),
-        Some(false) => ("Not valid: result false", Tone::Bad),
-        None => ("The server declared no result", Tone::Neutral),
+        Some(true) => (tr(Msg::ValidResultTrue), Tone::Ok),
+        Some(false) => (tr(Msg::NotValidResultFalse), Tone::Bad),
+        None => (tr(Msg::ServerDeclaredNoResult), Tone::Neutral),
     };
     let message = read
         .message
@@ -1138,15 +1110,15 @@ fn validation_view(read: &Validation) -> AnyView {
             {message}
         },
     );
-    let facts: Vec<(&'static str, AnyView)> = [
-        ("Code", read.code.clone()),
-        ("Code as the system spells it", read.normalized_code.clone()),
-        ("System", read.system.clone()),
-        ("Version validated in", read.version.clone()),
-        ("Display", read.display.clone()),
-        ("Status", read.status.clone()),
+    let facts: Vec<(String, AnyView)> = [
+        (tr(Msg::Code), read.code.clone()),
+        (tr(Msg::CodeSystemSpells), read.normalized_code.clone()),
+        (tr(Msg::System), read.system.clone()),
+        (tr(Msg::VersionValidatedIn), read.version.clone()),
+        (tr(Msg::Display), read.display.clone()),
+        (tr(Msg::Status), read.status.clone()),
         (
-            "Inactive",
+            tr(Msg::Inactive2),
             read.inactive
                 .map(|flag| String::from(if flag { "yes" } else { "no" })),
         ),
@@ -1166,7 +1138,7 @@ fn validation_view(read: &Validation) -> AnyView {
             Tone::Warn,
             Announce::Status,
             None,
-            "This concept is inactive in its code system. The server served it and marked it, which is an answer rather than a refusal.",
+            tr(Msg::ConceptInactiveCodeSystemServerServed),
         )
     });
     view! {
@@ -1186,7 +1158,7 @@ fn concept_view(read: &Validation) -> AnyView {
     let text = concept
         .text
         .clone()
-        .unwrap_or_else(|| NOT_DECLARED.to_owned());
+        .unwrap_or_else(|| not_declared().clone());
     let codings: Vec<AnyView> = concept
         .coding
         .iter()
@@ -1194,7 +1166,7 @@ fn concept_view(read: &Validation) -> AnyView {
             let version = coding
                 .version
                 .clone()
-                .map(|version| format!(" (version {version})"))
+                .map(|version| tr_with(Msg::Version9, &[("version", (version).clone().into())]))
                 .unwrap_or_default();
             view! { <span class="fui-mono break-all">{Coding::rendered(coding)} {version}</span> }
                 .into_any()
@@ -1202,8 +1174,8 @@ fn concept_view(read: &Validation) -> AnyView {
         .collect();
     view! {
         <div>
-            <p class="fui-label">"The concept the server echoed"</p>
-            <p>"Text: " {text}</p>
+            <p class="fui-label">{tr(Msg::ConceptServerEchoed)}</p>
+            <p>{tr(Msg::Text)} {text}</p>
             {bullet_list(codings)}
         </div>
     }
@@ -1221,7 +1193,7 @@ fn unknown_systems_view(systems: &[String]) -> AnyView {
         .collect();
     view! {
         <div>
-            <p class="fui-label">"Code systems this server does not hold"</p>
+            <p class="fui-label">{tr(Msg::CodeSystemsServerDoesNotHold)}</p>
             {cluster(listed)}
         </div>
     }
@@ -1260,7 +1232,7 @@ fn issues_view(issues: &[ValidationIssue]) -> AnyView {
         .collect();
     view! {
         <div>
-            <p class="fui-label">"The issues the server itemised"</p>
+            <p class="fui-label">{tr(Msg::IssuesServerItemised)}</p>
             {issue_list(&listed)}
         </div>
     }
@@ -1270,9 +1242,7 @@ fn issues_view(issues: &[ValidationIssue]) -> AnyView {
 /// The `$subsumes` answer, as the code and the sentence it stands for.
 fn outcome_view(answer: &ParametersAnswer, code_a: &str, code_b: &str) -> AnyView {
     let Some(outcome) = answer.subsumption() else {
-        return note(
-            "The server answered no outcome parameter, so there is nothing to report about these two codes.",
-        );
+        return note(tr(Msg::ServerAnsweredNoOutcomeParameterSo));
     };
     let sentence = subsumption_sentence(&outcome, code_a, code_b);
     panel_body(notice(
@@ -1292,7 +1262,7 @@ fn outcome_view(answer: &ParametersAnswer, code_a: &str, code_b: &str) -> AnyVie
 /// The sentence a `$subsumes` answer is announced as.
 fn outcome_sentence(answer: &ParametersAnswer, code_a: &str, code_b: &str) -> String {
     answer.subsumption().map_or_else(
-        || String::from("The server answered no outcome."),
+        || tr(Msg::ServerAnsweredNoOutcome),
         |outcome| {
             format!(
                 "{outcome}. {}",
@@ -1303,12 +1273,12 @@ fn outcome_sentence(answer: &ParametersAnswer, code_a: &str, code_b: &str) -> St
 }
 
 /// What a panel says before it has been given enough to run.
-fn invitation(text: &'static str) -> AnyView {
-    panel_body(empty_quiet(icon::VALIDATE, "Nothing run yet", text)).into_any()
+fn invitation(text: String) -> AnyView {
+    panel_body(empty_quiet(icon::VALIDATE, tr(Msg::NothingRunYet), text)).into_any()
 }
 
 /// A sentence stating what the server did not declare.
-fn note(text: &'static str) -> AnyView {
+fn note(text: String) -> AnyView {
     undeclared(text)
 }
 

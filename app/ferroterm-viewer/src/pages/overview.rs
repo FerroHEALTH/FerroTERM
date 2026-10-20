@@ -11,8 +11,8 @@ use ferrohealth_ui::view::empty::{empty_quiet, skeleton};
 use ferrohealth_ui::view::layout::{divided_list, main_aside};
 use ferrohealth_ui::view::status::badge;
 use ferrohealth_ui::view::surface::{
-    Stat, card, link_card_glyph, page_header, page_meta, panel_body, stack, stat_card, stat_grid,
-    titled_panel,
+    Stat, card, card_action, link_card_glyph, page_header, page_meta, panel_body, stack, stat_card,
+    stat_grid, titled_panel,
 };
 use leptos::prelude::*;
 use leptos_meta::Title;
@@ -27,6 +27,7 @@ use crate::fhir::named::NamedSearch;
 use crate::fhir::terminology::{SystemCard, TerminologyCapabilities};
 use crate::fhir::version::FhirVersion;
 use crate::fhir::{CODE_SYSTEM, CONCEPT_MAP, FhirClient, VALUE_SET};
+use crate::locale::{Msg, tr, tr_with};
 use crate::routes::{history_link, system_link, ui_link};
 
 /// How many code systems the dashboard's table shows before it leads to the
@@ -40,38 +41,40 @@ const ACTIVITY_KEPT: usize = 500;
 const ACTIVITY_SHOWN: usize = 6;
 
 /// The columns of the code system preview.
-const PREVIEW_COLUMNS: [Column; 3] = [
-    Column::text("system", "Code system"),
-    Column::text("version", "Default version"),
-    Column::text("content", "Content"),
-];
+fn preview_columns() -> [Column; 3] {
+    [
+        Column::text("system", tr(Msg::CodeSystem2)),
+        Column::text("version", tr(Msg::DefaultVersion)),
+        Column::text("content", tr(Msg::Content)),
+    ]
+}
 
 /// The four operations: the screen that runs each, its icon, its name, and
 /// what it is for.
-const OPERATIONS: [(&str, Glyph, &str, &str); 4] = [
+const OPERATIONS: [(&str, Glyph, Msg, Msg); 4] = [
     (
         "lookup",
         icon::LOOKUP,
-        "Look up a code",
-        "Read a code's display, designations and properties in its system.",
+        Msg::LookUpACode,
+        Msg::ReadCodeSDisplayDesignationsProperties,
     ),
     (
         "validate",
         icon::VALIDATE,
-        "Check a code",
-        "Ask whether a code is in a code system or a value set.",
+        Msg::CheckACode,
+        Msg::AskWhetherCodeCodeSystemValue,
     ),
     (
         "expand",
         icon::EXPAND,
-        "Expand a value set",
-        "List the codes a value set holds, a page at a time.",
+        Msg::ExpandAValueSet,
+        Msg::ListCodesValueSetHoldsPage,
     ),
     (
         "translate",
         icon::TRANSLATE,
-        "Translate a code",
-        "Follow a code through the concept maps this server holds.",
+        Msg::TranslateACode,
+        Msg::FollowCodeThroughConceptMapsServer,
     ),
 ];
 
@@ -102,7 +105,7 @@ pub(crate) fn OverviewPage() -> impl IntoView {
     let operations = operations_card(version);
 
     view! {
-        <Title text="Dashboard" />
+        <Title text=tr(Msg::Dashboard) />
         {header}
         {stack(
             view! {
@@ -228,11 +231,11 @@ fn header(
     view! {
         {move || {
             page_header(
-                "Dashboard",
+                tr(Msg::Dashboard),
                 Some(
-                    format!(
-                        "The code systems, value sets and concept maps this server serves on FHIR {}.",
-                        version.get().label(),
+                    tr_with(
+                        Msg::CodeSystemsValueSetsConceptMaps,
+                        &[("version", (version.get().label()).to_string().into())],
                     ),
                 ),
                 (),
@@ -270,45 +273,37 @@ fn stats(reads: Reads) -> AnyView {
             {stat_card(Stat {
                 glyph: icon::CODE_SYSTEMS,
                 value: systems,
-                label: "Code systems".into(),
+                label: tr(Msg::CodeSystems).into(),
                 href: Some(String::from("/systems")),
             })}
             {stat_card(Stat {
                 glyph: icon::VALUE_SETS,
                 value: sets,
-                label: "Value sets".into(),
+                label: tr(Msg::ValueSets).into(),
                 href: Some(String::from("/valuesets")),
             })}
             {stat_card(Stat {
                 glyph: icon::CONCEPT_MAPS,
                 value: maps,
-                label: "Concept maps".into(),
+                label: tr(Msg::ConceptMaps).into(),
                 href: Some(String::from("/conceptmaps")),
             })}
             {stat_card(Stat {
                 glyph: Glyph::ACTIVITY,
                 value: writes,
-                label: "Recent writes".into(),
+                label: tr(Msg::RecentWrites).into(),
                 href: None,
             })}
         })
     };
-    view! {
-        <Transition fallback=|| skeleton(2, "Reading what this server serves")>{cards}</Transition>
-    }
+    view! { <Transition fallback=|| skeleton(2, tr(Msg::ReadingWhatServerServes))>{cards}</Transition> }
     .into_any()
 }
 
 /// The first code systems the root serves, as a table leading to the
 /// listing.
 fn systems_panel(reads: Reads, version: Signal<FhirVersion>) -> AnyView {
-    let all = move || ui_link("systems", version.get());
-    let action = view! {
-        <a href=all class="fui-button fui-button-secondary fui-button-small">
-            "All code systems"
-            {ferrohealth_ui::icon::icon(Glyph::CHEVRON_RIGHT, "14")}
-        </a>
-    };
+    let action = move || card_action(ui_link("systems", version.get()), tr(Msg::AllCodeSystems));
     let table = move || {
         let names = reads.system_names.with(|answered| {
             answered
@@ -326,14 +321,14 @@ fn systems_panel(reads: Reads, version: Signal<FhirVersion>) -> AnyView {
     };
     let loading = || preview_table(Body::Loading(4));
     let body = view! { <Transition fallback=loading>{table}</Transition> };
-    titled_panel("Code systems", action, body).into_any()
+    titled_panel(tr(Msg::CodeSystems), action, body).into_any()
 }
 
 /// The preview table holding `body`.
 fn preview_table(body: Body) -> AnyView {
     data_table(DataTable {
-        caption: "Code systems",
-        columns: &PREVIEW_COLUMNS,
+        caption: &tr(Msg::CodeSystems),
+        columns: &preview_columns(),
         sort: None,
         sort_href: &|_| String::new(),
         body,
@@ -351,8 +346,8 @@ fn preview(
         return preview_table(Body::Empty(
             empty_quiet(
                 icon::CODE_SYSTEMS,
-                "No code system",
-                "This root serves none. A deployment loads one with the offline build.",
+                tr(Msg::NoCodeSystem),
+                tr(Msg::RootServesNoneDeploymentLoadsOne),
             )
             .into_any(),
         ));
@@ -394,10 +389,10 @@ fn preview_row(
                 <a href=href>{title}</a>
                 <span class="fui-truncate fui-small fui-muted fui-mono">{canonical}</span>
             </td>
-            <td data-label="Default version" class="fui-mono">
+            <td data-label=tr(Msg::DefaultVersion) class="fui-mono">
                 {default}
             </td>
-            <td data-label="Content">{content}</td>
+            <td data-label=tr(Msg::Content)>{content}</td>
         </tr>
     }
     .into_any()
@@ -413,9 +408,9 @@ fn activity_panel(activity: Fetched<Vec<Change>>, version: Signal<FhirVersion>) 
             })
         })
     };
-    let loading = || panel_body(skeleton(4, "Reading what was written lately"));
+    let loading = || panel_body(skeleton(4, tr(Msg::ReadingWhatWasWrittenLately)));
     let body = view! { <Transition fallback=loading>{changes}</Transition> };
-    titled_panel("Recent changes", (), body).into_any()
+    titled_panel(tr(Msg::RecentChanges), (), body).into_any()
 }
 
 /// The writes `changes` as a chart of the days they fell on and a list, or
@@ -424,8 +419,8 @@ fn changes_view(changes: &[Change], version: FhirVersion) -> AnyView {
     if changes.is_empty() {
         return panel_body(empty_quiet(
             Glyph::ACTIVITY,
-            "Nothing written yet",
-            "Every resource on this root was loaded by the offline build.",
+            tr(Msg::NothingWrittenYet),
+            tr(Msg::EveryResourceRootWasLoadedOffline),
         ))
         .into_any();
     }
@@ -434,12 +429,14 @@ fn changes_view(changes: &[Change], version: FhirVersion) -> AnyView {
         .map(|days| {
             activity_chart(&ActivityChart {
                 name: "writes-per-day",
-                label: String::from("Writes per day"),
-                summary: format!(
-                    "{} writes from {} to {}",
-                    changes.len(),
-                    days.first,
-                    days.last
+                label: tr(Msg::WritesPerDay),
+                summary: tr_with(
+                    Msg::WritesFromTo,
+                    &[
+                        ("changes", (changes.len()).to_string().into()),
+                        ("first", (days.first).clone().into()),
+                        ("last", (days.last).clone().into()),
+                    ],
                 ),
                 points: days.points,
                 ends: (days.first, days.last),
@@ -452,7 +449,7 @@ fn changes_view(changes: &[Change], version: FhirVersion) -> AnyView {
         .collect();
     panel_body(view! {
         {chart}
-        {divided_list(Some("Recent changes"), items)}
+        {divided_list(Some(tr(Msg::RecentChanges).into()), items)}
     })
     .into_any()
 }
@@ -502,14 +499,14 @@ fn operations_card(version: Signal<FhirVersion>) -> AnyView {
                 link_card_glyph(
                     ui_link(path, version.get()),
                     glyph,
-                    title,
-                    view! { <p class="fui-muted">{line}</p> },
+                    tr(title),
+                    view! { <p class="fui-muted">{tr(line)}</p> },
                 )
             })
             .collect_view();
         view! { <div class="grid gap-loose sm:grid-cols-2 xl:grid-cols-4">{links}</div> }
     };
-    card("Run an operation", cards).into_any()
+    card(tr(Msg::RunAnOperation), cards).into_any()
 }
 
 /// A refused read, in the server's own words.

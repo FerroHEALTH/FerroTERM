@@ -13,6 +13,7 @@ use crate::components::system_table::SystemTable;
 use crate::fhir::CODE_SYSTEM;
 use crate::fhir::FhirClient;
 use crate::fhir::named::NamedSearch;
+use crate::locale::{Msg, tr};
 
 /// Shows the listing of the code systems the root serves.
 ///
@@ -70,18 +71,18 @@ pub(crate) fn SystemsPage() -> impl IntoView {
         })
     };
     view! {
-        <Title text="Code systems" />
+        <Title text=tr(Msg::CodeSystems) />
         // NOTE: no specification governs this: our own design; the header is
         // the title alone, so twenty systems fit one desktop screen in compact.
-        {page_header("Code systems", None, ())}
+        {page_header(tr(Msg::CodeSystems), None, ())}
         <section aria-labelledby="systems-heading" class="fui-stack">
             <h2 id="systems-heading" class="fui-sr-only">
-                "The code systems this root serves"
+                {tr(Msg::CodeSystemsRootServes)}
             </h2>
-            {table_filter("systems-filter", "Filter by name or canonical", words, count.into())}
-            <Reading label="Reading the terminology capabilities">
-                {move || listing().map(IntoAny::into_any)}
-            </Reading>
+            {table_filter("systems-filter", tr(Msg::FilterNameCanonical), words, count.into())}
+            <Reading label=tr(
+                Msg::ReadingTheTerminologyCapabilities,
+            )>{move || listing().map(IntoAny::into_any)}</Reading>
         </section>
     }
 }

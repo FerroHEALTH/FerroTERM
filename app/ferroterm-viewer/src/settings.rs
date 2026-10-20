@@ -16,6 +16,8 @@ use leptos::server_fn::error::{FromServerFnError, ServerFnErrorErr};
 use serde::{Deserialize, Serialize};
 
 use crate::fhir::version::FhirVersion;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::locale::{Msg, tr_served};
 use crate::paging::MAX_COUNT;
 
 /// The page size a reader who set none reads at.
@@ -225,9 +227,7 @@ pub async fn save_settings(
         .all(|character| character.is_ascii_alphanumeric() || character == '-')
         || language.len() > 64
     {
-        return Err(PreferenceError::Invalid(String::from(
-            "the display language",
-        )));
+        return Err(PreferenceError::Invalid(tr_served(Msg::TheDisplayLanguage)));
     }
     server::keep(
         &[

@@ -39,8 +39,10 @@ use crate::components::coded::coded_control;
 use crate::components::coded::codes_of;
 use crate::components::coded::fixed;
 use crate::components::coded::gated;
+use crate::components::editor_mode;
 use crate::components::failure::Failure;
 use crate::components::history::history_offer;
+use crate::components::icon;
 use crate::components::reload::Reload;
 use crate::components::reload::announced;
 use crate::components::reload::focus_report;
@@ -56,9 +58,11 @@ use crate::fhir::validation::ValidateRequest;
 use crate::fhir::validation::Validation;
 use crate::fhir::version::FhirVersion;
 use crate::fhir::write::Refusal;
+use crate::locale::{Msg, message, tr, tr_with};
 use crate::routes::editing_link;
 use crate::styles;
-use ferrohealth_ui::view::empty::{Busy, busy};
+use ferrohealth_ui::view::empty::{Busy, busy, empty_quiet};
+use ferrohealth_ui::view::surface::{Crumb, Header, editor_heading, editor_title};
 
 /// The value set whose codes `CodeSystem.status` is bound to.
 ///
@@ -79,11 +83,11 @@ const REPORT_ID: &str = "editor-report";
 ///
 /// The words are the reader's; the codes are the standard property's
 /// (<https://hl7.org/fhir/R5/codesystem-concept-properties.html>).
-const LIFECYCLE_STATES: [(&str, &str); 4] = [
-    ("active", "Active"),
-    ("experimental", "Experimental"),
-    ("deprecated", "Deprecated"),
-    ("retired", "Retired"),
+const LIFECYCLE_STATES: [(&str, Msg); 4] = [
+    ("active", Msg::Active),
+    ("experimental", Msg::Experimental),
+    ("deprecated", Msg::Deprecated),
+    ("retired", Msg::Retired),
 ];
 
 /// The screen's own query parameters.
@@ -147,31 +151,31 @@ pub(crate) fn EditorPage() -> impl IntoView {
     let contents = codes_of(&client, version, bound(CONTENT_MODE));
     let kinds = codes_of(&client, version, bound(PROPERTY_TYPE));
 
+    let mode = move || editor_mode(&system.get());
     let heading = view! {
-        <Title text=move || title_of(&system.get()) />
+        <Title text=move || editor_title(message(Msg::TitleCodeSystemEditor), &mode()) />
         <div>
-            {ferrohealth_ui::view::surface::page_heading(
-                ferrohealth_ui::view::surface::Header {
-                    title: String::from("Edit a code system"),
-                    subtitle: Some(
-                        String::from(
-                            "Its metadata, the properties it declares, and its concepts with their designations and lifecycle.",
+            {move || {
+                editor_heading(
+                    message(Msg::TitleCodeSystemEditor),
+                    &mode(),
+                    Header {
+                        subtitle: Some(
+                            tr(Msg::MetadataPropertiesDeclaresConceptsTheirDesignations),
                         ),
-                    ),
-                    crumbs: vec![
-                        ferrohealth_ui::view::surface::Crumb::new("Code systems", "/systems"),
-                    ],
-                    mono: false,
-                },
-                (),
-            )}
+                        crumbs: vec![Crumb::new(tr(Msg::CodeSystems), "/systems")],
+                        ..Header::default()
+                    },
+                    (),
+                )
+            }}
         </div>
     }
     .into_any();
 
     let form = view! {
         <Transition fallback=|| {
-            busy("Reading the code system", Busy::Section)
+            busy(tr(Msg::ReadingTheCodeSystem), Busy::Section)
         }>
             {move || {
                 let client = client.clone();
@@ -245,15 +249,6 @@ fn standing_of(
                     .and_then(|read| read.as_ref().err().cloned())
             })
         }),
-    }
-}
-
-/// The document title for the code system being edited.
-fn title_of(system: &str) -> String {
-    if system.trim().is_empty() {
-        "New code system".to_owned()
-    } else {
-        format!("Edit {system}")
     }
 }
 
@@ -402,27 +397,19 @@ fn standing_section(
     readonly: Signal<bool>,
 ) -> AnyView {
     let because = move || match standing.backing.get() {
-        Backing::Reading => "Reading what this server can do with this code system.",
-        Backing::Unreadable => {
-            "This server's terminology capabilities did not read, so whether an artifact backs this code system is unknown, and the screen does not offer to change what it cannot place."
-        }
-        Backing::Artifact => {
-            "This code system is served from a built index, which has no write path. It is shown as the server holds it."
-        }
-        Backing::Local if !managed => {
-            "The server states no version for this resource, so there is nothing an update could state in If-Match."
-        }
-        Backing::Local if session.can(CODE_SYSTEM, letter.get()) => "",
-        Backing::Local => {
-            "This account carries no permission to change a code system. Sign in with one that does."
-        }
+        Backing::Reading => tr(Msg::ReadingWhatServerCanDoCode),
+        Backing::Unreadable => tr(Msg::ServerSTerminologyCapabilitiesDidNot),
+        Backing::Artifact => tr(Msg::CodeSystemServedFromBuiltIndex),
+        Backing::Local if !managed => tr(Msg::ServerStatesNoVersionResourceSo2),
+        Backing::Local if session.can(CODE_SYSTEM, letter.get()) => String::new(),
+        Backing::Local => tr(Msg::AccountCarriesNoPermissionChangeCode),
     };
     view! {
         <Show when=move || readonly.get() fallback=|| ()>
             <p class=format!(
                 "mt-default rounded-md p-default {}",
                 styles::NOTICE,
-            )>"Read only. " {because}</p>
+            )>{tr(Msg::ReadOnly)} {because}</p>
             {move || {
                 standing
                     .capability
@@ -474,7 +461,7 @@ fn outcome_section(
                     {move || {
                         refusal
                             .with(|held| {
-                                held.as_ref().map(|error| Refusal::of(error).what_to_do())
+                                held.as_ref().map(|error| tr(Refusal::of(error).what_to_do()))
                             })
                     }}
                 </p>
@@ -525,19 +512,17 @@ fn validation_view(validation: &Validation) -> AnyView {
     view! {
         <section class="fui-card" aria-labelledby="editor-check-heading">
             <h2 id="editor-check-heading" class="fui-card-title">
-                "What the server says about the retired concept"
+                {tr(Msg::WhatServerSaysAboutRetiredConcept)}
             </h2>
-            <p class="fui-muted">
-                "CodeSystem/$validate-code, run against the version that was just saved."
-            </p>
+            <p class="fui-muted">{tr(Msg::CodesystemValidateCodeRunAgainstVersion)}</p>
             <table class=format!("mt-default {}", styles::TABLE)>
                 <thead>
                     <tr>
                         <th scope="col" class=styles::TH>
-                            "Parameter"
+                            {tr(Msg::Parameter)}
                         </th>
                         <th scope="col" class=styles::TH>
-                            "Value"
+                            {tr(Msg::Value)}
                         </th>
                     </tr>
                 </thead>
@@ -556,9 +541,9 @@ fn validation_view(validation: &Validation) -> AnyView {
                         </th>
                         <td class=styles::TD>
                             {match inactive {
-                                Some(true) => "true",
-                                Some(false) => "false",
-                                None => "the server stated none",
+                                Some(true) => String::from("true"),
+                                Some(false) => String::from("false"),
+                                None => tr(Msg::TheServerStatedNone),
                             }}
                         </td>
                     </tr>
@@ -589,12 +574,12 @@ fn metadata_section(draft: RwSignal<Draft>, readonly: Signal<bool>, options: Opt
     view! {
         <section class="fui-card" aria-labelledby="editor-metadata-heading">
             <h2 id="editor-metadata-heading" class="fui-card-title">
-                "Metadata"
+                {tr(Msg::Metadata)}
             </h2>
             <div class="mt-default grid gap-default sm:grid-cols-2">
                 <div class="grid gap-tight">
                     <label for="editor-url" class=styles::LABEL>
-                        "Canonical (url)"
+                        {tr(Msg::CanonicalUrl)}
                     </label>
                     <input
                         id="editor-url"
@@ -611,7 +596,7 @@ fn metadata_section(draft: RwSignal<Draft>, readonly: Signal<bool>, options: Opt
                 </div>
                 <div class="grid gap-tight">
                     <label for="editor-version" class=styles::LABEL>
-                        "Business version"
+                        {tr(Msg::BusinessVersion)}
                     </label>
                     <input
                         id="editor-version"
@@ -630,7 +615,7 @@ fn metadata_section(draft: RwSignal<Draft>, readonly: Signal<bool>, options: Opt
                     Control {
                         id: String::from("editor-status"),
                         name: "status",
-                        label: fixed("Publication status"),
+                        label: fixed(tr(Msg::PublicationStatus)),
                         sr_only: false,
                     },
                     options.statuses,
@@ -642,7 +627,7 @@ fn metadata_section(draft: RwSignal<Draft>, readonly: Signal<bool>, options: Opt
                     Control {
                         id: String::from("editor-content"),
                         name: "content",
-                        label: fixed("Content mode"),
+                        label: fixed(tr(Msg::ContentMode)),
                         sr_only: false,
                     },
                     options.contents,
@@ -664,7 +649,7 @@ fn metadata_section(draft: RwSignal<Draft>, readonly: Signal<bool>, options: Opt
                         }
                     />
                     <label for="editor-case-sensitive" class=styles::LABEL>
-                        "Codes are case sensitive"
+                        {tr(Msg::CodesAreCaseSensitive)}
                     </label>
                 </div>
             </div>
@@ -686,34 +671,41 @@ fn properties_section(draft: RwSignal<Draft>, readonly: Signal<bool>, kinds: Cod
     view! {
         <section class="fui-card" aria-labelledby="editor-properties-heading">
             <h2 id="editor-properties-heading" class="fui-card-title">
-                "Declared properties"
+                {tr(Msg::DeclaredProperties)}
             </h2>
-            <p class="fui-muted">
-                "The lifecycle properties are declared by the editor on every save, so they are not listed here."
-            </p>
-            <table class=format!("mt-default {}", styles::TABLE)>
-                <thead>
-                    <tr>
-                        <th scope="col" class=styles::TH>
-                            "Code"
-                        </th>
-                        <th scope="col" class=styles::TH>
-                            "Identifier (uri)"
-                        </th>
-                        <th scope="col" class=styles::TH>
-                            "Type"
-                        </th>
-                        <th scope="col" class=styles::TH>
-                            "Remove"
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <For each=move || keys.get() key=|key| *key let:key>
-                        {property_row(draft, key, readonly, kinds)}
-                    </For>
-                </tbody>
-            </table>
+            <p class="fui-muted">{tr(Msg::LifecyclePropertiesDeclaredEditorEverySave)}</p>
+            <Show
+                when=move || keys.with(|keys| !keys.is_empty())
+                fallback=|| empty_quiet(
+                    icon::CODE_SYSTEMS,
+                    tr(Msg::NoPropertiesTitle),
+                    tr(Msg::NoPropertiesLine),
+                )
+            >
+                <table class=format!("mt-default {}", styles::TABLE)>
+                    <thead>
+                        <tr>
+                            <th scope="col" class=styles::TH>
+                                {tr(Msg::Code)}
+                            </th>
+                            <th scope="col" class=styles::TH>
+                                {tr(Msg::IdentifierUri)}
+                            </th>
+                            <th scope="col" class=styles::TH>
+                                {tr(Msg::Type)}
+                            </th>
+                            <th scope="col" class=styles::TH>
+                                {tr(Msg::Remove)}
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <For each=move || keys.get() key=|key| *key let:key>
+                            {property_row(draft, key, readonly, kinds)}
+                        </For>
+                    </tbody>
+                </table>
+            </Show>
             <Show when=move || !readonly.get() fallback=|| ()>
                 <p class="mt-default">
                     <button
@@ -732,7 +724,7 @@ fn properties_section(draft: RwSignal<Draft>, readonly: Signal<bool>, kinds: Cod
                                 });
                         }
                     >
-                        "Declare a property"
+                        {tr(Msg::DeclareAProperty)}
                     </button>
                 </p>
             </Show>
@@ -755,7 +747,7 @@ fn property_row(draft: RwSignal<Draft>, key: Key, readonly: Signal<bool>, kinds:
         <tr>
             <td class=styles::TD>
                 <label for=format!("property-{id}-code") class="sr-only">
-                    "Property code"
+                    {tr(Msg::PropertyCode)}
                 </label>
                 <input
                     id=format!("property-{id}-code")
@@ -772,7 +764,7 @@ fn property_row(draft: RwSignal<Draft>, key: Key, readonly: Signal<bool>, kinds:
             </td>
             <td class=styles::TD>
                 <label for=format!("property-{id}-uri") class="sr-only">
-                    "Property identifier"
+                    {tr(Msg::PropertyIdentifier)}
                 </label>
                 <input
                     id=format!("property-{id}-uri")
@@ -792,7 +784,7 @@ fn property_row(draft: RwSignal<Draft>, key: Key, readonly: Signal<bool>, kinds:
                     Control {
                         id: format!("property-{id}-type"),
                         name: "property-type",
-                        label: fixed("Property type"),
+                        label: fixed(tr(Msg::PropertyType)),
                         sr_only: true,
                     },
                     kinds,
@@ -819,7 +811,7 @@ fn property_row(draft: RwSignal<Draft>, key: Key, readonly: Signal<bool>, kinds:
                                 });
                         }
                     >
-                        "Remove"
+                        {tr(Msg::Remove)}
                     </button>
                 </Show>
             </td>
@@ -887,16 +879,23 @@ fn concepts_section(draft: RwSignal<Draft>, readonly: Signal<bool>, kinds: Codes
     view! {
         <section class="fui-card" aria-labelledby="editor-concepts-heading">
             <h2 id="editor-concepts-heading" class="fui-card-title">
-                "Concepts"
+                {tr(Msg::Concepts)}
             </h2>
-            <p class="fui-muted">
-                "A concept is retired rather than removed, so a code that has been published keeps meaning what it meant."
-            </p>
-            <div class="mt-default grid gap-default">
-                <For each=move || keys.get() key=|key| *key let:key>
-                    {concept_row(draft, key, readonly, kinds)}
-                </For>
-            </div>
+            <p class="fui-muted">{tr(Msg::ConceptRetiredRatherThanRemovedSo)}</p>
+            <Show
+                when=move || keys.with(|keys| !keys.is_empty())
+                fallback=|| empty_quiet(
+                    icon::CODE_SYSTEMS,
+                    tr(Msg::NoConceptsTitle),
+                    tr(Msg::NoConceptsLine),
+                )
+            >
+                <div class="mt-default grid gap-default">
+                    <For each=move || keys.get() key=|key| *key let:key>
+                        {concept_row(draft, key, readonly, kinds)}
+                    </For>
+                </div>
+            </Show>
             <Show when=move || !readonly.get() fallback=|| ()>
                 <p class="mt-default">
                     <button
@@ -915,7 +914,7 @@ fn concepts_section(draft: RwSignal<Draft>, readonly: Signal<bool>, kinds: Codes
                                 });
                         }
                     >
-                        "Add a concept"
+                        {tr(Msg::AddAConcept)}
                     </button>
                 </p>
             </Show>
@@ -931,7 +930,7 @@ fn concept_row(draft: RwSignal<Draft>, key: Key, readonly: Signal<bool>, kinds: 
     let named = move || {
         let code = concept_of(draft, key, |concept| concept.code.clone());
         if code.trim().is_empty() {
-            "A concept with no code yet".to_owned()
+            tr(Msg::ConceptNoCodeYet).clone()
         } else {
             code
         }
@@ -945,7 +944,7 @@ fn concept_row(draft: RwSignal<Draft>, key: Key, readonly: Signal<bool>, kinds: 
             <div class="grid gap-default sm:grid-cols-2">
                 <div class="grid gap-tight">
                     <label for=format!("concept-{id}-code") class=styles::LABEL>
-                        "Code"
+                        {tr(Msg::Code)}
                     </label>
                     <input
                         id=format!("concept-{id}-code")
@@ -962,7 +961,7 @@ fn concept_row(draft: RwSignal<Draft>, key: Key, readonly: Signal<bool>, kinds: 
                 </div>
                 <div class="grid gap-tight">
                     <label for=format!("concept-{id}-display") class=styles::LABEL>
-                        "Display"
+                        {tr(Msg::Display)}
                     </label>
                     <input
                         id=format!("concept-{id}-display")
@@ -980,7 +979,7 @@ fn concept_row(draft: RwSignal<Draft>, key: Key, readonly: Signal<bool>, kinds: 
             </div>
             <div class="mt-default grid gap-tight">
                 <label for=format!("concept-{id}-definition") class=styles::LABEL>
-                    "Definition"
+                    {tr(Msg::Definition)}
                 </label>
                 <textarea
                     id=format!("concept-{id}-definition")
@@ -1016,7 +1015,7 @@ fn concept_row(draft: RwSignal<Draft>, key: Key, readonly: Signal<bool>, kinds: 
                             );
                         }
                     >
-                        "Retire "
+                        {tr(Msg::Retire)}
                         {named}
                     </button>
                 </p>
@@ -1037,13 +1036,13 @@ fn lifecycle_view(draft: RwSignal<Draft>, key: Key, readonly: Signal<bool>) -> A
     let dated = move || state.get().dated();
     let options: Vec<AnyView> = LIFECYCLE_STATES
         .into_iter()
-        .map(|(code, label)| view! { <option value=code>{label}</option> }.into_any())
+        .map(|(code, label)| view! { <option value=code>{tr(label)}</option> }.into_any())
         .collect();
     view! {
         <div class="mt-default grid gap-default sm:grid-cols-2">
             <div class="grid gap-tight">
                 <label for=format!("concept-{id}-lifecycle") class=styles::LABEL>
-                    "Lifecycle"
+                    {tr(Msg::Lifecycle)}
                 </label>
                 <select
                     id=format!("concept-{id}-lifecycle")
@@ -1068,7 +1067,7 @@ fn lifecycle_view(draft: RwSignal<Draft>, key: Key, readonly: Signal<bool>) -> A
             </div>
             <div class="grid gap-tight" hidden=move || !dated()>
                 <label for=format!("concept-{id}-lifecycle-date") class=styles::LABEL>
-                    "On"
+                    {tr(Msg::On)}
                 </label>
                 <input
                     id=format!("concept-{id}-lifecycle-date")
@@ -1109,7 +1108,7 @@ fn designations_view(draft: RwSignal<Draft>, concept: Key, readonly: Signal<bool
     });
     view! {
         <div class="mt-default grid gap-tight">
-            <p class=styles::EYEBROW>"Designations"</p>
+            <p class=styles::EYEBROW>{tr(Msg::Designations)}</p>
             <For each=move || keys.get() key=|key| *key let:key>
                 {designation_row(draft, concept, key, readonly)}
             </For>
@@ -1136,7 +1135,7 @@ fn designations_view(draft: RwSignal<Draft>, concept: Key, readonly: Signal<bool
                                 });
                         }
                     >
-                        "Add a designation"
+                        {tr(Msg::AddADesignation)}
                     </button>
                 </p>
             </Show>
@@ -1162,7 +1161,7 @@ fn designation_row(
         <div class="grid gap-default sm:grid-cols-[1fr_1fr_2fr_auto]">
             <div class="grid gap-tight">
                 <label for=format!("designation-{id}-language") class=styles::LABEL>
-                    "Language"
+                    {tr(Msg::Language)}
                 </label>
                 <input
                     id=format!("designation-{id}-language")
@@ -1184,7 +1183,7 @@ fn designation_row(
             </div>
             <div class="grid gap-tight">
                 <label for=format!("designation-{id}-use") class=styles::LABEL>
-                    "Use (system|code)"
+                    {tr(Msg::UseSystemCode)}
                 </label>
                 <input
                     id=format!("designation-{id}-use")
@@ -1206,7 +1205,7 @@ fn designation_row(
             </div>
             <div class="grid gap-tight">
                 <label for=format!("designation-{id}-value") class=styles::LABEL>
-                    "Term"
+                    {tr(Msg::Term)}
                 </label>
                 <input
                     id=format!("designation-{id}-value")
@@ -1241,7 +1240,7 @@ fn designation_row(
                             );
                         }
                     >
-                        "Remove"
+                        {tr(Msg::Remove)}
                     </button>
                 </p>
             </Show>
@@ -1285,7 +1284,7 @@ fn values_view(
     });
     view! {
         <div class="mt-default grid gap-tight">
-            <p class=styles::EYEBROW>"Property values"</p>
+            <p class=styles::EYEBROW>{tr(Msg::PropertyValues)}</p>
             <For each=move || keys.get() key=|key| *key let:key>
                 {value_row(draft, concept, key, readonly, kinds)}
             </For>
@@ -1308,7 +1307,7 @@ fn values_view(
                                 });
                         }
                     >
-                        "Add a property value"
+                        {tr(Msg::AddAPropertyValue)}
                     </button>
                 </p>
             </Show>
@@ -1366,7 +1365,7 @@ fn value_row(
         <div class="grid gap-default sm:grid-cols-[1fr_2fr_auto_auto]">
             <div class="grid gap-tight">
                 <label for=format!("value-{id}-code") class=styles::LABEL>
-                    "Property"
+                    {tr(Msg::Property)}
                 </label>
                 <input
                     id=format!("value-{id}-code")
@@ -1383,7 +1382,7 @@ fn value_row(
             </div>
             <div class="grid gap-tight">
                 <label for=format!("value-{id}-text") class=styles::LABEL>
-                    "Value"
+                    {tr(Msg::Value)}
                 </label>
                 <input
                     id=format!("value-{id}-text")
@@ -1412,7 +1411,7 @@ fn value_row(
                             );
                         }
                     >
-                        "Remove"
+                        {tr(Msg::Remove)}
                     </button>
                 </p>
             </Show>
@@ -1490,15 +1489,13 @@ fn save_section(
         }
         let held = draft.get_untracked();
         if !held.savable() {
-            report.set(String::from(
-                "A code system needs a canonical, a status, and a content mode before it can be saved.",
-            ));
+            report.set(tr(Msg::CodeSystemNeedsCanonicalStatusContent));
             return;
         }
         saving.set(true);
         refusal.set(None);
         checked.set(None);
-        report.set(String::from("Saving"));
+        report.set(tr(Msg::Saving));
         let client = client.get_value();
         let version = version.get_untracked();
         spawn_local(async move {
@@ -1523,11 +1520,9 @@ fn save_section(
         <Show when=move || !readonly.get() fallback=|| ()>
             <section class="fui-card" aria-labelledby="editor-save-heading">
                 <h2 id="editor-save-heading" class="fui-card-title">
-                    "Save"
+                    {tr(Msg::Save)}
                 </h2>
-                <p class="fui-muted">
-                    "An update states the version it replaces, so a change made elsewhere since this form was opened is refused rather than overwritten."
-                </p>
+                <p class="fui-muted">{tr(Msg::UpdateStatesVersionReplacesSoChange)}</p>
                 <p class="mt-default">
                     <button
                         type="button"
@@ -1538,9 +1533,9 @@ fn save_section(
                     >
                         {move || {
                             if draft.read().id.is_empty() {
-                                "Create this code system"
+                                { tr(Msg::CreateThisCodeSystem) }
                             } else {
-                                "Save this code system"
+                                { tr(Msg::SaveThisCodeSystem) }
                             }
                         }}
                     </button>
@@ -1554,9 +1549,12 @@ fn save_section(
 /// What the live region says after a save the server took.
 fn saved_text(version_id: &str) -> String {
     if version_id.is_empty() {
-        String::from("Saved. The server stated no version for it.")
+        tr(Msg::SavedServerStatedNoVersion)
     } else {
-        format!("Saved. The server now holds version {version_id}.")
+        tr_with(
+            Msg::SavedServerNowHoldsVersion2,
+            &[("version_id", (version_id).to_string().into())],
+        )
     }
 }
 
@@ -1642,11 +1640,26 @@ async fn send_it(client: &FhirClient, version: FhirVersion, held: &Draft, into: 
 /// What the live region says about the check a save ran.
 fn checked_text(code: &str, answer: Result<&Validation, &FhirError>) -> String {
     match answer {
-        Err(error) => format!("The check on `{code}` did not answer: {error}"),
+        Err(error) => tr_with(
+            Msg::CheckDidNotAnswer,
+            &[
+                ("code", (code).to_string().into()),
+                ("error", (error).to_string().into()),
+            ],
+        ),
         Ok(validation) => match validation.inactive {
-            Some(true) => format!("The server reports `{code}` as inactive."),
-            Some(false) => format!("The server reports `{code}` as still active."),
-            None => format!("The server stated no inactive flag for `{code}`."),
+            Some(true) => tr_with(
+                Msg::ServerReportsInactive,
+                &[("code", (code).to_string().into())],
+            ),
+            Some(false) => tr_with(
+                Msg::ServerReportsStillActive,
+                &[("code", (code).to_string().into())],
+            ),
+            None => tr_with(
+                Msg::ServerStatedNoInactiveFlag,
+                &[("code", (code).to_string().into())],
+            ),
         },
     }
 }
@@ -1659,11 +1672,38 @@ mod tests {
 
     #[test]
     fn a_new_code_system_and_an_edited_one_title_the_page_apart() {
-        assert_eq!(title_of("  "), "New code system");
         assert_eq!(
-            title_of("https://terminology.example/colours"),
+            editor_title(message(Msg::TitleCodeSystemEditor), &editor_mode("  ")),
+            "New code system"
+        );
+        assert_eq!(
+            editor_title(
+                message(Msg::TitleCodeSystemEditor),
+                &editor_mode("https://terminology.example/colours")
+            ),
             "Edit https://terminology.example/colours"
         );
+    }
+
+    #[test]
+    fn an_empty_list_draws_the_shared_empty_state_and_no_bare_header() {
+        let (properties, concepts) = Owner::new().with(|| {
+            let draft = RwSignal::new(Draft::default());
+            let kinds = Codes {
+                offered: Signal::stored(Vec::new()),
+                refused: Signal::stored(None),
+            };
+            (
+                properties_section(draft, Signal::stored(false), kinds).to_html(),
+                concepts_section(draft, Signal::stored(false), kinds).to_html(),
+            )
+        });
+        assert!(properties.contains("No property declared"), "{properties}");
+        assert!(
+            !properties.contains("<thead>"),
+            "no bare header: {properties}"
+        );
+        assert!(concepts.contains("No concept yet"), "{concepts}");
     }
 
     #[test]
