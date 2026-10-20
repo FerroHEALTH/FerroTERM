@@ -1476,10 +1476,23 @@ async fn two_authorization_headers_are_an_invalid_request() {
     assert!(sent.contains("error=\"invalid_request\""), "{sent}");
 }
 
-/// The Argon2id PHC string of `password` under a fixed salt.
+/// Sixteen random bytes generated for this test run, so no credential or salt
+/// is committed.
+fn random_bytes() -> [u8; 16] {
+    let mut bytes = [0_u8; 16];
+    ring::rand::SecureRandom::fill(&SystemRandom::new(), &mut bytes).expect("random bytes");
+    bytes
+}
+
+/// A password generated for this test run.
+fn password() -> String {
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(random_bytes())
+}
+
+/// The Argon2id PHC string of `password` under a salt generated for the run.
 fn phc(password: &str) -> SecretString {
     let hash = Argon2::default()
-        .hash_password_with_salt(password.as_bytes(), b"synthetic-salt-16")
+        .hash_password_with_salt(password.as_bytes(), &random_bytes())
         .expect("hashes");
     SecretString::from(hash.to_string())
 }
@@ -1497,18 +1510,19 @@ fn basic(user: &str, password: &str) -> String {
 async fn a_basic_user_writes_and_reloads_with_its_configured_scopes() {
     let key = SigningKey::generate("k1");
     let mock = issuer(&key).await;
+    let (editor, sync, wrong) = (password(), password(), password());
     let mut setup = SmartSetup::for_issuer(&mock.uri());
     setup.auth.basic = Some(BasicSection {
         users: vec![
             BasicUser {
                 user: String::from("editor"),
-                password_hash: Some(phc("synthetic-editor")),
+                password_hash: Some(phc(&editor)),
                 scopes: vec![String::from("system/CodeSystem.cud")],
                 ..BasicUser::default()
             },
             BasicUser {
                 user: String::from("sync"),
-                password_hash: Some(phc("synthetic-sync")),
+                password_hash: Some(phc(&sync)),
                 scopes: vec![String::from("__ferroterm.admin")],
                 ..BasicUser::default()
             },
@@ -1532,27 +1546,25 @@ async fn a_basic_user_writes_and_reloads_with_its_configured_scopes() {
             .body(Body::from(colours().to_string()))
             .expect("request")
     };
-    let response = server.send(write(basic("editor", "wrong"))).await;
+    let response = server.send(write(basic("editor", &wrong))).await;
     assert_eq!(
         response.status(),
         StatusCode::UNAUTHORIZED,
         "a wrong password"
     );
-    let response = server.send(write(basic("sync", "synthetic-sync"))).await;
+    let response = server.send(write(basic("sync", &sync))).await;
     assert_eq!(response.status(), StatusCode::FORBIDDEN, "no write scope");
-    let response = server
-        .send(write(basic("editor", "synthetic-editor")))
-        .await;
+    let response = server.send(write(basic("editor", &editor))).await;
     assert_eq!(response.status(), StatusCode::CREATED);
 
     let response = admin
         .clone()
-        .oneshot(reload(Some(basic("editor", "synthetic-editor"))))
+        .oneshot(reload(Some(basic("editor", &editor))))
         .await
         .expect("response");
     assert_eq!(response.status(), StatusCode::FORBIDDEN, "no admin scope");
     let response = admin
-        .oneshot(reload(Some(basic("sync", "synthetic-sync"))))
+        .oneshot(reload(Some(basic("sync", &sync))))
         .await
         .expect("response");
     assert_eq!(response.status(), StatusCode::OK);
