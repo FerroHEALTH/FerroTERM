@@ -388,9 +388,10 @@ const fn diagnostics(refusal: &Refusal) -> (&'static str, &'static str) {
             "security",
             "the Authorization header carries no single credential",
         ),
-        Refusal::Forbidden | Refusal::Unclassified => {
-            ("forbidden", "the credential does not permit this request")
-        }
+        Refusal::Forbidden | Refusal::Unclassified => (
+            "forbidden",
+            "the credential carries no scope that permits this request",
+        ),
         Refusal::Unavailable => (
             "transient",
             "the credential could not be checked: the authorization server's keys could not be read",
