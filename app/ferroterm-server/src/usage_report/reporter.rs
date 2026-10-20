@@ -249,7 +249,7 @@ impl Reporter {
         serving: Serving,
         started: Instant,
     ) -> Result<Self, ReportError> {
-        if !crate::smart::discovery::secure(&config.endpoint) {
+        if !crate::usage_report::config::secure(&config.endpoint) {
             return Err(ReportError::NotSecure(config.endpoint.clone()));
         }
         let mut http = HttpConnector::new();

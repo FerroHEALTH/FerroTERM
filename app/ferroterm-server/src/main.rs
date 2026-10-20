@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use clap::Parser;
 use ferroterm_server::cli::{Cli, Command};
-use ferroterm_server::config::{ADMIN_LISTEN_ENV, Config, INDEX_ENV, LISTEN_ENV, OIDC_ISSUER_ENV};
+use ferroterm_server::config::{ADMIN_LISTEN_ENV, Config, INDEX_ENV, LISTEN_ENV};
 use ferroterm_server::reload::Serving;
 use ferroterm_server::smart::Smart;
 use ferroterm_server::state::AppState;
@@ -98,18 +98,27 @@ async fn run(config: Config, started: std::time::Instant) -> anyhow::Result<()> 
             "serving code system"
         );
     }
-    // The issuer is read before the listener binds, so a server that cannot
-    // check a token never answers on a surface it has declared protected.
+    // The issuers are read before the listener binds, so a server that cannot
+    // check a credential never answers on a surface it has declared protected.
     let smart = Smart::start(&config)
         .await
-        .with_context(|| format!("reading the OIDC issuer named by {OIDC_ISSUER_ENV}"))?
+        .context("starting the resource server [auth] names")?
         .map(Arc::new);
-    if let Some(smart) = &smart {
-        tracing::info!(
+    match &smart {
+        Some(smart) => tracing::info!(
             issuer = smart.issuer(),
             token_endpoint = smart.token_endpoint(),
-            "requiring a SMART bearer token on the write routes"
-        );
+            admin_scope = smart.admin_scope(),
+            "requiring a credential on the write routes and the admin listener"
+        ),
+        None if !config.auth.enabled
+            && (config.resources.is_some() || config.admin_listen.is_some()) =>
+        {
+            tracing::warn!(
+                "[auth] is off: the write routes and the admin listener authenticate no caller"
+            );
+        }
+        None => {}
     }
     let listener = TcpListener::bind(&config.listen)
         .await

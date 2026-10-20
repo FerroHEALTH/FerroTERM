@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use axum::Router;
 use axum::body::Body;
+use ferrohealth_smart::config::{AuthSection, IssuerKey};
 use ferroterm_server::config::Config;
 use ferroterm_server::reload::Serving;
 use ferroterm_server::state::AppState;
@@ -11,31 +12,33 @@ use http::{Request, Response, StatusCode};
 use serde_json::Value;
 use tower::ServiceExt;
 
-/// What a test's SMART gate is configured with.
+/// The audience a test token names unless the test says otherwise.
+pub(crate) const AUDIENCE: &str = "ferroterm";
+
+/// What a test's resource server is configured with: the `[auth]` table and
+/// the base URL.
 ///
-/// Every member but the issuer stays unset when a test names none, which is
-/// what an unset environment variable gives. There is no `Default`: an empty
-/// issuer is a configuration the server refuses to start on, so the issuer is
-/// named through [`SmartSetup::for_issuer`] and the rest is spread over it.
+/// There is no `Default`: `[auth]` without an issuer is a configuration the
+/// server refuses to start a guarded surface on, so the issuer is named
+/// through [`SmartSetup::for_issuer`] and the rest is spread over it.
 #[derive(Debug)]
 pub(crate) struct SmartSetup {
-    /// `FERROTERM_OIDC_ISSUER`, the issuer whose tokens the gate accepts.
-    pub(crate) issuer: String,
-    /// `FERROTERM_OIDC_AUDIENCE`.
-    pub(crate) audience: Option<String>,
-    /// `FERROTERM_OIDC_ADMIN_SCOPE`.
-    pub(crate) admin_scope: Option<String>,
+    /// The `[auth]` table.
+    pub(crate) auth: AuthSection,
     /// `FERROTERM_BASE_URL`, the address clients reach this server at.
     pub(crate) base_url: Option<String>,
 }
 
 impl SmartSetup {
-    /// The gate of `issuer`, with everything else unset.
+    /// The `[auth]` table of `issuer` with the audience [`AUDIENCE`], and
+    /// everything else at its default.
     pub(crate) fn for_issuer(issuer: &str) -> Self {
         Self {
-            issuer: issuer.to_owned(),
-            audience: None,
-            admin_scope: None,
+            auth: AuthSection {
+                issuer: IssuerKey::Flat(issuer.to_owned()),
+                audience: vec![String::from(AUDIENCE)],
+                ..AuthSection::default()
+            },
             base_url: None,
         }
     }
@@ -207,47 +210,51 @@ impl Server {
         Self::assembled(Arc::new(dir), config)
     }
 
-    /// The edition with a resource database and a SMART gate over its writes.
+    /// The edition with a resource database, an admin listener and a resource
+    /// server over both.
     ///
-    /// `audience` and `admin_scope` stay unset when the test names none, which
-    /// is what an unset environment variable gives; everything else is what
+    /// The audience is [`AUDIENCE`] and the admin scope the default product
+    /// scope when the test names none; everything else is what
     /// [`Server::start_persisting`] loads.
     pub(crate) async fn start_persisting_with_smart(
         issuer: &str,
         audience: Option<&str>,
         admin_scope: Option<&str>,
     ) -> Self {
-        Self::start_persisting_with_smart_setup(SmartSetup {
-            audience: audience.map(str::to_owned),
-            admin_scope: admin_scope.map(str::to_owned),
-            ..SmartSetup::for_issuer(issuer)
-        })
-        .await
+        let mut setup = SmartSetup::for_issuer(issuer);
+        if let Some(audience) = audience {
+            setup.auth.audience = vec![audience.to_owned()];
+        }
+        if let Some(scope) = admin_scope {
+            setup.auth.product_scope = scope.to_owned();
+        }
+        Self::start_persisting_with_smart_setup(setup).await
+    }
+
+    /// The configuration of that server under `setup`, over the edition
+    /// written into `dir`.
+    pub(crate) fn smart_config(dir: &std::path::Path, setup: SmartSetup) -> Config {
+        let SmartSetup { auth, base_url } = setup;
+        ferroterm_testkit::snomed::write(dir).expect("writes the edition");
+        let fhir = dir.join("fhir");
+        std::fs::create_dir_all(&fhir).expect("creates");
+        ferroterm_testkit::fhir::write_code_systems(&fhir).expect("writes the resources");
+        Config {
+            index: vec![dir.to_path_buf()],
+            code_systems: vec![fhir],
+            resources: Some(dir.join("resources.redb")),
+            base_url,
+            // The listener is never bound here; naming it builds the admin gate.
+            admin_listen: Some(String::from("127.0.0.1:0")),
+            auth,
+            ..Config::default()
+        }
     }
 
     /// The same server, configured by `setup`.
     pub(crate) async fn start_persisting_with_smart_setup(setup: SmartSetup) -> Self {
-        let SmartSetup {
-            issuer,
-            audience,
-            admin_scope,
-            base_url,
-        } = setup;
         let dir = tempfile::tempdir().expect("tempdir");
-        ferroterm_testkit::snomed::write(dir.path()).expect("writes the edition");
-        let fhir = dir.path().join("fhir");
-        std::fs::create_dir_all(&fhir).expect("creates");
-        ferroterm_testkit::fhir::write_code_systems(&fhir).expect("writes the resources");
-        let config = Config {
-            index: vec![dir.path().to_path_buf()],
-            code_systems: vec![fhir],
-            resources: Some(dir.path().join("resources.redb")),
-            base_url,
-            oidc_issuer: Some(issuer),
-            oidc_audience: audience,
-            oidc_admin_scope: admin_scope.unwrap_or_else(|| Config::default().oidc_admin_scope),
-            ..Config::default()
-        };
+        let config = Self::smart_config(dir.path(), setup);
         let smart = ferroterm_server::smart::Smart::start(&config)
             .await
             .expect("the issuer answers")

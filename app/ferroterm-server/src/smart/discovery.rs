@@ -1,323 +1,262 @@
-//! The issuer's OpenID Connect discovery document, and the HTTPS fetch under it.
+//! The SMART discovery document of this server, built from the issuer's
+//! metadata as `ferrohealth-smart` read it.
 //!
-//! An OpenID Connect issuer publishes its metadata at
-//! `{issuer}/.well-known/openid-configuration`, and the document names the
-//! endpoints and the JWKS this server needs
-//! (<https://openid.net/specs/openid-connect-discovery-1_0.html>, §4).
+//! The document is this server's own assertion about itself
+//! (<https://hl7.org/fhir/smart-app-launch/conformance.html>), so a value the
+//! specification does not define for a member is dropped rather than passed
+//! through from the issuer. It stays here, beside the crate's own builder, for
+//! two members a terminology server states differently: `issuer` appears only
+//! where `sso-openid-connect` is claimed, and `permission-patient` is never
+//! claimed, because a `patient/` scope writes nothing on this server.
 
-use std::time::Duration;
+use ferrohealth_smart::metadata::ServerMetadata;
 
-use axum::body::Body;
-use http::{Request, StatusCode};
-use hyper_util::client::legacy::Client;
-use hyper_util::client::legacy::connect::HttpConnector;
-use hyper_util::rt::TokioExecutor;
+/// The grant the authorization code flow of a standalone launch runs on
+/// (<https://hl7.org/fhir/smart-app-launch/app-launch.html>).
+const AUTHORIZATION_CODE: &str = "authorization_code";
 
-/// The path an OpenID Connect issuer publishes its metadata at
-/// (<https://openid.net/specs/openid-connect-discovery-1_0.html>, §4).
-pub const DISCOVERY_PATH: &str = ".well-known/openid-configuration";
+/// The grant types the SMART discovery document names as its options.
+const GRANT_TYPES: [&str; 2] = [AUTHORIZATION_CODE, "client_credentials"];
 
-/// How long one fetch of the discovery document or the JWKS may take.
+/// The client authentication methods the SMART discovery document names as its
+/// options.
+const TOKEN_ENDPOINT_AUTH_METHODS: [&str; 3] = [
+    "client_secret_post",
+    "client_secret_basic",
+    "private_key_jwt",
+];
+
+/// The PKCE methods the SMART discovery document publishes.
 ///
-/// No specification governs the bound: our own design, sized so a slow issuer
-/// refuses the start with a reason instead of hanging the process.
-pub const TIMEOUT: Duration = Duration::from_secs(10);
+/// "SMART servers SHALL support the `S256` `code_challenge_method` and SHALL
+/// NOT support the `plain` method", so the list is this one whatever the issuer
+/// advertises; `S256` is the SHA-256 challenge of RFC 7636 §4.2
+/// (<https://hl7.org/fhir/smart-app-launch/app-launch.html>).
+const CODE_CHALLENGE_METHODS: [&str; 1] = ["S256"];
 
-/// The grant types an issuer that omits `grant_types_supported` runs.
-///
-/// OpenID Connect Discovery 1.0 §3: "If omitted, the default value is
-/// `["authorization_code", "implicit"]`."
-const DEFAULT_GRANT_TYPES: [&str; 2] = ["authorization_code", "implicit"];
+/// The scope an issuer advertises when it mints an identity token
+/// (<https://openid.net/specs/openid-connect-core-1_0.html>, §3.1.2.1).
+const OPENID: &str = "openid";
 
-/// The client authentication an issuer that omits
-/// `token_endpoint_auth_methods_supported` runs.
-///
-/// OpenID Connect Discovery 1.0 §3: "If omitted, the default is
-/// `client_secret_basic`".
-const DEFAULT_TOKEN_ENDPOINT_AUTH_METHODS: [&str; 1] = ["client_secret_basic"];
-
-/// The largest metadata document this server reads.
-///
-/// No specification governs the bound: our own design. A JWKS holds a handful
-/// of public keys, so a megabyte is already generous.
-const MAX_BODY: usize = 1 << 20;
-
-/// A document the issuer did not give.
-#[derive(Debug, thiserror::Error)]
-pub enum FetchError {
-    /// The HTTPS client does not build, because the platform trust store does
-    /// not open.
-    #[error("cannot build the HTTPS client for the issuer")]
-    Client {
-        /// The cause.
-        #[source]
-        source: std::io::Error,
-    },
-    /// The URL does not parse.
-    #[error("{url} is not a URL")]
-    Url {
-        /// The URL as given.
-        url: String,
-        /// The cause.
-        #[source]
-        source: http::Error,
-    },
-    /// The request did not complete.
-    #[error("cannot reach {url}")]
-    Request {
-        /// The URL asked for.
-        url: String,
-        /// The cause.
-        #[source]
-        source: hyper_util::client::legacy::Error,
-    },
-    /// No answer arrived within [`TIMEOUT`].
-    #[error("{url} did not answer within {timeout:?}")]
-    Timeout {
-        /// The URL asked for.
-        url: String,
-        /// How long the fetch waited.
-        timeout: Duration,
-    },
-    /// The issuer answered something other than `200 OK`.
-    #[error("{url} answered {status}")]
-    Status {
-        /// The URL asked for.
-        url: String,
-        /// The status it answered.
-        status: StatusCode,
-    },
-    /// The body does not read, or exceeds the size this server accepts.
-    #[error("cannot read the body of {url}")]
-    Body {
-        /// The URL asked for.
-        url: String,
-        /// The cause.
-        #[source]
-        source: axum::Error,
-    },
-    /// The body is not the JSON document this server expects.
-    #[error("{url} did not answer the expected JSON document")]
-    Parse {
-        /// The URL asked for.
-        url: String,
-        /// The cause.
-        #[source]
-        source: serde_json::Error,
-    },
-    /// The document names an issuer other than the one it was fetched from.
-    #[error("{url} declares the issuer `{declared}`, which is not `{configured}`")]
-    IssuerMismatch {
-        /// The URL asked for.
-        url: String,
-        /// The issuer the document declares.
-        declared: String,
-        /// The issuer the deployment configured.
-        configured: String,
-    },
-    /// A URL that decides who may write arrives over cleartext HTTP.
-    #[error("{url} is not an https URL, and only a loopback issuer may be plain HTTP")]
-    NotSecure {
-        /// The URL as given.
-        url: String,
-    },
+/// The members of `advertised` that `options` admits, in the order `options`
+/// fixes them.
+fn only(advertised: &[String], options: &[&str]) -> Vec<String> {
+    options
+        .iter()
+        .filter(|option| advertised.iter().any(|value| value == *option))
+        .map(|option| (*option).to_owned())
+        .collect()
 }
 
-/// `values` as owned strings.
-fn owned(values: &[&str]) -> Vec<String> {
-    values.iter().map(|value| (*value).to_owned()).collect()
+/// Whether the issuer runs the authorization code flow a standalone launch
+/// needs (<https://hl7.org/fhir/smart-app-launch/app-launch.html>).
+fn standalone_launch(metadata: &ServerMetadata) -> bool {
+    metadata.authorization_endpoint.is_some()
+        && metadata
+            .grant_types()
+            .iter()
+            .any(|grant| grant == AUTHORIZATION_CODE)
 }
 
-/// Whether `url` may be fetched: `https`, or plain HTTP on the loopback host.
+/// Whether the issuer offers the OpenID Connect profile the
+/// `sso-openid-connect` capability rests on.
+fn openid_connect(metadata: &ServerMetadata) -> bool {
+    metadata
+        .scopes_supported
+        .iter()
+        .flatten()
+        .any(|scope| scope == OPENID)
+}
+
+/// The SMART capabilities the deployment offers, sorted: the ones read off
+/// the issuer's metadata and `added`, the ones `[auth] capabilities` names.
 ///
-/// OpenID Connect Discovery 1.0 §7.1 requires TLS on the issuer's endpoints,
-/// and §3 says `jwks_uri` "MUST use the https scheme", because these bytes
-/// decide which signatures this server trusts. A loopback issuer is the one
-/// place the transport cannot be observed, and a test issuer is that. The
-/// usage report holds its collector to the same rule.
-pub(crate) fn secure(url: &str) -> bool {
-    if url.starts_with("https://") {
-        return true;
+/// The scope syntaxes are this server's own; every other capability is claimed
+/// only where the issuer advertises what it rests on
+/// (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
+#[must_use]
+pub fn capabilities(metadata: &ServerMetadata, added: &[String]) -> Vec<String> {
+    let methods = metadata.token_endpoint_auth_methods();
+    // NOTE: `permission-v2` is exemplified only by the search-parameter
+    // syntax this server refuses, so withholding it is our own reading
+    // (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
+    let mut out = vec![
+        String::from("permission-v1"),
+        String::from("permission-user"),
+    ];
+    if standalone_launch(metadata) {
+        out.push(String::from("launch-standalone"));
     }
-    let Some(rest) = url.strip_prefix("http://") else {
-        return false;
-    };
-    let authority = rest.split(['/', '?', '#']).next().unwrap_or(rest);
-    // An IPv6 literal is bracketed, so its colons are not the port separator
-    // (RFC 3986 §3.2.2).
-    let host = match authority.split_once(']') {
-        Some((bracketed, _)) => bracketed.strip_prefix('[').unwrap_or(bracketed),
-        None => authority.split(':').next().unwrap_or(authority),
-    };
-    matches!(host, "localhost" | "127.0.0.1" | "::1")
-}
-
-/// The issuer metadata this server reads.
-///
-/// Only the members the SMART discovery document and the token check need are
-/// modelled; the issuer may publish more
-/// (<https://openid.net/specs/openid-connect-discovery-1_0.html>, §3).
-#[derive(Debug, Clone, serde::Deserialize)]
-pub struct IssuerMetadata {
-    /// `issuer`: the issuer identifier every token must claim.
-    pub issuer: String,
-    /// `jwks_uri`: where the signing keys are published (RFC 7517).
-    pub jwks_uri: String,
-    /// `authorization_endpoint`, absent from an issuer that runs no
-    /// authorization code flow.
-    ///
-    /// OpenID Connect Discovery 1.0 §3 makes it required, and an authorization
-    /// server that only mints Backend Services tokens has none, so the absence
-    /// is read rather than refused.
-    #[serde(default)]
-    pub authorization_endpoint: Option<String>,
-    /// `token_endpoint`: where a client obtains an access token.
-    pub token_endpoint: String,
-    /// `registration_endpoint`, when the issuer registers clients dynamically.
-    #[serde(default)]
-    pub registration_endpoint: Option<String>,
-    /// `introspection_endpoint` (RFC 7662), when the issuer offers one.
-    #[serde(default)]
-    pub introspection_endpoint: Option<String>,
-    /// `revocation_endpoint` (RFC 7009), when the issuer offers one.
-    #[serde(default)]
-    pub revocation_endpoint: Option<String>,
-    /// `grant_types_supported`.
-    #[serde(default)]
-    pub grant_types_supported: Vec<String>,
-    /// `scopes_supported`.
-    #[serde(default)]
-    pub scopes_supported: Vec<String>,
-    /// `response_types_supported`.
-    #[serde(default)]
-    pub response_types_supported: Vec<String>,
-    /// `token_endpoint_auth_methods_supported`.
-    #[serde(default)]
-    pub token_endpoint_auth_methods_supported: Vec<String>,
-    /// `code_challenge_methods_supported` (RFC 7636).
-    #[serde(default)]
-    pub code_challenge_methods_supported: Vec<String>,
-}
-
-/// The HTTPS client this server asks the issuer with.
-///
-/// It is built once, so the connection pool and the trust store survive across
-/// the discovery fetch and every later JWKS refresh.
-pub struct Http {
-    client: Client<hyper_rustls::HttpsConnector<HttpConnector>, Body>,
-}
-
-impl std::fmt::Debug for Http {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Http").finish_non_exhaustive()
+    if openid_connect(metadata) {
+        out.push(String::from("sso-openid-connect"));
     }
-}
-
-impl Http {
-    /// Builds the client over the platform's trust store.
-    ///
-    /// The trust store is the platform's, so a deployment whose issuer runs
-    /// under a private certificate authority installs that authority in the
-    /// image and needs nothing else here.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`FetchError::Client`] when the trust store does not open.
-    pub fn new() -> Result<Self, FetchError> {
-        let roots = hyper_rustls::HttpsConnectorBuilder::new()
-            .with_native_roots()
-            .map_err(|source| FetchError::Client { source })?;
-        // NOTE: `https_or_http` keeps a plain-HTTP issuer reachable, which is
-        // what a test issuer and a loopback issuer are
-        // (<https://docs.rs/hyper-rustls/0.27/hyper_rustls/struct.HttpsConnectorBuilder.html>).
-        let connector = roots.https_or_http().enable_http1().build();
-        Ok(Self {
-            client: Client::builder(TokioExecutor::new()).build(connector),
-        })
+    if methods.iter().any(|method| method == "private_key_jwt") {
+        out.push(String::from("client-confidential-asymmetric"));
     }
-
-    /// Fetches `url` and parses the JSON document it answers.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`FetchError`] when the URL is not `https` (or loopback), does
-    /// not parse, the request fails or exceeds [`TIMEOUT`], the answer is not
-    /// `200 OK`, or the body is not the document this server expects.
-    pub async fn json<T>(&self, url: &str) -> Result<T, FetchError>
-    where
-        T: serde::de::DeserializeOwned,
+    if methods
+        .iter()
+        .any(|method| method == "client_secret_basic" || method == "client_secret_post")
     {
-        if !secure(url) {
-            return Err(FetchError::NotSecure {
-                url: url.to_owned(),
-            });
+        out.push(String::from("client-confidential-symmetric"));
+    }
+    if methods.iter().any(|method| method == "none") {
+        out.push(String::from("client-public"));
+    }
+    for capability in added {
+        if !out.contains(capability) {
+            out.push(capability.clone());
         }
-        let request = Request::get(url)
-            .header(http::header::ACCEPT, "application/json")
-            .body(Body::empty())
-            .map_err(|source| FetchError::Url {
-                url: url.to_owned(),
-                source,
-            })?;
-        let response = tokio::time::timeout(TIMEOUT, self.client.request(request))
-            .await
-            .map_err(|_elapsed| FetchError::Timeout {
-                url: url.to_owned(),
-                timeout: TIMEOUT,
-            })?
-            .map_err(|source| FetchError::Request {
-                url: url.to_owned(),
-                source,
-            })?;
-        let status = response.status();
-        if status != StatusCode::OK {
-            return Err(FetchError::Status {
-                url: url.to_owned(),
-                status,
-            });
+    }
+    out.sort();
+    out
+}
+
+/// The `.well-known/smart-configuration` document of the deployment.
+///
+/// The members are the issuer's, with `capabilities` derived from what the
+/// issuer advertises; `token_endpoint`, `grant_types_supported`,
+/// `capabilities`, and `code_challenge_methods_supported` are the required
+/// ones (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
+/// `scopes_supported` lists the scopes `[auth] scopes_supported` names,
+/// because "the server SHALL support all scopes listed here", and never the
+/// issuer's own list.
+#[must_use]
+pub fn document(
+    metadata: &ServerMetadata,
+    token_endpoint: &str,
+    scopes_supported: &[String],
+    added: &[String],
+) -> serde_json::Value {
+    let mut document = serde_json::Map::new();
+    let mut put = |name: &str, value: serde_json::Value| {
+        document.insert(name.to_owned(), value);
+    };
+    let capabilities = capabilities(metadata, added);
+    // NOTE: `issuer` is required where `sso-openid-connect` is claimed and
+    // omitted otherwise
+    // (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
+    if capabilities
+        .iter()
+        .any(|capability| capability == "sso-openid-connect")
+    {
+        put("issuer", metadata.issuer.as_str().into());
+    }
+    if let Some(jwks_uri) = &metadata.jwks_uri {
+        put("jwks_uri", jwks_uri.as_str().into());
+    }
+    put("token_endpoint", token_endpoint.into());
+    put(
+        "grant_types_supported",
+        only(&metadata.grant_types(), &GRANT_TYPES).into(),
+    );
+    put("capabilities", capabilities.into());
+    // NOTE: the member is required and `S256` is a SHALL in it, so the
+    // server states its own PKCE support rather than the issuer's list
+    // (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
+    put(
+        "code_challenge_methods_supported",
+        CODE_CHALLENGE_METHODS
+            .iter()
+            .map(|method| (*method).to_owned())
+            .collect::<Vec<_>>()
+            .into(),
+    );
+    for (name, endpoint) in [
+        ("authorization_endpoint", &metadata.authorization_endpoint),
+        ("registration_endpoint", &metadata.registration_endpoint),
+        ("introspection_endpoint", &metadata.introspection_endpoint),
+        ("revocation_endpoint", &metadata.revocation_endpoint),
+    ] {
+        if let Some(endpoint) = endpoint {
+            put(name, endpoint.as_str().into());
         }
-        let bytes = axum::body::to_bytes(Body::new(response.into_body()), MAX_BODY)
-            .await
-            .map_err(|source| FetchError::Body {
-                url: url.to_owned(),
-                source,
-            })?;
-        serde_json::from_slice(&bytes).map_err(|source| FetchError::Parse {
-            url: url.to_owned(),
-            source,
-        })
+    }
+    let authentication = only(
+        &metadata.token_endpoint_auth_methods(),
+        &TOKEN_ENDPOINT_AUTH_METHODS,
+    );
+    for (name, values) in [
+        ("scopes_supported", scopes_supported.to_vec()),
+        (
+            "response_types_supported",
+            metadata
+                .response_types_supported
+                .clone()
+                .unwrap_or_default(),
+        ),
+        ("token_endpoint_auth_methods_supported", authentication),
+    ] {
+        if !values.is_empty() {
+            put(name, values.into());
+        }
+    }
+    serde_json::Value::Object(document)
+}
+
+#[cfg(test)]
+mod tests {
+    use ferrohealth_smart::metadata::ServerMetadata;
+
+    use super::{capabilities, document};
+
+    fn metadata() -> ServerMetadata {
+        ServerMetadata {
+            issuer: String::from("https://as.example.org"),
+            ..ServerMetadata::default()
+        }
     }
 
-    /// Fetches the discovery document of `issuer` and checks it names `issuer`.
-    ///
-    /// The issuer identifier in the document has to be the one the document was
-    /// fetched under, so a redirected or mistyped issuer refuses the start
-    /// instead of validating tokens from somewhere else
-    /// (<https://openid.net/specs/openid-connect-discovery-1_0.html>, §4.3).
-    ///
-    /// # Errors
-    ///
-    /// Returns [`FetchError`] when the document does not arrive, does not
-    /// parse, or declares another issuer.
-    pub async fn discover(&self, issuer: &str) -> Result<IssuerMetadata, FetchError> {
-        let url = format!("{}/{DISCOVERY_PATH}", issuer.trim_end_matches('/'));
-        let mut metadata: IssuerMetadata = self.json(&url).await?;
-        if metadata.issuer.trim_end_matches('/') != issuer.trim_end_matches('/') {
-            return Err(FetchError::IssuerMismatch {
-                url,
-                declared: metadata.issuer,
-                configured: issuer.to_owned(),
-            });
-        }
-        // NOTE: an omitted member means its documented default, not an issuer
-        // that supports nothing (OpenID Connect Discovery 1.0 §3).
-        if metadata.grant_types_supported.is_empty() {
-            metadata.grant_types_supported = owned(&DEFAULT_GRANT_TYPES);
-        }
-        if metadata.token_endpoint_auth_methods_supported.is_empty() {
-            metadata.token_endpoint_auth_methods_supported =
-                owned(&DEFAULT_TOKEN_ENDPOINT_AUTH_METHODS);
-        }
-        Ok(metadata)
+    // A terminology server holds no patient record, so a `patient/` scope
+    // writes nothing here and the capability that promises them is withheld.
+    #[test]
+    fn permission_patient_is_never_claimed() {
+        let claimed = capabilities(&metadata(), &[]);
+        assert!(
+            !claimed.iter().any(|c| c == "permission-patient"),
+            "{claimed:?}"
+        );
+        assert!(claimed.iter().any(|c| c == "permission-v1"));
+    }
+
+    // Additional capabilities are listed as `[auth] capabilities` names them
+    // (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
+    #[test]
+    fn a_configured_capability_is_added_once() {
+        let added = [String::from("launch-ehr"), String::from("permission-v1")];
+        let claimed = capabilities(&metadata(), &added);
+        assert_eq!(
+            claimed.iter().filter(|c| *c == "permission-v1").count(),
+            1,
+            "{claimed:?}"
+        );
+        assert!(claimed.iter().any(|c| c == "launch-ehr"));
+    }
+
+    // The server SHALL support every scope it lists, so the issuer's own list
+    // is never copied (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
+    #[test]
+    fn scopes_supported_is_the_configured_list_alone() {
+        let with_issuer_scopes = ServerMetadata {
+            scopes_supported: Some(vec![String::from("patient/*.rs")]),
+            ..metadata()
+        };
+        let none = document(
+            &with_issuer_scopes,
+            "https://as.example.org/token",
+            &[],
+            &[],
+        );
+        assert!(none.get("scopes_supported").is_none(), "{none}");
+        let listed = [String::from("system/CodeSystem.cud")];
+        let some = document(
+            &with_issuer_scopes,
+            "https://as.example.org/token",
+            &listed,
+            &[],
+        );
+        assert_eq!(
+            some["scopes_supported"],
+            serde_json::json!(["system/CodeSystem.cud"])
+        );
     }
 }

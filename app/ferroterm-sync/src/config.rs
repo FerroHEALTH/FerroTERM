@@ -11,6 +11,8 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
 
+use ferrohealth_smart::config::CredentialsSection;
+
 /// How a staged release reaches the served set.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -60,7 +62,7 @@ pub struct SourceConfig {
 }
 
 /// The whole configuration of one running service.
-#[derive(Debug, Clone, PartialEq, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
     /// The address the service's own admin listener binds.
@@ -95,6 +97,10 @@ pub struct Config {
     pub build_command: PathBuf,
     /// When a run starts by itself.
     pub schedule: ScheduleConfig,
+    /// The credential the reload call to the server's admin listener carries:
+    /// HTTP Basic with `user` and `password`, or the client credentials grant
+    /// under `oauth`; none when the table is empty.
+    pub server_admin_credentials: CredentialsSection,
     /// The sources a run reads, in the order they are configured.
     pub source: Vec<SourceConfig>,
 }
@@ -117,6 +123,7 @@ impl Default for Config {
             build_command: PathBuf::from("ferroterm-build"),
             schedule: ScheduleConfig::default(),
             source: Vec::new(),
+            server_admin_credentials: CredentialsSection::default(),
         }
     }
 }
@@ -221,9 +228,11 @@ mod tests {
     #[test]
     fn an_empty_file_is_the_default_deployment() -> Result<(), toml::de::Error> {
         let config: Config = toml::from_str("")?;
+        // The credentials table holds secrets and so compares by its `Debug`
+        // rendering, which redacts them.
         assert_eq!(
-            config,
-            Config::default(),
+            format!("{config:?}"),
+            format!("{:?}", Config::default()),
             "every key is optional and falls back to the image layout"
         );
         Ok(())

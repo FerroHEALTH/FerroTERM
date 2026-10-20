@@ -58,7 +58,10 @@ mounts the whole tree and writes to it as uid 65532.
 
 The overlay also sets `FERROTERM_ADMIN_LISTEN` on the server, because
 `POST /reload` on that listener is how the sync asks for the new release to be
-served.
+served. That listener is a guarded surface, so the server starts only once
+`[auth]` names an issuer, with `[server_admin_credentials]` in the sync
+configuration, or turns authentication off (see
+[Configuration](configuration.md#authentication)).
 
 `ferroterm-sync run-once` performs a single run and exits, which is what a
 first run and a cron-style deployment use.
@@ -84,6 +87,7 @@ not know is refused at start-up rather than ignored.
 | `webhook_url` | none | where one JSON summary per run is posted |
 | `timezone` | `UTC` | the zone a daily schedule is read in |
 | `build_command` | `ferroterm-build` | the offline build, on `PATH` or by path |
+| `[server_admin_credentials]` | none | the credential of the reload call (see [below](#the-credential-of-the-reload-call)) |
 
 A `[[source]]` entry names the add-on that reads a service and carries that
 add-on's own block:
@@ -114,8 +118,52 @@ An add-on whose service keeps resources behind its FHIR API lists that API by
 default; the NTS block takes `fhir_api = false` to keep a run to the feed and
 `fhir_api_url` to point at another endpoint.
 
-The file carries no credential. A source add-on reads its credentials from a
-file or from the environment, so this file is safe to commit and safe to show.
+The file carries no secret in clear. A source add-on reads its credentials from
+a file or from the environment, and the reload call reads its own from the
+files `[server_admin_credentials]` names, so this file is safe to commit and
+safe to show.
+
+### The credential of the reload call
+
+The server's admin listener requires a credential carrying its admin scope
+([Configuration](configuration.md#authentication)), and
+`[server_admin_credentials]` names the one the sync presents. It is HTTP Basic
+(RFC 7617), a user of the server's `[[auth.basic.users]]`:
+
+```toml
+[server_admin_credentials]
+user = "ferroterm-sync"
+password_file = "/run/secrets/sync-password"
+```
+
+or a token of the OAuth 2.0 client credentials grant (RFC 6749 §4.4) from the
+authorization server the server trusts, fetched before the call, kept until
+shortly before it expires, and fetched once more when the server answers
+`401`:
+
+```toml
+[server_admin_credentials.oauth]
+issuer = "https://auth.example.org/realms/tx"   # or token_endpoint = "…"
+client_id = "ferroterm-sync"
+client_secret_file = "/run/secrets/sync-client-secret"
+scope = "__ferroterm.admin"
+```
+
+| Key | Meaning | Default |
+|---|---|---|
+| `user`, `password` or `password_file` | the Basic credential; exactly one of the two secrets | none |
+| `oauth.issuer` or `oauth.token_endpoint` | where the token endpoint is read from, or the endpoint itself; exactly one | none |
+| `oauth.client_id` | the client at the authorization server | none |
+| `oauth.client_auth` | `client_secret_basic`, `client_secret_post` or `private_key_jwt` | `client_secret_basic` |
+| `oauth.client_secret` or `oauth.client_secret_file` | the client secret; exactly one | none |
+| `oauth.private_key_file`, `oauth.kid`, `oauth.assertion_alg` | the PEM key, `kid` and algorithm of a `private_key_jwt` assertion (RFC 7523) | the RFC 7638 thumbprint, the algorithm of the key |
+| `oauth.scope`, `oauth.resource`, `oauth.audience` | the token request's `scope`, RFC 8707 `resource` and `audience` parameters | none |
+| `oauth.refresh_margin_ms` | how long before the token expires a new one is fetched | `30000` |
+| `oauth.timeout_ms` | how long one call to the authorization server may take | `10000` |
+
+Basic and `oauth` exclude each other. With the table empty the call carries no
+credential, which only a server with `[auth]` turned off accepts. There is no
+static token.
 
 ## The schedule
 

@@ -150,9 +150,13 @@ serve() {
   pids+=("$!")
   await "http://127.0.0.1:$port/health" "$log"
 }
-serve 18080 "$work/server.log" FERROTERM_RESOURCES="$work/resources.redb"
+# The anonymous console writes through a server with [auth] off; the signed-in
+# one through a server that trusts the stub issuer, whose access tokens name
+# the audience `ferroterm` when the request names none.
+serve 18080 "$work/server.log" FERROTERM_RESOURCES="$work/resources.redb" \
+  FERROTERM_AUTH__ENABLED=false
 serve 18081 "$work/server-smart.log" FERROTERM_RESOURCES="$work/resources-smart.redb" \
-  FERROTERM_OIDC_ISSUER="$issuer"
+  FERROTERM_AUTH__ISSUER="$issuer" FERROTERM_AUTH__AUDIENCE='["ferroterm"]'
 
 console() {
   local port="$1" upstream="$2" log="$3"

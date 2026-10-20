@@ -73,8 +73,17 @@ serde_json = { version = "1.0.151", features = ["raw_value"] }
 # writer half is on. Checked against crates.io on
 # 2026-09-22.
 toml = { version = "1.1.6", default-features = false, features = ["std", "parse", "display", "serde"] }
-# Bearer-token validation for the optional SMART App Launch gate: an RFC 7519
-# JWT verified against the issuer's RFC 7517 JWKS. The `aws_lc_rs` backend is
+# The FerroHEALTH SMART and OAuth 2.0 resource-server crate: the token check,
+# the SMART scopes, the Basic users and the client credentials token of the
+# server and the sync service. Pinned exactly, as every family crate is.
+# Verified against crates.io on 2026-10-20.
+ferrohealth-smart = { version = "=0.1.1", features = ["axum"] }
+# The Argon2id hashes of the Basic users the SMART tests configure, the
+# version and features ferrohealth-smart verifies them with. Verified against
+# crates.io on 2026-10-20.
+argon2 = { version = "0.6.0", default-features = false, features = ["password-hash", "alloc"] }
+# The console checks the ID token it signs in with, and the SMART tests mint
+# the access tokens they present. The `aws_lc_rs` backend is
 # the one `rustls` already resolves to; the pure-Rust backend would add the
 # `rsa` crate, which carries an unresolved RustSec advisory. Checked against
 # crates.io on 2026-09-22.

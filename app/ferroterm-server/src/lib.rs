@@ -62,14 +62,18 @@ pub const FHIR_BASES: [&str; 4] = ["/r4", "/r4b", "/r5", "/r6"];
 pub fn router(serving: Serving) -> Router {
     // The gate sits inside each version's router, so the path it reads is the
     // one under the version prefix that `nest` leaves.
-    let gate = || axum::middleware::from_fn_with_state(serving.smart(), smart::guard::writes);
+    let smart = serving.smart();
+    let gated = |router: Router<Serving>, base: &'static str| match &smart {
+        Some(smart) => smart::guard::fhir(router, smart, base),
+        None => router,
+    };
     let [r4, r4b, r5, r6] = FHIR_BASES;
     Router::new()
         .route("/health", get(health))
-        .nest(r4, r4::router().layer(gate()))
-        .nest(r4b, r4b::router().layer(gate()))
-        .nest(r5, r5::router().layer(gate()))
-        .nest(r6, r6::router().layer(gate()))
+        .nest(r4, gated(r4::router(), r4))
+        .nest(r4b, gated(r4b::router(), r4b))
+        .nest(r5, gated(r5::router(), r5))
+        .nest(r6, gated(r6::router(), r6))
         .route("/metrics", get(metrics_scrape))
         .fallback(outcome::not_found)
         .layer(axum::middleware::from_fn_with_state(
@@ -115,9 +119,9 @@ where
 /// Serves the admin application ([`reload::router`]) on an already-bound
 /// listener until `shutdown` completes.
 ///
-/// The admin listener carries `POST /reload` and nothing of the FHIR surface.
-/// Without [`config::OIDC_ISSUER_ENV`] it authenticates nobody, so a deployment
-/// binds it to an address only its operators reach.
+/// The admin listener carries `POST /reload` and nothing of the FHIR surface,
+/// and every route on it requires the admin scope `[auth]` names, unless the
+/// deployment turned authentication off.
 ///
 /// # Errors
 ///

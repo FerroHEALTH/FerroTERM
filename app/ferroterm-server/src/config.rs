@@ -1,6 +1,9 @@
 //! Configuration: the environment in, a [`Config`] out.
 
-use std::path::PathBuf;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+
+use ferrohealth_smart::config::AuthSection;
 
 use crate::telemetry::{FILTER_ENV, FORMAT_ENV, FormatError, LogFormat};
 use crate::usage_report::config::UsageReportConfig;
@@ -11,8 +14,9 @@ pub const LISTEN_ENV: &str = "FERROTERM_LISTEN";
 ///
 /// The admin listener serves `POST /reload` and nothing else, on an address of
 /// its own so the FHIR surface never carries it. Unset means no admin listener
-/// and `SIGHUP` as the only reload trigger. Without [`OIDC_ISSUER_ENV`] it
-/// authenticates nobody, so a deployment keeps it on an internal address.
+/// and `SIGHUP` as the only reload trigger. It is a guarded surface: with it
+/// set, the server starts only once `[auth]` names an issuer or turns
+/// authentication off.
 pub const ADMIN_LISTEN_ENV: &str = "FERROTERM_ADMIN_LISTEN";
 /// The environment variable listing the artifact directories to serve,
 /// separated by the platform's path separator (`:` on Unix).
@@ -29,7 +33,8 @@ pub const CODESYSTEMS_ENV: &str = "FERROTERM_CODESYSTEMS";
 /// The `CodeSystem`, `ValueSet`, and `ConceptMap` resources written through the
 /// REST API live in this file, with the closure tables `$closure` maintains,
 /// and are served again after a restart. A deployment that names none refuses
-/// every write.
+/// every write. The writes are a guarded surface: with this set, the server
+/// starts only once `[auth]` names an issuer or turns authentication off.
 pub const RESOURCES_ENV: &str = "FERROTERM_RESOURCES";
 /// The environment variable naming the authentication in front of the server.
 ///
@@ -46,33 +51,27 @@ pub const SECURITY_SERVICE_ENV: &str = "FERROTERM_SECURITY_SERVICE";
 /// learns where to send the next request
 /// (<https://hl7.org/fhir/R4B/capabilitystatement-definitions.html#CapabilityStatement.implementation.url>).
 ///
-/// It is also what the SMART gate accepts as a token audience: every served
+/// It also widens the audiences the write routes accept: every served
 /// version's base under this URL, which is what a client sends as `aud`
-/// (<https://hl7.org/fhir/smart-app-launch/app-launch.html>). Setting it
-/// therefore turns the audience check on for the write routes.
+/// (<https://hl7.org/fhir/smart-app-launch/app-launch.html>), beside the
+/// `[auth] audience` list.
 pub const BASE_URL_ENV: &str = "FERROTERM_BASE_URL";
-/// The environment variable naming the OpenID Connect issuer to trust.
+/// The environment variable naming the TOML file that holds the `[auth]`
+/// table.
 ///
-/// Set, the server reads the issuer's discovery document and its key set at
-/// start, publishes `[base]/.well-known/smart-configuration` derived from that
-/// document, and requires a SMART bearer token on every write and on the admin
-/// listener (<https://hl7.org/fhir/smart-app-launch/conformance.html>). Unset,
-/// the server asks for no token and the whole surface answers as before.
-pub const OIDC_ISSUER_ENV: &str = "FERROTERM_OIDC_ISSUER";
-/// The environment variable naming one more audience a token may carry.
+/// The table is `ferrohealth-smart`'s `[auth]` section: the issuer or the
+/// `[[auth.issuer]]` entries, the audiences, the token rules, the product
+/// scope and the `[[auth.basic.users]]`. A file holds that one table and
+/// nothing else, and every `FERROTERM_AUTH__<KEY>` variable is applied over
+/// it. No specification governs the file: our own design.
+pub const AUTH_FILE_ENV: &str = "FERROTERM_AUTH_FILE";
+/// The prefix of an environment override of one `[auth]` key.
 ///
-/// The write routes accept it beside every served version's base derived from
-/// [`BASE_URL_ENV`], and the admin listener accepts it alone. A token whose
-/// `aud` holds none of them is refused (RFC 7519 §4.1.3). A deployment that
-/// names neither this nor a base URL checks no audience, and the issuer check
-/// alone bounds the token.
-pub const OIDC_AUDIENCE_ENV: &str = "FERROTERM_OIDC_AUDIENCE";
-/// The environment variable naming the scope the admin listener requires.
-///
-/// Its value is one scope string, compared verbatim against the scopes the
-/// token grants. No specification governs the admin surface, so the name is
-/// the deployment's own.
-pub const OIDC_ADMIN_SCOPE_ENV: &str = "FERROTERM_OIDC_ADMIN_SCOPE";
+/// The rest of the name is the key's path below `[auth]`, its segments
+/// separated by `__`: `FERROTERM_AUTH__ISSUER` for `issuer`,
+/// `FERROTERM_AUTH__AUDIENCE` for `audience`. The value reads as TOML syntax
+/// (`false`, `["a", "b"]`) or, when it is none, as the string it is.
+pub const AUTH_ENV_PREFIX: &str = "FERROTERM_AUTH__";
 /// The environment variable switching the usage report to `FerroPULSE` on or
 /// off.
 ///
@@ -113,7 +112,7 @@ pub const SECURITY_SERVICE_SYSTEM: &str =
     "http://terminology.hl7.org/CodeSystem/restful-security-service";
 
 /// What the server needs to start.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct Config {
     /// The socket address to bind.
     pub listen: String,
@@ -140,20 +139,14 @@ pub struct Config {
     /// The base URL clients reach this server at, without a version prefix
     /// and without a trailing slash; `None` when the deployment names none.
     pub base_url: Option<String>,
-    /// The OpenID Connect issuer whose tokens gate the writes; `None` when the
-    /// deployment names none and the server asks for no token.
-    pub oidc_issuer: Option<String>,
-    /// One more audience a token may carry, beside the version bases derived
-    /// from `base_url`; `None` when the deployment names none.
-    pub oidc_audience: Option<String>,
-    /// The scope the admin listener requires, compared verbatim.
-    pub oidc_admin_scope: String,
+    /// The `[auth]` table: who may write and reach the admin listener.
+    pub auth: AuthSection,
     /// The usage report to `FerroPULSE`.
     pub usage_report: UsageReportConfig,
 }
 
 /// A configuration value that does not parse.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
     /// `FERROTERM_LOG_FORMAT` names no format.
     #[error("{FORMAT_ENV}: {0}")]
@@ -175,6 +168,29 @@ pub enum ConfigError {
     /// `FERROTERM_DEPLOYMENT` names no deployment kind.
     #[error("{DEPLOYMENT_ENV}: `{0}` is none of `helm`, `compose`, `binary`, `unknown`")]
     Deployment(String),
+    /// The file `FERROTERM_AUTH_FILE` names cannot be read.
+    #[error("{AUTH_FILE_ENV}: {} cannot be read", path.display())]
+    AuthFile {
+        /// The file.
+        path: PathBuf,
+        /// What the file system reported.
+        #[source]
+        source: std::io::Error,
+    },
+    /// The `[auth]` table, the file with the overrides applied, does not read
+    /// as the section.
+    #[error("[auth] does not read as the auth section")]
+    Auth {
+        /// What the TOML reader reported.
+        #[source]
+        source: Box<toml::de::Error>,
+    },
+    /// The file holds a key outside the `[auth]` table.
+    #[error("{AUTH_FILE_ENV}: `{0}` is not the [auth] table, the one table the file holds")]
+    AuthKey(String),
+    /// An override names no key below `[auth]`, or a key that is no table.
+    #[error("`{0}` names no key below [auth]")]
+    AuthOverride(String),
 }
 
 impl Default for Config {
@@ -190,9 +206,7 @@ impl Default for Config {
             log_filter: String::from(crate::telemetry::DEFAULT_FILTER),
             security_services: Vec::new(),
             base_url: None,
-            oidc_issuer: None,
-            oidc_audience: None,
-            oidc_admin_scope: String::from("ferroterm/admin"),
+            auth: AuthSection::default(),
             usage_report: UsageReportConfig::default(),
         }
     }
@@ -229,22 +243,110 @@ impl Config {
             base_url: std::env::var(BASE_URL_ENV)
                 .ok()
                 .and_then(|url| base_url_of(&url)),
-            oidc_issuer: std::env::var(OIDC_ISSUER_ENV).ok().and_then(|url| {
-                let trimmed = url.trim().trim_end_matches('/');
-                (!trimmed.is_empty()).then(|| trimmed.to_owned())
-            }),
-            oidc_audience: std::env::var(OIDC_AUDIENCE_ENV)
-                .ok()
-                .map(|audience| audience.trim().to_owned())
-                .filter(|audience| !audience.is_empty()),
-            oidc_admin_scope: std::env::var(OIDC_ADMIN_SCOPE_ENV)
-                .ok()
-                .map(|scope| scope.trim().to_owned())
-                .filter(|scope| !scope.is_empty())
-                .unwrap_or(defaults.oidc_admin_scope),
+            auth: auth_from_env()?,
             usage_report: UsageReportConfig::from_lookup(|name| std::env::var(name).ok())?,
         })
     }
+}
+
+/// The `[auth]` table of the file `FERROTERM_AUTH_FILE` names, with every
+/// `FERROTERM_AUTH__` variable applied over it.
+///
+/// # Errors
+///
+/// Returns [`ConfigError::AuthFile`] when the named file cannot be read and
+/// every error [`auth_of`] returns.
+fn auth_from_env() -> Result<AuthSection, ConfigError> {
+    let text = match std::env::var_os(AUTH_FILE_ENV) {
+        None => None,
+        Some(path) => Some(read_auth_file(Path::new(&path))?),
+    };
+    let overrides: BTreeMap<String, String> = std::env::vars()
+        .filter(|(name, _)| name.starts_with(AUTH_ENV_PREFIX))
+        .collect();
+    auth_of(text.as_deref(), &overrides)
+}
+
+/// The text of the auth file at `path`.
+fn read_auth_file(path: &Path) -> Result<String, ConfigError> {
+    std::fs::read_to_string(path).map_err(|source| ConfigError::AuthFile {
+        path: path.to_path_buf(),
+        source,
+    })
+}
+
+/// The `[auth]` table `text` holds, with `overrides` applied over it.
+///
+/// Reading the sources and reading the process environment are separate so
+/// a test can state both: setting a variable needs `std::env::set_var`, which
+/// is unsafe in edition 2024 and this workspace forbids unsafe.
+///
+/// # Errors
+///
+/// Returns [`ConfigError::AuthKey`] for a file key outside `[auth]`,
+/// [`ConfigError::AuthOverride`] for an override that names no key below it,
+/// and [`ConfigError::Auth`] for a table that does not read as the section.
+pub fn auth_of(
+    text: Option<&str>,
+    overrides: &BTreeMap<String, String>,
+) -> Result<AuthSection, ConfigError> {
+    let mut file = match text {
+        None => toml::Table::new(),
+        Some(text) => toml::from_str(text).map_err(|source| ConfigError::Auth {
+            source: Box::new(source),
+        })?,
+    };
+    let mut table = match file.remove("auth") {
+        None => toml::Table::new(),
+        Some(toml::Value::Table(table)) => table,
+        Some(_) => return Err(ConfigError::AuthKey(String::from("auth"))),
+    };
+    if let Some(key) = file.keys().next() {
+        return Err(ConfigError::AuthKey(key.clone()));
+    }
+    for (name, raw) in overrides {
+        apply_override(&mut table, name, raw)?;
+    }
+    toml::Value::Table(table)
+        .try_into()
+        .map_err(|source| ConfigError::Auth {
+            source: Box::new(source),
+        })
+}
+
+/// Applies the override `name` = `raw` onto the `[auth]` `table`.
+fn apply_override(table: &mut toml::Table, name: &str, raw: &str) -> Result<(), ConfigError> {
+    let refused = || ConfigError::AuthOverride(name.to_owned());
+    let path = name.strip_prefix(AUTH_ENV_PREFIX).ok_or_else(refused)?;
+    let segments: Vec<String> = path.split("__").map(str::to_ascii_lowercase).collect();
+    let Some((key, parents)) = segments.split_last() else {
+        return Err(refused());
+    };
+    if key.is_empty() || parents.iter().any(String::is_empty) {
+        return Err(refused());
+    }
+    let mut cursor = table;
+    for parent in parents {
+        let entry = cursor
+            .entry(parent.clone())
+            .or_insert_with(|| toml::Value::Table(toml::Table::new()));
+        let toml::Value::Table(next) = entry else {
+            return Err(refused());
+        };
+        cursor = next;
+    }
+    cursor.insert(key.clone(), override_value(raw));
+    Ok(())
+}
+
+/// `raw` read as a TOML value, or as the string it is.
+fn override_value(raw: &str) -> toml::Value {
+    // NOTE: no specification governs this: our own design, the console's rule;
+    // text that is no TOML value is a plain string, so the failed parse is the answer.
+    toml::from_str::<toml::Table>(&format!("value = {raw}"))
+        .ok()
+        .and_then(|mut table| table.remove("value"))
+        .unwrap_or_else(|| toml::Value::String(raw.to_owned()))
 }
 
 /// The security services `FERROTERM_SECURITY_SERVICE` names, each a code of
@@ -303,7 +405,18 @@ fn base_url_of(value: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{ConfigError, base_url_of, services_of, switch_of};
+    use std::collections::BTreeMap;
+
+    use ferrohealth_smart::config::IssuerKey;
+
+    use super::{ConfigError, auth_of, base_url_of, services_of, switch_of};
+
+    fn overrides(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
+        pairs
+            .iter()
+            .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
+            .collect()
+    }
 
     #[test]
     fn a_security_service_list_admits_only_the_codes_the_value_set_defines() {
@@ -353,5 +466,64 @@ mod tests {
         );
         assert_eq!(base_url_of(""), None);
         assert_eq!(base_url_of("/"), None, "a slash alone names nothing");
+    }
+
+    #[test]
+    fn the_auth_file_holds_the_auth_table_and_the_environment_goes_over_it() {
+        let text = "[auth]\nissuer = \"https://as.example.org\"\naudience = [\"ferroterm\"]\n\n[[auth.basic.users]]\nuser = \"sync\"\npassword_hash_file = \"/run/secrets/sync\"\nscopes = [\"__ferroterm.admin\"]\n";
+        let auth = auth_of(
+            Some(text),
+            &overrides(&[
+                ("FERROTERM_AUTH__AUDIENCE", "[\"a\", \"b\"]"),
+                ("FERROTERM_AUTH__PRODUCT_SCOPE", "__ferroterm.reload"),
+            ]),
+        )
+        .expect("reads");
+        assert!(
+            matches!(&auth.issuer, IssuerKey::Flat(issuer) if issuer == "https://as.example.org")
+        );
+        assert_eq!(
+            auth.audience,
+            ["a", "b"],
+            "the environment wins over the file"
+        );
+        assert_eq!(auth.product_scope, "__ferroterm.reload");
+        let users = auth.basic.expect("the Basic table").users;
+        assert_eq!(users.len(), 1);
+        assert!(auth.enabled, "authentication is on unless it is turned off");
+    }
+
+    #[test]
+    fn no_file_and_no_override_is_the_default_section() {
+        let auth = auth_of(None, &BTreeMap::new()).expect("reads");
+        assert!(auth.enabled, "the default fails closed");
+        assert!(matches!(&auth.issuer, IssuerKey::Flat(issuer) if issuer.is_empty()));
+        let off =
+            auth_of(None, &overrides(&[("FERROTERM_AUTH__ENABLED", "false")])).expect("reads");
+        assert!(!off.enabled);
+    }
+
+    #[test]
+    fn a_key_outside_the_auth_table_or_unknown_inside_it_is_refused() {
+        assert!(matches!(
+            auth_of(Some("listen = \"x\"\n"), &BTreeMap::new()),
+            Err(ConfigError::AuthKey(key)) if key == "listen"
+        ));
+        assert!(matches!(
+            auth_of(Some("[auth]\nissuers = \"x\"\n"), &BTreeMap::new()),
+            Err(ConfigError::Auth { .. })
+        ));
+        assert!(matches!(
+            auth_of(None, &overrides(&[("FERROTERM_AUTH__ISUER", "x")])),
+            Err(ConfigError::Auth { .. })
+        ));
+        assert!(matches!(
+            auth_of(None, &overrides(&[("FERROTERM_AUTH__", "x")])),
+            Err(ConfigError::AuthOverride(_))
+        ));
+        assert!(matches!(
+            auth_of(None, &overrides(&[("FERROTERM_AUTH__REALM__X", "x"), ("FERROTERM_AUTH__REALM", "y")])),
+            Err(ConfigError::AuthOverride(name)) if name == "FERROTERM_AUTH__REALM__X"
+        ));
     }
 }
