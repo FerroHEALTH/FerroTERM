@@ -90,7 +90,7 @@ pub fn needed(method: &Method, path: &str) -> Option<Need> {
 ///
 /// The crate's layer admits a credential whose SMART scope grants the
 /// permission on the type; the `compartment` middleware refuses a grant that
-/// reaches only one patient's compartment; [`crate::smart::outcome`] writes the body
+/// reaches only one patient's compartment; [`Challenge`] writes the body
 /// of a refusal in the format the request asked for.
 pub fn fhir<S>(router: Router<S>, smart: &Smart, base: &'static str) -> Router<S>
 where
@@ -115,7 +115,6 @@ where
             compartment,
         ))
         .layer(AuthLayer::new(smart.fhir_gate().clone(), classify).with_render(render))
-        .layer(axum::middleware::from_fn(crate::smart::outcome))
 }
 
 /// Refuses a write whose grant reaches only a patient's compartment.
@@ -137,7 +136,8 @@ async fn compartment(
         })
     });
     if reached == Some(false) {
-        return render.render(&Refusal::Forbidden);
+        let (parts, _) = request.into_parts();
+        return render.render(&Refusal::Forbidden, &parts);
     }
     next.run(request).await
 }

@@ -1571,8 +1571,8 @@ async fn a_basic_user_writes_and_reloads_with_its_configured_scopes() {
 }
 
 // A refusal is an `OperationOutcome` in the format the request asked for
-// (<https://hl7.org/fhir/R4B/http.html#mime-type>), whatever the gate's
-// renderer can see.
+// (<https://hl7.org/fhir/R4B/http.html#mime-type>); the gate's renderer reads
+// the refused request's `Accept`.
 #[tokio::test]
 async fn a_refusal_answers_in_the_format_the_request_asked_for() {
     let key = SigningKey::generate("k1");
