@@ -41,6 +41,14 @@ Every source builds into the same layout, and the manifest names the system,
 so `FERROTERM_INDEX` takes any mix of them. When a new release arrives, rebuild
 its index and restart the server against it.
 
+Each command below names its output directory with `--out`. Give
+`--index-root DIR` (or set `FERROTERM_INDEX_ROOT`) instead, and the build
+writes a child of that root named for the source (`snomed`, `loinc`,
+`rxnorm`, ...) and refuses an `--out` outside it. The compose `build` service
+sets the root to its index mount (see
+[Where a build writes](install.md#where-a-build-writes)). Every build prints
+the absolute path it wrote.
+
 ## Loading a SNOMED CT edition
 
 The command takes the release zip as SNOMED International or your national

@@ -97,8 +97,15 @@ services:
   # every code system it knows builds through this one service. Run it once
   # per release:
   #
-  #   docker compose run --rm build --rf2 /releases/SnomedCT_Release.zip --out /data/index/snomed
-  #   docker compose run --rm build --loinc /releases/Loinc_2.82.zip --out /data/index/loinc
+  #   docker compose run --rm build --rf2 /releases/SnomedCT_Release.zip
+  #   docker compose run --rm build --loinc /releases/Loinc_2.83.zip
+  #
+  # Each writes a child of /data/index named for the source (snomed, loinc,
+  # ...), which is ${FERROTERM_INDEX_DIR:-./index}/snomed on the host, and
+  # prints the path. FERROTERM_INDEX_ROOT tells ferroterm-build that root:
+  # an `--out` outside it is refused, because the container's own filesystem
+  # is gone with `--rm`, and the service runs in /data/index, so a relative
+  # `--out loinc-2.83` lands on the mount too.
   #
   # FERROTERM_RELEASES_DIR names the directory, ./releases beside this file by
   # default. With no arguments the service prints ferroterm-build's help. A
@@ -109,8 +116,10 @@ services:
     profiles: [build]
     entrypoint: ["/usr/local/bin/ferroterm-build"]
     command: ["--help"]
+    working_dir: /data/index
     environment:
       TMPDIR: /tmp
+      FERROTERM_INDEX_ROOT: /data/index
     volumes:
       - type: bind
         source: ${FERROTERM_RELEASES_DIR:-./releases}

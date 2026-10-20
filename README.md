@@ -57,7 +57,8 @@ in `./releases` (any other code system builds the same way, with its own
 
 ```console
 $ curl -LO https://github.com/FerroHEALTH/FerroTERM/releases/latest/download/compose.yaml
-$ docker compose run --rm build --rf2 /releases/SnomedCT_Release.zip --out /data/index/snomed
+$ mkdir -p index
+$ docker compose run --rm build --rf2 /releases/SnomedCT_Release.zip
 $ docker compose up
 $ curl 'http://localhost:8080/r4b/CodeSystem/$lookup?system=http://snomed.info/sct&code=404684003&displayLanguage=nl'
 ```

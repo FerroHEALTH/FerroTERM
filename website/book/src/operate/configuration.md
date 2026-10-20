@@ -187,7 +187,8 @@ outside the root, then rename it in. `rename` is one atomic step
 a reload sees the new directory whole or not at all. The manifest is the marker
 that makes the directory an artifact, and `ferroterm-build` writes it after
 everything else, so a build straight into a root is picked up only once it has
-finished.
+finished. `ferroterm-build --index-root` writes straight into a root, one child
+per source.
 
 A root that holds no artifact serves nothing and logs `the index root holds no
 artifact`. A path that names nothing at all still refuses the start, and a

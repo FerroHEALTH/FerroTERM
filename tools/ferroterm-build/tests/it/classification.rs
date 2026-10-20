@@ -201,7 +201,8 @@ fn the_command_line_builds_claml_and_icd10cm_from_zips() {
         claml: Some(claml_zip),
         system: Some(CLAML_SYSTEM.to_owned()),
         claml_version: Some(String::from("2022")),
-        out: out.path().to_path_buf(),
+        out: Some(out.path().to_path_buf()),
+        index_root: None,
         ..no_input()
     })
     .expect("builds");
@@ -227,7 +228,8 @@ fn the_command_line_builds_claml_and_icd10cm_from_zips() {
     let out = tempfile::tempdir().expect("tempdir");
     let report = ferroterm_build::run(&ferroterm_build::Cli {
         icd10cm: vec![tables_zip, order_zip.clone()],
-        out: out.path().to_path_buf(),
+        out: Some(out.path().to_path_buf()),
+        index_root: None,
         ..no_input()
     })
     .expect("builds from two zips");
@@ -240,7 +242,8 @@ fn the_command_line_builds_claml_and_icd10cm_from_zips() {
         matches!(
             ferroterm_build::run(&ferroterm_build::Cli {
                 icd10cm: vec![order_zip],
-                out: out.path().to_path_buf(),
+                out: Some(out.path().to_path_buf()),
+                index_root: None,
                 ..no_input()
             }),
             Err(ferroterm_build::RunError::Icd10cm(_))
@@ -273,6 +276,7 @@ fn no_input() -> ferroterm_build::Cli {
         gstandaard_version: None,
         labcodeset: None,
         rxnorm_sources: Vec::new(),
-        out: std::path::PathBuf::new(),
+        out: None,
+        index_root: None,
     }
 }

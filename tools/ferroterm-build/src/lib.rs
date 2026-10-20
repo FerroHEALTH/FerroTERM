@@ -16,10 +16,11 @@ pub mod dhd;
 pub mod icd11;
 pub mod labcodeset;
 pub mod loinc;
+pub mod output;
 pub mod pipeline;
 pub mod rxnorm;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::Parser;
 
@@ -98,9 +99,12 @@ pub struct Cli {
     /// The `RxNorm` sources (`SAB`) whose names are kept beside the unrestricted `RXNORM` and `MTHSPL` (a full release under a UMLS licence).
     #[arg(long, value_name = "SAB", value_delimiter = ',', action = clap::ArgAction::Append, requires = "rxnorm")]
     pub rxnorm_sources: Vec<String>,
-    /// The directory to write the artifacts into.
+    /// The directory to write the artifacts into; a child of `--index-root` named for the source when absent.
     #[arg(long, value_name = "DIR")]
-    pub out: PathBuf,
+    pub out: Option<PathBuf>,
+    /// The index root the server reads: without `--out` the build writes under it, and an `--out` outside it is refused.
+    #[arg(long, value_name = "DIR", env = output::INDEX_ROOT_ENV)]
+    pub index_root: Option<PathBuf>,
 }
 
 /// Runs the build the CLI describes.
@@ -111,36 +115,50 @@ pub struct Cli {
 /// `RRF` tables of an `RxNorm` release) to a temporary directory that is
 /// removed when the build ends; a directory is read in place.
 ///
+/// The artifacts land in the directory [`output::output`] settles.
+///
+/// # Errors
+///
+/// Returns [`RunError::Output`] when no output directory can be settled, and
+/// the errors of [`run_into`].
+pub fn run(cli: &Cli) -> Result<Report, RunError> {
+    let out = output::output(cli)?;
+    run_into(cli, &out)
+}
+
+/// Runs the build the CLI describes into the directory `out`, ignoring the
+/// `--out` and `--index-root` of `cli`.
+///
 /// # Errors
 ///
 /// Returns [`RunError`] when the zip does not unpack, the release does not
 /// read, the edition cannot be identified, a layered package's module
 /// dependency is unmet, or an artifact cannot be written.
-pub fn run(cli: &Cli) -> Result<Report, RunError> {
-    if let Some(report) = run_labcodeset(cli)? {
+pub fn run_into(cli: &Cli, out: &Path) -> Result<Report, RunError> {
+    if let Some(report) = run_labcodeset(cli, out)? {
         return Ok(Report::Labcodeset(report));
     }
-    if let Some(reports) = run_gstandaard(cli)? {
+    if let Some(reports) = run_gstandaard(cli, out)? {
         return Ok(Report::Classifications(reports));
     }
-    if let Some(report) = run_classification(cli)? {
+    if let Some(report) = run_classification(cli, out)? {
         return Ok(Report::Classification(report));
     }
-    if let Some(reports) = run_icd11(cli)? {
+    if let Some(reports) = run_icd11(cli, out)? {
         return Ok(Report::Icd11(reports));
     }
-    if let Some(report) = run_rxnorm(cli)? {
+    if let Some(report) = run_rxnorm(cli, out)? {
         return Ok(Report::RxNorm(report));
     }
-    if let Some(report) = run_loinc(cli)? {
+    if let Some(report) = run_loinc(cli, out)? {
         return Ok(Report::Loinc(report));
     }
-    Ok(Report::Snomed(run_snomed(cli)?))
+    Ok(Report::Snomed(run_snomed(cli, out)?))
 }
 
 /// The Nederlandse Labcodeset build (`--labcodeset`), when the command line
 /// asks for one.
-fn run_labcodeset(cli: &Cli) -> Result<Option<labcodeset::Report>, RunError> {
+fn run_labcodeset(cli: &Cli, out: &Path) -> Result<Option<labcodeset::Report>, RunError> {
     let Some(labcodeset) = &cli.labcodeset else {
         return Ok(None);
     };
@@ -155,12 +173,12 @@ fn run_labcodeset(cli: &Cli) -> Result<Option<labcodeset::Report>, RunError> {
         labcodeset.clone()
     };
     let publication = ::labcodeset::read(&root)?;
-    Ok(Some(labcodeset::build(&publication, &cli.out)?))
+    Ok(Some(labcodeset::build(&publication, out)?))
 }
 
 /// The G-Standaard product ladder (`--gstandaard`), one report per rung, when
 /// the command line asks for one.
-fn run_gstandaard(cli: &Cli) -> Result<Option<Vec<classification::Report>>, RunError> {
+fn run_gstandaard(cli: &Cli, out: &Path) -> Result<Option<Vec<classification::Report>>, RunError> {
     let (Some(dir), Some(version)) = (&cli.gstandaard, &cli.gstandaard_version) else {
         return Ok(None);
     };
@@ -171,7 +189,7 @@ fn run_gstandaard(cli: &Cli) -> Result<Option<Vec<classification::Report>>, RunE
             classification,
             system,
             Some(version),
-            &cli.out.join(name),
+            &out.join(name),
         )?);
     }
     Ok(Some(reports))
@@ -179,7 +197,7 @@ fn run_gstandaard(cli: &Cli) -> Result<Option<Vec<classification::Report>>, RunE
 
 /// The ICD-11 builds (`--icd11`), one report per code system the cache holds,
 /// when the command line asks for one.
-fn run_icd11(cli: &Cli) -> Result<Option<Vec<icd11::Report>>, RunError> {
+fn run_icd11(cli: &Cli, out: &Path) -> Result<Option<Vec<icd11::Report>>, RunError> {
     let Some(cache) = &cli.icd11 else {
         return Ok(None);
     };
@@ -189,12 +207,12 @@ fn run_icd11(cli: &Cli) -> Result<Option<Vec<icd11::Report>>, RunError> {
     Ok(Some(icd11::build_all(
         cache,
         cli.icd11_release.as_deref(),
-        &cli.out,
+        out,
     )?))
 }
 
 /// The `RxNorm` build (`--rxnorm`), when the command line asks for one.
-fn run_rxnorm(cli: &Cli) -> Result<Option<rxnorm::Report>, RunError> {
+fn run_rxnorm(cli: &Cli, out: &Path) -> Result<Option<rxnorm::Report>, RunError> {
     let Some(rxnorm) = &cli.rxnorm else {
         return Ok(None);
     };
@@ -217,12 +235,12 @@ fn run_rxnorm(cli: &Cli) -> Result<Option<rxnorm::Report>, RunError> {
         &root,
         version.as_deref(),
         &cli.rxnorm_sources,
-        &cli.out,
+        out,
     )?))
 }
 
 /// The LOINC build (`--loinc`), when the command line asks for one.
-fn run_loinc(cli: &Cli) -> Result<Option<loinc::Report>, RunError> {
+fn run_loinc(cli: &Cli, out: &Path) -> Result<Option<loinc::Report>, RunError> {
     let Some(loinc) = &cli.loinc else {
         return Ok(None);
     };
@@ -237,12 +255,12 @@ fn run_loinc(cli: &Cli) -> Result<Option<loinc::Report>, RunError> {
         .loinc_version
         .clone()
         .or_else(|| loinc::version_from_name(loinc));
-    Ok(Some(loinc::build(&root, version.as_deref(), &cli.out)?))
+    Ok(Some(loinc::build(&root, version.as_deref(), out)?))
 }
 
 /// The SNOMED CT build: the edition `--rf2` names with every `--rf2-refset`
 /// package layered onto it.
-fn run_snomed(cli: &Cli) -> Result<pipeline::Report, RunError> {
+fn run_snomed(cli: &Cli, out: &Path) -> Result<pipeline::Report, RunError> {
     let Some(rf2) = &cli.rf2 else {
         return Err(RunError::NoInput);
     };
@@ -263,12 +281,12 @@ fn run_snomed(cli: &Cli) -> Result<pipeline::Report, RunError> {
     for package in &cli.rf2_refset {
         refsets.push(unpack(package)?);
     }
-    Ok(pipeline::build(&root, &refsets, &cli.out)?)
+    Ok(pipeline::build(&root, &refsets, out)?)
 }
 
 /// The classification builds (`--claml`, `--atc`, `--icd10cm`), when the
 /// command line asks for one.
-fn run_classification(cli: &Cli) -> Result<Option<classification::Report>, RunError> {
+fn run_classification(cli: &Cli, out: &Path) -> Result<Option<classification::Report>, RunError> {
     if let Some(claml) = &cli.claml {
         let system = cli.system.as_deref().ok_or(RunError::NoSystem)?;
         let scratch;
@@ -286,7 +304,7 @@ fn run_classification(cli: &Cli) -> Result<Option<classification::Report>, RunEr
             &classification,
             system,
             cli.claml_version.as_deref(),
-            &cli.out,
+            out,
         )?));
     }
     if let Some(dhd) = &cli.dhd {
@@ -309,9 +327,9 @@ fn run_classification(cli: &Cli) -> Result<Option<classification::Report>, RunEr
             &thesaurus.classification,
             ::dhd_thesaurus::SYSTEM,
             cli.dhd_version.as_deref(),
-            &cli.out,
+            out,
         )?;
-        dhd::write_concept_maps(&thesaurus, &report.version, &cli.out)?;
+        dhd::write_concept_maps(&thesaurus, &report.version, out)?;
         return Ok(Some(report));
     }
     if let Some(atc) = &cli.atc {
@@ -321,7 +339,7 @@ fn run_classification(cli: &Cli) -> Result<Option<classification::Report>, RunEr
             &classification,
             ::classification::atc::SYSTEM,
             Some(version),
-            &cli.out,
+            out,
         )?));
     }
     if cli.icd10cm.is_empty() {
@@ -343,13 +361,13 @@ fn run_classification(cli: &Cli) -> Result<Option<classification::Report>, RunEr
         &classification,
         classification::ICD10CM_SYSTEM,
         None,
-        &cli.out,
+        out,
     )?))
 }
 
 /// Fills the ICD-11 `cache` from the deployment at `api`: every code system
 /// the deployment serves, in the languages asked for.
-fn fetch_icd11(cache: &std::path::Path, api: &str, cli: &Cli) -> Result<(), RunError> {
+fn fetch_icd11(cache: &Path, api: &str, cli: &Cli) -> Result<(), RunError> {
     let release = if let Some(release) = &cli.icd11_release {
         release.clone()
     } else {
@@ -412,6 +430,9 @@ pub enum RunError {
     /// `--claml` without `--system`.
     #[error("`--claml` needs `--system`")]
     NoSystem,
+    /// No output directory could be settled.
+    #[error(transparent)]
+    Output(#[from] output::OutputError),
     /// The release zip does not unpack.
     #[error(transparent)]
     Archive(#[from] archive::ArchiveError),
