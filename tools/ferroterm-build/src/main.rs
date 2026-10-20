@@ -5,7 +5,8 @@ use clap::Parser;
 
 fn main() -> anyhow::Result<()> {
     let cli = ferroterm_build::Cli::parse();
-    match ferroterm_build::run(&cli)? {
+    let out = ferroterm_build::output::output(&cli)?;
+    match ferroterm_build::run_into(&cli, &out)? {
         ferroterm_build::Report::Snomed(report) => {
             println!(
                 "{}: {} concepts, {} designations, {} is-a edges, {} words, written to {}",
@@ -14,7 +15,7 @@ fn main() -> anyhow::Result<()> {
                 report.designations,
                 report.is_a_edges,
                 report.words,
-                cli.out.display()
+                out.display()
             );
             if report.skipped_relationships > 0 {
                 println!(
@@ -39,7 +40,7 @@ fn main() -> anyhow::Result<()> {
             report.answer_lists,
             report.designations,
             report.words,
-            cli.out.display()
+            out.display()
         ),
         ferroterm_build::Report::Icd11(reports) => {
             for report in reports {
@@ -62,7 +63,7 @@ fn main() -> anyhow::Result<()> {
             report.atoms,
             report.relationships,
             report.words,
-            cli.out.display()
+            out.display()
         ),
         ferroterm_build::Report::Classification(report) => println!(
             "{} {}: {} concepts, {} designations, {} words, written to {}",
@@ -71,7 +72,7 @@ fn main() -> anyhow::Result<()> {
             report.concepts,
             report.designations,
             report.words,
-            cli.out.display()
+            out.display()
         ),
         ferroterm_build::Report::Classifications(reports) => {
             for report in reports {

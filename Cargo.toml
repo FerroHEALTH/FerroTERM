@@ -132,7 +132,7 @@ tower-http = { version = "0.7.1", default-features = false, features = ["set-hea
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 # Command-line parsing for the tools and the server binary.
-clap = { version = "4.6.6", features = ["derive"] }
+clap = { version = "4.6.6", features = ["derive", "env"] }
 # Testing.
 insta = { version = "1.48.0", features = ["json"] }
 proptest = "1.11.0"

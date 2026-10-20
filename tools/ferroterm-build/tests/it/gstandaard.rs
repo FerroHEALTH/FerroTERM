@@ -30,7 +30,8 @@ fn the_release_builds_the_four_rungs_under_the_output_directory() {
         gstandaard_version: Some(String::from(VERSION)),
         labcodeset: None,
         rxnorm_sources: Vec::new(),
-        out: out.path().to_path_buf(),
+        out: Some(out.path().to_path_buf()),
+        index_root: None,
     })
     .expect("builds");
     let ferroterm_build::Report::Classifications(reports) = report else {

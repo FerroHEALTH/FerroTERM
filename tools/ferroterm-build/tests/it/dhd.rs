@@ -36,7 +36,8 @@ fn cli(
         gstandaard_version: None,
         labcodeset: None,
         rxnorm_sources: Vec::new(),
-        out: out.to_path_buf(),
+        out: Some(out.to_path_buf()),
+        index_root: None,
     }
 }
 

@@ -33,7 +33,8 @@ fn cli(labcodeset: std::path::PathBuf, out: &std::path::Path) -> ferroterm_build
         gstandaard_version: None,
         labcodeset: Some(labcodeset),
         rxnorm_sources: Vec::new(),
-        out: out.to_path_buf(),
+        out: Some(out.to_path_buf()),
+        index_root: None,
     }
 }
 

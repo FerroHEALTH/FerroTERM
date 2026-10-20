@@ -17,5 +17,6 @@ mod labcodeset;
 mod layered;
 mod local_edition;
 mod loinc;
+mod output;
 mod pipeline;
 mod rxnorm;
