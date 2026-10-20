@@ -1,10 +1,10 @@
 # Behind a reverse proxy
 
-FerroTERM speaks plain HTTP and, by default, authenticates nobody. That is
-deliberate: a deployment already has a proxy, and a terminology server is a
-poor place to reimplement TLS and rate limits. This page is the shape that gets
-you from that to a served endpoint, and the one part the server can take over
-itself: bearer validation on the routes that change content
+FerroTERM speaks plain HTTP and leaves TLS and rate limits to the proxy a
+deployment already has. Its read surface is open; the routes that change
+content and the admin listener authenticate their callers. This page is the
+shape that gets you from that to a served endpoint, and how the server checks
+those credentials
 ([Validating tokens in the server](#validating-tokens-in-the-server)).
 
 <!-- toc -->
@@ -14,7 +14,7 @@ itself: bearer validation on the routes that change content
 | The server | The proxy |
 |---|---|
 | answers FHIR terminology requests | terminates TLS |
-| reads its indexes, writes only what `FERROTERM_RESOURCES` names | authenticates the caller, unless `FERROTERM_OIDC_ISSUER` moves that into the server |
+| reads its indexes, writes only what `FERROTERM_RESOURCES` names | authenticates readers, if you want them authenticated; the server checks the writers and the admin callers itself |
 | logs a line per request with no bodies and no free text | rate-limits and sheds load |
 | states its endpoint and its declared security in the capability statement | forwards the client's `X-Request-Id` |
 
@@ -34,12 +34,14 @@ because the image has no shell to run a probe with. Fetching a release from a
 terminology service happens outside the server, on a machine of your choosing,
 and the server reads the artifacts that run writes.
 
-The one exception is the OIDC issuer, and only when you name one. With
-`FERROTERM_OIDC_ISSUER` set the server reads that issuer's discovery document
-and its JWKS at start, and the key set again when a token names a key it has
-not read (see [Validating tokens in the server](#validating-tokens-in-the-server)).
-That is the whole of its outbound traffic; leave the variable unset and it
-makes none.
+The one exception is the authorization server `[auth]` names, and only when
+you name one. With an issuer set the server reads that issuer's metadata and
+its key set at start, again when the key set is older than
+`jwks_max_age_seconds`, and again when a token names a key it has not read (see [Validating tokens in the server](#validating-tokens-in-the-server)).
+That is the whole of its outbound traffic, apart from the opt-out usage
+report; name no issuer and it makes none. Those reads go through the
+FerroHEALTH resource-server crate `ferrohealth-smart`, whose HTTP client is the
+one the server links.
 
 `scripts/checks/no-client-in-server.sh` is the evidence. The
 `no-client-in-server` job in `.github/workflows/ci.yml` runs it on every pull
@@ -144,19 +146,23 @@ which caller may change what. A gateway can protect a path; it cannot tell a
 terminologist's token from a reporting client's without repeating the scope
 rules FerroTERM already applies.
 
-Name the issuer, and the server takes the SMART App Launch resource-server role
-(<https://hl7.org/fhir/smart-app-launch/conformance.html>). It issues no tokens
-of its own: your authorization server does that, and FerroTERM only reads its
-public metadata.
+The server takes the SMART App Launch resource-server role
+(<https://hl7.org/fhir/smart-app-launch/conformance.html>) through the
+FerroHEALTH crate `ferrohealth-smart`. It issues no tokens of its own: your
+authorization server does that, and FerroTERM only reads its public metadata.
+A server that names `FERROTERM_RESOURCES` or `FERROTERM_ADMIN_LISTEN` refuses to
+start until `[auth]` names the issuer and an audience, or turns authentication
+off ([Configuration](configuration.md#authentication)).
 
 ```
 FERROTERM_BASE_URL=https://tx.example.org
-FERROTERM_OIDC_ISSUER=https://auth.example.org/realms/tx
-FERROTERM_OIDC_ADMIN_SCOPE=ferroterm/admin
+FERROTERM_AUTH__ISSUER=https://auth.example.org/realms/tx
+FERROTERM_AUTH__AUDIENCE='["https://tx.example.org"]'
 ```
 
-At start the server reads `{issuer}/.well-known/openid-configuration` and the
-JWKS it names. It refuses to start when either does not answer, so a server
+At start the server reads the issuer's metadata, at
+`/.well-known/oauth-authorization-server` (RFC 8414 §3) or
+`{issuer}/.well-known/openid-configuration`, and the key set it names. It refuses to start when either does not answer, so a server
 that cannot check a token never serves a surface it has declared protected.
 The issuer URL is `https`, and a plain-HTTP one is refused unless its host is
 the loopback, because those bytes decide which signatures the server trusts.
@@ -166,7 +172,7 @@ private one: the server uses the platform trust store.
 What changes once it is set:
 
 - `POST`, `PUT`, and `DELETE` on `CodeSystem`, `ValueSet`, and `ConceptMap`, on
-  every served FHIR version, require a bearer token. So does `POST [base]/$closure`,
+  every served FHIR version, require a credential. So does `POST [base]/`,
   which keeps a stored closure table, and every route on the admin listener.
 - The read surface stays open. `$lookup`, `$expand`, `$validate-code`,
   `$subsumes`, `$translate`, `/metadata`, `/health`, and `/metrics` answer
@@ -184,20 +190,24 @@ The scope for a route is the SMART version 2 one
 | `PUT /r4b/ValueSet/{id}` | `system/ValueSet.u` or `user/ValueSet.u` |
 | `DELETE /r4b/ConceptMap/{id}` | `system/ConceptMap.d` or `user/ConceptMap.d` |
 | `POST /r4b/$closure` | `system/ConceptMap.u` or `user/ConceptMap.u` |
-| Any admin-listener route | the `FERROTERM_OIDC_ADMIN_SCOPE` value |
+| Any admin-listener route | `[auth] product_scope`, `__ferroterm.admin` when unset |
 
-SMART names no scope for `$closure`, so that last row is our own reading: the
+SMART names no scope for ``, so that row is our own reading: the
 operation maintains a stored `ConceptMap`
-(<https://hl7.org/fhir/R4B/conceptmap-operation-closure.html>), and no
-specification governs the admin listener at all.
+(<https://hl7.org/fhir/R4B/conceptmap-operation-closure.html>). No
+specification governs the admin listener, so its scope is FerroTERM's own, in
+the extension form SMART App Launch 2.2.0 gives one (Scopes and Launch
+Context, §Extensibility): a string starting with `__`, or a full URI. Any other
+value refuses the start.
 
 Both compartments open the same routes. `system/` is a client authorized in
 its own right, which is what a sync service or a reporting client presents;
 `user/` is a person acting through an interactive client, which is what the
 editor presents. `patient/` is refused: a terminology server holds no patient
-record, so a patient-compartment scope selects nothing here. The served
-`scopes_supported` drops what the gate refuses, so it never advertises a scope
-the server would answer 403 to.
+record, so a patient-compartment scope selects nothing here, and the
+discovery document claims no `permission-patient`. The served
+`scopes_supported` lists `[auth] scopes_supported` and never the issuer's own
+list, because the server SHALL support every scope it lists.
 
 The combined forms work as the specification defines them, so
 `user/CodeSystem.cud` and `user/*.cruds` both grant a create, and the
@@ -208,11 +218,13 @@ the restriction, so it refuses rather than widening it. That is why the
 discovery document claims `permission-v1` and not `permission-v2`, which names
 the granular syntax. Grant an unnarrowed scope.
 
-The token itself is an ordinary JWT signed by the issuer. The server checks the
-signature against the JWKS, `iss`, `exp`, `nbf`, the audience as described
-below, and the `typ` header when the issuer sets one: a token typed as
-something other than an access token (an ID token, for example) is refused
-rather than spent here.
+The token is an RFC 9068 JWT access token signed by the issuer with an
+asymmetric algorithm. The server checks the signature against the key set,
+`iss`, `exp`, `nbf` and `iat` within the clock skew, the audience as described
+below, the `typ` header, which must be `at+jwt` (RFC 9068 §4), and the claims
+RFC 9068 §2.2 requires (`sub`, `client_id`, `jti`). An issuer that mints plain
+JWTs is admitted with `[auth] token_profile = "jwt"`, which still refuses a
+token typed as another kind (an ID token, for example).
 
 ### The audience a token carries
 
@@ -224,8 +236,8 @@ signs in on `/r4b` therefore get tokens with different audiences from an issuer
 that mints the claim from that request. Both are this server.
 
 The write routes accept every served version's base derived from
-`FERROTERM_BASE_URL`, with and without a trailing slash, plus
-`FERROTERM_OIDC_AUDIENCE` when you set it. With
+`FERROTERM_BASE_URL`, with and without a trailing slash, plus every
+`[auth] audience`. With
 `FERROTERM_BASE_URL=https://tx.example.org` the server accepts
 `https://tx.example.org/r4`, `/r4b`, `/r5`, and `/r6` under that host. A token
 passes when its `aud` holds any of them, which RFC 7519 §4.1.3 asks of a
@@ -244,22 +256,24 @@ and a value that differs from the one the viewer sends refuses every write
 from a reader who signed in successfully.
 
 The root URL is not in the set: the server serves no FHIR base there. Name it
-in `FERROTERM_OIDC_AUDIENCE` when your issuer mints it anyway.
+in `[auth] audience` when your issuer mints it anyway.
 
 The admin listener is not a FHIR endpoint, so no version base is an audience
-for it: it accepts `FERROTERM_OIDC_AUDIENCE` when you set one, and checks no
-audience when you do not.
+for it: it accepts `[auth] audience` alone.
 
-With neither variable set the server checks no audience anywhere, and the
-issuer check alone bounds the token. Set `FERROTERM_BASE_URL` in any deployment
-behind a proxy: it is what the capability statements publish, and it is what
-makes the audience check real.
+`[auth] audience` is required with an issuer, so every token is checked for an
+audience of this server (RFC 9068 §4); a server that names an issuer and no
+audience refuses to start. Set `FERROTERM_BASE_URL` in any deployment behind a
+proxy as well: it is what the capability statements publish.
 
 A server-to-server client obtains its token through SMART Backend Services,
 which is the flow a sync service uses
 (<https://hl7.org/fhir/smart-app-launch/backend-services.html>):
 `client_credentials` with `private_key_jwt`, the `system/` scopes above, and
-the token presented as `Authorization: Bearer`.
+the token presented as `Authorization: Bearer`. A machine caller that has no
+client at the authorization server authenticates with HTTP Basic as one of the
+`[[auth.basic.users]]` instead; its configured scopes decide what it reaches.
+The server accepts no static token.
 
 A browser client holds no secret, so it runs the standalone launch as a public
 client: the authorization code flow with PKCE
@@ -283,18 +297,27 @@ What comes back on a refusal follows RFC 6750 §3:
 
 | Situation | Answer |
 |---|---|
-| No token | `401`, `WWW-Authenticate: Bearer realm="…"`, an `OperationOutcome` with `login` |
-| Expired, malformed, wrong issuer, wrong audience, wrong signature | `401` with `error="invalid_token"` |
-| Valid token, no scope for the route | `403` with `error="insufficient_scope"`, and the outcome naming every scope that opens the route |
+| No credential | `401`, `WWW-Authenticate: Bearer realm="…"` (and a `Basic` challenge when Basic users are configured), an `OperationOutcome` with `login` |
+| Expired, malformed, wrong issuer, wrong audience, wrong signature | `401` with `error="invalid_token"` and no `error_description`: every invalid token answers alike |
+| Two `Authorization` headers, or a scheme with no credential | `400` with `error="invalid_request"` |
+| Valid credential, no scope for the route | `403` with `error="insufficient_scope"`; the outcome names no scope |
+| The key set could not be read to check the token | `503`, an `OperationOutcome` with `transient` |
 
-Key rotation needs nothing from you. A token naming a `kid` the server has not
-read makes it fetch the JWKS again, at most once a minute, so publishing the
-new key before you sign with it is enough.
+The outcome is written in the format the request asks for, JSON or XML.
+
+Key rotation needs nothing from you. The server reads the key set again when
+it is older than `jwks_max_age_seconds` (ten minutes), so a withdrawn key stops
+verifying, and a token naming a `kid` it has not read makes it read the set
+again, at most once per `jwks_refresh_interval_seconds` (a minute) counted from
+the last read, the one at start included. Publish the new key before you sign
+with it.
 
 ## The admin listener stays behind the proxy
 
 `FERROTERM_ADMIN_LISTEN` binds a second listener that serves `POST /reload`
-and nothing else. Without `FERROTERM_OIDC_ISSUER` it authenticates nobody
+and nothing else. Every route on it requires the admin scope, and the server
+refuses to start with it until `[auth]` names an issuer or turns
+authentication off
 ([Configuration](configuration.md#reloading-the-served-set)). Bind it to
 `127.0.0.1` or an address on your internal network, publish only the FHIR
 listener through the proxy, and reach the reload from the host or from the

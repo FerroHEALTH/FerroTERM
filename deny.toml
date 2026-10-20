@@ -74,6 +74,10 @@ exceptions = [
   # The FerroHEALTH console components, published by the same Licensor under
   # the same licence, which the console links from crates.io.
   { allow = ["BUSL-1.1"], crate = "ferrohealth-ui" },
+  # The FerroHEALTH SMART and OAuth 2.0 resource-server crate the server and
+  # the sync service authenticate with, the same Licensor's crate under the
+  # same licence.
+  { allow = ["BUSL-1.1"], crate = "ferrohealth-smart" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-build" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-bench" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-testkit" },

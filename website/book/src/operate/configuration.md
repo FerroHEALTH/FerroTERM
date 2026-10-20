@@ -1,8 +1,9 @@
 # Configuration
 
-The server reads its configuration from environment variables at start. There
-is no configuration file and no command-line flag; a container sets the
-variables, a host sets them in the service unit. `ValueSet/$expand` returns
+The server reads its configuration from environment variables at start, and
+has no command-line flag; a container sets the variables, a host sets them in
+the service unit. The one file it reads is the optional `[auth]` table that
+`FERROTERM_AUTH_FILE` names. `ValueSet/$expand` returns
 at most 1,000 members without `count` and asks for paging beyond that
 (`too-costly`); the limit is not configurable.
 
@@ -14,14 +15,13 @@ at most 1,000 members without `count` and asks for paging beyond that
 |---|---|---|
 | `FERROTERM_INDEX` | The artifact directories to serve, one per code system version (a SNOMED CT edition, a LOINC release, an ICD-10 classification, an RxNorm release, or one of the three ICD-11 code systems; the manifest says which), separated by the platform's path separator (`:` on Linux). Each holds the `store.redb` with its `store.*.col` column files, `hierarchy.bin`, `text.bin`, and `manifest.json` that `ferroterm-build` wrote. The server opens them read-only and refuses to start when one is missing, damaged, or duplicates another's system version. A path that holds no `manifest.json` of its own is an index root: every child directory that holds one is an artifact, and the server lists the root again on every reload (see [Index roots](#index-roots)). | none (the server starts with no code systems) |
 | `FERROTERM_CODESYSTEMS` | Directories of FHIR `CodeSystem` resources to serve, separated by the platform's path separator: a FHIR package's `package/` directory (HL7 Terminology, for example) or a directory of `CodeSystem` JSON files. Files are read in the FHIR version the directory's `package.json` declares, or as R4B when there is none. A resource with `content = supplement` is applied to the system it `supplements` and is read and searched as a `CodeSystem` of its own; the server refuses to start when that system is not loaded. `ValueSet` resources in the same directories are served by `url` and `version` for `ValueSet/$expand` and `ValueSet/$validate-code` (without a version, the greatest version answers). | none |
-| `FERROTERM_RESOURCES` | The database file holding the `CodeSystem`, `ValueSet`, and `ConceptMap` resources clients write through the REST API, and the closure tables `$closure` maintains. The server creates the file when it does not exist, serves every resource in it exactly as it serves one from `FERROTERM_CODESYSTEMS`, and loads them again after a restart. A deployment that names no file refuses every write with a `422` and declares no write interaction in its capability statement. | none (the server persists nothing) |
+| `FERROTERM_RESOURCES` | The database file holding the `CodeSystem`, `ValueSet`, and `ConceptMap` resources clients write through the REST API, and the closure tables `$closure` maintains. The server creates the file when it does not exist, serves every resource in it exactly as it serves one from `FERROTERM_CODESYSTEMS`, and loads them again after a restart. A deployment that names no file refuses every write with a `422` and declares no write interaction in its capability statement. With a file named, the server refuses to start until `[auth]` names an issuer or turns authentication off (see [Authentication](#authentication)). | none (the server persists nothing) |
 | `FERROTERM_LISTEN` | The socket address to bind. | `127.0.0.1:8080` (the container image sets `0.0.0.0:8080`) |
-| `FERROTERM_ADMIN_LISTEN` | The socket address of the admin listener, which serves `POST /reload` and nothing else (see [Reloading the served set](#reloading-the-served-set)). Without `FERROTERM_OIDC_ISSUER` it authenticates nobody, so bind it to an address only your operators reach. Unset, the server binds no second listener and `SIGHUP` is the only reload trigger. | none (no admin listener) |
-| `FERROTERM_BASE_URL` | The URL clients reach this server at, without a version prefix and without a trailing slash (`https://tx.example.org`). Each version states it as `implementation.url` in its capability statements, so a client behind a reverse proxy learns the address it should use rather than the socket the process bound. Setting it also turns on the audience check of the SMART gate, whose accepted set is every served version's base under this URL (see [Behind a reverse proxy](reverse-proxy.md#the-audience-a-token-carries)). A deployment that names none states no URL. | none |
-| `FERROTERM_SECURITY_SERVICE` | The authentication in front of the server, as comma-separated codes of the FHIR `restful-security-service` value set (`OAuth`, `SMART-on-FHIR`, `Basic`, `Certificates`, `Kerberos`, `NTLM`). The codes declare what a proxy enforces, in `CapabilityStatement.rest.security.service`; with `FERROTERM_OIDC_ISSUER` set, `SMART-on-FHIR` is added to whatever you declare here. | none |
-| `FERROTERM_OIDC_ISSUER` | The OpenID Connect issuer whose access tokens gate the write routes and the admin listener (see [Behind a reverse proxy](reverse-proxy.md#validating-tokens-in-the-server)). The server reads `{issuer}/.well-known/openid-configuration` and the JWKS it names before it binds, and refuses to start when either does not answer. Map a terminologist's role in that issuer to `user/CodeSystem.cud`, `user/ValueSet.cud`, and `user/ConceptMap.cud`, and a reader's role to none of them, so a reader's token carries no write scope at all. Unset, the server asks for no token and every route answers as it does today. | none (no token is ever asked for) |
-| `FERROTERM_OIDC_AUDIENCE` | One more `aud` value the server accepts, beside the FHIR base of every served version it derives from `FERROTERM_BASE_URL`. Set it when your issuer mints an audience of its own, a resource identifier registered in the issuer, for example. A token passes when its `aud`, a string or an array, holds any accepted value, and is refused with `401 invalid_token` otherwise (see [Behind a reverse proxy](reverse-proxy.md#the-audience-a-token-carries)). With neither this nor `FERROTERM_BASE_URL` set, the server checks no audience and the issuer alone bounds the token. | none |
-| `FERROTERM_OIDC_ADMIN_SCOPE` | The scope the admin-listener routes require, compared verbatim against the scopes the token grants. Map an operator's role to it and leave it off a terminologist's and a reader's roles. No specification governs the admin surface, so the name is yours. | `ferroterm/admin` |
+| `FERROTERM_ADMIN_LISTEN` | The socket address of the admin listener, which serves `POST /reload` and nothing else (see [Reloading the served set](#reloading-the-served-set)). Every route on it requires the admin scope (see [Authentication](#authentication)), and the server refuses to start with it until `[auth]` names an issuer or turns authentication off. Unset, the server binds no second listener and `SIGHUP` is the only reload trigger. | none (no admin listener) |
+| `FERROTERM_BASE_URL` | The URL clients reach this server at, without a version prefix and without a trailing slash (`https://tx.example.org`). Each version states it as `implementation.url` in its capability statements, so a client behind a reverse proxy learns the address it should use rather than the socket the process bound. Setting it also adds every served version's base under this URL to the audiences the write routes accept, beside `[auth] audience` (see [Behind a reverse proxy](reverse-proxy.md#the-audience-a-token-carries)). A deployment that names none states no URL. | none |
+| `FERROTERM_SECURITY_SERVICE` | The authentication in front of the server, as comma-separated codes of the FHIR `restful-security-service` value set (`OAuth`, `SMART-on-FHIR`, `Basic`, `Certificates`, `Kerberos`, `NTLM`). The codes declare what a proxy enforces, in `CapabilityStatement.rest.security.service`; with an `[auth]` issuer, `SMART-on-FHIR` is added to whatever you declare here. | none |
+| `FERROTERM_AUTH_FILE` | A TOML file holding the `[auth]` table and nothing else (see [Authentication](#authentication)). Use it for what the environment cannot say well: several issuers, `[[auth.basic.users]]`, the token rules. Every `FERROTERM_AUTH__<KEY>` variable is applied over it. | none |
+| `FERROTERM_AUTH__<KEY>` | One key of the `[auth]` table, named by its path below `[auth]` with `__` between the segments: `FERROTERM_AUTH__ISSUER`, `FERROTERM_AUTH__AUDIENCE`, `FERROTERM_AUTH__ENABLED`, `FERROTERM_AUTH__PRODUCT_SCOPE`. The value reads as TOML (`false`, `["https://tx.example.org/r4"]`) or, when it is not TOML, as the string it is. A name that is no key refuses the start. | see [Authentication](#authentication) |
 | `FERROTERM_USAGE_REPORT` | Whether the server sends the [usage report](usage-report.md) to FerroPULSE. Reads `on` or `off` (`true`/`false`, `1`/`0`, `yes`/`no`). `on` cannot override CI detection: with `GITHUB_ACTIONS` or `CI` set to `true` or `1`, the report is off. | `on` |
 | `FERROTERM_USAGE_REPORT_ENDPOINT` | The collector the usage report is posted to: an `https` URL without credentials, or plain `http` to a loopback host. The server refuses to start on anything else. | `https://report.ferropulse.eu/v1/report` |
 | `FERROTERM_STATE_DIR` | A writable directory where the server keeps its own state: the usage report's instance id and the time of its last start report. Without one, or with one the server cannot write, the usage report is off. | none (the compose file sets `/data/state`, on a named volume; the container image sets none) |
@@ -29,6 +29,70 @@ at most 1,000 members without `count` and asks for paging beyond that
 | `FERROTERM_DEFAULT_LANGUAGE` | The BCP 47 language used for `display` when a request names none. | `en` |
 | `FERROTERM_LOG_FORMAT` | `auto`, `json`, or `pretty`. `json` writes one object per line (`timestamp`, `level`, `message`, and the fields) for a log pipeline; `pretty` writes aligned human lines with colour; `auto` picks `pretty` when stdout is a terminal and `json` otherwise. The startup banner prints only with `pretty`. | `auto` |
 | `RUST_LOG` | The `tracing` filter. | `info,hyper=warn,tower=warn,h2=warn` |
+
+## Authentication
+
+The server is a SMART App Launch resource server
+(<https://hl7.org/fhir/smart-app-launch/conformance.html>) over the FerroHEALTH
+crate `ferrohealth-smart`: it checks credentials and never issues one. The read
+surface stays open. The write routes (`POST`, `PUT` and `DELETE` on
+`CodeSystem`, `ValueSet` and `ConceptMap`, and `POST [base]/$closure`) and every
+route of the admin listener require a credential.
+
+Authentication is on by default and fails closed: a server that names
+`FERROTERM_RESOURCES` or `FERROTERM_ADMIN_LISTEN` refuses to start until
+`[auth]` names an issuer and an audience, or says `enabled = false`. A
+read-only server with neither starts without `[auth]`.
+
+```sh
+FERROTERM_AUTH__ISSUER=https://auth.example.org/realms/tx
+FERROTERM_AUTH__AUDIENCE='["https://tx.example.org"]'
+# or, on a network only trusted callers reach:
+FERROTERM_AUTH__ENABLED=false
+```
+
+The keys of `[auth]`, in the file `FERROTERM_AUTH_FILE` names or as
+`FERROTERM_AUTH__<KEY>`:
+
+| Key | Meaning | Default |
+|---|---|---|
+| `enabled` | Whether the write routes and the admin listener authenticate their callers. | `true` |
+| `issuer` | The issuer identifier of the authorization server whose access tokens are accepted, an `https` URL (plain `http` on a loopback host only). The server reads its metadata (RFC 8414, with OpenID Connect Discovery as the fallback) and its key set before it binds, and refuses to start when either does not answer. `[[auth.issuer]]` entries name several issuers, each with any of the keys below that differ. | none |
+| `audience` | The `aud` values a token may carry; one of them is required (RFC 9068 §4). The write routes also accept every served version's base under `FERROTERM_BASE_URL`; the admin listener accepts this list alone. | none (required with an issuer) |
+| `product_scope` | The scope the admin listener requires, a string starting with `__` or a full URI (SMART App Launch 2.2.0, Scopes and Launch Context, §Extensibility). Anything else refuses the start. | `__ferroterm.admin` |
+| `algorithms` | The signature algorithms accepted; an HMAC algorithm refuses the start. | `RS256`, `RS384`, `PS256`, `PS384`, `ES256`, `ES384` |
+| `token_profile` | `rfc9068`, which requires the `at+jwt` type and the RFC 9068 claims (`iss`, `sub`, `aud`, `exp`, `iat`, `jti`, `client_id`), or `jwt` for an issuer that mints plain JWTs. | `rfc9068` |
+| `clock_skew_seconds` | The skew allowed on `exp`, `nbf` and `iat`, at most 300. | `60` |
+| `jwks_max_age_seconds` | How long a key set is used before it is read again. | `600` |
+| `jwks_refresh_interval_seconds` | The shortest time between two reads of the key set, so an unknown `kid` reads it at most once per interval. | `60` |
+| `jwks_file` | A key set file handed over out of band, read in place of the issuer's `jwks_uri`. | none |
+| `timeout_ms` | How long one call to the authorization server may take. | `10000` |
+| `realm` | The realm every challenge names. | `FERROTERM_BASE_URL`, else `FerroTERM` |
+| `scopes_supported` | The scopes the discovery document lists. List only scopes the server honours: "the server SHALL support all scopes listed here". | none (the member is omitted) |
+| `capabilities` | SMART capabilities the discovery document adds to the ones it derives. | none |
+| `scopeless_subjects` | The exact `sub` values granted every write without a scope. | none |
+| `[[auth.basic.users]]` | HTTP Basic users (RFC 7617) for machine callers: `user`, `password_hash` or `password_hash_file` (an Argon2id PHC string), and `scopes`, which decide what the user reaches as a token's scopes would. | none (no Basic) |
+
+A machine caller authenticates with HTTP Basic as one of those users or with an
+access token it obtained with the OAuth 2.0 client credentials grant; the
+server accepts no static token. A file holding a Basic user:
+
+```toml
+[auth]
+issuer = "https://auth.example.org/realms/tx"
+audience = ["https://tx.example.org"]
+
+[[auth.basic.users]]
+user = "ferroterm-sync"
+password_hash_file = "/run/secrets/sync-password-hash"
+scopes = ["__ferroterm.admin"]
+```
+
+A refused credential answers `401` with an `OperationOutcome` and a
+`WWW-Authenticate` challenge that names no claim and no scope; a credential
+that grants no permission for the route answers `403` (RFC 6750 §3.1). The
+scopes each route requires are in
+[Behind a reverse proxy](reverse-proxy.md#validating-tokens-in-the-server).
 
 ## What the server logs
 
@@ -83,9 +147,9 @@ removing a release inside an index root does not, because a reload lists every
 root again.
 
 The admin listener carries `POST /reload` and nothing else and answers `404` to
-anything else. It authenticates nobody unless `FERROTERM_OIDC_ISSUER` is set,
-in which case every route on it requires a bearer token carrying
-`FERROTERM_OIDC_ADMIN_SCOPE`. Bind it to a loopback or internal
+anything else. Every route on it requires a credential carrying the admin
+scope, `[auth] product_scope` (`__ferroterm.admin` when unset), unless `[auth]`
+turns authentication off. Bind it to a loopback or internal
 address (`127.0.0.1:8081`), keep it off the address your clients reach, and
 leave it out of the reverse proxy that publishes the FHIR surface (see
 [Behind a reverse proxy](reverse-proxy.md)). The FHIR listener never serves

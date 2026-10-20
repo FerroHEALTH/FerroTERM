@@ -25,9 +25,20 @@
 # filesystem. The server mounts the two directories it reads as read-only; the
 # sync mounts the whole tree writable and runs as the same uid 65532.
 #
-# Neither admin listener authenticates anybody. Both stay on the compose
-# network here, and neither is published; keep it that way, or put them behind
-# something that does authenticate.
+# The server's admin listener requires a credential carrying its admin scope,
+# so the server refuses to start until you name the authorization server that
+# issues it, or say the compose network is trusted:
+#
+#   FERROTERM_AUTH__ISSUER=https://auth.example.org/realms/tx
+#   FERROTERM_AUTH__AUDIENCE='["https://tx.example.org"]'
+#   # or, on a network only trusted callers reach:
+#   FERROTERM_AUTH__ENABLED=false
+#
+# With an issuer, give the sync the credential it reloads with in its own
+# configuration file, under [server_admin_credentials] (HTTP Basic or the OAuth
+# 2.0 client credentials grant). The sync's own admin listener authenticates
+# nobody. Both stay on the compose network here, and neither is published;
+# keep it that way.
 
 services:
   ferroterm:
@@ -36,6 +47,12 @@ services:
       # It is reachable as `ferroterm:8081` inside the compose network and is
       # published nowhere.
       FERROTERM_ADMIN_LISTEN: 0.0.0.0:8081
+      # Inbound authentication (the [auth] table), passed through when set; the
+      # admin scope is `__ferroterm.admin` unless PRODUCT_SCOPE names another.
+      FERROTERM_AUTH__ENABLED:
+      FERROTERM_AUTH__ISSUER:
+      FERROTERM_AUTH__AUDIENCE:
+      FERROTERM_AUTH__PRODUCT_SCOPE:
       FERROTERM_CODESYSTEMS: /data/codesystems
     volumes:
       - type: bind

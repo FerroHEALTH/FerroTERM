@@ -37,7 +37,7 @@ struct Inner {
     /// Held for the length of one rebuild, so two triggers arriving together
     /// open the artifacts once and swap once.
     rebuilding: Mutex<()>,
-    /// The SMART bearer gate, when the deployment configured an issuer.
+    /// The resource server, when the deployment authenticates its callers.
     smart: Option<Arc<crate::smart::Smart>>,
     /// The usage report window the request middleware records into; it
     /// outlives every swap of the served set.
@@ -64,14 +64,15 @@ pub enum ReloadError {
 }
 
 impl Serving {
-    /// The set `state`, reloaded from `config` on request, with no SMART gate.
+    /// The set `state`, reloaded from `config` on request, authenticating no
+    /// caller.
     #[must_use]
     pub fn new(config: Config, state: Arc<AppState>) -> Self {
         Self::with_smart(config, state, None)
     }
 
-    /// The set `state`, gated by `smart` when the deployment configured an
-    /// issuer.
+    /// The set `state`, guarded by `smart` when the deployment authenticates
+    /// its callers.
     #[must_use]
     pub fn with_smart(
         config: Config,
@@ -89,7 +90,7 @@ impl Serving {
         }
     }
 
-    /// The SMART bearer gate, when the deployment configured one.
+    /// The resource server, when the deployment authenticates its callers.
     #[must_use]
     pub fn smart(&self) -> Option<Arc<crate::smart::Smart>> {
         self.inner.smart.clone()
@@ -191,17 +192,17 @@ impl FromRef<Serving> for Option<Arc<crate::smart::Smart>> {
 /// The admin application over `serving`: `POST /reload` and nothing else.
 ///
 /// The FHIR listener never carries these routes, so a client of the
-/// terminology API cannot reach them. A deployment that configured a SMART
-/// issuer requires the admin scope on every route here.
+/// terminology API cannot reach them. Every route here requires the admin
+/// scope `[auth]` names, unless the deployment turned authentication off.
 pub fn router(serving: Serving) -> Router {
-    Router::new()
+    let routes = Router::new()
         .route("/reload", post(reload))
-        .fallback(unknown)
-        .layer(axum::middleware::from_fn_with_state(
-            serving.smart(),
-            crate::smart::guard::admin,
-        ))
-        .with_state(serving)
+        .fallback(unknown);
+    let routes = match serving.smart() {
+        Some(smart) => crate::smart::guard::admin(routes, &smart),
+        None => routes,
+    };
+    routes.with_state(serving)
 }
 
 /// `POST /reload`: the systems now served on success, the reason on failure.

@@ -1,40 +1,40 @@
-//! SMART App Launch: the optional bearer gate over the write routes.
+//! SMART App Launch: the server as a resource server over `ferrohealth-smart`.
 //!
 //! The server takes the resource-server role and never the authorization-server
-//! one: it validates a presented access token and issues none, and every
-//! endpoint it publishes is read from the configured issuer's own discovery
-//! document (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
+//! one: it validates a presented credential and issues none
+//! (<https://hl7.org/fhir/smart-app-launch/conformance.html>). The crate reads
+//! each configured issuer's metadata and key set, validates every access token
+//! under RFC 9068, checks the Basic users of `[[auth.basic.users]]`, answers
+//! the status and challenge of every refusal (RFC 6750 §3.1) and writes the
+//! audit line. This module holds what is the server's own: which surfaces need
+//! `[auth]`, the audiences each surface accepts, the admin scope, the
+//! `OperationOutcome` and admin bodies of a refusal, and the SMART discovery
+//! document ([`discovery`]). The route table is [`guard`]'s.
 //!
-//! A deployment that names an OpenID Connect issuer in `FERROTERM_OIDC_ISSUER`
-//! turns this on. The server then reads the issuer's discovery document and its
-//! JWKS at start, publishes `[base]/.well-known/smart-configuration` derived
-//! from that document, declares `SMART-on-FHIR` in its capability statements,
-//! and requires a bearer token carrying the SMART scope for every write
-//! (<https://hl7.org/fhir/smart-app-launch/conformance.html>). A deployment
-//! that names none is unchanged: no token is ever asked for, and the whole
-//! surface answers as before.
-//!
-//! The read surface stays open either way. A terminology read names a code
-//! system and a code, so the gate is on what a caller may change, and the
-//! deployment's own gateway remains free to require more.
+//! The read surface stays open whatever `[auth]` says. A terminology read
+//! names a code system and a code, so the gate is on what a caller may change,
+//! and the deployment's own gateway remains free to require more.
 
 pub mod discovery;
 pub mod guard;
-pub mod jwks;
-pub mod scopes;
 
 use std::sync::Arc;
 
 use axum::body::Body;
+use axum::extract::Request;
+use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use http::{HeaderMap, HeaderValue, StatusCode};
-use jsonwebtoken::{Algorithm, Validation, decode, decode_header};
+use ferrohealth_smart::basic::PasswordStore;
+use ferrohealth_smart::config::ConfigError;
+use ferrohealth_smart::extract::HeaderOnly;
+use ferrohealth_smart::guard::{Gate, Render};
+use ferrohealth_smart::metadata::ServerMetadata;
+use ferrohealth_smart::refusal::Refusal;
+use ferrohealth_smart::resource::{IssuerSet, ResourceError, ResourceServer, Settings};
+use http::{HeaderMap, StatusCode};
 
 use crate::config::Config;
 use crate::outcome::Failure;
-use crate::smart::discovery::{FetchError, Http, IssuerMetadata};
-use crate::smart::jwks::{KeyError, Keys};
-use crate::smart::scopes::Permission;
 
 /// The `restful-security-service` code a SMART server declares
 /// (<http://terminology.hl7.org/CodeSystem/restful-security-service>).
@@ -51,674 +51,430 @@ pub const OAUTH_URIS: &str =
 /// (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
 pub const SMART_CONFIGURATION_JSON: &str = "application/json";
 
-/// The signature algorithms this server verifies a token with.
+/// The admin scope of a deployment whose `[auth] product_scope` names none.
 ///
-/// Only asymmetric algorithms are accepted: an HMAC algorithm would let a
-/// caller sign a token with a key the JWKS publishes, which is the algorithm
-/// confusion RFC 8725 §3.1 requires a verifier to close.
-const ALGORITHMS: [Algorithm; 9] = [
-    Algorithm::RS256,
-    Algorithm::RS384,
-    Algorithm::RS512,
-    Algorithm::PS256,
-    Algorithm::PS384,
-    Algorithm::PS512,
-    Algorithm::ES256,
-    Algorithm::ES384,
-    Algorithm::EdDSA,
-];
+/// SMART scopes cover FHIR resources only, so the admin listener is guarded by
+/// a scope of FerroTERM's own, in the form SMART App Launch 2.2.0, Scopes and
+/// Launch Context, §Extensibility, gives an extension scope: "any string
+/// starting with `__`".
+pub const ADMIN_SCOPE: &str = "__ferroterm.admin";
 
-/// The grant the authorization code flow of a standalone launch runs on
-/// (<https://hl7.org/fhir/smart-app-launch/app-launch.html>).
-const AUTHORIZATION_CODE: &str = "authorization_code";
+/// The realm of a deployment that names neither `[auth] realm` nor a base URL.
+const REALM: &str = "FerroTERM";
 
-/// The grant types the SMART discovery document names as its options.
-const GRANT_TYPES: [&str; 2] = [AUTHORIZATION_CODE, "client_credentials"];
-
-/// The client authentication methods the SMART discovery document names as its
-/// options.
-const TOKEN_ENDPOINT_AUTH_METHODS: [&str; 3] = [
-    "client_secret_post",
-    "client_secret_basic",
-    "private_key_jwt",
-];
-
-/// The PKCE methods the SMART discovery document publishes.
-///
-/// "SMART servers SHALL support the `S256` `code_challenge_method` and SHALL
-/// NOT support the `plain` method", so the list is this one whatever the issuer
-/// advertises; `S256` is the SHA-256 challenge of RFC 7636 §4.2
-/// (<https://hl7.org/fhir/smart-app-launch/app-launch.html>).
-const CODE_CHALLENGE_METHODS: [&str; 1] = ["S256"];
-
-/// The scope an issuer advertises when it mints an identity token
-/// (<https://openid.net/specs/openid-connect-core-1_0.html>, §3.1.2.1).
-const OPENID: &str = "openid";
-
-/// The members of `advertised` that `options` admits, in the order `options`
-/// fixes them.
-///
-/// The discovery document is this server's own assertion about itself, so a
-/// value the specification does not define for a member is dropped rather than
-/// passed through from the issuer's document
-/// (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
-fn only(advertised: &[String], options: &[&str]) -> Vec<String> {
-    options
-        .iter()
-        .filter(|option| advertised.iter().any(|value| value == *option))
-        .map(|option| (*option).to_owned())
-        .collect()
-}
-
-/// The audiences a token may name, by the surface it is spent on.
-///
-/// The `aud` of a SMART authorization request names the resource server the
-/// app wants FHIR data from, which is what keeps a genuine token from reaching
-/// a counterfeit one (<https://hl7.org/fhir/smart-app-launch/app-launch.html>). This
-/// server publishes one FHIR base per version, so an issuer that mints the
-/// claim from that request gives a reader who signed in on `/r5` a different
-/// audience from one who signed in on `/r4b`.
-#[derive(Debug)]
-struct Audiences {
-    /// What the FHIR surface accepts: every served version's base under
-    /// `FERROTERM_BASE_URL`, and the audience the deployment named.
-    ///
-    /// The set is one for every version rather than one per version, so a
-    /// token minted for `/r5` is spendable on `/r4b` as well. That is our own
-    /// design: one process serves the four bases and a reader moves between
-    /// them in one session. An issuer that wants a token bounded to one base
-    /// says so with `authorization_details`
-    /// (<https://hl7.org/fhir/smart-app-launch/app-launch.html>), which this
-    /// server does not read.
-    fhir: Vec<String>,
-    /// What the admin listener accepts: the audience the deployment named.
-    admin: Vec<String>,
-}
-
-impl Audiences {
-    /// The sets this deployment accepts; both empty when it checks none.
-    fn of(config: &Config) -> Self {
-        let named: Vec<String> = config.oidc_audience.clone().into_iter().collect();
-        let mut fhir = Vec::new();
-        if let Some(base) = config.base_url.as_deref() {
-            for segment in crate::version::SEGMENTS {
-                let endpoint = crate::version::endpoint(base, segment);
-                // NOTE: FHIR fixes a service base with no trailing slash
-                // (<https://hl7.org/fhir/R4B/http.html#root>), so admitting the
-                // slashed form is our own tolerance and the only one performed.
-                fhir.push(format!("{endpoint}/"));
-                fhir.push(endpoint);
-            }
-        }
-        fhir.extend(named.iter().cloned());
-        Self { fhir, admin: named }
-    }
-
-    /// The audiences a token for `need` may name.
-    ///
-    /// The admin listener serves no FHIR interaction, so the version bases are
-    /// not its audience and only the configured one is: no specification
-    /// governs that surface, which is our own design.
-    fn accepted(&self, need: Need) -> &[String] {
-        match need {
-            Need::Write { .. } => &self.fhir,
-            Need::Admin => &self.admin,
-        }
-    }
-}
-
-/// A start the issuer refused.
+/// A start the authorization server or the configuration refused.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum StartError {
-    /// The discovery document does not arrive or does not parse.
-    #[error("the OIDC issuer `{issuer}` does not answer its discovery document")]
-    Discovery {
-        /// The issuer configured.
-        issuer: String,
-        /// The cause.
+    /// A guarded surface runs and `[auth]` names no issuer and is not off.
+    #[error(
+        "{} need [auth]: set FERROTERM_AUTH__ISSUER and FERROTERM_AUTH__AUDIENCE (or the file FERROTERM_AUTH_FILE), or FERROTERM_AUTH__ENABLED=false on a network only trusted callers reach",
+        surfaces.join(" and ")
+    )]
+    Unconfigured {
+        /// The guarded surfaces the deployment turned on, each with the
+        /// variable that turned it on.
+        surfaces: Vec<&'static str>,
+    },
+    /// The `[auth]` section breaks a rule.
+    #[error("[auth] is refused")]
+    Auth {
+        /// The rule.
         #[source]
-        source: Box<FetchError>,
+        source: Box<ConfigError>,
     },
-    /// The issuer's key set does not arrive.
-    #[error("the OIDC issuer `{issuer}` does not answer its key set")]
-    Keys {
-        /// The issuer configured.
+    /// An issuer's metadata or key set could not be read, or breaks a rule.
+    #[error("the authorization server {issuer} could not be read")]
+    Issuer {
+        /// The issuer identifier.
         issuer: String,
-        /// The cause.
+        /// What the resource server reported.
         #[source]
-        source: Box<KeyError>,
+        source: Box<ResourceError>,
+    },
+    /// The first issuer publishes no token endpoint, which the discovery
+    /// document requires (SMART App Launch 2.2.0, Conformance, §Metadata,
+    /// `token_endpoint`: REQUIRED).
+    #[error("the authorization server metadata of {issuer} names no token_endpoint")]
+    NoTokenEndpoint {
+        /// The issuer identifier.
+        issuer: String,
     },
 }
 
-/// What a route requires of the caller.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Need {
-    /// A write on one of the stored resource types.
-    Write {
-        /// The resource type the route writes.
-        resource: &'static str,
-        /// The interaction it performs.
-        permission: Permission,
-    },
-    /// A route of the admin listener, which the configured admin scope covers.
-    Admin,
-}
-
-/// The claims this server reads off a validated token.
-///
-/// The signature and the `iss`, `aud`, `exp`, and `nbf` claims are checked by
-/// `jsonwebtoken` against the raw payload, whatever this shape carries
-/// (<https://docs.rs/jsonwebtoken/11.1.0/jsonwebtoken/fn.decode.html>).
-#[derive(Debug, serde::Deserialize)]
-struct Claims {
-    /// RFC 6749 §3.3: the space-delimited grant.
-    #[serde(default)]
-    scope: Option<String>,
-    /// The array form several issuers mint instead of `scope`.
-    #[serde(default)]
-    scp: Option<Vec<String>>,
-}
-
-/// The configured SMART layer: the issuer, its keys, and what it permits.
+/// The started resource server: the gates in front of the write routes and
+/// the admin listener, and what the discovery documents name.
 #[derive(Debug)]
 pub struct Smart {
-    /// The issuer's discovery document, read at start.
-    metadata: IssuerMetadata,
-    /// The audiences a token may carry, per surface.
-    audiences: Audiences,
-    /// The scope the admin listener requires, compared verbatim.
-    admin_scope: String,
-    /// The protection space the challenge names (RFC 6750 §3).
+    /// The credentials the write routes admit.
+    fhir: Gate,
+    /// The credentials the admin listener admits; `None` when the deployment
+    /// binds no admin listener, so the admin routes refuse every caller.
+    admin: Option<Gate>,
+    /// The issuer the discovery document and the capability statement name.
+    primary: Arc<ResourceServer>,
+    /// The token endpoint that issuer's metadata names.
+    token_endpoint: String,
+    /// The protection space the challenges name (RFC 6750 §3, RFC 7617 §2).
     realm: String,
-    /// The client the issuer is asked with.
-    http: Http,
-    /// The issuer's signing keys.
-    keys: Keys,
+    /// The scope the admin listener requires.
+    admin_scope: String,
+    /// The scopes `[auth] scopes_supported` lists.
+    scopes_supported: Vec<String>,
+    /// The capabilities `[auth] capabilities` adds.
+    capabilities: Vec<String>,
 }
 
 impl Smart {
-    /// Reads the issuer's discovery document and key set, or answers `None`
-    /// when the deployment configured no issuer.
+    /// Reads the metadata and the key set of every issuer `[auth]` names, or
+    /// answers `None` when the deployment serves without authentication.
+    ///
+    /// Authentication is off when `[auth] enabled = false`, and when `[auth]`
+    /// names no issuer on a server that serves no write and no admin listener:
+    /// the read surface is open either way. A server that serves either and
+    /// names no issuer refuses to start (no specification governs the
+    /// default: our own design, the family's fail-closed rule). Each issuer is
+    /// read once here, so an authorization server that cannot be reached
+    /// refuses the start rather than the first request.
     ///
     /// # Errors
     ///
-    /// Returns [`StartError`] when the issuer does not answer, which is what
-    /// refuses the start: a server that cannot check a token must not serve a
-    /// surface it has declared protected.
+    /// Returns [`StartError::Unconfigured`] for a guarded surface without an
+    /// issuer, [`StartError::Auth`] for a section that breaks a rule,
+    /// [`StartError::Issuer`] for an issuer whose metadata or key set could
+    /// not be read, and [`StartError::NoTokenEndpoint`] when the first issuer
+    /// names no token endpoint.
     pub async fn start(config: &Config) -> Result<Option<Self>, StartError> {
-        let Some(issuer) = config.oidc_issuer.clone() else {
+        let auth = &config.auth;
+        if !auth.enabled {
             return Ok(None);
-        };
-        let http = Http::new().map_err(|source| StartError::Discovery {
-            issuer: issuer.clone(),
+        }
+        if auth.issuers().iter().all(|entry| entry.issuer.is_empty()) {
+            let surfaces = guarded_surfaces(config);
+            if surfaces.is_empty() {
+                return Ok(None);
+            }
+            return Err(StartError::Unconfigured { surfaces });
+        }
+        let resolved = auth.resolve().map_err(|source| StartError::Auth {
             source: Box::new(source),
         })?;
-        let metadata = http
-            .discover(&issuer)
-            .await
-            .map_err(|source| StartError::Discovery {
-                issuer: issuer.clone(),
-                source: Box::new(source),
-            })?;
-        let keys = Keys::read(&http, &metadata.jwks_uri)
-            .await
-            .map_err(|source| StartError::Keys {
-                issuer: issuer.clone(),
-                source: Box::new(source),
-            })?;
-        let realm = config
-            .base_url
-            .clone()
-            .unwrap_or_else(|| String::from("FerroTERM"));
+        let bases = version_bases(config.base_url.as_deref());
+        let mut fhir = IssuerSet::new();
+        let mut admin = IssuerSet::new();
+        let mut primary = None;
+        for settings in resolved.issuers {
+            let mut widened = settings.clone();
+            widened.audience.extend(bases.iter().cloned());
+            let server = discover(widened).await?;
+            primary.get_or_insert_with(|| Arc::clone(&server));
+            fhir = fhir.with(Arc::clone(&server));
+            if config.admin_listen.is_some() {
+                // NOTE: no specification governs the admin surface: our own design;
+                // it serves no FHIR base, so only the configured audiences open it.
+                let narrow = if bases.is_empty() {
+                    server
+                } else {
+                    discover(settings).await?
+                };
+                admin = admin.with(narrow);
+            }
+        }
+        let Some(primary) = primary else {
+            return Err(StartError::Auth {
+                source: Box::new(ConfigError::Missing { key: "auth.issuer" }),
+            });
+        };
+        let token_endpoint = primary.metadata().token_endpoint.clone().ok_or_else(|| {
+            StartError::NoTokenEndpoint {
+                issuer: primary.settings().issuer.clone(),
+            }
+        })?;
+        let realm = resolved
+            .realm
+            .or_else(|| config.base_url.clone())
+            .unwrap_or_else(|| String::from(REALM));
+        let basic = resolved.basic.map(Arc::new);
+        let fhir = gate_of(Arc::new(fhir), basic.as_ref(), &realm);
+        let admin = config
+            .admin_listen
+            .is_some()
+            .then(|| gate_of(Arc::new(admin), basic.as_ref(), &realm));
         Ok(Some(Self {
-            metadata,
-            audiences: Audiences::of(config),
-            admin_scope: config.oidc_admin_scope.clone(),
+            fhir,
+            admin,
+            primary,
+            token_endpoint,
             realm,
-            http,
-            keys,
+            admin_scope: resolved
+                .product_scope
+                .unwrap_or_else(|| String::from(ADMIN_SCOPE)),
+            scopes_supported: resolved.scopes_supported,
+            capabilities: resolved.capabilities,
         }))
     }
 
-    /// The issuer this server accepts tokens from.
+    /// The credentials the write routes admit.
+    #[must_use]
+    pub const fn fhir_gate(&self) -> &Gate {
+        &self.fhir
+    }
+
+    /// The credentials the admin listener admits, when the deployment binds
+    /// one.
+    #[must_use]
+    pub const fn admin_gate(&self) -> Option<&Gate> {
+        self.admin.as_ref()
+    }
+
+    /// The scope the admin listener requires.
+    #[must_use]
+    pub fn admin_scope(&self) -> &str {
+        &self.admin_scope
+    }
+
+    /// The realm every challenge names.
+    #[must_use]
+    pub fn realm(&self) -> &str {
+        &self.realm
+    }
+
+    /// The issuer the discovery documents name, the first one configured.
     #[must_use]
     pub fn issuer(&self) -> &str {
-        &self.metadata.issuer
+        &self.primary.settings().issuer
+    }
+
+    /// That issuer's metadata.
+    #[must_use]
+    pub fn metadata(&self) -> &ServerMetadata {
+        self.primary.metadata()
     }
 
     /// The issuer's token endpoint, which a capability statement states.
     #[must_use]
     pub fn token_endpoint(&self) -> &str {
-        &self.metadata.token_endpoint
+        &self.token_endpoint
     }
 
     /// The issuer's authorization endpoint, when it runs one.
     #[must_use]
     pub fn authorize_endpoint(&self) -> Option<&str> {
-        self.metadata.authorization_endpoint.as_deref()
+        self.metadata().authorization_endpoint.as_deref()
     }
 
     /// The issuer's dynamic registration endpoint, when it runs one.
     #[must_use]
     pub fn register_endpoint(&self) -> Option<&str> {
-        self.metadata.registration_endpoint.as_deref()
+        self.metadata().registration_endpoint.as_deref()
     }
 
     /// The issuer's introspection endpoint, when it runs one (RFC 7662).
     #[must_use]
     pub fn introspect_endpoint(&self) -> Option<&str> {
-        self.metadata.introspection_endpoint.as_deref()
+        self.metadata().introspection_endpoint.as_deref()
     }
 
     /// The issuer's revocation endpoint, when it runs one (RFC 7009).
     #[must_use]
     pub fn revoke_endpoint(&self) -> Option<&str> {
-        self.metadata.revocation_endpoint.as_deref()
-    }
-
-    /// Whether the issuer runs the authorization code flow a standalone launch
-    /// needs (<https://hl7.org/fhir/smart-app-launch/app-launch.html>).
-    fn standalone_launch(&self) -> bool {
-        self.metadata.authorization_endpoint.is_some()
-            && self
-                .metadata
-                .grant_types_supported
-                .iter()
-                .any(|grant| grant == AUTHORIZATION_CODE)
-    }
-
-    /// Whether the issuer offers the OpenID Connect profile the
-    /// `sso-openid-connect` capability rests on.
-    fn openid_connect(&self) -> bool {
-        self.metadata
-            .scopes_supported
-            .iter()
-            .any(|scope| scope == OPENID)
+        self.metadata().revocation_endpoint.as_deref()
     }
 
     /// The SMART capabilities this deployment offers, sorted.
-    ///
-    /// The scope syntaxes are this server's own; every other capability is read
-    /// off the issuer's document and claimed only where the issuer advertises
-    /// what it rests on
-    /// (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
     #[must_use]
     pub fn capabilities(&self) -> Vec<String> {
-        let methods = &self.metadata.token_endpoint_auth_methods_supported;
-        // NOTE: `permission-v2` is exemplified only by the search-parameter
-        // syntax this server refuses, so withholding it is our own reading
-        // (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
-        let mut out = vec![
-            String::from("permission-v1"),
-            String::from("permission-user"),
-        ];
-        if self.standalone_launch() {
-            out.push(String::from("launch-standalone"));
-        }
-        if self.openid_connect() {
-            out.push(String::from("sso-openid-connect"));
-        }
-        if methods.iter().any(|method| method == "private_key_jwt") {
-            out.push(String::from("client-confidential-asymmetric"));
-        }
-        if methods
-            .iter()
-            .any(|method| method == "client_secret_basic" || method == "client_secret_post")
-        {
-            out.push(String::from("client-confidential-symmetric"));
-        }
-        if methods.iter().any(|method| method == "none") {
-            out.push(String::from("client-public"));
-        }
-        out.sort();
-        out
+        discovery::capabilities(self.metadata(), &self.capabilities)
     }
 
     /// The `.well-known/smart-configuration` document of this deployment.
-    ///
-    /// The members are the issuer's, with `capabilities` derived from what the
-    /// issuer advertises; `token_endpoint`, `grant_types_supported`,
-    /// `capabilities`, and `code_challenge_methods_supported` are the required
-    /// ones (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
     #[must_use]
     pub fn configuration(&self) -> serde_json::Value {
-        let mut document = serde_json::Map::new();
-        let mut put = |name: &str, value: serde_json::Value| {
-            document.insert(name.to_owned(), value);
-        };
-        // NOTE: `issuer` is required where `sso-openid-connect` is claimed and
-        // omitted otherwise
-        // (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
-        if self.openid_connect() {
-            put("issuer", self.metadata.issuer.as_str().into());
-        }
-        put("jwks_uri", self.metadata.jwks_uri.as_str().into());
-        put(
-            "token_endpoint",
-            self.metadata.token_endpoint.as_str().into(),
-        );
-        put(
-            "grant_types_supported",
-            only(&self.metadata.grant_types_supported, &GRANT_TYPES).into(),
-        );
-        put("capabilities", self.capabilities().into());
-        // NOTE: the member is required and `S256` is a SHALL in it, so the
-        // server states its own PKCE support rather than the issuer's list
-        // (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
-        put(
-            "code_challenge_methods_supported",
-            CODE_CHALLENGE_METHODS
-                .iter()
-                .map(|method| (*method).to_owned())
-                .collect::<Vec<_>>()
-                .into(),
-        );
-        for (name, endpoint) in [
-            ("authorization_endpoint", self.authorize_endpoint()),
-            ("registration_endpoint", self.register_endpoint()),
-            ("introspection_endpoint", self.introspect_endpoint()),
-            ("revocation_endpoint", self.revoke_endpoint()),
-        ] {
-            if let Some(endpoint) = endpoint {
-                put(name, endpoint.into());
-            }
-        }
-        let authentication = only(
-            &self.metadata.token_endpoint_auth_methods_supported,
-            &TOKEN_ENDPOINT_AUTH_METHODS,
-        );
-        // NOTE: the server SHALL support every scope it lists here, so a scope
-        // the write gate refuses is dropped from the issuer's list
-        // (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
-        let advertised = self
-            .metadata
-            .scopes_supported
-            .iter()
-            .filter(|scope| scopes::serves(scope))
-            .cloned()
-            .collect();
-        for (name, values) in [
-            ("scopes_supported", advertised),
-            (
-                "response_types_supported",
-                self.metadata.response_types_supported.clone(),
-            ),
-            ("token_endpoint_auth_methods_supported", authentication),
-        ] {
-            if !values.is_empty() {
-                put(name, values.into());
-            }
-        }
-        serde_json::Value::Object(document)
+        discovery::document(
+            self.metadata(),
+            &self.token_endpoint,
+            &self.scopes_supported,
+            &self.capabilities,
+        )
     }
 
-    /// Checks the caller's token against what `need` requires.
-    ///
-    /// # Errors
-    ///
-    /// Returns the [`Refusal`] to answer with: `401` when no usable token
-    /// arrived, `403` when the token carries no scope for the route.
-    pub async fn authorize(&self, headers: &HeaderMap, need: Need) -> Result<(), Refusal> {
-        let token = bearer(headers).ok_or_else(|| Refusal::unauthenticated(&self.realm))?;
-        let header = decode_header(token)
-            .map_err(|error| Refusal::invalid_token(&self.realm, &error.to_string()))?;
-        if !ALGORITHMS.contains(&header.alg) {
-            return Err(Refusal::invalid_token(
-                &self.realm,
-                &format!(
-                    "the token is signed with {:?}, which this server does not accept",
-                    header.alg
-                ),
-            ));
+    /// The renderer of a refusal on the FHIR surface.
+    #[must_use]
+    pub fn fhir_render(&self) -> Challenge {
+        Challenge {
+            header: HeaderOnly::with_realm(self.realm.clone()),
         }
-        if let Some(declared) = header.typ.as_deref()
-            && !accepted_type(declared)
-        {
-            return Err(Refusal::invalid_token(
-                &self.realm,
-                &format!("the token declares the type `{declared}`"),
-            ));
-        }
-        let key = self
-            .keys
-            .key(&self.http, header.kid.as_deref(), header.alg)
-            .await
-            .map_err(|error| Refusal::invalid_token(&self.realm, &error.to_string()))?;
-        // NOTE: the accepted set is checked above; `Validation` admits one
-        // algorithm family at a time, so it names the one the key verifies
-        // (<https://docs.rs/jsonwebtoken/11.1.0/jsonwebtoken/struct.Validation.html>).
-        let mut validation = Validation::new(header.alg);
-        validation.set_issuer(&[self.metadata.issuer.as_str()]);
-        // RFC 7519 §4.1.5: the crate does not check `nbf` unless asked.
-        validation.validate_nbf = true;
-        // RFC 8725 §3.8: a claim the crate checks only when it is present is no
-        // check at all, so `iss` is required outright.
-        validation.required_spec_claims.insert(String::from("iss"));
-        let accepted = self.audiences.accepted(need);
-        if accepted.is_empty() {
-            // NOTE: RFC 9068 §4 has a resource server check `aud`, so a
-            // deployment naming neither a base nor an audience is our own
-            // tolerance for the unconfigured case, bounded by the issuer check.
-            validation.validate_aud = false;
-        } else {
-            // NOTE: RFC 7519 §4.1.3 has the recipient identify itself with a
-            // value in `aud`, which the crate reads over the string form and
-            // the array form alike (<https://docs.rs/jsonwebtoken/11.1.0/jsonwebtoken/struct.Validation.html>).
-            validation.set_audience(accepted);
-            // RFC 8725 §3.9: a token whose audience is absent is rejected
-            // just as one whose audience is another recipient.
-            validation.required_spec_claims.insert(String::from("aud"));
-        }
-        let data = decode::<Claims>(token, &key, &validation)
-            .map_err(|error| Refusal::invalid_token(&self.realm, &error.to_string()))?;
-        let granted = scopes::granted(data.claims.scope.as_deref(), data.claims.scp.as_deref());
-        self.permits(&granted, need)
     }
 
-    /// Whether `granted` covers `need`.
-    fn permits(&self, granted: &[String], need: Need) -> Result<(), Refusal> {
-        match need {
-            Need::Write {
-                resource,
-                permission,
-            } => {
-                if granted
-                    .iter()
-                    .any(|scope| scopes::grants(scope, resource, permission))
-                {
-                    return Ok(());
-                }
-                Err(Refusal::forbidden(
-                    &self.realm,
-                    &permission.scopes_for(resource),
-                ))
-            }
-            Need::Admin => {
-                if granted.contains(&self.admin_scope) {
-                    return Ok(());
-                }
-                Err(Refusal::forbidden(
-                    &self.realm,
-                    std::slice::from_ref(&self.admin_scope),
-                ))
-            }
+    /// The renderer of a refusal on the admin listener.
+    #[must_use]
+    pub fn admin_render(&self) -> AdminRefusal {
+        AdminRefusal {
+            header: HeaderOnly::with_realm(self.realm.clone()),
         }
     }
 }
 
-/// Whether `declared`, the token's `typ` header, names a kind this server
-/// spends as an access token.
+/// Reads one issuer's metadata and key set.
+async fn discover(settings: Settings) -> Result<Arc<ResourceServer>, StartError> {
+    let issuer = settings.issuer.clone();
+    ResourceServer::discover(settings)
+        .await
+        .map(Arc::new)
+        .map_err(|source| StartError::Issuer {
+            issuer,
+            source: Box::new(source),
+        })
+}
+
+/// The gate admitting the bearer tokens `verifier` checks and the Basic users
+/// of `basic`, naming `realm` on every challenge.
+fn gate_of(verifier: Arc<IssuerSet>, basic: Option<&Arc<PasswordStore>>, realm: &str) -> Gate {
+    let gate = Gate::open().with_bearer(verifier).with_realm(realm);
+    match basic {
+        Some(store) => gate.with_basic(Arc::clone(store)),
+        None => gate,
+    }
+}
+
+/// The guarded surfaces `config` turns on, each named with its variable.
+fn guarded_surfaces(config: &Config) -> Vec<&'static str> {
+    let mut surfaces = Vec::new();
+    if config.resources.is_some() {
+        surfaces.push("the write routes (FERROTERM_RESOURCES)");
+    }
+    if config.admin_listen.is_some() {
+        surfaces.push("the admin listener (FERROTERM_ADMIN_LISTEN)");
+    }
+    surfaces
+}
+
+/// The audiences the write routes accept beside `[auth] audience`: every
+/// served version's base under `base_url`, with and without a trailing slash.
 ///
-/// RFC 8725 §3.12 asks that the rules for the kinds one issuer mints be
-/// mutually exclusive, so an ID token or a registration token typed by its
-/// issuer is refused here rather than spent as an access token. A token with no
-/// `typ` is judged by its claims alone, which is what RFC 7519 §5.1 leaves open.
-fn accepted_type(declared: &str) -> bool {
-    let declared = declared.trim();
-    // RFC 9068 §2.1 admits the media type with or without its `application/`
-    // prefix, and RFC 7519 §5.1 makes the generic `JWT` type legal.
-    ["at+jwt", "application/at+jwt", "jwt", "application/jwt"]
-        .iter()
-        .any(|known| declared.eq_ignore_ascii_case(known))
+/// The `aud` of a SMART authorization request names the resource server the
+/// app wants FHIR data from (<https://hl7.org/fhir/smart-app-launch/app-launch.html>),
+/// and this server publishes one base per version. The set is one for every
+/// version, so a token minted for `/r5` is spendable on `/r4b` as well: our own
+/// design, one process serving the four bases to a reader in one session.
+fn version_bases(base_url: Option<&str>) -> Vec<String> {
+    let Some(base) = base_url else {
+        return Vec::new();
+    };
+    let mut bases = Vec::new();
+    for segment in crate::version::SEGMENTS {
+        let endpoint = crate::version::endpoint(base, segment);
+        // NOTE: FHIR fixes a service base with no trailing slash
+        // (<https://hl7.org/fhir/R4B/http.html#root>), so the slashed form is
+        // our own tolerance and the only one performed.
+        bases.push(format!("{endpoint}/"));
+        bases.push(endpoint);
+    }
+    bases
 }
 
-/// The bearer credential of `headers`, when one arrived (RFC 6750 §2.1).
-fn bearer(headers: &HeaderMap) -> Option<&str> {
-    let value = headers.get(http::header::AUTHORIZATION)?.to_str().ok()?;
-    let (scheme, credential) = value.split_once(' ')?;
-    if !scheme.eq_ignore_ascii_case("Bearer") {
-        return None;
+/// The `OperationOutcome` issue code and the text of a refusal, which name no
+/// claim and no scope.
+///
+/// No specification requires the omission: our own design, so a refusal
+/// teaches a caller nothing about why a forged or stolen token failed.
+const fn diagnostics(refusal: &Refusal) -> (&'static str, &'static str) {
+    match refusal {
+        Refusal::Missing(_) | Refusal::InvalidToken | Refusal::InvalidBasic => (
+            "login",
+            "the request carries no valid credential for this server",
+        ),
+        Refusal::InvalidRequest => (
+            "security",
+            "the Authorization header carries no single credential",
+        ),
+        Refusal::Forbidden | Refusal::Unclassified => (
+            "forbidden",
+            "the credential carries no scope that permits this request",
+        ),
+        Refusal::Unavailable => (
+            "transient",
+            "the credential could not be checked: the authorization server's keys could not be read",
+        ),
+        _ => ("security", "the request was refused at the gate"),
     }
-    let credential = credential.trim();
-    (!credential.is_empty()).then_some(credential)
 }
 
-/// A request this server will not answer, and the challenge that says why.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Refusal {
-    /// The status to answer.
-    status: StatusCode,
-    /// The `OperationOutcome` issue code, of the FHIR issue-type value set
-    /// (<https://hl7.org/fhir/R4B/valueset-issue-type.html>).
-    code: &'static str,
-    /// What the client is told.
-    diagnostics: String,
-    /// The `WWW-Authenticate` value (RFC 6750 §3).
-    challenge: String,
+/// The refusal a response answers, left for [`outcome`] to write its body.
+#[derive(Debug, Clone)]
+struct Refused(Refusal);
+
+/// The renderer of a refusal on the FHIR surface: the crate's status and
+/// challenge, and an `OperationOutcome` body [`outcome`] writes in the format
+/// the request asked for.
+#[derive(Debug, Clone)]
+pub struct Challenge {
+    /// The status and the challenge.
+    header: HeaderOnly,
 }
 
-impl Refusal {
-    /// No credential arrived.
-    ///
-    /// RFC 6750 §3.1 keeps the error code out of the challenge when the request
-    /// carried no authentication at all.
-    #[must_use]
-    fn unauthenticated(realm: &str) -> Self {
-        Self {
-            status: StatusCode::UNAUTHORIZED,
-            code: "login",
-            diagnostics: String::from("this request requires an OAuth 2.0 bearer token"),
-            challenge: format!("Bearer realm=\"{}\"", quoted(realm)),
-        }
-    }
-
-    /// A credential arrived and did not verify (RFC 6750 §3.1, `invalid_token`).
-    ///
-    /// The reason can quote what the token said, so it is bounded and reduced
-    /// before it reaches either the header or the body.
-    #[must_use]
-    fn invalid_token(realm: &str, reason: &str) -> Self {
-        let reason = &quoted(reason);
-        Self {
-            status: StatusCode::UNAUTHORIZED,
-            code: "login",
-            diagnostics: format!("the bearer token is not valid: {reason}"),
-            challenge: format!(
-                "Bearer realm=\"{}\", error=\"invalid_token\", error_description=\"{}\"",
-                quoted(realm),
-                quoted(reason)
-            ),
-        }
-    }
-
-    /// The token verified and carries none of the scopes the route accepts
-    /// (RFC 6750 §3.1, `insufficient_scope`).
-    ///
-    /// The optional `scope` attribute is sent only where one scope opens the
-    /// route: RFC 6750 §3 reads it as "the required scope of the access token",
-    /// a space-delimited set the client would have to hold in full (RFC 6749
-    /// §3.3), so alternatives are named in the outcome instead.
-    #[must_use]
-    fn forbidden(realm: &str, wanted: &[String]) -> Self {
-        let named = wanted
-            .iter()
-            .map(|scope| format!("`{scope}`"))
-            .collect::<Vec<_>>()
-            .join(" or ");
-        let attribute = match wanted {
-            [one] => format!(", scope=\"{}\"", quoted(one)),
-            _ => String::new(),
-        };
-        Self {
-            status: StatusCode::FORBIDDEN,
-            code: "forbidden",
-            diagnostics: format!("the bearer token carries no {named} scope"),
-            challenge: format!(
-                "Bearer realm=\"{}\", error=\"insufficient_scope\"{attribute}",
-                quoted(realm)
-            ),
-        }
-    }
-
-    /// The refusal as an `OperationOutcome`, in the format `headers` asks for.
-    #[must_use]
-    pub fn fhir_response(&self, headers: &HeaderMap) -> Response {
-        // NOTE: an `Accept` this server does not speak is a second fault on a
-        // request already refused, so the outcome answers in the default format
-        // rather than replacing the security refusal with a format one.
-        let wire = crate::wire::Wire::negotiate(&[], headers).unwrap_or_default();
-        let mut response =
-            Failure::new(self.status, self.code, self.diagnostics.clone()).respond(wire);
-        self.challenge_header(&mut response);
+impl Render for Challenge {
+    fn render(&self, refusal: &Refusal) -> Response {
+        let mut response = self.header.respond(refusal, Body::empty());
+        response.extensions_mut().insert(Refused(refusal.clone()));
         response
     }
+}
 
-    /// The refusal in the shape the admin listener answers in, which is plain
-    /// JSON and never FHIR.
-    #[must_use]
-    pub fn admin_response(&self) -> Response {
+/// Writes the `OperationOutcome` of a refused request in the format its
+/// headers ask for.
+///
+/// The layer's renderer sees the refusal and never the request, so the body is
+/// written here, outside the layer, where the `Accept` header is read.
+pub async fn outcome(request: Request, next: Next) -> Response {
+    // NOTE: an `Accept` this server does not speak is a second fault on a
+    // request already refused, so the outcome answers in the default format.
+    let wire = crate::wire::Wire::negotiate(&[], request.headers()).unwrap_or_default();
+    let response = next.run(request).await;
+    let Some(Refused(refusal)) = response.extensions().get::<Refused>().cloned() else {
+        return response;
+    };
+    let (code, text) = diagnostics(&refusal);
+    let mut answered = Failure::new(refusal.status(), code, text).respond(wire);
+    if let Some(challenge) = response.headers().get(http::header::WWW_AUTHENTICATE) {
+        answered
+            .headers_mut()
+            .insert(http::header::WWW_AUTHENTICATE, challenge.clone());
+    }
+    answered
+}
+
+/// The renderer of a refusal on the admin listener, which answers plain JSON
+/// and never FHIR.
+#[derive(Debug, Clone)]
+pub struct AdminRefusal {
+    /// The status and the challenge.
+    header: HeaderOnly,
+}
+
+impl Render for AdminRefusal {
+    fn render(&self, refusal: &Refusal) -> Response {
+        let (_, text) = diagnostics(refusal);
         let body = serde_json::json!({
             "outcome": crate::metrics::Outcome::Failed.as_str(),
-            "reason": self.diagnostics,
+            "reason": text,
         });
-        let mut response = match serde_json::to_vec(&body) {
-            Ok(bytes) => Response::builder()
-                .status(self.status)
-                .header(http::header::CONTENT_TYPE, "application/json")
-                .body(Body::from(bytes))
-                .unwrap_or_else(|_| self.status.into_response()),
-            Err(_) => self.status.into_response(),
+        let Ok(bytes) = serde_json::to_vec(&body) else {
+            return self.header.respond(refusal, Body::empty());
         };
-        self.challenge_header(&mut response);
+        let mut response = self.header.respond(refusal, Body::from(bytes));
+        response.headers_mut().insert(
+            http::header::CONTENT_TYPE,
+            http::HeaderValue::from_static("application/json"),
+        );
         response
     }
-
-    /// Adds the `WWW-Authenticate` challenge to `response`.
-    ///
-    /// RFC 9110 §15.5.2 makes the header mandatory on a `401`, so a challenge
-    /// that somehow does not read as a header value falls back to the bare
-    /// scheme rather than being dropped.
-    fn challenge_header(&self, response: &mut Response) {
-        let value = HeaderValue::from_str(&self.challenge)
-            .unwrap_or_else(|_| HeaderValue::from_static("Bearer"));
-        response
-            .headers_mut()
-            .insert(http::header::WWW_AUTHENTICATE, value);
-    }
-}
-
-/// The longest a challenge parameter this server writes may be.
-///
-/// No specification bounds it: our own design, so a `kid` or an issuer message
-/// echoed back cannot grow the response header.
-const PARAMETER_LIMIT: usize = 200;
-
-/// `text` reduced to what a challenge `quoted-string` may carry.
-///
-/// RFC 6750 §3 limits the parameter value to `%x20-21 / %x23-5B / %x5D-7E`,
-/// which leaves out the quote and the backslash that would end the value early
-/// and every control or non-ASCII byte a header cannot hold.
-fn quoted(text: &str) -> String {
-    text.chars()
-        .filter(|character| matches!(*character, ' '..='!' | '#'..='[' | ']'..='~'))
-        .take(PARAMETER_LIMIT)
-        .collect()
 }
 
 /// `GET [base]/.well-known/smart-configuration`.
 ///
-/// A deployment that configured no issuer serves nothing here, so the answer is
-/// the `not-found` outcome any other unknown path gives.
+/// A deployment that serves without authentication serves nothing here, so the
+/// answer is the `not-found` outcome any other unknown path gives.
 pub async fn configuration(
     axum::extract::State(smart): axum::extract::State<Option<Arc<Smart>>>,
     headers: HeaderMap,
@@ -742,114 +498,46 @@ pub async fn configuration(
 
 #[cfg(test)]
 mod tests {
-    use http::HeaderMap;
-
-    use super::{Audiences, Need, bearer, quoted};
+    use super::{guarded_surfaces, version_bases};
     use crate::config::Config;
-    use crate::smart::scopes::Permission;
-
-    /// A write, which is what the FHIR surface asks a token for.
-    const WRITE: Need = Need::Write {
-        resource: "ValueSet",
-        permission: Permission::Update,
-    };
-
-    #[test]
-    fn a_bearer_credential_is_read_whatever_the_case_of_its_scheme() {
-        let mut headers = HeaderMap::new();
-        assert_eq!(bearer(&headers), None);
-        headers.insert(http::header::AUTHORIZATION, "bearer abc".parse().unwrap());
-        assert_eq!(bearer(&headers), Some("abc"));
-        headers.insert(http::header::AUTHORIZATION, "Bearer  abc ".parse().unwrap());
-        assert_eq!(bearer(&headers), Some("abc"));
-        headers.insert(http::header::AUTHORIZATION, "Basic abc".parse().unwrap());
-        assert_eq!(bearer(&headers), None, "another scheme is not a token");
-        headers.insert(http::header::AUTHORIZATION, "Bearer ".parse().unwrap());
-        assert_eq!(bearer(&headers), None, "an empty credential is none");
-    }
-
-    #[test]
-    fn a_challenge_parameter_cannot_carry_a_quote_or_a_backslash() {
-        assert_eq!(quoted(r#"a"b\c"#), "abc");
-        assert_eq!(quoted("plain"), "plain");
-    }
 
     // The `aud` a client sends is the FHIR base it is talking to
     // (<https://hl7.org/fhir/smart-app-launch/app-launch.html>), and this
     // server has one per version.
     #[test]
-    fn every_served_version_base_is_an_audience_beside_the_configured_one() {
-        let audiences = Audiences::of(&Config {
-            base_url: Some(String::from("https://tx.example.org")),
-            oidc_audience: Some(String::from("ferroterm")),
-            ..Config::default()
-        });
-        let accepted = audiences.accepted(WRITE);
+    fn every_served_version_base_is_an_audience_of_the_write_routes() {
+        let bases = version_bases(Some("https://tx.example.org"));
         for segment in crate::version::SEGMENTS {
             let base = format!("https://tx.example.org/{segment}");
-            assert!(accepted.contains(&base), "{base}: {accepted:?}");
-            assert!(accepted.contains(&format!("{base}/")), "{base}/");
+            assert!(bases.contains(&base), "{base}: {bases:?}");
+            assert!(bases.contains(&format!("{base}/")), "{base}/");
         }
         assert!(
-            accepted.contains(&String::from("ferroterm")),
-            "the configured audience stays accepted: {accepted:?}"
+            !bases.contains(&String::from("https://tx.example.org")),
+            "the root serves no FHIR base: {bases:?}"
         );
-        assert!(
-            !accepted.contains(&String::from("https://tx.example.org")),
-            "the root serves no FHIR base: {accepted:?}"
-        );
-    }
-
-    // The admin listener serves no FHIR interaction, so a base URL is not an
-    // audience for it and naming one leaves it as it was.
-    #[test]
-    fn the_admin_listener_takes_only_the_configured_audience() {
-        let audiences = Audiences::of(&Config {
-            base_url: Some(String::from("https://tx.example.org")),
-            oidc_audience: Some(String::from("ferroterm")),
-            ..Config::default()
-        });
-        assert_eq!(
-            audiences.accepted(Need::Admin),
-            [String::from("ferroterm")],
-            "no version base is an admin audience"
-        );
-        let base_only = Audiences::of(&Config {
-            base_url: Some(String::from("https://tx.example.org")),
-            ..Config::default()
-        });
-        assert!(
-            base_only.accepted(Need::Admin).is_empty(),
-            "a deployment naming no audience checks none there, as before"
-        );
-    }
-
-    #[test]
-    fn a_deployment_naming_no_base_and_no_audience_checks_none() {
-        let none = Audiences::of(&Config::default());
-        assert!(none.accepted(WRITE).is_empty());
-        assert!(none.accepted(Need::Admin).is_empty());
-        let only_configured = Audiences::of(&Config {
-            oidc_audience: Some(String::from("ferroterm")),
-            ..Config::default()
-        });
-        assert_eq!(only_configured.accepted(WRITE), [String::from("ferroterm")]);
+        assert!(version_bases(None).is_empty());
     }
 
     // A base URL with a trailing slash would otherwise double the separator
     // and refuse every real token.
     #[test]
     fn a_base_url_that_ends_in_a_slash_derives_the_same_audiences() {
-        let audiences = Audiences::of(&Config {
-            base_url: Some(String::from("https://tx.example.org/")),
-            ..Config::default()
-        });
+        let bases = version_bases(Some("https://tx.example.org/"));
         assert!(
-            audiences
-                .accepted(WRITE)
-                .contains(&String::from("https://tx.example.org/r4b")),
-            "{:?}",
-            audiences.accepted(WRITE)
+            bases.contains(&String::from("https://tx.example.org/r4b")),
+            "{bases:?}"
         );
+    }
+
+    #[test]
+    fn the_writes_and_the_admin_listener_are_the_guarded_surfaces() {
+        assert!(guarded_surfaces(&Config::default()).is_empty());
+        let both = Config {
+            resources: Some(std::path::PathBuf::from("resources.redb")),
+            admin_listen: Some(String::from("127.0.0.1:8081")),
+            ..Config::default()
+        };
+        assert_eq!(guarded_surfaces(&both).len(), 2);
     }
 }

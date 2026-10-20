@@ -22,6 +22,7 @@ path = "src/main.rs"
 anyhow.workspace = true
 axum.workspace = true
 clap.workspace = true
+ferrohealth-smart.workspace = true
 prometheus-client.workspace = true
 fhir-types.workspace = true
 fhir-terminology.workspace = true
@@ -30,11 +31,12 @@ http.workspace = true
 hyper-rustls.workspace = true
 hyper-util.workspace = true
 jiff.workspace = true
-jsonwebtoken.workspace = true
 redb.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+# The `[auth]` table is read from the TOML file `FERROTERM_AUTH_FILE` names.
+toml.workspace = true
 # `time` bounds the health probe; the runtime features come from the workspace.
 tokio = { workspace = true, features = ["time"] }
 tracing.workspace = true
@@ -43,12 +45,15 @@ tracing-subscriber.workspace = true
 uuid = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]
+argon2.workspace = true
 base64.workspace = true
 criterion.workspace = true
 ferroterm-testkit.workspace = true
+jsonwebtoken.workspace = true
 # The SMART tests stand up an issuer and mint tokens for it, so they generate a
 # signing key and publish it as a JWK instead of committing one.
 ring.workspace = true
+secrecy.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["io-util", "sync", "time"] }
 tower = { workspace = true, features = ["util"] }

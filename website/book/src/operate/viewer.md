@@ -82,10 +82,13 @@ session on its own server, behind one cookie the browser cannot read; the
 browser never holds a token. Register the console as a client at the provider
 with the redirect address `https://your-console/auth/callback` and the scopes
 above, and point the terminology server at the same issuer with
-`FERROTERM_OIDC_ISSUER` ([Configuration](configuration.md)), so it accepts the
-tokens the console presents. A role that gets none of the three `user/` scopes
-reads the server and changes nothing; the menu under your name says what you
-may edit.
+`FERROTERM_AUTH__ISSUER` and the audience the provider puts in the console's
+tokens with `FERROTERM_AUTH__AUDIENCE`
+([Configuration](configuration.md#authentication)), so it accepts the tokens
+the console presents. A provider that types its access tokens `JWT` rather
+than `at+jwt` (RFC 9068) needs `FERROTERM_AUTH__TOKEN_PROFILE=jwt`. A role that
+gets none of the three `user/` scopes reads the server and changes nothing;
+the menu under your name says what you may edit.
 
 **Sign out** ends the session, revokes its token where the provider publishes
 a revocation endpoint (RFC 7009), and takes you to the provider's end-session

@@ -25,6 +25,8 @@ addon-nts.workspace = true
 anyhow.workspace = true
 axum.workspace = true
 clap.workspace = true
+# The credential of the reload call: HTTP Basic or a client credentials token.
+ferrohealth-smart.workspace = true
 jiff = { workspace = true, features = ["serde"] }
 prometheus-client.workspace = true
 # `query` carries the operation parameters: the revalidation reads the FHIR
@@ -40,6 +42,7 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 
 [dev-dependencies]
+secrecy.workspace = true
 sha2.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["fs", "io-util", "process", "sync", "time", "rt-multi-thread", "macros"] }

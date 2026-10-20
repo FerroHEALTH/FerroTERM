@@ -52,6 +52,20 @@ pub enum ServiceError {
         #[source]
         source: reqwest::Error,
     },
+    /// `[server_admin_credentials]` breaks a rule.
+    #[error("[server_admin_credentials] is refused")]
+    Credentials {
+        /// The rule.
+        #[source]
+        source: Box<ferrohealth_smart::config::ConfigError>,
+    },
+    /// The token client of the client credentials grant cannot be built.
+    #[error("the token client of [server_admin_credentials.oauth] cannot be built")]
+    Token {
+        /// Why.
+        #[source]
+        source: Box<ferrohealth_smart::client::TokenError>,
+    },
 }
 
 /// One running synchronisation service.
@@ -78,7 +92,9 @@ impl Service {
     ///
     /// Returns [`ServiceError::Schedule`] when the schedule does not read,
     /// [`ServiceError::State`] when the state file does not read, and
-    /// [`ServiceError::Client`] when the HTTP client cannot be built.
+    /// [`ServiceError::Client`] when the HTTP client cannot be built, and
+    /// [`ServiceError::Credentials`] or [`ServiceError::Token`] when the
+    /// credential of the reload call does not resolve.
     pub fn new(
         config: Config,
         sources: Vec<ConfiguredSource>,
@@ -92,7 +108,20 @@ impl Service {
             .timeout(std::time::Duration::from_mins(30))
             .build()
             .map_err(|source| ServiceError::Client { source })?;
-        let admin = AdminClient::new(client.clone(), &config.server_admin_url);
+        let mut admin = AdminClient::new(client.clone(), &config.server_admin_url);
+        let outbound = config
+            .server_admin_credentials
+            .resolve()
+            .map_err(|source| ServiceError::Credentials {
+                source: Box::new(source),
+            })?;
+        if let Some(outbound) = outbound {
+            admin = admin
+                .with_credentials(outbound)
+                .map_err(|source| ServiceError::Token {
+                    source: Box::new(source),
+                })?;
+        }
         let webhook = config
             .webhook_url
             .as_deref()

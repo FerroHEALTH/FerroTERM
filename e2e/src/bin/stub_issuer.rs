@@ -72,6 +72,10 @@ const VALID_DAYS: i64 = 30;
 /// The `kid` the key set and every token header carry (RFC 7517 §4.5).
 const KEY_ID: &str = "stub-issuer-k1";
 
+/// The audience an access token names when the authorization request names
+/// none, the one `scripts/ui-e2e.sh` configures the server with.
+const AUDIENCE: &str = "ferroterm";
+
 /// The scopes this issuer knows how to grant.
 ///
 /// The three resource scopes are the ones FerroTERM's write gate honours, in
@@ -212,14 +216,15 @@ impl Keys {
         }]}))
     }
 
-    /// `claims` signed as an ES256 token naming this key.
+    /// `claims` signed as an ES256 token of type `typ` naming this key.
     ///
     /// ES256 rather than RS256: this issuer generates its key at start, `ring`
     /// generates no RSA key, and the crate that does carries RUSTSEC-2023-0071.
     /// FerroTERM accepts every asymmetric algorithm RFC 7518 defines.
-    fn sign(&self, claims: &Value) -> Result<String, Failure> {
+    fn sign(&self, claims: &Value, typ: &str) -> Result<String, Failure> {
         let mut header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::ES256);
         header.kid = Some(KEY_ID.to_owned());
+        header.typ = Some(typ.to_owned());
         let key = jsonwebtoken::EncodingKey::from_ec_der(&self.pkcs8);
         Ok(jsonwebtoken::encode(&header, claims, &key)?)
     }
@@ -393,15 +398,27 @@ impl Stub {
     fn minted_for(&self, pending: &Pending) -> Result<Value, Failure> {
         let now = jiff::Timestamp::now().as_second();
         let expires = now + LIFETIME_SECONDS;
-        let access = self.keys.sign(&json!({
-            "iss": self.issuer,
-            "sub": FHIR_USER,
-            "aud": pending.audience,
-            "iat": now,
-            "nbf": now,
-            "exp": expires,
-            "scope": pending.profile.in_token(&pending.asked).join(" "),
-        }))?;
+        // RFC 9068 §2: an access token is typed `at+jwt` and carries `client_id`
+        // and `jti` beside the claims every JWT carries.
+        let audience = if pending.audience.is_empty() {
+            AUDIENCE
+        } else {
+            pending.audience.as_str()
+        };
+        let access = self.keys.sign(
+            &json!({
+                "iss": self.issuer,
+                "sub": FHIR_USER,
+                "aud": audience,
+                "client_id": pending.client,
+                "jti": format!("{}-{now}", pending.tag),
+                "iat": now,
+                "nbf": now,
+                "exp": expires,
+                "scope": pending.profile.in_token(&pending.asked).join(" "),
+            }),
+            "at+jwt",
+        )?;
         let mut identity_claims = json!({
             "iss": self.issuer,
             "sub": FHIR_USER,
@@ -416,7 +433,7 @@ impl Stub {
         {
             claims.insert(String::from("nonce"), Value::from(pending.nonce.clone()));
         }
-        let identity = self.keys.sign(&identity_claims)?;
+        let identity = self.keys.sign(&identity_claims, "JWT")?;
         self.minted
             .lock()
             .unwrap_or_else(PoisonError::into_inner)

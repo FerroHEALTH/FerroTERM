@@ -90,6 +90,7 @@ FERROTERM_INDEX="$work/index" \
 FERROTERM_CODESYSTEMS="$work/codesystems" \
 FERROTERM_LISTEN=127.0.0.1:8080 \
 FERROTERM_ADMIN_LISTEN=127.0.0.1:8081 \
+FERROTERM_AUTH__ENABLED=false \
 FERROTERM_LOG_FORMAT=json \
   "$bin/ferroterm" >"$work/server.log" 2>&1 &
 server_pid=$!

@@ -141,7 +141,29 @@ fn endpoint_admitted(url: &str) -> bool {
     let authority = url.split_once("://").map_or("", |(_, rest)| {
         rest.split(['/', '?', '#']).next().unwrap_or(rest)
     });
-    !authority.is_empty() && !authority.contains('@') && crate::smart::discovery::secure(url)
+    !authority.is_empty() && !authority.contains('@') && secure(url)
+}
+
+/// Whether `url` may be fetched: `https`, or plain HTTP on the loopback host.
+///
+/// A loopback collector is the one place the transport cannot be observed,
+/// and a test collector is that (no specification governs the exception: our
+/// own design).
+pub(crate) fn secure(url: &str) -> bool {
+    if url.starts_with("https://") {
+        return true;
+    }
+    let Some(rest) = url.strip_prefix("http://") else {
+        return false;
+    };
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or(rest);
+    // An IPv6 literal is bracketed, so its colons are not the port separator
+    // (RFC 3986 §3.2.2).
+    let host = match authority.split_once(']') {
+        Some((bracketed, _)) => bracketed.strip_prefix('[').unwrap_or(bracketed),
+        None => authority.split(':').next().unwrap_or(authority),
+    };
+    matches!(host, "localhost" | "127.0.0.1" | "::1")
 }
 
 #[cfg(test)]

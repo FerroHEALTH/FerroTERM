@@ -1,17 +1,20 @@
-//! The optional SMART App Launch bearer gate over the write routes and the
-//! admin listener.
+//! The resource server over the write routes and the admin listener:
+//! `ferrohealth-smart`, configured by `[auth]`.
 //!
 //! The issuer is a `wiremock` server that publishes an OpenID Connect discovery
-//! document and a JWKS; the tokens are minted in the test with a key generated
-//! for the run, so no key material is committed. The requirements asserted are
+//! document and a JWKS; the RFC 9068 access tokens are minted in the test with
+//! a key generated for the run, so no key material is committed. The requirements asserted are
 //! SMART App Launch conformance and discovery
 //! (<https://hl7.org/fhir/smart-app-launch/conformance.html>), the version 2
 //! scope syntax
 //! (<https://hl7.org/fhir/smart-app-launch/scopes-and-launch-context.html>),
 //! and the bearer challenge of RFC 6750 §3.
 
+use argon2::Argon2;
+use argon2::password_hash::PasswordHasher;
 use axum::body::Body;
 use base64::Engine;
+use ferrohealth_smart::config::{BasicSection, BasicUser};
 use ferroterm_server::config::Config;
 use ferroterm_server::smart::Smart;
 use http::header::{AUTHORIZATION, WWW_AUTHENTICATE};
@@ -19,6 +22,7 @@ use http::{Request, StatusCode};
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use ring::rand::SystemRandom;
 use ring::signature::{ECDSA_P256_SHA256_FIXED_SIGNING, EcdsaKeyPair, KeyPair};
+use secrecy::SecretString;
 use serde_json::{Value, json};
 use tower::ServiceExt;
 use wiremock::matchers::{method, path};
@@ -84,6 +88,8 @@ impl SigningKey {
     fn sign(&self, claims: &Value) -> String {
         let mut header = Header::new(Algorithm::ES256);
         header.kid = Some(self.kid.clone());
+        // RFC 9068 §2.1: an access token is typed `at+jwt`.
+        header.typ = Some(String::from("at+jwt"));
         self.sign_with(&header, claims)
     }
 
@@ -93,13 +99,18 @@ impl SigningKey {
     }
 }
 
-/// The claims of a token minted for `issuer`.
+/// The claims of an RFC 9068 access token minted for `issuer`.
+///
+/// RFC 9068 §2.2 requires `iss`, `exp`, `aud`, `sub`, `client_id`, `iat` and
+/// `jti`.
 fn claims(issuer: &str, scope: &str, expires_in: i64) -> Value {
     let now = jiff::Timestamp::now().as_second();
     json!({
         "iss": issuer,
         "sub": "ferroterm-test-client",
-        "aud": "ferroterm",
+        "client_id": "ferroterm-test-client",
+        "jti": format!("jti-{now}"),
+        "aud": fixture::AUDIENCE,
         "iat": now,
         "nbf": now - 5,
         "exp": now + expires_in,
@@ -225,14 +236,16 @@ fn challenge(response: &http::Response<Body>) -> String {
     fixture::header(response, WWW_AUTHENTICATE).unwrap_or_default()
 }
 
+// A deployment that turned `[auth]` off is served the way `Serving::new`
+// serves: no credential is asked for anywhere.
 #[tokio::test]
-async fn an_unconfigured_issuer_leaves_every_route_open() {
+async fn a_server_with_auth_off_leaves_every_route_open() {
     let server = Server::start_persisting();
     let response = put_colours(&server, None).await;
     assert_eq!(
         response.status(),
         StatusCode::CREATED,
-        "a write answers without a token when no issuer is configured"
+        "a write answers without a token when authentication is off"
     );
     assert_eq!(
         fixture::header(&response, WWW_AUTHENTICATE),
@@ -297,16 +310,13 @@ async fn a_token_with_the_scope_writes_and_one_without_it_is_refused() {
     let sent = challenge(&response);
     assert_eq!(response.status(), StatusCode::FORBIDDEN, "{sent}");
     assert!(sent.contains("error=\"insufficient_scope\""), "{sent}");
-    // RFC 6750 §3 reads `scope` as the scope a token must carry, a conjunction
-    // (RFC 6749 §3.3), so two alternatives are named in the outcome instead.
+    // RFC 6750 §3 makes the `scope` attribute optional, and the refusal names
+    // no scope anywhere, so it teaches a caller nothing about its grants.
     assert!(!sent.contains("scope="), "{sent}");
     let (_, body) = fixture::json(response).await;
     assert_eq!(body["issue"][0]["code"], "forbidden");
     let diagnostics = body["issue"][0]["diagnostics"].as_str().unwrap_or_default();
-    assert!(
-        diagnostics.contains("`system/CodeSystem.u` or `user/CodeSystem.u`"),
-        "{diagnostics}"
-    );
+    assert!(!diagnostics.contains("CodeSystem."), "{diagnostics}");
 
     let writer = key.sign(&claims(&mock.uri(), "system/CodeSystem.cud", 300));
     let (status, body) = fixture::json(put_colours(&server, Some(&writer)).await).await;
@@ -401,11 +411,9 @@ async fn a_user_update_scope_writes_a_put_and_a_user_create_scope_does_not() {
     );
     assert!(sent.contains("error=\"insufficient_scope\""), "{sent}");
     let (_, body) = fixture::json(response).await;
+    assert_eq!(body["issue"][0]["code"], "forbidden");
     let diagnostics = body["issue"][0]["diagnostics"].as_str().unwrap_or_default();
-    assert!(
-        diagnostics.contains("`system/ValueSet.u` or `user/ValueSet.u`"),
-        "{diagnostics}"
-    );
+    assert!(!diagnostics.contains("ValueSet."), "{diagnostics}");
 
     let updater = key.sign(&claims(&mock.uri(), "user/ValueSet.u", 300));
     let response = put_with(
@@ -483,6 +491,28 @@ async fn a_patient_scope_is_refused_on_every_write_route() {
             &colours(),
             AUTHORIZATION.as_str(),
             &format!("Bearer {token}"),
+        )
+        .await;
+    assert_eq!(code, StatusCode::FORBIDDEN, "a create is refused too");
+
+    // With a launch context the grant reaches that patient's compartment
+    // (<https://hl7.org/fhir/smart-app-launch/scopes-and-launch-context.html>),
+    // which holds no terminology resource, so the write is refused all the same.
+    let mut launched = claims(&mock.uri(), "patient/CodeSystem.cud patient/*.*", 300);
+    launched["patient"] = json!("p-1");
+    let launched = key.sign(&launched);
+    let response = put_colours(&server, Some(&launched)).await;
+    let sent = challenge(&response);
+    assert_eq!(response.status(), StatusCode::FORBIDDEN, "{sent}");
+    assert!(sent.contains("error=\"insufficient_scope\""), "{sent}");
+    let (_, body) = fixture::json(response).await;
+    assert_eq!(body["issue"][0]["code"], "forbidden");
+    let (code, _) = server
+        .post_with_header(
+            "/r4b/CodeSystem",
+            &colours(),
+            AUTHORIZATION.as_str(),
+            &format!("Bearer {launched}"),
         )
         .await;
     assert_eq!(code, StatusCode::FORBIDDEN, "a create is refused too");
@@ -581,11 +611,14 @@ async fn an_issuer_that_omits_the_optional_members_gets_their_documented_default
             "{capability} is missing from {claimed:?}"
         );
     }
-    // The server SHALL support every scope it republishes, so the refused ones
-    // are dropped (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
-    assert_eq!(
-        document["scopes_supported"],
-        json!(["openid", "user/ValueSet.cud"])
+    // The server SHALL support every scope it lists, so the issuer's own list,
+    // with the patient scope this server refuses, is never republished; the
+    // member lists `[auth] scopes_supported`, empty here
+    // (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
+    assert!(document["scopes_supported"].is_null(), "{document}");
+    assert!(
+        !document.to_string().contains("patient/CodeSystem.cud"),
+        "{document}"
     );
 }
 
@@ -689,6 +722,7 @@ async fn a_symmetric_algorithm_is_never_accepted() {
 
     let mut header = Header::new(Algorithm::HS256);
     header.kid = Some(String::from("k1"));
+    header.typ = Some(String::from("at+jwt"));
     let forged = encode(
         &header,
         &claims(&mock.uri(), "system/CodeSystem.cud", 300),
@@ -744,6 +778,16 @@ async fn a_token_typed_as_another_kind_is_refused() {
     let response = put_colours(&server, Some(&key.sign_with(&header, &payload))).await;
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 
+    // RFC 9068 §4: the resource server rejects a token whose `typ` is neither
+    // `at+jwt` nor `application/at+jwt`, an untyped one and a plain `JWT` too.
+    for typ in [None, Some("JWT")] {
+        let mut header = Header::new(Algorithm::ES256);
+        header.kid = Some(String::from("k1"));
+        header.typ = typ.map(str::to_owned);
+        let response = put_colours(&server, Some(&key.sign_with(&header, &payload))).await;
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "{typ:?}");
+    }
+
     let mut header = Header::new(Algorithm::ES256);
     header.kid = Some(String::from("k1"));
     header.typ = Some(String::from("at+jwt"));
@@ -777,10 +821,9 @@ async fn a_token_naming_no_key_against_two_usable_keys_is_refused() {
         .await;
     let server = Server::start_persisting_with_smart(&base, None, None).await;
 
-    let anonymous = first.sign_with(
-        &Header::new(Algorithm::ES256),
-        &claims(&base, "system/CodeSystem.cud", 300),
-    );
+    let mut header = Header::new(Algorithm::ES256);
+    header.typ = Some(String::from("at+jwt"));
+    let anonymous = first.sign_with(&header, &claims(&base, "system/CodeSystem.cud", 300));
     let response = put_colours(&server, Some(&anonymous)).await;
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
@@ -824,21 +867,22 @@ async fn create_and_delete_are_gated_like_update() {
     assert_eq!(response.status(), StatusCode::NO_CONTENT);
 }
 
+/// A `POST /reload` carrying `authorization` as its credential, when given.
+fn reload(authorization: Option<String>) -> Request<Body> {
+    let mut request = Request::post("/reload");
+    if let Some(value) = authorization {
+        request = request.header(AUTHORIZATION, value);
+    }
+    request.body(Body::empty()).expect("request")
+}
+
 #[tokio::test]
 async fn the_admin_listener_requires_the_configured_scope() {
     let key = SigningKey::generate("k1");
     let mock = issuer(&key).await;
     let server =
-        Server::start_persisting_with_smart(&mock.uri(), None, Some("ferroterm/reload")).await;
+        Server::start_persisting_with_smart(&mock.uri(), None, Some("__ferroterm.reload")).await;
     let admin = server.admin_router();
-
-    let reload = |token: Option<String>| {
-        let mut request = Request::post("/reload");
-        if let Some(token) = token {
-            request = request.header(AUTHORIZATION, format!("Bearer {token}"));
-        }
-        request.body(Body::empty()).expect("request")
-    };
 
     let response = admin.clone().oneshot(reload(None)).await.expect("response");
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
@@ -847,57 +891,113 @@ async fn the_admin_listener_requires_the_configured_scope() {
     let wrong = key.sign(&claims(&mock.uri(), "system/CodeSystem.cud", 300));
     let response = admin
         .clone()
-        .oneshot(reload(Some(wrong)))
+        .oneshot(reload(Some(format!("Bearer {wrong}"))))
         .await
         .expect("response");
     assert_eq!(response.status(), StatusCode::FORBIDDEN);
-    // RFC 6750 §3: one scope opens this route, so the challenge names it.
-    assert!(
-        challenge(&response).contains("scope=\"ferroterm/reload\""),
-        "{}",
-        challenge(&response)
-    );
+    // RFC 6750 §3 makes the `scope` attribute optional, and the refusal names
+    // no scope anywhere.
+    let sent = challenge(&response);
+    assert!(sent.contains("error=\"insufficient_scope\""), "{sent}");
+    assert!(!sent.contains("scope="), "{sent}");
 
-    let right = key.sign(&claims(&mock.uri(), "ferroterm/reload", 300));
+    let right = key.sign(&claims(&mock.uri(), "__ferroterm.reload", 300));
     let response = admin
         .clone()
-        .oneshot(reload(Some(right)))
+        .oneshot(reload(Some(format!("Bearer {right}"))))
         .await
         .expect("response");
     assert_eq!(response.status(), StatusCode::OK);
 }
 
-// RFC 7517 §4.5: a rotated key arrives under a new `kid`, so a token naming one
-// the server has not read is the signal to read the set again.
+// The admin scope is a product scope, `__ferroterm.admin` when `[auth]` names
+// none (SMART App Launch 2.2.0, Scopes and Launch Context, §Extensibility).
 #[tokio::test]
-async fn an_unknown_key_id_refreshes_the_key_set_once() {
-    let first = SigningKey::generate("k1");
-    let second = SigningKey::generate("k2");
-    let mock = MockServer::start().await;
+async fn the_default_admin_scope_is_the_extension_scope_of_ferroterm() {
+    let key = SigningKey::generate("k1");
+    let mock = issuer(&key).await;
+    let server = Server::start_persisting_with_smart(&mock.uri(), None, None).await;
+    let admin = server.admin_router();
+
+    let old = key.sign(&claims(&mock.uri(), "ferroterm/admin", 300));
+    let response = admin
+        .clone()
+        .oneshot(reload(Some(format!("Bearer {old}"))))
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+    let token = key.sign(&claims(&mock.uri(), "__ferroterm.admin", 300));
+    let response = admin
+        .oneshot(reload(Some(format!("Bearer {token}"))))
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+// SMART App Launch 2.2.0, Scopes and Launch Context, §Extensibility: a scope
+// of a server's own is a full URI or a string starting with `__`.
+#[tokio::test]
+async fn an_admin_scope_outside_the_extension_forms_refuses_the_start() {
+    let key = SigningKey::generate("k1");
+    let mock = issuer(&key).await;
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mut setup = SmartSetup::for_issuer(&mock.uri());
+    setup.auth.product_scope = String::from("ferroterm/reload");
+    let config = Server::smart_config(dir.path(), setup);
+    let error = Smart::start(&config)
+        .await
+        .expect_err("the start is refused");
+    assert!(
+        causes(&error).contains("ferroterm/reload"),
+        "{}",
+        causes(&error)
+    );
+}
+
+/// The issuer of `mock` publishing `first` once, then `first` and `second`.
+async fn rotating_issuer(mock: &MockServer, first: &SigningKey, second: &SigningKey) {
     let base = mock.uri();
     Mock::given(method("GET"))
         .and(path("/.well-known/openid-configuration"))
         .respond_with(ResponseTemplate::new(200).set_body_json(discovery(&base)))
-        .mount(&mock)
+        .mount(mock)
         .await;
     Mock::given(method("GET"))
         .and(path("/jwks"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({"keys": [first.jwk()]})))
         .up_to_n_times(1)
-        .mount(&mock)
+        .mount(mock)
         .await;
     Mock::given(method("GET"))
         .and(path("/jwks"))
         .respond_with(
             ResponseTemplate::new(200).set_body_json(json!({"keys": [first.jwk(), second.jwk()]})),
         )
-        .mount(&mock)
+        .mount(mock)
         .await;
+}
 
-    let server = Server::start_persisting_with_smart(&base, None, None).await;
+/// A server over `mock` that reads its key set again at most once per
+/// `interval_seconds`.
+async fn with_refresh_interval(mock: &MockServer, interval_seconds: u64) -> Server {
+    let mut setup = SmartSetup::for_issuer(&mock.uri());
+    setup.auth.jwks_refresh_interval_seconds = interval_seconds;
+    Server::start_persisting_with_smart_setup(setup).await
+}
+
+// RFC 7517 §4.5: a rotated key arrives under a new `kid`, so a token naming one
+// the server has not read is the signal to read the set again.
+#[tokio::test]
+async fn an_unknown_key_id_refreshes_the_key_set() {
+    let first = SigningKey::generate("k1");
+    let second = SigningKey::generate("k2");
+    let mock = MockServer::start().await;
+    rotating_issuer(&mock, &first, &second).await;
+    let server = with_refresh_interval(&mock, 0).await;
     assert_eq!(jwks_reads(&mock).await, 1, "the start reads the set once");
 
-    let rotated = second.sign(&claims(&base, "system/CodeSystem.cud", 300));
+    let rotated = second.sign(&claims(&mock.uri(), "system/CodeSystem.cud", 300));
     let response = put_colours(&server, Some(&rotated)).await;
     assert_eq!(
         response.status(),
@@ -905,15 +1005,28 @@ async fn an_unknown_key_id_refreshes_the_key_set_once() {
         "the refreshed set carries the new key"
     );
     assert_eq!(jwks_reads(&mock).await, 2, "the unknown kid read it again");
+}
+
+// A stream of forged `kid`s must not turn the server into a load on the
+// issuer, so a second unknown `kid` inside the refresh interval reads nothing
+// (no specification governs the interval: `ferrohealth-smart`'s own design,
+// measured from the last read, the one at start included).
+#[tokio::test]
+async fn an_unknown_key_id_inside_the_interval_reads_nothing_and_is_refused() {
+    let first = SigningKey::generate("k1");
+    let second = SigningKey::generate("k2");
+    let mock = MockServer::start().await;
+    rotating_issuer(&mock, &first, &second).await;
+    let server = with_refresh_interval(&mock, 3600).await;
 
     let third = SigningKey::generate("k3");
-    let unknown = third.sign(&claims(&base, "system/CodeSystem.cud", 300));
+    let unknown = third.sign(&claims(&mock.uri(), "system/CodeSystem.cud", 300));
     let response = put_colours(&server, Some(&unknown)).await;
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     assert_eq!(
         jwks_reads(&mock).await,
-        2,
-        "the cooldown holds the next refresh off"
+        1,
+        "the interval holds the next refresh off"
     );
 }
 
@@ -927,6 +1040,24 @@ async fn jwks_reads(mock: &MockServer) -> usize {
         .count()
 }
 
+/// `error` and every cause under it, on one line.
+fn causes(error: &dyn std::error::Error) -> String {
+    let mut out = error.to_string();
+    let mut source = error.source();
+    while let Some(cause) = source {
+        out.push_str(": ");
+        out.push_str(&cause.to_string());
+        source = cause.source();
+    }
+    out
+}
+
+/// The configuration of a server over the edition in `dir` whose `[auth]`
+/// trusts `issuer`.
+fn trusting(dir: &std::path::Path, issuer: &str) -> Config {
+    Server::smart_config(dir, SmartSetup::for_issuer(issuer))
+}
+
 #[tokio::test]
 async fn a_discovery_failure_refuses_the_start() {
     let mock = MockServer::start().await;
@@ -935,17 +1066,14 @@ async fn a_discovery_failure_refuses_the_start() {
         .respond_with(ResponseTemplate::new(500))
         .mount(&mock)
         .await;
-    let config = Config {
-        oidc_issuer: Some(mock.uri()),
-        ..Config::default()
-    };
-    let error = Smart::start(&config)
+    let dir = tempfile::tempdir().expect("tempdir");
+    let error = Smart::start(&trusting(dir.path(), &mock.uri()))
         .await
         .expect_err("the start is refused");
     let reason = format!("{error}");
     assert!(
-        reason.contains("discovery document"),
-        "the reason names what did not answer: {reason}"
+        reason.contains(&mock.uri()),
+        "the reason names the issuer that did not answer: {reason}"
     );
     assert!(
         std::error::Error::source(&error).is_some(),
@@ -953,23 +1081,77 @@ async fn a_discovery_failure_refuses_the_start() {
     );
 }
 
-// OpenID Connect Discovery 1.0 §3 and §7.1: the issuer's endpoints are https,
+// RFC 8414 §2 and OpenID Connect Discovery 1.0 §3: the issuer is an https URL,
 // because these bytes decide which signatures the server trusts.
 #[tokio::test]
 async fn a_cleartext_issuer_outside_the_loopback_refuses_the_start() {
-    let config = Config {
-        oidc_issuer: Some(String::from("http://auth.example.org/realms/tx")),
+    let dir = tempfile::tempdir().expect("tempdir");
+    let error = Smart::start(&trusting(dir.path(), "http://auth.example.org/realms/tx"))
+        .await
+        .expect_err("the start is refused");
+    let chain = causes(&error);
+    assert!(chain.contains("not an https URL"), "{chain}");
+}
+
+// The family's fail-closed rule (no specification governs it: our own design):
+// a server that serves writes or the admin listener starts only once `[auth]`
+// names an issuer, or says it is off.
+#[tokio::test]
+async fn a_guarded_surface_without_an_issuer_refuses_the_start() {
+    for (resources, admin, named) in [
+        (true, false, "FERROTERM_RESOURCES"),
+        (false, true, "FERROTERM_ADMIN_LISTEN"),
+    ] {
+        let config = Config {
+            resources: resources.then(|| std::path::PathBuf::from("resources.redb")),
+            admin_listen: admin.then(|| String::from("127.0.0.1:0")),
+            ..Config::default()
+        };
+        let error = Smart::start(&config)
+            .await
+            .expect_err("the start is refused");
+        let reason = error.to_string();
+        assert!(reason.contains(named), "{reason}");
+        assert!(reason.contains("FERROTERM_AUTH__ISSUER"), "{reason}");
+    }
+}
+
+#[tokio::test]
+async fn a_read_only_server_or_auth_off_starts_without_an_issuer() {
+    let read_only = Smart::start(&Config::default())
+        .await
+        .expect("a read-only server needs no issuer");
+    assert!(read_only.is_none());
+    let mut off = Config {
+        resources: Some(std::path::PathBuf::from("resources.redb")),
+        admin_listen: Some(String::from("127.0.0.1:0")),
         ..Config::default()
     };
+    off.auth.enabled = false;
+    let started = Smart::start(&off).await.expect("auth off starts");
+    assert!(
+        started.is_none(),
+        "the guarded surfaces authenticate nobody"
+    );
+}
+
+// RFC 9068 §4: the resource server validates that `aud` names it, so an issuer
+// without an audience refuses the start rather than accepting a token minted
+// for any resource server of that issuer (RFC 8725 §3.9).
+#[tokio::test]
+async fn an_issuer_without_an_audience_refuses_the_start() {
+    let key = SigningKey::generate("k1");
+    let mock = issuer(&key).await;
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mut setup = SmartSetup::for_issuer(&mock.uri());
+    setup.auth.audience = Vec::new();
+    setup.base_url = Some(String::from(PROXIED));
+    let config = Server::smart_config(dir.path(), setup);
     let error = Smart::start(&config)
         .await
         .expect_err("the start is refused");
-    let reason = format!("{error}");
-    assert!(reason.contains("discovery document"), "{reason}");
-    let cause = std::error::Error::source(&error)
-        .map(ToString::to_string)
-        .unwrap_or_default();
-    assert!(cause.contains("not an https URL"), "{cause}");
+    let chain = causes(&error);
+    assert!(chain.contains("audience"), "{chain}");
 }
 
 // SMART App Launch: the document lives at `[base]/.well-known/smart-configuration`
@@ -979,7 +1161,12 @@ async fn the_smart_configuration_is_served_from_the_issuer_document() {
     let key = SigningKey::generate("k1");
     let mock = issuer(&key).await;
     let base = mock.uri();
-    let server = Server::start_persisting_with_smart(&base, None, None).await;
+    let mut setup = SmartSetup::for_issuer(&base);
+    setup.auth.scopes_supported = vec![
+        String::from("system/CodeSystem.cud"),
+        String::from("system/ValueSet.cud"),
+    ];
+    let server = Server::start_persisting_with_smart_setup(setup).await;
 
     for version in ["r4", "r4b", "r5", "r6"] {
         let document = configuration(&server, version).await;
@@ -1091,15 +1278,15 @@ async fn the_capability_statement_declares_the_service_and_the_oauth_uris() {
 /// The address a proxy reaches the server at in the audience tests.
 const PROXIED: &str = "https://tx.example.org";
 
-/// A server behind [`PROXIED`] whose gate takes `audience` from the
-/// environment.
+/// A server behind [`PROXIED`] whose `[auth] audience` is `audience`, or
+/// [`fixture::AUDIENCE`] when the test names none.
 async fn proxied(issuer: &str, audience: Option<&str>) -> Server {
-    Server::start_persisting_with_smart_setup(SmartSetup {
-        audience: audience.map(str::to_owned),
-        base_url: Some(String::from(PROXIED)),
-        ..SmartSetup::for_issuer(issuer)
-    })
-    .await
+    let mut setup = SmartSetup::for_issuer(issuer);
+    if let Some(audience) = audience {
+        setup.auth.audience = vec![audience.to_owned()];
+    }
+    setup.base_url = Some(String::from(PROXIED));
+    Server::start_persisting_with_smart_setup(setup).await
 }
 
 /// The claims of a write token for `issuer` carrying `audience` as `aud`.
@@ -1208,8 +1395,9 @@ async fn a_token_with_no_audience_or_the_root_as_one_is_refused() {
     );
 }
 
-// The admin listener serves no FHIR interaction, so a base URL is not an
-// audience for it: naming one leaves that surface as it was.
+// The admin listener serves no FHIR interaction, so a version base is not an
+// audience for it: only the configured audiences open it (no specification
+// governs the admin surface: our own design).
 #[tokio::test]
 async fn the_admin_listener_does_not_take_a_version_base_as_its_audience() {
     let key = SigningKey::generate("k1");
@@ -1217,32 +1405,192 @@ async fn the_admin_listener_does_not_take_a_version_base_as_its_audience() {
     let server = proxied(&mock.uri(), None).await;
     let admin = server.admin_router();
 
-    let mut payload = claims_for(&mock.uri(), json!("an-audience-of-its-own"));
-    payload["scope"] = json!("ferroterm/admin");
-    let request = Request::post("/reload")
-        .header(AUTHORIZATION, format!("Bearer {}", key.sign(&payload)))
-        .body(Body::empty())
-        .expect("request");
-    let response = admin.oneshot(request).await.expect("the admin answers");
+    let mut for_a_base = claims_for(&mock.uri(), json!(format!("{PROXIED}/r4b")));
+    for_a_base["scope"] = json!("__ferroterm.admin");
+    let response = admin
+        .clone()
+        .oneshot(reload(Some(format!("Bearer {}", key.sign(&for_a_base)))))
+        .await
+        .expect("the admin answers");
     assert_eq!(
         response.status(),
-        StatusCode::OK,
-        "a base URL alone does not start checking the admin audience"
+        StatusCode::UNAUTHORIZED,
+        "a version base is no admin audience"
     );
+
+    let mut configured = claims_for(&mock.uri(), json!(fixture::AUDIENCE));
+    configured["scope"] = json!("__ferroterm.admin");
+    let response = admin
+        .oneshot(reload(Some(format!("Bearer {}", key.sign(&configured)))))
+        .await
+        .expect("the admin answers");
+    assert_eq!(response.status(), StatusCode::OK);
 }
 
-// RFC 7519 §4.1.3 leaves `aud` optional: a deployment that names neither a
-// base nor an audience checks none, and the issuer bounds the token.
+// RFC 6750 §3: `error_description` is optional, and every invalid token gets
+// one generic `401` that names no claim, no `kid` and no issuer message, so a
+// refusal teaches the holder of a forged or stolen token nothing.
 #[tokio::test]
-async fn a_deployment_naming_no_base_and_no_audience_checks_no_audience() {
+async fn every_invalid_token_gets_the_same_refusal() {
     let key = SigningKey::generate("k1");
     let mock = issuer(&key).await;
     let server = Server::start_persisting_with_smart(&mock.uri(), None, None).await;
 
-    let elsewhere = key.sign(&claims_for(
-        &mock.uri(),
-        json!("https://elsewhere.example.org/r4b"),
-    ));
-    let response = put_colours(&server, Some(&elsewhere)).await;
+    let expired = key.sign(&claims(&mock.uri(), "system/CodeSystem.cud", -600));
+    let stranger = SigningKey::generate("unknown-kid");
+    let unknown = stranger.sign(&claims(&mock.uri(), "system/CodeSystem.cud", 300));
+    let mut answers = Vec::new();
+    for token in [expired.as_str(), unknown.as_str(), "not-a-token"] {
+        let response = put_colours(&server, Some(token)).await;
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        let sent = challenge(&response);
+        assert!(!sent.contains("error_description"), "{sent}");
+        assert!(!sent.contains("unknown-kid"), "{sent}");
+        let (_, body) = fixture::json(response).await;
+        assert!(!body.to_string().contains("unknown-kid"), "{body}");
+        answers.push((sent, body));
+    }
+    let (first, rest) = answers.split_first().expect("three answers");
+    for other in rest {
+        assert_eq!(first, other, "two failures answer alike");
+    }
+}
+
+// RFC 6750 §3.1: a request that carries two credentials is `invalid_request`.
+#[tokio::test]
+async fn two_authorization_headers_are_an_invalid_request() {
+    let key = SigningKey::generate("k1");
+    let mock = issuer(&key).await;
+    let server = Server::start_persisting_with_smart(&mock.uri(), None, None).await;
+    let writer = key.sign(&claims(&mock.uri(), "system/CodeSystem.cud", 300));
+
+    let request = Request::put("/r4b/CodeSystem/colours")
+        .header(http::header::CONTENT_TYPE, "application/fhir+json")
+        .header(AUTHORIZATION, format!("Bearer {writer}"))
+        .header(AUTHORIZATION, format!("Bearer {writer}"))
+        .body(Body::from(colours().to_string()))
+        .expect("request");
+    let response = server.send(request).await;
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let sent = challenge(&response);
+    assert!(sent.contains("error=\"invalid_request\""), "{sent}");
+}
+
+/// Sixteen random bytes generated for this test run, so no credential or salt
+/// is committed.
+fn random_bytes() -> [u8; 16] {
+    let mut bytes = [0_u8; 16];
+    ring::rand::SecureRandom::fill(&SystemRandom::new(), &mut bytes).expect("random bytes");
+    bytes
+}
+
+/// A password generated for this test run.
+fn password() -> String {
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(random_bytes())
+}
+
+/// The Argon2id PHC string of `password` under a salt generated for the run.
+fn phc(password: &str) -> SecretString {
+    let hash = Argon2::default()
+        .hash_password_with_salt(password.as_bytes(), &random_bytes())
+        .expect("hashes");
+    SecretString::from(hash.to_string())
+}
+
+/// `Basic` credentials of `user` and `password` (RFC 7617 §2).
+fn basic(user: &str, password: &str) -> String {
+    let encoded = base64::engine::general_purpose::STANDARD.encode(format!("{user}:{password}"));
+    format!("Basic {encoded}")
+}
+
+// Machine-to-machine callers authenticate with HTTP Basic (RFC 7617) as a
+// `[[auth.basic.users]]` entry beside the bearer tokens; the user's scopes
+// decide what it reaches, as a token's would.
+#[tokio::test]
+async fn a_basic_user_writes_and_reloads_with_its_configured_scopes() {
+    let key = SigningKey::generate("k1");
+    let mock = issuer(&key).await;
+    let (editor, sync, wrong) = (password(), password(), password());
+    let mut setup = SmartSetup::for_issuer(&mock.uri());
+    setup.auth.basic = Some(BasicSection {
+        users: vec![
+            BasicUser {
+                user: String::from("editor"),
+                password_hash: Some(phc(&editor)),
+                scopes: vec![String::from("system/CodeSystem.cud")],
+                ..BasicUser::default()
+            },
+            BasicUser {
+                user: String::from("sync"),
+                password_hash: Some(phc(&sync)),
+                scopes: vec![String::from("__ferroterm.admin")],
+                ..BasicUser::default()
+            },
+        ],
+    });
+    let server = Server::start_persisting_with_smart_setup(setup).await;
+    let admin = server.admin_router();
+
+    let response = put_colours(&server, None).await;
+    let sent = challenge(&response);
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert!(
+        sent.contains("Bearer") && sent.contains("Basic realm="),
+        "{sent}"
+    );
+
+    let write = |authorization: String| {
+        Request::put("/r4b/CodeSystem/colours")
+            .header(http::header::CONTENT_TYPE, "application/fhir+json")
+            .header(AUTHORIZATION, authorization)
+            .body(Body::from(colours().to_string()))
+            .expect("request")
+    };
+    let response = server.send(write(basic("editor", &wrong))).await;
+    assert_eq!(
+        response.status(),
+        StatusCode::UNAUTHORIZED,
+        "a wrong password"
+    );
+    let response = server.send(write(basic("sync", &sync))).await;
+    assert_eq!(response.status(), StatusCode::FORBIDDEN, "no write scope");
+    let response = server.send(write(basic("editor", &editor))).await;
     assert_eq!(response.status(), StatusCode::CREATED);
+
+    let response = admin
+        .clone()
+        .oneshot(reload(Some(basic("editor", &editor))))
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::FORBIDDEN, "no admin scope");
+    let response = admin
+        .oneshot(reload(Some(basic("sync", &sync))))
+        .await
+        .expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+// A refusal is an `OperationOutcome` in the format the request asked for
+// (<https://hl7.org/fhir/R4B/http.html#mime-type>), whatever the gate's
+// renderer can see.
+#[tokio::test]
+async fn a_refusal_answers_in_the_format_the_request_asked_for() {
+    let key = SigningKey::generate("k1");
+    let mock = issuer(&key).await;
+    let server = Server::start_persisting_with_smart(&mock.uri(), None, None).await;
+
+    let request = Request::put("/r4b/CodeSystem/colours")
+        .header(http::header::CONTENT_TYPE, "application/fhir+json")
+        .header(http::header::ACCEPT, "application/fhir+xml")
+        .body(Body::from(colours().to_string()))
+        .expect("request");
+    let response = server.send(request).await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert!(challenge(&response).starts_with("Bearer realm="));
+    let (_, content_type, body) = fixture::text(response).await;
+    assert!(
+        content_type.starts_with("application/fhir+xml"),
+        "{content_type}"
+    );
+    assert!(body.contains("<OperationOutcome"), "{body}");
 }
