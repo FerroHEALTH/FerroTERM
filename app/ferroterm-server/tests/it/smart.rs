@@ -1456,6 +1456,26 @@ async fn every_invalid_token_gets_the_same_refusal() {
     }
 }
 
+// RFC 9068 §2.2 requires `sub` and RFC 7519 §4.1.2 has it identify a
+// principal; RFC 6750 §2.1 fixes the `b64token` syntax, and §3.1 answers a
+// token that is "malformed" with `invalid_token`.
+#[tokio::test]
+async fn a_blank_sub_or_a_value_outside_b64token_is_an_invalid_token() {
+    let key = SigningKey::generate("k1");
+    let mock = issuer(&key).await;
+    let server = Server::start_persisting_with_smart(&mock.uri(), None, None).await;
+    let mut blank = claims(&mock.uri(), "system/CodeSystem.cud", 300);
+    blank["sub"] = json!("  ");
+    let blank = key.sign(&blank);
+    for token in [blank.as_str(), "a,b", "a=b"] {
+        let response = put_colours(&server, Some(token)).await;
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "{token}");
+        let sent = challenge(&response);
+        assert!(sent.contains("error=\"invalid_token\""), "{sent}");
+        assert!(!sent.contains("error_description"), "{sent}");
+    }
+}
+
 // RFC 6750 §3.1: a request that carries two credentials is `invalid_request`.
 #[tokio::test]
 async fn two_authorization_headers_are_an_invalid_request() {
@@ -1527,6 +1547,7 @@ async fn a_basic_user_writes_and_reloads_with_its_configured_scopes() {
                 ..BasicUser::default()
             },
         ],
+        ..BasicSection::default()
     });
     let server = Server::start_persisting_with_smart_setup(setup).await;
     let admin = server.admin_router();
