@@ -3,8 +3,17 @@
 
 # Security Policy
 
-FerroTERM is a read-oriented FHIR terminology server. This document says which
-versions receive security fixes and how to report a vulnerability privately.
+FerroTERM is a read-oriented FHIR terminology server. This document carries
+what is particular to FerroTERM: the versions that receive security fixes,
+where to report, the response times it commits to, its scope, and how to verify
+a release.
+
+The vulnerability-handling policy every FerroHEALTH product shares is on one
+page of the family book, written by the manufacturer, Cadasto B.V.:
+<https://ferrohealth.eu/docs/security.html>. It covers what happens after you
+report, coordinated disclosure and credit, how a fix and its advisory reach
+you, the support period, and what the manufacturer reports to the authorities
+under the Cyber Resilience Act.
 
 ## Supported versions
 
@@ -39,31 +48,20 @@ privately through GitHub's private vulnerability reporting:
 
 This opens a private advisory visible only to you and the maintainer. If you
 cannot use GitHub's form, email <me@rubentalstra.nl> and ask for a private
-channel before sending any details; the maintainer's profile is
-<https://github.com/rubentalstra>.
+channel before sending any details. The family policy lists what a report
+should carry.
 
-Please include, where you can:
+**Never include SNOMED CT or other licensed terminology content in a report.**
+A reproduction is easy to build from a licensed release by accident; use the
+shaped, synthetic content the test fixtures use, or describe the request.
 
-- the affected version, tag, or commit;
-- a description of the impact (what an attacker can do);
-- steps to reproduce, a proof of concept, or a failing request;
-- any suggested remediation.
+## Response times
 
-## What to expect
-
-This is a solo-maintained project, so timelines are best effort rather than a
-contractual SLA:
-
-- **Acknowledgement** of your report within about 5 business days.
-- **An initial assessment** (is it valid, how severe) within about 10 business
-  days.
-- **A fix or a mitigation plan** for a confirmed vulnerability as a priority,
-  released as a new patch version. A published release is immutable, so fixes
-  ship forward as a new version rather than by re-tagging.
-
-We will keep you informed through the private advisory and, with your consent,
-credit you when the advisory is published. Please give us a reasonable window
-to release a fix before any public disclosure (coordinated disclosure).
+FerroTERM is solo-maintained, so these are best effort rather than a
+contractual service-level agreement: an acknowledgement within about 5
+business days, and an initial assessment (is it valid, how severe) within
+about 10. A confirmed vulnerability is fixed as a priority in a new patch
+version; the family policy says how that release and its advisory reach you.
 
 ## Scope
 
@@ -72,8 +70,8 @@ release pipeline, and its published artifacts.
 
 Out of scope: vulnerabilities in third-party dependencies without a
 FerroTERM-specific impact (report those upstream; Dependabot and `cargo deny`
-track advisories here), and issues that require a already-compromised host or
-misconfiguration outside FerroTERM's control.
+track advisories here), and issues that require an already-compromised host or
+a misconfiguration outside FerroTERM's control.
 
 ## How releases are verified
 
