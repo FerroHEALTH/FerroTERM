@@ -451,11 +451,7 @@ fn status_of(serving: &Serving) -> Status {
         .origins()
         .map(|(url, origin)| Family::of(url, origin))
         .collect();
-    Status::new(
-        !families.is_empty(),
-        families,
-        state.persists(),
-    )
+    Status::new(!families.is_empty(), families, state.persists())
 }
 
 /// The wait before the next daily report: 24 hours, spread at random by up
