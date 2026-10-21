@@ -55,8 +55,7 @@ shape, and one operator experience. That is the reason for the shape:
 | Halves | chosen by compilation target, never by a Cargo feature: the host half links `leptos` with `ssr`, the `wasm32-unknown-unknown` half with `hydrate` |
 | Rendering | every route `SsrMode::Async`: the server waits for the reads a screen exists to show, so no content waits on a script |
 | Components | `ferrohealth-ui` (crates.io), its stylesheet served at `/ferrohealth-ui.css` and the FerroTERM brand at `/theme.css` |
-| Layout utilities | Tailwind 4 over `app/ferroterm-viewer/style/tailwind.css`, theme and utilities only, no preflight |
-| Build | cargo-leptos (`scripts/release/viewer-site.sh`), the Tailwind CLI and `wasm-opt` pinned and checked by SHA-256 (`scripts/release/viewer-tools.sh`); no Node |
+| Build | cargo-leptos (`scripts/release/viewer-site.sh`), `wasm-opt` pinned and checked by SHA-256 (`scripts/release/viewer-tools.sh`); no Node |
 | Image | `docker/viewer/Dockerfile`, distroless static, the binary and the site bundle the release lane stages |
 
 ## 3. Screens

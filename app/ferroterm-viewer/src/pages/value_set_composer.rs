@@ -788,15 +788,13 @@ fn identity_section(editing: Editing, editable: Memo<bool>) -> AnyView {
             <h2 id="compose-identity-heading" class="fui-card-title">
                 {tr(Msg::TheValueSet)}
             </h2>
-            <div>
-                <fieldset
-                    class="fui-fieldset"
-                    aria-labelledby="compose-identity-heading"
-                    disabled=move || !editable.get()
-                >
-                    <div class="fui-columns">{fields}</div>
-                </fieldset>
-            </div>
+            <fieldset
+                class="fui-fieldset"
+                aria-labelledby="compose-identity-heading"
+                disabled=move || !editable.get()
+            >
+                <div class="fui-columns">{fields}</div>
+            </fieldset>
         </section>
     }
     .into_any()

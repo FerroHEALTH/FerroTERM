@@ -36,7 +36,6 @@ Three properties decide most questions in this crate:
 | `src/app.rs`, `src/components/`, `src/pages/` | the page tree, the shell and the screens |
 | `src/fhir/` | the requests and the minimum the screens read of each answer |
 | `src/authoring/` | the editors' models, plain values with unit tests |
-| `style/theme.css`, `style/tailwind.css` | the FerroTERM brand; the console's own layout utilities |
 
 The models live under `src/authoring/` rather than at the crate root because
 `pages::tests::no_screen_names_a_code_system` walks directories: a screen's

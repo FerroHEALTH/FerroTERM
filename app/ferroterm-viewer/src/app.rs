@@ -19,7 +19,7 @@
 
 use ferrohealth_ui::i18n::{Locale, provide_locale};
 use leptos::prelude::*;
-use leptos_meta::{Stylesheet, Title, provide_meta_context};
+use leptos_meta::{Title, provide_meta_context};
 use leptos_router::components::Router;
 use serde::{Deserialize, Serialize};
 
@@ -28,9 +28,6 @@ use crate::components::shell::{Console, PRODUCT, console_shell};
 use crate::fhir::FhirClient;
 use crate::runs::RunList;
 use crate::settings::Settings;
-
-/// The path of the stylesheet cargo-leptos writes into the site bundle.
-pub const STYLESHEET: &str = "/pkg/ferroterm-viewer.css";
 
 /// What the server tells the page about the request it renders: carried to
 /// the browser half serialized, so both halves draw the same page (the Leptos
@@ -133,7 +130,6 @@ pub fn App() -> impl IntoView {
     };
     provide_context(console);
     view! {
-        <Stylesheet id="leptos" href=STYLESHEET />
         <Title formatter=|text: String| format!("{text} · {PRODUCT}") />
         <Router>{console_shell(console)}</Router>
     }

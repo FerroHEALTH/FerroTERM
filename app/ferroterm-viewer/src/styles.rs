@@ -80,21 +80,3 @@ pub(crate) const ABSENT: &str = "fui-muted";
 
 /// The character that mark draws.
 pub(crate) const ABSENT_MARK: &str = "\u{2014}";
-
-/// The indentation of a row at each depth of a hierarchy, written as classes
-/// so no row carries a `style` attribute the policy would refuse.
-// TODO(#730): FerroUI's depth classes (FerroUI issue 37) replace these.
-const DEPTHS: [&str; 9] = [
-    "depth-0", "depth-1", "depth-2", "depth-3", "depth-4", "depth-5", "depth-6", "depth-7",
-    "depth-8",
-];
-
-/// The indentation class of a row at `depth`, deeper rows at the last step.
-pub(crate) fn depth(depth: u32) -> &'static str {
-    let index = usize::try_from(depth).unwrap_or(usize::MAX);
-    DEPTHS
-        .get(index)
-        .or(DEPTHS.last())
-        .copied()
-        .unwrap_or_default()
-}

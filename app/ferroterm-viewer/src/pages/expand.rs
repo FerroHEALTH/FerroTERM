@@ -56,11 +56,10 @@ use crate::routes::base_url;
 use crate::runs::Run;
 use crate::settings::Settings;
 use crate::settings::parse_page_size;
-use crate::styles;
 use ferrohealth_ui::table::model::filled_columns;
 use ferrohealth_ui::table::model::{Noun, OpenWindow, Paging, Window};
 use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Listing, Step, data_table, open_pager, step_label,
+    Body, Column, DataTable, Listing, Step, data_table, depth, open_pager, step_label,
 };
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::button::Variant;
@@ -862,7 +861,7 @@ fn concept_row(row: &ConceptRow, flagged: bool) -> AnyView {
     let flags = (!flags.is_empty()).then(|| badge(Tone::Neutral, &flags));
     view! {
         <tr>
-            <td class=format!("fui-mono {}", styles::depth(row.depth))>
+            <td class=format!("fui-mono {}", depth(row.depth))>
                 <span class="fui-sr-only">{nesting}</span>
                 {row.code.clone()}
             </td>

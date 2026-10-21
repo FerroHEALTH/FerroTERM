@@ -47,7 +47,7 @@ const COMMAND_BAR: &str = "#command-bar";
 const COMMAND_SUBMIT: &str = "form[role='search'] button[type='submit']";
 
 /// One offer the find screen made, as the link that takes it.
-const OFFER: &str = "section[aria-labelledby='find-offers-heading'] [role='listitem'] a";
+const OFFER: &str = "section[aria-labelledby='find-offers-heading'] li a";
 
 /// The density control that pane carries.
 const DENSITY_CONTROL: &str = "#viewer-density";

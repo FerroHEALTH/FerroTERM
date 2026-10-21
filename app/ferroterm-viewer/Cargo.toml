@@ -98,10 +98,6 @@ workspace = true
 output-name = "ferroterm-viewer"
 site-root = "target/site"
 site-pkg-dir = "pkg"
-# The console's own layout utilities: Tailwind 4, built by the standalone CLI
-# at the version scripts/release/viewer-site.sh sets. The components'
-# stylesheet and the brand theme are served from the binary.
-tailwind-input-file = "style/tailwind.css"
 # Copied into the site root as it stands: the brand favicon.
 assets-dir = "public"
 site-addr = "127.0.0.1:3000"

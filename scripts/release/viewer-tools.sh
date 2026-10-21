@@ -1,29 +1,25 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
-# Installs the two build tools cargo-leptos runs for the console's
-# site bundle, the Tailwind CSS standalone CLI and Binaryen's wasm-opt, each
-# at its pinned release and checked against its pinned SHA-256 before it is
-# kept, so cargo-leptos finds both on PATH and never downloads either itself
-# (no specification governs this: our own design).
+# Installs the build tool cargo-leptos runs for the console's site bundle,
+# Binaryen's wasm-opt, at its pinned release and checked against its pinned
+# SHA-256 before it is kept, so cargo-leptos finds it on PATH and never
+# downloads it itself (no specification governs this: our own design).
 #
-# cargo-leptos 0.3.11 runs a `tailwindcss` or `wasm-opt` it finds on PATH, and
-# otherwise downloads the release archive and runs it unchecked. The versions
-# and digests below are the rows of docs/VERSIONS.md, which
-# scripts/checks/versions.sh holds them to; each digest equals the one the
-# upstream release publishes beside its asset.
+# cargo-leptos 0.3.11 runs a `wasm-opt` it finds on PATH, and otherwise
+# downloads the release archive and runs it unchecked. The version and
+# digests below are the rows of docs/VERSIONS.md, which
+# scripts/checks/versions.sh holds them to; each archive digest equals the one
+# the upstream release publishes beside its asset.
 #
 # Usage:
-#   scripts/release/viewer-tools.sh DIR   install both into DIR/bin; put
+#   scripts/release/viewer-tools.sh DIR   install it into DIR/bin; put
 #                                         DIR/bin on PATH before the build
 #   scripts/release/viewer-tools.sh --check
-#                                         fail unless PATH holds both at
-#                                         their pinned versions and digests
+#                                         fail unless PATH holds it at its
+#                                         pinned version and digests
 set -Eeuo pipefail
 
-tailwind_version="4.3.3"
-tailwind_linux_x64_sha256="dc61b3ac6b8c9ca874c0cc4c57b2409791a64c5540404ca5f5367360babc313a"
-tailwind_macos_arm64_sha256="cdf646702987a743464dff4d9c60fd4480d1c1e73dd819a9a67f1078815dce9d"
 binaryen_version="version_133"
 binaryen_x86_64_linux_sha256="2dc9c7813f5375db93d96ead4b78222fcc3e2677bbb832297af4797782a37489"
 binaryen_arm64_macos_sha256="ad66da82ac13f163e424b1643f16c6dfcccc98b5966296b43e52d3cab04f84a8"
@@ -68,45 +64,33 @@ resolve() {
   (cd -P "$(dirname "$file")" && printf '%s/%s\n' "$(pwd -P)" "$(basename "$file")")
 }
 
-# Prints the first line a tool printed, with any ANSI escape removed: the
-# Tailwind CSS 4 CLI colours its banner even when its output is a pipe.
+# Prints the first line a tool printed, with any ANSI escape removed.
 first_line() {
   NO_COLOR=1 FORCE_COLOR=0 "$@" 2>&1 | head -n 1 | sed -E $'s/\x1b\\[[0-9;]*[A-Za-z]//g' || true
 }
 
-# Fails unless the tools on PATH are the pinned releases, by version and by
+# Fails unless the wasm-opt on PATH is the pinned release, by version and by
 # the SHA-256 of the files that run.
 check() {
-  local said tailwind wasm_opt tailwind_sha wasm_opt_sha libbinaryen_sha=""
+  local said wasm_opt wasm_opt_sha libbinaryen_sha=""
   case "$(uname -s)-$(uname -m)" in
     Linux-x86_64)
-      tailwind_sha="$tailwind_linux_x64_sha256"
       wasm_opt_sha="$wasm_opt_x86_64_linux_sha256"
       ;;
     Darwin-arm64)
-      tailwind_sha="$tailwind_macos_arm64_sha256"
       wasm_opt_sha="$wasm_opt_arm64_macos_sha256"
       libbinaryen_sha="$libbinaryen_arm64_macos_sha256"
       ;;
-    *) die "no pinned digest for $(uname -s) $(uname -m), so the tools on PATH cannot be checked" ;;
+    *) die "no pinned digest for $(uname -s) $(uname -m), so the wasm-opt on PATH cannot be checked" ;;
   esac
-  tailwind="$(command -v tailwindcss)" ||
-    die "no tailwindcss on PATH; run scripts/release/viewer-tools.sh DIR and put DIR/bin on PATH"
   wasm_opt="$(command -v wasm-opt)" ||
     die "no wasm-opt on PATH; run scripts/release/viewer-tools.sh DIR and put DIR/bin on PATH"
-  said="$(first_line tailwindcss --help)"
-  case "$said" in
-    *"tailwindcss v$tailwind_version"*) ;;
-    *) die "tailwindcss on PATH says '$said', not v$tailwind_version" ;;
-  esac
   said="$(first_line wasm-opt --version)"
   case "$said" in
     *"($binaryen_version)"*) ;;
     *) die "wasm-opt on PATH says '$said', not $binaryen_version" ;;
   esac
-  tailwind="$(resolve "$tailwind")"
   wasm_opt="$(resolve "$wasm_opt")"
-  verify "$tailwind" "$tailwind_sha"
   verify "$wasm_opt" "$wasm_opt_sha"
   if [ -n "$libbinaryen_sha" ]; then
     verify "$(dirname "$wasm_opt")/../lib/libbinaryen.dylib" "$libbinaryen_sha"
@@ -119,28 +103,19 @@ fetch() {
 }
 
 install() {
-  local dir="$1" tailwind_asset tailwind_sha binaryen_asset binaryen_sha
+  local dir="$1" binaryen_asset binaryen_sha
   case "$(uname -s)-$(uname -m)" in
     Linux-x86_64)
-      tailwind_asset="tailwindcss-linux-x64"
-      tailwind_sha="$tailwind_linux_x64_sha256"
       binaryen_asset="binaryen-$binaryen_version-x86_64-linux.tar.gz"
       binaryen_sha="$binaryen_x86_64_linux_sha256"
       ;;
     Darwin-arm64)
-      tailwind_asset="tailwindcss-macos-arm64"
-      tailwind_sha="$tailwind_macos_arm64_sha256"
       binaryen_asset="binaryen-$binaryen_version-arm64-macos.tar.gz"
       binaryen_sha="$binaryen_arm64_macos_sha256"
       ;;
-    *) die "no pinned digest for $(uname -s) $(uname -m); install both tools by hand" ;;
+    *) die "no pinned digest for $(uname -s) $(uname -m); install wasm-opt by hand" ;;
   esac
   mkdir -p "$dir/bin" "$dir/download"
-  fetch "https://github.com/tailwindlabs/tailwindcss/releases/download/v$tailwind_version/$tailwind_asset" \
-    "$dir/download/$tailwind_asset"
-  verify "$dir/download/$tailwind_asset" "$tailwind_sha"
-  cp "$dir/download/$tailwind_asset" "$dir/bin/tailwindcss"
-  chmod 755 "$dir/bin/tailwindcss"
   fetch "https://github.com/WebAssembly/binaryen/releases/download/$binaryen_version/$binaryen_asset" \
     "$dir/download/$binaryen_asset"
   verify "$dir/download/$binaryen_asset" "$binaryen_sha"
@@ -149,7 +124,7 @@ install() {
   # own, so it stays in its tree and PATH reaches it through a link.
   ln -sf "$dir/binaryen-$binaryen_version/bin/wasm-opt" "$dir/bin/wasm-opt"
   PATH="$dir/bin:$PATH" check
-  echo "viewer-tools: tailwindcss v$tailwind_version and wasm-opt $binaryen_version are in $dir/bin"
+  echo "viewer-tools: wasm-opt $binaryen_version is in $dir/bin"
 }
 
 case "${1:-}" in

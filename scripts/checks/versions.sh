@@ -350,20 +350,16 @@ echo "== console tool pins (docs/VERSIONS.md <-> Cargo.toml <-> the scripts <-> 
 if [[ -d app/ferroterm-viewer ]] && [[ -f docs/VERSIONS.md ]]; then
   pin_leptos="$(sed -n 's/^| cargo-leptos | \([0-9][0-9.]*\),.*/\1/p' docs/VERSIONS.md | head -n1)"
   pin_bindgen="$(sed -n 's/^| .wasm-bindgen. CLI | \([0-9][0-9.]*\),.*/\1/p' docs/VERSIONS.md | head -n1)"
-  pin_tailwind="$(sed -n 's/^| Tailwind CSS standalone CLI | \([0-9][0-9.]*\),.*/\1/p' docs/VERSIONS.md | head -n1)"
   pin_binaryen="$(sed -n 's/^| Binaryen .wasm-opt. | \(version_[0-9]*\),.*/\1/p' docs/VERSIONS.md | head -n1)"
   pin_leptosfmt="$(sed -n 's/^| .leptosfmt. | \([0-9][0-9.]*\),.*/\1/p' docs/VERSIONS.md | head -n1)"
   pin_chrome="$(sed -n 's/^| Chrome for Testing | \([0-9][0-9.]*\) .*/\1/p' docs/VERSIONS.md | head -n1)"
-  if [[ -z "$pin_leptos" || -z "$pin_bindgen" || -z "$pin_tailwind" || -z "$pin_binaryen" || -z "$pin_leptosfmt" || -z "$pin_chrome" ]]; then
-    bad "docs/VERSIONS.md lacks a Console toolchain row for cargo-leptos, wasm-bindgen, the Tailwind CLI, wasm-opt, leptosfmt or Chrome for Testing"
+  if [[ -z "$pin_leptos" || -z "$pin_bindgen" || -z "$pin_binaryen" || -z "$pin_leptosfmt" || -z "$pin_chrome" ]]; then
+    bad "docs/VERSIONS.md lacks a Console toolchain row for cargo-leptos, wasm-bindgen, wasm-opt, leptosfmt or Chrome for Testing"
   else
     crate_bindgen="$(sed -n 's/^wasm-bindgen[[:space:]]*=[[:space:]]*"=\([0-9][0-9.]*\)".*/\1/p' Cargo.toml | head -n1)"
     [[ "$crate_bindgen" == "$pin_bindgen" ]] \
       || bad "Cargo.toml wasm-bindgen (${crate_bindgen:-unset}) != docs/VERSIONS.md pin ($pin_bindgen)"
-    tools_tailwind="$(sed -n 's/^tailwind_version="\([0-9][0-9.]*\)"/\1/p' scripts/release/viewer-tools.sh | head -n1)"
     tools_binaryen="$(sed -n 's/^binaryen_version="\(version_[0-9]*\)"/\1/p' scripts/release/viewer-tools.sh | head -n1)"
-    [[ "$tools_tailwind" == "$pin_tailwind" ]] \
-      || bad "viewer-tools.sh Tailwind (${tools_tailwind:-unset}) != docs/VERSIONS.md pin ($pin_tailwind)"
     [[ "$tools_binaryen" == "$pin_binaryen" ]] \
       || bad "viewer-tools.sh Binaryen (${tools_binaryen:-unset}) != docs/VERSIONS.md pin ($pin_binaryen)"
     tools_chrome="$(sed -n 's/^chrome_version="\([0-9][0-9.]*\)"/\1/p' scripts/release/journey-tools.sh | head -n1)"
@@ -385,7 +381,7 @@ if [[ -d app/ferroterm-viewer ]] && [[ -f docs/VERSIONS.md ]]; then
         [[ "$got" == "$pin_chrome" ]] || bad "$wf installs Chrome $got, docs/VERSIONS.md pins $pin_chrome"
       done < <(sed -n 's/^[[:space:]]*chrome-version:[[:space:]]*\([0-9][0-9.]*\).*/\1/p' "$wf")
     done
-    [[ "$fail" -ne 0 ]] || note "OK: cargo-leptos $pin_leptos, wasm-bindgen $pin_bindgen, Tailwind CLI $pin_tailwind, wasm-opt $pin_binaryen, leptosfmt $pin_leptosfmt, Chrome $pin_chrome"
+    [[ "$fail" -ne 0 ]] || note "OK: cargo-leptos $pin_leptos, wasm-bindgen $pin_bindgen, wasm-opt $pin_binaryen, leptosfmt $pin_leptosfmt, Chrome $pin_chrome"
   fi
 else
   note "no console crate yet — skipped"

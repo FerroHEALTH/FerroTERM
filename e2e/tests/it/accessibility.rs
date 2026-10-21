@@ -178,7 +178,7 @@ const WALK_STOPS: &str = "return (window.walkStops || []).join('\\n');";
 /// element shows what is behind it. Large text is 18.66px bold or 24px, which
 /// is the threshold the success criterion names.
 const CONTRAST_FAILURES: &str = r#"
-// Tailwind 4 writes its palette in oklch, and a browser computes `color` to
+// A stylesheet may write a colour in oklch, and a browser computes `color` to
 // the space the author wrote (https://www.w3.org/TR/css-color-4/#resolving-color-values),
 // so a reader of getComputedStyle sees oklch and never rgb. Both are converted
 // to linear-light sRGB here, which is what the luminance formula wants anyway.

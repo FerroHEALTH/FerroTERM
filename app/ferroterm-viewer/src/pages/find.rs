@@ -158,13 +158,8 @@ fn offers_view(found: &[Offer]) -> AnyView {
                 offer.label.clone(),
                 view! { <p class="fui-muted">{offer.detail.clone()}</p> },
             );
-            view! { <div role="listitem">{card}</div> }.into_any()
+            view! { <li>{card}</li> }.into_any()
         })
         .collect();
-    view! {
-        <div class="fui-grid" role="list">
-            {rows}
-        </div>
-    }
-    .into_any()
+    view! { <ul class="fui-grid">{rows}</ul> }.into_any()
 }

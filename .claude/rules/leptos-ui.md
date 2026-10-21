@@ -83,11 +83,9 @@ The oracle for a Leptos question is the official Leptos book
 
 - The components' stylesheet is `ferrohealth_ui::style::STYLESHEET`, served at
   `/ferrohealth-ui.css`; the brand is `ferrohealth_ui::style::Brand::Term`'s
-  theme (FerroTERM teal), served at `/theme.css`; the
-  console's own utilities are Tailwind 4 over `style/tailwind.css`, which
-  imports Tailwind's theme and utilities and **not its preflight** (it would
-  reset what the components' stylesheet draws), and maps the FerroUI roles,
-  steps and spacing in an `@theme inline reference` block.
+  theme (FerroTERM teal), served at `/theme.css`. The console builds no
+  stylesheet of its own: every class a screen writes is a ferrohealth-ui
+  class, and `scripts/checks/viewer-tokens.sh` fails any other.
 - `scripts/checks/viewer-tokens.sh` refuses a palette entry, a per-element
   `dark:` variant, a raw type size and a spacing value off the four steps.
 - A screen draws with FerroUI components. What FerroUI does not have yet is

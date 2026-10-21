@@ -77,8 +77,8 @@ artifact digest and signed by the pinnable workflow identity, verifiable with
 `app/ferroterm-viewer` is the FerroTERM Console, its own binary and image
 (`ghcr.io/ferrohealth/ferroterm-viewer`), rendered on the server and hydrated
 in the browser. cargo-leptos builds the WebAssembly half and the site bundle;
-the Tailwind standalone CLI and Binaryen's `wasm-opt` are downloaded and
-checked against their SHA-256 by `scripts/release/viewer-tools.sh`, so there
+Binaryen's `wasm-opt` is downloaded and checked against its SHA-256 by
+`scripts/release/viewer-tools.sh`, so there
 is no Node in any lane. `scripts/checks/versions.sh` fails when a tool pin of
 `docs/VERSIONS.md` and a workflow or script drift apart.
 

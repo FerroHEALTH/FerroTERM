@@ -109,8 +109,8 @@ leptos_router = "0.8.17"
 wasm-bindgen = "=0.2.129"
 console_error_panic_hook = "0.1.7"
 # The shared FerroHEALTH UI components, pinned exactly: a console moves its pin
-# after looking at its own screens. Verified against crates.io on 2026-10-19.
-ferrohealth-ui = "=0.2.0"
+# after looking at its own screens. Verified against crates.io on 2026-10-21.
+ferrohealth-ui = "=0.2.2"
 # The console's string catalogs: Project Fluent messages embedded at build
 # time from app/ferroterm-viewer/locales/, the crate and version
 # ferrohealth-ui catalogs its own words with, so one locale drives both.
