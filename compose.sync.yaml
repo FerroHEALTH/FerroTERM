@@ -70,6 +70,9 @@ services:
         read_only: true
 
   sync:
+    # No release publishes this image yet (FerroTERM issue 798): build it from
+    # docker/Dockerfile.sync under this tag first, as the book's sync page
+    # shows, and Compose runs the local image.
     image: ghcr.io/ferrohealth/ferroterm-sync:${FERROTERM_VERSION:-0.1.9}
     container_name: ferroterm-sync
     restart: unless-stopped
