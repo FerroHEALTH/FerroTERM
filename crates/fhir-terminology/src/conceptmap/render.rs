@@ -99,6 +99,10 @@ macro_rules! render_concept_map {
                     name: model.name.as_deref().map(Into::into),
                     title: model.title.as_deref().map(Into::into),
                     status: status(model).into(),
+                    experimental: model.experimental.map(Into::into),
+                    date: model.date.as_deref().map(Into::into),
+                    publisher: model.publisher.as_deref().map(Into::into),
+                    description: model.description.as_deref().map(Into::into),
                     source: model
                         .source_scope
                         .as_deref()
@@ -225,6 +229,10 @@ macro_rules! render_concept_map {
                     name: model.name.as_deref().map(Into::into),
                     title: model.title.as_deref().map(Into::into),
                     status: status(model).into(),
+                    experimental: model.experimental.map(Into::into),
+                    date: model.date.as_deref().map(Into::into),
+                    publisher: model.publisher.as_deref().map(Into::into),
+                    description: model.description.as_deref().map(Into::into),
                     source_scope: model
                         .source_scope
                         .as_deref()

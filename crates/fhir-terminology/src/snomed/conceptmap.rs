@@ -306,6 +306,10 @@ pub(crate) fn concept_map(
             .map(|name| format!("SNOMED CT {name} Concept Map")),
         title: None,
         status: String::from("active"),
+        experimental: None,
+        date: None,
+        publisher: None,
+        description: None,
         source_scope: scope.clone(),
         target_scope: scope,
         groups: vec![Group {
