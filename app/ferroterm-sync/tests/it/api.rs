@@ -176,3 +176,72 @@ async fn an_api_that_does_not_answer_fails_the_run_and_keeps_the_feed_lane() {
         "nothing is called invisible when a listing failed"
     );
 }
+
+// A service's FHIR API lists every resource it holds, so an entry left behind
+// only because the subscription does not name it is counted, not listed, while
+// every other reason keeps its line (#695).
+#[tokio::test]
+async fn resources_outside_the_subscription_are_counted_not_listed() {
+    let harness = Harness::new().await;
+    harness.publish(&[]).await;
+    harness
+        .publish_api(&[
+            value_set(
+                "a1",
+                "https://example.invalid/ValueSet/a",
+                "1",
+                "2026-09-01T00:00:00Z",
+            ),
+            value_set(
+                "b1",
+                "https://example.invalid/ValueSet/b",
+                "1",
+                "2026-09-01T00:00:00Z",
+            ),
+            value_set(
+                "c1",
+                "https://example.invalid/ValueSet/c",
+                "1",
+                "2026-09-01T00:00:00Z",
+            ),
+        ])
+        .await;
+    harness.reloads_with(200).await;
+    harness.accepts_webhooks().await;
+    let clock = TestClock::new("2026-10-01T03:00:00Z", 0);
+    let subscription = Subscription::new()
+        .with_system("https://example.invalid/ValueSet/a")
+        .with_category(CategoryTerm::FhirValueSet);
+    let service = harness.service(vec![harness.source_with_api(subscription)], clock);
+
+    let first = service.run(Trigger::RunOnce).await;
+    let second = service.run(Trigger::Manual).await;
+
+    let source = &first.sources[0];
+    assert_eq!(source.taken.len(), 1, "the subscribed resource was taken");
+    assert!(
+        source.skipped.is_empty(),
+        "no unsubscribed resource is listed: {:?}",
+        source.skipped
+    );
+    assert_eq!(
+        source.not_subscribed,
+        vec![ferroterm_sync::record::NotSubscribed {
+            origin: Origin::FhirApi,
+            entries: 2,
+        }],
+        "the two unsubscribed resources are one count"
+    );
+    assert_eq!(first.summary().entries_not_subscribed, 2);
+    assert_eq!(first.summary().entries_skipped, 0);
+
+    let again = &second.sources[0];
+    assert_eq!(
+        again.skipped.len(),
+        1,
+        "a resource held already keeps its line: {:?}",
+        again.skipped
+    );
+    assert_eq!(second.summary().entries_skipped, 1);
+    assert_eq!(second.summary().entries_not_subscribed, 2);
+}

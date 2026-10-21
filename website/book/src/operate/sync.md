@@ -305,10 +305,12 @@ by time. It carries:
   address and how many resources it listed when the source has one, what was
   taken (with its origin, feed or FHIR API, the bytes, the download time, the
   build time, and the corrections that were applied), what was left behind
-  with the reason for each one, such as a system you did not subscribe to, a
-  release you already serve, a delta rather than a snapshot, Ontoserver's
-  binary index, or a `CodeSystem` whose content is `not-present`, and the
-  subscribed canonicals no listing carried at all, which means the account
+  with the reason for each one, such as a release you already serve, a delta
+  rather than a snapshot, Ontoserver's binary index, or a `CodeSystem` whose
+  content is `not-present`, a count per origin (feed or FHIR API) of the
+  entries left behind only because your subscription does not name their
+  system or category, which a service's FHIR API lists by the thousand, and
+  the subscribed canonicals no listing carried at all, which means the account
   could not see them and never that the service lacks them;
 - the activation: the mode, what reached the server, what is still staged, what
   the server answered to each reload, and whether the run was rolled back;
@@ -318,8 +320,10 @@ by time. It carries:
 - what retention removed and how many bytes the index root uses;
 - every error, in the order it happened.
 
-The same summary is what the webhook receives: one POST per run end, on success
-and on failure. A delivery that fails is logged and never fails the run.
+The summary that `/runs` lists and the webhook receives counts the two kinds
+apart: `entries_skipped` for the entries left behind with a reason of their
+own, and `entries_not_subscribed` for those outside the subscription. The
+webhook receives one POST per run end, on success and on failure. A delivery that fails is logged and never fails the run.
 
 ## NTS (Nationale Terminologie Server)
 
