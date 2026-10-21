@@ -44,15 +44,16 @@ readonly ONE_SHOT='[[:space:]"'\'',]healthcheck(["'\''[:space:]]|$)'
 # Prints the file's content without comment lines, one logical line per
 # backslash-continued command.
 logical_lines() {
+  local file="$1"
   awk '/^[[:space:]]*#/ { next }
        { l = $0; if (sub(/\\$/, "", l)) { buf = buf l " "; next } print buf l; buf = "" }
-       END { if (buf != "") print buf }' "$1"
+       END { if (buf != "") print buf }' "$file"
 }
 
 # The predicates grep a captured copy, never a pipe: `grep -q` exits at the
 # first match, and under pipefail the writer's SIGPIPE would read as no match.
 is_launcher() {
-  local lines starts runs
+  local lines starts
   lines="$(logical_lines "$1")"
   grep -qE "$COMPOSE_UP|$HELM_INSTALL" <<<"$lines" && return 0
   starts="$(grep -E "$BINARY|$DOCKER_RUN" <<<"$lines" || true)"

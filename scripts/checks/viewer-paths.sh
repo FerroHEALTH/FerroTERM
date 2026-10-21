@@ -34,17 +34,17 @@ pattern='(/home/|/Users/|/root/|[A-Za-z]:\\Users\\|/runner/|/github/workspace|\.
 
 found=0
 for file in "$name.wasm" "$name.js"; do
-  if [ ! -s "$pkg/$file" ]; then
+  if [[ ! -s "$pkg/$file" ]]; then
     echo "viewer-paths: $pkg/$file is missing; run scripts/release/viewer-site.sh --release first." >&2
     exit 1
   fi
   hits="$(LC_ALL=C grep -a -o -E "$pattern" "$pkg/$file" | sort -u || true)"
-  if [ -n "$hits" ]; then
+  if [[ -n "$hits" ]]; then
     count="$(printf '%s\n' "$hits" | wc -l | tr -d '[:space:]')"
     echo "::error file=scripts/release/viewer-site.sh::pkg/$file names $count path(s) of the build host; remap them in scripts/release/viewer-site.sh." >&2
     printf '%s\n' "$hits" | head -n 20 >&2
     found=1
   fi
 done
-[ "$found" -eq 0 ] || exit 1
+[[ "$found" -eq 0 ]] || exit 1
 echo "viewer-paths: the bundle names no directory of the build host"

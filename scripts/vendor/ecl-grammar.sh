@@ -31,7 +31,10 @@ done
 # The pin: the first word of the second cell of the ECL row.
 tag="$(awk -F'|' '$2 ~ /^[[:space:]]*ECL[[:space:]]*$/ { v = $3; gsub(/^[[:space:]]+/, "", v); split(v, w, /[[:space:]]/); print w[1]; exit }' "$pins")"
 [[ -n "$tag" ]] || die "no ECL row in $pins"
-case "$tag" in *[!0-9.]*) die "ECL pin is not a plain tag: '$tag'" ;; esac
+case "$tag" in
+  *[!0-9.]*) die "ECL pin is not a plain tag: '$tag'" ;;
+  *) ;;
+esac
 
 sha="$(git ls-remote --tags "$repo" "refs/tags/$tag" | awk '{ print $1; exit }')"
 [[ -n "$sha" ]] || die "tag $tag not found at $repo"

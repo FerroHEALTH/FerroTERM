@@ -156,7 +156,7 @@ pub(crate) struct GroupRow {
 }
 
 impl Published for PublishedConceptMap {
-    const RESOURCE_TYPE: &'static str = "ConceptMap";
+    const RESOURCE_TYPE: &str = "ConceptMap";
 
     fn declared_type(&self) -> Option<&str> {
         self.resource_type.as_deref()

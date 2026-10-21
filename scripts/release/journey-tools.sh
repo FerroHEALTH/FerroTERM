@@ -37,10 +37,11 @@ die() {
 
 # Prints the SHA-256 of FILE, with the tool the platform has.
 digest_of() {
+  local file="$1"
   if command -v sha256sum > /dev/null; then
-    sha256sum "$1" | cut -d' ' -f1
+    sha256sum "$file" | cut -d' ' -f1
   else
-    shasum -a 256 "$1" | cut -d' ' -f1
+    shasum -a 256 "$file" | cut -d' ' -f1
   fi
 }
 
@@ -48,20 +49,22 @@ digest_of() {
 verify() {
   local file="$1" digest="$2" found
   found="$(digest_of "$file")"
-  [ "$found" = "$digest" ] || die "$file has SHA-256 $found, the pin is $digest"
+  [[ "$found" = "$digest" ]] || die "$file has SHA-256 $found, the pin is $digest"
 }
 
 # Downloads URL into FILE.
 fetch() {
-  curl --fail --silent --show-error --location --retry 3 --output "$2" "$1"
+  local url="$1" file="$2"
+  curl --fail --silent --show-error --location --retry 3 --output "$file" "$url"
 }
 
 # Prints the URL the API lists for the pinned version of PRODUCT (chrome or
 # chromedriver) on PLATFORM, from the API answer in FILE.
 url_of() {
-  jq -r --arg version "$chrome_version" --arg product "$1" --arg platform "$2" \
+  local product="$1" platform="$2" file="$3"
+  jq -r --arg version "$chrome_version" --arg product "$product" --arg platform "$platform" \
     '.versions[] | select(.version == $version) | .downloads[$product][]?
-      | select(.platform == $platform) | .url' "$3"
+      | select(.platform == $platform) | .url' "$file"
 }
 
 # Fetches PRODUCT for PLATFORM into DIR, checks it against DIGEST, and
@@ -69,7 +72,7 @@ url_of() {
 install_one() {
   local product="$1" platform="$2" digest="$3" dir="$4" url zip
   url="$(url_of "$product" "$platform" "$dir/download/versions.json")"
-  [ -n "$url" ] || die "the Chrome for Testing API lists no $product $chrome_version for $platform"
+  [[ -n "$url" ]] || die "the Chrome for Testing API lists no $product $chrome_version for $platform"
   zip="$dir/download/$product-$platform.zip"
   fetch "$url" "$zip"
   verify "$zip" "$digest"
@@ -119,13 +122,13 @@ install() {
     *"ChromeDriver $chrome_version "*) ;;
     *) die "the unpacked chromedriver says '$said', not $chrome_version" ;;
   esac
-  [ -x "$chrome" ] || die "the Chrome zip holds no $chrome"
+  [[ -x "$chrome" ]] || die "the Chrome zip holds no $chrome"
   echo "journey-tools: Chrome for Testing and chromedriver $chrome_version are in $dir"
 }
 
 case "${1:-}" in
   --paths)
-    [ $# -eq 2 ] || { echo "usage: scripts/release/journey-tools.sh --paths DIR" >&2; exit 2; }
+    [[ $# -eq 2 ]] || { echo "usage: scripts/release/journey-tools.sh --paths DIR" >&2; exit 2; }
     platform_paths "$2" | sed 1d
     ;;
   "" | -*)

@@ -40,7 +40,7 @@ for tool in gzip brotli; do
 done
 
 for file in "$name.wasm" "$name.js"; do
-  if [ ! -s "$pkg/$file" ]; then
+  if [[ ! -s "$pkg/$file" ]]; then
     echo "viewer-bundle: $pkg/$file is missing; run scripts/release/viewer-site.sh --release first." >&2
     exit 1
   fi
@@ -61,9 +61,18 @@ if ! [[ "$budgets" =~ ^[0-9]+$ ]]; then
 fi
 budget="$budgets"
 
-raw() { wc -c < "$1" | tr -d '[:space:]'; }
-gz() { gzip -9 -c "$1" | wc -c | tr -d '[:space:]'; }
-br() { brotli -q 11 -c "$1" | wc -c | tr -d '[:space:]'; }
+raw() {
+  local file="$1"
+  wc -c < "$file" | tr -d '[:space:]'
+}
+gz() {
+  local file="$1"
+  gzip -9 -c "$file" | wc -c | tr -d '[:space:]'
+}
+br() {
+  local file="$1"
+  brotli -q 11 -c "$file" | wc -c | tr -d '[:space:]'
+}
 
 wasm="$pkg/$name.wasm"
 js="$pkg/$name.js"
@@ -82,11 +91,11 @@ table="$(
 )"
 
 echo "$table"
-if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
   echo "$table" >> "$GITHUB_STEP_SUMMARY"
 fi
 
-if [ "$wasm_br" -gt "$budget" ]; then
+if [[ "$wasm_br" -gt "$budget" ]]; then
   echo "::error file=.claude/rules/leptos-ui.md::The brotli-compressed WebAssembly is $wasm_br bytes, over the $budget-byte budget of .claude/rules/leptos-ui.md § Bundle. Shrink the bundle, or raise the budget there with the reason." >&2
   exit 1
 fi

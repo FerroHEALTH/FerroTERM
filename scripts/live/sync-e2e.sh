@@ -31,7 +31,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-if [ -n "${CI:-}" ] || [ -n "${GITHUB_ACTIONS:-}" ]; then
+if [[ -n "${CI:-}" ]] || [[ -n "${GITHUB_ACTIONS:-}" ]]; then
   echo "sync-e2e: this run reads a licensed feed with a personal account and never runs under CI" >&2
   exit 2
 fi
@@ -39,7 +39,7 @@ fi
 work=""
 systems="http://snomed.info/sct/11000146104,http://loinc.org,http://unitsofmeasure.org,http://hl7.org/fhir/sid/icd-10"
 keep=0
-while [ "$#" -gt 0 ]; do
+while [[ "$#" -gt 0 ]]; do
   case "$1" in
     --work) work="${2:?--work needs a directory}"; shift 2 ;;
     --systems) systems="${2:?--systems needs a list}"; shift 2 ;;
@@ -52,13 +52,13 @@ done
 for tool in cargo curl jq python3; do
   command -v "$tool" >/dev/null 2>&1 || { echo "sync-e2e: missing required tool: $tool" >&2; exit 2; }
 done
-if [ -z "${FERROTERM_NTS_CLIENT_SECRET:-}" ] && { [ -z "${FERROTERM_NTS_USERNAME:-}" ] || [ -z "${FERROTERM_NTS_PASSWORD:-}" ]; }; then
+if [[ -z "${FERROTERM_NTS_CLIENT_SECRET:-}" ]] && { [[ -z "${FERROTERM_NTS_USERNAME:-}" ]] || [[ -z "${FERROTERM_NTS_PASSWORD:-}" ]]; }; then
   echo "sync-e2e: set FERROTERM_NTS_USERNAME and FERROTERM_NTS_PASSWORD (or FERROTERM_NTS_CLIENT_ID and FERROTERM_NTS_CLIENT_SECRET)" >&2
   exit 2
 fi
 
 temporary=0
-if [ -z "$work" ]; then
+if [[ -z "$work" ]]; then
   work="$(mktemp -d)"
   temporary=1
 fi
@@ -72,11 +72,11 @@ bin="$(cargo metadata --format-version 1 --no-deps | jq -r .target_directory)/re
 
 server_pid=""
 cleanup() {
-  if [ -n "$server_pid" ] && kill -0 "$server_pid" 2>/dev/null; then
+  if [[ -n "$server_pid" ]] && kill -0 "$server_pid" 2>/dev/null; then
     kill -TERM "$server_pid" 2>/dev/null || true
     wait "$server_pid" 2>/dev/null || true
   fi
-  if [ "$temporary" -eq 1 ] && [ "$keep" -eq 0 ]; then
+  if [[ "$temporary" -eq 1 ]] && [[ "$keep" -eq 0 ]]; then
     rm -rf "$work"
   else
     echo "== kept: $work (licensed content, never commit it)"
@@ -128,7 +128,7 @@ echo "== one run against the NTS (this downloads and builds; a SNOMED CT edition
 
 echo "== the run record"
 record="$(find "$work/records" -name '*.json' -type f -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -1 || true)"
-if [ -n "$record" ]; then
+if [[ -n "$record" ]]; then
   jq '{outcome, duration_ms, entries_taken, errors, sources, activation, retention, revalidation}' "$record"
 else
   echo "   no record written" >&2

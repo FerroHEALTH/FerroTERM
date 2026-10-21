@@ -35,6 +35,7 @@ sha="$(awk -F'|' '$2 ~ /^[[:space:]]*SCG[[:space:]]*$/ { v = $3; gsub(/^[[:space
 [[ -n "$sha" ]] || die "no SCG row in $pins"
 case "$sha" in
   *[!0-9a-f]* | "") die "SCG pin is not a commit: '$sha'" ;;
+  *) ;;
 esac
 [[ "${#sha}" -eq 40 ]] || die "SCG pin is not a 40-character commit: '$sha'"
 

@@ -26,7 +26,7 @@
 # Requires: curl, jq, python3.
 set -euo pipefail
 
-if [ -n "${CI:-}" ] || [ -n "${GITHUB_ACTIONS:-}" ]; then
+if [[ -n "${CI:-}" ]] || [[ -n "${GITHUB_ACTIONS:-}" ]]; then
   echo "nts-feed: this check reads a licensed feed with a personal account and never runs under CI" >&2
   exit 2
 fi
@@ -34,7 +34,7 @@ fi
 base="https://terminologieserver.nl"
 keep=""
 saved=""
-while [ "$#" -gt 0 ]; do
+while [[ "$#" -gt 0 ]]; do
   case "$1" in
     --base) base="${2:?--base needs a URL}"; shift 2 ;;
     --keep) keep="${2:?--keep needs a file}"; shift 2 ;;
@@ -48,8 +48,8 @@ for tool in curl jq python3; do
   command -v "$tool" >/dev/null 2>&1 || { echo "nts-feed: missing required tool: $tool" >&2; exit 2; }
 done
 
-if [ -n "$saved" ]; then
-  [ -f "$saved" ] || { echo "nts-feed: no such listing: $saved" >&2; exit 2; }
+if [[ -n "$saved" ]]; then
+  [[ -f "$saved" ]] || { echo "nts-feed: no such listing: $saved" >&2; exit 2; }
   listing="$saved"
   echo "== listing: $saved ($(wc -c <"$listing" | tr -d ' ') bytes, saved)"
 else
@@ -57,26 +57,28 @@ user="${FERROTERM_NTS_USERNAME:-}"
 pass="${FERROTERM_NTS_PASSWORD:-}"
 client_id="${FERROTERM_NTS_CLIENT_ID:-}"
 client_secret="${FERROTERM_NTS_CLIENT_SECRET:-}"
-if [ -z "$client_secret" ] && { [ -z "$user" ] || [ -z "$pass" ]; }; then
+if [[ -z "$client_secret" ]] && { [[ -z "$user" ]] || [[ -z "$pass" ]]; }; then
   echo "nts-feed: set FERROTERM_NTS_USERNAME and FERROTERM_NTS_PASSWORD (or FERROTERM_NTS_CLIENT_ID and FERROTERM_NTS_CLIENT_SECRET)" >&2
   exit 2
 fi
 
+# Every fetch refuses a protocol other than HTTPS and a TLS version below 1.2.
+https_only=(--proto '=https' --tlsv1.2)
 echo "== discovery: ${base}/fhir/.well-known/smart-configuration"
-token_endpoint="$(curl --proto '=https' --tlsv1.2 -sSfL --max-redirs 3 "${base}/fhir/.well-known/smart-configuration" | jq -r '.token_endpoint')"
-[ -n "$token_endpoint" ] && [ "$token_endpoint" != "null" ] || { echo "nts-feed: the discovery document names no token_endpoint" >&2; exit 1; }
+token_endpoint="$(curl "${https_only[@]}" -sSfL --max-redirs 3 "${base}/fhir/.well-known/smart-configuration" | jq -r '.token_endpoint')"
+[[ -n "$token_endpoint" ]] && [[ "$token_endpoint" != "null" ]] || { echo "nts-feed: the discovery document names no token_endpoint" >&2; exit 1; }
 echo "   token endpoint: ${token_endpoint}"
 
-if [ -n "$client_secret" ]; then
+if [[ -n "$client_secret" ]]; then
   echo "== token: client_credentials as ${client_id:-<no client id>}"
-  token_json="$(curl --proto '=https' --tlsv1.2 -sSf -X POST "$token_endpoint" \
+  token_json="$(curl "${https_only[@]}" -sSf -X POST "$token_endpoint" \
     -H 'Content-Type: application/x-www-form-urlencoded' \
     --data-urlencode 'grant_type=client_credentials' \
     --data-urlencode "client_id=${client_id}" \
     --data-urlencode "client_secret=${client_secret}")"
 else
   echo "== token: password grant as ${user} with client_id cli_client (the documented grant)"
-  token_json="$(curl --proto '=https' --tlsv1.2 -sSf -X POST "$token_endpoint" \
+  token_json="$(curl "${https_only[@]}" -sSf -X POST "$token_endpoint" \
     -H 'Content-Type: application/x-www-form-urlencoded' \
     --data-urlencode 'grant_type=password' \
     --data-urlencode 'client_id=cli_client' \
@@ -84,18 +86,18 @@ else
     --data-urlencode "password=${pass}")"
 fi
 access_token="$(jq -r '.access_token // empty' <<<"$token_json")"
-[ -n "$access_token" ] || { echo "nts-feed: no access_token in the token response" >&2; exit 1; }
+[[ -n "$access_token" ]] || { echo "nts-feed: no access_token in the token response" >&2; exit 1; }
 # The lifetimes are what the add-on's refresh logic is built on (24 h claimed
 # for the refresh token by the Nictiz FAQ); print them, never the tokens.
 echo "   access token lifetime:  $(jq -r '.expires_in // "?"' <<<"$token_json") s"
 echo "   refresh token lifetime: $(jq -r '.refresh_expires_in // "?"' <<<"$token_json") s"
 
 listing="${keep:-$(mktemp)}"
-if [ -z "$keep" ]; then
+if [[ -z "$keep" ]]; then
   trap 'rm -f "$listing"' EXIT
 fi
 echo "== listing: ${base}/synd/syndication.xml"
-curl --proto '=https' --tlsv1.2 -sSf -H "Authorization: Bearer ${access_token}" \
+curl "${https_only[@]}" -sSf -H "Authorization: Bearer ${access_token}" \
   -o "$listing" "${base}/synd/syndication.xml"
 echo "   $(wc -c <"$listing" | tr -d ' ') bytes${keep:+, kept at $keep}"
 fi
