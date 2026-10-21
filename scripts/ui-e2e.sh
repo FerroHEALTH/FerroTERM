@@ -116,10 +116,25 @@ FAILURES_DIR="${FERROTERM_UI_E2E_FAILURES:-$root/target/ui-e2e-failures}"
 mkdir -p "$FAILURES_DIR"
 pids=()
 
-# Stops everything this run started, by the process id it recorded.
+# Prints the process ids of every process below PID, deepest first: the
+# browsers chromedriver started, and the helpers each browser started.
+descendants() {
+  local child
+  for child in $(pgrep -P "$1" 2> /dev/null || true); do
+    descendants "$child"
+    echo "$child"
+  done
+}
+
+# Stops everything this run started, by the process id it recorded, and the
+# browsers below them first, so no Chrome outlives the run to hold a port the
+# next run's sessions need.
 cleanup() {
-  local pid
+  local pid child
   for pid in ${pids[@]+"${pids[@]}"}; do
+    for child in $(descendants "$pid"); do
+      kill "$child" 2> /dev/null || true
+    done
     kill "$pid" 2> /dev/null || true
   done
   for pid in ${pids[@]+"${pids[@]}"}; do
@@ -211,6 +226,24 @@ console 13001 http://127.0.0.1:18081/ "$work/console-signed-in.log" \
 "$chromedriver" --port=4444 > "$work/chromedriver.log" 2>&1 &
 pids+=("$!")
 await "http://127.0.0.1:4444/status" "$work/chromedriver.log"
+
+# One session opened and closed before any journey runs: a driver that cannot
+# start a browser (a Chrome left from an earlier run holding what the new one
+# needs, a browser the driver does not match) fails here with the driver's own
+# words, instead of as every journey's timeout.
+capabilities='{"capabilities":{"alwaysMatch":{"browserName":"chrome","goog:chromeOptions":{"args":["--headless=new","--no-sandbox","--disable-dev-shm-usage"]}}}}'
+if [[ -n "${FERROTERM_UI_E2E_CHROME:-}" ]]; then
+  capabilities="$(jq -c --arg binary "$FERROTERM_UI_E2E_CHROME" \
+    '.capabilities.alwaysMatch["goog:chromeOptions"].binary = $binary' <<< "$capabilities")"
+fi
+opened="$(curl --silent --show-error --max-time 60 -H 'Content-Type: application/json' \
+  -d "$capabilities" http://127.0.0.1:4444/session || true)"
+session="$(jq -r '.value.sessionId // empty' <<< "$opened" 2> /dev/null || true)"
+if [[ -z "$session" ]]; then
+  reason="$(jq -r '.value.message // empty' <<< "$opened" 2> /dev/null || true)"
+  die "chromedriver could not start a browser session: ${reason:-no answer}; a browser or driver left from an earlier run may still be running"
+fi
+curl --silent --output /dev/null -X DELETE "http://127.0.0.1:4444/session/$session" || true
 
 journeys() {
   FERROTERM_UI_E2E_BASE_URL=http://127.0.0.1:13000 \
