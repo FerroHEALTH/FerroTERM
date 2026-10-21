@@ -104,7 +104,7 @@ among them; the pins below are the tools.
 | Tailwind CSS standalone CLI | 4.3.3, downloaded and checked against its SHA-256 by `scripts/release/viewer-tools.sh`, so there is no Node and no npm |
 | Binaryen `wasm-opt` | version_133, downloaded and checked the same way |
 | `leptosfmt` | 0.1.33, the `view!` macro formatter |
-| Chrome for Testing | 155.0.8059.79 with its chromedriver, installed by `browser-actions/setup-chrome` in the `ui-e2e` job of `ci.yml` |
+| Chrome for Testing | 155.0.8059.79 with its chromedriver, installed by `browser-actions/setup-chrome` in the `ui-e2e` job of `ci.yml`, and on a developer machine by `scripts/release/journey-tools.sh`, which checks each zip against its SHA-256 |
 
 ## GitHub Actions pins
 

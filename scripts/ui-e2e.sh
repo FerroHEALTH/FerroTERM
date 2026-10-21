@@ -26,7 +26,10 @@
 # `Secure` (the console refuses that anywhere else) and no certificate is
 # needed. The browser is Chrome for Testing with its chromedriver, named by
 # FERROTERM_UI_E2E_CHROME and FERROTERM_UI_E2E_CHROMEDRIVER, or found on PATH;
-# CI installs both at the release docs/VERSIONS.md pins.
+# CI installs both at the release docs/VERSIONS.md pins. Without either, the
+# script fetches that release into target/journey-tools, and the site build's
+# tailwindcss and wasm-opt into target/viewer-tools, so a fresh checkout runs
+# with nothing installed by hand beyond cargo-nextest and cargo-leptos.
 #
 # The battery must not change a tracked file. The documentation capture pass
 # is the one exception, and it runs alone when --docs-shots asks for it: it
@@ -75,8 +78,32 @@ need() {
 
 need cargo-nextest "cargo install cargo-nextest --locked"
 need cargo-leptos "cargo install cargo-leptos --locked --version 0.3.11"
+
+# The browser: the one FERROTERM_UI_E2E_CHROMEDRIVER and FERROTERM_UI_E2E_CHROME
+# name, else a chromedriver on PATH, else the pinned Chrome for Testing in
+# target/journey-tools, fetched there on first use.
 chromedriver="${FERROTERM_UI_E2E_CHROMEDRIVER:-$(command -v chromedriver || true)}"
-[[ -x "$chromedriver" ]] || die "no chromedriver; name it in FERROTERM_UI_E2E_CHROMEDRIVER"
+if [[ -z "$chromedriver" ]]; then
+  tools="$root/target/journey-tools"
+  chromedriver="$(bash scripts/release/journey-tools.sh --paths "$tools" | sed -n 1p)"
+  if [[ ! -x "$chromedriver" ]]; then
+    echo "ui-e2e: no chromedriver named or on PATH; fetching the pinned Chrome for Testing into $tools"
+    bash scripts/release/journey-tools.sh "$tools"
+  fi
+  export FERROTERM_UI_E2E_CHROME="${FERROTERM_UI_E2E_CHROME:-$(bash scripts/release/journey-tools.sh --paths "$tools" | sed -n 2p)}"
+fi
+[[ -x "$chromedriver" ]] || die "$chromedriver is not an executable chromedriver"
+
+# The site build's tools, tailwindcss and wasm-opt: the pinned ones on PATH,
+# else the ones in target/viewer-tools, fetched there on first use.
+if ! bash scripts/release/viewer-tools.sh --check > /dev/null 2>&1; then
+  tools="$root/target/viewer-tools"
+  export PATH="$tools/bin:$PATH"
+  if ! bash scripts/release/viewer-tools.sh --check > /dev/null 2>&1; then
+    echo "ui-e2e: the pinned tailwindcss and wasm-opt are not on PATH; fetching them into $tools"
+    bash scripts/release/viewer-tools.sh "$tools"
+  fi
+fi
 
 # How many journeys drive the browser at once: each opens its own Chrome under
 # the one chromedriver, and more sessions than the processors (four on the
