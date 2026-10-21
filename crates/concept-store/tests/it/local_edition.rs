@@ -187,5 +187,5 @@ fn the_local_edition_builds_an_artifact_and_opens_fast() {
         designation_index.len(),
         preferred.term
     );
-    assert!(!preferred.term.is_empty());
+    assert_ne!(preferred.term, "");
 }

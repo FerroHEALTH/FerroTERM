@@ -785,7 +785,7 @@ mod tests {
     #[test]
     fn an_answer_carrying_no_parameter_reads_as_no_match() {
         let answer = parse(r#"{"resourceType":"Parameters"}"#);
-        assert!(answer.matches().is_empty());
+        assert_eq!(answer.matches(), Vec::<TranslationMatch>::new());
         assert_eq!(
             answer.result(),
             None,

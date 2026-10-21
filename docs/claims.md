@@ -391,7 +391,7 @@ Per system, the loader flag, the provider, and the test that exercises it:
 
 | Claim | Evidence |
 |---|---|
-| One Cargo workspace, Rust 1.98, edition 2024 | `rust-toolchain.toml:4` `channel = "1.98.0"`; `Cargo.toml:4` `resolver = "3"`, `edition = "2024"`, `rust-version = "1.98"`; enforced by the `msrv (cargo-hack)` job |
+| One Cargo workspace, Rust 1.99, edition 2024 | `rust-toolchain.toml:4` `channel = "1.99.1"`; `Cargo.toml:4` `resolver = "3"`, `edition = "2024"`, `rust-version = "1.98"`; enforced by the `msrv (cargo-hack)` job |
 | The crate list (`rf2`, `loinc`, `classification`, `rxnorm-rrf`, `icd11`, `concept-graph`, `concept-store`, `designation-index`, `fhir-terminology`) | `crates/` holds each of them |
 | The local gates mirror CI | `.github/workflows/ci.yml`; `scripts/checks/comment-style.sh` |
 | `Cargo.lock` is committed and CI builds with `--locked` | `Cargo.lock`; the `--locked` flags in `ci.yml` |

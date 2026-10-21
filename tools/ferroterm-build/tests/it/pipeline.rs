@@ -428,7 +428,7 @@ fn the_attribute_graph_member_tables_and_identifiers_are_written_beside_the_stor
     .expect("reads");
     let table = members.table(legs).expect("the simple reference set table");
     assert_eq!(table.len(), 2);
-    assert!(table.fields().is_empty());
+    assert_eq!(table.fields(), Vec::<String>::new());
     assert!(table.members().contains(cat.index()));
     let identifiers = concept_graph::identifiers::Identifiers::read_from(
         &mut fs::read(out.path().join(pipeline::IDENTIFIERS_FILE))

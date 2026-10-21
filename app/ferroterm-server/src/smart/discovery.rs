@@ -70,7 +70,7 @@ mod tests {
     // configured one (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
     #[test]
     fn scopes_supported_is_the_configured_list_alone() {
-        assert!(options(&[], &[]).scopes_supported.is_empty());
+        assert_eq!(options(&[], &[]).scopes_supported, Vec::<String>::new());
         let listed = [String::from("system/CodeSystem.cud")];
         assert_eq!(options(&listed, &[]).scopes_supported, listed);
     }

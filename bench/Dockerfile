@@ -8,7 +8,7 @@
 # From the repository root:
 #   docker compose -f bench/compose.yaml run --rm bench --skip-ingest
 
-FROM rust:1.98-bookworm@sha256:82150a52ec202c1b14d7817e14516c392bb7f5cfebd88f1ed531cb37ebd39922 AS build
+FROM rust:1.99.1-bookworm@sha256:665b6e0a9290a7298236c08c6e4f1e754e3f0d9b70421c434daa3dfba888d63e AS build
 WORKDIR /src
 COPY . .
 RUN cargo build --release --locked -p ferroterm-server -p ferroterm-build -p ferroterm-bench

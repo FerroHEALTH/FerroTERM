@@ -343,7 +343,7 @@ mod tests {
     #[test]
     fn an_empty_searchset_reads_as_no_published_resource() {
         let search = parse(r#"{"resourceType":"Bundle","type":"searchset","total":0}"#);
-        assert!(search.published().is_empty());
+        assert_eq!(search.published(), Vec::<PublishedCodeSystem>::new());
         assert_eq!(search.total(), Some(0));
     }
 

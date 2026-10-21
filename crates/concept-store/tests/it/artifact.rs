@@ -210,7 +210,10 @@ fn a_batch_read_answers_in_the_order_asked_and_marks_what_is_absent() {
         store.codes(asked).expect("batch read"),
         vec![Some("1001".to_owned()), None, Some("1000".to_owned())]
     );
-    assert!(store.codes([]).expect("batch read").is_empty());
+    assert_eq!(
+        store.codes([]).expect("batch read"),
+        Vec::<Option<String>>::new()
+    );
 }
 
 #[test]

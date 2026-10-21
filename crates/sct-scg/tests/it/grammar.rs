@@ -90,11 +90,14 @@ fn a_refinement_may_open_with_a_set_or_with_a_group() {
     let set = parsed("100000001 : 200000001 = 300000001");
     let refinement = set.sub_expression.refinement.expect("a refinement");
     assert_eq!(refinement.ungrouped.len(), 1);
-    assert!(refinement.groups.is_empty());
+    assert_eq!(
+        refinement.groups,
+        Vec::<sct_scg::ast::AttributeGroup>::new()
+    );
 
     let grouped = parsed("100000001 : { 200000001 = 300000001 }");
     let refinement = grouped.sub_expression.refinement.expect("a refinement");
-    assert!(refinement.ungrouped.is_empty());
+    assert_eq!(refinement.ungrouped, Vec::<sct_scg::ast::Attribute>::new());
     assert_eq!(refinement.groups.len(), 1);
 }
 

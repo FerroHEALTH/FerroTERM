@@ -760,7 +760,7 @@ mod tests {
             }],
             "every version makes the element 1..1, so a target without one is refused"
         );
-        assert!(!draft.problems(FhirVersion::R4B).is_empty());
+        assert_ne!(draft.problems(FhirVersion::R4B), Vec::<Problem>::new());
         assert!(
             !draft.problems(FhirVersion::R5).is_empty(),
             "R5 makes `relationship` mandatory the same way R4B makes `equivalence` mandatory"
@@ -793,7 +793,7 @@ mod tests {
         );
         draft.url = String::from("https://terminology.example/m");
         draft.status = String::from("draft");
-        assert!(draft.problems(FhirVersion::R5).is_empty());
+        assert_eq!(draft.problems(FhirVersion::R5), Vec::<Problem>::new());
     }
 
     #[test]
@@ -1049,7 +1049,7 @@ mod tests {
             .first_mut()
             .expect("the element carries one target")
             .comment = String::from("Vermilion is one shade of red.");
-        assert!(draft.problems(FhirVersion::R4B).is_empty());
+        assert_eq!(draft.problems(FhirVersion::R4B), Vec::<Problem>::new());
     }
 
     #[test]

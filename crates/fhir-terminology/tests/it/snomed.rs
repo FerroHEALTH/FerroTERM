@@ -155,7 +155,7 @@ fn properties_follow_the_snomed_on_fhir_list() {
         [&PropertyValue::String(String::from("20260101"))]
     );
     assert_eq!(find("parent"), [&PropertyValue::Code(sctid(item(ANIMAL)))]);
-    assert!(find("child").is_empty());
+    assert_eq!(find("child"), Vec::<&PropertyValue>::new());
     assert_eq!(
         find(&sctid(item(COVERING))),
         [&PropertyValue::Code(sctid(item(FUR)))]

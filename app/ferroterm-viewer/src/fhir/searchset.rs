@@ -166,7 +166,7 @@ mod tests {
     #[test]
     fn an_empty_searchset_reads_as_no_match_rather_than_as_a_decode_error() {
         let found = parse(r#"{"resourceType":"Bundle","type":"searchset","total":0}"#);
-        assert!(found.found().is_empty());
+        assert_eq!(found.found(), Vec::<&Thing>::new());
         assert_eq!(found.total(), Some(0));
     }
 }

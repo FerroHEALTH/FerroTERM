@@ -29,10 +29,10 @@ discovery-phase repo.
 
 | Item | Pin |
 |---|---|
-| Rust toolchain | 1.98.0 (stable, pinned in `rust-toolchain.toml`) |
+| Rust toolchain | 1.99.1 (stable, pinned in `rust-toolchain.toml`) |
 | Edition | 2024 |
 | Cargo resolver | 3 |
-| MSRV | 1.98 (`rust-version` in the root `Cargo.toml`, checked by `cargo hack check --rust-version`); the deliverable is a binary, so MSRV tracks the pinned stable |
+| MSRV | 1.98 (`rust-version` in the root `Cargo.toml`, checked by `cargo hack check --rust-version`); the toolchain is the newest stable Rust release and the MSRV the toolchain minus one minor release, the rule every FerroHEALTH repository follows; an MSRV is only ever raised |
 
 ## openEHR: n/a
 

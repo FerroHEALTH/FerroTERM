@@ -211,7 +211,7 @@ fn the_provider_locates_describes_and_filters_expressions() {
         .implicit_value_set("http://unitsofmeasure.org/vs")
         .expect("implicit")
         .expect("compose");
-    assert!(all.include[0].filters.is_empty());
+    assert_eq!(all.include[0].filters, Vec::<Filter>::new());
     let mass = provider
         .implicit_value_set("http://unitsofmeasure.org/vs/g")
         .expect("implicit")

@@ -225,7 +225,7 @@ fn maps_are_chosen_by_scope_and_target_system_and_read_in_reverse() {
     };
     let translation = run(&world, &wrong_target);
     assert!(!translation.result);
-    assert!(translation.matches.is_empty());
+    assert_eq!(translation.matches, Vec::<Match>::new());
     let reverse = TranslateInput {
         url: Some(CM_ANIMALS_COLOURS.to_owned()),
         code: Some(String::from("Green")),

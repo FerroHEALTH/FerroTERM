@@ -45,10 +45,9 @@ fn code_filters_select_by_code() {
             .len(),
         7
     );
-    assert!(
-        run(&p, "concept", FilterOperator::Exists, "false")
-            .unwrap()
-            .is_empty()
+    assert_eq!(
+        run(&p, "concept", FilterOperator::Exists, "false").unwrap(),
+        Vec::<String>::new()
     );
     assert!(matches!(
         run(&p, "concept", FilterOperator::Exists, "maybe"),

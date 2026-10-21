@@ -120,13 +120,9 @@ async fn an_open_service_needs_no_credentials_at_all() {
         "reference",
         &format!("{}/synd/syndication.xml", server.uri()),
     );
-    assert!(
-        !source
-            .list()
-            .await
-            .expect("the listing is open")
-            .entries
-            .is_empty()
+    assert_ne!(
+        source.list().await.expect("the listing is open").entries,
+        Vec::<terminology_syndication::model::Entry>::new()
     );
     let directory = tempfile::tempdir().expect("a temporary directory");
     let destination = directory.path().join("item.zip");
@@ -156,13 +152,9 @@ async fn affiliate_credentials_travel_as_http_basic() {
             user: String::from("affiliate"),
             password: String::from("secret"),
         });
-    assert!(
-        !source
-            .list()
-            .await
-            .expect("the listing is served")
-            .entries
-            .is_empty()
+    assert_ne!(
+        source.list().await.expect("the listing is served").entries,
+        Vec::<terminology_syndication::model::Entry>::new()
     );
 }
 

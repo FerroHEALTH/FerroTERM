@@ -299,7 +299,10 @@ mod tests {
             "ValueSet/$expand",
             "a leading or trailing slash is not a segment"
         );
-        assert!(split_url("ValueSet/$expand?").1.is_empty());
+        assert_eq!(
+            split_url("ValueSet/$expand?").1,
+            Vec::<(String, String)>::new()
+        );
     }
 
     #[test]

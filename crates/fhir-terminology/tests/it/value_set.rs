@@ -213,7 +213,7 @@ fn expand_pages_filters_and_honours_active_only() {
         ..ExpandInput::default()
     };
     let vs = expand::expand(&world.sources(), &zero).expect("expands");
-    assert!(codes(&vs).is_empty());
+    assert_eq!(codes(&vs), Vec::<String>::new());
     assert_eq!(vs.total, 8);
 }
 
@@ -442,7 +442,7 @@ fn expand_takes_an_inline_value_set_and_pins_system_versions() {
         ..ExpandInput::default()
     };
     let vs = expand::expand(&world.sources(), &excluded).expect("expands");
-    assert!(codes(&vs).is_empty());
+    assert_eq!(codes(&vs), Vec::<String>::new());
 }
 
 #[test]
@@ -549,7 +549,7 @@ fn validate_code_answers_the_membership_the_echo_and_the_issues() {
     assert_eq!(validation.system.as_deref(), Some(ANIMALS));
     assert_eq!(validation.version.as_deref(), Some("2.0"));
     assert_eq!(validation.code.as_deref(), Some("kitten"));
-    assert!(validation.issues.is_empty());
+    assert_eq!(validation.issues, Vec::<Issue>::new());
     let inferred = ValueSetValidateInput {
         url: Some(VS_PETS.to_owned()),
         code: Some(String::from("kitten")),
@@ -933,7 +933,10 @@ fn expand_returns_the_properties_asked_for() {
         Some("http://example.org/legs")
     );
     // NOTE: the ecosystem does not echo `property` among the expansion parameters (#190).
-    assert!(parameter(&by_code, "property").is_empty());
+    assert_eq!(
+        parameter(&by_code, "property"),
+        Vec::<ParameterValue>::new()
+    );
     let by_uri = expand::expand(
         &world.sources(),
         &ExpandInput {
@@ -971,7 +974,7 @@ fn expand_returns_the_properties_asked_for() {
     )
     .expect("expands");
     assert!(none.contains.iter().all(|c| c.properties.is_empty()));
-    assert!(none.properties.is_empty());
+    assert_eq!(none.properties, Vec::<expand::ExpansionProperty>::new());
 }
 
 // NOTE: the value set version trio and the system trio negotiate the versions an
@@ -1346,7 +1349,7 @@ fn validate_code_judges_a_codeable_concept_coding_by_coding() {
         ]
     );
     assert_eq!(validation.x_unknown_systems, ["http://example.org/none"]);
-    assert!(validation.unknown_systems.is_empty());
+    assert_eq!(validation.unknown_systems, Vec::<String>::new());
     // The missing system speaks first, then the concept's verdict (the
     // ecosystem's `codeableconcept-bad-version2` case).
     assert_eq!(
@@ -1848,7 +1851,7 @@ fn validate_code_names_its_messages_and_shapes_the_unknown_system_answer() {
         caused.unknown_systems,
         ["http://example.org/fhir/CodeSystem/nowhere"]
     );
-    assert!(caused.x_unknown_systems.is_empty());
+    assert_eq!(caused.x_unknown_systems, Vec::<String>::new());
 }
 
 #[test]
@@ -2121,7 +2124,7 @@ fn validate_code_names_a_value_set_used_as_a_system_as_bad_data() {
         )
     );
     assert!(validation.x_unknown_systems.is_empty(), "no missing system");
-    assert!(validation.unknown_systems.is_empty());
+    assert_eq!(validation.unknown_systems, Vec::<String>::new());
 }
 
 #[test]

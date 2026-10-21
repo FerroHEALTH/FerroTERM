@@ -17,7 +17,7 @@ to get building.
 
 ## The workspace
 
-One Cargo workspace, Rust 1.98, edition 2024: `crates/*` are the libraries
+One Cargo workspace, Rust 1.99, edition 2024: `crates/*` are the libraries
 (`rf2`, `loinc`, `classification`, `rxnorm-rrf`, `icd11` the release readers;
 `concept-graph`, `concept-store`, `designation-index` the substrates;
 `fhir-terminology` the engine and providers), `app/ferroterm-server` is the

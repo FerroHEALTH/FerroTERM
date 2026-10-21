@@ -1276,7 +1276,7 @@ mod tests {
         let (before, at, after) = mark("<<7", 99);
         assert_eq!(before, "<<7", "a column past the end marks the end");
         assert_eq!(at, " ");
-        assert!(after.is_empty());
+        assert_eq!(after, "");
         let (before, at, _) = mark("<<7", 4);
         assert_eq!(
             (before.as_str(), at.as_str()),

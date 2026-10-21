@@ -205,7 +205,10 @@ fn refinements_match_attribute_rows_with_their_cardinalities() {
         ),
         [CAT, DOG]
     );
-    assert!(set(&p, &format!("< {animals} : {} = {}", c(COVERING), c(CAT))).is_empty());
+    assert_eq!(
+        set(&p, &format!("< {animals} : {} = {}", c(COVERING), c(CAT))),
+        Vec::<u32>::new()
+    );
     assert_eq!(
         set(&p, &format!("< {animals} : * = {}", c(FUR))),
         [CAT, DOG],
@@ -228,19 +231,22 @@ fn refinements_match_attribute_rows_with_their_cardinalities() {
         [CAT, DOG],
         "zero occurrences"
     );
-    assert!(
+    assert_eq!(
         set(
             &p,
             &format!("< {animals} : [0..0] {} = {}", c(COVERING), c(FUR))
-        )
-        .is_empty()
+        ),
+        Vec::<u32>::new()
     );
     assert_eq!(
         set(&p, &format!("< {animals} : [2..*] * = *")),
         [CAT, DOG],
         "two attributes each"
     );
-    assert!(set(&p, &format!("< {animals} : [3..*] * = *")).is_empty());
+    assert_eq!(
+        set(&p, &format!("< {animals} : [3..*] * = *")),
+        Vec::<u32>::new()
+    );
     assert_eq!(
         set(&p, &format!("<< {} : [0..0] {} = *", c(TOP), c(COVERING))).len(),
         18,
@@ -255,7 +261,10 @@ fn refinements_match_attribute_rows_with_their_cardinalities() {
         set(&p, &format!("< {animals} : {} > #3", c(LEGS))),
         [CAT, DOG]
     );
-    assert!(set(&p, &format!("< {animals} : {} >= #5", c(LEGS))).is_empty());
+    assert_eq!(
+        set(&p, &format!("< {animals} : {} >= #5", c(LEGS))),
+        Vec::<u32>::new()
+    );
     assert_eq!(
         set(&p, &format!("< {animals} : {} != #5", c(LEGS))),
         [CAT, DOG]
@@ -387,7 +396,10 @@ fn reverse_and_dotted_attributes_walk_to_the_values() {
         [FUR],
         "two sources"
     );
-    assert!(set(&p, &format!("* : [3..*] R {} = *", c(COVERING))).is_empty());
+    assert_eq!(
+        set(&p, &format!("* : [3..*] R {} = *", c(COVERING))),
+        Vec::<u32>::new()
+    );
     assert_eq!(
         set(&p, &format!("< {} . {}", c(ANIMAL), c(COVERING))),
         [FUR],
@@ -398,7 +410,10 @@ fn reverse_and_dotted_attributes_walk_to_the_values() {
         [FUR],
         "numbers are not concepts"
     );
-    assert!(set(&p, &format!("{} . {}", c(FUR), c(COVERING))).is_empty());
+    assert_eq!(
+        set(&p, &format!("{} . {}", c(FUR), c(COVERING))),
+        Vec::<u32>::new()
+    );
     assert_eq!(
         set(&p, &format!("( < {} . {} ) . *", c(ANIMAL), c(COVERING))).len(),
         0,
@@ -455,12 +470,12 @@ fn description_filters_match_one_description_per_concept() {
         ),
         [CAT]
     );
-    assert!(
+    assert_eq!(
         set(
             &p,
             &format!("< {animals} {{{{ term = \"poes\", dialect = nl-nl (prefer) }}}}")
-        )
-        .is_empty()
+        ),
+        Vec::<u32>::new()
     );
     assert_eq!(
         set(
@@ -476,12 +491,12 @@ fn description_filters_match_one_description_per_concept() {
         ),
         [CAT]
     );
-    assert!(
+    assert_eq!(
         set(
             &p,
             &format!("< {animals} {{{{ term = \"kat\", dialect = en-gb }}}}")
-        )
-        .is_empty()
+        ),
+        Vec::<u32>::new()
     );
     assert_eq!(
         set(
@@ -504,12 +519,12 @@ fn description_filters_match_one_description_per_concept() {
         ),
         [CAT]
     );
-    assert!(
+    assert_eq!(
         set(
             &p,
             &format!("< {animals} {{{{ term = \"cat\", type = def }}}}")
-        )
-        .is_empty()
+        ),
+        Vec::<u32>::new()
     );
     assert!(
         set(&p, &format!("< {animals} {{{{ term = \"moggy\" }}}}")).is_empty(),
@@ -609,7 +624,7 @@ fn concept_filters_read_the_concept_rows() {
         ),
         [ANIMAL, CAT, DOG]
     );
-    assert!(
+    assert_eq!(
         set(
             &p,
             &format!(
@@ -617,11 +632,14 @@ fn concept_filters_read_the_concept_rows() {
                 c(ANIMAL),
                 sctid(Item::raw(99))
             )
-        )
-        .is_empty()
+        ),
+        Vec::<u32>::new()
     );
     assert_eq!(set(&p, "* {{ C effectiveTime = \"20260101\" }}").len(), 21);
-    assert!(set(&p, "* {{ C effectiveTime >= \"20270101\" }}").is_empty());
+    assert_eq!(
+        set(&p, "* {{ C effectiveTime >= \"20270101\" }}"),
+        Vec::<u32>::new()
+    );
     assert_eq!(
         set(&p, "* {{ C effectiveTime != (\"20250101\" \"20260101\") }}").len(),
         0
@@ -652,7 +670,10 @@ fn member_filters_read_the_fields_of_the_rows() {
         set(&p, &format!("^ {map} {{{{ M mapGroup = #1 }}}}")),
         [CAT, DOG]
     );
-    assert!(set(&p, &format!("^ {map} {{{{ M mapGroup > #1 }}}}")).is_empty());
+    assert_eq!(
+        set(&p, &format!("^ {map} {{{{ M mapGroup > #1 }}}}")),
+        Vec::<u32>::new()
+    );
     assert_eq!(
         set(
             &p,
@@ -667,12 +688,12 @@ fn member_filters_read_the_fields_of_the_rows() {
         ),
         [CAT, DOG]
     );
-    assert!(
+    assert_eq!(
         set(
             &p,
             &format!("^ {map} {{{{ M effectiveTime < \"20260101\" }}}}")
-        )
-        .is_empty()
+        ),
+        Vec::<u32>::new()
     );
     assert_eq!(
         set(
@@ -703,12 +724,12 @@ fn member_filters_read_the_fields_of_the_rows() {
         ),
         [FISH]
     );
-    assert!(
+    assert_eq!(
         set(
             &p,
             &format!("^ {} {{{{ M targetComponentId = {} }}}}", same_as(), c(DOG))
-        )
-        .is_empty()
+        ),
+        Vec::<u32>::new()
     );
     assert!(
         set(&p, &format!("^ {map} {{{{ M nosuch = \"x\" }}}}")).is_empty(),
