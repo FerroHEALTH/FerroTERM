@@ -32,6 +32,15 @@ authoring SNOMED content and MRCM validation of post-coordinated expressions,
 this book says so. Each open item is an issue with acceptance criteria on the
 tracker, and the milestones are the roadmap.
 
+## What this book leaves to the family book
+
+FerroTERM is one product of the FerroHEALTH family, and Cadasto B.V. is the
+manufacturer of every product. This book documents FerroTERM alone. The
+manufacturer, the shared security policy and support period, the Cyber
+Resilience Act's manufacturer side, how the products fit together, and the
+licensing and trademark terms are written once, in the
+[FerroHEALTH book](https://ferrohealth.eu/docs/).
+
 ## Who each part of this book is for
 
 - **[Evaluate](evaluate/what-ferroterm-is.md)** is for anyone deciding whether

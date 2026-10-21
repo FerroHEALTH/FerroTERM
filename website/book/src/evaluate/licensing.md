@@ -9,6 +9,9 @@ boundary in the order people ask about it, so you can answer "do I need a
 commercial licence?" without reading the parameters.
 
 The code systems are a separate question, answered at the bottom of this page.
+The terms every FerroHEALTH product shares, the trademarks and the
+contribution terms among them, are in the family book's
+[licensing page](https://ferrohealth.eu/docs/licensing.html).
 
 ## Do you need a commercial licence?
 

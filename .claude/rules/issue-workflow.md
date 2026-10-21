@@ -124,10 +124,18 @@ Labels carry what the platform has no field for. Bootstrap them with
   taxonomy the tracker uses.
 - **Workflow:** `security`, `dependencies` (Dependabot), `accessibility`,
   `blocked-upstream` (waits on an upstream specification or tool release),
-  `on-hold` (waits on an input nobody here can provide), `upstream-report`,
-  and the pull-request escape hatches `no-changelog` and `no-crate-bump`.
-  Blocked-ness is the native blocked-by edge (`issue-relationships.md`), never
-  a label.
+  `on-hold` (waits on an input nobody here can provide), and the pull-request
+  escape hatches `no-changelog` and `no-crate-bump`. Blocked-ness is the
+  native blocked-by edge (`issue-relationships.md`), never a label.
+- **Outbound:** `upstream-report` for a report of a defect, contradiction, or
+  silence in a published specification or an upstream suite. The issue IS the
+  report: it opens with a plain summary, then what the specification says
+  (with citations), what this implementation does, and the resolution an
+  upstream would need. The issue is the record and stays here: nothing is
+  filed on an external tracker, and no owner-action issue for filing is ever
+  created. It never carries a milestone: it closes when the upstream changes,
+  on a timeline this repository does not control, and the in-repo decision it
+  forces is its own, milestoned issue.
 
 The organisation also defines `Start date` and `Target date` issue fields;
 this repository leaves both empty, because the milestone is the release spine

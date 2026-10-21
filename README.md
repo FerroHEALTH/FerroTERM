@@ -182,17 +182,32 @@ v0.1.8 is the current release. The tracker's milestones are the roadmap, and
 the open issues under each are the worklist:
 
 - **[v0.1.9](https://github.com/FerroHEALTH/FerroTERM/milestone/23)**: the
-  viewer restructure and its design, the differential check against the Nictiz
-  Nationale Terminologieserver for the Dutch variants, the benchmark record set
-  retaken after the memory change with the published table re-rendered from
-  it, a shorter sync run record, the rest of the FerroHEALTH organisation
-  setup with both SPDX lines on every first-party file, the documentation
-  narrowed to FerroTERM's own with the family book linked for the rest, and
-  the NHG tables for licence holders once Nictiz grants that licence.
+  rest of the FerroHEALTH organisation setup with both SPDX lines on every
+  first-party file, the sync service's admin listener behind
+  `ferrohealth-smart`, a shorter sync run record, the descriptive elements a
+  loaded `CodeSystem` and `ConceptMap` keep, the documentation narrowed to
+  FerroTERM's own with the family book linked for the rest, and fixes to the
+  browser journeys and the release tooling.
+- **[v0.2.0](https://github.com/FerroHEALTH/FerroTERM/milestone/24)**: the
+  console on FerroUI's own layout components without the Tailwind CLI, the
+  locale catalog, the WebAssembly headroom, and the benchmark record set
+  retaken after the memory change.
 - **[v0.3.0](https://github.com/FerroHEALTH/FerroTERM/milestone/16)**: the
-  suite cases that are waiting on an upstream ruling rather than on work here,
-  the two unmaintained advisories in the viewer's dependency tree, and the
-  OpenSSF Best Practices badge.
+  work that waits on outside access or an upstream release: the differential
+  check against the Nictiz Nationale Terminologieserver, the NHG tables once
+  Nictiz grants that licence, the suite modes that need an edition or a
+  vocabulary this repository cannot hold, the two unmaintained advisories in
+  the console's dependency tree, and the OpenSSF Best Practices badge.
+
+FerroTERM is one product of the FerroHEALTH family, made by Cadasto B.V.
+What holds for every product is written once, in the family book at
+<https://ferrohealth.eu/docs/>:
+[the manufacturer](https://ferrohealth.eu/docs/manufacturer.html),
+[the security policy](https://ferrohealth.eu/docs/security.html) and
+[post-market support](https://ferrohealth.eu/docs/post-market.html),
+[the Cyber Resilience Act](https://ferrohealth.eu/docs/cra.html),
+[how the products fit together](https://ferrohealth.eu/docs/architecture.html),
+and [licensing and trademarks](https://ferrohealth.eu/docs/licensing.html).
 
 ## How it is built
 

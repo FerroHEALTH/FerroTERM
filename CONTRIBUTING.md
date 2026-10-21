@@ -4,10 +4,14 @@
 # Contributing to FerroTERM
 
 FerroTERM is a pure-Rust FHIR terminology server for SNOMED CT, LOINC, and other
-clinical code systems, SNOMED CT first. It is in early
-design; the architecture is recorded, with citations, in
-[`docs/architecture.md`](docs/architecture.md), and the working discipline is in
-[`CLAUDE.md`](CLAUDE.md). Read both before making a change.
+clinical code systems, SNOMED CT first. The architecture is recorded, with
+citations, in [`docs/architecture.md`](docs/architecture.md), and the working
+discipline is in [`CLAUDE.md`](CLAUDE.md). Read both before making a change.
+
+This file carries what is particular to FerroTERM: how to build and test it,
+its rules for a change, and the part it publishes under another licence. The
+contribution terms every FerroHEALTH product shares are in the family book at
+<https://ferrohealth.eu/docs/licensing.html#contributions>.
 
 ## The two layers
 
@@ -22,7 +26,7 @@ design; the architecture is recorded, with citations, in
 
 ## Build and test
 
-Once the Cargo workspace exists, the local gates mirror CI exactly:
+The local gates mirror CI exactly:
 
 ```
 cargo fmt --all --check
@@ -38,8 +42,8 @@ full `--workspace` gates before opening a pull request. All cargo invocations
 use `--locked`; `Cargo.lock` is committed.
 
 The workflow lanes that also run on shell and YAML (`actionlint`, `zizmor`,
-`shellcheck`) run on every change, including before any Rust exists. If you edit
-a shell script, keep it clean at `shellcheck --severity=style`.
+`shellcheck`) run on every change. If you edit a shell script, keep it clean at
+`shellcheck --severity=style`.
 
 ## Branches and commits
 
@@ -67,19 +71,25 @@ a shell script, keep it clean at `shellcheck --severity=style`.
 
 ## Security
 
-Report vulnerabilities privately. See [`SECURITY.md`](SECURITY.md). Do not open
-a public issue for a security problem.
+Report vulnerabilities privately. See [`SECURITY.md`](SECURITY.md), and the
+family policy it links for how a report is handled. Do not open a public issue
+for a security problem.
 
 ## Licensing of contributions
 
 FerroTERM's own code is licensed under the Business Source License 1.1
-([`LICENSE`](LICENSE)). By submitting a contribution you:
+([`LICENSE`](LICENSE)). These are the terms the family book states for every
+FerroHEALTH product
+([Contributions](https://ferrohealth.eu/docs/licensing.html#contributions)),
+with the part FerroTERM publishes under another licence named in point 2. By
+submitting a contribution you:
 
 1. certify that you wrote it, or otherwise have the right to submit it under
    these terms;
 2. license it under the Business Source License 1.1 as applied to the version it
    lands in, including that version's Change License, so it becomes Apache 2.0
-   with the rest of that version; and
+   with the rest of that version. A contribution to `crates/rf2`, the RF2
+   reader, is licensed under that crate's Apache License 2.0 instead; and
 3. grant the Licensor named in `LICENSE`, Cadasto B.V., a perpetual,
    irrevocable, worldwide, royalty-free, transferable right to use, reproduce,
    modify, distribute, sublicense and relicense the contribution as part of the
