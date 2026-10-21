@@ -13,7 +13,6 @@
   "status": {
     "index_ok": false,
     "code_systems": [],
-    "viewer": true,
     "persistence": false
   },
   "metrics": {

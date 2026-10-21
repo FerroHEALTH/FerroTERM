@@ -17,7 +17,6 @@
       "loinc",
       "snomed"
     ],
-    "viewer": true,
     "persistence": false
   },
   "first_start": true
