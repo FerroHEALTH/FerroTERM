@@ -35,6 +35,7 @@ sha="$(awk -F'|' '$2 ~ /^[[:space:]]*FerroPULSE report v2[[:space:]]*$/ { v = $3
 [[ -n "$sha" ]] || die "no FerroPULSE report v2 row in $pins"
 case "$sha" in
   *[!0-9a-f]* | "") die "the FerroPULSE pin is not a commit: '$sha'" ;;
+  *) ;;
 esac
 [[ "${#sha}" -eq 40 ]] || die "the FerroPULSE pin is not a 40-character commit: '$sha'"
 
@@ -46,7 +47,8 @@ fetch() {
 
 # The files of one directory at the pin, by name.
 list() {
-  gh api "repos/$repo/contents/$1?ref=$sha" --jq '.[] | select(.type == "file") | .name'
+  local directory="$1"
+  gh api "repos/$repo/contents/$directory?ref=$sha" --jq '.[] | select(.type == "file") | .name'
 }
 
 echo "== FerroPULSE report v2 ($sha)"

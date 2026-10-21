@@ -79,7 +79,7 @@ do_publish() {
     esac
   done
   [[ -z "$failed" ]] || {
-    echo "::error::failed to publish:$failed"
+    echo "::error::failed to publish:$failed" >&2
     return 1
   }
   echo "publish-crates: every crate is at $(manifest_version) or was already there"
@@ -111,7 +111,7 @@ do_verify() {
     [[ -n "$got" ]] || bad="$bad $crate"
   done
   [[ -z "$bad" ]] || {
-    echo "::error::the published set is split; not at $want:$bad"
+    echo "::error::the published set is split; not at $want:$bad" >&2
     return 1
   }
   echo "publish-crates: confirmed on crates.io, all ${#CRATES[@]} crates at $want"

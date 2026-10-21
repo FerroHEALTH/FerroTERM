@@ -22,12 +22,12 @@
 # skip it, and what a CI run never does, because CI always sets PR_BODY.
 set -euo pipefail
 
-if [ "$#" -ne 0 ]; then
+if [[ "$#" -ne 0 ]]; then
   echo "usage: $0   (reads the pull request body from PR_BODY; takes no arguments)" >&2
   exit 2
 fi
 
-if [ -z "${PR_BODY+set}" ]; then
+if [[ -z "${PR_BODY+set}" ]]; then
   self="$0"
   PR_BODY='- [x] I accept the terms in [CONTRIBUTING.md § Licensing of contributions](x)' "$self" >/dev/null
   if PR_BODY='- [ ] I accept the terms in [CONTRIBUTING.md § Licensing of contributions](x)' "$self" 2>/dev/null; then

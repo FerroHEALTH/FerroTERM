@@ -11,7 +11,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-if [ "$#" -ne 0 ]; then
+if [[ "$#" -ne 0 ]]; then
   echo "usage: $0   (takes no arguments)" >&2
   exit 2
 fi
@@ -28,5 +28,5 @@ for manifest in crates/*/Cargo.toml addons/*/Cargo.toml app/*/Cargo.toml tools/*
     fi
   done
 done
-[ "$status" -eq 0 ] && echo "ok: repo-map (every one of the $count workspace members is named in CLAUDE.md and docs/architecture.md)"
+[[ "$status" -eq 0 ]] && echo "ok: repo-map (every one of the $count workspace members is named in CLAUDE.md and docs/architecture.md)"
 exit "$status"

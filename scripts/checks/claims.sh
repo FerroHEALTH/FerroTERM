@@ -11,7 +11,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-if [ "$#" -ne 0 ]; then
+if [[ "$#" -ne 0 ]]; then
   echo "usage: $0   (takes no arguments)" >&2
   exit 2
 fi
@@ -29,7 +29,7 @@ while IFS= read -r cite; do
   path="${cite%%::*}"
   name="${cite#*::}"
   checked=$((checked + 1))
-  if [ ! -f "$path" ]; then
+  if [[ ! -f "$path" ]]; then
     echo "error: $doc cites $path, which does not exist" >&2
     status=1
     continue
@@ -40,5 +40,5 @@ while IFS= read -r cite; do
   fi
 done < <(grep -oE '`[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)+\.rs::[A-Za-z0-9_]+' "$doc" | tr -d '`' | sort -u)
 
-[ "$status" -eq 0 ] && echo "ok: claims ($checked symbol and test citations resolve, no line numbers)"
+[[ "$status" -eq 0 ]] && echo "ok: claims ($checked symbol and test citations resolve, no line numbers)"
 exit "$status"

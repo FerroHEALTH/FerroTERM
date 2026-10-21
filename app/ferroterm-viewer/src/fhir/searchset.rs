@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 /// entry has to say what it is before it is drawn as a match.
 pub(crate) trait Published {
     /// The `resourceType` a match declares.
-    const RESOURCE_TYPE: &'static str;
+    const RESOURCE_TYPE: &str;
 
     /// The `resourceType` this entry declared, when it declared one.
     ///
@@ -113,7 +113,7 @@ mod tests {
     }
 
     impl Published for Thing {
-        const RESOURCE_TYPE: &'static str = "Thing";
+        const RESOURCE_TYPE: &str = "Thing";
 
         fn declared_type(&self) -> Option<&str> {
             self.resource_type.as_deref()

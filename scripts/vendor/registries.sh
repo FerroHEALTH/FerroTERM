@@ -21,27 +21,30 @@ mkdir -p "$data/iana/media-types" "$data/cldr"
 
 CLDR_REF=${CLDR_REF:-main}
 
-curl --proto '=https' --tlsv1.2 -sSL -o "$data/iana/language-subtag-registry" \
+# Every fetch refuses a protocol other than HTTPS and a TLS version below 1.2.
+https_only=(--proto '=https' --tlsv1.2)
+
+curl "${https_only[@]}" -sSL -o "$data/iana/language-subtag-registry" \
   https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry
 for top in application audio font haptics image message model multipart text video; do
-  curl --proto '=https' --tlsv1.2 -sSL -o "$data/iana/media-types/$top.csv" "https://www.iana.org/assignments/media-types/$top.csv"
+  curl "${https_only[@]}" -sSL -o "$data/iana/media-types/$top.csv" "https://www.iana.org/assignments/media-types/$top.csv"
 done
-curl --proto '=https' --tlsv1.2 -sSL -o "$data/cldr/territories.json" \
+curl "${https_only[@]}" -sSL -o "$data/cldr/territories.json" \
   "https://raw.githubusercontent.com/unicode-org/cldr-json/$CLDR_REF/cldr-json/cldr-localenames-full/main/en/territories.json"
-curl --proto '=https' --tlsv1.2 -sSL -o "$data/cldr/codeMappings.json" \
+curl "${https_only[@]}" -sSL -o "$data/cldr/codeMappings.json" \
   "https://raw.githubusercontent.com/unicode-org/cldr-json/$CLDR_REF/cldr-json/cldr-core/supplemental/codeMappings.json"
-curl --proto '=https' --tlsv1.2 -sSL -o "$data/cldr/LICENSE" "https://raw.githubusercontent.com/unicode-org/cldr-json/$CLDR_REF/LICENSE"
+curl "${https_only[@]}" -sSL -o "$data/cldr/LICENSE" "https://raw.githubusercontent.com/unicode-org/cldr-json/$CLDR_REF/LICENSE"
 
 mkdir -p "$data/ucum"
 UCUM_REF=${UCUM_REF:-main}
-curl --proto '=https' --tlsv1.2 -sSL -o "$data/ucum/ucum-essence.xml" "https://raw.githubusercontent.com/ucum-org/ucum/$UCUM_REF/ucum-essence.xml"
-curl --proto '=https' --tlsv1.2 -sSL -o "$data/ucum/LICENSE.md" "https://raw.githubusercontent.com/ucum-org/ucum/$UCUM_REF/LICENSE.md"
+curl "${https_only[@]}" -sSL -o "$data/ucum/ucum-essence.xml" "https://raw.githubusercontent.com/ucum-org/ucum/$UCUM_REF/ucum-essence.xml"
+curl "${https_only[@]}" -sSL -o "$data/ucum/LICENSE.md" "https://raw.githubusercontent.com/ucum-org/ucum/$UCUM_REF/LICENSE.md"
 ucum_version=$(grep -o 'ucum-essence" version="[0-9.]*"' "$data/ucum/ucum-essence.xml" | sed 's/.*version="//; s/"$//')
-ucum_commit=$(curl --proto '=https' --tlsv1.2 -sSL "https://api.github.com/repos/ucum-org/ucum/commits/$UCUM_REF" | jq -r '.sha')
+ucum_commit=$(curl "${https_only[@]}" -sSL "https://api.github.com/repos/ucum-org/ucum/commits/$UCUM_REF" | jq -r '.sha')
 
 registry_date=$(sed -n 's/^File-Date: //p' "$data/iana/language-subtag-registry" | head -n1)
 cldr_version=$(jq -r '.supplemental.version._cldrVersion' "$data/cldr/codeMappings.json")
-cldr_commit=$(curl --proto '=https' --tlsv1.2 -sSL "https://api.github.com/repos/unicode-org/cldr-json/commits/$CLDR_REF" | jq -r '.sha')
+cldr_commit=$(curl "${https_only[@]}" -sSL "https://api.github.com/repos/unicode-org/cldr-json/commits/$CLDR_REF" | jq -r '.sha')
 
 today=$(date -u +%Y-%m-%d)
 

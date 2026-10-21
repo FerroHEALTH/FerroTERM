@@ -401,8 +401,7 @@ const CORE_VERSIONS: [(&str, FhirVersion); 4] = [
 /// call; the cache keeps a second server in one process from reading them
 /// again.
 fn core_terminology() -> Result<BTreeMap<&'static str, CoreTerminology>, LoadError> {
-    static CACHE: std::sync::OnceLock<BTreeMap<&'static str, CoreTerminology>> =
-        std::sync::OnceLock::new();
+    static CACHE: std::sync::OnceLock<BTreeMap<&str, CoreTerminology>> = std::sync::OnceLock::new();
     if let Some(cached) = CACHE.get() {
         return Ok(cached.clone());
     }

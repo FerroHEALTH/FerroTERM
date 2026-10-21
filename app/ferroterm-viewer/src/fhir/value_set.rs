@@ -127,7 +127,7 @@ pub(crate) struct ClauseRow {
 }
 
 impl Published for PublishedValueSet {
-    const RESOURCE_TYPE: &'static str = "ValueSet";
+    const RESOURCE_TYPE: &str = "ValueSet";
 
     fn declared_type(&self) -> Option<&str> {
         self.resource_type.as_deref()

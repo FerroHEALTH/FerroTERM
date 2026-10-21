@@ -49,7 +49,8 @@ ROWS=$(awk '
 ' "$TOKENS")
 
 measure() {
-  awk -v a="$1" -v b="$2" '
+  local first="$1" second="$2"
+  awk -v a="$first" -v b="$second" '
     function hexval(pair,   digits, i, c, n, v) {
       digits = "0123456789abcdef"; v = 0
       for (i = 1; i <= length(pair); i++) {
@@ -73,7 +74,8 @@ measure() {
 
 # What a measured ratio permits, as the words a `safe:` comment uses.
 verdict() {
-  awk -v r="$1" 'BEGIN { print (r >= 4.5) ? "text" : (r >= 3) ? "graphics" : "neither" }'
+  local ratio="$1"
+  awk -v r="$ratio" 'BEGIN { print (r >= 4.5) ? "text" : (r >= 3) ? "graphics" : "neither" }'
 }
 
 # A pipeline-free loop still runs in this shell, but the here-document below is
@@ -83,7 +85,7 @@ trap 'rm -rf "$scratch"' EXIT
 failures=0
 table=""
 while IFS="	" read -r name value claim; do
-  [ -n "$name" ] || continue
+  [[ -n "$name" ]] || continue
   light=$(measure "$value" "$LIGHT")
   dark=$(measure "$value" "$DARK")
   measured="light: $(verdict "$light"), dark: $(verdict "$dark")"

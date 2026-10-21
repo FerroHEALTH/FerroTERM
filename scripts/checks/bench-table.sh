@@ -25,12 +25,13 @@ cd "$(dirname "$0")/../.."
 readonly RECORDS=bench/records
 
 target_file() {
-  case "$1" in
+  local target="$1"
+  case "$target" in
     readme) echo README.md ;;
     book) echo website/book/src/evaluate/benchmarks.md ;;
     figures) echo website/landing/index.html ;;
     benchmarks) echo website/landing/benchmarks.html ;;
-    *) echo "bench-table: unknown target $1" >&2; return 2 ;;
+    *) echo "bench-table: unknown target $target" >&2; return 2 ;;
   esac
 }
 

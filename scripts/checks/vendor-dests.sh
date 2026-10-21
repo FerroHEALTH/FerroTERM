@@ -11,7 +11,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-if [ "$#" -ne 0 ]; then
+if [[ "$#" -ne 0 ]]; then
   echo "usage: $0   (takes no arguments)" >&2
   exit 2
 fi
@@ -19,17 +19,17 @@ fi
 status=0
 for script in scripts/vendor/*.sh; do
   dest="$(grep -m1 -E '^(dest|data)=' "$script" | sed -E 's/^(dest|data)=//; s/^"//; s/"$//')"
-  if [ -z "$dest" ]; then
+  if [[ -z "$dest" ]]; then
     echo "error: $script names no dest= or data= destination" >&2
     status=1
     continue
   fi
-  if [ ! -d "$dest" ]; then
+  if [[ ! -d "$dest" ]]; then
     echo "error: $script writes to $dest, which is not a directory in the tree" >&2
     status=1
     continue
   fi
   echo "ok: $script -> $dest"
 done
-[ "$status" -eq 0 ] && echo "ok: vendor-dests (every fetcher writes into the tree)"
+[[ "$status" -eq 0 ]] && echo "ok: vendor-dests (every fetcher writes into the tree)"
 exit "$status"

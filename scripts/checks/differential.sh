@@ -138,7 +138,8 @@ fi
 # passes through unchanged; a post-coordinated expression carries spaces and
 # operators that would otherwise cut the query short.
 field() {
-  jq -rR '@uri' <<<"$(jq -r ".$1" <<<"$2")"
+  local name="$1" request="$2"
+  jq -rR '@uri' <<<"$(jq -r ".$name" <<<"$request")"
 }
 
 # The URL of one request against one base, per operation.
