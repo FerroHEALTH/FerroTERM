@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: Apache-2.0
+
 //! The one integration-test binary for `rf2`; one module per topic.
 //!
 //! Every fixture is synthetic: identifiers are minted with valid check digits

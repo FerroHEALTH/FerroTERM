@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # The fuzz targets
 
 Every input a client or a release hands the server passes a hand-written

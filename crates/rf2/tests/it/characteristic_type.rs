@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: Apache-2.0
+
 //! The `characteristicTypeId` filter over the relationship files.
 //!
 //! Appendix E.5 of the release file specification enumerates the column, and

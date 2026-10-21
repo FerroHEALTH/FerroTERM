@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Fetching a FHIR resource file and correcting it for this service.
 
 use addon_nts::fixup::FixupKind;

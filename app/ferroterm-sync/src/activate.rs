@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Putting what a run staged in front of the server, and taking it back.
 //!
 //! A staged item reaches the server with one rename, which the filesystem

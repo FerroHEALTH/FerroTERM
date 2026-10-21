@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Authoring one local `ConceptMap` in the browser, with a translate preview.
 //!
 //! The screen is the same for a map this deployment loaded and one a person

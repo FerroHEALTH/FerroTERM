@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The environment the usage report reads.
 //!
 //! No FHIR or SNOMED CT specification governs this: our own design.

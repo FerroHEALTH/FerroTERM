@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Retention: the configured number of releases per code system stays, the
 //! rest goes after the server has reloaded the new one.
 //!

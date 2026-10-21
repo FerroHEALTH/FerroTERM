@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: Apache-2.0
+
 //! SNOMED CT identifiers.
 //!
 //! An SCTID is an integer of 6 to 18 digits whose last digit is a Verhoeff

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Value set filters (`ValueSet.compose.include.filter`) and their generic
 //! evaluation over a provider.
 //!

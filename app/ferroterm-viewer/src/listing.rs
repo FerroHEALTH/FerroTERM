@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The chrome the resource listing screens share: the address, and the pager.
 //!
 //! `GET [base]/{type}` answers one `searchset` with every match in it: no

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The `OperationOutcome` the server answers a refusal with.
 //!
 //! The viewer carries the fields it renders and nothing more. It never mirrors

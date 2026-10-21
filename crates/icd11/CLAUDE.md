@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # icd11
 
 The ICD-11 reader. Hand-written; the WHO ICD-API (version 2, the local

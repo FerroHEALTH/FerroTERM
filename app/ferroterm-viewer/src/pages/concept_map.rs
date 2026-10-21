@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 //! One concept map: what it declares, every mapping it writes, and the
 //! resource as the server sent it.

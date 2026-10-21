@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Confirmed correct in the sibling project's viewer review. Do not re-litigate
 the ones that carry over.
 

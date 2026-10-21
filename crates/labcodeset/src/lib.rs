@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The Nederlandse Labcodeset publication
 //! (<https://www.nictiz.nl/wat-we-doen/activiteiten/terminologie/nederlandse-labcodeset/>).
 //!

@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # gstandaard
 
 The G-Standaard (Z-Index) product ladder.

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The FHIR client: the one module in the console that builds a request.
 //!
 //! Every request is an ordinary request to the terminology server's public

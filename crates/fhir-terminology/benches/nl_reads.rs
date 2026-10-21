@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Read-path latency over the local NL edition artifact (`artifacts/nl`),
 //! when present; the bar is one millisecond per read
 //! (`docs/architecture.md`). Skips silently without the artifact.

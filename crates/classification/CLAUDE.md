@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # classification
 
 The readers for statistical classifications: ClaML (ISO 13120; WHO ICD-10 and

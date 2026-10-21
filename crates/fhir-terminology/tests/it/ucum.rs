@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! UCUM (<https://ucum.org/ucum>, <https://terminology.hl7.org/UCUM.html>):
 //! the grammar, canonical forms, and the provider over the seam.
 

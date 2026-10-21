@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Verified against the pinned thaw git checkout source
 (rev `0726a3d6788f07e929996e77399d83655ffaacde`):
 

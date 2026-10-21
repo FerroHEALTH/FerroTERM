@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # ferroterm-sync
 
 The synchronisation service: one way from a terminology syndication feed into a

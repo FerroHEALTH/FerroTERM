@@ -6,6 +6,9 @@ paths:
   - "crates/fhir-terminology/**"
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # SNOMED CT on FHIR + ECL + RF2
 
 This file governs the SNOMED CT provider: the RF2 loader, ECL, and the SNOMED

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Discovery, the grants, and keeping a token fresh across a long run.
 //!
 //! Every clock movement is driven by hand, so a run covering a day takes no

@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Usage report
 
 Every FerroTERM server sends a small JSON report to FerroPULSE, a collector

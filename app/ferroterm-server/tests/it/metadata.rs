@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `GET /r4b/metadata` and `?mode=terminology`.
 
 use http::StatusCode;

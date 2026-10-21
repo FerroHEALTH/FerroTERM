@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 //! What every detail screen shares: the tabs it keeps in its address, and
 //! the pane that shows the resource as the server sent it.

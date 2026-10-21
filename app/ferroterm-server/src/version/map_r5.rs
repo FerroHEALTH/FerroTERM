@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The generated request and response contracts of the R5 family (R5 and the R6 ballot) mapped to and from the engine's neutral inputs and outcomes.
 
 macro_rules! family_map {

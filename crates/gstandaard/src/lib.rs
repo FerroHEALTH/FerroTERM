@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The G-Standaard (Z-Index) product ladder from the fixed-length files
 //! (<https://www.z-index.nl/documentatie/bestandsbeschrijvingen>).
 //!

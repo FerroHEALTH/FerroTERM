@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! ISO 3166-1 country codes (`urn:iso:std:iso:3166`) from the Unicode CLDR data.
 //!
 //! All three code forms of each territory are codes of this system: the

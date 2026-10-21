@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Verified against the pinned `leptos-chartistry` 0.2.3 source:
 
 - **`<Chart>` gates the SVG** behind

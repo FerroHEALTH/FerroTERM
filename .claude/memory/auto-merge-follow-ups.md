@@ -8,6 +8,9 @@ metadata:
   modified: 2026-09-03T13:17:48.657Z
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 With `gh pr merge --auto --squash` armed, a PR merges the moment its checks pass. On 2026-09-03 the second refactor slice was pushed to PR #149 after CI had gone green on the first; the squash merged the first slice only, the branch kept the second, and the next branch built on the wrong base (a broken tree was even committed and pushed for a few minutes).
 
 **Why:** auto-merge is a race with any further push; "one PR, one unit of work" is the safe shape.

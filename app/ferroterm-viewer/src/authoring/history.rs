@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! What the history screen shows: the versions of one resource, what two of
 //! them differ by, and what a restore sends.
 //!

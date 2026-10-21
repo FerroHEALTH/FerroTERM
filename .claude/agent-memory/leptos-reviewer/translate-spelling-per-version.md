@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Read first-hand on 2026-09-07 from the `ConceptMap-translate`
 `OperationDefinition` of each core package (`hl7.fhir.{r4,r4b,r5,r6}.core`),
 which those packages left this repository with (#300); the published operation

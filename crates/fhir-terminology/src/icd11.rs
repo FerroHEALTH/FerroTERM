@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The ICD-11 provider: one of the three WHO code systems (the MMS and ICF
 //! linearizations, the Foundation) read from its artifact directory.
 //!

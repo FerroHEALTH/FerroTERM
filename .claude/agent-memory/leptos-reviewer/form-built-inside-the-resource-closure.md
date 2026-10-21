@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 The alternative to [[seed-once-form-idiom]]: instead of creating the form's
 signals in the setup function and seeding them, the editor creates the whole
 `RwSignal<Draft>` **inside** the closure that reads the resource

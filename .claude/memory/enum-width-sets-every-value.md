@@ -5,6 +5,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 A Rust enum is as large as its largest variant, so one rare wide variant sets the
 size every value of that enum pays, including the small common ones. Boxing the
 wide variants moves them to the heap and leaves the enum as narrow as the

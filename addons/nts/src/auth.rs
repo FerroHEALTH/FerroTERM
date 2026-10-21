@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Obtaining and keeping an OAuth 2 access token, without a person present.
 //!
 //! The service challenges the listing itself, so every request a run makes

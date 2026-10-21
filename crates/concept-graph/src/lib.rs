@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The materialized hierarchy.
 //!
 //! Integer-keyed compressed sparse row adjacency for a code system's is-a

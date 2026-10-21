@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
 # The bar a served read holds across every code system, checked against the
 # committed record set (#512, #304).
 #

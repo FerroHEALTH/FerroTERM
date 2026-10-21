@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `$batch-validate-code`: many validations against one value set, in one
 //! request.
 //!

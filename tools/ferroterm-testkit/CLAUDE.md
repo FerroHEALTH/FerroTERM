@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # ferroterm-testkit
 
 Synthetic fixtures shared by the test suites (a dev-dependency only, never a

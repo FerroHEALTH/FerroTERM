@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The terminology ecosystem overlay on the wire: every served version accepts
 //! the pre-adopted and ecosystem-defined parameters
 //! (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>), refuses

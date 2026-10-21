@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! What the command bar was given, and what this root can do with it.
 //!
 //! The classification is the viewer's own reading of the string's shape, in

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Shared helpers: a driven clock, the fixture feed, and a mock service.
 //!
 //! No test reaches the network. The mock service answers the three requests

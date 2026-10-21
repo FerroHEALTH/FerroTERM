@@ -5,6 +5,9 @@ allowed-tools: Read, Bash
 argument-hint: (none)
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # /phase-status
 
 A fast orientation dump, the orient step of the issue workflow

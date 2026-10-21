@@ -8,6 +8,9 @@ metadata:
   modified: 2026-09-02T21:12:39.015Z
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Every point read and every terminology operation answers in under 1 ms in
 the release profile on the NL edition; `ferroterm-build` ingests the NL
 edition in under 60 s. A latency in the milliseconds is never described as

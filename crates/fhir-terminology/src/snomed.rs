@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The SNOMED CT provider: one built edition version read from its artifact
 //! directory (`store.redb`, `hierarchy.bin`, `text.bin`, and `manifest.json`).
 //!

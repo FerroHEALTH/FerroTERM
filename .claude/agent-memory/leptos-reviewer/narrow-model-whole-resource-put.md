@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 `.claude/rules/leptos-ui.md` §0 requires the viewer to deserialize only the
 fields it renders and never to mirror a whole FHIR resource. A FHIR `update`
 replaces the resource in full (<https://hl7.org/fhir/R4B/http.html#update>).

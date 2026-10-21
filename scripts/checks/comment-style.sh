@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # Comment-style guard (.claude/rules/comments.md — RFC 505 / RFC 1574).
 #

@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # The console
 
 The FerroTERM Console is the browser interface of a FerroTERM deployment: a

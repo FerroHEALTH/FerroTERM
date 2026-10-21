@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The disk-backed concept store.
 //!
 //! A `redb` database holding one code system version's concepts, displays,

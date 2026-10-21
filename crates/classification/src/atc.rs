@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The WHO ATC/DDD classification, from the index table or the G-Standaard file.
 //!
 //! The index is the table the WHO Collaborating Centre sells, a spreadsheet

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! One JSON record per run, and the directory they are kept in.
 //!
 //! A record says what the feed offered, what the run took and what it left

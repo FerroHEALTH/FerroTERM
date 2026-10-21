@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # CLAUDE.md
 
 **FerroTERM** is a pure-Rust FHIR terminology server for SNOMED CT,

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Keeping the last releases of each code system and removing the rest.
 //!
 //! A new release arrives beside the one it succeeds, so the previous release

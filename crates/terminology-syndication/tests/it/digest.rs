@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Computing the digests the tests advertise, independently of the crate.
 
 use core::fmt::Write as _;

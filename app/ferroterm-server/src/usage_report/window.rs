@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The usage report's metrics window: latency histograms per operation group
 //! and request counts per FHIR version, recorded by the request middleware.
 //!

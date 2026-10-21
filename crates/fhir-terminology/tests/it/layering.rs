@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! A deployment's layer over the FHIR core terminology, resolved per `url`
 //! and `version`.
 //!

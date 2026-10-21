@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The health probe the container runs against itself.
 //!
 //! The image has no shell and no HTTP client, so `ferroterm healthcheck` is its

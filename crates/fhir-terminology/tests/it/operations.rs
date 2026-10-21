@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The three R4B operations over the synthetic provider: every parameter
 //! branch the R4B definitions admit, and every refusal.
 

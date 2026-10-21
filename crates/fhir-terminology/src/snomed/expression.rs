@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Post-coordinated SNOMED CT expressions behind the provider seam.
 //!
 //! An expression in Compositional Grammar is a valid `code` for

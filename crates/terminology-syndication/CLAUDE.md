@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # terminology-syndication
 
 The terminology syndication client. Hand-written; the Atom Syndication Format

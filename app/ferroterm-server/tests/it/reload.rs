@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Reloading the served set without a restart: what a swap picks up, what a
 //! refused swap leaves alone, and who may ask for one.
 //!

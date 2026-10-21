@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The runs a reader has made, kept in this browser and nowhere else.
 //!
 //! A run is already a URL: every runner puts its parameters in the address, so

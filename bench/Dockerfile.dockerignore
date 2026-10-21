@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+
 # The context of bench/Dockerfile is the repository root (the harness builds
 # from the checkout), so this file, not the root .dockerignore, guards it: the
 # sources go in, the build outputs, the licensed data, and the site stay out.

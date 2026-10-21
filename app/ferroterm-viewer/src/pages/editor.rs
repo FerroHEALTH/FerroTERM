@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Authoring one local `CodeSystem` in the browser.
 //!
 //! The screen is the same for a code system this deployment built from a

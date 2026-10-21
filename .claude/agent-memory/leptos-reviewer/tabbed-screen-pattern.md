@@ -6,6 +6,9 @@ metadata:
   type: project
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 The sibling project's correct multi-tab screen had two halves:
 
 1. **All tab bodies always mounted**, toggled with

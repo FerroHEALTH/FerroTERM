@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The resource server over the write routes and the admin listener:
 //! `ferrohealth-smart`, configured by `[auth]`.
 //!

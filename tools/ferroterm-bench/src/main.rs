@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `ferroterm-bench`: one reproducible record per code system and run.
 //!
 //! For each system in the configuration the harness times `ferroterm-build`

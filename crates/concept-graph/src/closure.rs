@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The transitive closure of the is-a hierarchy.
 //!
 //! Computed once, offline, by a bitset sweep in topological order: a node's

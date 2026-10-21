@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: Cadasto B.V. */
+/* SPDX-License-Identifier: BUSL-1.1 */
+
 /* FerroTERM landing page: design tokens and layout.
    Self-contained: system font stack, no external assets, light and dark via
    prefers-color-scheme. Relative URLs only. */

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! What a screen draws where there is no answer to draw.
 //!
 //! Three states, three shapes, the same on every screen. A reader who learns

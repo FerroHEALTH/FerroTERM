@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Claim evidence
 
 Every factual claim FerroTERM makes in public, with the evidence behind it.

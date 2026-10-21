@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The way from a screen that edits a resource to the versions of it.
 //!
 //! One offer, drawn the same on every authoring screen, so a terminologist

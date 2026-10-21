@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
 # Fetches the public registries the registry code systems are built from,
 # verbatim, into crates/fhir-terminology/data/, and rewrites the
 # provenance stamp. Re-run to refresh; commit the result.

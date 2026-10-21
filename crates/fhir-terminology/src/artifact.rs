@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! What an artifact directory holds, before a provider opens it.
 
 use std::path::{Path, PathBuf};

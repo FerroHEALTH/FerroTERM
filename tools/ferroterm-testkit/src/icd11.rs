@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! A synthetic ICD-11 cache, shaped like the entity JSON a local ICD-API
 //! deployment serves.
 //!

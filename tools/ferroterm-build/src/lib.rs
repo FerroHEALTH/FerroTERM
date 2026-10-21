@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The offline build: an RF2 release in, the served artifacts out.
 //!
 //! Runs once per SNOMED CT edition, outside the server process. It reads the

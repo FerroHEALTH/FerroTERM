@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Two SNOMED CT editions loaded at once, and the implicit forms of each.
 //!
 //! The FHIR SNOMED CT page says an implicit URI's base "is either

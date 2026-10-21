@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # The differential check against a reference server
 
 `requests.json` is the sample both servers answer: SNOMED CT identifiers, an

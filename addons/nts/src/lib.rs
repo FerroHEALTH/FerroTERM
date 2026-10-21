@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The Nationale Terminologie Server (NTS) source add-on.
 //!
 //! The NTS is the Dutch national terminology service, run by Nictiz

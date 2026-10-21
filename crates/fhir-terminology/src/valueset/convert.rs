@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! From a generated `ValueSet` of any served FHIR version to the model.
 //!
 //! The four versions share the compose elements the model needs; one macro

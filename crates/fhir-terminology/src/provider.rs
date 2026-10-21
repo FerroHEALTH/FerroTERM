@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The code system provider seam.
 //!
 //! Every code system reaches the operations through [`CodeSystemProvider`]:

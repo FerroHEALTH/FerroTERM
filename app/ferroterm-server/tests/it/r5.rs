@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! FHIR R5 under `/r5`: the 5.0.0 resources and the operation shapes R5 adds
 //! (<https://hl7.org/fhir/R5/terminology-service.html>), and the R4-family
 //! endpoints staying within their declared outputs.

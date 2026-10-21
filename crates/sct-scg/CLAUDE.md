@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # sct-scg
 
 The SNOMED CT Compositional Grammar lexer, parser, and printer. Hand-written;

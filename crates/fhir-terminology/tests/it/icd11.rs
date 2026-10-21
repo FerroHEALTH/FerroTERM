@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The ICD-11 provider over the testkit's API-shaped artifacts, asserting
 //! what the HL7 terminology ecosystem test cases for ICD-11 assert.
 

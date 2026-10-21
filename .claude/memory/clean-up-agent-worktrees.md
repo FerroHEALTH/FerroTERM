@@ -5,6 +5,9 @@ metadata:
   type: feedback
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 When a subagent's PR merges, remove its worktree and delete the leftover
 branches in the same breath. Do not wait to be asked and do not batch it up for
 later.

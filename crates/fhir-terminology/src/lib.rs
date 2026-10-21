@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The terminology engine.
 //!
 //! Implements the FHIR terminology operations (`$lookup`, `$validate-code`,

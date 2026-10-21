@@ -2,6 +2,9 @@
 paths: ["crates/**", "app/**", "tools/**", "scripts/**"]
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Spec adherence (the FHIR + SNOMED specs are the oracle)
 
 The conformance authority for this project is the published specifications:

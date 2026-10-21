@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 A `ferroterm-bench` record set is only worth publishing when nothing else runs
 on the machine. Measured 2026-09-08 while taking one:
 

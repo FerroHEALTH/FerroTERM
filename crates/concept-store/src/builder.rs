@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Writing an artifact, offline, in one transaction.
 //!
 //! The build tool feeds concepts, designations, acceptability, properties, and

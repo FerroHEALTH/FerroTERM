@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Arbitrary text as an expression constraint.
 //!
 //! The parser answers a typed error or an AST. A panic, an arithmetic

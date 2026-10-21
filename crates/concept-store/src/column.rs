@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! A dense column: one record per ordinal, addressed by position.
 //!
 //! An ordinal is a position, so the record at that position is found by

@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 //! The `$lookup` runner: one code, read in the code system it belongs to.
 //!

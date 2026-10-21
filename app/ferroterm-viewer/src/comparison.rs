@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The four served roots, read side by side.
 //!
 //! The comparison is a plain value built from the four `CapabilityStatement`

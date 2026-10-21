@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! BCP 47 language tags (`urn:ietf:bcp:47`): the grammar of RFC 5646 §2.1
 //! over the IANA Language Subtag Registry.
 //!

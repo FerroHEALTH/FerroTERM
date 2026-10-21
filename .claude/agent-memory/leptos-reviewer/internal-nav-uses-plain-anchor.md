@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Verified first-hand against leptos_router 0.8 source:
 
 - `src/location/history.rs:161`: `BrowserUrl::init` installs

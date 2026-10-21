@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `--dhd` over a synthetic delivery: the artifact and its concept maps.
 
 use std::io::Write;

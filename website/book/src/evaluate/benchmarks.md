@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Benchmarks
 
 Every figure FerroTERM quotes about speed or footprint comes from a record the

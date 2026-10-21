@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The service's admin listener: the manual triggers, the run records, the
 //! metrics, and the health probe.
 //!

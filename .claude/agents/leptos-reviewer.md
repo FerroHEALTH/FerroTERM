@@ -15,6 +15,9 @@ memory: project
 color: orange
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Consult your agent memory before reviewing: it holds the Leptos and component
 hazards confirmed in this family of projects, each classified against
 client-side rendering. After a review, save newly confirmed patterns, one line

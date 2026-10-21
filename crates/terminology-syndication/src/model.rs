@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The typed feed model: an Atom feed of entries carrying the NCTS extensions.
 //!
 //! The wire shape is the Atom Syndication Format (RFC 4287,

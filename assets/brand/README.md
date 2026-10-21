@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # FerroTERM brand
 
 FerroTERM is the official name (Ferro for the Rust family shared with FerroEHR,

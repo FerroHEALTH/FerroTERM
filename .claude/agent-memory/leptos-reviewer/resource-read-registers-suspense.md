@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Verified first-hand in `reactive_graph` 0.2.14,
 `src/computed/async_derived/arc_async_derived.rs:629-665`.
 

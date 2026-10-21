@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 //! Authoring a local code system, and what a console without a sign-in does
 //! not carry.

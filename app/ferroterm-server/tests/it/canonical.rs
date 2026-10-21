@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! One canonical resource per `url` and `version`.
 //!
 //! The `url` and `version` of a canonical resource identify one resource

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The labelled controls a runner's form is built from.
 //!
 //! One `Field` describes a control: the name it carries on the wire, the label

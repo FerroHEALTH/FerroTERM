@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `parse(print(tree)) == tree` for generated trees (`proptest`).
 
 use proptest::prelude::*;

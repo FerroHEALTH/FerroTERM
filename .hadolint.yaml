@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+
 # hadolint configuration, read by the CI job (hadolint-action) and by a local
 # `hadolint <Dockerfile>`. Every Dockerfile in the repository is held to the
 # same bar: a digest-pinned FROM from a trusted registry, pinned packages, and

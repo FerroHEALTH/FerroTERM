@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # Every project extension the server writes resolves on the website. FHIR asks
 # that an extension's URL be the canonical of the StructureDefinition that

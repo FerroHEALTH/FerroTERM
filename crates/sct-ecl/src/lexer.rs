@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The token layer of ECL: the grammar's lexer rules folded into the tokens
 //! the parser consumes (`ECL.g4`, the lexer rules and `ws`, `comment`,
 //! `term`, and the quoted forms).

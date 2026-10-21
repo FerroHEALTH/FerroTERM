@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Pinned version matrix
 
 The single source of truth for every version pin in FerroTERM. If this file and a

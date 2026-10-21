@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Locating the files and reading the rows
 //! (<https://www.nlm.nih.gov/research/umls/rxnorm/docs/techdoc.html>).
 

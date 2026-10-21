@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The parser against the vendored public listings.
 //!
 //! The three files under `vendor/feeds/` are the listings of three real

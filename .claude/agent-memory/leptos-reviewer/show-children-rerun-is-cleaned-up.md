@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Verified first-hand in the pinned sources (leptos 0.8.20, reactive_graph 0.2.14).
 
 **The children closure really does re-run.** `leptos/src/show.rs` takes

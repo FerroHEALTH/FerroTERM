@@ -5,6 +5,9 @@ paths:
   - "deny.toml"
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # CI/CD + supply-chain discipline
 
 No spec governs this: our own design, grounded in the OWASP GitHub Actions

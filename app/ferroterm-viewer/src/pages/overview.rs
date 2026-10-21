@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The dashboard: what this server serves on the FHIR version in view, what
 //! was written lately, and the way into each operation.
 

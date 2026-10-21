@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 The viewer's page controls render an available step as
 `<a class="… text-brand-700 hover:underline">` and an unavailable one as
 `<span class="… text-slate-500">{text} <span class="sr-only">", unavailable"</span></span>`

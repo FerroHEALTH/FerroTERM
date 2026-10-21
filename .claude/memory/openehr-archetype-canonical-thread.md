@@ -5,6 +5,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 The owner opened <https://discourse.openehr.org/t/what-should-the-canonical-url-of-an-archetype-local-value-set-be/17292>
 on 2026-09-12 after #547 (archetype terminology served through the ordinary
 operations). No openEHR spec defines the URL; Archetype Identification's

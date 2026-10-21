@@ -5,6 +5,9 @@ allowed-tools: Read, Edit, Grep, Glob, Bash
 argument-hint: "[issue number] (optional)"
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # /phase-done
 
 The closing step of the issue workflow (`.claude/rules/issue-workflow.md`).

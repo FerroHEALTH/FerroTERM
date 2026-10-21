@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 //! The glyphs the screens carry, by what they mean here, each one of the
 //! Lucide outlines `ferrohealth-ui` vendors.

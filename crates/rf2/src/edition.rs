@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: Apache-2.0
+
 //! Edition identification from the module dependency reference set.
 //!
 //! A release assembles modules; each module dependency member says that its

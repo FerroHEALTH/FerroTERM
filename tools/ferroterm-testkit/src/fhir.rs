@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Synthetic FHIR `CodeSystem` resources (R5 JSON) for the generic provider:
 //! invented systems under `http://example.org/`, no published content.
 

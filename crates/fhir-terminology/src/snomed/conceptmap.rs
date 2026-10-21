@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The implicit concept maps of SNOMED CT: `http://snomed.info/sct?fhir_cm=[sctid]`.
 //!
 //! The FHIR SNOMED CT page defines the form over four association reference

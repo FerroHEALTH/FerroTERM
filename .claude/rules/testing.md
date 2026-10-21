@@ -2,6 +2,9 @@
 paths: ["crates/**", "addons/**", "app/**", "tools/**"]
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Testing discipline
 
 Test discipline is non-negotiable (a standing hard rule; see `CLAUDE.md`). It

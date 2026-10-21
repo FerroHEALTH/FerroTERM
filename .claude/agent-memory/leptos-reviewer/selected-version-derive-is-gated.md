@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 `components/shell.rs` builds `SelectedVersion(Signal::derive(move || query
 .read()… ))` over `use_query::<ShellQuery>()`. `use_query` returns a
 `Memo<Result<T, ParamsError>>` and `ShellQuery` derives `PartialEq`, so the

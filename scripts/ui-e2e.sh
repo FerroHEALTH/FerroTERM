@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # The console's browser journeys: headless Chrome, driven over WebDriver
 # (https://www.w3.org/TR/webdriver2/), against the console and the server

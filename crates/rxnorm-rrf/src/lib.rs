@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `RxNorm` Rich Release Format (RRF) reading.
 //!
 //! Locates the files of an unpacked release (`RXNCONSO.RRF`, `RXNREL.RRF`,

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The command line: no subcommand serves, `healthcheck` probes a server.
 
 use clap::{Parser, Subcommand};

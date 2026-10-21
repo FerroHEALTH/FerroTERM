@@ -1,0 +1,1 @@
+- Every first-party file opens with the two SPDX lines naming Cadasto B.V. as copyright holder and the file's licence (`BUSL-1.1`, `Apache-2.0` in `rf2`), and two CI guards keep it so: `scripts/checks/spdx-headers.sh` and `scripts/checks/copyright-holder.sh`.

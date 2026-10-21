@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The served code systems as one table, one row per system.
 //!
 //! A deployment serves twenty systems as readily as five, so the listing is

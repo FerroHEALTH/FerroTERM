@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `_elements` and `_summary` on the wire: the subset a client asked for, on
 //! every version, on search and on read.
 //!

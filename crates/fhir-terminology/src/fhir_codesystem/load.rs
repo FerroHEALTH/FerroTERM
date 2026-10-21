@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Reading `CodeSystem` resources from JSON files: a directory of resources or
 //! a FHIR package's `package/` directory, in the FHIR version the files use.
 

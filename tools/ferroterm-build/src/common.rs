@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! What the LOINC and `RxNorm` pipelines both do: number an index, name a file
 //! failure, hold a designation until it is written, number the property keys,
 //! and write the designations and the text index.

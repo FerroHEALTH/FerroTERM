@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Value sets, implicit value sets, and ECL
 
 A value set names a set of codes. FerroTERM answers value sets defined as FHIR

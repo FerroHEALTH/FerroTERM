@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The usage report client: decides whether the report runs, assembles a
 //! [`Report`], sends it, and schedules the start and daily events.
 //!

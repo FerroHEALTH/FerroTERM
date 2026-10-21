@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The screen logic behind the authoring screens, which only the editor
 //! bundle carries.
 //!

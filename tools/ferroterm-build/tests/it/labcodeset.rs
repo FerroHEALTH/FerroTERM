@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `--labcodeset` over a synthetic publication: the FHIR resource directory.
 
 use std::io::Write;

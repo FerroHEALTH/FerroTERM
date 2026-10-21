@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! What a reader typed into the command bar, and what can be done with it.
 //!
 //! The reading is of the string's shape alone. Nothing here asks the server a

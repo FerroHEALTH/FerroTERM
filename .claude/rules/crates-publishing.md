@@ -2,6 +2,9 @@
 paths: ["crates/**", "scripts/release/**", ".github/workflows/publish-crates.yml"]
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Published crates discipline (crates.io)
 
 The `crates/*` members are published on crates.io under plain names

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The selection rules over the synthetic feed.
 
 use terminology_syndication::model::{CategoryTerm, Feed};

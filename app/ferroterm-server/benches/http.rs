@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The same four operations as `fhir-terminology`'s `operations` bench, this
 //! time through the router: routing, content negotiation, the codec, and the
 //! response body included.

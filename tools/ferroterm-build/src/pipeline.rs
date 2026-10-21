@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The pipeline: read the Snapshot, number everything, write the artifacts.
 
 use std::collections::BTreeMap;

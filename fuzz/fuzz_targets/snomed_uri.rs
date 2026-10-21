@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Arbitrary text as a SNOMED CT implicit value set or concept map URI.
 //!
 //! `?fhir_vs`, `?fhir_vs=isa/[sctid]`, `?fhir_vs=ecl/[ecl]`, `?fhir_vs=refset`,

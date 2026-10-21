@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: Apache-2.0
+
 //! SNOMED CT RF2 loading and the typed component model.
 //!
 //! Streams the RF2 release files (concepts, descriptions, relationships,

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The `ferroterm-build` binary: parse the command line, run the build.
 #![expect(clippy::print_stdout, reason = "a command-line tool reports to stdout")]
 

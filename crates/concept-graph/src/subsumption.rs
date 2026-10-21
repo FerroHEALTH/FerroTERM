@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Subsumption over the closure, in the vocabulary FHIR `$subsumes` returns.
 
 use crate::closure::Closure;

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The `CodeSystem` instances the deployment loaded, read and searched.
 //!
 //! The FHIR REST API defines the instance read and the type-level search

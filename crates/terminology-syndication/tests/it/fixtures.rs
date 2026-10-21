@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Reading the synthetic fixtures and the vendored listings from disk.
 
 use std::path::PathBuf;

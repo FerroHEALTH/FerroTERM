@@ -15,6 +15,9 @@ model: opus
 color: blue
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 You are a specification researcher for a FHIR terminology server for SNOMED
 CT, LOINC, and other clinical code systems (see `CLAUDE.md` and
 `docs/architecture.md`). Your sources of truth, in

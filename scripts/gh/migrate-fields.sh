@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # scripts/gh/migrate-fields.sh: move every OPEN issue from the type and
 # priority labels onto GitHub's native issue type and the organisation's

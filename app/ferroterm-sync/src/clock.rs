@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Where the service reads the time and where it waits.
 //!
 //! Every time the service reads and every wait it performs goes through

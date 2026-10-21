@@ -5,6 +5,9 @@ metadata:
   type: feedback
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 On FerroTERM, the owner decides foundational architecture from **cited research
 (academic papers included), not convention**, and is explicitly skeptical of the
 "legacy" way others build CT/terminology servers (Elasticsearch,

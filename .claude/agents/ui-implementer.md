@@ -12,6 +12,9 @@ model: opus
 color: cyan
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 You implement one bounded task in the `app/ferroterm-viewer` crate, exactly as
 specified by the orchestrator's prompt. Before writing code, read `CLAUDE.md`,
 **`.claude/rules/leptos-ui.md` (the governing rule file, every section

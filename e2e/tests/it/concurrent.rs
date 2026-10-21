@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 //! Two writers on one resource: a save over a version another window
 //! replaced is refused, and the screen offers the way back.

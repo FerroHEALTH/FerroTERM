@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The dialect aliases of the ECL specification.
 //!
 //! Appendix C, "Dialect Aliases"

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `TerminologyCapabilities` from the registry, rendered per FHIR version.
 
 use std::sync::Arc;

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Synthetic fixtures for the FerroTERM test suites.
 //!
 //! Shared by the crates' integration tests as a dev-dependency; nothing here

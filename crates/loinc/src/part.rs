@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The parts, the multiaxial hierarchy, and the primary part links.
 //!
 //! `Part.csv` lists the parts; `ComponentHierarchyBySystem.csv` places parts

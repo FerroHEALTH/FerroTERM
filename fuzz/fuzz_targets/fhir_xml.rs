@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Arbitrary text as a FHIR XML body.
 //!
 //! The XML wire is the second body form a client can send, and it has its own

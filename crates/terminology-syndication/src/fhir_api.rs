@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Listing the terminology resources a FHIR server serves, as feed entries.
 //!
 //! Some services keep their FHIR resources behind their FHIR API rather than

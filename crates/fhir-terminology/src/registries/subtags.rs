@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The IANA Language Subtag Registry (RFC 5646 §3.1), parsed from the
 //! vendored record-jar file.
 

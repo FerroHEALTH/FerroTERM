@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The attribute relationships of an edition.
 //!
 //! Per source concept, every active relationship that is not is-a, with its

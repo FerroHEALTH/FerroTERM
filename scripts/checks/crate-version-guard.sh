@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # The crate-line bump rule (.claude/rules/crates-publishing.md): a change that
 # alters the PACKAGED content of any `crates/*` member (what its `include`

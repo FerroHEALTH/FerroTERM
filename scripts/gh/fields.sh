@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # scripts/gh/fields.sh: the issue type, the Priority and the Effort field, by
 # issue number.

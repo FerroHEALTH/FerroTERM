@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `POST [base]` with a `batch` Bundle
 //! (<https://hl7.org/fhir/R4B/http.html#transaction>).
 

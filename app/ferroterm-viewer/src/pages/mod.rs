@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The routed screens.
 
 // The diagnostic lands on macro output rather than on an item written here,

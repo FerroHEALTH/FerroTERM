@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Machine review (SonarQube Cloud): advisory, never authority
 
 Every pull request and every push to `main` is analyzed by SonarQube Cloud

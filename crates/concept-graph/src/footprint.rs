@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! What a loaded structure holds in memory, counted allocation by allocation.
 //!
 //! A served edition's resident memory is the sum of the structures it loaded

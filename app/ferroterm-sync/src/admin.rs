@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The service's own admin listener.
 //!
 //! Six routes and nothing else: `POST /run` and `POST /activate` are the

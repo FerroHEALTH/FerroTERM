@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The `ValueSet` operations on the wire
 //! (<https://hl7.org/fhir/R4B/valueset-operation-expand.html>,
 //! <https://hl7.org/fhir/R4B/valueset-operation-validate-code.html>).

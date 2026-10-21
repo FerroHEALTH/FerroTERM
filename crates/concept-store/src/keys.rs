@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! A sorted `u64` key to `u32` ordinal table beside an artifact.
 //!
 //! A code system whose concepts have identifiers beyond their codes (the atom

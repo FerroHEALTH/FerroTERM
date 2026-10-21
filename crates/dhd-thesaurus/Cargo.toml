@@ -1,8 +1,9 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 [package]
 name = "dhd-thesaurus"
 description = "DHD Diagnosethesaurus and Verrichtingenthesaurus delivery (uitleverformaat 5.0) reader"
-version = "0.1.118"
+version = "0.1.119"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

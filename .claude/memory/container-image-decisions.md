@@ -8,6 +8,9 @@ metadata:
   modified: 2026-09-02T20:03:52.397Z
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Decided 2026-09-02 for the image at `ghcr.io/ferrohealth/ferroterm` (PR #61,
 issue #57), after research on primary sources and a read of FerroEHR's setup:
 

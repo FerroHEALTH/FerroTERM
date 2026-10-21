@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Reading `ConceptMap` resources from a directory, beside the `CodeSystem`s.
 
 use std::path::Path;

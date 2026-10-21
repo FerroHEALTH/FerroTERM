@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The ICD-10-CM reader (the tabular XML and the CMS order-file columns).
 
 use ::classification::icd10cm::{Icd10cmError, KINDS, SHORT, locate, read};

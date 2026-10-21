@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # fhir-terminology
 
 The engine. Hand-written; the FHIR terminology module for the served version

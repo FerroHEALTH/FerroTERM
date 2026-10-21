@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The term table, `Loinc.csv`: one row per LOINC term with every column kept
 //! by name, since the FHIR filters range over "any field of the table".
 

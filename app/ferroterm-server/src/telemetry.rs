@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Console logging: the format choice and the subscriber.
 //!
 //! Two formats over `tracing`: `pretty` for a person (colour when the

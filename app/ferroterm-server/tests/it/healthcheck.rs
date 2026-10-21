@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `ferroterm healthcheck` against a served instance and against nothing.
 
 use std::net::SocketAddr;

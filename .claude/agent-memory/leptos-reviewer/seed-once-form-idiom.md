@@ -6,6 +6,9 @@ metadata:
   type: project
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 The accepted shape for a form seeded from a resource, with the parts that
 survive marked.
 

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The `RxNorm` provider: one release read from its artifact directory
 //! (`store.redb`, `text.bin`, `relations.bin`, `atoms.bin`, and
 //! `manifest.json`).

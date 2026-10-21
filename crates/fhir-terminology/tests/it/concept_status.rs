@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The standard concept status properties on a persisted `CodeSystem`
 //! (<https://hl7.org/fhir/R5/codesystem-concept-properties.html>).
 

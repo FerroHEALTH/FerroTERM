@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Code system supplements applied to a provider's designations and properties
 //! (`CodeSystem.content = supplement`, <https://hl7.org/fhir/R4B/codesystem.html#supplements>).
 

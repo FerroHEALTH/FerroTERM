@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The part of a `CapabilityStatement` the shell renders.
 
 use crate::locale::{Msg, tr_with};

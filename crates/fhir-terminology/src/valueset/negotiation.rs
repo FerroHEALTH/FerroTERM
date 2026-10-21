@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Version negotiation for the systems and value sets an operation touches.
 //!
 //! The `system-version`, `check-system-version`, and `force-system-version`

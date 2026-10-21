@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! ICD-11 from the WHO ICD-API.
 //!
 //! `api`, behind the `api` feature, walks a local deployment of the ICD-API

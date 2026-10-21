@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! From a generated `CodeSystem` of any served FHIR version to the model.
 //!
 //! The four versions share the element set the model needs; R5 and R6 add

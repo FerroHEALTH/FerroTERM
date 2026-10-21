@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The part of a published `ConceptMap` the concept map screen renders.
 //!
 //! `GET [base]/ConceptMap` is the search interaction and `GET

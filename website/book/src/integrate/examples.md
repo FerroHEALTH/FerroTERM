@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Worked examples
 
 The requests below were sent to v0.1.0 serving the public ICD-10-CM FY2026

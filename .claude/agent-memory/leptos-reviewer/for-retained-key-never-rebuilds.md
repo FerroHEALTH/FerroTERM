@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Verified first-hand in the pinned sources (leptos 0.8.20, tachys 0.2.18).
 
 **`<For>` only builds ADDED keys.** `leptos/src/for_loop.rs:144` is

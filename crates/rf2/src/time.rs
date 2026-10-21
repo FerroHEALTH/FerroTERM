@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: Apache-2.0
+
 //! The RF2 `effectiveTime`: a calendar date written `YYYYMMDD`.
 
 use std::fmt;

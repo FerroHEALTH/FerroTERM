@@ -13,6 +13,9 @@ model: opus
 color: green
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 You implement one bounded task in the ferroterm workspace (a pure-Rust FHIR
 terminology server for SNOMED CT, LOINC, and other clinical code systems, see `CLAUDE.md` and
 `docs/architecture.md`), exactly as specified by the orchestrator's prompt.

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The one integration-test binary for `fhir-terminology`; one module per topic.
 //!
 //! Every test drives the seam through a synthetic in-memory provider

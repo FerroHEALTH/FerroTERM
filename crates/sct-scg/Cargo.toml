@@ -1,8 +1,9 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 [package]
 name = "sct-scg"
 description = "The SNOMED CT Compositional Grammar lexer, parser, and printer"
-version = "0.1.118"
+version = "0.1.119"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The sources a run reads, and the add-on each one comes from.
 //!
 //! A source is an add-on from `addons/*` implementing

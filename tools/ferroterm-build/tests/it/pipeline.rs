@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The pipeline end to end over the synthetic release: deterministic output,
 //! the manifest, and the artifacts opened by the store, graph, and text crates.
 

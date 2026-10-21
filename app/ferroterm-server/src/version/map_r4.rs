@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The generated request and response contracts of the R4 family (R4 and R4B) mapped to and from the engine's neutral inputs and outcomes.
 
 macro_rules! family_map {

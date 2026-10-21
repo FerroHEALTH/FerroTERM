@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Memory index
 
 - [Architecture decisions](architecture-decisions.md), locked design: SNOMED as OWL-EL ontology with an offline-classification / online-serving split; graph MODEL served from an index-materialized store (CSR adjacency + roaring transitive-closure bitmaps in redb); machine-generated FHIR R4/R4B/R5/R6; pure-Rust, no graph DB, no Elasticsearch, no JVM

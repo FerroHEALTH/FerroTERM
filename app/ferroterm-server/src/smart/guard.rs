@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The route table: which requests need a credential, and what it must grant.
 //!
 //! One `ferrohealth-smart` layer sits inside each version's router, so the path

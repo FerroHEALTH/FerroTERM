@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Memory index: leptos-reviewer
 
 Ported from the sibling FerroEHR viewer programme, where each entry was

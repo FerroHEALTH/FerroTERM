@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The classification provider: one `ClaML` or ICD-10-CM release read from its
 //! artifact directory (`store.redb`, `hierarchy.bin`, `text.bin`, and
 //! `manifest.json` with `kind = classification`).

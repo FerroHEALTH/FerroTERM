@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The registry and grammar code systems: BCP 47 language tags, BCP 13 media
 //! types, and ISO 3166-1 country codes.
 //!

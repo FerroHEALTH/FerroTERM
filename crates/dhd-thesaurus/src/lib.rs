@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The DHD Diagnosethesaurus and Verrichtingenthesaurus deliveries
 //! ("Uitleverformaat 5.0", <https://www.dhd.nl/assets/uploads/Uitleverformaat-Thesauri-5.0-v1.0.pdf>).
 //!

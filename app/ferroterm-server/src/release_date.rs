@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 // The build script includes this file (`include!`), so it carries no module
 // doc of its own: an inner doc comment cannot appear where it is included.

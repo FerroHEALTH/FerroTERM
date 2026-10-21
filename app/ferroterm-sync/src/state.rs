@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! What the service remembers between runs.
 //!
 //! One JSON file holds three things: when the last run ended, so a restart

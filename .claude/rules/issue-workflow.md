@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Issue workflow (the tracker loop)
 
 **The tracker is GitHub Issues: the open issue list IS the worklist.** Issue

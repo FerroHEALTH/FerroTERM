@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Every `filter-operator` code through the generic evaluation
 //! (<https://hl7.org/fhir/R5/codesystem-filter-operator.html>).
 

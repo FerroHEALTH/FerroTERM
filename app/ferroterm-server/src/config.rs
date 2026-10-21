@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Configuration: the environment in, a [`Config`] out.
 
 use std::collections::BTreeMap;

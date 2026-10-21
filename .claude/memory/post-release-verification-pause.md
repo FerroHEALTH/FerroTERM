@@ -8,6 +8,9 @@ metadata:
   modified: 2026-09-02T20:30:12.303Z
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 After cutting v0.0.3 (the first release with the container image lane), stop
 and verify the whole release as a consumer would before starting the next
 unit: every binary tarball with `gh attestation verify --signer-workflow

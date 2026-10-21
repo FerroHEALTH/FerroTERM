@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Dense ordinals: the graph's own keys.
 //!
 //! A loader assigns every concept of a code system version a dense ordinal

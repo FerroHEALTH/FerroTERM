@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Post-coordinated SNOMED CT expressions through the operations, over the
 //! synthetic edition.
 //!

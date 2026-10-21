@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Classification Markup Language (`ClaML`, ISO 13120).
 //!
 //! The document structure is the `ClaML` DTD: `Title` (name, version), `Meta`

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! A synthetic G-Standaard-shaped release: the ladder files as fixed-length
 //! records at the published positions, with invented codes and names.
 

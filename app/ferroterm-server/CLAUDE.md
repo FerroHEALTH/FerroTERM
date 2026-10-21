@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # ferroterm-server
 
 The `axum` HTTP server: FHIR endpoints, content negotiation, and runtime

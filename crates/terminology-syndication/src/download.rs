@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Streaming one content item to a file and verifying its digest.
 //!
 //! The bytes never sit in memory as a whole: a release package runs to

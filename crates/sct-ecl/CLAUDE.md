@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # sct-ecl
 
 The ECL lexer, parser, and evaluator. Hand-written; the ECL specification and

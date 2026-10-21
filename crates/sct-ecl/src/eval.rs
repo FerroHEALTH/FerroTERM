@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The evaluator: an expression constraint to the set of concept ordinals it
 //! selects, as set algebra over the materialized closure, the attribute
 //! graph, and the reference set tables of one edition.

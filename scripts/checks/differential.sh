@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
 # The differential check against Snowstorm, the reference server, over one
 # licensed SNOMED CT edition.
 #

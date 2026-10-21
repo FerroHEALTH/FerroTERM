@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The FerroTERM synchronisation service: one way from a terminology
 //! syndication feed into a running FerroTERM.
 //!

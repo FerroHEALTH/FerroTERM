@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The RF2 lane: the offline build, run as a subprocess.
 //!
 //! A SNOMED CT release arrives as one archive, and turning it into the

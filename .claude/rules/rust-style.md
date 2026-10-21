@@ -2,6 +2,9 @@
 paths: ["crates/**/*.rs", "addons/**/*.rs", "app/**/*.rs", "tools/**/*.rs"]
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Rust style: idiomatic application code
 
 Applies to hand-written `.rs`: the SNOMED engine and its crates

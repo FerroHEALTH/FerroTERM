@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Arbitrary bytes as a FHIR JSON body.
 //!
 //! Every resource a client can POST is decoded here: a malformed body is a

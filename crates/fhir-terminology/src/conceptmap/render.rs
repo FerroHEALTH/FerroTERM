@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! A model back to a generated `ConceptMap`, for a read of a loaded instance.
 //!
 //! One macro produces a module per served version so they cannot drift:

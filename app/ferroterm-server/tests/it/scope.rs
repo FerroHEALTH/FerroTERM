@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Request-scoped resources: `tx-resource`, `$cache-control` with
 //! `X-Cache-Id`, `$versions`, and the `ValueSet` read and search
 //! (<https://build.fhir.org/ig/HL7/fhir-tx-ecosystem-ig/requirements.html>).

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The ICD-11 pipeline: a cached linearization (or the Foundation) numbered
 //! and written as the artifacts the provider reads.
 //!

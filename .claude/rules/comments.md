@@ -2,6 +2,9 @@
 paths: ["crates/**/*.rs", "addons/**/*.rs", "app/**/*.rs", "tools/**/*.rs"]
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Comments & documentation (RFC 505 + RFC 1574)
 
 The authority is the official Rust API documentation conventions: RFC 505
@@ -27,6 +30,23 @@ has a durable home and goes there, not into the source:
 **No change-narration in comments**: "previously…", "now correctly…",
 "before this refactor…", "the former X is retired" is PR text; git history
 carries it. A comment describes the code as it IS.
+
+## The file header
+
+Every first-party file in a format that takes a comment opens with two SPDX
+lines, in that format's comment syntax, before anything but a shebang, a
+doctype, a Dockerfile parser directive or a Markdown front matter:
+
+```rust
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+```
+
+`crates/rf2` says `Apache-2.0`. Vendored trees (a directory with a
+`PROVENANCE.md`), JSON and the changelog fragments carry none.
+`scripts/checks/spdx-headers.sh` fails a file without the pair and
+`scripts/checks/copyright-holder.sh` fails a header naming another holder.
+The header does not count toward the budgets below.
 
 ## Budgets
 

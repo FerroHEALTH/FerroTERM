@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 `thaw::Input` renders `name=name` on the underlying `<input>` element (pinned
 thaw rev `0726a3d`, `thaw/src/input/mod.rs:166`), and `Field::use_id_and_name`
 honours an explicit `name` prop first.

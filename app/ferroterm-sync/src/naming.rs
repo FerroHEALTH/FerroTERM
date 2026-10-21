@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! What a run calls the directories and files it writes.
 //!
 //! A release directory and a resource file are named after the content item

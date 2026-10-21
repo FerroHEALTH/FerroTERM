@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: Apache-2.0
+
 //! Checks over the licensed release a developer keeps under `data/`.
 //!
 //! Ignored by default: the content is licence-gated and never committed

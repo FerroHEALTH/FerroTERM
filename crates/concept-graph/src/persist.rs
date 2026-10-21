@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! A versioned binary layout for the graph, for the offline build to store.
 //!
 //! No spec governs this: our own design. Little-endian, a magic and version

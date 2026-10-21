@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The part of a published `ValueSet` the value set screen renders.
 //!
 //! `GET [base]/ValueSet` is the search interaction and `GET

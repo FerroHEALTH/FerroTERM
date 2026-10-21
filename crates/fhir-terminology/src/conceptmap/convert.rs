@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! From a generated `ConceptMap` of any served FHIR version to the model.
 //!
 //! R4 and R4B carry `equivalence`, `sourceVersion`, `dependsOn.property`, and

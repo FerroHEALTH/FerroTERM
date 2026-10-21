@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # The FerroTERM Console
 
 No FHIR or SNOMED CT specification governs a terminology server's user

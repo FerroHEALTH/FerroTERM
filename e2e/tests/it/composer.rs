@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 //! Composing a local value set in the editor bundle, and what the reader
 //! bundle does not carry.

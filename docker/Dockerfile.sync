@@ -1,4 +1,6 @@
 # syntax=docker/dockerfile:1
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
 # The FerroTERM sync image: the synchronisation service and the offline index
 # builder, two static binaries on distroless static, per platform. The service
 # runs `ferroterm-build` as a subprocess, which is why both live here.

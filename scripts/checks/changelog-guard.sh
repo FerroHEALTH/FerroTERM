@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # The changelog guard (no specification governs it: our own design): a pull
 # request records its user-visible effect in the changelog. It passes when the

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `POST [base]/$closure`: the closure table a client maintains.
 //!
 //! The operation is invoked at the system level and keeps a named transitive

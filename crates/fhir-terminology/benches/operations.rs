@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The four served read operations over a synthetic edition, so the latency
 //! bar is measured on any machine and in CI, not only where a licensed
 //! edition sits.

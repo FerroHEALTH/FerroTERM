@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! A synthetic code system: a small is-a hierarchy with two languages and two
 //! properties, in two versions, plus a flat system without a hierarchy.
 

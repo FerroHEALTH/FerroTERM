@@ -5,6 +5,9 @@ allowed-tools: Read, Grep, Glob, Bash
 argument-hint: "[issue number] (optional)"
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # /next-task
 
 Turns an open tracker issue into an actionable plan, the planning step of the

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The `_elements` projection: the subset of a resource a client asked for.
 //!
 //! `_elements` is a search parameter every served version defines

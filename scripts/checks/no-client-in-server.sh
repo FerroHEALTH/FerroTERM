@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # The server binary carries no general HTTP client. Its outbound calls are the
 # authorization server [auth] names (its metadata and key set, read by the

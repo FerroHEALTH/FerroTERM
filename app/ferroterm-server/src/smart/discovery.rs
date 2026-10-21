@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! What this server adds to the SMART discovery document `ferrohealth-smart`
 //! builds from the issuer's metadata.
 //!

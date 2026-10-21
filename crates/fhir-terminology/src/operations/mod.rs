@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The FHIR terminology operations over the seam, one module each.
 //!
 //! Each operation takes the generated request type of a FHIR version and

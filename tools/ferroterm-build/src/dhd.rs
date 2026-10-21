@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The concept maps a DHD delivery carries.
 //!
 //! The thesaurus links to SNOMED CT (the fully specified names' identifiers)

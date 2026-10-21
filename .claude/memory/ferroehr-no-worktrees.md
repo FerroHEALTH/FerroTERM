@@ -8,6 +8,9 @@ metadata:
   modified: 2026-09-23T06:49:51.919Z
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 The FerroEHR repository (`/Users/rubentalstra/RustroverProjects/FerroEHR`) carries an owner directive of 2026-08-06 in its own memory (`no-worktrees-single-checkout.md`): every change happens in the main checkout on the current branch, never in a `git worktree`, because the owner follows the work in one working directory. On 2026-09-23 a brief from this session told an agent to use a worktree there; the agent complied and flagged the conflict.
 
 **Why:** each repository's owner rules outrank a brief written from the other repository.

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # SonarQube Cloud's open issues on the main branch as a SARIF 2.1.0 log, for
 # GitHub code scanning (no specification governs this: our own design).

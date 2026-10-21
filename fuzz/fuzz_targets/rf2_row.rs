@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Arbitrary text as the parts of an RF2 release.
 //!
 //! A release is client-supplied content: a deployment brings its own. A

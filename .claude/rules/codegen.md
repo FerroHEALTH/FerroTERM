@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Generated code: consumed here, produced elsewhere
 
 FerroTERM no longer generates a FHIR layer. The `fhir-types` crate and its

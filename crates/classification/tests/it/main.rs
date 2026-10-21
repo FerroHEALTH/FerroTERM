@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The readers over the testkit's release-shaped fixtures.
 #![allow(
     clippy::unwrap_used,

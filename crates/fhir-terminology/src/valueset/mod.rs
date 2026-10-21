@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `ValueSet` resources as the compose layer evaluates them.
 //!
 //! A `ValueSet` of any served FHIR version reduces to one

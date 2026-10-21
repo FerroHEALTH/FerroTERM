@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! What a failure leaves behind: the served set unchanged, the run marked
 //! failed, and the webhook fired either way.
 //!

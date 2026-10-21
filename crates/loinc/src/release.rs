@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Locating the files of an unpacked release.
 
 use std::path::{Path, PathBuf};

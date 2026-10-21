@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! When the next run is due.
 //!
 //! Two shapes are configured, an interval and a time of day, and both are read

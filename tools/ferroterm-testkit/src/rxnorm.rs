@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! A synthetic `RxNorm`-shaped release: the `RRF` files `rxnorm-rrf`
 //! reads, with invented identifiers.
 //!

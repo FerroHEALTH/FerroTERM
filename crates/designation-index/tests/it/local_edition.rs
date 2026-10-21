@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Indexes the descriptions of the licensed release under `data/`, when present.
 //!
 //! Ignored by default (`.claude/rules/vendored-inputs.md`). Run with

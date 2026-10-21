@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! A synthetic Labcodeset-shaped publication: the `labconcepts` document with
 //! invented LOINC, SNOMED CT, and UCUM content.
 

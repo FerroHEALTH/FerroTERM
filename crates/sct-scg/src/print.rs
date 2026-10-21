@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The printer: every tree node writes itself in the grammar it was read
 //! from, so the output parses back to the same tree.
 //!

@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 FerroTERM is a pure-Rust FHIR terminology server for SNOMED CT, LOINC, and other
 clinical code systems, SNOMED CT first (owner decision 2026-09-02: build the
 engine around a code system provider seam from the first line of engine code;

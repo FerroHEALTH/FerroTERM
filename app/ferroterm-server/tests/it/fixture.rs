@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! A server state over the testkit's synthetic SNOMED edition, and request helpers.
 
 use std::sync::Arc;

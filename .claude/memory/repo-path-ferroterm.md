@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 The working clone lives at `/Users/rubentalstra/RustroverProjects/FerroTERM`
 since 2026-09-03 (renamed from `notio` by the owner mid-session). The Claude
 project directory followed (`-Users-rubentalstra-RustroverProjects-FerroTERM`)

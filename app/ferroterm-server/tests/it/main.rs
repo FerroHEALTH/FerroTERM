@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The one integration-test binary for `ferroterm-server`; one module per topic.
 //!
 //! The FHIR tests drive the router with `tower::ServiceExt::oneshot` over a

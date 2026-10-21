@@ -8,6 +8,9 @@ metadata:
   modified: 2026-09-08T19:16:18.983Z
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 `e2e/` carries its own `Cargo.toml` workspace and its own `Cargo.lock`, so
 `cargo fmt --all` and `cargo clippy` run from the repository root do not see
 `e2e/tests/it/*.rs` at all. CI's `ui-e2e` job runs them inside `e2e/` and fails

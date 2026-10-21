@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
 # code-systems.sh — the served code systems are listed once.
 #
 # The book's table (website/book/src/evaluate/code-systems.md, between the

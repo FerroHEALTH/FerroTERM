@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Word tokens for indexing and querying.
 //!
 //! A term is decomposed (NFD), its combining marks dropped, lowercased, and

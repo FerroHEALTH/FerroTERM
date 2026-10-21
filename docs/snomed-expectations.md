@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # SNOMED CT terminology service expectations
 
 What SNOMED International and HL7 expect of a SNOMED CT terminology service,

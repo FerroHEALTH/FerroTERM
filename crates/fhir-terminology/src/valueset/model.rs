@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The version-neutral `ValueSet`: identity and `compose`
 //! (<https://hl7.org/fhir/R4B/valueset.html>).
 

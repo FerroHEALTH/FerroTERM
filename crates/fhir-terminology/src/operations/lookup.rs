@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `CodeSystem/$lookup` in the terms every served FHIR version shares.
 //!
 //! The input is the union of the parameters the versions declare

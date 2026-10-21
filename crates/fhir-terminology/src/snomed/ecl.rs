@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The SNOMED provider as the edition the ECL evaluator reads
 //! (`sct_ecl::eval::Model`): the closure and the graphs are the
 //! artifact's, the concept and description filters are answered from the

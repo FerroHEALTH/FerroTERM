@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # labcodeset
 
 The reader for the Nederlandse Labcodeset publication. Hand-written; the

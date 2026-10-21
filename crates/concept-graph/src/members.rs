@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Reference set memberships: for every reference set of an edition, the
 //! bitmap of the concepts that are its active members.
 //!
