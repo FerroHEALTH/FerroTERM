@@ -50,10 +50,15 @@ bash scripts/checks/viewer-paths.sh
 bash scripts/ui-e2e.sh
 ```
 
-Stage 5 locally needs Chrome for Testing and its chromedriver at the release
-`docs/VERSIONS.md` pins, named by `FERROTERM_UI_E2E_CHROME` and
-`FERROTERM_UI_E2E_CHROMEDRIVER`. Without them, report `SKIPPED(reason)` and
-say that CI's `ui-e2e` job runs it and gates the merge; a skip is not a pass.
+Stage 5 drives Chrome for Testing and its chromedriver at the release
+`docs/VERSIONS.md` pins. `FERROTERM_UI_E2E_CHROME` and
+`FERROTERM_UI_E2E_CHROMEDRIVER` name them; without either, and with no
+chromedriver on PATH, the script fetches that release into
+`target/journey-tools` (`scripts/release/journey-tools.sh`) and the pinned
+`tailwindcss` and `wasm-opt` into `target/viewer-tools`. It needs `jq`,
+`unzip`, `cargo-nextest` and `cargo-leptos`. If it still cannot run, report
+`SKIPPED(reason)` and say that CI's `ui-e2e` job runs it and gates the merge;
+a skip is not a pass.
 
 ## Report
 

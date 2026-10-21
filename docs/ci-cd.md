@@ -92,8 +92,12 @@ them, since two halves built apart do not hydrate) and the stub identity
 provider from `e2e/src/bin/stub_issuer.rs`, starts two servers, the provider
 and two consoles on loopback, one console offering no sign-in and one signing
 in at the provider, and runs the journeys against them with Chrome for Testing
-and its chromedriver at the release `docs/VERSIONS.md` pins. Every address is
-loopback, so no certificate is needed and no check is turned off. The journeys
+and its chromedriver at the release `docs/VERSIONS.md` pins. On a developer
+machine without them the script fetches that release into
+`target/journey-tools` with `scripts/release/journey-tools.sh`, and the site
+build's tools into `target/viewer-tools`, each checked against its pinned
+SHA-256. Every address is loopback, so no certificate is needed and no check
+is turned off. The journeys
 are plain `#[tokio::test]`s in `e2e/`, a crate the root manifest excludes:
 `thirtyfour` depends on `serde_json` with `preserve_order`, and cargo unifies
 features across one invocation, so holding it in the workspace would make the

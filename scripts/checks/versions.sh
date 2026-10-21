@@ -365,6 +365,9 @@ if [[ -d app/ferroterm-viewer ]] && [[ -f docs/VERSIONS.md ]]; then
       || bad "viewer-tools.sh Tailwind (${tools_tailwind:-unset}) != docs/VERSIONS.md pin ($pin_tailwind)"
     [[ "$tools_binaryen" == "$pin_binaryen" ]] \
       || bad "viewer-tools.sh Binaryen (${tools_binaryen:-unset}) != docs/VERSIONS.md pin ($pin_binaryen)"
+    tools_chrome="$(sed -n 's/^chrome_version="\([0-9][0-9.]*\)"/\1/p' scripts/release/journey-tools.sh | head -n1)"
+    [[ "$tools_chrome" == "$pin_chrome" ]] \
+      || bad "journey-tools.sh Chrome (${tools_chrome:-unset}) != docs/VERSIONS.md pin ($pin_chrome)"
     # Every workflow that installs a console tool installs the pinned version.
     for wf in .github/workflows/ci.yml .github/workflows/release-viewer.yml; do
       [[ -f "$wf" ]] || continue
