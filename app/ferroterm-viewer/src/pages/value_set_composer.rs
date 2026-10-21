@@ -217,7 +217,7 @@ pub(crate) fn ValueSetComposerPage() -> impl IntoView {
 
     view! {
         {heading}
-        <div class="mt-loose grid items-start gap-loose lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <div class="fui-main-aside">
             {stack(
                 view! {
                     {versions}
@@ -229,7 +229,7 @@ pub(crate) fn ValueSetComposerPage() -> impl IntoView {
                     {actions}
                     {refused}
                 },
-            )} <div class="min-w-0">{preview}</div>
+            )} <div class="fui-aside-part">{preview}</div>
         </div>
     }
 }
@@ -347,7 +347,7 @@ fn read_refusal(read: Reading) -> AnyView {
                 .map(|error| view! { <Failure error=Signal::stored(error.clone()) /> }.into_any())
         })
     };
-    view! { <div class="mt-default">{shown}</div> }.into_any()
+    view! { {shown} }.into_any()
 }
 
 /// Whether the screen may offer to save what it is showing.
@@ -570,7 +570,7 @@ fn capability_refusal(read: Declared) -> AnyView {
                 .map(|error| view! { <Failure error=Signal::stored(error.clone()) /> }.into_any())
         })
     };
-    view! { <div class="mt-default">{shown}</div> }.into_any()
+    view! { {shown} }.into_any()
 }
 
 /// The offers `choices` makes, as a choice control's options.
@@ -616,7 +616,7 @@ fn text_control(
 ) -> AnyView {
     let described_by = format!("{id}-note");
     view! {
-        <div class="grid content-start gap-tight">
+        <div class="fui-field">
             <label for=id.clone() class=styles::LABEL>
                 {move || label.get()}
             </label>
@@ -629,7 +629,7 @@ fn text_control(
                 prop:value=move || value.get()
                 on:input=change
             />
-            <p id=described_by class=format!("{} wrap-break-word", styles::HINT)>
+            <p id=described_by class=format!("{} fui-break", styles::HINT)>
                 {move || note.get()}
             </p>
         </div>
@@ -669,15 +669,15 @@ fn select_with(
     // is drawn again when the offers arrive and the selection is reapplied.
     let offered = move || drawn(&options, &chosen.get());
     view! {
-        <div class="grid content-start gap-tight">
+        <div class="fui-field">
             <label for=id.clone() class=styles::LABEL>
                 {label}
             </label>
-            <div class="flex items-center gap-default">
+            <div class="fui-field-flow">
                 <select
                     id=id
                     name=name
-                    class=format!("{} min-w-0 flex-1", ferrohealth_ui::view::form::SELECT)
+                    class=ferrohealth_ui::view::form::SELECT
                     aria-describedby=described_by.clone()
                     prop:value=move || chosen.get()
                     on:change=change
@@ -708,8 +708,8 @@ fn act(label: String, click: OnClick) -> AnyView {
 /// A control beside the control that drops what it edits.
 fn removable(control: AnyView, remove: OnClick) -> AnyView {
     view! {
-        <div class="flex items-end gap-default">
-            <div class="min-w-0 flex-1">{control}</div>
+        <div class="fui-field-row fui-field-row-actions">
+            <div>{control}</div>
             <button type="button" class=styles::BUTTON_QUIET on:click=remove>
                 {tr(Msg::Remove)}
             </button>
@@ -738,7 +738,7 @@ fn read_only_banner(writable: Memo<bool>, id: Memo<String>, session: Session) ->
     };
     view! {
         <Show when=move || !writable.get() fallback=|| ()>
-            <p class=format!("mt-default rounded-md p-loose {}", styles::NOTICE)>{sentence}</p>
+            <p class=styles::NOTICE>{sentence}</p>
         </Show>
     }
     .into_any()
@@ -788,13 +788,15 @@ fn identity_section(editing: Editing, editable: Memo<bool>) -> AnyView {
             <h2 id="compose-identity-heading" class="fui-card-title">
                 {tr(Msg::TheValueSet)}
             </h2>
-            <fieldset
-                class="fui-fieldset mt-default"
-                aria-labelledby="compose-identity-heading"
-                disabled=move || !editable.get()
-            >
-                <div class="grid gap-default sm:grid-cols-2">{fields}</div>
-            </fieldset>
+            <div>
+                <fieldset
+                    class="fui-fieldset"
+                    aria-labelledby="compose-identity-heading"
+                    disabled=move || !editable.get()
+                >
+                    <div class="fui-columns">{fields}</div>
+                </fieldset>
+            </div>
         </section>
     }
     .into_any()
@@ -923,10 +925,10 @@ fn clause_section(
                 {heading}
             </h2>
             <p class="fui-muted">{rule}</p>
-            <div class="mt-default grid gap-default">{cards}</div>
+            <div class="fui-stack fui-gap-default">{cards}</div>
             <button
                 type="button"
-                class=format!("mt-default {}", styles::BUTTON)
+                class=styles::BUTTON
                 disabled=move || !editable.get()
                 on:click=move |_| {
                     editing
@@ -979,7 +981,7 @@ fn clause_card(
             <legend>{if included { tr(Msg::Include) } else { tr(Msg::Exclude) }}</legend>
             <p class=styles::MUTED>{move || clause.with(Clause::rule)}</p>
             <Show when=move || defect.with(Option::is_some) fallback=|| ()>
-                <p role="status" class=format!("rounded-md p-loose {}", styles::NOTICE)>
+                <p role="status" class=styles::NOTICE>
                     {move || defect.get().unwrap_or_default()}
                 </p>
             </Show>
@@ -1017,7 +1019,7 @@ fn value_set_rows(editing: Editing, offers: Offers, key: u32, clause: Memo<Claus
     group(
         tr(Msg::ValueSets),
         vec![
-            view! { <div class="grid gap-default">{listed}</div> }.into_any(),
+            view! { <div class="fui-stack fui-gap-default">{listed}</div> }.into_any(),
             add_published_value_set(editing, offers, key),
             add_implicit_value_set(editing, offers, key, clause),
         ],
@@ -1156,7 +1158,7 @@ fn add_implicit_value_set(
     // declares no form, so the reader's choice survives a re-read of the
     // capabilities.
     view! {
-        <div class="grid gap-default" hidden=move || forms.with(Vec::is_empty)>
+        <div class="fui-stack fui-gap-default" hidden=move || forms.with(Vec::is_empty)>
             {control}
             {fields}
             <div>
@@ -1202,7 +1204,7 @@ fn implicit_arguments(
                 clause,
                 PickInto::Argument(arguments),
             );
-            view! { <div class="grid gap-default">{picked} {search}</div> }.into_any()
+            view! { <div class="fui-stack fui-gap-default">{picked} {search}</div> }.into_any()
         }
         ImplicitArgument::Expression => {
             let fields: Vec<AnyView> = placeholders
@@ -1210,7 +1212,7 @@ fn implicit_arguments(
                 .enumerate()
                 .map(|(index, placeholder)| argument_control(key, index, &placeholder, arguments))
                 .collect();
-            view! { <div class="grid gap-default">{fields}</div> }.into_any()
+            view! { <div class="fui-stack fui-gap-default">{fields}</div> }.into_any()
         }
     }
 }
@@ -1278,7 +1280,7 @@ fn system_picker(editing: Editing, offers: Offers, key: u32, clause: Memo<Clause
             editing.change_clause(key, move |clause| clause.system_version = typed);
         }),
     );
-    view! { <div class="grid gap-default sm:grid-cols-2">{system} {version}</div> }.into_any()
+    view! { <div class="fui-columns">{system} {version}</div> }.into_any()
 }
 
 /// The codes one clause names, and the search that picks them.
@@ -1303,7 +1305,7 @@ fn concept_rows(
     group(
         tr(Msg::Codes),
         vec![
-            view! { <div class="grid gap-default">{listed}</div> }.into_any(),
+            view! { <div class="fui-stack fui-gap-default">{listed}</div> }.into_any(),
             concept_search(editing, offers, key, clause),
         ],
     )
@@ -1358,7 +1360,7 @@ fn concept_row(
         )
     });
     let control = view! {
-        <div class="grid gap-tight">
+        <div class="fui-stack fui-gap-tight">
             <p class=styles::CODE>
                 {move || picked.with(|(code, _)| code.clone())} " "
                 <span class=styles::CODE_MUTED>
@@ -1509,7 +1511,7 @@ fn code_search(
         </button>
     });
     view! {
-        <div class="grid gap-tight">
+        <div class="fui-stack fui-gap-tight">
             <form on:submit=submit>{search_row}</form>
             <Show when=move || offers.picking.get() == Some(key) fallback=|| ()>
                 <Reading label=&{ tr(Msg::SearchingThatCodeSystem) }>{results}</Reading>
@@ -1553,7 +1555,7 @@ fn found_view(editing: Editing, key: u32, value: &ExpandedValueSet, into: PickIn
                 ),
             };
             view! {
-                <li class="flex items-center justify-between gap-default">
+                <li class="fui-split">
                     <span class=styles::CODE>
                         {shown_code} " " <span class=styles::CODE_MUTED>{shown_display}</span>
                     </span>
@@ -1563,7 +1565,7 @@ fn found_view(editing: Editing, key: u32, value: &ExpandedValueSet, into: PickIn
             .into_any()
         })
         .collect();
-    view! { <ul class="grid gap-tight">{rows}</ul> }.into_any()
+    view! { <ul class="fui-divided">{rows}</ul> }.into_any()
 }
 
 /// The filters one clause selects with, drawn from what the version declares.
@@ -1635,7 +1637,7 @@ fn filter_rows(
         Some(add),
     );
     let adder = view! {
-        <div class="grid gap-tight">
+        <div class="fui-stack fui-gap-tight">
             {control}
             <Show
                 when=move || !system.with(String::is_empty) && declared.with(Vec::is_empty)
@@ -1649,7 +1651,7 @@ fn filter_rows(
     group(
         tr(Msg::Filters),
         vec![
-            view! { <div class="grid gap-default">{listed}</div> }.into_any(),
+            view! { <div class="fui-stack fui-gap-default">{listed}</div> }.into_any(),
             adder,
         ],
     )
@@ -1793,7 +1795,7 @@ fn save_section(
         // control the server would refuse is a worse answer than no control
         // (`app/ferroterm-viewer/src/auth/scopes.rs`). The banner above says
         // why there is none.
-        <div class="mt-section flex flex-wrap items-center gap-default">
+        <div class="fui-cluster">
             <Show when=move || writable.get() fallback=|| ()>
                 <button
                     type="button"
@@ -1838,7 +1840,7 @@ fn refusal_section(
         focus_report(REPORT_ID);
     });
     let offer = reload_offer(refusal, press);
-    view! { <div class="mt-default grid gap-default">{shown} {offer}</div> }.into_any()
+    view! { <div class="fui-stack fui-gap-default">{shown} {offer}</div> }.into_any()
 }
 
 /// The preview read: the answer to `$expand` over the compose on screen.
@@ -1952,8 +1954,8 @@ fn preview_controls(
         });
     };
     view! {
-        <form class="mt-default flex items-end gap-default" on:submit=run>
-            <div class="grid min-w-0 flex-1 gap-tight">
+        <form class="fui-field-flow" on:submit=run>
+            <div class="fui-field">
                 <label for="compose-preview-filter" class=styles::LABEL>
                     {tr(Msg::FilterThePreview)}
                 </label>
@@ -2019,7 +2021,7 @@ fn preview_view(value: &ExpandedValueSet, page: Memo<Preview>, id: Memo<String>)
     let listed = expansion.listed();
     let walk = pager(page, expansion.offset, total, listed, id);
     view! {
-        <table class=format!("mt-default {}", styles::TABLE)>
+        <table class=styles::TABLE>
             <thead>
                 <tr>
                     <th scope="col" class=styles::TH>
@@ -2090,7 +2092,7 @@ fn pager(
         ),
     };
     view! {
-        <div class="mt-default flex items-center gap-default">
+        <div class="fui-cluster">
             {previous.map(|target| link(target, tr(Msg::Previous)))}
             {next.map(|target| link(target, tr(Msg::Next)))} <p class=styles::MUTED>{counted}</p>
         </div>
@@ -2110,7 +2112,7 @@ fn expansion_refusal(error: &FhirError, editing: Editing) -> AnyView {
         .collect();
     let shown = error.clone();
     view! {
-        <div class="mt-default grid gap-default">
+        <div class="fui-stack fui-gap-default">
             <Failure error=Signal::stored(shown) />
             {marked}
         </div>
@@ -2130,17 +2132,14 @@ fn marked_expression(expression: &str, column: u32, editing: Editing) -> Option<
     let (before, at, after) = mark(&value, column);
     Some(
         view! {
-            <div class=format!("rounded-md p-loose {}", styles::NOTICE)>
+            <div class=styles::NOTICE>
                 <p class=styles::LABEL>
                     {tr_with(
                         Msg::AtCharacter,
                         &[("form", (form).clone().into()), ("column", (column).to_string().into())],
                     )}
                 </p>
-                <p class=format!(
-                    "mt-tight {}",
-                    styles::CODE,
-                )>{before} <span class="font-semibold underline">{at}</span> {after}</p>
+                <p class=styles::CODE>{before} <strong>{at}</strong> {after}</p>
             </div>
         }
         .into_any(),

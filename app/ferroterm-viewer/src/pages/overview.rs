@@ -478,14 +478,14 @@ fn change_item(change: &Change, version: FhirVersion) -> AnyView {
     let kind = change.resource_type.clone();
     let title = named.clone();
     view! {
-        <div class="flex items-start justify-between gap-default">
-            <div class="min-w-0">
-                <a href=href class="block truncate" title=title>
+        <div class="fui-split">
+            <div class="fui-truncate">
+                <a href=href title=title>
                     {named}
                 </a>
-                <span class="block fui-small fui-muted">{kind} " · " {when}</span>
+                <div class="fui-small fui-muted">{kind} " · " {when}</div>
             </div>
-            <span class="shrink-0">{badge(tone, word)}</span>
+            {badge(tone, word)}
         </div>
     }
     .into_any()
@@ -507,7 +507,7 @@ fn operations_card(version: Signal<FhirVersion>) -> AnyView {
                 )
             })
             .collect_view();
-        view! { <div class="grid gap-loose sm:grid-cols-2 xl:grid-cols-4">{links}</div> }
+        view! { <div class="fui-grid">{links}</div> }
     };
     card(tr(Msg::RunAnOperation), cards).into_any()
 }

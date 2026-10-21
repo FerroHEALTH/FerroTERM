@@ -14,35 +14,32 @@
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::button::Variant;
 
-/// A raised surface: a card, a pane, a panel.
-pub(crate) const PANEL: &str = "fui-card";
-
 /// A label over a group, in small caps, for a thing that is not a heading.
-pub(crate) const EYEBROW: &str = "text-micro font-semibold tracking-wide text-muted uppercase";
+pub(crate) const EYEBROW: &str = "fui-label";
 
 /// Body prose that supports something else.
-pub(crate) const MUTED: &str = "text-small text-muted";
+pub(crate) const MUTED: &str = "fui-muted";
 
 /// The quietest readable text: a hint under a control, a note beside a figure.
 pub(crate) const HINT: &str = "fui-help";
 
 /// An identifier, a code, or a canonical.
-pub(crate) const CODE: &str = "fui-mono text-ink wrap-break-word";
+pub(crate) const CODE: &str = "fui-mono fui-break";
 
 /// An identifier that supports something else.
-pub(crate) const CODE_MUTED: &str = "fui-mono text-muted wrap-break-word";
+pub(crate) const CODE_MUTED: &str = "fui-mono fui-muted fui-break";
 
 /// A table that compares rows; FerroUI styles its header and cells.
 pub(crate) const TABLE: &str = "fui-table";
 
-/// A table's header cell, styled by the table.
-pub(crate) const TH: &str = "whitespace-nowrap";
+/// A table's header cell, which the table keeps on one line.
+pub(crate) const TH: &str = "";
 
-/// A table's cell, styled by the table.
-pub(crate) const TD: &str = "align-top";
+/// A table's cell, which the table aligns to the top of its row.
+pub(crate) const TD: &str = "";
 
-/// A table cell whose content is one token and must not wrap.
-pub(crate) const TD_TIGHT: &str = "align-top whitespace-nowrap";
+/// A table cell whose content is one short token.
+pub(crate) const TD_TIGHT: &str = "";
 
 /// The control that submits a form.
 pub(crate) const SUBMIT: &str = Variant::Primary.class();
@@ -69,9 +66,7 @@ pub(crate) const BADGE_OK: &str = Tone::Ok.badge();
 pub(crate) const BADGE_DANGER: &str = Tone::Bad.badge();
 
 /// A standing notice about the answer being shown.
-// TODO(#730): the inline notice of FerroUI issue 11 replaces this tint.
-pub(crate) const NOTICE: &str =
-    "rounded-md border border-edge bg-warn-ground p-default text-small text-warn";
+pub(crate) const NOTICE: &str = "fui-notice fui-tone-warn";
 
 /// A link inside prose; the components' base layer draws every link.
 pub(crate) const LINK: &str = "";
@@ -81,7 +76,7 @@ pub(crate) const LINK: &str = "";
 /// An em dash, not a sentence. Eleven cells that each say "Not loaded from an
 /// artifact" make absence the densest thing on a screen; the sentence belongs
 /// in the mark's own title, where a reader who wants it can find it.
-pub(crate) const ABSENT: &str = "text-muted";
+pub(crate) const ABSENT: &str = "fui-muted";
 
 /// The character that mark draws.
 pub(crate) const ABSENT_MARK: &str = "\u{2014}";

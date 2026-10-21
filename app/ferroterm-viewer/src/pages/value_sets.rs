@@ -288,7 +288,7 @@ fn row_view(resource: &PublishedValueSet, version: FhirVersion) -> AnyView {
 fn failure_view(error: &FhirError) -> AnyView {
     let error = error.clone();
     view! {
-        <div class="mt-default">
+        <div>
             <Failure error=Signal::stored(error) />
         </div>
     }

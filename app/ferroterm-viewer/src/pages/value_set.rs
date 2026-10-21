@@ -194,7 +194,7 @@ fn header(
     let facts = facts_row(vec![
         (
             tr(Msg::Canonical),
-            view! { <span class="fui-mono break-all">{canonical.unwrap_or_else(|| String::from("—"))}</span> }
+            view! { <span class="fui-mono fui-break">{canonical.unwrap_or_else(|| String::from("—"))}</span> }
                 .into_any(),
         ),
         (
@@ -302,7 +302,7 @@ fn clause_row(clause: &ClauseRow) -> AnyView {
     view! {
         <tr>
             <td>{kind}</td>
-            <td data-label=tr(Msg::CodeSystem2) class="fui-mono break-all">
+            <td data-label=tr(Msg::CodeSystem2) class="fui-mono fui-break">
                 {system}
             </td>
             <td data-label=tr(Msg::Selects)>{selection_view(clause)}</td>
@@ -335,7 +335,7 @@ fn selection_view(clause: &ClauseRow) -> AnyView {
     lines.extend(clause.value_sets.iter().map(|url| {
         view! {
             {tr(Msg::EveryCodeIn)}
-            <span class="fui-mono break-all">{url.clone()}</span>
+            <span class="fui-mono fui-break">{url.clone()}</span>
         }
         .into_any()
     }));
@@ -444,10 +444,7 @@ fn preview(
                         <tr>
                             <td class="fui-mono">{concept.code.clone()}</td>
                             <td data-label=tr(Msg::Display)>{display}</td>
-                            <td
-                                data-label=tr(Msg::System)
-                                class="fui-mono fui-small fui-muted sm:whitespace-nowrap"
-                            >
+                            <td data-label=tr(Msg::System) class="fui-mono fui-small fui-muted">
                                 {concept.system.clone()}
                             </td>
                         </tr>
@@ -475,7 +472,7 @@ fn preview(
         body,
     });
     let aside = view! {
-        <span class="inline-flex items-center gap-default">
+        <span class="fui-cluster">
             <span class="fui-small fui-muted">{total}</span>
             {all}
         </span>

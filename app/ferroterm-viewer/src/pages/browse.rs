@@ -415,7 +415,7 @@ fn system_section(
                 <h2 id="browse-system-heading" class="fui-sr-only">
                     {tr(Msg::CodeSystemBeingBrowsed)}
                 </h2>
-                <p class="fui-mono break-all">
+                <p class="fui-mono fui-break">
                     {move || {
                         params
                             .with(|params| {
@@ -693,7 +693,7 @@ fn matches_view(concepts: &[ConceptRow], params: &BrowseParams, version: FhirVer
             let inactive = concept.inactive.then(|| String::from(" (inactive)"));
             view! {
                 <a href=target>{display}</a>
-                <span class="block fui-small fui-muted fui-mono break-all">{code} {inactive}</span>
+                <div class="fui-small fui-muted fui-mono fui-break">{code} {inactive}</div>
             }
             .into_any()
         })
@@ -875,8 +875,8 @@ fn concept_view(
     );
     view! {
         <div>
-            <h3 class="text-title font-semibold">{display}</h3>
-            <p class="fui-mono fui-small fui-muted break-all">{code}</p>
+            <h2>{display}</h2>
+            <p class="fui-mono fui-small fui-muted fui-break">{code}</p>
             <p class="fui-small fui-muted">{held}</p>
         </div>
         {parents}
@@ -1410,7 +1410,7 @@ fn partial_levels(answers: &[(String, Result<Level, FhirError>)]) -> BTreeSet<St
 fn failure_view(error: &FhirError) -> AnyView {
     let error = error.clone();
     view! {
-        <div class="mt-default">
+        <div>
             <Failure error=Signal::stored(error) />
         </div>
     }

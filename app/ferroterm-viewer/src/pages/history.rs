@@ -430,12 +430,7 @@ fn outcome_section(restoring: Restoring) -> AnyView {
     // because a region inserted along with its first message is not announced
     // (<https://www.w3.org/TR/wai-aria-1.2/#aria-live>).
     let region = view! {
-        <p
-            id=REPORT_ID
-            tabindex="-1"
-            aria-live="polite"
-            class=format!("mt-default {}", styles::MUTED)
-        >
+        <p id=REPORT_ID tabindex="-1" aria-live="polite" class=styles::MUTED>
             {move || report.get()}
         </p>
     }
@@ -451,7 +446,7 @@ fn outcome_section(restoring: Restoring) -> AnyView {
     let press = StoredValue::new(press);
     let refused = view! {
         <Show when=move || refusal.with(Option::is_some) fallback=|| ()>
-            <div class="mt-default grid gap-default">
+            <div class="fui-stack fui-gap-default">
                 <p class=styles::MUTED>
                     {move || {
                         refusal
@@ -504,10 +499,10 @@ fn list_section(restoring: Restoring, opened: &Opened, writable: bool) -> AnyVie
     // that cannot change while it stands.
     let listed = if rows.is_empty() {
         let why = opened.support.why_empty();
-        view! { <p class=format!("mt-default {}", styles::MUTED)>{why}</p> }.into_any()
+        view! { <p class=styles::MUTED>{why}</p> }.into_any()
     } else {
         view! {
-            <div class="mt-default overflow-x-auto">
+            <div class="fui-table-scroll">
                 <table class=styles::TABLE>
                     <thead>
                         <tr>
@@ -535,24 +530,13 @@ fn list_section(restoring: Restoring, opened: &Opened, writable: bool) -> AnyVie
         .into_any()
     };
     let composed = if opened.support == Support::VersionRead {
-        view! {
-            <p class=format!(
-                "mt-default {}",
-                styles::HINT,
-            )>{tr(Msg::ServerDeclaresVersionReadNotHistory)}</p>
-        }
-        .into_any()
+        view! { <p class=styles::HINT>{tr(Msg::ServerDeclaresVersionReadNotHistory)}</p> }
+            .into_any()
     } else {
         ().into_any()
     };
     let bounded = if opened.truncated {
-        view! {
-            <p class=format!(
-                "mt-default {}",
-                styles::HINT,
-            )>{tr(Msg::OnlyMostRecentVersionsListed)}</p>
-        }
-        .into_any()
+        view! { <p class=styles::HINT>{tr(Msg::OnlyMostRecentVersionsListed)}</p> }.into_any()
     } else {
         ().into_any()
     };
@@ -587,7 +571,7 @@ fn version_row(
     let restore_it = restoring.presses(subject, held, at.clone(), current.to_owned());
     view! {
         <tr>
-            <th scope="row" class=format!("{} font-normal", styles::TD_TIGHT)>
+            <th scope="row" class=styles::TD_TIGHT>
                 <span class=styles::CODE>{at.clone()}</span>
                 {marked(is_current)}
             </th>
@@ -625,8 +609,11 @@ fn version_row(
 /// The mark on the version the server holds now, where this row is it.
 fn marked(is_current: bool) -> AnyView {
     if is_current {
-        view! { <span class=format!("ml-tight {}", styles::BADGE)>{tr(Msg::Current)}</span> }
-            .into_any()
+        view! {
+            " "
+            <span class=styles::BADGE>{tr(Msg::Current)}</span>
+        }
+        .into_any()
     } else {
         ().into_any()
     }
@@ -641,7 +628,7 @@ fn unrestorable() -> AnyView {
         <span class=styles::ABSENT aria-hidden="true">
             {styles::ABSENT_MARK}
         </span>
-        <span class="sr-only">{tr(Msg::VersionOneServerHoldsNowAccount)}</span>
+        <span class="fui-sr-only">{tr(Msg::VersionOneServerHoldsNowAccount)}</span>
     }
     .into_any()
 }
@@ -740,8 +727,8 @@ fn compare_section(
         let from_options = options(&ids, &chosen.from);
         let to_options = options(&ids, &chosen.to);
         view! {
-            <form class="mt-default flex flex-wrap items-end gap-default" on:submit=submitted>
-                <div class="grid gap-tight">
+            <form class="fui-field-flow" on:submit=submitted>
+                <div class="fui-field">
                     <label for="history-from" class=styles::LABEL>
                         {tr(Msg::EarlierVersion)}
                     </label>
@@ -755,7 +742,7 @@ fn compare_section(
                         {from_options}
                     </select>
                 </div>
-                <div class="grid gap-tight">
+                <div class="fui-field">
                     <label for="history-to" class=styles::LABEL>
                         {tr(Msg::LaterVersion)}
                     </label>
@@ -844,7 +831,7 @@ fn difference_section(opened: &Opened, compared: Memo<Compared>) -> AnyView {
         }
         let rows: Vec<AnyView> = held.rows().iter().map(difference_row).collect();
         view! {
-            <div class="mt-default overflow-x-auto">
+            <div class="fui-table-scroll">
                 <table class=styles::TABLE>
                     <thead>
                         <tr>
@@ -900,7 +887,7 @@ fn difference_row(row: &Difference) -> AnyView {
     let after = (row.change != Change::Removed).then(|| row.after.clone());
     view! {
         <tr>
-            <th scope="row" class=format!("{} font-normal", styles::TD)>
+            <th scope="row" class=styles::TD>
                 <span class=styles::CODE>{path}</span>
             </th>
             <td class=styles::TD_TIGHT>
@@ -967,7 +954,7 @@ fn findings_section(client: &FhirClient, read: Resource<Result<Opened, FhirError
                         {tr(Msg::WhatLastSynchronisationFound)}
                     </h2>
                     <p class="fui-muted">{tr(Msg::CodesResourceNamesReleaseSyncService)}</p>
-                    <div class="mt-default overflow-x-auto">
+                    <div class="fui-table-scroll">
                         <table class=styles::TABLE>
                             <thead>
                                 <tr>
@@ -1003,7 +990,7 @@ fn finding_row(finding: &sync::Finding) -> AnyView {
     let release = finding.release.clone();
     view! {
         <tr>
-            <th scope="row" class=format!("{} font-normal", styles::TD_TIGHT)>
+            <th scope="row" class=styles::TD_TIGHT>
                 <span class=styles::CODE>{code}</span>
             </th>
             <td class=styles::TD>

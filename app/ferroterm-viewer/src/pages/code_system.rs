@@ -236,7 +236,7 @@ fn facts(
     facts_row(vec![
         (
             tr(Msg::Canonical),
-            view! { <span class="fui-mono break-all">{canonical.to_owned()}</span> }.into_any(),
+            view! { <span class="fui-mono fui-break">{canonical.to_owned()}</span> }.into_any(),
         ),
         (
             tr(Msg::DefaultVersion),

@@ -48,7 +48,7 @@ pub(crate) fn pane() -> AnyView {
 
     let in_use = definitions(vec![(
         tr(Msg::FhirBaseInUse),
-        view! { <span class="fui-mono break-all">{base}</span> }.into_any(),
+        view! { <span class="fui-mono fui-break">{base}</span> }.into_any(),
     )])
     .into_any();
 

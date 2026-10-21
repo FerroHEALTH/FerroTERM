@@ -195,7 +195,7 @@ fn header(
     };
     let actions = view! { <div class="fui-cluster">{run} {edit} {history}</div> };
     let scope = |scope: Option<&str>| {
-        view! { <span class="fui-mono break-all">{scope.unwrap_or("—").to_owned()}</span> }
+        view! { <span class="fui-mono fui-break">{scope.unwrap_or("—").to_owned()}</span> }
             .into_any()
     };
     let facts = facts_row(vec![
@@ -277,10 +277,10 @@ fn groups_view(groups: &[GroupRow]) -> AnyView {
                 .map(|group| {
                     view! {
                         <tr>
-                            <td class="fui-mono break-all">
+                            <td class="fui-mono fui-break">
                                 {group.source.clone().unwrap_or_else(|| String::from("—"))}
                             </td>
-                            <td data-label=tr(Msg::To) class="fui-mono break-all">
+                            <td data-label=tr(Msg::To) class="fui-mono fui-break">
                                 {group.target.clone().unwrap_or_else(|| String::from("—"))}
                             </td>
                             <td data-label=tr(Msg::CodesMapped) class="fui-num">
@@ -417,10 +417,8 @@ fn mapping_row(row: &MappingRow) -> AnyView {
     let code = |code: Option<String>, display: Option<String>, system: Option<String>| {
         view! {
             <span class="fui-mono">{code.unwrap_or_else(|| tr(Msg::NoTarget))}</span>
-            <span class="block">{display.unwrap_or_default()}</span>
-            <span class="block font-normal fui-small fui-muted fui-mono sm:whitespace-nowrap">
-                {system.unwrap_or_default()}
-            </span>
+            <div>{display.unwrap_or_default()}</div>
+            <span class="fui-small fui-muted fui-mono">{system.unwrap_or_default()}</span>
         }
     };
     view! {

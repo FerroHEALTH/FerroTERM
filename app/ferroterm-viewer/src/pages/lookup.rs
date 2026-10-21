@@ -11,7 +11,7 @@ use ferrohealth_ui::table::view::{Body, Column, DataTable, data_table};
 use ferrohealth_ui::view::button::Variant;
 use ferrohealth_ui::view::empty::empty_quiet;
 use ferrohealth_ui::view::surface::{
-    card, chip, cluster, facts_row, page_header, panel_body, stack, titled_panel,
+    chip, cluster, facts_row, page_header, panel_body, stack, titled_panel,
 };
 use ferrohealth_ui::widget::help::{help_switch, provide_help};
 use leptos::ev::SubmitEvent;
@@ -241,7 +241,15 @@ fn form_card(client: &FhirClient, version: Signal<FhirVersion>, run: Signal<Look
             </div>
         </form>
     };
-    card(tr(Msg::Parameters), form).into_any()
+    // NOTE: no specification governs this: our own design; the fieldsets name
+    // each group, so the card's own heading is for assistive technology only.
+    view! {
+        <section class="fui-card">
+            <h2 class="fui-sr-only">{tr(Msg::Parameters)}</h2>
+            {form}
+        </section>
+    }
+    .into_any()
 }
 
 /// Which code system the code is read in, and its version.
@@ -365,9 +373,7 @@ fn concept_view(answer: &LookupAnswer, asked: &LookupRun, version: FhirVersion) 
     let relatives = relatives_view(&concept, asked, version);
     let summary = view! {
         <div class="fui-panel-body fui-stack">
-            <p class="text-title font-semibold" aria-live="polite">
-                {display}
-            </p>
+            <h2 aria-live="polite">{display}</h2>
             {facts}
             {relatives}
         </div>

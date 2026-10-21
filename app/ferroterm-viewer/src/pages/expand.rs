@@ -68,7 +68,7 @@ use ferrohealth_ui::view::empty::empty_quiet;
 use ferrohealth_ui::view::layout::bullet_list;
 use ferrohealth_ui::view::notice::{Announce, notice};
 use ferrohealth_ui::view::status::badge;
-use ferrohealth_ui::view::surface::{card, page_header, panel_body, stack};
+use ferrohealth_ui::view::surface::{page_header, panel_body, stack};
 use ferrohealth_ui::widget::help::help_switch;
 
 /// The runner's own path below the router base.
@@ -508,7 +508,15 @@ fn form_section(
             </div>
         </form>
     };
-    card(tr(Msg::Parameters), form).into_any()
+    // NOTE: no specification governs this: our own design; the fieldsets name
+    // each group, so the card's own heading is for assistive technology only.
+    view! {
+        <section class="fui-card">
+            <h2 class="fui-sr-only">{tr(Msg::Parameters)}</h2>
+            {form}
+        </section>
+    }
+    .into_any()
 }
 
 /// Which value set the run expands.
@@ -854,7 +862,7 @@ fn concept_row(row: &ConceptRow, flagged: bool) -> AnyView {
     let flags = (!flags.is_empty()).then(|| badge(Tone::Neutral, &flags));
     view! {
         <tr>
-            <td class=format!("fui-mono sm:whitespace-nowrap {}", styles::depth(row.depth))>
+            <td class=format!("fui-mono {}", styles::depth(row.depth))>
                 <span class="fui-sr-only">{nesting}</span>
                 {row.code.clone()}
             </td>
@@ -864,10 +872,7 @@ fn concept_row(row: &ConceptRow, flagged: bool) -> AnyView {
                     {designation_list(&row.designations)}
                 </div>
             </td>
-            <td
-                data-label=tr(Msg::System)
-                class="fui-mono fui-small fui-muted sm:whitespace-nowrap"
-            >
+            <td data-label=tr(Msg::System) class="fui-mono fui-small fui-muted">
                 {system}
             </td>
             {flagged.then(|| view! { <td data-label=tr(Msg::Flags)>{flags}</td> })}
@@ -984,7 +989,7 @@ fn parameters_view(lines: &[ParameterLine]) -> AnyView {
         .map(|line| {
             view! {
                 <dt class="fui-mono">{line.name.clone()}</dt>
-                <dd class="break-all">{crate::components::stated(line.value.clone())}</dd>
+                <dd class="fui-break">{crate::components::stated(line.value.clone())}</dd>
             }
             .into_any()
         })
@@ -1004,14 +1009,13 @@ fn refusal_view(error: &FhirError) -> AnyView {
         .outcome()
         .is_some_and(|outcome| outcome.carries_code(TOO_COSTLY));
     let advice = if costly {
-        view! { <p class="mt-default text-body">{tr(Msg::ServerRefusedExpandSelectionLargeOne)}</p> }
-        .into_any()
+        view! { <p>{tr(Msg::ServerRefusedExpandSelectionLargeOne)}</p> }.into_any()
     } else {
         ().into_any()
     };
     let error = error.clone();
     view! {
-        <div class="mt-default">
+        <div class="fui-stack fui-gap-default">
             <Failure error=Signal::stored(error) />
             {advice}
         </div>

@@ -409,10 +409,7 @@ fn standing_section(
     };
     view! {
         <Show when=move || readonly.get() fallback=|| ()>
-            <p class=format!(
-                "mt-default rounded-md p-default {}",
-                styles::NOTICE,
-            )>{tr(Msg::ReadOnly)} {because}</p>
+            <p class=styles::NOTICE>{tr(Msg::ReadOnly)} {because}</p>
             {move || {
                 standing
                     .capability
@@ -459,7 +456,7 @@ fn outcome_section(
     let press = StoredValue::new(press);
     let refused = view! {
         <Show when=move || refusal.with(Option::is_some) fallback=|| ()>
-            <div class="mt-default grid gap-default">
+            <div class="fui-stack fui-gap-default">
                 <p class=styles::MUTED>
                     {move || {
                         refusal
@@ -518,7 +515,7 @@ fn validation_view(validation: &Validation) -> AnyView {
                 {tr(Msg::WhatServerSaysAboutRetiredConcept)}
             </h2>
             <p class="fui-muted">{tr(Msg::CodesystemValidateCodeRunAgainstVersion)}</p>
-            <table class=format!("mt-default {}", styles::TABLE)>
+            <table class=styles::TABLE>
                 <thead>
                     <tr>
                         <th scope="col" class=styles::TH>
@@ -579,8 +576,8 @@ fn metadata_section(draft: RwSignal<Draft>, readonly: Signal<bool>, options: Opt
             <h2 id="editor-metadata-heading" class="fui-card-title">
                 {tr(Msg::Metadata)}
             </h2>
-            <div class="mt-default grid gap-default sm:grid-cols-2">
-                <div class="grid gap-tight">
+            <div class="fui-columns">
+                <div class="fui-field">
                     <label for="editor-url" class=styles::LABEL>
                         {tr(Msg::CanonicalUrl)}
                     </label>
@@ -597,7 +594,7 @@ fn metadata_section(draft: RwSignal<Draft>, readonly: Signal<bool>, options: Opt
                         }
                     />
                 </div>
-                <div class="grid gap-tight">
+                <div class="fui-field">
                     <label for="editor-version" class=styles::LABEL>
                         {tr(Msg::BusinessVersion)}
                     </label>
@@ -638,12 +635,11 @@ fn metadata_section(draft: RwSignal<Draft>, readonly: Signal<bool>, options: Opt
                     gated(Box::new(move || draft.read().content.clone())),
                     Box::new(move |chosen| draft.update(|draft| draft.content = chosen)),
                 )}
-                <div class="flex items-center gap-default">
+                <div class="fui-check">
                     <input
                         id="editor-case-sensitive"
                         name="caseSensitive"
                         type="checkbox"
-                        class="h-4 w-4 accent-accent"
                         disabled=move || readonly.get()
                         prop:checked=move || draft.read().case_sensitive
                         on:change:target=move |event| {
@@ -685,7 +681,7 @@ fn properties_section(draft: RwSignal<Draft>, readonly: Signal<bool>, kinds: Cod
                     tr(Msg::NoPropertiesLine),
                 )
             >
-                <table class=format!("mt-default {}", styles::TABLE)>
+                <table class=styles::TABLE>
                     <thead>
                         <tr>
                             <th scope="col" class=styles::TH>
@@ -710,7 +706,7 @@ fn properties_section(draft: RwSignal<Draft>, readonly: Signal<bool>, kinds: Cod
                 </table>
             </Show>
             <Show when=move || !readonly.get() fallback=|| ()>
-                <p class="mt-default">
+                <p>
                     <button
                         type="button"
                         class=styles::BUTTON
@@ -749,7 +745,7 @@ fn property_row(draft: RwSignal<Draft>, key: Key, readonly: Signal<bool>, kinds:
     view! {
         <tr>
             <td class=styles::TD>
-                <label for=format!("property-{id}-code") class="sr-only">
+                <label for=format!("property-{id}-code") class="fui-sr-only">
                     {tr(Msg::PropertyCode)}
                 </label>
                 <input
@@ -766,7 +762,7 @@ fn property_row(draft: RwSignal<Draft>, key: Key, readonly: Signal<bool>, kinds:
                 />
             </td>
             <td class=styles::TD>
-                <label for=format!("property-{id}-uri") class="sr-only">
+                <label for=format!("property-{id}-uri") class="fui-sr-only">
                     {tr(Msg::PropertyIdentifier)}
                 </label>
                 <input
@@ -893,14 +889,14 @@ fn concepts_section(draft: RwSignal<Draft>, readonly: Signal<bool>, kinds: Codes
                     tr(Msg::NoConceptsLine),
                 )
             >
-                <div class="mt-default grid gap-default">
+                <div class="fui-stack fui-gap-default">
                     <For each=move || keys.get() key=|key| *key let:key>
                         {concept_row(draft, key, readonly, kinds)}
                     </For>
                 </div>
             </Show>
             <Show when=move || !readonly.get() fallback=|| ()>
-                <p class="mt-default">
+                <p>
                     <button
                         type="button"
                         class=styles::BUTTON
@@ -944,8 +940,8 @@ fn concept_row(draft: RwSignal<Draft>, key: Key, readonly: Signal<bool>, kinds: 
     view! {
         <fieldset class="fui-fieldset fui-well">
             <legend>{named}</legend>
-            <div class="grid gap-default sm:grid-cols-2">
-                <div class="grid gap-tight">
+            <div class="fui-columns">
+                <div class="fui-field">
                     <label for=format!("concept-{id}-code") class=styles::LABEL>
                         {tr(Msg::Code)}
                     </label>
@@ -962,7 +958,7 @@ fn concept_row(draft: RwSignal<Draft>, key: Key, readonly: Signal<bool>, kinds: 
                         }
                     />
                 </div>
-                <div class="grid gap-tight">
+                <div class="fui-field">
                     <label for=format!("concept-{id}-display") class=styles::LABEL>
                         {tr(Msg::Display)}
                     </label>
@@ -980,7 +976,7 @@ fn concept_row(draft: RwSignal<Draft>, key: Key, readonly: Signal<bool>, kinds: 
                     />
                 </div>
             </div>
-            <div class="mt-default grid gap-tight">
+            <div class="fui-stack fui-gap-tight">
                 <label for=format!("concept-{id}-definition") class=styles::LABEL>
                     {tr(Msg::Definition)}
                 </label>
@@ -1002,7 +998,7 @@ fn concept_row(draft: RwSignal<Draft>, key: Key, readonly: Signal<bool>, kinds: 
             {designations}
             {values}
             <Show when=move || !readonly.get() fallback=|| ()>
-                <p class="mt-default">
+                <p>
                     <button
                         type="button"
                         class=styles::BUTTON
@@ -1042,8 +1038,8 @@ fn lifecycle_view(draft: RwSignal<Draft>, key: Key, readonly: Signal<bool>) -> A
         .map(|(code, label)| view! { <option value=code>{tr(label)}</option> }.into_any())
         .collect();
     view! {
-        <div class="mt-default grid gap-default sm:grid-cols-2">
-            <div class="grid gap-tight">
+        <div class="fui-columns">
+            <div class="fui-field">
                 <label for=format!("concept-{id}-lifecycle") class=styles::LABEL>
                     {tr(Msg::Lifecycle)}
                 </label>
@@ -1068,7 +1064,7 @@ fn lifecycle_view(draft: RwSignal<Draft>, key: Key, readonly: Signal<bool>) -> A
                     {options}
                 </select>
             </div>
-            <div class="grid gap-tight" hidden=move || !dated()>
+            <div class="fui-field" hidden=move || !dated()>
                 <label for=format!("concept-{id}-lifecycle-date") class=styles::LABEL>
                     {tr(Msg::On)}
                 </label>
@@ -1110,7 +1106,7 @@ fn designations_view(draft: RwSignal<Draft>, concept: Key, readonly: Signal<bool
         })
     });
     view! {
-        <div class="mt-default grid gap-tight">
+        <div class="fui-stack fui-gap-tight">
             <p class=styles::EYEBROW>{tr(Msg::Designations)}</p>
             <For each=move || keys.get() key=|key| *key let:key>
                 {designation_row(draft, concept, key, readonly)}
@@ -1161,8 +1157,8 @@ fn designation_row(
         .unwrap_or_default();
     let id = key.0;
     view! {
-        <div class="grid gap-default sm:grid-cols-[1fr_1fr_2fr_auto]">
-            <div class="grid gap-tight">
+        <div class="fui-field-row fui-field-row-definition">
+            <div class="fui-field">
                 <label for=format!("designation-{id}-language") class=styles::LABEL>
                     {tr(Msg::Language)}
                 </label>
@@ -1184,7 +1180,7 @@ fn designation_row(
                     }
                 />
             </div>
-            <div class="grid gap-tight">
+            <div class="fui-field">
                 <label for=format!("designation-{id}-use") class=styles::LABEL>
                     {tr(Msg::UseSystemCode)}
                 </label>
@@ -1206,7 +1202,7 @@ fn designation_row(
                     }
                 />
             </div>
-            <div class="grid gap-tight">
+            <div class="fui-field">
                 <label for=format!("designation-{id}-value") class=styles::LABEL>
                     {tr(Msg::Term)}
                 </label>
@@ -1229,7 +1225,7 @@ fn designation_row(
                 />
             </div>
             <Show when=move || !readonly.get() fallback=|| ()>
-                <p class="self-end">
+                <p>
                     <button
                         type="button"
                         class=styles::BUTTON
@@ -1286,7 +1282,7 @@ fn values_view(
         })
     });
     view! {
-        <div class="mt-default grid gap-tight">
+        <div class="fui-stack fui-gap-tight">
             <p class=styles::EYEBROW>{tr(Msg::PropertyValues)}</p>
             <For each=move || keys.get() key=|key| *key let:key>
                 {value_row(draft, concept, key, readonly, kinds)}
@@ -1365,8 +1361,8 @@ fn value_row(
         })
     };
     view! {
-        <div class="grid gap-default sm:grid-cols-[1fr_2fr_auto_auto]">
-            <div class="grid gap-tight">
+        <div class="fui-field-row fui-field-row-code-display">
+            <div class="fui-field">
                 <label for=format!("value-{id}-code") class=styles::LABEL>
                     {tr(Msg::Property)}
                 </label>
@@ -1383,7 +1379,7 @@ fn value_row(
                     }
                 />
             </div>
-            <div class="grid gap-tight">
+            <div class="fui-field">
                 <label for=format!("value-{id}-text") class=styles::LABEL>
                     {tr(Msg::Value)}
                 </label>
@@ -1400,9 +1396,9 @@ fn value_row(
                     }
                 />
             </div>
-            <p class=format!("self-end {}", styles::HINT)>{kind_of}</p>
+            <p class=styles::HINT>{kind_of}</p>
             <Show when=move || !readonly.get() fallback=|| ()>
-                <p class="self-end">
+                <p>
                     <button
                         type="button"
                         class=styles::BUTTON
@@ -1526,7 +1522,7 @@ fn save_section(
                     {tr(Msg::Save)}
                 </h2>
                 <p class="fui-muted">{tr(Msg::UpdateStatesVersionReplacesSoChange)}</p>
-                <p class="mt-default">
+                <p>
                     <button
                         type="button"
                         class=styles::SUBMIT

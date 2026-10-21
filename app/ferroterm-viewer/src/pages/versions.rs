@@ -227,9 +227,9 @@ fn row_view(row: &Row, labels: &[&'static str]) -> AnyView {
     // An operation is named by its code, which reads in the code face;
     // a declaration is named in words.
     let class = if row.label.contains('$') {
-        "fui-mono wrap-break-word"
+        "fui-mono fui-break"
     } else {
-        "wrap-break-word"
+        "fui-break"
     };
     view! {
         <tr>
@@ -279,7 +279,7 @@ fn root_notes_view(label: &str, notes: &[(String, String)]) -> AnyView {
         .iter()
         .map(|(operation, note)| {
             view! {
-                <dt class="fui-mono wrap-break-word">{operation.clone()}</dt>
+                <dt class="fui-mono fui-break">{operation.clone()}</dt>
                 <dd>{note.clone()}</dd>
             }
             .into_any()

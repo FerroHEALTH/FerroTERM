@@ -327,10 +327,7 @@ fn standing_section(
     };
     view! {
         <Show when=move || readonly.get() fallback=|| ()>
-            <p class=format!(
-                "mt-default rounded-md p-default {}",
-                styles::NOTICE,
-            )>{tr(Msg::ReadOnly)} {because}</p>
+            <p class=styles::NOTICE>{tr(Msg::ReadOnly)} {because}</p>
         </Show>
     }
     .into_any()
@@ -368,7 +365,7 @@ fn outcome_section(
     let press = StoredValue::new(press);
     let refused = view! {
         <Show when=move || refusal.with(Option::is_some) fallback=|| ()>
-            <div class="mt-default grid gap-default">
+            <div class="fui-stack fui-gap-default">
                 <p class=styles::MUTED>
                     {move || {
                         refusal
@@ -422,8 +419,8 @@ fn metadata_section(
             <h2 id="map-metadata-heading" class="fui-card-title">
                 {tr(Msg::Metadata)}
             </h2>
-            <div class="mt-default grid gap-default sm:grid-cols-2">
-                <div class="grid gap-tight">
+            <div class="fui-columns">
+                <div class="fui-field">
                     <label for="map-url" class=styles::LABEL>
                         {tr(Msg::CanonicalUrl)}
                     </label>
@@ -440,7 +437,7 @@ fn metadata_section(
                         }
                     />
                 </div>
-                <div class="grid gap-tight">
+                <div class="fui-field">
                     <label for="map-version" class=styles::LABEL>
                         {tr(Msg::BusinessVersion)}
                     </label>
@@ -469,7 +466,7 @@ fn metadata_section(
                     gated(Box::new(move || draft.read().status.clone())),
                     Box::new(move |chosen| draft.update(|draft| draft.status = chosen)),
                 )}
-                <div class="grid gap-tight">
+                <div class="fui-field">
                     <label for="map-source-scope" class=styles::LABEL>
                         {source_label}
                     </label>
@@ -486,7 +483,7 @@ fn metadata_section(
                         }
                     />
                 </div>
-                <div class="grid gap-tight">
+                <div class="fui-field">
                     <label for="map-target-scope" class=styles::LABEL>
                         {target_label}
                     </label>
@@ -541,7 +538,7 @@ fn groups_section(
                     tr(Msg::NoGroupsLine),
                 )
             >
-                <div class="mt-default grid gap-default">
+                <div class="fui-stack fui-gap-default">
                     <For each=move || keys.get() key=|key| *key let:key>
                         {group_panel(
                             client,
@@ -557,7 +554,7 @@ fn groups_section(
                 </div>
             </Show>
             <Show when=move || !readonly.get() fallback=|| ()>
-                <p class="mt-default">
+                <p>
                     <button
                         type="button"
                         class=styles::BUTTON
@@ -623,7 +620,7 @@ fn group_panel(
             {systems}
             {elements}
             <Show when=move || !readonly.get() fallback=|| ()>
-                <p class="mt-default flex flex-wrap gap-default">
+                <p class="fui-cluster">
                     <button
                         type="button"
                         class=styles::BUTTON
@@ -673,7 +670,7 @@ fn group_panel(
 fn systems_view(draft: RwSignal<MapDraft>, key: Key, readonly: Signal<bool>) -> AnyView {
     let id = key.0;
     view! {
-        <div class="grid gap-default sm:grid-cols-2">
+        <div class="fui-columns">
             {driven_control(
                 format!("group-{id}-source"),
                 "group-source",
@@ -735,7 +732,7 @@ fn elements_view(
         })
     });
     view! {
-        <div class="mt-default grid gap-default">
+        <div class="fui-stack fui-gap-default">
             <p class=styles::EYEBROW>{tr(Msg::Codes)}</p>
             <Show when=move || keys.with(Vec::is_empty) fallback=|| ()>
                 {empty_quiet(icon::CONCEPT_MAPS, tr(Msg::NoElementsTitle), tr(Msg::NoElementsLine))}
@@ -775,7 +772,7 @@ fn driven_control(
 ) -> AnyView {
     let named = StoredValue::new(id);
     view! {
-        <div class="grid gap-tight">
+        <div class="fui-field">
             <label for=move || named.with_value(Clone::clone) class=styles::LABEL>
                 {label}
             </label>
@@ -856,7 +853,7 @@ fn element_panel(
             {picked}
             {no_map}
             <div hidden=unmapped>{targets}</div>
-            <p class="mt-default">
+            <p>
                 <button
                     type="button"
                     class=styles::BUTTON
@@ -870,7 +867,7 @@ fn element_panel(
             </p>
             {preview_view(preview, key)}
             <Show when=move || !readonly.get() fallback=|| ()>
-                <p class="mt-default">
+                <p>
                     <button
                         type="button"
                         class=styles::BUTTON
@@ -900,7 +897,7 @@ fn element_fields(
 ) -> AnyView {
     let id = key.0;
     view! {
-        <div class="grid gap-default sm:grid-cols-2">
+        <div class="fui-columns">
             {driven_control(
                 format!("element-{id}-code"),
                 "element-code",
@@ -943,12 +940,11 @@ fn no_map_control(
     let unmapped = move || element_of(draft, group, key, |element| element.no_map);
     view! {
         <Show when=move || dialect(version.get()).no_map fallback=|| ()>
-            <div class="mt-default flex items-center gap-default">
+            <div class="fui-check">
                 <input
                     id=format!("element-{id}-nomap")
                     name="element-nomap"
                     type="checkbox"
-                    class="h-4 w-4 accent-accent"
                     disabled=move || readonly.get()
                     prop:checked=unmapped
                     on:change:target=move |event| {
@@ -984,7 +980,7 @@ fn targets_view(
         })
     });
     view! {
-        <div class="mt-default grid gap-default">
+        <div class="fui-stack fui-gap-default">
             <p class=styles::EYEBROW>{tr(Msg::MapsTo)}</p>
             <For each=move || keys.get() key=|key| *key let:key>
                 {target_row(client, version, draft, group, element, key, readonly, relationships)}
@@ -1059,12 +1055,9 @@ fn target_row(
     );
     let fields = target_fields(draft, group, element, key, readonly, relationships, version);
     view! {
-        <div class=format!(
-            "p-default {}",
-            styles::PANEL,
-        )>
+        <div class="fui-well fui-stack fui-gap-default">
             {fields} {picked} <Show when=move || !readonly.get() fallback=|| ()>
-                <p class="mt-default">
+                <p>
                     <button
                         type="button"
                         class=styles::BUTTON
@@ -1098,7 +1091,7 @@ fn target_fields(
 ) -> AnyView {
     let id = key.0;
     view! {
-        <div class="grid gap-default sm:grid-cols-2">
+        <div class="fui-columns">
             {driven_control(
                 format!("target-{id}-code"),
                 "target-code",
@@ -1291,9 +1284,9 @@ fn picker(
         })
     };
     view! {
-        <div class="mt-default grid gap-tight">
-            <form class="flex flex-wrap items-end gap-default" on:submit=search>
-                <div class="grid grow gap-tight">
+        <div class="fui-stack fui-gap-tight">
+            <form class="fui-field-flow" on:submit=search>
+                <div class="fui-field">
                     <label for=field class=styles::LABEL>
                         {tr_with(Msg::FindSystem, &[("what", what.into())])}
                     </label>
@@ -1352,7 +1345,7 @@ fn offers(rows: &[ConceptRow], readonly: Signal<bool>, chose: &Chosen) -> AnyVie
             .into_any()
         })
         .collect();
-    view! { <ul class="mt-tight flex flex-wrap gap-tight">{drawn}</ul> }.into_any()
+    view! { <ul class="fui-tiles">{drawn}</ul> }.into_any()
 }
 
 /// What the preview of one code answered.
@@ -1441,7 +1434,7 @@ fn matches_view(answer: &TranslateAnswer, inline: bool) -> AnyView {
         .into_any()
     };
     view! {
-        <div class="mt-default grid gap-tight">
+        <div class="fui-stack fui-gap-tight">
             <p class=styles::MUTED>{source}</p>
             <p class=styles::MUTED>{result} " " {message}</p>
             {table}
@@ -1626,9 +1619,9 @@ fn save_section(
                 </h2>
                 <p class="fui-muted">{tr(Msg::UpdateStatesVersionReplacesSoChange)}</p>
                 <Show when=move || !problems.read().is_empty() fallback=|| ()>
-                    <ul class=format!("mt-default grid gap-tight {}", styles::MUTED)>{listed}</ul>
+                    <ul class=format!("fui-divided {}", styles::MUTED)>{listed}</ul>
                 </Show>
-                <p class="mt-default">
+                <p>
                     <button
                         type="button"
                         class=styles::SUBMIT

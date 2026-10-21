@@ -23,6 +23,7 @@ use ferrohealth_ui::table::view::{
     ACTIONS, Body, Column as TableColumn, DataTable, Listing, data_table, link_pager,
 };
 use ferrohealth_ui::tone::Tone;
+use ferrohealth_ui::view::button::Variant;
 use ferrohealth_ui::view::empty::empty_quiet;
 use ferrohealth_ui::view::status::badge;
 use ferrohealth_ui::view::surface::chip;
@@ -357,12 +358,8 @@ fn system_row(card: &SystemCard, version: Signal<FhirVersion>, name: Option<&str
     view! {
         <tr>
             <td>{system_cell(card, version, name)}</td>
-            <td data-label=tr(Msg::Versions) class="sm:whitespace-nowrap">
-                {versions_cell(&card.versions)}
-            </td>
-            <td data-label=tr(Msg::Content) class="sm:whitespace-nowrap">
-                {word_cell(card.content.clone())}
-            </td>
+            <td data-label=tr(Msg::Versions)>{versions_cell(&card.versions)}</td>
+            <td data-label=tr(Msg::Content)>{word_cell(card.content.clone())}</td>
             <td data-label=tr(Msg::Subsumes)>{yes_no_cell(card.subsumption)}</td>
             <td data-label=tr(Msg::ReadFrom)>{artifact_cell(artifact.as_ref())}</td>
             <td data-label=tr(Msg::Actions) class=ACTIONS>
@@ -394,15 +391,20 @@ fn tools_cell(card: &SystemCard, version: Signal<FhirVersion>) -> AnyView {
         let system = card.url.clone();
         let code = code.clone();
         let href = move || system_tool_link(path, &system, code.as_deref(), version.get());
-        view! { <a href=href>{label}</a> }.into_any()
+        view! {
+            <a href=href class=Variant::Secondary.small()>
+                {label}
+            </a>
+        }
+        .into_any()
     };
     let browse = walkable.then(|| link(BROWSE_PATH, tr(Msg::Browse)));
     // NOTE: no specification governs this: our own design; the screens a row
-    // opens are links of the text's height, so a row stays one line tall.
+    // opens are FerroUI's small row-action links, which keep the row one line tall.
     view! {
-        <span class="inline-flex gap-default">
-            {browse} {link(VALIDATE_PATH, tr(Msg::Validate))}
-        </span>
+        {browse}
+        " "
+        {link(VALIDATE_PATH, tr(Msg::Validate))}
     }
     .into_any()
 }
@@ -424,13 +426,10 @@ fn system_cell(card: &SystemCard, version: Signal<FhirVersion>, name: Option<&st
             // NOTE: no specification governs this: our own design; the name and
             // the canonical share one line, so twenty systems fit one screen.
             view! {
-                <span class="flex flex-col sm:flex-row sm:items-baseline sm:gap-default system-cell">
-                    <a href=href class="shrink-0">
-                        {name}
-                    </a>
-                    <span class="fui-truncate font-normal fui-small fui-muted fui-mono" title=title>
-                        {canonical}
-                    </span>
+                <span class="fui-truncate" title=title>
+                    <a href=href>{name}</a>
+                    " "
+                    <code class="fui-small fui-muted">{canonical}</code>
                 </span>
             }
             .into_any()
@@ -453,19 +452,19 @@ fn versions_cell(versions: &[VersionRow]) -> AnyView {
             let mark = served
                 .is_default
                 .then(|| badge(Tone::Accent, "default").into_any());
-            Some(view! { <span class="inline-flex items-center gap-tight">{chip(code)} {mark}</span> }.into_any())
+            Some(view! { <span class="fui-truncate">{chip(code)} {mark}</span> }.into_any())
         })
         .collect();
     if chips.is_empty() {
         return absent(tr(Msg::ServerDeclaredNoVersionCodeSystem));
     }
-    view! { <div class="inline-flex flex-col gap-tight">{chips}</div> }.into_any()
+    view! { <div class="fui-stack fui-gap-tight">{chips}</div> }.into_any()
 }
 
 /// A word the server stated, or the mark for one it did not.
 fn word_cell(word: Option<String>) -> AnyView {
     match word.filter(|word| !word.is_empty()) {
-        Some(word) => view! { <span>{word}</span> }.into_any(),
+        Some(word) => view! { <span class="fui-truncate">{word}</span> }.into_any(),
         None => absent(tr(Msg::FhirVersionHasNoSuchElement)),
     }
 }
@@ -491,10 +490,10 @@ fn artifact_cell(artifact: Option<&Artifact>) -> AnyView {
     let name = artifact.name.clone();
     let release = artifact.release.clone();
     let release_line =
-        release.map(|release| view! { <span class="block fui-small fui-muted">{release}</span> });
+        release.map(|release| view! { <div class="fui-small fui-muted">{release}</div> });
     match name {
         Some(name) => view! {
-            <span class="block fui-mono">{name}</span>
+            <div class="fui-mono">{name}</div>
             {release_line}
         }
         .into_any(),

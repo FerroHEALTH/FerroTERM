@@ -594,10 +594,7 @@ pub(crate) fn published_row(
     view! {
         <tr>
             <th scope="row">
-                {heading}
-                <span class="fui-truncate font-normal fui-small fui-muted fui-mono">
-                    {canonical}
-                </span>
+                {heading} <span class="fui-truncate fui-small fui-muted fui-mono">{canonical}</span>
             </th>
             <td data-label=tr(Msg::Version)>{version}</td>
             <td data-label=tr(Msg::Status)>{status_pill(published.status)}</td>

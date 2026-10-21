@@ -54,14 +54,11 @@ impl History {
                     let rows: Vec<AnyView> = held
                         .with(|held| held.entries().iter().map(row).collect());
                     view! {
-                        <details class="mt-loose rounded-md border border-edge text-small">
-                            <summary class=format!(
-                                "cursor-pointer px-default py-tight font-medium {}",
-                                styles::MUTED,
-                            )>{tr(Msg::RunsMadePage)}</summary>
-                            <div class="border-t border-edge px-default py-tight">
+                        <details class="fui-disclosure">
+                            <summary>{tr(Msg::RunsMadePage)}</summary>
+                            <div class="fui-stack fui-gap-default">
                                 <p class=styles::HINT>{tr(Msg::EachOneAddressMadeTheyLive)}</p>
-                                <ul class="mt-default grid gap-tight">{rows}</ul>
+                                <ul class="fui-divided">{rows}</ul>
                             </div>
                         </details>
                     }
@@ -80,7 +77,7 @@ fn row(run: &Run) -> AnyView {
     let subject = run.subject.clone();
     view! {
         <li>
-            <a href=address class="flex flex-wrap items-baseline gap-default">
+            <a href=address class="fui-cluster">
                 <span class=styles::LINK>{screen}</span>
                 <span class=styles::CODE_MUTED>{subject}</span>
             </a>

@@ -88,7 +88,7 @@ pub(crate) fn FindPage() -> impl IntoView {
             subject.as_ref().map(|subject| {
                 panel(facts_row(vec![(
                     tr(Msg::WhatYouTyped),
-                    view! { <span class="fui-mono break-all">{subject.typed().to_owned()}</span> }
+                    view! { <span class="fui-mono fui-break">{subject.typed().to_owned()}</span> }
                         .into_any(),
                 )]))
                 .into_any()
@@ -158,8 +158,13 @@ fn offers_view(found: &[Offer]) -> AnyView {
                 offer.label.clone(),
                 view! { <p class="fui-muted">{offer.detail.clone()}</p> },
             );
-            view! { <li class="grid">{card}</li> }.into_any()
+            view! { <div role="listitem">{card}</div> }.into_any()
         })
         .collect();
-    view! { <ul class="fui-grid sm:grid-cols-2 xl:grid-cols-4">{rows}</ul> }.into_any()
+    view! {
+        <div class="fui-grid" role="list">
+            {rows}
+        </div>
+    }
+    .into_any()
 }

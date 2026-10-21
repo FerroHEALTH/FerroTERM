@@ -45,7 +45,7 @@ pub(crate) fn health_indicator() -> impl IntoView {
     // NOTE: no specification governs this: our own design; below 40rem the
     // bar holds the version and the theme on one row, so the status yields.
     view! {
-        <span class="hidden sm:contents">
+        <span class="fui-roomy-only">
             <Reading inline=true label=tr(Msg::CheckingTheServer)>
                 {move || {
                     health

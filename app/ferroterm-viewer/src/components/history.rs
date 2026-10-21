@@ -28,7 +28,7 @@ pub(crate) fn history_offer(
     let address = move || history_link(resource_type, &id.get(), version.get());
     view! {
         <Show when=move || !id.read().trim().is_empty() fallback=|| ()>
-            <p class="mt-default">
+            <p>
                 <a href=address class=styles::LINK>
                     {tr(Msg::HistoryOfThisResource)}
                 </a>

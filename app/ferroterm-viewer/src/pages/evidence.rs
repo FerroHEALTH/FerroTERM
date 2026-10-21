@@ -123,8 +123,9 @@ fn section(
 ) -> AnyView {
     let body = view! {
         <div class="fui-panel-body fui-stack">
-            {lead} <p class="text-title font-medium">{summary}</p> {disclosure(caption, table)}
-            <p class="fui-small fui-muted">{sources}</p>
+            {lead} <p>
+                <strong>{summary}</strong>
+            </p> {disclosure(caption, table)} <p class="fui-small fui-muted">{sources}</p>
         </div>
     };
     view! { <div id=id>{titled_panel(title, (), body)}</div> }.into_any()
@@ -151,12 +152,12 @@ fn conformance_section(conformance: Conformance) -> AnyView {
                         {mode.ran}
                     </td>
                     <td data-label=tr(Msg::Share)>
-                        <div class="grid gap-tight">
-                            <span class="tabular-nums">{share} "%"</span>
+                        <div class="fui-stack fui-gap-tight">
+                            <span>{share} "%"</span>
                             {proportion(u8::try_from(share.min(100)).unwrap_or(100), None)}
                         </div>
                     </td>
-                    <td data-label=tr(Msg::From) class="fui-mono fui-small fui-muted break-all">
+                    <td data-label=tr(Msg::From) class="fui-mono fui-small fui-muted fui-break">
                         {mode.source}
                     </td>
                 </tr>
@@ -216,16 +217,12 @@ fn latency_section(latency: Latency) -> AnyView {
                         {tr(Msg::S)}
                     </td>
                     <td data-label=tr(Msg::Measured)>
-                        <div class="grid gap-tight">
-                            <span class="tabular-nums whitespace-nowrap">
-                                {bar.measured_us} " µs"
-                            </span>
+                        <div class="fui-stack fui-gap-tight">
+                            <span>{bar.measured_us} "\u{a0}µs"</span>
                             {proportion(u8::try_from(width).unwrap_or(100), None)}
                         </div>
                     </td>
-                    <td data-label=tr(Msg::Room) class="whitespace-nowrap">
-                        {headroom}
-                    </td>
+                    <td data-label=tr(Msg::Room)>{headroom}</td>
                     <td data-label=tr(Msg::WhatTheBarClaims)>{bar.claim}</td>
                 </tr>
             }
@@ -285,7 +282,7 @@ fn system_view(system: &SystemRun) -> AnyView {
     let release = system
         .release
         .map_or_else(|| tr(Msg::BuiltOutsideThisRun), str::to_owned);
-    let mono = |text: String| view! { <span class="fui-mono break-all">{text}</span> }.into_any();
+    let mono = |text: String| view! { <span class="fui-mono fui-break">{text}</span> }.into_any();
     let facts = definitions(vec![
         (tr(Msg::Concepts), system.concepts.into_any()),
         (tr(Msg::OfflineBuild), ingest.into_any()),
@@ -311,7 +308,7 @@ fn system_view(system: &SystemRun) -> AnyView {
     let title = format!("{} {}", system.system, system.system_version);
     let body = view! {
         <div class="fui-panel-body fui-stack">
-            <p class="fui-mono fui-small fui-muted break-all">{system.system_uri}</p>
+            <p class="fui-mono fui-small fui-muted fui-break">{system.system_uri}</p>
             {facts}
         </div>
         {timings_view(system)}

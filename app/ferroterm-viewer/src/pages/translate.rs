@@ -659,7 +659,7 @@ fn match_row(found: &TranslationMatch) -> AnyView {
     .map(|(label, value)| {
         (
             label,
-            view! { <span class="wrap-break-word">{value}</span> }.into_any(),
+            view! { <span class="fui-break">{value}</span> }.into_any(),
         )
     })
     .collect();
@@ -689,8 +689,8 @@ fn coding_cell(coding: &Coding) -> AnyView {
         .unwrap_or_default();
     view! {
         <span class="fui-mono">{coding.code.clone().unwrap_or_default()}</span>
-        <span class="block">{coding.display.clone().unwrap_or_default()}</span>
-        <span class="block font-normal fui-small fui-muted fui-mono sm:whitespace-nowrap">
+        <div>{coding.display.clone().unwrap_or_default()}</div>
+        <span class="fui-small fui-muted fui-mono">
             {coding.system.clone().unwrap_or_default()} {version}
         </span>
     }
@@ -710,7 +710,7 @@ fn values_view(label: String, values: &[NamedValue]) -> AnyView {
                 crate::components::stated,
             );
             view! {
-                <span class="break-all">
+                <span class="fui-break">
                     <span class="fui-mono">{value.name.clone()}</span>
                     ": "
                     {rendered}

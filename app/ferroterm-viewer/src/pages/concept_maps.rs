@@ -184,7 +184,7 @@ fn search_form(params: Signal<ListParams>, version: Signal<FhirVersion>) -> AnyV
 fn failure_view(error: &FhirError) -> AnyView {
     let error = error.clone();
     view! {
-        <div class="mt-default">
+        <div>
             <Failure error=Signal::stored(error) />
         </div>
     }

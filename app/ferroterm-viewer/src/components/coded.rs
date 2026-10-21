@@ -214,7 +214,7 @@ pub(crate) fn coded_control(
         styles::LABEL
     };
     view! {
-        <div class="grid gap-tight">
+        <div class="fui-field">
             <label for=move || named.with_value(Clone::clone) class=label_class>
                 {move || label.get()}
             </label>

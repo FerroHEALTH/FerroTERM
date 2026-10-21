@@ -476,7 +476,7 @@ fn root_section(
                         } else {
                             let target = system_link(&params.system, version.get());
                             view! {
-                                <p class="fui-mono break-all">
+                                <p class="fui-mono fui-break">
                                     <a href=target>{params.system.clone()}</a>
                                 </p>
                             }
@@ -1131,7 +1131,7 @@ fn validation_view(read: &Validation) -> AnyView {
         value.map(|value| {
             (
                 label,
-                view! { <span class="break-all">{value}</span> }.into_any(),
+                view! { <span class="fui-break">{value}</span> }.into_any(),
             )
         })
     })
@@ -1171,7 +1171,7 @@ fn concept_view(read: &Validation) -> AnyView {
                 .clone()
                 .map(|version| tr_with(Msg::Version9, &[("version", (version).clone().into())]))
                 .unwrap_or_default();
-            view! { <span class="fui-mono break-all">{Coding::rendered(coding)} {version}</span> }
+            view! { <span class="fui-mono fui-break">{Coding::rendered(coding)} {version}</span> }
                 .into_any()
         })
         .collect();
