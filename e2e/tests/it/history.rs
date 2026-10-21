@@ -362,17 +362,18 @@ async fn the_comparison_runs_from_the_keyboard_alone() {
                 .count_becoming(By::XPath(VERSION_ROWS), 2, "both versions")
                 .await;
 
-            // A closed select moves its selection with the arrow keys, so the
-            // walk down the options is the keyboard's own way to choose one.
-            let down = TypingData::from(Key::Down).to_string();
+            // A closed select chooses the option whose label starts with the
+            // typed letter, and the same letter again moves to the next such
+            // option. That holds on every platform, where an arrow key on macOS
+            // opens the native picker instead of moving the selection.
             journey
                 .tab_to("history-from", "the earlier version control")
                 .await;
-            journey.type_here(&down).await?;
+            journey.type_here("v").await?;
             journey
                 .tab_to("history-to", "the later version control")
                 .await;
-            journey.type_here(&down.repeat(2)).await?;
+            journey.type_here("vv").await?;
             journey
                 .tab_to("Compare these versions", "the control that compares")
                 .await;
