@@ -811,7 +811,7 @@ mod tests {
             SearchFilter::default(),
             "nothing was asked for, so nothing narrows the search"
         );
-        assert!(params.id.is_empty());
+        assert_eq!(params.id, "");
     }
 
     #[test]

@@ -93,7 +93,7 @@ fn the_environment_fills_the_config() {
     let config = Config::default();
     assert_eq!(config.listen, "127.0.0.1:8080");
     assert_eq!(config.default_language, "en");
-    assert!(config.index.is_empty());
+    assert_eq!(config.index, Vec::<std::path::PathBuf>::new());
 }
 
 #[test]

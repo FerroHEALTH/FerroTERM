@@ -140,13 +140,19 @@ fn lookup_naming_other_properties_only_leaves_the_designations_out() {
     let outcome = lookup(&registry, &Invocation::Type, &input).expect("looks up");
     let codes: Vec<&str> = outcome.properties.iter().map(|p| p.code.as_str()).collect();
     assert_eq!(codes, ["legs"]);
-    assert!(outcome.designations.is_empty());
+    assert_eq!(
+        outcome.designations,
+        Vec::<fhir_terminology::provider::Designation>::new()
+    );
     let input = LookupInput {
         properties: vec![String::from("designation")],
         ..input
     };
     let outcome = lookup(&registry, &Invocation::Type, &input).expect("looks up");
-    assert!(outcome.properties.is_empty());
+    assert_eq!(
+        outcome.properties,
+        Vec::<fhir_terminology::provider::Property>::new()
+    );
     assert_eq!(outcome.designations.len(), 2);
 }
 
@@ -713,5 +719,8 @@ fn validate_code_itemises_its_issues() {
         },
     )
     .expect("validates");
-    assert!(valid.issues.is_empty());
+    assert_eq!(
+        valid.issues,
+        Vec::<fhir_terminology::operations::Issue>::new()
+    );
 }

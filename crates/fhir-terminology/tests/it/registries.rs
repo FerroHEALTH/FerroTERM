@@ -406,7 +406,7 @@ fn bcp47_subsumes_language_tags_by_extended_filtering() {
 fn iso3166_is_a_case_insensitive_table_with_user_assigned_codes() {
     let provider = iso3166::provider().expect("cldr data");
     assert_eq!(provider.identity().url, iso3166::URL);
-    assert!(!provider.identity().version.is_empty());
+    assert_ne!(provider.identity().version, "");
     let nl = provider.locate("nl").expect("reads").expect("NL");
     assert_eq!(nl.code, "NL");
     assert_eq!(
@@ -671,12 +671,9 @@ fn a_filtered_media_type_expansion_is_unclosed_and_an_enumerated_one_is_not() {
         "the codes an include lists are its members"
     );
     let rendered = fhir_terminology::valueset::render::r4b::expansion(&outcome);
-    assert!(
-        rendered
-            .expansion
-            .expect("an expansion")
-            .extension
-            .is_empty()
+    assert_eq!(
+        rendered.expansion.expect("an expansion").extension,
+        Vec::<fhir_types::r4b::extension::Extension>::new()
     );
 }
 

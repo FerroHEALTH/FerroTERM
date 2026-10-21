@@ -832,10 +832,10 @@ impl<'a> Expander<'a> {
         };
         let mut selected = if include.concepts.is_empty() {
             let unclosed = provider.unclosed(&include.filters);
-            let stated = provider.filter_ordered(&include.filters).map_err(&failed)?;
+            let stated = provider.filter_ordered(&include.filters).map_err(failed)?;
             let set = match &stated {
                 Some(order) => order.iter().copied().collect(),
-                None => provider.filter_all(&include.filters).map_err(&failed)?,
+                None => provider.filter_all(&include.filters).map_err(failed)?,
             };
             Selected {
                 set,
@@ -884,7 +884,7 @@ impl<'a> Expander<'a> {
         let mut stated: Vec<u32> = Vec::new();
         let mut set = ConceptSet::new();
         for concept in &include.concepts {
-            let Some(located) = provider.locate(&concept.code).map_err(&failed)? else {
+            let Some(located) = provider.locate(&concept.code).map_err(failed)? else {
                 continue;
             };
             if options.exclude_post_coordinated && provider.is_postcoordinated(located.concept) {
@@ -950,7 +950,7 @@ fn drop_inactive(url: &str, selection: &mut Selection) -> Result<(), ComposeErro
         if !selection
             .provider
             .status(Concept::new(index))
-            .map_err(&failed)?
+            .map_err(failed)?
             .active
         {
             inactive.insert(index);
@@ -982,7 +982,7 @@ fn drop_not_for_ui(url: &str, selection: &mut Selection) -> Result<(), ComposeEr
         if selection
             .provider
             .status(Concept::new(index))
-            .map_err(&failed)?
+            .map_err(failed)?
             .abstract_concept
         {
             abstract_concepts.insert(index);
@@ -1111,7 +1111,7 @@ fn materialize(
         Some(spelling) => spelling.clone(),
         None => provider
             .code(concept)
-            .map_err(&failed)?
+            .map_err(failed)?
             .unwrap_or_else(|| index.to_string()),
     };
     let requested = options.language.as_deref();
@@ -1121,19 +1121,19 @@ fn materialize(
         let asked = language::for_provider(provider.as_ref(), requested);
         let shown = provider
             .display(concept, asked.as_deref())
-            .map_err(&failed)?;
+            .map_err(failed)?;
         // NOTE: a request refusing every language it does not name has no
         // display to answer with here, so the item carries none
         // (<https://www.rfc-editor.org/rfc/rfc9110#field.accept-language>).
         if language::refuses_unnamed(requested)
-            && !acceptable_display(provider.as_ref(), concept, requested).map_err(&failed)?
+            && !acceptable_display(provider.as_ref(), concept, requested).map_err(failed)?
         {
             None
         } else {
             shown
         }
     };
-    let status = provider.status(concept).map_err(&failed)?;
+    let status = provider.status(concept).map_err(failed)?;
     Ok(Item {
         system: url.to_owned(),
         version: version.to_owned(),

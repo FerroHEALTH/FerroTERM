@@ -491,7 +491,7 @@ mod tests {
     #[test]
     fn two_identical_resources_differ_in_nothing() {
         let held = resource(r#"{"resourceType":"CodeSystem","id":"c","status":"draft"}"#);
-        assert!(differences(&held, &held).is_empty());
+        assert_eq!(differences(&held, &held), Vec::<Difference>::new());
     }
 
     #[test]
@@ -679,7 +679,7 @@ mod tests {
         let held = resource(r#"{"resourceType":"CodeSystem","status":"draft"}"#);
         let unread = Comparison::of(None, Some(&held));
         assert_eq!(unread, Comparison::Unread);
-        assert!(unread.rows().is_empty());
+        assert_eq!(unread.rows(), []);
         assert!(
             unread.sentence().contains("nothing to compare"),
             "a deleted version says so rather than agreeing: `{}`",

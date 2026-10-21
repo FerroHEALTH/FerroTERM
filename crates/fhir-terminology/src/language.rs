@@ -200,7 +200,7 @@ mod tests {
         let r = ranges("en, en-AU; q=0.4, de;q=0.8, fr;q=0");
         let tags: Vec<&str> = r.iter().map(|x| x.tag.as_str()).collect();
         assert_eq!(tags, ["en", "de", "en-AU"]);
-        assert!(ranges("").is_empty());
+        assert_eq!(ranges(""), Vec::<crate::language::Range>::new());
     }
 
     #[test]

@@ -530,6 +530,6 @@ mod tests {
         let comparison = compare(&answers);
         assert_eq!(comparison.columns[0].state, "not read");
         assert_eq!(row(&comparison.facts, "Software").cells, [Cell::Unread]);
-        assert!(notes(&RootAnswer::Unread).is_empty());
+        assert_eq!(notes(&RootAnswer::Unread), Vec::<(String, String)>::new());
     }
 }

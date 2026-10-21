@@ -183,9 +183,9 @@ mod tests {
         assert_eq!(csr.nodes(), 4);
         assert_eq!(csr.edges(), 3);
         assert_eq!(csr.neighbours(o(0)), &[1, 3]);
-        assert!(csr.neighbours(o(1)).is_empty());
+        assert_eq!(csr.neighbours(o(1)), []);
         assert_eq!(csr.neighbours(o(2)), &[1]);
-        assert!(csr.neighbours(o(9)).is_empty());
+        assert_eq!(csr.neighbours(o(9)), []);
         assert_eq!(csr.offsets(), &[0, 2, 2, 3, 3]);
     }
 
@@ -195,7 +195,7 @@ mod tests {
         let back = csr.transpose().expect("transposes");
         assert_eq!(back.neighbours(o(2)), &[0, 1]);
         assert_eq!(back.neighbours(o(1)), &[0]);
-        assert!(back.neighbours(o(0)).is_empty());
+        assert_eq!(back.neighbours(o(0)), []);
         assert_eq!(back.transpose().expect("transposes"), csr);
     }
 

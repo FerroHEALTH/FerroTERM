@@ -256,7 +256,7 @@ mod tests {
     #[test]
     fn the_vendored_registry_parses_with_every_kind() {
         let registry = &*REGISTRY_DATA;
-        assert!(!registry.file_date.is_empty());
+        assert_ne!(registry.file_date, "");
         assert_eq!(
             registry
                 .get(Kind::Language, "EN")

@@ -160,8 +160,8 @@ mod tests {
     #[test]
     fn a_record_with_no_revalidation_carries_no_findings() {
         let empty: Value = serde_json::from_str(r#"{"id":"x"}"#).expect("the fixture parses");
-        assert!(findings_of(&empty).is_empty());
-        assert!(findings_of(&Value::Null).is_empty());
+        assert_eq!(findings_of(&empty), Vec::<Finding>::new());
+        assert_eq!(findings_of(&Value::Null), Vec::<Finding>::new());
     }
 
     #[test]
@@ -198,7 +198,7 @@ mod tests {
             names_of("ConceptMap", "m1", "   "),
             vec![String::from("ConceptMap/m1")]
         );
-        assert!(names_of("ConceptMap", "", "").is_empty());
+        assert_eq!(names_of("ConceptMap", "", ""), Vec::<String>::new());
     }
 
     #[test]

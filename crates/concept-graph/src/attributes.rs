@@ -565,7 +565,7 @@ mod tests {
         assert_eq!(cat[0].value, ValueRef::Concept(Ordinal::new(3)));
         assert_eq!(cat[1].value, ValueRef::Number("4"));
         assert_eq!(attributes.sources(0, Ordinal::new(3)), [1, 2]);
-        assert!(attributes.sources(1, Ordinal::new(3)).is_empty());
+        assert_eq!(attributes.sources(1, Ordinal::new(3)), []);
         assert_eq!(attributes.targets_of_kind(0), [3]);
         assert_eq!(
             attributes

@@ -492,7 +492,7 @@ mod tests {
             !bases.contains(&String::from("https://tx.example.org")),
             "the root serves no FHIR base: {bases:?}"
         );
-        assert!(version_bases(None).is_empty());
+        assert_eq!(version_bases(None), Vec::<String>::new());
     }
 
     // A base URL with a trailing slash would otherwise double the separator
@@ -508,7 +508,7 @@ mod tests {
 
     #[test]
     fn the_writes_and_the_admin_listener_are_the_guarded_surfaces() {
-        assert!(guarded_surfaces(&Config::default()).is_empty());
+        assert_eq!(guarded_surfaces(&Config::default()), Vec::<&str>::new());
         let both = Config {
             resources: Some(std::path::PathBuf::from("resources.redb")),
             admin_listen: Some(String::from("127.0.0.1:8081")),

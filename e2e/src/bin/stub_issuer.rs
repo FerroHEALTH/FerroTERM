@@ -960,6 +960,6 @@ mod tests {
     #[test]
     fn a_scope_this_issuer_does_not_grant_is_dropped() {
         let asked = vec![String::from("system/CodeSystem.cud")];
-        assert!(keep(&asked, &["openid"]).is_empty());
+        assert_eq!(keep(&asked, &["openid"]), Vec::<String>::new());
     }
 }

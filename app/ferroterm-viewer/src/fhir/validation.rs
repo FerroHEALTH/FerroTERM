@@ -844,7 +844,7 @@ mod tests {
     #[test]
     fn an_answer_with_no_issues_reads_as_an_empty_list_rather_than_a_failure() {
         let read = parse(r#"{"parameter":[{"name":"result","valueBoolean":true}]}"#).validation();
-        assert!(read.issues.is_empty());
+        assert_eq!(read.issues, Vec::<ValidationIssue>::new());
         assert_eq!(
             read.sentence(),
             "The server answered result true: the code is valid."

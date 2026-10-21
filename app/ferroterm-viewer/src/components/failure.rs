@@ -114,7 +114,10 @@ mod tests {
             message: String::from("connection refused"),
         });
         assert_eq!(None, refused.status);
-        assert!(refused.issues.is_empty());
+        assert_eq!(
+            refused.issues,
+            Vec::<ferrohealth_ui::view::refusal::Issue>::new()
+        );
         assert_eq!(Some("http://x/health"), refused.request.as_deref());
         assert_eq!(Some("connection refused"), refused.evidence.as_deref());
     }

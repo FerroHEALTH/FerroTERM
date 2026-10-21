@@ -403,7 +403,7 @@ mod tests {
             ["url", "title"],
             "an empty name is a slip, not a request for an element with no name"
         );
-        assert!(requested("").is_empty());
+        assert_eq!(requested(""), Vec::<String>::new());
     }
 
     #[test]

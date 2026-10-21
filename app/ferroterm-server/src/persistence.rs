@@ -699,7 +699,7 @@ mod tests {
         let path = dir.path().join("resources.redb");
         {
             let store = ResourceStore::open(&path).expect("opens");
-            assert!(store.all().expect("reads").is_empty());
+            assert_eq!(store.all().expect("reads"), Vec::<Record>::new());
             store.put(&record("pets", 1)).expect("writes");
             store.put(&record("colours", 1)).expect("writes");
         }

@@ -285,7 +285,7 @@ mod tests {
 
     #[test]
     fn an_empty_answer_offers_nothing() {
-        assert!(NamedSearch::default().choices().is_empty());
+        assert_eq!(NamedSearch::default().choices(), Vec::<Choice>::new());
         assert!(NamedSearch::default().names().is_empty());
     }
 }
