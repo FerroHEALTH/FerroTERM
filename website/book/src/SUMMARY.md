@@ -15,6 +15,8 @@
 - [Benchmarks](evaluate/benchmarks.md)
 - [Conformance](evaluate/conformance.md)
 - [Licensing](evaluate/licensing.md)
+- [CRA risk assessment](evaluate/cra-risk-assessment.md)
+- [CRA information for users](evaluate/cra-user-information.md)
 
 # Operate
 
