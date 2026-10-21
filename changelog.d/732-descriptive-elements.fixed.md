@@ -1,0 +1,1 @@
+- A `CodeSystem` or `ConceptMap` loaded from a resource keeps its `publisher`, `description`, `date` and (for a `ConceptMap`) `experimental` on a read and a search, on every served FHIR version, where the server used to drop them.

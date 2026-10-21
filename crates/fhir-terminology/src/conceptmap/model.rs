@@ -237,6 +237,14 @@ pub struct ConceptMapModel {
     pub title: Option<String>,
     /// `status`.
     pub status: String,
+    /// `experimental`, when stated.
+    pub experimental: Option<bool>,
+    /// `date`: when the resource last changed.
+    pub date: Option<String>,
+    /// `publisher`.
+    pub publisher: Option<String>,
+    /// `description`, as the Markdown it was written in.
+    pub description: Option<String>,
     /// `source[x]` (R4) / `sourceScope[x]` (R5): the source value set.
     pub source_scope: Option<String>,
     /// `target[x]` (R4) / `targetScope[x]` (R5): the target value set.

@@ -167,6 +167,15 @@ macro_rules! convert_concept_map {
                     name: text(resource.name.as_ref().and_then(|v| v.value.as_deref())),
                     title: text(resource.title.as_ref().and_then(|v| v.value.as_deref())),
                     status: text(resource.status.value.as_deref()).unwrap_or_default(),
+                    experimental: resource.experimental.as_ref().and_then(|b| b.value),
+                    date: text(resource.date.as_ref().and_then(|d| d.value.as_deref())),
+                    publisher: text(resource.publisher.as_ref().and_then(|p| p.value.as_deref())),
+                    description: text(
+                        resource
+                            .description
+                            .as_ref()
+                            .and_then(|d| d.value.as_deref()),
+                    ),
                     source_scope: resource.source.as_ref().and_then(|s| match s {
                         ConceptMapSource::Uri(u) => scope_uri(u.value.as_deref()),
                         ConceptMapSource::Canonical(c) => scope_uri(c.value.as_deref()),
@@ -327,6 +336,15 @@ macro_rules! convert_concept_map {
                     name: text(resource.name.as_ref().and_then(|v| v.value.as_deref())),
                     title: text(resource.title.as_ref().and_then(|v| v.value.as_deref())),
                     status: text(resource.status.value.as_deref()).unwrap_or_default(),
+                    experimental: resource.experimental.as_ref().and_then(|b| b.value),
+                    date: text(resource.date.as_ref().and_then(|d| d.value.as_deref())),
+                    publisher: text(resource.publisher.as_ref().and_then(|p| p.value.as_deref())),
+                    description: text(
+                        resource
+                            .description
+                            .as_ref()
+                            .and_then(|d| d.value.as_deref()),
+                    ),
                     source_scope: resource.source_scope.as_ref().and_then(|s| match s {
                         ConceptMapSourceScope::Uri(u) => text(u.value.as_deref()),
                         ConceptMapSourceScope::Canonical(c) => text(c.value.as_deref()),

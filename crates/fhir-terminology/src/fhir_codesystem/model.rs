@@ -51,6 +51,12 @@ pub struct CodeSystemModel {
     pub status: String,
     /// `CodeSystem.experimental`, when stated.
     pub experimental: Option<bool>,
+    /// `CodeSystem.date`: when the resource last changed.
+    pub date: Option<String>,
+    /// `CodeSystem.publisher`.
+    pub publisher: Option<String>,
+    /// `CodeSystem.description`, as the Markdown it was written in.
+    pub description: Option<String>,
     /// The `structuredefinition-standards-status` extension's code, when set.
     pub standards_status: Option<String>,
     /// `CodeSystem.content`.
@@ -198,6 +204,9 @@ impl CodeSystemModel {
             language: provider.language().map(str::to_owned),
             status: standing.status,
             experimental: Some(standing.experimental),
+            date: None,
+            publisher: None,
+            description: None,
             standards_status: standing.standards_status,
             content: declaration.content,
             case_sensitive: declaration.case_sensitive,

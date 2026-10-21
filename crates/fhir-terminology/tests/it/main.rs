@@ -28,6 +28,7 @@ mod implicit_forms;
 mod labcodeset;
 mod layering;
 mod loinc;
+mod metadata;
 mod operations;
 mod registries;
 mod registry;

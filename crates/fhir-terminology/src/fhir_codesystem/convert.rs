@@ -270,6 +270,11 @@ macro_rules! convert_code_system {
                     language: text(resource.language.as_ref().and_then(|l| l.value.as_deref())),
                     status: text(resource.status.value.as_deref()).unwrap_or_default(),
                     experimental: resource.experimental.as_ref().and_then(|b| b.value),
+                    date: text(resource.date.as_ref().and_then(|d| d.value.as_deref())),
+                    publisher: text(resource.publisher.as_ref().and_then(|p| p.value.as_deref())),
+                    description: text(
+                        resource.description.as_ref().and_then(|d| d.value.as_deref()),
+                    ),
                     standards_status: resource
                         .extension
                         .iter()
