@@ -104,7 +104,9 @@ pub struct Ferroterm {
     /// beside every request it makes; the base URL when unset.
     pub public_url: Option<String>,
     /// The root of the sync service's admin listener, whose newest run's
-    /// findings the console shows; none when unset.
+    /// findings the console shows; none when unset. The console reads it with
+    /// the signed-in reader's access token, so the reader's token must carry
+    /// the listener's product scope (`__ferroterm.sync` by default).
     pub sync_url: Option<String>,
     /// How long one call to the server may take, in milliseconds.
     pub timeout_ms: u64,

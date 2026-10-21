@@ -1,0 +1,1 @@
+- `ferrohealth-smart` 0.4.1 (#764), a patch release with no API change.

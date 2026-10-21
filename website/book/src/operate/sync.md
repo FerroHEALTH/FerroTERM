@@ -91,6 +91,7 @@ not know is refused at start-up rather than ignored.
 | `timezone` | `UTC` | the zone a daily schedule is read in |
 | `build_command` | `ferroterm-build` | the offline build, on `PATH` or by path |
 | `[server_admin_credentials]` | none | the credential of the reload call (see [below](#the-credential-of-the-reload-call)) |
+| `[auth]` | on, no issuer | the credentials the admin listener admits (see [The admin listener](#the-admin-listener)) |
 
 A `[[source]]` entry names the add-on that reads a service and carries that
 add-on's own block:
@@ -253,17 +254,40 @@ The service binds `listen` and serves six routes:
 | `GET /metrics` | the Prometheus exposition |
 | `GET /health` | `200` while the process is up |
 
-It authenticates nobody, exactly like the server's admin listener. Keep it on
-an internal network, and never publish it. The Compose overlay leaves both
-listeners unpublished, reachable only inside the compose network.
+Every route but `GET /health` requires a credential carrying the product
+scope, `__ferroterm.sync` unless `[auth] product_scope` names another. The
+`[auth]` table is the one the server reads ([Configuration](configuration.md#authentication)):
+an `issuer` and an `audience` for the access tokens it accepts, Basic users
+under `[[auth.basic.users]]`, or both. A refused request answers `401` with a
+challenge naming the realm `ferroterm-sync` (or `[auth] realm`), or `403` for a
+credential without the scope, with a JSON `error` body.
 
-The viewer's history screen reads `GET /runs` and `GET /runs/{id}` to show what
-the last run found about the resource a terminologist has open
-([The viewer](viewer.md)). It is a browser, so it reaches only the address it
-was served from: a deployment that wants those findings on screen maps `/runs`
-on the server's own origin to this listener in the reverse proxy in front of
-it, and keeps the rest of the listener unreachable. A deployment that maps
-nothing shows no findings, which is the default.
+The service refuses to start while `[auth]` admits no credential, unless the
+file says `enabled = false`, which only a network that trusted callers alone
+reach should:
+
+```toml
+[auth]
+issuer = "https://auth.example.org/realms/tx"
+audience = ["ferroterm-sync"]
+
+# or a machine caller with HTTP Basic, the hash an Argon2id PHC string:
+[[auth.basic.users]]
+user = "monitor"
+password_hash_file = "/run/secrets/monitor.phc"
+scopes = ["__ferroterm.sync"]
+```
+
+Keep the listener unpublished whatever `[auth]` says; the Compose overlay
+leaves both listeners reachable only inside the compose network.
+
+The console's history screen reads `GET /runs` and `GET /runs/{id}` to show
+what the last run found about the resource a terminologist has open
+([The console](viewer.md)). The console's own server makes the call, at
+`[ferroterm] sync_url`, with the signed-in reader's access token, so a reader
+sees the findings when the identity provider grants them the product scope
+and lists the sync's audience in the token. A visitor, a reader without the
+scope, or a console with no `sync_url` sees no findings.
 
 `/metrics` carries `ferroterm_sync_runs_total{outcome="ok"|"failed"}`,
 `ferroterm_sync_last_run_timestamp_seconds`,

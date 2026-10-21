@@ -14,7 +14,7 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
 
-use ferrohealth_smart::config::CredentialsSection;
+use ferrohealth_smart::config::{AuthSection, CredentialsSection};
 
 /// How a staged release reaches the served set.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
@@ -104,6 +104,10 @@ pub struct Config {
     /// HTTP Basic with `user` and `password`, or the client credentials grant
     /// under `oauth`; none when the table is empty.
     pub server_admin_credentials: CredentialsSection,
+    /// The credentials the admin listener admits: the issuers whose access
+    /// tokens it accepts, the Basic users, and the product scope every route
+    /// but `GET /health` requires ([`crate::auth`]).
+    pub auth: AuthSection,
     /// The sources a run reads, in the order they are configured.
     pub source: Vec<SourceConfig>,
 }
@@ -127,6 +131,7 @@ impl Default for Config {
             schedule: ScheduleConfig::default(),
             source: Vec::new(),
             server_admin_credentials: CredentialsSection::default(),
+            auth: AuthSection::default(),
         }
     }
 }

@@ -29,8 +29,10 @@ COPY --chmod=0555 dist/${TARGETOS}/${TARGETARCH}/ferroterm-build /usr/local/bin/
 
 # The admin listener carries the manual triggers, the run records, and the
 # metrics. Its default address is loopback, which no container can publish, so
-# the image default is every interface on the documented port. Keep it on an
-# internal network: it authenticates nobody.
+# the image default is every interface on the documented port. Every route but
+# /health requires a credential carrying `__ferroterm.sync`, which [auth] in the
+# configuration file names; keep the listener on an internal network all the
+# same.
 EXPOSE 8181/tcp
 
 # Numeric on purpose: the kubelet cannot resolve a user name against an image

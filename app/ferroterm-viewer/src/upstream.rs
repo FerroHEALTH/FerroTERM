@@ -8,8 +8,9 @@
 //! health route goes to the configured FHIR server, and `/runs` to the
 //! configured sync service's admin listener; any other path is refused
 //! before a request is sent. A signed-in reader's access token rides every
-//! request to the FHIR server as a bearer credential (RFC 6750 §2.1), so a
-//! write is the reader's own and the server decides what it allows; a
+//! request to either as a bearer credential (RFC 6750 §2.1), so a write is
+//! the reader's own and the server decides what it allows, and the sync
+//! service admits the reader whose token carries its product scope; a
 //! visitor's request carries none, as the server's read surface asks for
 //! none. The token never leaves this process. An answer of any status is
 //! handed back as it came, never turned into an empty one. No specification
@@ -115,13 +116,10 @@ pub async fn forward(exchange: Exchange) -> Result<Answer, ExchangeError> {
             joined(base, &exchange.path, target)?
         }
     };
-    let token = match target {
-        Target::Fhir => crate::session::request::access_token().map_err(|error| {
-            tracing::error!(%error, "the session store could not be read");
-            ExchangeError::Sessions
-        })?,
-        Target::Sync => None,
-    };
+    let token = crate::session::request::access_token().map_err(|error| {
+        tracing::error!(%error, "the session store could not be read");
+        ExchangeError::Sessions
+    })?;
     let client = state.upstream();
     let method = match exchange.method {
         Method::Get => reqwest::Method::GET,

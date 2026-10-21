@@ -254,9 +254,13 @@ Where the [synchronisation service](sync.md) is running and the console names
 its admin listener in `[ferroterm] sync_url`, the screen also lists what the
 newest run found about the resource you have open: the codes it names that the
 activated release made inactive, removed, or pushed outside the value set they
-came through. The console's server reads the listener itself, so the listener
-stays on your private network; without `sync_url` the screen does not show the
-section.
+came through. The console's server reads the listener itself, with the
+signed-in reader's access token, so the listener stays on your private network.
+The listener admits a token carrying its product scope, `__ferroterm.sync` by
+default ([The admin listener](sync.md#the-admin-listener)): add it to the
+console's `[oidc] scopes` and have the identity provider grant it to the
+readers who should see the findings. Without `sync_url`, for a visitor, or for
+a reader without the scope, the screen does not show the section.
 
 ## About these screenshots
 

@@ -1235,9 +1235,9 @@ checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 
 [[package]]
 name = "ferrohealth-smart"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ffe8ec80408ba7026bae4480d6e4ea13380e056f4d6a0704c1698e5ef40b14d"
+checksum = "06fa71e7f2cc72e0170c82cfc16571b7b30d6edae73f9a6bf28c4c4c8faa83ea"
 dependencies = [
  "argon2",
  "aws-lc-rs",
@@ -1360,7 +1360,9 @@ version = "0.1.8"
 dependencies = [
  "addon-nts",
  "anyhow",
+ "argon2",
  "axum",
+ "base64 0.23.1",
  "clap",
  "ferrohealth-smart",
  "jiff",
@@ -4376,7 +4378,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
