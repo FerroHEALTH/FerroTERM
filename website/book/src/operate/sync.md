@@ -44,9 +44,25 @@ touched.
 
 ## Running it
 
-The service ships as its own image, carrying `ferroterm-sync` and
+The service runs as its own image, carrying `ferroterm-sync` and
 `ferroterm-build`, and the Compose overlay runs it beside the server over one
-volume:
+volume. No release publishes that image yet (#798), so build it from
+`docker/Dockerfile.sync` first. The file copies the two binaries from a staged
+`dist/linux/<arch>/` tree, built for the musl target of your platform (on
+Linux, with `musl-tools` installed):
+
+```bash
+cargo build --release --locked --target x86_64-unknown-linux-musl \
+  -p ferroterm-sync -p ferroterm-build
+mkdir -p dist/linux/amd64
+cp target/x86_64-unknown-linux-musl/release/ferroterm-sync \
+  target/x86_64-unknown-linux-musl/release/ferroterm-build dist/linux/amd64/
+docker buildx build -f docker/Dockerfile.sync --platform linux/amd64 \
+  -t ghcr.io/ferrohealth/ferroterm-sync:0.1.9 --load .
+```
+
+The tag is the one `compose.sync.yaml` names, so Compose runs the image you
+built:
 
 ```bash
 FERROTERM_SYNC_DATA=/srv/ferroterm FERROTERM_SYNC_CONFIG=/srv/sync.toml \

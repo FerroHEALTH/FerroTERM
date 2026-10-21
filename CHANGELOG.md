@@ -17,6 +17,180 @@ fragments here under the version and its date.
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-10-21
+
+### Changed
+
+- A synchronisation run record counts the entries it left behind only because
+  the subscription does not name them, one count per origin, in place of a
+  line each, and the run summary carries the count as
+  `entries_not_subscribed`; `entries_skipped` now counts only the entries left
+  behind for another reason (#695).
+- Every first-party file opens with the two SPDX lines naming Cadasto B.V. as copyright holder and the file's licence (`BUSL-1.1`, `Apache-2.0` in `rf2`), and two CI guards keep it so: `scripts/checks/spdx-headers.sh` and `scripts/checks/copyright-holder.sh` (#706).
+- The viewer is now the FerroTERM Console, its own binary and image
+  (`ghcr.io/ferrohealth/ferroterm-viewer`), rendered on the server and
+  hydrated, built on the FerroHEALTH component library `ferrohealth-ui`. It
+  reaches the server over the public FHIR API from its own server, adds a
+  dashboard, listings and detail screens for code systems, value sets and
+  concept maps, a `$lookup` screen, and the four operation screens laid out
+  as forms with a result panel. Reading stays open; editing needs a sign-in
+  at the OpenID Provider, which the console's server holds, revoking the
+  token on sign-out where the provider publishes a revocation endpoint. Run
+  it with the quickstart's `viewer` profile (#729).
+- The console draws in FerroUI 0.1.4. Every date-time it shows (a
+  resource's last change, a version's time in its history, the recent
+  changes on the overview, a date-time parameter of an expansion, a property
+  or a translation, and the time a benchmark record was taken) reads as
+  "2026-10-18 23:18:37 UTC" on one line, with the value the server sent in
+  its tooltip. The overview's recent changes no longer cut an instant to the
+  minute in the zone it was written in. A disabled field inside a well keeps
+  its edge in the dark theme, so the value set composer's "Find a code"
+  field shows before a code system is chosen (#742).
+- The console draws in FerroUI 0.1.5. The value set composer's code search
+  in every clause is FerroUI's shared field, so each clause's label names
+  its own search field, with no markup of its own (#745).
+- The console draws in FerroUI 0.1.6, and every field it shows is FerroUI's
+  shared field, so none is built by hand. A checkbox's help line sits under
+  its words and follows the form's help switch, a picker over a canonical
+  or a version is FerroUI's field that switches between the list and a
+  typed value, and the browser's display language, filter and code system
+  fields name their help lines with ids that end in `-help` (#747).
+- The console draws with FerroUI 0.1.7 and is ready for more languages,
+  English the one that ships (#749). The components' words and the console's
+  come from Fluent catalogs, the console's under
+  `app/ferroterm-viewer/locales/`, so a language joins as a catalog file with
+  no code change. The locale is chosen once per request, the best language of
+  `Accept-Language` the console's catalog holds or else the new
+  `[server] locale` (default `en`), and the page writes it as `<html lang>`.
+  `scripts/checks/stray-literals.sh` fails CI on a console string outside the
+  catalog beyond the per-file baseline the remaining strings hold while they
+  move. The review capture waits for the page height to hold before it
+  measures a screen, so the concept browser is shot with its list.
+- The console takes FerroUI 0.2.0 and reads every word it hands FerroUI
+  from its catalog at run time (#749): table captions, column headers,
+  pager nouns with their plurals, navigation, tabs, fields, dialogs and
+  page titles come from `locales/en/ferroterm-viewer.ftl`, and the
+  stray-literal baseline drops from 1388 to 115 literals. English remains
+  the only locale.
+- Only the newest release is supported. `SECURITY.md` says that every
+  earlier release stops receiving fixes when a new one is published, with no
+  maintenance branches, no long-term-support line and no backports, and that
+  upgrading is free. Cadasto B.V. commits to keep publishing security fixes
+  for at least five years after each release (Regulation (EU) 2024/2847
+  Art 13(8)) and ships them only in the newest release (Art 13(10)) (#754).
+- The server checks credentials through the FerroHEALTH resource-server crate
+  `ferrohealth-smart` 0.1.1, and its own issuer, key set and scope code is
+  gone. Authentication is configured by an `[auth]` table, read from the TOML
+  file `FERROTERM_AUTH_FILE` names with `FERROTERM_AUTH__<KEY>` overrides
+  (`FERROTERM_AUTH__ISSUER`, `FERROTERM_AUTH__AUDIENCE`,
+  `FERROTERM_AUTH__ENABLED`, `FERROTERM_AUTH__PRODUCT_SCOPE`, and the rest of
+  the keys the configuration page lists). It is on by default and fails
+  closed: a server that names `FERROTERM_RESOURCES` or
+  `FERROTERM_ADMIN_LISTEN` refuses to start until `[auth]` names an issuer and
+  an audience, or says `enabled = false`. A read-only server starts as before (#762).
+- An audience is required with an issuer (RFC 9068 §4); the write routes still
+  accept every served version's base under `FERROTERM_BASE_URL` beside
+  `[auth] audience`, and the admin listener accepts `[auth] audience` alone (#762).
+- Access tokens are checked under RFC 9068 by default: the `at+jwt` type and
+  the `sub`, `client_id`, `iat` and `jti` claims are required. An issuer that
+  mints plain JWTs is admitted with `[auth] token_profile = "jwt"` (#762).
+- The admin scope is a product scope in the SMART extension form,
+  `[auth] product_scope`, `__ferroterm.admin` when unset; a value that is
+  neither a `__` string nor a full URI refuses the start (#762).
+- Machine callers authenticate with HTTP Basic as an `[[auth.basic.users]]`
+  entry (Argon2id hashes) or with a client credentials token. Several issuers
+  are trusted with `[[auth.issuer]]` (#762).
+- A refusal names no claim and no scope: every invalid token gets the same
+  `401` with `error="invalid_token"` and no `error_description`, a `403` names
+  no missing scope, two `Authorization` headers answer `400`
+  `invalid_request`, and a key set that cannot be read answers `503` (#762).
+- The key set is read again once it is older than ten minutes
+  (`jwks_max_age_seconds`), so a key the issuer withdrew stops verifying (#762).
+- `scopes_supported` in the SMART discovery document lists
+  `[auth] scopes_supported` and no longer republishes the issuer's list (#762).
+- `ferroterm-sync` authenticates `POST /reload` with the credential its new
+  `[server_admin_credentials]` table names: HTTP Basic (`user`, `password` or
+  `password_file`) or the client credentials grant under
+  `[server_admin_credentials.oauth]` (#762).
+- `ferrohealth-smart` 0.4.1 (#764), a patch release with no API change.
+- `ferrohealth-smart` 0.2.0 builds the `.well-known/smart-configuration`
+  document. It still writes `issuer` only where `sso-openid-connect` is
+  claimed, which needs an issuer that lists the `openid` scope. It declares
+  `permission-v1` and `permission-user` and never `permission-patient`. The
+  capabilities follow the crate's order and are no longer sorted, and
+  `token_endpoint_auth_methods_supported` is always present. A refused write
+  still answers an `OperationOutcome` in the format `Accept` asks for; the
+  gate's renderer now reads it (#765).
+- `ferrohealth-smart` 0.3.1. A write route and the admin listener refuse a
+  token whose `sub` is empty or whitespace only (RFC 9068 §2.2, RFC 7519
+  §4.1.2) and a bearer value outside the RFC 6750 §2.1 `b64token` syntax,
+  each with the generic `401 invalid_token` and no `error_description` (#767).
+- `ferrohealth-smart` 0.4.0 (#771). The sync service's
+  `server_admin_credentials.oauth` table takes the keys the crate adds:
+  `client_auth = "tls_client_auth"` or `"self_signed_tls_client_auth"` with
+  `client_certificate_file` and `client_key_file` for RFC 8705 §2 mutual TLS
+  to the token endpoint, `ca_file` for trust roots added to the built-in
+  ones, and `assertion_audience = "issuer"` for a `private_key_jwt`
+  assertion that names the issuer (RFC 7523 §3) in place of the token
+  endpoint.
+- The workspace builds with Rust 1.99.1 in place of 1.98.0, and the MSRV
+  stays at 1.98: the FerroHEALTH family builds with the latest stable
+  toolchain and declares the release before it as its MSRV. The crate line
+  moves to 0.1.119 with no API change (#773).
+
+### Removed
+
+- The terminology server no longer serves a user interface: `/ui` and the
+  `FERROTERM_UI` switch are gone, and the server image carries no viewer
+  bundle (#729).
+- The usage report's FerroTERM `status` no longer carries `viewer`, which was
+  false on every report since the server stopped serving a user interface
+  (#736).
+- `FERROTERM_OIDC_ISSUER`, `FERROTERM_OIDC_AUDIENCE` and
+  `FERROTERM_OIDC_ADMIN_SCOPE` are gone; `[auth] issuer`, `[auth] audience`
+  and `[auth] product_scope` replace them. The default admin scope
+  `ferroterm/admin` is now `__ferroterm.admin` (#762).
+
+### Fixed
+
+- A `CodeSystem` or `ConceptMap` loaded from a resource keeps its `publisher`, `description`, `date` and (for a `ConceptMap`) `experimental` on a read and a search, on every served FHIR version, where the server used to drop them (#732).
+- On a phone the value set composer's code search puts its label above the
+  field and the Search button on its own line below it, where the field used
+  to narrow beside the button until its label wrapped (#740).
+- The code system and concept map editors and the value set composer name
+  their mode in the header and the page title (#756): "New code system",
+  "New concept map" or "New value set" when they create, "Edit <name>" when
+  they edit.
+- An editor table with no rows draws FerroUI's shared empty state in place
+  of a bare header row (#757).
+- Two console source files carry their SPDX header (#760).
+- The compose `build` service writes onto the host index directory with no
+  `--out`: `docker compose run --rm build --loinc /releases/Loinc_2.83.zip`
+  builds into `./index/loinc`. A relative `--out` used to land in the
+  container's own filesystem, which `--rm` discarded after the build reported
+  success. `ferroterm-build` takes `--index-root` (`FERROTERM_INDEX_ROOT`,
+  which the service sets to `/data/index`): without `--out` it writes a child
+  of the root named for the source, it refuses an `--out` outside the root,
+  and every build prints the absolute path it wrote. The book's Install and
+  run page walks through the LOINC build, serving, and a `$lookup` check with
+  the host and container paths named, and lists the command for every other
+  source (#769).
+
+### Security
+
+- A token minted for any audience of the issuer no longer passes a server that
+  names no audience: the start is refused instead (#751) (#762).
+- An invalid token's refusal no longer quotes the token's `kid` or the
+  issuer's error text in `error_description` (#752) (#762).
+- The synchronisation service's admin listener requires a credential carrying
+  `__ferroterm.sync` (or `[auth] product_scope`) on every route but
+  `GET /health`, through `ferrohealth-smart`, and refuses to start while its
+  `[auth]` table admits no credential, unless it says `enabled = false` (#764).
+  The console reads the run list with the signed-in reader's access token.
+- `rustls-webpki` 0.103.16 and `webpki-root-certs` 1.0.10 in the lock, past
+  RUSTSEC-2026-0382 and RUSTSEC-2026-0383 (certificate paths through the
+  distrusted emSign intermediates) (#771).
+
 ## [0.1.8] - 2026-10-16
 
 ### Added
@@ -1608,7 +1782,8 @@ binary answers `GET /health` only.
 - No existing Rust terminology or FHIR crate is a dependency; the README
   records the evaluation and the reasons.
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.9...HEAD
+[0.1.9]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.5...v0.1.6

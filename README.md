@@ -34,7 +34,7 @@ The image serves UCUM, BCP 47, BCP 13, and ISO 3166-1 with no configuration,
 so the first call needs nothing beyond Docker:
 
 ```console
-$ docker run --rm -p 8080:8080 ghcr.io/ferrohealth/ferroterm:0.1.8
+$ docker run --rm -p 8080:8080 ghcr.io/ferrohealth/ferroterm:0.1.9
 $ curl 'http://localhost:8080/r4b/CodeSystem/$lookup?system=http://unitsofmeasure.org&code=mg/dL'
 ```
 
@@ -178,20 +178,14 @@ Every route answers FHIR JSON or FHIR XML, by `_format` or `Accept`.
 
 ## What is next
 
-v0.1.8 is the current release. The tracker's milestones are the roadmap, and
+v0.1.9 is the current release. The tracker's milestones are the roadmap, and
 the open issues under each are the worklist:
 
-- **[v0.1.9](https://github.com/FerroHEALTH/FerroTERM/milestone/23)**: the
-  rest of the FerroHEALTH organisation setup with both SPDX lines on every
-  first-party file, the sync service's admin listener behind
-  `ferrohealth-smart`, a shorter sync run record, the descriptive elements a
-  loaded `CodeSystem` and `ConceptMap` keep, the documentation narrowed to
-  FerroTERM's own with the family book linked for the rest, and fixes to the
-  browser journeys and the release tooling.
 - **[v0.2.0](https://github.com/FerroHEALTH/FerroTERM/milestone/24)**: the
   console on FerroUI's own layout components without the Tailwind CLI, the
-  locale catalog, the WebAssembly headroom, and the benchmark record set
-  retaken after the memory change.
+  locale catalog, the WebAssembly headroom, FerroTERM's own CRA risk
+  assessment and user information, the SonarQube Cloud triage, and the
+  benchmark record set retaken after the memory change.
 - **[v0.3.0](https://github.com/FerroHEALTH/FerroTERM/milestone/16)**: the
   work that waits on outside access or an upstream release: the differential
   check against the Nictiz Nationale Terminologieserver, the NHG tables once
