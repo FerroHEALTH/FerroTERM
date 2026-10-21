@@ -454,9 +454,6 @@ fn status_of(serving: &Serving) -> Status {
     Status::new(
         !families.is_empty(),
         families,
-        // NOTE: no specification governs this: our own design; the console is its own
-        // binary now (app/ferroterm-viewer), so this server never mounts a viewer.
-        false,
         state.persists(),
     )
 }
