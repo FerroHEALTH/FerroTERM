@@ -13,6 +13,10 @@ editing `CHANGELOG.md`, so two pull requests never touch the same lines.
   list items that open with `- ` and continue on lines indented by two spaces,
   with no heading and no blank line inside. A fragment carries no SPDX header:
   its text moves into `CHANGELOG.md`, which carries the header.
+- **Issue reference:** the cut ends the first paragraph of each entry with
+  `(#<issue>)`, the number the file name starts with, unless the entry already
+  names that issue, so the release notes link every entry to its issue
+  without the fragment spelling it out.
 
 `scripts/release/changelog.sh --check` validates every fragment, and CI runs it.
 The release cut runs `scripts/release/changelog.sh --assemble <version> <date>`,

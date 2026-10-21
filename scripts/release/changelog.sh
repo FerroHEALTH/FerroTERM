@@ -159,7 +159,7 @@ assemble() {
         [[ -e "$file" ]] || continue
         git ls-files --error-unmatch -- "$file" > /dev/null 2>&1 || die "$file is not tracked by git; commit it before the cut"
         fragments+=("$file")
-        trim "$file"
+        trim "$file" | name_issue "$file"
       done
     } > "$work/new.$section"
     [[ ! -s "$work/new.$section" ]] || entries=$((entries + 1))
@@ -210,6 +210,40 @@ trim() {
   ' "$file"
 }
 
+# name_issue FILE: the entries on stdin, each ending its first paragraph with
+# the issue the fragment's file name starts with, `(#NNN)`, unless the entry
+# already names that issue. A trailing full stop stays last.
+name_issue() {
+  local issue
+  issue="$(basename "$1")"
+  issue="${issue%%-*}"
+  awk -v issue="$issue" '
+    function flush(   i) {
+      if (count == 0) return
+      if (!named) {
+        if (lines[last] ~ /\.$/) {
+          lines[last] = substr(lines[last], 1, length(lines[last]) - 1) " (#" issue ")."
+        } else {
+          lines[last] = lines[last] " (#" issue ")"
+        }
+      }
+      for (i = 1; i <= count; i++) print lines[i]
+      count = 0
+      named = 0
+    }
+    /^- / { flush(); paragraph = 1; last = 1 }
+    {
+      lines[++count] = $0
+      if ($0 ~ ("#" issue "([^0-9]|$)")) named = 1
+      if (count > 1) {
+        if ($0 ~ /^[[:space:]]+[-*] /) paragraph = 0
+        else if (paragraph) last = count
+      }
+    }
+    END { flush() }
+  '
+}
+
 self_test() {
   local script status
   # Global, so the EXIT trap still sees it after the function returns.
@@ -255,7 +289,8 @@ self_test() {
 
   # --check: the names and contents it accepts, and each it refuses.
   expect "a directory holding only the README" 0 --check
-  fragment 3-a-change.added.md '- An entry that runs' '  over two lines.' '  - and nests a list item.'
+  fragment 3-a-change.added.md '- An entry that runs' '  over two lines.' '  - and nests a list item.' \
+    '- A second entry of fragment 3, unpunctuated'
   expect "a well-formed fragment beside the README" 0 --check
   local bad
   for bad in 3-Upper.added.md a-no-issue.added.md 3-a.unknown.md 3-a.added.txt 3-a_b.fixed.md 3-.fixed.md; do
@@ -309,7 +344,7 @@ self_test() {
 [Unreleased]: https://example.org/r/compare/v0.0.1...HEAD
 [0.0.1]: https://example.org/r/releases/tag/v0.0.1
 EOF
-  fragment 12-b.added.md '- Fragment 12-b.'
+  fragment 12-b.added.md '- Fragment 12-b.' '- Fragment 12-b names another issue (#99) and its own (#12) already.'
   fragment 7-y.changed.md '- Fragment 7-y.' '' ''
   fragment 5-x.security.md '- Fragment 5-x.'
   stub_git add -A
@@ -332,14 +367,16 @@ EOF
 
 - An entry written into CHANGELOG.md
   before the fragments.
-- Fragment 12-b.
+- Fragment 12-b (#12).
+- Fragment 12-b names another issue (#99) and its own (#12) already.
 - An entry that runs
-  over two lines.
+  over two lines (#3).
   - and nests a list item.
+- A second entry of fragment 3, unpunctuated (#3)
 
 ### Changed
 
-- Fragment 7-y.
+- Fragment 7-y (#7).
 
 ### Fixed
 
@@ -347,7 +384,7 @@ EOF
 
 ### Security
 
-- Fragment 5-x.
+- Fragment 5-x (#5).
 
 ## [0.0.1] - 2026-10-01
 
