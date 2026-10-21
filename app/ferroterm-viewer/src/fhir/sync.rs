@@ -2,11 +2,11 @@
 //!
 //! No FHIR specification governs these records: they are the sync service's
 //! own, and its admin listener answers `GET /runs` with the runs newest first
-//! and `GET /runs/{id}` with one whole record. The listener authenticates
-//! nobody and is never published, so the viewer reads it same-origin, which
-//! means a deployment that wants these findings on screen puts the listener
-//! behind the same address the server is served from. Nothing answers there
-//! by default, and the screen then shows no findings at all.
+//! and `GET /runs/{id}` with one whole record. The console's server reads it
+//! at `[ferroterm] sync_url` with the signed-in reader's access token, and
+//! the listener admits a token carrying its product scope. With no
+//! `sync_url`, for a visitor, or for a reader without the scope, the screen
+//! shows no findings at all.
 //!
 //! The record is read out of the JSON document rather than through a derived
 //! decoder. The document is already decoded to a `serde_json::Value` by the

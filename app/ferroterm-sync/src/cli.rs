@@ -61,6 +61,9 @@ pub enum StartError {
     /// The service cannot be built.
     #[error("the service cannot be built")]
     Service(#[from] ServiceError),
+    /// The admin listener's `[auth]` cannot guard it.
+    #[error("the admin listener cannot be guarded")]
+    Auth(#[from] crate::auth::AuthError),
     /// The admin listener does not bind.
     #[error("cannot bind the admin listener on {address}")]
     Bind {
@@ -100,11 +103,22 @@ pub fn service(path: &std::path::Path) -> Result<Arc<Service>, StartError> {
 ///
 /// # Errors
 ///
-/// Returns [`StartError::Bind`] when the admin listener does not bind and
+/// Returns [`StartError::Auth`] when `[auth]` cannot guard the admin
+/// listener, [`StartError::Bind`] when the listener does not bind and
 /// [`StartError::Serve`] when it stops with an error; the start-up errors of
 /// [`service`] reach the caller unchanged.
 pub async fn serve(path: &std::path::Path) -> Result<(), StartError> {
     let service = service(path)?;
+    let guard = crate::auth::AdminAuth::start(&service.config().auth).await?;
+    let unguarded = crate::admin::router(Arc::clone(&service));
+    let admin = if let Some(guard) = &guard {
+        guard.guard(unguarded)
+    } else {
+        tracing::warn!(
+            "[auth] enabled = false: the admin listener authenticates nobody, so only trusted callers may reach it"
+        );
+        unguarded
+    };
     let address = service.config().listen;
     let listener = TcpListener::bind(address)
         .await
@@ -116,10 +130,10 @@ pub async fn serve(path: &std::path::Path) -> Result<(), StartError> {
         listen = %address,
         activation = service.config().activation.as_str(),
         sources = service.config().source.len(),
+        guarded = guard.is_some(),
         "ferroterm-sync started"
     );
-    let admin = axum::serve(listener, crate::admin::router(Arc::clone(&service)))
-        .with_graceful_shutdown(shutdown_signal());
+    let admin = axum::serve(listener, admin).with_graceful_shutdown(shutdown_signal());
     let schedule = Arc::clone(&service).serve_schedule(shutdown_signal());
     let served = tokio::join!(admin, schedule);
     let (admin, ()) = served;

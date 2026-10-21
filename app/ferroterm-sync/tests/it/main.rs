@@ -16,6 +16,7 @@
 
 mod admin;
 mod api;
+mod auth;
 mod credentials;
 mod failure;
 mod lanes;

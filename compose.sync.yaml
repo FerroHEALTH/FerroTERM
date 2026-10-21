@@ -36,8 +36,12 @@
 #
 # With an issuer, give the sync the credential it reloads with in its own
 # configuration file, under [server_admin_credentials] (HTTP Basic or the OAuth
-# 2.0 client credentials grant). The sync's own admin listener authenticates
-# nobody. Both stay on the compose network here, and neither is published;
+# 2.0 client credentials grant). The sync's own admin listener requires a
+# credential carrying `__ferroterm.sync` on every route but GET /health, so its
+# configuration file names the credentials it admits under [auth] (an issuer
+# and an audience, or [[auth.basic.users]]), or says `enabled = false` on a
+# network only trusted callers reach; without either it refuses to start.
+# Both listeners stay on the compose network here, and neither is published;
 # keep it that way.
 
 services:

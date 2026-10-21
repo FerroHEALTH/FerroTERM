@@ -20,11 +20,12 @@
 //! [`source`] is the add-on seam, [`build`] is the RF2 lane, [`activate`] puts
 //! a staged release in front of the server, [`retention`] prunes what it
 //! replaced, [`record`] writes down what happened, and [`admin`] serves that
-//! record, [`metrics`], and the manual triggers.
+//! record, [`metrics`], and the manual triggers behind [`auth`].
 #![doc(test(attr(deny(warnings))))]
 
 pub mod activate;
 pub mod admin;
+pub mod auth;
 pub mod build;
 pub mod cli;
 pub mod clock;

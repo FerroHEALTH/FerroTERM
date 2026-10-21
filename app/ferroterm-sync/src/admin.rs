@@ -3,8 +3,8 @@
 //! Six routes and nothing else: `POST /run` and `POST /activate` are the
 //! manual triggers, `GET /runs` and `GET /runs/{id}` are the run records,
 //! `GET /metrics` is the Prometheus exposition, and `GET /health` says the
-//! process is up. The listener authenticates nobody, like the server's own
-//! admin listener, so it belongs on an internal network.
+//! process is up. [`crate::auth`] puts every route but `GET /health` behind
+//! a credential carrying the product scope.
 //!
 //! A `POST /run` answers when the run has finished, which is how an operator
 //! reads the outcome of the run they asked for. A run that builds an edition
