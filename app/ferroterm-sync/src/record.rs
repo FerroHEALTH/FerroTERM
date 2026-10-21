@@ -129,6 +129,20 @@ pub struct SkippedEntry {
     pub reason: String,
 }
 
+/// How many entries of one origin the run left behind only because the
+/// subscription does not name their system or category.
+///
+/// These are counted rather than listed: a service's FHIR API lists every
+/// resource it holds, and a line per unsubscribed one would bury the entries
+/// that were decided. No specification governs the record: our own design.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub struct NotSubscribed {
+    /// Where the run saw the entries.
+    pub origin: Origin,
+    /// How many there were.
+    pub entries: usize,
+}
+
 /// What one source contributed to a run.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct SourceRun {
@@ -151,8 +165,13 @@ pub struct SourceRun {
     pub not_visible: Vec<String>,
     /// The entries the run took.
     pub taken: Vec<TakenEntry>,
-    /// The entries the run left behind.
+    /// The entries the run left behind for a reason other than the
+    /// subscription, one line each.
     pub skipped: Vec<SkippedEntry>,
+    /// The entries left behind only because the subscription does not name
+    /// them, one count per origin that had any.
+    #[serde(default)]
+    pub not_subscribed: Vec<NotSubscribed>,
     /// What went wrong while reading this source.
     pub errors: Vec<String>,
 }
@@ -170,8 +189,32 @@ impl SourceRun {
             not_visible: Vec::new(),
             taken: Vec::new(),
             skipped: Vec::new(),
+            not_subscribed: Vec::new(),
             errors: Vec::new(),
         }
+    }
+
+    /// Counts one entry of `origin` the subscription does not name.
+    pub fn count_not_subscribed(&mut self, origin: Origin) {
+        if let Some(held) = self
+            .not_subscribed
+            .iter_mut()
+            .find(|held| held.origin == origin)
+        {
+            held.entries = held.entries.saturating_add(1);
+        } else {
+            self.not_subscribed
+                .push(NotSubscribed { origin, entries: 1 });
+        }
+    }
+
+    /// How many entries the subscription left behind, over every origin.
+    #[must_use]
+    pub fn not_subscribed_total(&self) -> usize {
+        self.not_subscribed
+            .iter()
+            .map(|held| held.entries)
+            .fold(0_usize, usize::saturating_add)
     }
 }
 
@@ -384,6 +427,11 @@ impl RunRecord {
                 .iter()
                 .map(|source| source.skipped.len())
                 .sum::<usize>(),
+            entries_not_subscribed: self
+                .sources
+                .iter()
+                .map(SourceRun::not_subscribed_total)
+                .fold(0_usize, usize::saturating_add),
             activated: self.activation.activated.len(),
             bytes_staged: self.bytes_staged,
             bytes_used: self.bytes_used,
@@ -411,8 +459,13 @@ pub struct Summary {
     pub duration_ms: u64,
     /// How many entries the run took.
     pub entries_taken: usize,
-    /// How many entries the run left behind.
+    /// How many entries the run left behind for a reason other than the
+    /// subscription.
     pub entries_skipped: usize,
+    /// How many entries the run left behind only because the subscription
+    /// does not name them.
+    #[serde(default)]
+    pub entries_not_subscribed: usize,
     /// How many staged items reached the server.
     pub activated: usize,
     /// How many bytes the run staged.

@@ -20,7 +20,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use terminology_syndication::model::CategoryTerm;
-use terminology_syndication::select::{Holdings, Taken};
+use terminology_syndication::select::{Holdings, SkipReason, Taken};
 
 use crate::clock::Clock;
 use crate::config::{Activation, Config};
@@ -360,6 +360,13 @@ impl Service {
     ) {
         let selection = source.select(feed, held);
         for skipped in selection.skipped {
+            if matches!(
+                skipped.reason,
+                SkipReason::SystemNotSubscribed { .. } | SkipReason::CategoryNotSubscribed { .. }
+            ) {
+                run.count_not_subscribed(origin);
+                continue;
+            }
             run.skipped.push(SkippedEntry {
                 entry_id: skipped.entry_id,
                 title: skipped.title,
