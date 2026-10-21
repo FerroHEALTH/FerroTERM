@@ -239,9 +239,6 @@ pub struct Status {
     pub index_ok: bool,
     /// The loaded code system families, unique and sorted ascending.
     pub code_systems: Vec<Family>,
-    /// Whether this server mounts a viewer, which it no longer does: the
-    /// console is a binary of its own.
-    pub viewer: bool,
     /// Whether a resources database is configured.
     pub persistence: bool,
 }
@@ -253,7 +250,6 @@ impl Status {
     pub fn new(
         index_ok: bool,
         families: impl IntoIterator<Item = Family>,
-        viewer: bool,
         persistence: bool,
     ) -> Self {
         let mut code_systems: Vec<Family> = families.into_iter().collect();
@@ -263,7 +259,6 @@ impl Status {
         Self {
             index_ok,
             code_systems,
-            viewer,
             persistence,
         }
     }
@@ -497,7 +492,6 @@ mod tests {
         let status = Status::new(
             true,
             [Family::Snomed, Family::Loinc, Family::Snomed, Family::Fhir],
-            false,
             false,
         );
         let json = serde_json::to_value(&status).expect("serializes");

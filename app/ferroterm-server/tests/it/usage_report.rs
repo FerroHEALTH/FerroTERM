@@ -167,7 +167,6 @@ fn the_start_report_is_exactly_the_v2_envelope() {
             "status": {
                 "index_ok": true,
                 "code_systems": ["fhir", "loinc", "rxnorm", "snomed"],
-                "viewer": false,
                 "persistence": false
             }
         })
@@ -271,7 +270,6 @@ async fn the_daily_report_carries_the_window_the_router_recorded() {
             "status": {
                 "index_ok": true,
                 "code_systems": ["fhir", "snomed"],
-                "viewer": false,
                 "persistence": true
             },
             "metrics": {

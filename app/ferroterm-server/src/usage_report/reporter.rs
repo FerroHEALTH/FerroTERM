@@ -454,14 +454,7 @@ fn status_of(serving: &Serving) -> Status {
         .origins()
         .map(|(url, origin)| Family::of(url, origin))
         .collect();
-    Status::new(
-        !families.is_empty(),
-        families,
-        // NOTE: no specification governs this: our own design; the console is its own
-        // binary now (app/ferroterm-viewer), so this server never mounts a viewer.
-        false,
-        state.persists(),
-    )
+    Status::new(!families.is_empty(), families, state.persists())
 }
 
 /// The wait before the next daily report: 24 hours, spread at random by up

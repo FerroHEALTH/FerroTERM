@@ -91,7 +91,6 @@ The `status` object:
 |---|---|
 | `index_ok` | Whether at least one code system the deployment loaded is serving. |
 | `code_systems` | The families of the loaded code systems, sorted: `dhd`, `fhir`, `gstandaard`, `icd10`, `icd10cm`, `icd11`, `labcodeset`, `loinc`, `other`, `rxnorm`, `snomed`. `fhir` is a `CodeSystem` resource from `FERROTERM_CODESYSTEMS` that no other family names, and `other` is an artifact none names. Never an edition, a module id, a version or a URL. |
-| `viewer` | Whether the viewer is mounted at `/ui`. |
 | `persistence` | Whether a resources database (`FERROTERM_RESOURCES`) is configured. |
 
 A start report, formatted here for reading (the server sends it on one line):
@@ -113,7 +112,6 @@ A start report, formatted here for reading (the server sends it on one line):
   "status": {
     "index_ok": true,
     "code_systems": ["loinc", "snomed"],
-    "viewer": true,
     "persistence": false
   }
 }
