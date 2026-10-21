@@ -41,7 +41,44 @@ cut follows, in order.
 4. **The gates pass on the release commit**: `cargo fmt --all --check`,
    `cargo clippy --workspace --all-targets --all-features`, `cargo nextest run
    --workspace --locked`, `RUSTDOCFLAGS="-D warnings" cargo doc`, and the
-   scripts under `scripts/checks/`.
+   guards under `scripts/checks/`, run as CI runs them. The two that compare a
+   change against its base take `origin/main HEAD` on the release branch, and
+   the viewer's two bundle checks read the site `scripts/release/viewer-site.sh
+   --release` builds:
+
+   ```sh
+   bash scripts/checks/versions.sh
+   bash scripts/checks/comment-style.sh --all
+   bash scripts/checks/stray-literals.sh app/ferroterm-viewer/src
+   bash scripts/checks/spdx-headers.sh
+   bash scripts/checks/copyright-holder.sh
+   bash scripts/checks/vendor-dests.sh
+   bash scripts/checks/repo-map.sh
+   bash scripts/checks/claims.sh
+   bash scripts/checks/extension-definitions.sh
+   bash scripts/checks/usage-report-off.sh
+   bash scripts/checks/brand-contrast.sh
+   bash scripts/checks/code-systems.sh
+   bash scripts/checks/bench-table.sh check
+   bash scripts/checks/viewer-boundary.sh
+   bash scripts/checks/viewer-tokens.sh
+   bash scripts/checks/addon-boundary.sh
+   bash scripts/checks/no-client-in-server.sh
+   bash scripts/checks/changelog-guard.sh origin/main HEAD
+   bash scripts/checks/crate-version-guard.sh origin/main HEAD
+   bash scripts/release/viewer-site.sh --release
+   bash scripts/checks/viewer-bundle.sh
+   bash scripts/checks/viewer-paths.sh
+   ```
+
+   `contribution-licence.sh` reads the pull request body, so it runs in CI
+   only. The guards that need a running server or the licensed editions run
+   in the steps below or in their own lanes: `bench-bars.sh` in step 5,
+   `served-bars.sh` over the record set of step 6, `served-artifacts.sh
+   --server URL --index DIRS` against a server over the local editions, and
+   `tx-ecosystem.sh` and `differential.sh --index DIR` in their CI lanes.
+   `conformance-badges.sh <out-dir>` writes the badge files the Docs workflow
+   publishes and checks nothing.
 5. **The latency bars hold**: `scripts/checks/bench-bars.sh` measures the four
    operations over the generated edition and compares each median to the claim
    in `bench/bars.json`. CI runs it on every pull request too.
