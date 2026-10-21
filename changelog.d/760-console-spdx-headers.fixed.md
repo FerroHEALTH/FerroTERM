@@ -1,1 +1,0 @@
-- Two console source files carry their SPDX header (#760).

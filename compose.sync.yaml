@@ -70,7 +70,7 @@ services:
         read_only: true
 
   sync:
-    image: ghcr.io/ferrohealth/ferroterm-sync:${FERROTERM_VERSION:-0.1.8}
+    image: ghcr.io/ferrohealth/ferroterm-sync:${FERROTERM_VERSION:-0.1.9}
     container_name: ferroterm-sync
     restart: unless-stopped
     environment:
