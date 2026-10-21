@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! One run, end to end, and the service that performs it.
 //!
 //! A run lists every configured source, its feed and, when it has one, its

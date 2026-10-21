@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The version-neutral `ConceptMap` (<https://hl7.org/fhir/R4B/conceptmap.html>,
 //! <https://hl7.org/fhir/R5/conceptmap.html>).
 

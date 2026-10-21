@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The evidence screen: what this build passes, and what it measured.
 //!
 //! Every other screen reads the running server. This one reads nothing: the

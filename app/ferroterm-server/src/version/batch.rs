@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `POST [base]` with a `Bundle`: the batch interaction.
 //!
 //! A `batch` Bundle carries one entry per request, each with the method and the

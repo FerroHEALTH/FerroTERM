@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 //! The client resources a deployment persists: `CodeSystem`, `ValueSet`, and
 //! `ConceptMap` written through the REST API, in a `redb` database beside the

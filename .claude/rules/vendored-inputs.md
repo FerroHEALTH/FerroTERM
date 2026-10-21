@@ -2,6 +2,9 @@
 paths: ["scripts/vendor/*.sh", "crates/sct-ecl/vendor/**", "crates/**/data/**", "crates/**/tests/fixtures/**"]
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Vendored inputs and the SNOMED content rule
 
 Two kinds of external material touch this repo, and they are handled

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! What the grammar admits and refuses, one behaviour per case
 //! (`vendor/syntax/ECL.g4`; the rule named in each test).
 

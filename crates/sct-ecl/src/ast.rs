@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The syntax tree of an expression constraint, one type per grammar rule
 //! that carries meaning (`ECL.g4`; the rules that only spell a keyword or a
 //! character class are folded into their parents).

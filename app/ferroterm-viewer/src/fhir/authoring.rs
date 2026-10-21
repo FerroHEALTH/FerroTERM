@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The `CodeSystem` an editor reads back, in the elements it authors.
 //!
 //! The editor screen needs more of the resource than the detail screen shows:

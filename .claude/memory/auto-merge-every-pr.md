@@ -8,6 +8,9 @@ metadata:
   modified: 2026-09-09T04:46:38.713Z
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Enable auto-merge on every pull request as soon as it is opened:
 `gh pr merge <n> --auto`. Then carry on with the next slice rather than
 waiting for the merge.

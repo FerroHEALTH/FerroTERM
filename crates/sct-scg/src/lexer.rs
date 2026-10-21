@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The token layer of the Compositional Grammar: the ABNF's character rules
 //! folded into the tokens the parser consumes (`ws`, `term`, `stringValue`,
 //! `digit`, and each literal the grammar spells).

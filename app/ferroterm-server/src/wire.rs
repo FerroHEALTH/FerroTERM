@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The wire format of a request and a response: FHIR JSON or FHIR XML.
 //!
 //! A client names the response format with `_format` in the query, else with

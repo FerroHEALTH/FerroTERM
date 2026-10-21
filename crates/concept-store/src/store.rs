@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Read-only access to a built artifact.
 //!
 //! Every method is a point read: one position or one key, one record, decoded

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The Necessary Normal Form of a concept, rendered in SNOMED CT
 //! Compositional Grammar.
 //!

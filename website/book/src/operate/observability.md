@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Health, metrics, and request identifiers
 
 FerroTERM answers a health probe at `GET /health`, a Prometheus scrape at

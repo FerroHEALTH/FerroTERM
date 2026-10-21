@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Prints where the bytes of a built artifact go, table by table, for the
 //! footprint work. Ignored by default: it reads the local artifact under
 //! `artifacts/nl/` (a licensed edition, never committed).

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The runs a reader has made, as the links that re-run them.
 //!
 //! Every runner draws this the same way and records into it the same way, so

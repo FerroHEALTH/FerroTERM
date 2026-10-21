@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # The crates.io upload of the `crates/*` members, and its read-back, as one
 # implementation shared by the `crates` leg of release.yml (a `v*` tag,

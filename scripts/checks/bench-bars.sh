@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
 # The latency bars, measured over the synthetic edition and compared to the
 # claims in bench/bars.json.
 #

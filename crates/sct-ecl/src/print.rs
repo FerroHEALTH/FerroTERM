@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The canonical text of a syntax tree: `Display` for every node, in the
 //! grammar's own spelling, so `parse(print(tree)) == tree`.
 

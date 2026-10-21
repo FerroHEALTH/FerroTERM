@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 //! The versions of a resource in the editor bundle: reading them, comparing
 //! two, and putting an earlier one back.

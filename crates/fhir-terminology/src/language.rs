@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The display language of a request: a language range list resolved
 //! against the languages a code system carries.
 //!

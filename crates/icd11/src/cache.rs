@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Reading a cache the walker wrote back into entities.
 
 use std::collections::BTreeMap;

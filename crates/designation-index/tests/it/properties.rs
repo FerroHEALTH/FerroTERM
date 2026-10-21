@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Property tests: every token of an indexed term finds it, paging is a
 //! partition of the full result, and the layout round-trips.
 

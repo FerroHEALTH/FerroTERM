@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The SNOMED CT implicit concept maps `?fhir_cm=[sctid]` and the historical
 //! associations `$translate` falls back to
 //! (<https://hl7.org/fhir/R4B/snomedct.html>, "Implicit Concept Maps").

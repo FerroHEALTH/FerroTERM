@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Everything about this server and this console, on one screen.
 //!
 //! Three tabs, one shown at a time. They are one screen because none of them

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The command line, and what each command does.
 //!
 //! With no subcommand the process serves: it binds the admin listener and runs

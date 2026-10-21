@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The ICD-11 build over the testkit's API-shaped cache.
 
 use concept_graph::persist::Hierarchy;

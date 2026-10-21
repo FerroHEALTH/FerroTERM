@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 //! Reads the release date of the version being built from `CHANGELOG.md`
 //! (`## [<version>] - <date>`) into `FERROTERM_RELEASE_DATE`, for

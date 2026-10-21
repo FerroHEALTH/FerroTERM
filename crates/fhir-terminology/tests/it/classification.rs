@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The classification provider over the testkit's `ClaML` and ICD-10-CM
 //! artifacts (<https://hl7.org/fhir/R4B/icd.html>).
 

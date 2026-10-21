@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Writing a resource: what a write sends, what it answers, and how a refusal
 //! reads.
 //!

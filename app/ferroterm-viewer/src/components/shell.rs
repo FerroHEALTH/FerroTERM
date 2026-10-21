@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The chrome around every screen, and the routes it wraps.
 //!
 //! The screens are reached from FerroUI's navigation; the top bar carries

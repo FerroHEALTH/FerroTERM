@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The LOINC provider over the testkit's release-shaped artifact
 //! (<https://hl7.org/fhir/R4B/loinc.html>).
 

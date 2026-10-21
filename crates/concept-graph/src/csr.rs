@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Compressed sparse row adjacency.
 //!
 //! One `Csr` holds the out-edges of one edge kind in one direction: an

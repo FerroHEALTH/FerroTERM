@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Asking the server to reload the set it serves.
 //!
 //! The server re-scans its index root and its resource directory on

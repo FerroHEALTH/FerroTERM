@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The `Parameters` wire of one version: GET query and POST body decoding, the `Accept-Language` fold, and JSON responses.
 
 macro_rules! parameters {

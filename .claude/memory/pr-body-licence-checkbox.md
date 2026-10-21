@@ -5,6 +5,9 @@ metadata:
   type: feedback
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Every pull request body follows `.github/PULL_REQUEST_TEMPLATE.md` verbatim, with the line `- [x] I accept the terms in [CONTRIBUTING.md § Licensing of contributions](...)` ticked, plus the ticked checklist. `gh pr create --body` with free text fails the `contribution-licence-guard` CI job (`scripts/checks/contribution-licence.sh` greps for that exact line), and the `conclusion` check then blocks the merge.
 
 **Why:** the owner flagged on 2026-09-22 that PRs kept failing this guard ("you are every time missing this"); the check exists since #575.

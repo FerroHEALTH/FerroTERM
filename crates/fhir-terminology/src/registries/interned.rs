@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Concept ordinals for a grammar system: codes are interned as they are
 //! met, so a valid code has a stable ordinal for the life of the provider.
 

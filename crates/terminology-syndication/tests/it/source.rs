@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The `Source` seam against a mock syndication service.
 //!
 //! Each test stands up one of the authentication shapes the public services

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Reading an Atom syndication document into the typed [`Feed`] model.
 //!
 //! The reader is namespace-aware: an element counts only when it resolves into

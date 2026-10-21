@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
 # The resident memory of a built artifact, structure by structure (#322).
 #
 #   scripts/bench/residency.sh artifacts/nl [repeats]

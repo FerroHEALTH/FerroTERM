@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `TerminologyCapabilities` from the loaded providers' declarations
 //! (<https://hl7.org/fhir/R4B/terminologycapabilities.html>,
 //! <https://hl7.org/fhir/R5/terminologycapabilities.html>).

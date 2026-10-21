@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The table set of one artifact.
 //!
 //! Every value is a byte string decoded by `record`, so a damaged artifact is

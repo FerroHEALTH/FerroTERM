@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The [`Source`] seam: one syndication service, with its own authentication.
 //!
 //! A source is configuration plus an authentication scheme. The Atom dialect,

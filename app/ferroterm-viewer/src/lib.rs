@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 //! The FerroTERM Console: a FHIR terminology browser and editor, rendered on
 //! the server and hydrated in the browser, with a backend-for-frontend in

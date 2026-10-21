@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Hardware sizing
 
 FerroTERM is built to run an edition on ordinary hardware. This page says

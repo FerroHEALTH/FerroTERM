@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The scrape endpoint and the request id
 //! (<https://prometheus.io/docs/instrumenting/exposition_formats/>; no FHIR
 //! specification governs either, so both are our own design, #122).

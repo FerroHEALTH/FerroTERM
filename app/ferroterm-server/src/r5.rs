@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! FHIR R5 (5.0.0) under `/r5`: the generated `fhir_types::r5` contracts
 //! over the engine (<https://hl7.org/fhir/R5/terminology-service.html>).
 //!

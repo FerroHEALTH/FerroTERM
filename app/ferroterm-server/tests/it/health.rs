@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 use axum::body::Body;
 use http::{Request, StatusCode};
 use tower::ServiceExt;

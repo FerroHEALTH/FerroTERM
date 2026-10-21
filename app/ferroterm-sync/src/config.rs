@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The one configuration file the service reads.
 //!
 //! The file is TOML and every key is optional: a deployment writes what it

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! BCP 13 media types (`urn:ietf:bcp:13`): the grammar of RFC 6838 §4.2 and
 //! RFC 2045 §5.1 over the IANA Media Types registry.
 //!

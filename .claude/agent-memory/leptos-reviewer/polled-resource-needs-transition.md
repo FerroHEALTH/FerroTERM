@@ -6,6 +6,9 @@ metadata:
   type: project
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 A resource that is refetched, whether by an interval poll or by a change in its
 source, reverts to pending on every refetch. Read under `<Suspense>`, the
 section then flashes its loading fallback each time.

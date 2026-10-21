@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Found in review of #637, the viewer's version and restore screen.
 
 A section built inside a `<Transition>` child closure that reads BOTH a

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The one place the engine reads the wall clock for a FHIR `dateTime`.
 
 /// The current instant.

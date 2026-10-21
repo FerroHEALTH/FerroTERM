@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # rxnorm-rrf
 
 The RxNorm release reader. Hand-written; the RxNorm Technical Documentation

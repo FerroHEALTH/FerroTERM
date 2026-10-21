@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
 # The HL7 terminology ecosystem suite against a FerroTERM, with a committed
 # pass list: a test on the list that fails is a regression, a test that
 # newly passes is reported so it can be added.

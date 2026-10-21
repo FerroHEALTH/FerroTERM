@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # concept-store
 
 The disk-backed concept store. Hand-written; no spec governs the on-disk

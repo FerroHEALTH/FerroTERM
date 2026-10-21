@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Reading the challenged listing, and what a run does with what it finds.
 
 use terminology_syndication::model::CategoryTerm;

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Walking a local deployment of the ICD-API into a cache of entity JSON.
 //!
 //! The deployment (`docker run -e acceptLicense=true -e include=2026-01_en

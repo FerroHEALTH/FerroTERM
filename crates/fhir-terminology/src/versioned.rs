@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! A store of canonical resources by `url` and `version`, with the
 //! default-version rule the value sets and concept maps share.
 

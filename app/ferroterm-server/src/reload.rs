@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Reloading the served set: re-scan the configured directories, build a new
 //! state, swap it in, and drop the old one when the last request on it ends.
 //!

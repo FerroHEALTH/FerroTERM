@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The one correction this service's FHIR resource files need.
 //!
 //! FHIR declares `experimental` as a `boolean`, and a boolean is written in

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! One log line per HTTP request: method, route, status, latency, the request
 //! id, and the system and code the request named. Bodies are never logged.
 //!

@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # The FHIR terminology API
 
 FerroTERM speaks the HL7 FHIR terminology API. If your client already talks to

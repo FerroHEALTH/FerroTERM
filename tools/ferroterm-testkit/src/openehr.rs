@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! An openEHR archetype's local terminology, as the FHIR resources a producer
 //! derives from it.
 //!

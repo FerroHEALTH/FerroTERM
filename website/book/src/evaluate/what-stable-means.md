@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # What stable means in v0.1.0
 
 v0.1.0 is the first release the project calls stable. Stable here is a promise

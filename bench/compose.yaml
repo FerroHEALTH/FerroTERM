@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+
 # The benchmark harness in a container. From the repository root:
 #   docker compose -f bench/compose.yaml run --rm bench --skip-ingest
 #   docker compose -f bench/compose.yaml run --rm bench --only LOINC

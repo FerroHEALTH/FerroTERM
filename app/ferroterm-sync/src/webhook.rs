@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The one JSON post per run end.
 //!
 //! The service posts [`crate::record::Summary`] to the configured address when

@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Confirmed reviewing the FerroTERM concept browser tree
 (`app/ferroterm-viewer/src/pages/browse.rs`, `src/tree.rs`), against
 `.claude/rules/leptos-ui.md` §9 and the ARIA Authoring Practices tree view

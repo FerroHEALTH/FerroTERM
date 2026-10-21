@@ -1,3 +1,4 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 
 [workspace]
@@ -157,21 +158,21 @@ fhir-types = "0.1.109"
 # Workspace-internal crates. The `crates/*` members carry the published crate
 # line (lockstep, bumped with their packaged content, never the product
 # version); the tools stay on the workspace version.
-rf2 = { path = "crates/rf2", version = "0.1.118" }
-loinc = { path = "crates/loinc", version = "0.1.118" }
-classification = { path = "crates/classification", version = "0.1.118" }
-dhd-thesaurus = { path = "crates/dhd-thesaurus", version = "0.1.118" }
-gstandaard = { path = "crates/gstandaard", version = "0.1.118" }
-labcodeset = { path = "crates/labcodeset", version = "0.1.118" }
-icd11 = { path = "crates/icd11", version = "0.1.118" }
-rxnorm-rrf = { path = "crates/rxnorm-rrf", version = "0.1.118" }
-concept-graph = { path = "crates/concept-graph", version = "0.1.118" }
-concept-store = { path = "crates/concept-store", version = "0.1.118" }
-designation-index = { path = "crates/designation-index", version = "0.1.118" }
-sct-ecl = { path = "crates/sct-ecl", version = "0.1.118" }
-sct-scg = { path = "crates/sct-scg", version = "0.1.118" }
-fhir-terminology = { path = "crates/fhir-terminology", version = "0.1.118" }
-terminology-syndication = { path = "crates/terminology-syndication", version = "0.1.118" }
+rf2 = { path = "crates/rf2", version = "0.1.119" }
+loinc = { path = "crates/loinc", version = "0.1.119" }
+classification = { path = "crates/classification", version = "0.1.119" }
+dhd-thesaurus = { path = "crates/dhd-thesaurus", version = "0.1.119" }
+gstandaard = { path = "crates/gstandaard", version = "0.1.119" }
+labcodeset = { path = "crates/labcodeset", version = "0.1.119" }
+icd11 = { path = "crates/icd11", version = "0.1.119" }
+rxnorm-rrf = { path = "crates/rxnorm-rrf", version = "0.1.119" }
+concept-graph = { path = "crates/concept-graph", version = "0.1.119" }
+concept-store = { path = "crates/concept-store", version = "0.1.119" }
+designation-index = { path = "crates/designation-index", version = "0.1.119" }
+sct-ecl = { path = "crates/sct-ecl", version = "0.1.119" }
+sct-scg = { path = "crates/sct-scg", version = "0.1.119" }
+fhir-terminology = { path = "crates/fhir-terminology", version = "0.1.119" }
+terminology-syndication = { path = "crates/terminology-syndication", version = "0.1.119" }
 # The source add-ons. Path-only and never published; only app/ferroterm-sync
 # may take one (scripts/checks/addon-boundary.sh).
 addon-nts = { path = "addons/nts" }

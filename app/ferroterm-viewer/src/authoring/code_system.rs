@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The form model behind the code system editor.
 //!
 //! Everything here is plain values and plain functions: what a local

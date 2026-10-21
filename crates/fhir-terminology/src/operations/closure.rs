@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `ConceptMap/$closure` in the terms every served FHIR version shares.
 //!
 //! A client keeps a transitive closure table of the concepts it has seen, and

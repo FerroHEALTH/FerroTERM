@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The expansion runner: `ValueSet/$expand`, one page at a time.
 
 use leptos::ev::SubmitEvent;

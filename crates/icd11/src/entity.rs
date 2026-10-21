@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! One entity as the ICD-API serves it, in as many languages as were cached.
 
 use std::collections::BTreeSet;

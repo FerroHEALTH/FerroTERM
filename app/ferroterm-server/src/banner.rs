@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The boot banner: the wordmark and what this process is, printed before
 //! the log subscriber exists and only when the console is for a person.
 

@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Issue relationships (GitHub native sub-issues + dependencies)
 
 The tracker is GitHub Issues (`.claude/rules/issue-workflow.md`). GitHub exposes

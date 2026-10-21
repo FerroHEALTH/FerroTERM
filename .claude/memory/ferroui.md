@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Every FerroHEALTH console (FerroBRIDGE, FerroFED, FerroEHR, FerroTERM) draws
 in FerroUI, the shared component library (`ferrohealth-ui` on crates.io,
 FerroHEALTH/FerroUI), pinned exactly (`=0.1.x`) from crates.io, never a

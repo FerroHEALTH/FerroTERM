@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The ECL evaluator over the synthetic edition: one case per construct, with
 //! the expected set from the ECL specification's definitions
 //! (<https://docs.snomed.org/snomed-ct-specifications/snomed-ct-expression-constraint-language>,

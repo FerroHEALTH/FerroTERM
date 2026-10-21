@@ -1,8 +1,9 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 [package]
 name = "sct-ecl"
 description = "The SNOMED CT Expression Constraint Language lexer, parser, and evaluator"
-version = "0.1.118"
+version = "0.1.119"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

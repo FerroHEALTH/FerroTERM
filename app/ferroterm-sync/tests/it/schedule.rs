@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The schedule: a run starts at its due time, and a restart between two runs
 //! does not replay the one that already happened.
 //!

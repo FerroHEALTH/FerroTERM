@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Typed adjacency: every edge carries a relationship type, and both
 //! directions are materialized.
 //!

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The generic `CodeSystem` provider over the synthetic R5 resources.
 
 use std::sync::Arc;

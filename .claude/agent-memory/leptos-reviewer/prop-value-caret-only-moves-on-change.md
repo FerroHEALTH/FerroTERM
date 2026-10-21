@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 The HTML Standard's `input.value` setter, mode "value", sets the value and
 then, "if the element's new API value is different from its old API value, move
 the text entry cursor position to the end of the text control"

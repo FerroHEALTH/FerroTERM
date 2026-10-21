@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Reading the synthetic Atom documents into the typed model.
 
 use terminology_syndication::model::{CategoryTerm, Checksum, LinkRel, SnomedRelease};

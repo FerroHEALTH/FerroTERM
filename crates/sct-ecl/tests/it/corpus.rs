@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Every example of the official corpus parses, and its printed form parses
 //! to the same tree (`vendor/examples`, the tag in `vendor/PROVENANCE.md`).
 

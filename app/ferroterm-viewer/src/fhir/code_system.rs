@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The part of a published `CodeSystem` the detail screen renders.
 //!
 //! `GET [base]/CodeSystem?url=` is the RESTful search interaction

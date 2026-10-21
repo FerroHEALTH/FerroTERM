@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The parser: one function per rule of the normative ABNF, over the token
 //! stream of [`crate::lexer`], with `winnow`.
 //!

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Positions inside a refused value: a parser's byte offset, carried back
 //! through percent-encoding and counted as the column a client reads.
 //!

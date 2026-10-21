@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The Prometheus metrics a deployment scrapes, and the registry behind them.
 //!
 //! No FHIR specification governs this: our own design, kept off the FHIR base

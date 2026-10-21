@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The system-level routes of one version: `$versions`, `$cache-control`, and `ValueSet` read and search.
 
 macro_rules! system {

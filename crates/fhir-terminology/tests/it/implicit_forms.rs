@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The implicit value set forms a provider declares, instantiated against it.
 //!
 //! No FHIR/SNOMED spec governs the declaration: our own design. Each declared

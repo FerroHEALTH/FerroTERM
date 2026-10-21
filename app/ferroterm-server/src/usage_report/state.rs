@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The usage report's state on disk: the instance id and the time of the last
 //! start report, under `FERROTERM_STATE_DIR`.
 //!

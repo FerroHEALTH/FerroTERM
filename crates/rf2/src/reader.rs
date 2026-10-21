@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: Apache-2.0
+
 //! Streaming reader for one RF2 file.
 //!
 //! RF2 files are UTF-8, tab-delimited, unquoted, with a header row naming

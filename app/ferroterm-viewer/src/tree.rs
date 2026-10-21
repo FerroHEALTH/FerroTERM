@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The taxonomy tree's model: which rows are visible.
 //!
 //! The model is a plain value so the tree's behaviour is pinned by unit tests

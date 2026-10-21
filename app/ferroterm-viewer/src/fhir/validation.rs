@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `$validate-code` and `$subsumes`: the requests they take, and the answers.
 //!
 //! `CodeSystem/$validate-code` checks a code against a code system and

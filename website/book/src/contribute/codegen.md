@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # The FHIR model
 
 The FHIR layer of FerroTERM is generated, not hand-written, and it is generated

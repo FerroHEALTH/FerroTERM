@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The compose layer: union, intersection, exclude, dedup, order, paging
 //! (<https://hl7.org/fhir/R5/valueset.html#compositions>).
 

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! An expression that parses prints and parses back to the same tree.
 //!
 //! `proptest` asserts this over generated trees; this asserts it over the

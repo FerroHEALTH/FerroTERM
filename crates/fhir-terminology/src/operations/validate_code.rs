@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `CodeSystem/$validate-code` in the terms every served FHIR version shares.
 //!
 //! One of `code` (with `url`), `coding`, or `codeableConcept` is checked

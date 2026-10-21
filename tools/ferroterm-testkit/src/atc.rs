@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! A synthetic ATC-shaped table: the WHO index as a CSV export and the
 //! G-Standaard `BST801T` records, with ATC-shaped codes and invented names.
 

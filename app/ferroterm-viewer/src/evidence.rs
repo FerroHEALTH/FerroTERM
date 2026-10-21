@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The conformance and benchmark evidence this build carries.
 //!
 //! Every figure here was read out of a committed file by `build.rs` and

@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # CI/CD and supply-chain
 
 No spec governs this: our own design, grounded in SLSA v1.0, OpenSSF, Sigstore,

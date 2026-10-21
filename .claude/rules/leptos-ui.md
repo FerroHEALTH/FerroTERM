@@ -2,6 +2,9 @@
 paths: ["app/ferroterm-viewer/**"]
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # The FerroTERM Console's own rules (`app/ferroterm-viewer`)
 
 **The component rules are FerroUI's**: `.claude/rules/leptos-ui.md` in

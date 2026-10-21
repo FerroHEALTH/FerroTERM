@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 **The original finding.** A set of end-to-end journeys asserted on
 `driver.source()` substrings instead of interacting with the page, justified by
 a comment claiming the shell arrived as inert `<template>` fragments without

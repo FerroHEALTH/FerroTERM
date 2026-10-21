@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The settings pane: what the console remembers about this reader.
 
 use ferrohealth_ui::icon::Glyph;

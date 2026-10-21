@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Dimensional analysis: an expression reduced to a magnitude over the seven
 //! base units (<https://ucum.org/ucum> §2.3 "Semantics").
 

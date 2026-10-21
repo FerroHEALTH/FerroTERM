@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # PreToolUse hook (matcher: Bash). Blocks `git push` when the outgoing commits
 # (against the merge-base with origin/main) change packaged content of the

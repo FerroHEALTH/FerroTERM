@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! What a synchronisation run recorded about the deployment's own resources.
 //!
 //! No FHIR specification governs these records: they are the sync service's

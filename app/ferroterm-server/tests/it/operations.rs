@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The `CodeSystem` operations over HTTP: GET and POST, type and instance level,
 //! and every refusal as an `OperationOutcome`.
 

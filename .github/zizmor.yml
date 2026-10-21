@@ -1,3 +1,4 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # zizmor configuration (docs.zizmor.sh/configuration). Only findings with a
 # recorded reason are ignored here; everything else fails the workflow-audit

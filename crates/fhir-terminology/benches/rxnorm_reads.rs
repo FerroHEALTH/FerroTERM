@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Read-path latency over the local `RxNorm` artifact (`artifacts/rxnorm`), when
 //! present; the bar is one millisecond per read (`bench/bars.json`). Skips
 //! silently without the artifact.

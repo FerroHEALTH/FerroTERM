@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Reading the synthetic LOINC-shaped release.
 
 use ::loinc::release::Release;

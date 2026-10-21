@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Since 2026-10-05 FerroTERM tracks the kind and urgency of its work the way
 FerroFED has since 2026-10-02: the native issue type (`Bug`, `Feature`,
 `Task`), the organisation's `Priority` field (`Urgent`, `High`, `Medium`,

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The SNOMED CT provider through the seam, over the synthetic artifact.
 
 use std::sync::Arc;

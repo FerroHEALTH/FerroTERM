@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The loaded code system versions, by system URI, with the default-version rule.
 
 use std::borrow::Cow;

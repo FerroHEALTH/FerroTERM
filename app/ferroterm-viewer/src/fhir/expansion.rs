@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The `ValueSet/$expand` request the runner sends, and the answer it reads.
 //!
 //! `$expand` is paged with `count` and `offset` and reports `expansion.total`

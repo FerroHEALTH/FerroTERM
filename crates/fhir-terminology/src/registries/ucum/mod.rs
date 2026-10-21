@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! UCUM, the Unified Code for Units of Measure (`http://unitsofmeasure.org`).
 //!
 //! A grammar over the unit definitions of `ucum-essence.xml`

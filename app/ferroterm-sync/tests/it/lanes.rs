@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The two lanes: an RF2 release becomes a built artifact, a FHIR resource
 //! becomes a file, and what the deployment already holds is left alone.
 //!

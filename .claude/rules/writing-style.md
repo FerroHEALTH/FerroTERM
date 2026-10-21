@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Writing style: no AI tells
 
 Applies to every piece of prose a person reads: the README, the `docs/` pages,

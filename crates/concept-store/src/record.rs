@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The byte encodings of the stored records.
 //!
 //! Little-endian, length-prefixed strings, a tag byte per property value.

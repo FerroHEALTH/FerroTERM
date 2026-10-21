@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The `RxNorm` build over the testkit's release-shaped fixture.
 
 use concept_graph::ordinal::Ordinal;

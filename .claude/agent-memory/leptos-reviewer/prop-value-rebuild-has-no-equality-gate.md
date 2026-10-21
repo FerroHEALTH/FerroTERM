@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Verified first-hand in the pinned source (tachys 0.2.18).
 
 `prop:value=move || …` builds `IntoProperty for F: ReactiveFunction`

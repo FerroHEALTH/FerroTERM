@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Streaming a content item to disk with its digest verified.
 
 use crate::digest::{md5_of, sha256_of};

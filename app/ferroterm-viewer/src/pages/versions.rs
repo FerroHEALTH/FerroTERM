@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The four served FHIR roots, side by side.
 //!
 //! One process answers `/r4`, `/r4b`, `/r5`, and `/r6`, each with its own

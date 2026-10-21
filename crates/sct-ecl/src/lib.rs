@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The Expression Constraint Language.
 //!
 //! A `logos` lexer and a `winnow` parser faithful to the official ECL ANTLR

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The NCHS ICD-10-CM release: the tabular XML and the order file.
 //!
 //! The tabular list (`icd10cm_tabular_<year>.xml`) carries the chapters,

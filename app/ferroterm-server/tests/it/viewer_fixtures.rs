@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The guard over `app/ferroterm-viewer/fixtures`, and the recorder that
 //! writes them.
 //!

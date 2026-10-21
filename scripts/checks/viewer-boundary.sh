@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # The viewer is a FHIR client and links NO crate from this workspace, so that
 # anything the viewer can do a client can do. One dependency edge into the

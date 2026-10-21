@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The logical id a loaded `CodeSystem`, `ValueSet`, or `ConceptMap` answers
 //! on.
 //!

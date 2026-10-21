@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The value set composer: build a `ValueSet.compose`, preview it, save it.
 //!
 //! The screen is the editor bundle's own. It draws the composition rules FHIR

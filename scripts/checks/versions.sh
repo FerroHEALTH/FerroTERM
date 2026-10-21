@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # scripts/checks/versions.sh
 #
@@ -225,9 +226,9 @@ if [[ -f LICENSE ]]; then
     [[ -n "$hit" ]] || continue
     bad "stale licence claim at $hit"; stale=1
   done < <(git grep -n -E 'SPDX-License-Identifier: (MIT|Apache-2\.0)|License-MIT|License-Apache|^license = "(MIT|Apache-2\.0)"|^license: (MIT|Apache-2\.0)|image\.licenses="?(MIT|Apache)' \
-    -- ':!scripts/checks/versions.sh' ':!crates/sct-ecl/vendor' ':!crates/rf2/LICENSE' ':!crates/rf2/Cargo.toml' ':!crates/rf2/README.md' ':!website/book/mermaid.min.js' ':!CHANGELOG.md' || true)
+    -- ':!scripts/checks/versions.sh' ':!crates/sct-ecl/vendor' ':!crates/rf2' ':!website/book/mermaid.min.js' ':!CHANGELOG.md' || true)
   # rf2 is published under Apache 2.0 (the owner's decision, #223); it carries
-  # the Apache text and says so.
+  # the Apache text and says so, its files' SPDX headers included.
   if ! grep -q '^license = "Apache-2.0"' crates/rf2/Cargo.toml || ! grep -q 'Apache License' crates/rf2/LICENSE; then
     bad "crates/rf2 is not Apache-2.0 in its manifest and LICENSE"; stale=1
   fi

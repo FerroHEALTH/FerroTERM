@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 //! What was written lately: the type-level history of the three definitional
 //! resources this server publishes, merged into one list, newest first.

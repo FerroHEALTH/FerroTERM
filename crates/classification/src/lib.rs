@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Statistical classifications read into one model.
 //!
 //! `claml` reads Classification Markup Language (ISO 13120: WHO ICD-10, the

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The operation handlers of one version: GET and POST, type and instance level, over the engine.
 
 macro_rules! operations {

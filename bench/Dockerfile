@@ -1,4 +1,6 @@
 # syntax=docker/dockerfile:1
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
 # The benchmark image: builds the server, the offline index builder, and the
 # harness from this checkout, and runs the harness over releases and artifacts
 # mounted at run time, so a record is taken in one known Linux environment

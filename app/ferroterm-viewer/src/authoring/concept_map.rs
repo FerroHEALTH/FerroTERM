@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The form model behind the concept map editor.
 //!
 //! Everything here is plain values and plain functions: what a local

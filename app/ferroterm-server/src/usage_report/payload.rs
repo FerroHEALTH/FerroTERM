@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The report payload: `FerroPULSE`'s envelope v2 with FerroTERM's `status`
 //! and `metrics` objects.
 //!

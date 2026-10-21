@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! A synthetic RF2 Snapshot in a temporary directory: invented concepts in an
 //! invented namespace, valid check digits, published metadata identifiers only.
 

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! A control over a code of a value set the served root expands.
 //!
 //! Every coded element of an authored resource is bound to a value set

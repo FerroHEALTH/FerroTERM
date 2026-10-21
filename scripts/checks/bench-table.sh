@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
 # bench-table.sh: every public speed and footprint figure, rendered from a
 # committed set of benchmark records, never typed by hand.
 #

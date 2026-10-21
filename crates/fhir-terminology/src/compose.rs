@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The compose layer: `ValueSet.compose` evaluated once, above every provider.
 //!
 //! Includes union, criteria within an include intersect, excludes subtract,

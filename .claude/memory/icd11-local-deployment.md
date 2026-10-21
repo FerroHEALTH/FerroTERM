@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 The ICD-11 source is the WHO ICD-API local deployment: `docker run -d -p
 18090:80 -e acceptLicense=true -e saveAnalytics=false -e include=2026-01_en
 whoicd/icd-api`. `include` takes one `<release>_<language>` entry per

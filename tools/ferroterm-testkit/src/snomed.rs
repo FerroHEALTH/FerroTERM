@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! A synthetic SNOMED CT edition as an artifact directory, and a refset-only
 //! RF2 package to layer onto one.
 //!

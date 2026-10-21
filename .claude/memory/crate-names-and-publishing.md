@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 On 2026-09-03 the owner renamed every `crates/*` member to what it is, for
 crates.io and FerroBRIDGE (#164, PR #167): `fhir-types` (was ferroterm-fhir),
 `rf2`, `concept-graph`, `concept-store`, `designation-index`, `sct-ecl`,

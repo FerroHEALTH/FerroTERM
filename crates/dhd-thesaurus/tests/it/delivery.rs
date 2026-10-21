@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The reader over the Uitleverformaat 5.0 tables.
 
 use ::classification::{Class, PREFERRED};

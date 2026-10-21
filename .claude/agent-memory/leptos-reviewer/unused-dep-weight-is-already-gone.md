@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Measured 2026-09-07 with `twiggy` 0.8.0 over
 `target/wasm32-unknown-unknown/wasm-release/ferroterm-viewer.wasm`, the module
 before `wasm-opt` strips the name section, aggregated by the crate that owns

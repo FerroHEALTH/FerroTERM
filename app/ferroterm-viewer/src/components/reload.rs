@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! What an authoring screen does with a refused write: the sentence its live
 //! region announces, and the way back after a `412`.
 //!

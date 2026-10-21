@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # CLAUDE.md (`app/ferroterm-viewer`)
 
 The FerroTERM Console: a Leptos app rendered on the server and hydrated in

@@ -1,3 +1,4 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 
 # Contributing to FerroTERM
@@ -91,3 +92,15 @@ There is no separate agreement to sign: the pull request template carries a
 checkbox recording your acceptance of these terms, and a pull request from a
 person does not merge without it (the `contribution-licence-guard` check, backed
 by `scripts/checks/contribution-licence.sh`).
+
+Every file you add in a format that takes a comment opens with the two SPDX
+lines, in that format's comment syntax:
+
+```text
+SPDX-FileCopyrightText: Cadasto B.V.
+SPDX-License-Identifier: BUSL-1.1
+```
+
+Files under `crates/rf2` name `Apache-2.0` instead. JSON, vendored trees and
+changelog fragments carry no header. `scripts/checks/spdx-headers.sh` and
+`scripts/checks/copyright-holder.sh` check both lines in CI.

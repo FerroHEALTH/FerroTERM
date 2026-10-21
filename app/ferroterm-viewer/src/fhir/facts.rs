@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! One declared fact of a published resource, and how a value reads.
 //!
 //! A screen that draws a published definitional resource draws a list of

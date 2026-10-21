@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The FHIR surface of one served version, instantiated per version.
 //!
 //! R4 (4.0.1) and R4B (4.3.0) declare the same terminology operation

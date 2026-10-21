@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 //! The capture pass: a PNG of every console screen, for the book and for the
 //! visual review of a change.

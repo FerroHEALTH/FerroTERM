@@ -5,6 +5,9 @@ metadata:
   type: feedback
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Bash is the editing tool here, and three failures repeated on 2026-09-03:
 a `q{...}` or `s{...}{...}` perl string that contains Rust braces breaks the
 script ("unmatched right curly bracket"); a replacement written from memory

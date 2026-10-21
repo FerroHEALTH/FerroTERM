@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! A refset-only RF2 package layered onto the synthetic edition: its concepts
 //! and reference set join the edition, and an unmet module dependency is
 //! refused.

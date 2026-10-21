@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! A reference [`Source`] implementation, the shape an add-on takes.
 //!
 //! It implements only the six methods the contract requires and takes

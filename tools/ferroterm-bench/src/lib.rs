@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! What the two measurement binaries share.
 //!
 //! `ferroterm-bench` writes a record per code system and `ferroterm-residency`

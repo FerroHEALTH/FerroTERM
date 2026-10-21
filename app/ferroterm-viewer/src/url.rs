@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! URL building for every address the viewer emits.
 //!
 //! A code system URI, an ECL expression, a value set canonical, and a search

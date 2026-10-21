@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 On 2026-09-04 the owner asked for benchmarks like sct-rs's speed table (<https://github.com/pacharanero/sct/blob/HEAD/docs/benchmarks.md>) "but better and more trusted and verified", for every served code system, on the README, with memory beside speed, a website redesign for several audiences with a benchmarks page, and the harness running in a Docker container. Filed as #212 (harness, PR #218), #213 (README table from records), #214 (website redesign); #217 (P0, v0.1.0) audits every public claim against the SNOMED International terminology services expectations and Snowstorm before anything is called stable.
 
 **Why:** the owner's claims must hold up under scrutiny; a number typed by hand or taken on a busy laptop is not a claim.

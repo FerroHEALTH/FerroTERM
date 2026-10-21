@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Manual activation: a run stages and stops, and `POST /activate` is what
 //! puts the release in front of the server.
 //!

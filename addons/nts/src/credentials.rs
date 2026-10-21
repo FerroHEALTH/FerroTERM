@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The account the add-on authenticates with, read from outside the config.
 //!
 //! The service issues a personal account, so the secret is the deployment's to

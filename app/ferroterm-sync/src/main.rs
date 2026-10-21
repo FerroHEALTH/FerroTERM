@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The `ferroterm-sync` binary: the command line in,
 //! [`ferroterm_sync::cli`] out.
 #![expect(

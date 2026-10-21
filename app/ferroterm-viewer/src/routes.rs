@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The in-application addresses the shell links to.
 //!
 //! Every link keeps the selected FHIR version in the query, so a link a reader

@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # What FerroTERM is
 
 FerroTERM is a read-oriented FHIR terminology server for clinical code

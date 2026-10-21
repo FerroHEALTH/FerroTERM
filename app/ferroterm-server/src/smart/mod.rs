@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! SMART App Launch: the server as a resource server over `ferrohealth-smart`.
 //!
 //! The server takes the resource-server role and never the authorization-server

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The post-activation check: what a new release did to the deployment's own
 //! value sets and maps.
 //!

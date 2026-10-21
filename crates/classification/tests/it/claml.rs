@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The `ClaML` reader (the `ClaML` DTD; <https://hl7.org/fhir/R4B/icd.html> for
 //! the period in the codes).
 

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `ConceptMap/$translate`: the request each version takes, and its answer.
 //!
 //! The operation is spelled differently in every release this server mounts,

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! What one structure of a built artifact costs in memory, measured on its own.
 //!
 //! A served SNOMED edition holds more memory than its side files appear to

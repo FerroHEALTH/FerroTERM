@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: Apache-2.0
+
 use rf2::component::{
     Concept, ConcreteRelationship, ConcreteValue, Description, Relationship, Rows,
 };

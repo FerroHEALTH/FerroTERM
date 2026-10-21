@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The paging arithmetic every paged FHIR result shares.
 //!
 //! `ValueSet/$expand` pages with `offset` and `count` and reports

@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Licence history: MIT until 2026-09-03; BUSL 1.1 (#147) merged and was reverted for Apache 2.0 the same day (#150); on 2026-09-04 the owner asked, as priority 0, for BUSL 1.1 again "like what we have for FerroEHR" (#221): non-commercial production use is free, commercial production use needs a licence from the Licensor, hosted/managed/embedded services and for-fee distribution always need one, Apache 2.0 four years after each version. The LICENSE is FerroEHR's text with the Licensed Work renamed and clause (a) extended to terminology and code system content.
 
 **Why:** the owner wants FerroTERM and FerroEHR under one licensing model; the earlier revert to Apache was undone.

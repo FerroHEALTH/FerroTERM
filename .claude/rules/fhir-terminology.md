@@ -4,6 +4,9 @@ paths:
   - "app/ferroterm-server/**"
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # FHIR terminology service: wire conformance
 
 The FHIR specification is the oracle for the terminology wire. Implement and

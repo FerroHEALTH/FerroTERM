@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The value sets this root holds: the search and its pages. One value set
 //! is read on its own screen, `pages::value_set`.
 //!

@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # loinc
 
 The LOINC release loader. Hand-written; the LOINC Users' Guide and the FHIR

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Synthetic classification releases: a `ClaML` document shaped like a WHO
 //! ICD-10 translation and an ICD-10-CM release shaped like the NCHS files.
 //!

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The harness every case runs on: three mock servers, a fake build binary,
 //! and a clock the test drives.
 //!

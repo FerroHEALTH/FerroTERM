@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The `RxNorm` pipeline: read the release, number the concepts, write the
 //! artifacts (<https://hl7.org/fhir/R4B/rxnorm.html> for what the provider
 //! needs of them).

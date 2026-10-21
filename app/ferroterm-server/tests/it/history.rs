@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The history interaction on the persisted resources, at the instance and
 //! type levels (<https://hl7.org/fhir/R4B/http.html#history>).
 //!

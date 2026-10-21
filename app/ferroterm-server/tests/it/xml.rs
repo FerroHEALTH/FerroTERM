@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! FHIR XML on the wire: `_format`, `Accept`, and `Content-Type` choose the
 //! format on every route (<https://hl7.org/fhir/R4B/http.html#mime-type>).
 

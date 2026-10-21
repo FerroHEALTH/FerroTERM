@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Licensed source data on this machine, never committed (`/data/` is gitignored):
 
 - `data/snomed/SnomedCT_ManagedServiceNL_PRODUCTION_NL1000146_20260630T120000Z.zip` (and the unpacked directory): the Dutch edition, `http://snomed.info/sct/11000146104/version/20260630`, 548,949 concepts.

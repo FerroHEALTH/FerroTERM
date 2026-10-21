@@ -4,6 +4,9 @@ description: Look up the authoritative FHIR, SNOMED CT, or ECL requirement for a
 allowed-tools: Read, Grep, Glob, WebFetch
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Spec lookup
 
 Answer a "what does the spec say" question about the FHIR terminology wire,

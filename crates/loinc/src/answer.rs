@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The answer lists (`AnswerList.csv`): each list (`LL…`) with its answers
 //! (`LA…`), and the terms each list is linked to (`LoincAnswerListLink.csv`).
 

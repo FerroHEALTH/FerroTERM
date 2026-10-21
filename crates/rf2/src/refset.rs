@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: Apache-2.0
+
 //! Reference set members.
 //!
 //! Every reference set file starts with the six member columns; the file

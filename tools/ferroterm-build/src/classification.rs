@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The classification pipeline: a [`Classification`] (`ClaML` or the ICD-10-CM
 //! release, read by `classification`) numbered and written as the
 //! artifacts every provider reads.

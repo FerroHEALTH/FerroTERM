@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The ATC reader over the testkit's index and `BST801T` fixtures
 //! (<https://atcddd.fhi.no/atc/structure_and_principles/>).
 

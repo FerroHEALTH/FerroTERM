@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 //! One value set: what its definition selects, the codes it expands to, and
 //! the resource as the server sent it.

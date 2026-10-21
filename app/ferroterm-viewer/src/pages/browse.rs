@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The concept browser: search one code system, read a concept, walk its tree.
 //!
 //! What the screen offers is what the served version declares. The hierarchy

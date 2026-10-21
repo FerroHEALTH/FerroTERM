@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: Apache-2.0
+
 //! A synthetic RF2 Snapshot release built in a temporary directory.
 
 use std::fs;

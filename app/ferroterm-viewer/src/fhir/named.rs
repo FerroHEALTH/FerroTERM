@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The name every published resource of one type carries.
 //!
 //! `GET [base]/{type}?_elements=url,name,title,version` is the RESTful search

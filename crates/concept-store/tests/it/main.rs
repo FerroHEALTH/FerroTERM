@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The one integration-test binary for `concept-store`; one module per topic.
 #![allow(
     clippy::panic_in_result_fn,

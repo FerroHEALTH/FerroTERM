@@ -1,3 +1,4 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 
 # CI — two tiers.
@@ -193,8 +194,8 @@ jobs:
   # The tree guards: every vendor fetcher writes into the tree, every
   # workspace member is named in the repo map and the architecture table,
   # every evidence citation in docs/claims.md resolves to a symbol or a test,
-  # and every project extension the server writes has its StructureDefinition
-  # on the website.
+  # every project extension the server writes has its StructureDefinition
+  # on the website, and every first-party file carries its SPDX header.
   tree-guards:
     name: tree-guards
     runs-on: ubuntu-latest
@@ -213,6 +214,16 @@ jobs:
         run: bash scripts/checks/claims.sh
       - name: extension-definitions
         run: bash scripts/checks/extension-definitions.sh
+      # Every first-party file carries both SPDX lines, and every header
+      # names the Licensor. Each self-test runs first on a synthetic tree.
+      - name: spdx-headers
+        run: |
+          bash scripts/checks/spdx-headers.sh --self-test
+          bash scripts/checks/spdx-headers.sh
+      - name: copyright-holder
+        run: |
+          bash scripts/checks/copyright-holder.sh --self-test
+          bash scripts/checks/copyright-holder.sh
       # Every launcher that starts the server switches the usage report off.
       # The self-test runs first: it judges synthetic launchers.
       - name: usage-report-off

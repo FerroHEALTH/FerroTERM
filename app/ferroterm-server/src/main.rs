@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The `ferroterm` binary: configuration in, [`ferroterm_server::serve`] out.
 //!
 //! The order is the one that makes the console right: read the configuration,

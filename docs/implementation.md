@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Implementation checklist
 
 FerroTERM implements the whole FHIR terminology surface for SNOMED CT, LOINC, and

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The versions of one resource: what they are, what two of them differ by,
 //! and putting an earlier one back.
 //!

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: Apache-2.0
+
 //! RF2 file names and the layout of a release directory.
 //!
 //! A release file is named `[FileType]_[ContentType]_[ContentSubType]_

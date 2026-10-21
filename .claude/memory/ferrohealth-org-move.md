@@ -8,6 +8,9 @@ metadata:
   modified: 2026-10-01T15:55:50.606Z
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 On 2026-10-01 the owner asked to transfer the repository to the FerroHEALTH organisation and fix the configuration; done via `gh api repos/rubentalstra/FerroTERM/transfer` (PR #698 rewrote the tree, v0.1.6 is the first release from the org).
 
 - Moved with the repo: issues, PRs, releases, secrets (SONAR_TOKEN), environments (crates-io, github-pages), rulesets, private vulnerability reporting.

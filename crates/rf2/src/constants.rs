@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: Apache-2.0
+
 //! Identifiers the SNOMED CT specifications publish, as typed constants.
 //!
 //! Every value here is a published SCTID from the release file specification,

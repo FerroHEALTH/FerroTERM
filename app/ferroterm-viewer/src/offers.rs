@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! What a picker offers: the resources of one type this root publishes.
 //!
 //! A canonical is what every operation takes and what almost no reader knows

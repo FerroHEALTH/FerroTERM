@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The add-on itself: one configured service behind a bearer challenge.
 //!
 //! The service challenges both the listing and a download, and both carry the

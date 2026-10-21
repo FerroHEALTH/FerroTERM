@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The Nederlandse Labcodeset as FHIR resources over the LOINC, SNOMED CT, and
 //! UCUM providers.
 //!

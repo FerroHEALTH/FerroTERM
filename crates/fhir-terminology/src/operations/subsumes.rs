@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `CodeSystem/$subsumes` in the terms every served FHIR version shares.
 //!
 //! Two codes (or two codings) of one system, and the subsumption outcome of

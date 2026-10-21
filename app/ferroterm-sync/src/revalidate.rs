@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Revalidating the deployment's own value sets and maps after a release is
 //! activated.
 //!

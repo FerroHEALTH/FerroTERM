@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The linguistic variants: one file per translation
 //! (`nlNL22LinguisticVariant.csv`), the language and region in the file name.
 

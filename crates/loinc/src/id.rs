@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! LOINC codes and their check digit.
 //!
 //! A LOINC code is digits, a hyphen, and one check digit computed with the

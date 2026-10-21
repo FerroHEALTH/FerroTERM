@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Word-prefix matching over designations without a built text index.
 //!
 //! The fold and the word rules are `designation-index`'s, so a resource-backed

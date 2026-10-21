@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Opening a side file for a structure to be assembled from.
 //!
 //! Every structure of a built artifact is read once, from front to back, into

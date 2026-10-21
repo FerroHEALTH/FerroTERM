@@ -1,4 +1,6 @@
 # syntax=docker/dockerfile:1
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
 # The FerroTERM image: the server and the offline index builder, two static
 # binaries on distroless static, per platform. The binaries are not built here. The release workflow builds and
 # attests them in the SLSA L3 lane (release-build.yml), verifies each

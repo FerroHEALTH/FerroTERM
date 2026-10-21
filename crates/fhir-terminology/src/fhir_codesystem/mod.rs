@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The generic provider for any code system published as a FHIR `CodeSystem`
 //! resource: HL7 Terminology, custom systems, and supplements.
 //!

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The REST interactions of the persisted `CodeSystem`, `ValueSet`, and
 //! `ConceptMap` resources.
 //!

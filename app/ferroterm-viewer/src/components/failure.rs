@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Rendering a refused request, in the server's own words.
 
 use ferrohealth_ui::view::refusal::{Issue, Refusal, Severity, refusal};

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The concept maps this root holds, as the resources it publishes.
 //!
 //! The screen reads and never writes. The RESTful API defines create, update,

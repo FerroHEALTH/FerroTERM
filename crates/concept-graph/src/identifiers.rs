@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The alternate identifiers of an edition: a code of another scheme
 //! (`LOINC` `54486-6`) for a concept, from the RF2 identifier file, so an
 //! ECL `scheme#code` focus resolves to the concept.

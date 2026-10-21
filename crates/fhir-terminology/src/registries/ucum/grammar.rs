@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The UCUM expression grammar (<https://ucum.org/ucum> §2.2 "Syntax Rules").
 //!
 //! `term = component | term "." component | term "/" component`, with a

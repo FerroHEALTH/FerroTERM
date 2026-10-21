@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Where the service is, and which of its content a run takes.
 //!
 //! The configuration carries no secret. It names where the credentials are

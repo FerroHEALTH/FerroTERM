@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 //! The `ferroterm-viewer` binary: a thin entry point over the library run
 //! path.

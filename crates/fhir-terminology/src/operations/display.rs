@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The judgement of a display a client asserts, in the terminology
 //! ecosystem's words.
 //!

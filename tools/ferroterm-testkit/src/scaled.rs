@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! A synthetic SNOMED CT edition of any size, as an artifact directory.
 //!
 //! [`crate::snomed`] writes sixteen shaped concepts, which is the right fixture

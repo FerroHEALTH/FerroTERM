@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Request-scoped resources: `tx-resource` parameters and `$cache-control`.
 //!
 //! The terminology ecosystem's runner never uploads its setup resources: it

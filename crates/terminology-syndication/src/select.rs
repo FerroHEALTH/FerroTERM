@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Deciding which feed entries a run takes, and naming why it leaves the rest.
 //!
 //! Every entry a run leaves behind carries a [`SkipReason`], so a run record

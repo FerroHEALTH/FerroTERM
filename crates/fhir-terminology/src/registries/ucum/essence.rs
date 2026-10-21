@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The vendored `ucum-essence.xml`: prefixes, base units, and defined units.
 
 use std::collections::BTreeMap;

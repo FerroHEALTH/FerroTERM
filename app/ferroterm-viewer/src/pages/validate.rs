@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The `$validate-code` and `$subsumes` runners.
 //!
 //! What the screen offers is what the served root declares. A `$validate-code`

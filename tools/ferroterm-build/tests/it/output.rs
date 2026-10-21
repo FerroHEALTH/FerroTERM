@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Where a build writes: `--out`, or a child of the index root named for the
 //! source, and the refusal of an `--out` outside that root.
 

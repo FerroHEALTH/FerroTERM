@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! What the ABNF admits and what it refuses, rule by rule
 //! (`vendor/syntax/Compositional Grammar v2 - ABNF (Normative).txt`).
 //!

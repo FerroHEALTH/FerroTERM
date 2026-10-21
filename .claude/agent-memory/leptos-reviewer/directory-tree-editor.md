@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Reviewed live in the sibling project's folder-tree editor. The design was one
 working-tree signal with no per-row local state:
 

@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # FHIR versions
 
 FerroTERM answers FHIR R4 under `/r4`, R4B under `/r4b`, R5 under `/r5`, and

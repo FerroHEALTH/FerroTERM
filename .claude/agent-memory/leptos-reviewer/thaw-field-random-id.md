@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 `thaw::Field` generates its label and input id with `Uuid::new_v4()` at
 component setup (pinned thaw rev `0726a3d`, `thaw/src/field/field.rs:26`). It
 renders that uuid onto the label as a **static** `attr:for` and provides it,

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Postcoordination expressions: `1A00&XN8P1`, `NC53.Y&XK8G/PA71&XE5UF`,
 //! `1D01.0Y/1G41/1G40`, the ICF form `d5409.qp3`, and the URI form
 //! `<uri> & <uri>`.

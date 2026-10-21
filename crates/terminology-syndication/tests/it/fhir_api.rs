@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Listing a FHIR API as a feed, and fetching what it lists.
 //!
 //! No FHIR specification governs a feed built from a search (our own design);

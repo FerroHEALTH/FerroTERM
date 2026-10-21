@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # The public roadmap board (GitHub Project v2)
 
 The tracker is GitHub Issues (`.claude/rules/issue-workflow.md`); milestones are

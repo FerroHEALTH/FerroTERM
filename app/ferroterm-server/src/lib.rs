@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The FerroTERM FHIR terminology server.
 //!
 //! The library holds the whole run path so integration tests can drive it:

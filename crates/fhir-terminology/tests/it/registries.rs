@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The registry and grammar systems: BCP 47 (RFC 5646), BCP 13 (RFC 6838),
 //! and ISO 3166-1 over the vendored IANA and CLDR data.
 

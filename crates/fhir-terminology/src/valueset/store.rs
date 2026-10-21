@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The value sets a server holds, by `url` and `version`, and the resolver
 //! that answers `include.valueSet` references over them.
 

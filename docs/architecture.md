@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Architecture
 
 FerroTERM is a pure-Rust FHIR terminology server for SNOMED CT, LOINC,

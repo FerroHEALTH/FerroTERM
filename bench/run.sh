@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
 # run.sh — measure every configured code system into bench/results/.
 #
 # Builds the release binaries, then runs ferroterm-bench over bench/systems.json

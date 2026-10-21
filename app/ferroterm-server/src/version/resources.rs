@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The `tx-resource` parameters of one version, converted to the engine's models.
 
 macro_rules! resources {

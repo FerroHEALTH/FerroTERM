@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! What the deployment already serves, as the replace rule compares it.
 //!
 //! [`terminology_syndication::select`] takes an entry only when the same

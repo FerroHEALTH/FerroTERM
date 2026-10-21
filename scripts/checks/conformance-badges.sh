@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # The conformance badges: one shields.io endpoint JSON per served FHIR version,
 # derived from the committed pass lists of the HL7 terminology ecosystem suite

@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 `<Transition>` keeps the previous children mounted while the resource
 refetches, and a `LocalResource` keeps its previous value until the new future
 resolves. Anything in that subtree that reads the ROUTE instead of the ANSWER

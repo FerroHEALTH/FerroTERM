@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The lexical forms of FHIR primitives on the write path, refused by the
 //! generated codec (<https://hl7.org/fhir/R5/datatypes.html#primitive>) and
 //! answered as a `400` with the element path

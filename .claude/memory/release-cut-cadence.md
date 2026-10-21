@@ -8,6 +8,9 @@ metadata:
   modified: 2026-09-03T09:32:09.439Z
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 When a `vX.Y.Z` milestone reaches zero open issues, open the release PR right
 away, then push a GPG-signed tag (`git tag -s vX.Y.Z`) after it merges so
 `release.yml` publishes. The release PR bumps the version everywhere the

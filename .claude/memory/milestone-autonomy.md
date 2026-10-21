@@ -5,6 +5,9 @@ metadata:
   type: feedback
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Work the current milestone to zero open issues without stopping to ask what to do next, then cut the release: bump the version everywhere, cut the changelog, open the release PR. The owner said it first for v0.0.4 through v0.0.7 and restated it on 2026-09-04 for v0.0.11: "keep going till there is nothing left in the milestone like the last one so we can cut a new release".
 
 **Why:** the owner reviews and merges, and pushes the signed tag; deciding the order of issues inside a milestone is not something they want to be asked about. Pick by priority and blockers ([[repo-merge-gates]], the issue-workflow rules), state the order once, then execute.

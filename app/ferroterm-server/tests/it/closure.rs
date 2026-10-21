@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `POST [base]/$closure`
 //! (<https://hl7.org/fhir/R4B/conceptmap-operation-closure.html>,
 //! <https://hl7.org/fhir/R4B/terminology-service.html> "Maintaining a Closure

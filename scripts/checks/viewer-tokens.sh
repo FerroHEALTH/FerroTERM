@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # A viewer screen names a role and a step from the token layer, never a palette
 # entry, a raw type size, or a per-element theme prefix. The palette is measured

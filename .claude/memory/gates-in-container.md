@@ -5,6 +5,9 @@ metadata:
   type: feedback
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 Run every gate on the host: `cargo fmt`, `cargo clippy --workspace --all-targets --all-features`, `RUSTDOCFLAGS="-D warnings" cargo doc`, `scripts/checks/*.sh`, **and `cargo nextest run --workspace --locked`**.
 
 The pinned `rust:1.98-bookworm` container run is retired (the owner's instruction, 2026-09-05). Its `ferroterm-gates-target` volume reached 104.4 GB and crashed Docker once; both volumes were removed. Do not recreate them and do not run the suite in Docker.

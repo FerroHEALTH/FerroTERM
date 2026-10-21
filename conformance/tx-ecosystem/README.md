@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # The HL7 terminology ecosystem suite
 
 The suite (<https://build.fhir.org/ig/HL7/fhir-tx-ecosystem-ig/>) groups its

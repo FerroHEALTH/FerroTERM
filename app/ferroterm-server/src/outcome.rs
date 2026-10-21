@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `OperationOutcome` responses
 //! (<https://hl7.org/fhir/R4B/operationoutcome.html>).
 //!

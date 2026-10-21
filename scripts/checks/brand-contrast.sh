@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
 # The brand palette's contrast against the two grounds it is drawn on, measured
 # from assets/brand/tokens.css and checked against what that file claims.
 #

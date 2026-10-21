@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! LOINC release loading and the typed row model.
 //!
 //! Reads a LOINC release (the unpacked `Loinc_<version>` directory) into typed

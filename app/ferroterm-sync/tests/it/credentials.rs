@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The credential of the reload call: none, HTTP Basic (RFC 7617), or an
 //! OAuth 2.0 client credentials token (RFC 6749 §4.4) that `ferrohealth-smart`
 //! fetches and renews once when the server answers `401`.

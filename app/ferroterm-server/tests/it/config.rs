@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Loading the artifacts named by the configuration.
 
 use ferroterm_server::config::Config;

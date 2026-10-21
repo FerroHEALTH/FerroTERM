@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The health indicator, which asks the server's `GET /health`.
 
 use std::time::Duration;

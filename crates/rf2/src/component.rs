@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: Apache-2.0
+
 //! The RF2 component rows: concepts, descriptions, relationships,
 //! concrete-value relationships, and alternate identifiers.
 //!

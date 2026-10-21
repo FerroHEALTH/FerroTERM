@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The loaded server state: a registry of code system providers and the ids
 //! their `CodeSystem` instances answer on.
 //!

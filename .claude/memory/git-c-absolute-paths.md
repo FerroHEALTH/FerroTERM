@@ -5,6 +5,9 @@ metadata:
   type: feedback
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 A `cd <worktree> && git checkout -B <branch>` ran in a different worktree than
 the one named, and the follow-up force push overwrote a sibling PR's remote
 branch with another PR's content (2026-09-24, PRs #674 and #676).

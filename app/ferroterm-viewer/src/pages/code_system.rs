@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! One code system: what it says it is, what this server can do with it,
 //! and the resource as the server sent it.
 //!

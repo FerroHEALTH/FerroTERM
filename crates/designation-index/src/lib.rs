@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The designation search index.
 //!
 //! An `fst` map over designation word tokens plus roaring posting bitmaps per

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! `--gstandaard` over a synthetic release: four artifacts under one output.
 
 use ferroterm_testkit::gstandaard::{VERSION, write_release};

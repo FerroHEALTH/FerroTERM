@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! A synthetic LOINC-shaped release: the files `loinc` reads, laid
 //! out as the release archive lays them out, with invented codes carrying
 //! valid check digits.

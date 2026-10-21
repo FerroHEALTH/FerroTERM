@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The container health probe: one `GET /health` on the admin listener.
 //!
 //! The image has no shell and no HTTP client, so the probe is the binary

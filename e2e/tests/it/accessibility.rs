@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 //! The WCAG 2.2 Level AA pass, walked across every screen rather than per
 //! slice (<https://www.w3.org/TR/WCAG22/>).

@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # ferroterm-build
 
 The offline build: a licensed RF2 release in, the served artifacts out, once

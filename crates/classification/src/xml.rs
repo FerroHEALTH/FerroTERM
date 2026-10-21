@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The XML reading shared by the two readers.
 
 use quick_xml::XmlVersion;

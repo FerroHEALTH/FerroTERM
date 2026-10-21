@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 A coded control fills its `<select>` from a `ValueSet/$expand` that resolves
 after the form is built. Driving the select with `prop:value` alone is not
 enough, and the failure is silent: the select shows the first option, and the

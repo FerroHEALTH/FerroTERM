@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The `$translate` runner: one code, through the maps this root holds.
 //!
 //! The screen reads and never writes. Every parameter of a run lives in the

@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # rf2
 
 The SNOMED CT RF2 loader and the typed component model. Hand-written; the

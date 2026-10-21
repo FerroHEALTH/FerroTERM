@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The LOINC pipeline: read the release, number everything, write the
 //! artifacts (<https://hl7.org/fhir/R4B/loinc.html> for what the provider
 //! needs of them).

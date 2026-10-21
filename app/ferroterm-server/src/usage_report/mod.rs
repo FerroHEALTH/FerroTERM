@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The usage report to `FerroPULSE`.
 //!
 //! One `start` report at each process start and one `daily` report a day,

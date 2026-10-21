@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 **Kept for the record.** Nothing in this entry applies to a client-side
 rendered viewer: there is no `SsrMode`, no `leptos_axum`, and no server-side
 redirect. It is preserved because the mechanism is worth knowing if this

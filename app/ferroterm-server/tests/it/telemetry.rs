@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The JSON log format carries the startup and request fields a pipeline reads.
 
 use std::io::Write;

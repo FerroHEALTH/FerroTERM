@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 On 2026-09-22 the owner decided how FerroTERM takes content from the Nictiz Nationale Terminologie Server (NTS), after the PvE review of the filled Excel:
 
 - The sync is a separate service, `app/ferroterm-sync`, never inside the server. The server only gains a reload path (#578).

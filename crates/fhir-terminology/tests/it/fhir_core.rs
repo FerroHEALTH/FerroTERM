@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The terminology the FHIR specification defines, per served version
 //! (<https://hl7.org/fhir/R4B/terminologies-systems.html>).
 

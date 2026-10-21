@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The `searchset` `Bundle` a RESTful search answers.
 //!
 //! `GET [base]/{type}?…` is the search interaction and it answers a `Bundle`

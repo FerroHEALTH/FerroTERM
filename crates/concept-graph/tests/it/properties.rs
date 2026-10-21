@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Property tests: the closure agrees with brute-force reachability on random
 //! acyclic graphs, and the set operations keep their algebraic identities.
 

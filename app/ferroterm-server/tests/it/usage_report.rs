@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The usage report to `FerroPULSE`: the rendered payloads, the window fed by
 //! the router, and the start and daily sends to a mock collector.
 //!

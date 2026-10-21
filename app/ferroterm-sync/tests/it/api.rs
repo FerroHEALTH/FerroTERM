@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The FHIR API lane: a service that keeps its resources behind its FHIR API
 //! rather than in the feed is listed there, and what it lists goes through
 //! the resource lane like a feed entry.

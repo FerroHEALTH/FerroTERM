@@ -6,6 +6,9 @@ metadata:
   type: reference
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 **The original finding.** `leptos_axum::redirect` builds the `Location` header
 with `HeaderValue::from_str(path).expect("Failed to create HeaderValue")`.
 Header values reject control characters and non-ASCII bytes, so an unencoded

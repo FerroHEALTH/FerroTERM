@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The reads the concept browser makes, and the answers it draws.
 //!
 //! One concept is read with `CodeSystem/$lookup`

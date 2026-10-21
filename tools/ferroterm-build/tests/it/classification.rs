@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The classification build over the testkit's `ClaML` and ICD-10-CM fixtures.
 
 use ::classification::claml::read;

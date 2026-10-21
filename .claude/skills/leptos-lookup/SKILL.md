@@ -11,6 +11,9 @@ allowed-tools: Read, Grep, Glob, Bash
 argument-hint: "<signal / resource / router / form / ssr / bundle-size topic>"
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # /leptos-lookup
 
 Answer Leptos questions from the official book text, never from memory. Leptos

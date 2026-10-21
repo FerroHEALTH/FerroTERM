@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # The 2026-09-23 record set, Apple M2
 
 Seven code systems, one record each, taken with the 0.1.4 release binaries

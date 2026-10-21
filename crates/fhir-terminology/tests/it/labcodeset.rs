@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
+// SPDX-License-Identifier: BUSL-1.1
+
 //! The Labcodeset resources the build writes load as a value set, a LOINC
 //! supplement, and ordinal value sets.
 

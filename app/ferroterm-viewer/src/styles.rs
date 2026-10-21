@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 //! The console's class vocabulary: the FerroUI components' classes a screen
 //! paints with, under the names the screens use.
