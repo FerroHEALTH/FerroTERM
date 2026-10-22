@@ -34,7 +34,7 @@ The image serves UCUM, BCP 47, BCP 13, and ISO 3166-1 with no configuration,
 so the first call needs nothing beyond Docker:
 
 ```console
-$ docker run --rm -p 8080:8080 ghcr.io/ferrohealth/ferroterm:0.1.9
+$ docker run --rm -p 8080:8080 ghcr.io/ferrohealth/ferroterm:0.1.10
 $ curl 'http://localhost:8080/r4b/CodeSystem/$lookup?system=http://unitsofmeasure.org&code=mg/dL'
 ```
 
@@ -178,7 +178,7 @@ Every route answers FHIR JSON or FHIR XML, by `_format` or `Accept`.
 
 ## What is next
 
-v0.1.9 is the current release. The tracker's milestones are the roadmap, and
+v0.1.10 is the current release. The tracker's milestones are the roadmap, and
 the open issues under each are the worklist:
 
 - **[v0.2.0](https://github.com/FerroHEALTH/FerroTERM/milestone/24)**: the
