@@ -17,6 +17,28 @@ allowed-tools: Bash, Read, Grep, Glob
 Run every gate the console must pass (`.claude/rules/leptos-ui.md` §6 and §7).
 Stop and report on the first hard failure; run the cheap gates first.
 
+## What FerroUI already checks (inherited, not re-run here)
+
+FerroUI leads the console's UI, and its gates hold every component the
+console draws before a release reaches the pin (`ferrohealth-ui` in the
+root `Cargo.toml`, `=0.2.0` today):
+
+- the library gates of FerroUI's `.claude/rules/leptos-ui.md` §10 (fmt,
+  clippy on the host and wasm32, nextest, the gallery journeys and
+  screenshots) and its no-inline-style and no-WebAssembly tests
+  (`crates/ferrohealth-ui/tests/it/stylesheet.rs` and, on `main`,
+  `app/ferrohealth-ui-gallery/tests/it/no_wasm.rs`);
+- the design checks of `design/COMPONENTS.md` § Checks every console runs
+  (`render.py`, `overflow.py`, `hover.py`, `contrast.py`, `selects.py`,
+  `popups.py`, `forms.py`, run by `design/tools/check.sh` over the console's
+  mockup in `design/consoles/ferroterm/`).
+
+A gate failure that comes from a FerroUI part is reported as a FerroUI
+issue (FerroHEALTH/FerroUI), never fixed by a local override. The console's
+own gates follow; the CI guards `viewer-boundary.sh`, `viewer-tokens.sh`
+and `stray-literals.sh app/ferroterm-viewer/src` hold its boundary, its
+tokens and its catalog beside them.
+
 ## Preconditions
 
 - Tooling presence, reported rather than silently installed:
