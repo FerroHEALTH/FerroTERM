@@ -265,8 +265,10 @@ apply always. Read the relevant one before working in that area.
   names on crates.io, the lockstep bump rule, Trusted Publishing lanes).
 - `.claude/rules/leptos-ui.md`: the console's own rules (the backend-for-frontend,
   server rendering and hydration, the FHIR-client boundary, code-system
-  neutrality), scoped to `app/ferroterm-viewer`; the component rules are
-  FerroUI's. The design is `docs/viewer.md`.
+  neutrality), scoped to `app/ferroterm-viewer`. FerroUI leads the console's
+  UI: its [consumer guide](https://github.com/FerroHEALTH/FerroUI/blob/main/docs/consoles.md),
+  component rules and design, read at the tag matching the `ferrohealth-ui`
+  pin, come before this file. The design is `docs/viewer.md`.
 - `.claude/rules/issue-workflow.md`, `issue-relationships.md`, `project-board.md`:
   the tracker work-style.
 - Skills: `/spec-lookup` (find the authoritative spec answer in oracle order),

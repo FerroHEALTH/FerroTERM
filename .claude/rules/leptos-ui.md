@@ -7,13 +7,47 @@ paths: ["app/ferroterm-viewer/**"]
 
 # The FerroTERM Console's own rules (`app/ferroterm-viewer`)
 
-**The component rules are FerroUI's**: `.claude/rules/leptos-ui.md` in
-FerroHEALTH/FerroUI, the one rule set of every FerroHEALTH console, covers the
-mandates (Rust only, no inline style, no server function in the library, no
-browser storage), the two tiers of component, rendering in both halves,
-reactivity, views, forms, tables and paging, accessibility, tokens and icons.
-Read it first. This file keeps only what is particular to FerroTERM's console.
-The oracle for a Leptos question is the official Leptos book
+**FerroUI leads the console's UI.** FerroUI (`ferrohealth-ui` on crates.io,
+repository FerroHEALTH/FerroUI) is the family's component library and the
+one source of its console design and its Leptos rules. Read these first,
+before any console change:
+
+- the consumer guide, [`docs/consoles.md`](https://github.com/FerroHEALTH/FerroUI/blob/main/docs/consoles.md):
+  how a console takes the library, what it keeps local, how it moves to a
+  new release;
+- the component rules, [`.claude/rules/leptos-ui.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.2.0/.claude/rules/leptos-ui.md):
+  the mandates (§0: Rust only, no inline style, no server function in the
+  library, no browser storage, no patient identifier in a URL), the two
+  tiers (§1), reactivity, views, forms, tables and paging, accessibility,
+  tokens and themes, icons, the bundle (§12) and the catalogs (§13); on
+  `main` the same file adds the four-layer interaction contract (§1), the
+  book's rules (§14) and the island rules (§15);
+- the crate discipline, [`crates/ferrohealth-ui/CLAUDE.md`](https://github.com/FerroHEALTH/FerroUI/blob/main/crates/ferrohealth-ui/CLAUDE.md):
+  the interaction contract, islands mode and the list of ready islands;
+- the reviewed design, [`design/README.md`](https://github.com/FerroHEALTH/FerroUI/blob/main/design/README.md),
+  [`design/COMPONENTS.md`](https://github.com/FerroHEALTH/FerroUI/blob/main/design/COMPONENTS.md)
+  (the component IDs such as R9, F13 and M1 to M6, the family rules, the
+  page templates) and the console's mockup under
+  [`design/consoles/ferroterm/`](https://github.com/FerroHEALTH/FerroUI/tree/main/design/consoles/ferroterm).
+
+**The pin decides the version you read.** The console pins `ferrohealth-ui
+= "=0.2.0"` (root `Cargo.toml`), so its component rules are read at the tag
+`v0.2.0`. The guide, the crate discipline and the design entered FerroUI
+after that tag and are read on `main` until the pin reaches a tag that
+carries them. The console moves to FerroUI 0.3.x, islands mode and the
+four-layer interaction contract in the console rollout
+(FerroHEALTH/FerroUI#161, after FerroUI 0.3.2); new UI work waits for it.
+FerroUI's `design/` is the only design source: a design folder anywhere
+else is stale and never synced from.
+
+**Nothing FerroUI has or should have is built here.** A missing component,
+a wrong behaviour in one, a stylesheet override or a script the console
+would need is filed on FerroHEALTH/FerroUI and linked from the console's
+issue (§4). Never a local copy, a shadow component, a local stylesheet
+override or a hand-written script.
+
+This file keeps only what is particular to FerroTERM's console. The oracle
+for a Leptos question FerroUI does not settle is the official Leptos book
 (<https://github.com/leptos-rs/book>, Leptos 0.8) through `/leptos-lookup`.
 
 ## 1. What the console is
@@ -108,6 +142,10 @@ compressed (`server.rs`).
 
 ## 6. Testing and gates
 
+- FerroUI's own gates (its `leptos-ui.md` §10) hold the library; the
+  design checks of the console's mockup (`design/COMPONENTS.md` § Checks
+  every console runs, `design/tools/check.sh`) run in FerroUI. The console
+  runs the gates below over its own code.
 - Business logic lives outside components, in plain types with unit tests
   (URL building, `OperationOutcome` flattening, the paging arithmetic, the
   tree model, the authoring models, the exchange's path check).
