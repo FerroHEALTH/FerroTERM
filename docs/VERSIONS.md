@@ -36,6 +36,7 @@ discovery-phase repo.
 | Edition | 2024 |
 | Cargo resolver | 3 |
 | MSRV | 1.98 (`rust-version` in the root `Cargo.toml`, checked by `cargo hack check --rust-version`); the toolchain is the newest stable Rust release and the MSRV the toolchain minus one minor release, the rule every FerroHEALTH repository follows; an MSRV is only ever raised |
+| Container base image | `gcr.io/distroless/static-debian13:nonroot@sha256:d62067879de890a1def9da0e7766b7d20810a5e5555cef8506b752437d7a3e88` (`ca-certificates` 20250419+deb13u1), the `FROM` of `docker/Dockerfile`, `docker/Dockerfile.sync` and `docker/viewer/Dockerfile`, and each one's `org.opencontainers.image.base.name` label without the digest |
 
 ## openEHR: n/a
 
