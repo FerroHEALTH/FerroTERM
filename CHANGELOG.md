@@ -17,7 +17,9 @@ fragments here under the version and its date.
 
 ## [Unreleased]
 
-## [0.1.9] - 2026-10-21
+## [0.1.10] - 2026-10-22
+
+The v0.1.9 tag was pushed but its release never published: the console tarball lacked its README. 0.1.10 is the same release with that README added, and no 0.1.9 artifacts exist.
 
 ### Changed
 
@@ -1782,8 +1784,8 @@ binary answers `GET /health` only.
 - No existing Rust terminology or FHIR crate is a dependency; the README
   records the evaluation and the reasons.
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.9...HEAD
-[0.1.9]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.8...v0.1.9
+[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.10...HEAD
+[0.1.10]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.8...v0.1.10
 [0.1.8]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.5...v0.1.6

@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "addon-nts"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "jiff",
  "reqwest",
@@ -1273,7 +1273,7 @@ dependencies = [
 
 [[package]]
 name = "ferroterm-bench"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "anyhow",
  "clap",
@@ -1291,7 +1291,7 @@ dependencies = [
 
 [[package]]
 name = "ferroterm-build"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "anyhow",
  "clap",
@@ -1318,7 +1318,7 @@ dependencies = [
 
 [[package]]
 name = "ferroterm-server"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "anyhow",
  "argon2",
@@ -1356,7 +1356,7 @@ dependencies = [
 
 [[package]]
 name = "ferroterm-sync"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "addon-nts",
  "anyhow",
@@ -1385,7 +1385,7 @@ dependencies = [
 
 [[package]]
 name = "ferroterm-testkit"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "classification",
  "concept-graph",
@@ -1405,7 +1405,7 @@ dependencies = [
 
 [[package]]
 name = "ferroterm-viewer"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "aws-lc-rs",
  "axum",
