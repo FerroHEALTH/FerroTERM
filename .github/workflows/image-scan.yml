@@ -17,7 +17,9 @@
 # Run colour: the run is red only when the probe fails (an image that cannot be
 # resolved or pulled, a Trivy crash, output jq cannot read). A finding files or
 # updates one tracking issue and the run stays green: the issue is the alert,
-# where a red scheduled run reaches only someone watching the Actions tab.
+# where a red scheduled run reaches only someone watching the Actions tab. An
+# image never yet published at `latest` (the console before its first release
+# under that name) is named in the summary and skipped.
 name: Published image scan
 
 on:
@@ -95,7 +97,17 @@ jobs:
           : > findings.md
           for image in ferroterm ferroterm-console; do
             ref="ghcr.io/${OWNER}/${image}:${SCAN_TAG}"
-            digest=$(docker buildx imagetools inspect "$ref" --format '{{.Manifest.Digest}}')
+            # An image never yet published at the tag is skipped with a
+            # warning; any other inspect failure fails the run.
+            if ! digest=$(docker buildx imagetools inspect "$ref" --format '{{.Manifest.Digest}}' 2> inspect.err); then
+              if grep -q 'not found' inspect.err; then
+                echo "::warning::${ref} is not published yet; skipped"
+                echo "| \`${image}\` | | not published at \`${SCAN_TAG}\` | skipped |" >> findings.md
+                continue
+              fi
+              cat inspect.err >&2
+              exit 1
+            fi
             for platform in linux/amd64 linux/arm64; do
               arch=${platform##*/}
               echo "::group::${image} ${platform} (${digest})"
@@ -111,6 +123,7 @@ jobs:
             done
           done
           echo "total=$total" >> "$GITHUB_OUTPUT"
+          # shellcheck disable=SC2016 # the backticks are Markdown in the summary, not a command
           {
             printf '## Published image scan\n\n'
             printf 'Tag `%s`, Trivy %s, HIGH/CRITICAL with a fix available, VEX applied.\n\n' \
@@ -140,6 +153,7 @@ jobs:
         run: |
           set -euo pipefail
           title="security(images): the published images carry fixable HIGH/CRITICAL findings"
+          # shellcheck disable=SC2016 # the backticks are Markdown in the issue body, not a command
           {
             printf 'A scheduled scan of the published images found **%s** fixable HIGH/CRITICAL findings.\n\n' "$TOTAL"
             printf '| image | platform | digest | findings |\n|---|---|---|---|\n'
