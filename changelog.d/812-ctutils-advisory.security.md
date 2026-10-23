@@ -1,1 +1,1 @@
-- The lock moves `ctutils` from 0.4.3 to 0.4.5, which the server and the synchronisation service reach through `argon2`, past RUSTSEC-2026-0385: 0.4.3 could branch on a secret value while generating a constant-time mask.
+- The lock moves `ctutils` from 0.4.3 to 0.4.5, which the server and the synchronisation service reach through `argon2`, past RUSTSEC-2026-0385 (GHSA-2cmc-fgqj-cfcv): 0.4.3 could branch on a secret value while generating a constant-time mask.
