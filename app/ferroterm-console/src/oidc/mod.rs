@@ -267,6 +267,15 @@ async fn redirected(
             tracing::warn!(error = %error, "a sign-in's ID Token was refused");
             return to_sign_in(SignInState::Rejected);
         }
+        // NOTE: RFC 6749 §5.2: a provider that answered the exchange was
+        // reached, so its refusal or its malformed answer is never "unreachable".
+        Err(error) if error.is_answered_refusal() => {
+            tracing::warn!(error = %error, "the OpenID Provider refused a sign-in's code exchange");
+            return to_sign_in(match error {
+                exchange::ExchangeError::Refused { .. } => SignInState::Refused,
+                _ => SignInState::Rejected,
+            });
+        }
         Err(error) => {
             tracing::error!(
                 error = %crate::command::chain(&error),
