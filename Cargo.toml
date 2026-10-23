@@ -134,7 +134,7 @@ secrecy = { version = "0.10.3", features = ["serde"] }
 url = "2.5.8"
 # Only the console's site bundle is compressed, brotli or gzip as the request
 # asks; the security headers are set per response. Verified 2026-10-18.
-tower-http = { version = "0.7.1", default-features = false, features = ["set-header", "compression-br", "compression-gzip"] }
+tower-http = { version = "0.7.1", default-features = false, features = ["set-header", "compression-br", "compression-gzip", "fs"] }
 # Observability.
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
