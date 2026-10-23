@@ -384,11 +384,10 @@ async fn states(journey: &Journey, dir: &Path, base: &str) -> WebDriverResult<()
         let (width, height) = STATE_WINDOWS[1];
         open(journey, base, "/").await;
         journey.resize(width, height).await;
-        journey
+        let drawer = journey
             .visible(By::Css(DRAWER_BUTTON), "the drawer button")
-            .await
-            .click()
-            .await?;
+            .await;
+        journey.press_on(&drawer, "the drawer button").await?;
         journey.shot(&into.join("drawer-open-390.png")).await;
     }
     journey.set_cookie(THEME_COOKIE, "light").await
@@ -401,11 +400,10 @@ async fn menu_open(journey: &Journey, dir: &Path, base: &str) -> WebDriverResult
         for (width, height) in STATE_WINDOWS {
             open(journey, base, "/").await;
             journey.resize(width, height).await;
-            journey
+            let menu = journey
                 .visible(By::Css(MENU_BUTTON), "the reader's menu button")
-                .await
-                .click()
-                .await?;
+                .await;
+            journey.press_on(&menu, "the reader's menu button").await?;
             journey
                 .visible(By::Css("#user-menu"), "the open menu")
                 .await;

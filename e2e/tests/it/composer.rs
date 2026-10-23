@@ -74,20 +74,16 @@ async fn compose(journey: &Journey, canonical: &str, code: &str) -> WebDriverRes
         .send_keys("Below the first branch")
         .await?;
     journey
-        .element(
+        .press(
             By::Css("#vs-status option[value='active']"),
             "the active status",
         )
-        .await
-        .click()
         .await?;
     journey
-        .element(
+        .press(
             By::Css(format!("{CLAUSE_SYSTEM} option[value='{TAXONOMY}']")),
             "the taxonomy offered to the clause",
         )
-        .await
-        .click()
         .await?;
     journey.press(By::Css(ADD_FILTER), "Add filter").await?;
     journey

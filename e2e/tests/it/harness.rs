@@ -69,6 +69,32 @@ return [on.id || '', on.getAttribute('name') || '', (on.textContent || '').trim(
   .filter((part) => part !== '').join(' ');
 ";
 
+/// Tags the page in front of the browser before a press, and records on the
+/// tag whether the press starts loading another page: a navigation the
+/// Navigation API reports, or a form submission nothing cancelled, which
+/// navigates only in a later task
+/// (<https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#form-submission-algorithm>).
+const TAG: &str = r#"
+if (window.__journeyPress === undefined) {
+  navigation.addEventListener("navigate", (event) => {
+    if (!event.hashChange) { window.__journeyPress.navigating = true; }
+  });
+  addEventListener("submit", (event) => { window.__journeyPress.submits.push(event); }, true);
+}
+window.__journeyPress = { navigating: false, submits: [] };
+"#;
+
+/// Where the press [`TAG`] watched has left the browser: `loaded` once the
+/// tagged page is gone, `leaving` while it is still in front of the browser
+/// and another page is on its way, `staying` when the press loads nothing.
+const LEFT: &str = r#"
+const press = window.__journeyPress;
+if (press === undefined) { return "loaded"; }
+const posted = press.submits.some((event) => !event.defaultPrevented
+  && (event.submitter?.getAttribute("formmethod") ?? event.target.method).toLowerCase() !== "dialog");
+return press.navigating || posted ? "leaving" : "staying";
+"#;
+
 /// How often a wait re-reads the page while it waits.
 const POLL: Duration = Duration::from_millis(100);
 
@@ -149,16 +175,17 @@ pub async fn sign_in(journey: &Journey, deployment: &SignedIn) -> String {
     let control = journey
         .element(By::XPath(SIGN_IN_CONTROL), "the sign-in control")
         .await;
-    control.click().await.unwrap_or_else(|error| {
-        panic!("the sign-in control refused the press: {error}");
-    });
     journey
-        .element(
+        .press_on(&control, "the sign-in control")
+        .await
+        .unwrap_or_else(|error| {
+            panic!("the sign-in control refused the press: {error}");
+        });
+    journey
+        .press(
             By::Css("a[href^='/auth/login']"),
             "the sign-in page's way to the identity provider",
         )
-        .await
-        .click()
         .await
         .unwrap_or_else(|error| {
             panic!("the sign-in page's control refused the press: {error}");
@@ -462,13 +489,65 @@ impl Journey {
         }
     }
 
-    /// Presses the element matching `selector` once it is on the page.
+    /// Presses the element matching `selector` once it is on the page, and
+    /// returns once the page the press loads, if any, has hydrated.
     ///
     /// # Errors
     ///
     /// Returns the WebDriver error if the browser refused the press.
     pub async fn press(&self, selector: By, what: &str) -> WebDriverResult<()> {
-        self.element(selector, what).await.click().await
+        let element = self.element(selector, what).await;
+        self.press_on(&element, what).await
+    }
+
+    /// Presses `element`, which a journey already holds, and returns once the
+    /// page the press loads, if any, has hydrated.
+    ///
+    /// # Errors
+    ///
+    /// Returns the WebDriver error if the browser refused the press.
+    pub async fn press_on(&self, element: &WebElement, what: &str) -> WebDriverResult<()> {
+        self.acting(what, || element.click()).await
+    }
+
+    /// Runs `act`, a press or keys, on a tagged page, and returns once the
+    /// page it loads, if any, has hydrated.
+    ///
+    /// A click can return while the page it leaves is still in front of the
+    /// browser, hydrated, and carrying the controls the next step looks for,
+    /// so every wait after it would pass on a page about to go away. The tag
+    /// goes with that page, which is how the new one is told apart.
+    async fn acting<F, A>(&self, what: &str, act: F) -> WebDriverResult<()>
+    where
+        F: FnOnce() -> A,
+        A: Future<Output = WebDriverResult<()>>,
+    {
+        self.driver.execute(TAG, Vec::new()).await?;
+        act().await?;
+        let deadline = Instant::now() + WAIT;
+        loop {
+            // NOTE: a script the navigation interrupts has no answer, which reads
+            // as the page still leaving.
+            let left = self
+                .driver
+                .execute(LEFT, Vec::new())
+                .await
+                .ok()
+                .and_then(|answer| answer.convert::<String>().ok());
+            match left.as_deref() {
+                Some("staying") => return Ok(()),
+                Some("loaded") => {
+                    self.hydrated().await;
+                    return Ok(());
+                }
+                _ => {}
+            }
+            if Instant::now() >= deadline {
+                let reason = "the page the press left never went away";
+                panic!("{}", self.failure(what, reason).await);
+            }
+            tokio::time::sleep(POLL).await;
+        }
     }
 
     /// Keeps one preference of Your preferences: the choice card of `key`
@@ -494,13 +573,14 @@ impl Journey {
         if self.count(kept.clone()).await == 1 {
             return Ok(());
         }
-        self.visible(
-            By::Css(format!("label:has(input[name='{key}'][value='{value}'])")),
-            "the choice of the preference",
-        )
-        .await
-        .click()
-        .await?;
+        let choice = self
+            .visible(
+                By::Css(format!("label:has(input[name='{key}'][value='{value}'])")),
+                "the choice of the preference",
+            )
+            .await;
+        self.press_on(&choice, "the choice of the preference")
+            .await?;
         self.count_becoming(kept, 1, "the console to draw the kept setting")
             .await;
         self.hydrated().await;
@@ -587,11 +667,12 @@ impl Journey {
     ///
     /// Every other reading here is a WebDriver primitive, because inert markup
     /// satisfies a source assertion even when the control it describes is
-    /// unreachable. Four things have no primitive: the element focus is on
+    /// unreachable. Five things have no primitive: the element focus is on
     /// after a key press, the colour a browser actually painted, the height
     /// of the viewport, because Get Window Rect reports the window around it
-    /// (<https://www.w3.org/TR/webdriver2/#get-window-rect>), and whether a
-    /// document has finished loading, which `hydrated` reads. They are read
+    /// (<https://www.w3.org/TR/webdriver2/#get-window-rect>), whether a
+    /// document has finished loading, which `hydrated` reads, and whether a
+    /// press is loading another page, which `acting` reads. They are read
     /// through a script (<https://www.w3.org/TR/webdriver2/#execute-script>)
     /// and nothing else is.
     pub async fn evaluate(&self, script: &str) -> WebDriverResult<String> {
@@ -629,7 +710,8 @@ impl Journey {
     ///
     /// A shortcut answers only once the page has hydrated, and the last press
     /// may have loaded a page whose controls are on screen before then, so
-    /// the keys wait for the page.
+    /// the keys wait for the page. A key that submits a form returns once the
+    /// page it loads has hydrated, as a press does.
     ///
     /// # Errors
     ///
@@ -637,17 +719,20 @@ impl Journey {
     pub async fn type_here(&self, text: &str) -> WebDriverResult<()> {
         self.hydrated().await;
         let chain = self.driver.action_chain();
-        match text.strip_prefix('\u{e009}') {
-            Some(chord) => {
-                chain
-                    .key_down(Key::Control)
-                    .send_keys(chord)
-                    .key_up(Key::Control)
-                    .perform()
-                    .await
+        self.acting("the keys typed", || async move {
+            match text.strip_prefix('\u{e009}') {
+                Some(chord) => {
+                    chain
+                        .key_down(Key::Control)
+                        .send_keys(chord)
+                        .key_up(Key::Control)
+                        .perform()
+                        .await
+                }
+                None => chain.send_keys(text).perform().await,
             }
-            None => chain.send_keys(text).perform().await,
-        }
+        })
+        .await
     }
 
     /// Presses tab until the keyboard is on the control `wanted` names.
