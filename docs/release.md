@@ -149,14 +149,24 @@ To add a release fact, add a function and a line to the list in
 
 The signed tag is the owner's: `git tag -s vX.Y.Z -m "vX.Y.Z" <commit>` on the
 merged release commit, then `git push origin vX.Y.Z`. `release.yml` takes it
-from there: the plan job (the preflight's list), the draft release, the four per-architecture builds, the image, the
-asset verification, the publish, the crates.io leg behind the `crates-io`
-environment's required reviewer, and last the `milestone` job, which closes
+from there: the plan job (the preflight's list), the draft release, the four
+per-architecture builds, the server and console images pushed by digest, the
+vulnerability record, the image scan that tags both digests only once it
+passes, the asset verification, the publish, the crates.io leg behind the
+`crates-io` environment's required reviewer, and last the `milestone` job, which closes
 the milestone titled as the tag once every other leg has succeeded. When a
 leg fails or the crates.io approval is refused, that job names the leg in its
 log and leaves the milestone open; a re-run of the failed jobs closes it. An
 already-closed milestone counts as done, and a pre-release tag finishes no
 milestone, so neither milestone step reads or changes one for it.
+
+A refused vulnerability record names each finding without a judging
+statement. Fix the finding with a rebuild or a dependency bump, or add its
+statement under `security/vex/` (`security/vex/README.md`), and cut the next
+patch: the refused release stays a draft and its images stay untagged. The
+same scan runs locally over the published images with
+`bash scripts/security/scan-images.sh`, or over a candidate image with
+`--candidate <ref>`.
 
 ## After the tag
 

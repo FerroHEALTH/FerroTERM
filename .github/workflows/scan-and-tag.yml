@@ -1,0 +1,172 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+
+# The image vulnerability gate and the tag application, as a reusable
+# workflow release.yml calls (no specification governs the order: our own
+# design, the one FerroEHR's release lane runs).
+#
+# The order is the point: release-image.yml and release-console.yml push each
+# image BY DIGEST with no tag, this workflow scans those digests, and only a
+# passing scan makes them referencable. A tagged image that fails its scan
+# afterwards is already `latest` for anyone pulling it.
+#
+# Both images are static distroless (musl binaries on
+# gcr.io/distroless/static-debian13), so the OS surface is the base image's
+# few Debian packages. The gate fails on a HIGH or CRITICAL finding that has a
+# fix (trivy.yaml); the release's vulnerability record, which runs before this
+# workflow, judges every other finding against security/vex/.
+name: Scan and tag images (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      server-image:
+        description: The server image name (ghcr.io/...).
+        required: true
+        type: string
+      server-digest:
+        description: The server image's pushed index digest.
+        required: true
+        type: string
+      server-tags:
+        description: The newline-separated tag list to apply to the server digest.
+        required: true
+        type: string
+      console-image:
+        description: The console image name (ghcr.io/...).
+        required: true
+        type: string
+      console-digest:
+        description: The console image's pushed index digest.
+        required: true
+        type: string
+      console-tags:
+        description: The newline-separated tag list to apply to the console digest.
+        required: true
+        type: string
+
+permissions: {}
+
+env:
+  REGISTRY: ghcr.io
+  # The one Trivy version the release record and the weekly scan run too.
+  TRIVY_VERSION: "0.73.0"
+
+jobs:
+  image-scan:
+    name: image vulnerability scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read # pull the digests the caller just pushed
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The published index is dual-arch and Trivy reads one variant per
+      # invocation (`--platform`, default linux/amd64), so each variant is
+      # scanned by the pushed digest.
+      - name: Scan the server image (linux/amd64)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: linux/amd64
+        with:
+          version: v${{ env.TRIVY_VERSION }}
+          scan-type: image
+          image-ref: ${{ inputs.server-image }}@${{ inputs.server-digest }}
+          scanners: vuln
+          exit-code: "1"
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivy-config: trivy.yaml
+
+      - name: Scan the server image (linux/arm64)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: linux/arm64
+        with:
+          version: v${{ env.TRIVY_VERSION }}
+          scan-type: image
+          image-ref: ${{ inputs.server-image }}@${{ inputs.server-digest }}
+          scanners: vuln
+          exit-code: "1"
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivy-config: trivy.yaml
+
+      - name: Scan the console image (linux/amd64)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: linux/amd64
+        with:
+          version: v${{ env.TRIVY_VERSION }}
+          scan-type: image
+          image-ref: ${{ inputs.console-image }}@${{ inputs.console-digest }}
+          scanners: vuln
+          exit-code: "1"
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivy-config: trivy.yaml
+
+      - name: Scan the console image (linux/arm64)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: linux/arm64
+        with:
+          version: v${{ env.TRIVY_VERSION }}
+          scan-type: image
+          image-ref: ${{ inputs.console-image }}@${{ inputs.console-digest }}
+          scanners: vuln
+          exit-code: "1"
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivy-config: trivy.yaml
+
+  # Tags exist only after the scan passes. `imagetools create` over a single
+  # source re-tags the same digest, so the attestations bound to it stay valid.
+  apply-tags:
+    name: apply image tags (after the scan gate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      packages: write # tag the digests the caller pushed
+    needs: image-scan
+    steps:
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag the server image
+        env:
+          IMAGE: ${{ inputs.server-image }}
+          DIGEST: ${{ inputs.server-digest }}
+          TAGS: ${{ inputs.server-tags }}
+        run: |
+          set -euo pipefail
+          args=()
+          while IFS= read -r t; do [ -n "$t" ] && args+=(-t "$t"); done <<< "$TAGS"
+          [ "${#args[@]}" -gt 0 ] || { echo "::error::no tags to apply to ${IMAGE}@${DIGEST}"; exit 1; }
+          docker buildx imagetools create "${args[@]}" "${IMAGE}@${DIGEST}"
+
+      - name: Tag the console image
+        env:
+          IMAGE: ${{ inputs.console-image }}
+          DIGEST: ${{ inputs.console-digest }}
+          TAGS: ${{ inputs.console-tags }}
+        run: |
+          set -euo pipefail
+          args=()
+          while IFS= read -r t; do [ -n "$t" ] && args+=(-t "$t"); done <<< "$TAGS"
+          [ "${#args[@]}" -gt 0 ] || { echo "::error::no tags to apply to ${IMAGE}@${DIGEST}"; exit 1; }
+          docker buildx imagetools create "${args[@]}" "${IMAGE}@${DIGEST}"

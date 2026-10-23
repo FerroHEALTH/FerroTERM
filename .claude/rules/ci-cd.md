@@ -68,6 +68,15 @@ CI fails on lockfile drift, never on registry drift. Commit `Cargo.lock`.
   CycloneDX SBOM; `actions/attest-build-provenance` and `actions/attest-sbom`
   sign both keyless (Sigstore/Fulcio, `id-token: write`). Consumers verify with
   `gh attestation verify … --signer-workflow …/release-build.yml`.
+- **Images are scanned before they are tagged, and every finding is judged.**
+  `release-image.yml` and `release-console.yml` push by digest with no tag;
+  the release's `vulnerability-record` job scans both images and the server
+  tarballs at every severity and `scripts/checks/vex-coverage.sh` refuses the
+  release while a finding has no statement under `security/vex/`;
+  `scan-and-tag.yml` gates on fixable HIGH and CRITICAL findings, then tags.
+  Trivy is pinned to one version (`TRIVY_VERSION`) in every lane, and its
+  actions by digest. The Rust-advisory VEX document is generated, never
+  hand-edited (`security/vex/README.md`).
 - **Releases are immutable** (draft → attach all assets → verify the set →
   publish last; the platform freezes on publish). The fix for a bad cut is a new
   patch version, never a retag.

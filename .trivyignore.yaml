@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+#
+# Adjudicated scanner exceptions (Trivy ignore file). Every entry states what is
+# exempt, why, and until when (`expired_at`), so an exception cannot become
+# permanent by inattention. There is no blanket suppression and no lowered
+# severity threshold standing in for one.
+
+# No vulnerability exceptions. The gate reports only findings that have a fix,
+# and those are fixed by a rebuild or a base bump. A finding judged not to
+# affect FerroTERM gets its argument as an OpenVEX statement under
+# security/vex/, which the release record and the weekly published-image scan
+# read.
+vulnerabilities: []

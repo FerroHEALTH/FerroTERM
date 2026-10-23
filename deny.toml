@@ -15,18 +15,15 @@ version = 2
 # zero, re-checked at every dependency-bump cycle, never a permanent waiver).
 yanked = "deny"
 ignore = [
-  # Both arrived with the console's leptos tree, both are `unmaintained` rather
-  # than a vulnerability, and both are compile-time only, so neither reaches
-  # the server binary or the WebAssembly bundle. Driven to zero on #432; each
-  # is deleted when the upstream release that drops it is picked up.
-  # paste, reached through leptos/either_of/reactive_graph/tachys. Added
-  # 2026-09-06, re-checked 2026-09-11: either_of 0.1.9 is the newest release and
-  # still depends on it, and so does leptos 0.9.0-beta.
+  # paste arrived with the console's leptos tree. It is `unmaintained` rather
+  # than a vulnerability and compile-time only, so it reaches neither the
+  # server binary nor the WebAssembly bundle; security/vex/rust-advisories.toml
+  # publishes the argument. Driven to zero on #432, and deleted when the
+  # upstream release that drops it is picked up. Reached through
+  # leptos/either_of/reactive_graph/reactive_stores/tachys. Added 2026-09-06,
+  # re-checked 2026-10-23: either_of 0.1.9 is the newest release and still
+  # depends on it. scripts/checks/advisory-exceptions.sh fails once it is gone.
   { id = "RUSTSEC-2024-0436", reason = "deleted when a leptos release stops pulling paste (#432)" },
-  # proc-macro-error2, reached through leptos_macro and the other proc-macro
-  # crates in that tree. Added 2026-09-06, re-checked 2026-09-11: leptos_macro
-  # 0.8.17 is the newest 0.8 release and 0.9.0-beta still depends on it too.
-  { id = "RUSTSEC-2026-0173", reason = "deleted when leptos_macro moves off proc-macro-error2 (#432)" },
 ]
 
 [licenses]

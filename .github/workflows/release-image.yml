@@ -12,8 +12,10 @@
 # is staged, so the image provenance chains to attested inputs.
 #
 # What lands in the registry for one release:
-#   - the image index (linux/amd64, linux/arm64) tagged <version>, <major.minor>,
-#     and latest, with OCI annotations on the index and both manifests;
+#   - the image index (linux/amd64, linux/arm64), pushed by digest with OCI
+#     annotations on the index and both manifests, and tagged <version>,
+#     <major.minor> and latest by scan-and-tag.yml only after its scan and the
+#     release's vulnerability record pass;
 #   - BuildKit's own SLSA provenance (mode=max) as attestation manifests in
 #     the index (the unknown/unknown entries GHCR shows);
 #   - GitHub attestations, pushed as OCI referrers: SLSA provenance for the
@@ -43,6 +45,13 @@ on:
       digest:
         description: The digest of the pushed image index.
         value: ${{ jobs.image.outputs.digest }}
+      tags:
+        description: >-
+          The newline-separated tag list the metadata step computed. The index
+          is pushed by digest with no tag; release.yml applies these through
+          scan-and-tag.yml once the image's scan and the release's
+          vulnerability record pass.
+        value: ${{ jobs.image.outputs.tags }}
 
 permissions: {}
 
@@ -64,6 +73,7 @@ jobs:
       attestations: write # store them against this repository
     outputs:
       digest: ${{ steps.build.outputs.digest }}
+      tags: ${{ steps.meta.outputs.tags }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -155,11 +165,13 @@ jobs:
           context: .
           file: docker/Dockerfile
           platforms: linux/amd64,linux/arm64
-          push: true
+          # By digest, untagged: scan-and-tag.yml tags the index only after the
+          # scan and the vulnerability record pass. Attestations bind the
+          # digest, so they are the same either way.
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
           no-cache: true
           provenance: mode=max
           sbom: false
-          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
 
@@ -252,7 +264,6 @@ jobs:
         run: |
           set -euo pipefail
           signer="${GITHUB_REPOSITORY}/.github/workflows/release-image.yml"
-          gh attestation verify "oci://${IMAGE}:${VERSION}" --repo "$GITHUB_REPOSITORY" --signer-workflow "$signer"
           gh attestation verify "oci://${IMAGE}@${DIGEST}" --repo "$GITHUB_REPOSITORY" --signer-workflow "$signer"
           for manifest in "$AMD64" "$ARM64"; do
             gh attestation verify "oci://${IMAGE}@${manifest}" --repo "$GITHUB_REPOSITORY" --signer-workflow "$signer"

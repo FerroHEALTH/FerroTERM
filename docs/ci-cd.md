@@ -17,14 +17,17 @@ exist.
 | Workflow | Does | Active |
 |---|---|---|
 | `ci.yml` (workflows lane) | `actionlint`, `zizmor --min-severity=low` over `.github/workflows/`, `shellcheck` over tracked shell | now |
-| `ci.yml` (Rust lanes) | fmt, clippy `-D warnings`, nextest `--locked` + doctests, rustdoc `-D warnings`, `cargo deny`, MSRV (`cargo hack check --rust-version`), dependency-review (PR) | on workspace |
+| `ci.yml` (Rust lanes) | fmt, clippy `-D warnings`, nextest `--locked` + doctests, rustdoc `-D warnings`, `cargo deny` with no stale advisory exception (`advisory-exceptions.sh`) and every VEX statement's dependency path against the graph (`vex-reachability.sh`), MSRV (`cargo hack check --rust-version`), dependency-review (PR) | on workspace |
 | `ci.yml` (`versions` job) | `scripts/checks/versions.sh`, version-drift guard | now |
 | `scorecard.yml` | OpenSSF Scorecard, results published, SARIF → code scanning | now |
 | `codeql.yml` | CodeQL: `actions` now, `rust` self-activates when the workspace lands | actions now |
 | `sonar.yml` | SonarQube Cloud (advisory; `.claude/rules/ai-code-review.md`) | now (sweep); coverage on workspace |
 | `release-build.yml` | reusable SLSA Build L3 lane: build + SBOM + keyless attest | on tag |
-| `release.yml` | `v*` orchestrator: draft → per-arch build → image → verify assets → publish last | on tag |
-| `release-image.yml` | reusable SLSA Build L3 lane: the distroless static image from the attested musl binaries, pushed to GHCR with provenance and SBOM attestations on the index and on each platform manifest | on tag |
+| `release.yml` | `v*` orchestrator: plan → draft → per-arch build → images by digest → vulnerability record → scan and tag → verify assets → publish last | on tag |
+| `release-image.yml` | reusable SLSA Build L3 lane: the distroless static image from the attested musl binaries, pushed to GHCR by digest with provenance and SBOM attestations on the index and on each platform manifest | on tag |
+| `scan-and-tag.yml` | reusable: both pushed digests scanned with Trivy (HIGH/CRITICAL with a fix, `trivy.yaml`), and only then tagged | on tag |
+| `image-scan.yml` | weekly: the published `latest` images scanned with every `security/vex/` document as `--vex`, one tracking issue filed or updated on a finding | weekly |
+| `ci.yml` (`vex` job) | the Rust-advisory OpenVEX document regenerated from `deny.toml` and `security/vex/rust-advisories.toml` and diffed, every hand-written document well-formed (`scripts/checks/vex-advisories.sh`), and the release record's coverage check self-tested | always |
 | `ci.yml` (`hadolint` job) | `hadolint` over every `Dockerfile` in the tree, plus `docker/Dockerfile.sync` by name | now |
 | `ci.yml` (`console` job) | the console's browser half: `cargo fmt` and `leptosfmt --check` over `app/ferroterm-console`, `cargo clippy --target wasm32-unknown-unknown -D warnings`, the release site bundle built by cargo-leptos (`scripts/release/console-site.sh --release`), its size against the budget (`scripts/checks/console-bundle.sh`) and no build-host path in it (`scripts/checks/console-paths.sh`) | on workspace |
 | `ci.yml` (`console-boundary` job) | the console's resolved dependency closure links no workspace crate (`scripts/checks/console-boundary.sh`) | on workspace |
@@ -146,6 +149,18 @@ dependency list inside the binary, so the SBOM names the crates). BuildKit's own
 SBOM scanner is off; it would see a two-file filesystem. The lane finishes by
 verifying its own output as a consumer would, and the release does not publish
 without it.
+
+The lane pushes the index by digest with no tag. The release's
+`vulnerability-record` job then scans both images and the server's glibc
+tarballs with every severity, unfixed findings included, and
+`scripts/checks/vex-coverage.sh` refuses the release while a finding has no
+judging statement under `security/vex/` (CRA Annex I Part I(2)(a));
+the record, `ferroterm-<tag>-vulnerability-record.json`, and the raw Trivy
+reports are release assets. `scan-and-tag.yml` then fails on any HIGH or
+CRITICAL finding with a fix and only after that applies the tags, and the
+release publishes only after both, so a refused release leaves no tag and no
+published page. The weekly `image-scan.yml` scans the published images again
+with the VEX documents applied (`security/vex/README.md`).
 
 Tags are `<version>`, `<major.minor>`, and `latest` (skipped for a
 pre-release); GHCR tags are mutable, so deploy by digest. Verify:
