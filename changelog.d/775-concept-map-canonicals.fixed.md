@@ -1,0 +1,1 @@
+- A concept map's Mappings table breaks a long canonical at its slashes and stays inside its card at 1440 and 390 px.

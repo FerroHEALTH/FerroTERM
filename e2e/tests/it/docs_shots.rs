@@ -60,51 +60,37 @@ const MAPPED_CODE: &str = "ca-leaf";
 /// The cookie the console keeps its theme in.
 const THEME_COOKIE: &str = "ferroterm_console_theme";
 
-/// A code system row whose version declares the direct-child operator: the
-/// row offers the concept browser, so the browse link is the mark.
-const WALKABLE_ROW: &str =
-    "//tr[.//a[contains(@href, '/browse')]]//a[starts-with(@href, '/systems/')]";
+/// The code system the fixture mounts, whose R5 version declares `child-of`.
+const SYSTEM: &str = "https://ferroterm.eu/fhir/CodeSystem/e2e-taxonomy";
 
-/// The canonical fact of a detail screen.
-const CANONICAL_FACT: &str = "//dt[normalize-space()='Canonical']/following-sibling::dd[1]";
+/// The value set the fixture publishes over it.
+const VALUE_SET: &str = "https://ferroterm.eu/fhir/ValueSet/e2e-taxonomy-all";
 
-/// A listed value set, as the link that opens its screen.
-const VALUE_SET_LINK: &str = "main tbody a[href^='/valuesets/']";
+/// The value set's logical id.
+const VALUE_SET_ID: &str = "e2e-taxonomy-all";
 
-/// A listed concept map, as the link that opens its screen.
-const CONCEPT_MAP_LINK: &str = "main tbody a[href^='/conceptmaps/']";
+/// The concept map's logical id.
+const CONCEPT_MAP_ID: &str = "e2e-taxonomy-map";
 
-/// The link from a code system's screen into the concept browser.
-const BROWSE_LINK: &str = "nav[aria-label^='Screens for'] a[href*='/browse']";
-
-/// A concept the browser's search answered.
-const SEARCH_RESULT: &str = "section[aria-labelledby='browse-search-heading'] ul li a";
-
-/// One row of the tree.
-const TREE_ROW: &str = "li[role='treeitem']";
-
-/// The link from a value set's screen to its versions.
-const HISTORY_LINK: &str = "main a[href^='/history']";
+/// A concept with rows above and below it in the tree.
+const BRANCH: &str = "ba-branch";
 
 /// The first table row link of a listing, for the hover state.
 const ROW_LINK: &str = "main tbody tr a";
 
-/// The command bar, for the focus state.
-const COMMAND_BAR: &str = "#command-bar";
+/// The top bar's search field, for the focus state.
+const FIND_FIELD: &str = "#find";
 
 /// The drawer button the shell draws at a narrow width.
 const DRAWER_BUTTON: &str = "header button.fui-drawer-only";
 
-/// The operator menu's button, drawn once a reader is signed in.
-const MENU_BUTTON: &str = "header button[popovertarget='operator-menu']";
+/// The reader's menu button in the top bar.
+const MENU_BUTTON: &str = "header button[popovertarget='user-menu']";
 
-/// The translate screen's code system picker, a combobox.
-const PICKER: &str = "#translate-system";
+/// The FHIR version select in the top bar.
+const VERSION_SELECT: &str = "summary.fui-version-select";
 
-/// The list that picker opens.
-const PICKER_LIST: &str = "#translate-system-list";
-
-/// A disclosure's summary.
+/// A disclosure's summary: the Parameters a lookup answered.
 const DISCLOSURE: &str = "main details summary";
 
 /// The width of every book image, in CSS pixels; the height is fitted.
@@ -140,21 +126,6 @@ struct Screen {
     path: String,
 }
 
-/// What the walk learned from the listings, so it names no resource itself.
-#[derive(Debug)]
-struct Subjects {
-    /// The canonical of a code system whose version declares `child-of`.
-    system: String,
-    /// The path of that code system's screen.
-    system_path: String,
-    /// The path of a value set's screen.
-    value_set_path: String,
-    /// The canonical of that value set.
-    value_set: String,
-    /// The path of a concept map's screen.
-    concept_map_path: String,
-}
-
 /// Where a capture writes, and which variants it takes.
 #[derive(Clone, Debug)]
 enum Mode {
@@ -178,12 +149,6 @@ impl Mode {
 fn on_version(path: &str) -> String {
     let joiner = if path.contains('?') { '&' } else { '?' };
     format!("{path}{joiner}fhir={CAPTURED_VERSION}")
-}
-
-/// A listing's link without the query it carries, which [`on_version`] puts
-/// back.
-fn without_query(href: &str) -> String {
-    href.split('?').next().unwrap_or_default().to_owned()
 }
 
 /// The directory a review image in `theme` goes to.
@@ -272,77 +237,42 @@ async fn open(journey: &Journey, base: &str, path: &str) {
         .await;
 }
 
-/// Reads the subjects from the listings.
-async fn subjects(journey: &Journey, base: &str) -> WebDriverResult<Subjects> {
-    open(journey, base, "/systems").await;
-    let row = journey
-        .element(By::XPath(WALKABLE_ROW), "a code system with a hierarchy")
-        .await;
-    let system_path = row.attr("href").await?.unwrap_or_default();
-    row.click().await?;
-    let system = journey
-        .element(By::XPath(CANONICAL_FACT), "the code system's canonical")
-        .await
-        .text()
-        .await?;
-    open(journey, base, "/valuesets").await;
-    let link = journey
-        .element(By::Css(VALUE_SET_LINK), "a listed value set")
-        .await;
-    let value_set_path = link.attr("href").await?.unwrap_or_default();
-    link.click().await?;
-    let value_set = journey
-        .element(By::XPath(CANONICAL_FACT), "the value set's canonical")
-        .await
-        .text()
-        .await?;
-    open(journey, base, "/conceptmaps").await;
-    let concept_map_path = journey
-        .element(By::Css(CONCEPT_MAP_LINK), "a listed concept map")
-        .await
-        .attr("href")
-        .await?
-        .unwrap_or_default();
-    Ok(Subjects {
-        system: system.trim().to_owned(),
-        system_path: without_query(&system_path),
-        value_set_path: without_query(&value_set_path),
-        value_set: value_set.trim().to_owned(),
-        concept_map_path: without_query(&concept_map_path),
-    })
-}
-
-/// The screens a visitor reads, in walking order, the concept browser apart.
-fn read_screens(subjects: &Subjects) -> Vec<Screen> {
-    let system = query_param(&subjects.system);
-    let value_set = query_param(&subjects.value_set);
+/// The screens a visitor reads, in walking order.
+fn read_screens() -> Vec<Screen> {
+    let system = query_param(SYSTEM);
+    let value_set = query_param(VALUE_SET);
     let screen = |name, book, path: String| Screen { name, book, path };
-    let system_path = &subjects.system_path;
-    let value_set_path = &subjects.value_set_path;
-    let concept_map_path = &subjects.concept_map_path;
+    let system_path = format!("/systems/{system}");
+    let value_set_path = format!("/valuesets/{VALUE_SET_ID}");
+    let concept_map_path = format!("/conceptmaps/{CONCEPT_MAP_ID}");
     vec![
         screen("dashboard", Some("dashboard"), "/".to_owned()),
         screen("code-systems", Some("code-systems"), "/systems".to_owned()),
         screen("code-system", Some("code-system"), system_path.clone()),
         screen(
-            "code-system-support",
+            "code-system-versions",
             None,
-            format!("{system_path}?tab=support"),
+            format!("{system_path}?pane=versions"),
         ),
-        screen("code-system-json", None, format!("{system_path}?tab=json")),
+        screen("code-system-json", None, format!("{system_path}?pane=json")),
         screen("value-sets", None, "/valuesets".to_owned()),
         screen("value-set", Some("value-set"), value_set_path.clone()),
         screen(
             "value-set-expansion",
             None,
-            format!("{value_set_path}?tab=expansion"),
+            format!("{value_set_path}?pane=expansion"),
         ),
         screen("concept-maps", None, "/conceptmaps".to_owned()),
-        screen("concept-map", None, concept_map_path.clone()),
+        screen("concept-map", Some("concept-map"), concept_map_path.clone()),
         screen(
-            "concept-map-mappings",
-            Some("concept-map"),
-            format!("{concept_map_path}?tab=mappings"),
+            "concept-map-overview",
+            None,
+            format!("{concept_map_path}?pane=overview"),
+        ),
+        screen(
+            "browse",
+            Some("browse"),
+            format!("/browse?system={system}&code={BRANCH}"),
         ),
         screen(
             "lookup",
@@ -352,7 +282,7 @@ fn read_screens(subjects: &Subjects) -> Vec<Screen> {
         screen(
             "validate",
             None,
-            format!("/validate?on=codesystem&system={system}&code={MAPPED_CODE}"),
+            format!("/validate?url={value_set}&system={system}&code={MAPPED_CODE}"),
         ),
         screen("expand", Some("expand"), format!("/expand?url={value_set}")),
         screen(
@@ -360,10 +290,17 @@ fn read_screens(subjects: &Subjects) -> Vec<Screen> {
             None,
             format!("/translate?system={system}&code={MAPPED_CODE}"),
         ),
-        screen("find", None, format!("/find?q={system}")),
+        screen("find", None, format!("/find?q={MAPPED_CODE}")),
+        screen("server", Some("server"), "/server".to_owned()),
+        screen("server-operations", None, "/server/operations".to_owned()),
+        screen("server-evidence", None, "/server/evidence".to_owned()),
+        screen("configuration", None, "/configuration".to_owned()),
+        screen(
+            "preferences",
+            Some("preferences"),
+            "/preferences".to_owned(),
+        ),
         screen("about", Some("about"), "/about".to_owned()),
-        screen("about-evidence", None, "/about?tab=evidence".to_owned()),
-        screen("about-settings", None, "/about?tab=settings".to_owned()),
         screen("not-found", None, "/no-such-screen".to_owned()),
     ]
 }
@@ -408,77 +345,6 @@ async fn capture(
     Ok(number)
 }
 
-/// The concept browser, reached the way a reader reaches it: from a code
-/// system, through a search, onto a concept with rows below it.
-async fn browse(
-    journey: &Journey,
-    mode: &Mode,
-    base: &str,
-    subjects: &Subjects,
-    number: usize,
-) -> WebDriverResult<()> {
-    let screen = Screen {
-        name: "browse",
-        book: Some("browse"),
-        path: subjects.system_path.clone(),
-    };
-    for theme in mode.themes() {
-        journey.set_cookie(THEME_COOKIE, theme).await?;
-        open(journey, base, &screen.path).await;
-        journey
-            .press(By::Css(BROWSE_LINK), "the link into the concept browser")
-            .await?;
-        journey
-            .press(By::Css(SEARCH_RESULT), "a concept the search answered")
-            .await?;
-        journey
-            .address_carrying("code=", "the address to carry the concept")
-            .await;
-        journey
-            .element(By::Css(TREE_ROW), "a row of the tree")
-            .await;
-        journey
-            .settled("the concept browser to finish answering")
-            .await;
-        shots(journey, mode, theme, number, &screen).await?;
-    }
-    journey.set_cookie(THEME_COOKIE, "light").await
-}
-
-/// The versions of the value set, reached from its screen.
-async fn history(
-    journey: &Journey,
-    mode: &Mode,
-    base: &str,
-    subjects: &Subjects,
-    number: usize,
-) -> WebDriverResult<()> {
-    let screen = Screen {
-        name: "history",
-        book: None,
-        path: subjects.value_set_path.clone(),
-    };
-    for theme in mode.themes() {
-        journey.set_cookie(THEME_COOKIE, theme).await?;
-        open(journey, base, &screen.path).await;
-        journey
-            .press(
-                By::Css(HISTORY_LINK),
-                "the link to the value set's versions",
-            )
-            .await?;
-        journey
-            .address_carrying("/history", "the versions screen")
-            .await;
-        journey
-            .element(By::Css("main h1"), "the versions screen's heading")
-            .await;
-        journey.settled("the versions to finish answering").await;
-        shots(journey, mode, theme, number, &screen).await?;
-    }
-    journey.set_cookie(THEME_COOKIE, "light").await
-}
-
 /// The hover, focus and open states a full-page capture never shows, in the
 /// window a reader has, in both themes.
 async fn states(journey: &Journey, dir: &Path, base: &str) -> WebDriverResult<()> {
@@ -493,26 +359,28 @@ async fn states(journey: &Journey, dir: &Path, base: &str) -> WebDriverResult<()
             .await?;
         journey.shot(&into.join("hover-row-1440.png")).await;
         journey
-            .press(By::Css(COMMAND_BAR), "the command bar")
+            .press(By::Css(FIND_FIELD), "the search field")
             .await?;
-        journey.shot(&into.join("focus-command-bar-1440.png")).await;
-        open(journey, base, "/about").await;
+        journey.shot(&into.join("focus-search-1440.png")).await;
+        open(
+            journey,
+            base,
+            &format!("/lookup?system={}&code={MAPPED_CODE}", query_param(SYSTEM)),
+        )
+        .await;
         journey.resize(width, height).await;
         journey.press(By::Css(DISCLOSURE), "a disclosure").await?;
         journey.shot(&into.join("disclosure-open-1440.png")).await;
-        for (width, height) in STATE_WINDOWS {
-            open(journey, base, "/translate").await;
-            journey.resize(width, height).await;
-            journey
-                .press(By::Css(PICKER), "the code system picker")
-                .await?;
-            journey
-                .visible(By::Css(PICKER_LIST), "the open list of code systems")
-                .await;
-            journey
-                .shot(&into.join(format!("combobox-open-{width}.png")))
-                .await;
-        }
+        // A phone carries the version in the reader's menu, which the menu
+        // capture shows open, so the select is captured on the wide window.
+        open(journey, base, "/systems").await;
+        journey.resize(width, height).await;
+        journey
+            .press(By::Css(VERSION_SELECT), "the FHIR version select")
+            .await?;
+        journey
+            .shot(&into.join(format!("version-select-open-{width}.png")))
+            .await;
         let (width, height) = STATE_WINDOWS[1];
         open(journey, base, "/").await;
         journey.resize(width, height).await;
@@ -526,7 +394,7 @@ async fn states(journey: &Journey, dir: &Path, base: &str) -> WebDriverResult<()
     journey.set_cookie(THEME_COOKIE, "light").await
 }
 
-/// The operator menu, open, on a signed-in console.
+/// The reader's menu, open, on a signed-in console.
 async fn menu_open(journey: &Journey, dir: &Path, base: &str) -> WebDriverResult<()> {
     for theme in ["light", "dark"] {
         journey.set_cookie(THEME_COOKIE, theme).await?;
@@ -534,12 +402,12 @@ async fn menu_open(journey: &Journey, dir: &Path, base: &str) -> WebDriverResult
             open(journey, base, "/").await;
             journey.resize(width, height).await;
             journey
-                .visible(By::Css(MENU_BUTTON), "the operator menu's button")
+                .visible(By::Css(MENU_BUTTON), "the reader's menu button")
                 .await
                 .click()
                 .await?;
             journey
-                .visible(By::Css("#operator-menu"), "the open operator menu")
+                .visible(By::Css("#user-menu"), "the open menu")
                 .await;
             let file = format!("menu-open-{width}.png");
             journey
@@ -581,14 +449,8 @@ async fn the_documentation_screenshots_are_captured() {
         .await
         .run_and_quit(|driver| async move {
             let journey = Journey::open(driver, &base, "/").await;
-            let subjects = subjects(&journey, &base).await?;
-            let screens = read_screens(&subjects);
-            let (before, after) = screens.split_at(3);
-            let next = capture(&journey, &reading, &base, before, 1).await?;
-            browse(&journey, &reading, &base, &subjects, next).await?;
-            let next = capture(&journey, &reading, &base, after, next.saturating_add(1)).await?;
+            capture(&journey, &reading, &base, &read_screens(), 1).await?;
             if let Mode::Review(dir) = &reading {
-                history(&journey, &reading, &base, &subjects, next).await?;
                 states(&journey, dir, &base).await?;
             }
             Ok::<(), WebDriverError>(())

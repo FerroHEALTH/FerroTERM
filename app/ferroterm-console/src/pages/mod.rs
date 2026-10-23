@@ -1,7 +1,11 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The routed screens.
+//! The routed screens, each drawn on the server alone.
+//!
+//! A screen reads what it shows on the server while the page renders
+//! ([`parts::loaded`]), so the browser receives the whole page as HTML and
+//! hydrates the islands in it and nothing else.
 
 // The diagnostic lands on macro output rather than on an item written here,
 // so the expectation covers the module tree.
@@ -13,25 +17,32 @@
 pub(crate) mod about;
 pub(crate) mod browse;
 pub(crate) mod code_system;
+pub(crate) mod code_system_editor;
+pub(crate) mod code_systems;
+pub(crate) mod composer;
 pub(crate) mod concept_map;
 pub(crate) mod concept_map_editor;
 pub(crate) mod concept_maps;
+pub(crate) mod configuration;
+pub(crate) mod dashboard;
+pub(crate) mod detail;
 pub(crate) mod editor;
-pub(crate) mod evidence;
+pub(crate) mod errors;
 pub(crate) mod expand;
 pub(crate) mod find;
 pub(crate) mod history;
+pub(crate) mod listing;
 pub(crate) mod lookup;
-pub(crate) mod not_found;
-pub(crate) mod overview;
-pub(crate) mod settings;
-pub(crate) mod systems;
+pub(crate) mod operations;
+pub(crate) mod parts;
+pub(crate) mod preferences;
+pub(crate) mod server;
+pub(crate) mod shortcuts;
+pub(crate) mod sign_in;
 pub(crate) mod translate;
 pub(crate) mod validate;
 pub(crate) mod value_set;
-pub(crate) mod value_set_composer;
 pub(crate) mod value_sets;
-pub(crate) mod versions;
 
 #[cfg(test)]
 mod tests {
@@ -55,18 +66,14 @@ mod tests {
         "urn:iso:std:iso",
     ];
 
-    /// The directories holding the screens, the chrome they render inside,
-    /// and the screen logic behind the authoring screens.
+    /// The directories holding the screens and the screen logic behind the
+    /// authoring screens.
     ///
     /// Each entry is a directory rather than a list of files, so a screen
-    /// added tomorrow is covered the day it lands. That is why the authoring
-    /// screens' own logic lives under `src/authoring` rather than at the crate
-    /// root, where three such files sat outside this guard.
-    ///
-    /// The reading layer under `src/fhir` is out of scope, because its tests
-    /// quote real canonicals to prove the reader handles them. The mandate
-    /// still covers it, and a reviewer checks it there.
-    const SCREEN_DIRECTORIES: [&str; 3] = ["src/pages", "src/components", "src/authoring"];
+    /// added tomorrow is covered the day it lands. The reading layer under
+    /// `src/fhir` is out of scope, because its tests quote real canonicals to
+    /// prove the reader handles them.
+    const SCREEN_DIRECTORIES: [&str; 2] = ["src/pages", "src/authoring"];
 
     /// Every `.rs` file under `directory`, in a stable order.
     fn sources(directory: &Path) -> Vec<PathBuf> {

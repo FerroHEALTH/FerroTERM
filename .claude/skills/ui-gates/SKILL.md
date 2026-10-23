@@ -21,12 +21,12 @@ Stop and report on the first hard failure; run the cheap gates first.
 
 FerroUI leads the console's UI, and its gates hold every component the
 console draws before a release reaches the pin (`ferrohealth-ui` in the
-root `Cargo.toml`, `=0.2.0` today):
+root `Cargo.toml`, `=0.3.2` today):
 
 - the library gates of FerroUI's `.claude/rules/leptos-ui.md` §10 (fmt,
   clippy on the host and wasm32, nextest, the gallery journeys and
   screenshots) and its no-inline-style and no-WebAssembly tests
-  (`crates/ferrohealth-ui/tests/it/stylesheet.rs` and, on `main`,
+  (`crates/ferrohealth-ui/tests/it/stylesheet.rs` and
   `app/ferrohealth-ui-gallery/tests/it/no_wasm.rs`);
 - the design checks of `design/COMPONENTS.md` § Checks every console runs
   (`render.py`, `overflow.py`, `hover.py`, `contrast.py`, `selects.py`,
@@ -44,8 +44,8 @@ tokens and its catalog beside them.
 - Tooling presence, reported rather than silently installed:
   `rustup target list --installed | grep wasm32`, `cargo leptos --version`
   (0.3.11), `wasm-bindgen --version` (the `=` pin of the root manifest),
-  `leptosfmt --version`. `scripts/release/console-tools.sh` fetches the
-  Tailwind CLI and `wasm-opt` by SHA-256. Ask before installing anything else.
+  `leptosfmt --version`. `scripts/release/console-tools.sh` fetches
+  `wasm-opt` by SHA-256. Ask before installing anything else.
 - Shared `./target`, no ad-hoc `RUSTFLAGS`, no flag variation between runs.
 
 ## The battery, in order
@@ -80,7 +80,7 @@ Stage 5 drives Chrome for Testing and its chromedriver at the release
 `FERROTERM_UI_E2E_CHROMEDRIVER` name them; without either, and with no
 chromedriver on PATH, the script fetches that release into
 `target/journey-tools` (`scripts/release/journey-tools.sh`) and the pinned
-`tailwindcss` and `wasm-opt` into `target/console-tools`. It needs `jq`,
+`wasm-opt` into `target/console-tools`. It needs `jq`,
 `unzip`, `cargo-nextest` and `cargo-leptos`. If it still cannot run, report
 `SKIPPED(reason)` and say that CI's `ui-e2e` job runs it and gates the merge;
 a skip is not a pass.

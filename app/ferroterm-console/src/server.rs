@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The console's HTTP service: the health route, the sign-in routes, the
-//! Leptos pages, the server functions and the site bundle, under one set of
+//! form routes, the Leptos pages and the site bundle, under one set of
 //! browser security headers.
 //!
 //! Every response carries a Content-Security-Policy whose script source is a
@@ -19,7 +19,7 @@ use axum::Extension;
 use axum::extract::Request;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use axum::routing::get;
+use axum::routing::{get, post};
 use http::header::{
     CACHE_CONTROL, CONTENT_SECURITY_POLICY, REFERRER_POLICY, X_CONTENT_TYPE_OPTIONS,
     X_FRAME_OPTIONS,
@@ -153,19 +153,33 @@ pub fn router(state: ConsoleState) -> axum::Router {
         .route(HEALTH, get(health))
         .route(COMPONENTS_CSS, get(components_css))
         .route(THEME_CSS, get(theme_css))
-        .route(crate::oidc::LOGIN, get(crate::oidc::login))
+        .route(crate::routes::LOGIN_ROUTE, get(crate::oidc::login))
         .route(crate::oidc::CALLBACK, get(crate::oidc::callback))
         .route(
-            crate::oidc::logout::LOGOUT,
-            axum::routing::post(crate::oidc::logout::logout),
+            crate::routes::SIGN_OUT_ROUTE,
+            post(crate::oidc::logout::logout),
         )
+        .route(
+            crate::routes::PREFERENCE_ROUTE,
+            post(crate::post::preference),
+        )
+        .route(crate::routes::RESET_ROUTE, post(crate::post::reset))
+        .route(crate::routes::SIDEBAR_ROUTE, post(crate::post::sidebar))
+        .route(
+            crate::routes::FHIR_VERSION_ROUTE,
+            get(crate::post::fhir_version),
+        )
+        .route(crate::routes::HISTORY_ROUTE, post(posted_page))
+        .route(crate::routes::CODE_SYSTEM_EDITOR_ROUTE, post(posted_page))
+        .route(crate::routes::COMPOSE_ROUTE, post(posted_page))
+        .route(crate::routes::CONCEPT_MAP_EDITOR_ROUTE, post(posted_page))
         .leptos_routes_with_context(&options, routes, context.clone(), {
             let options = options.clone();
-            move || crate::app::shell(options.clone())
+            move || crate::app::document(options.clone())
         })
         .fallback(leptos_axum::file_and_error_handler_with_context(
             context,
-            crate::app::shell,
+            crate::app::document,
         ))
         .layer(axum::middleware::from_fn(
             crate::oidc::refresh::refresh_session,
@@ -173,6 +187,35 @@ pub fn router(state: ConsoleState) -> axum::Router {
         .layer(axum::middleware::from_fn(same_origin_only))
         .layer(Extension(state));
     with_security_headers(pages.layer(bundle_compression()), form_action).with_state(options)
+}
+
+/// Draws the page a form was posted to, the posted fields in its context
+/// ([`crate::posted::Posted`]), so the page sends the write and answers with
+/// what it wrote or with the refusal over the reader's draft.
+async fn posted_page(
+    Extension(state): Extension<ConsoleState>,
+    axum::extract::State(options): axum::extract::State<LeptosOptions>,
+    request: Request,
+) -> Response {
+    let (parts, body) = request.into_parts();
+    let Ok(bytes) = axum::body::to_bytes(body, crate::posted::LIMIT).await else {
+        return (
+            StatusCode::PAYLOAD_TOO_LARGE,
+            [(CACHE_CONTROL, "no-store")],
+            crate::locale::tr(crate::locale::Msg::ServerFormTooLarge),
+        )
+            .into_response();
+    };
+    let posted = crate::posted::Posted::parse(&bytes);
+    let context = move || {
+        leptos::context::provide_context(state.clone());
+        leptos::context::provide_context(posted.clone());
+        provide_request_nonce();
+    };
+    let render = leptos_axum::render_app_async_with_context(context, move || {
+        crate::app::document(options.clone())
+    });
+    render(Request::from_parts(parts, axum::body::Body::empty())).await
 }
 
 /// The fetch metadata header that names where a request comes from.

@@ -56,6 +56,18 @@ pub(crate) const CONCEPT_MAP_EDITOR_PATH: &str = "conceptmap";
 /// The history and restore screen's path below the base, in the editor bundle.
 pub(crate) const HISTORY_PATH: &str = "history";
 
+/// The route the history screen is served and posted at.
+pub(crate) const HISTORY_ROUTE: &str = "/history";
+
+/// The route the code system editor is served and posted at.
+pub(crate) const CODE_SYSTEM_EDITOR_ROUTE: &str = "/codesystem";
+
+/// The route the value set composer is served and posted at.
+pub(crate) const COMPOSE_ROUTE: &str = "/compose";
+
+/// The route the concept map editor is served and posted at.
+pub(crate) const CONCEPT_MAP_EDITOR_ROUTE: &str = "/conceptmap";
+
 /// The query parameter that carries a resource type into the history screen.
 pub(crate) const TYPE_PARAM: &str = "type";
 
@@ -143,6 +155,83 @@ pub(crate) fn history_link(resource_type: &str, id: &str, version: FhirVersion) 
 
 /// The About screen's path below the base.
 pub(crate) const ABOUT_PATH: &str = "about";
+
+/// The About screen's address, which the footer links to.
+pub(crate) const ABOUT_ROUTE: &str = "/about";
+
+/// The Operations workbench's first tab, which its navigation entry opens.
+pub(crate) const OPERATIONS_PATH: &str = "lookup";
+
+/// The Server screen's path below the base.
+pub(crate) const SERVER_PATH: &str = "server";
+
+/// The Configuration screen's path below the base.
+pub(crate) const CONFIGURATION_PATH: &str = "configuration";
+
+/// Your preferences' path below the base.
+pub(crate) const PREFERENCES_PATH: &str = "preferences";
+
+/// The keyboard shortcut legend's path below the base.
+pub(crate) const SHORTCUTS_PATH: &str = "shortcuts";
+
+/// The route every preference posts to, its value under its cookie key.
+pub(crate) const PREFERENCE_ROUTE: &str = "/preference";
+
+/// The route Reset to defaults posts to.
+pub(crate) const RESET_ROUTE: &str = "/preferences/reset";
+
+/// The route the navigation's Collapse and Expand post to.
+pub(crate) const SIDEBAR_ROUTE: &str = "/sidebar";
+
+/// The route the top bar's FHIR version select leads to, which keeps the
+/// version for the browser's session and returns to the page.
+pub(crate) const FHIR_VERSION_ROUTE: &str = "/fhir-version";
+
+/// The sign-in page.
+pub(crate) const SIGN_IN_PAGE: &str = "/auth/sign-in";
+
+/// The route that starts a sign-in at the OpenID Provider.
+pub(crate) const LOGIN_ROUTE: &str = "/auth/login";
+
+/// The route Sign out posts to.
+pub(crate) const SIGN_OUT_ROUTE: &str = "/auth/sign-out";
+
+/// The query parameter that carries the page to return to.
+pub(crate) const BACK_PARAM: &str = "back";
+
+/// The absolute path of the console's page `path`, with `""` naming the
+/// dashboard.
+pub(crate) fn ui_path(path: &str) -> String {
+    let mut url = base_url();
+    for part in path.split('/').filter(|part| !part.is_empty()) {
+        url = url.segment(part);
+    }
+    rooted(url.render(""))
+}
+
+/// The sign-in page, returning to `back` once the reader is signed in.
+pub(crate) fn sign_in_link(back: &str) -> String {
+    rooted(
+        base_url()
+            .segment("auth")
+            .segment("sign-in")
+            .query(BACK_PARAM, back)
+            .render(""),
+    )
+}
+
+/// The choice of `version` in the top bar's select, on the page at `path`
+/// with the query `search`: the route that keeps it for the session and
+/// returns to the same page read through it.
+pub(crate) fn version_choice(path: &str, search: &str, version: FhirVersion) -> String {
+    rooted(
+        base_url()
+            .segment("fhir-version")
+            .query(VERSION_PARAM, version.segment())
+            .query(BACK_PARAM, &version_link(path, search, version))
+            .render(""),
+    )
+}
 
 /// The query parameter that carries a code system canonical into a screen.
 pub(crate) const SYSTEM_PARAM: &str = "system";
@@ -253,13 +342,6 @@ pub(crate) fn expansion_link(canonical: &str, version: FhirVersion) -> String {
 /// works over one code system carries it in the query and switching version
 /// must not drop what the reader is looking at. `search` is the query without
 /// its leading `?`, already percent-encoded, so each pair is carried verbatim.
-#[cfg_attr(
-    target_arch = "wasm32",
-    expect(
-        dead_code,
-        reason = "the console's server rewrites the address a version post returns to"
-    )
-)]
 pub(crate) fn version_link(pathname: &str, search: &str, version: FhirVersion) -> String {
     let mut kept: Vec<&str> = search
         .split('&')

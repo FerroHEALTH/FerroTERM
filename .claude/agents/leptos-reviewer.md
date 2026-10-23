@@ -30,27 +30,26 @@ commands (git diff, git log, `git -C <FerroUI checkout> show`, grep, dry-run
 clippy).
 
 **First, read FerroUI, which leads the console's UI.** The console pins
-`ferrohealth-ui` in the root `Cargo.toml` (`=0.2.0` today, tag `v0.2.0`).
+`ferrohealth-ui` in the root `Cargo.toml` (`=0.3.2` today, tag `v0.3.2`).
 Read, from a FerroUI checkout or from GitHub (FerroHEALTH/FerroUI):
 
 - `.claude/rules/leptos-ui.md` at the tag matching the pin: the component
   rules;
 - `docs/consoles.md`, `crates/ferrohealth-ui/CLAUDE.md`, `design/README.md`,
-  `design/COMPONENTS.md` and `design/consoles/ferroterm/` on `main` until
-  the pin reaches a tag that carries them: the consumer guide, the
-  interaction contract and islands mode, and the reviewed design with its
-  component IDs.
+  `design/COMPONENTS.md` and `design/consoles/ferroterm/` at the same tag:
+  the consumer guide, the interaction contract and islands mode, and the
+  reviewed design with its component IDs.
 
 Then read `.claude/rules/leptos-ui.md` of this repository in full, because
-it is the console's own checklist and names the pin and the rollout
-(FerroHEALTH/FerroUI#161), and `docs/console.md` for the design the diff has
+it is the console's own checklist and names the pin, and `docs/console.md` for the design the diff has
 to fit.
 
-**The console is rendered on the server and hydrated**, built by cargo-leptos,
-its halves chosen by compilation target. Every server function is a `POST`
-that reads the session itself, and the browser never holds a token. Memory
-entries written while the console was client-side rendered may be moot; read
-the classification before citing one.
+**The console is drawn on the server in islands mode**, built by
+cargo-leptos, its halves chosen by compilation target. Every page works with
+no WebAssembly: a read is a link or a `GET` form, a write a plain `POST` form
+to the page's own address that the server answers with what it wrote or the
+refusal over the draft. The browser hydrates FerroUI's islands and the
+console's shortcuts, never holds a token, and stores nothing.
 
 Review priority (report in this order):
 

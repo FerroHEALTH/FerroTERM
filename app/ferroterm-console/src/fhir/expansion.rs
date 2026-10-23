@@ -233,17 +233,6 @@ impl Expansion {
     pub(crate) fn listed(&self) -> u32 {
         u32::try_from(self.concepts.len()).unwrap_or(u32::MAX)
     }
-
-    /// Whether the server nested entries under one another.
-    ///
-    /// "Paging only applies to flat expansions: servers ignore paging if the
-    /// expansion is not flat"
-    /// (<https://hl7.org/fhir/R4B/valueset-operation-expand.html>, the `count`
-    /// parameter), so a nested answer is the whole selection rather than a
-    /// page of one.
-    pub(crate) fn hierarchical(&self) -> bool {
-        self.concepts.iter().any(|concept| concept.depth > 0)
-    }
 }
 
 /// The mark saying the value set admits codes this expansion does not list.
@@ -581,7 +570,7 @@ mod tests {
             "`expansion.total` counts concept nodes, so every rendered row counts"
         );
         assert!(
-            expansion.hierarchical(),
+            expansion.concepts.iter().any(|concept| concept.depth > 0),
             "an answer with a nested entry is not a page of a flat expansion"
         );
     }
@@ -594,7 +583,7 @@ mod tests {
                 .expect("the answer carries an expansion");
         assert_eq!(expansion.listed(), 2);
         assert!(
-            !expansion.hierarchical(),
+            !expansion.concepts.iter().any(|concept| concept.depth > 0),
             "nothing is nested, so the page window the request asked for applies"
         );
     }

@@ -1,0 +1,1 @@
+- The console's site bundle is built with `cargo leptos build --split`, which cuts FerroUI's lazy islands into chunks fetched on first use; without it no island hydrates. The bundle is 502,374 brotli bytes, entry and chunks together, 43% of the 1 MiB budget, where it was 97%, and `scripts/checks/console-bundle.sh` sums the chunks with the entry.

@@ -197,43 +197,7 @@ impl ImplicitArgument {
 
 // NOTE: only the composer fills a template, and the reader bundle carries no
 // composer, so the filling is editor-only (no FHIR/SNOMED spec governs this: our own design).
-impl ImplicitForm {
-    /// The names of the bracketed placeholders, in template order.
-    pub(crate) fn placeholders(&self) -> Vec<String> {
-        let mut names = Vec::new();
-        let mut rest = self.pattern.as_str();
-        while let Some((_, after)) = rest.split_once('[') {
-            let Some((name, tail)) = after.split_once(']') else {
-                break;
-            };
-            names.push(name.to_owned());
-            rest = tail;
-        }
-        names
-    }
-
-    /// The value set URL with each placeholder replaced, in order, by one of
-    /// `arguments`, or `None` while a placeholder has no non-blank argument.
-    pub(crate) fn instantiate(&self, arguments: &[String]) -> Option<String> {
-        let mut out = String::new();
-        let mut rest = self.pattern.as_str();
-        let mut arguments = arguments.iter();
-        while let Some((before, after)) = rest.split_once('[') {
-            let Some((_, tail)) = after.split_once(']') else {
-                break;
-            };
-            let argument = arguments.next().map(|argument| argument.trim())?;
-            if argument.is_empty() {
-                return None;
-            }
-            out.push_str(before);
-            out.push_str(argument);
-            rest = tail;
-        }
-        out.push_str(rest);
-        Some(out)
-    }
-}
+impl ImplicitForm {}
 
 /// The built index one served code system version was read from.
 ///
@@ -848,64 +812,5 @@ mod tests {
                 ImplicitArgument::Code
             )]
         );
-    }
-
-    /// The filling of a template, which only the editor bundle carries.
-    mod filling {
-        use super::*;
-
-        #[test]
-        fn a_pattern_names_its_placeholders_in_order() {
-            assert_eq!(
-                form("https://t.example/vs", ImplicitArgument::None).placeholders(),
-                Vec::<String>::new()
-            );
-            assert_eq!(
-                form("[entity]/scale/[axis]", ImplicitArgument::Expression).placeholders(),
-                ["entity", "axis"]
-            );
-        }
-
-        #[test]
-        fn a_pattern_without_a_placeholder_is_the_url_as_it_stands() {
-            assert_eq!(
-                form("https://t.example/vs", ImplicitArgument::None).instantiate(&[]),
-                Some(String::from("https://t.example/vs"))
-            );
-        }
-
-        #[test]
-        fn a_code_replaces_the_bracketed_placeholder() {
-            assert_eq!(
-                form(
-                    "https://t.example?fhir_vs=isa/[code]",
-                    ImplicitArgument::Code
-                )
-                .instantiate(&[String::from(" 123 ")]),
-                Some(String::from("https://t.example?fhir_vs=isa/123"))
-            );
-        }
-
-        #[test]
-        fn every_placeholder_takes_its_own_argument_in_order() {
-            assert_eq!(
-                form("[entity]/scale/[axis]", ImplicitArgument::Expression)
-                    .instantiate(&[String::from("https://t.example/1"), String::from("size")]),
-                Some(String::from("https://t.example/1/scale/size"))
-            );
-        }
-
-        #[test]
-        fn a_missing_or_blank_argument_instantiates_nothing() {
-            let two = form("[entity]/scale/[axis]", ImplicitArgument::Expression);
-            assert_eq!(
-                two.instantiate(&[String::from("https://t.example/1")]),
-                None
-            );
-            assert_eq!(
-                two.instantiate(&[String::from("https://t.example/1"), String::from("  ")]),
-                None
-            );
-        }
     }
 }

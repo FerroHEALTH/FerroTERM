@@ -7,7 +7,7 @@
 use cookie::{Cookie, SameSite};
 use http::HeaderMap;
 
-use crate::session::{COOKIE, HOST_PREFIX, SIGN_IN_COOKIE, SessionId, Sessions, THEME_COOKIE};
+use crate::session::{COOKIE, HOST_PREFIX, SIGN_IN_COOKIE, SessionId, Sessions};
 
 impl Sessions {
     /// The name `base` takes on this console: [`HOST_PREFIX`] and `base` when
@@ -71,20 +71,28 @@ impl Sessions {
             .build()
     }
 
-    /// The `Set-Cookie` value that keeps the operator's theme choice `theme`
-    /// for 400 days, the longest a browser keeps a cookie (RFC 6265bis
-    /// §5.6.2).
-    #[must_use]
-    pub fn theme_cookie(&self, theme: &str) -> Cookie<'static> {
-        self.preference_cookie(THEME_COOKIE, theme)
-    }
-
     /// The `Set-Cookie` value that keeps the reader's preference `base` at
-    /// `value` for 400 days, as [`Self::theme_cookie`] keeps the theme.
+    /// `value` for one year (FerroUI's family rule 9).
     #[must_use]
     pub fn preference_cookie(&self, base: &str, value: &str) -> Cookie<'static> {
         self.cookie(base, value)
-            .max_age(cookie::time::Duration::days(400))
+            .max_age(cookie::time::Duration::days(365))
+            .build()
+    }
+
+    /// The `Set-Cookie` value that keeps `base` at `value` for the browser's
+    /// session alone: it carries no `Max-Age`, so the browser drops it when
+    /// the session ends (RFC 6265bis §5.6.2).
+    #[must_use]
+    pub fn session_preference_cookie(&self, base: &str, value: &str) -> Cookie<'static> {
+        self.cookie(base, value).build()
+    }
+
+    /// The `Set-Cookie` value that removes the reader's preference `base`.
+    #[must_use]
+    pub fn preference_cookie_removal(&self, base: &str) -> Cookie<'static> {
+        self.cookie(base, "")
+            .max_age(cookie::time::Duration::ZERO)
             .build()
     }
 
@@ -131,11 +139,20 @@ mod tests {
     }
 
     #[test]
-    fn the_theme_cookie_is_host_bound_http_only_lax_secure_and_kept_400_days() {
+    fn a_preference_cookie_is_host_bound_http_only_lax_secure_and_kept_a_year() {
         let sessions = Sessions::new(settings());
         assert_eq!(
-            "__Host-ferroterm_console_theme=dark; HttpOnly; SameSite=Lax; Secure; Path=/; Max-Age=34560000",
-            sessions.theme_cookie("dark").to_string()
+            "__Host-ferroterm_console_theme=dark; HttpOnly; SameSite=Lax; Secure; Path=/; Max-Age=31536000",
+            sessions
+                .preference_cookie("ferroterm_console_theme", "dark")
+                .to_string()
+        );
+        assert!(
+            sessions
+                .preference_cookie_removal("ferroterm_console_theme")
+                .to_string()
+                .contains("Max-Age=0"),
+            "reset to defaults clears the same host-bound cookie"
         );
     }
 

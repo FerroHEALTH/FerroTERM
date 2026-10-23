@@ -25,7 +25,7 @@ use crate::server::ConsoleState;
 use crate::session::{COOKIE, Ended};
 
 /// The path of the sign-out route.
-pub const LOGOUT: &str = crate::components::shell::SIGN_OUT;
+pub const LOGOUT: &str = crate::routes::SIGN_OUT_ROUTE;
 
 /// The provider's end-session request for `oidc`.
 ///
@@ -82,8 +82,16 @@ pub async fn logout(Extension(state): Extension<ConsoleState>, headers: HeaderMa
         }
         None => None,
     };
-    let location = end_session_request(oidc, id_token.as_ref())
-        .map_or_else(|| String::from("/"), String::from);
+    let location = end_session_request(oidc, id_token.as_ref()).map_or_else(
+        || {
+            format!(
+                "{}?state={}",
+                crate::routes::SIGN_IN_PAGE,
+                super::SignInState::SignedOut.key()
+            )
+        },
+        String::from,
+    );
     let removal = sessions.session_cookie_removal().to_string();
     let (Ok(location), Ok(removal)) = (
         HeaderValue::from_str(&location),

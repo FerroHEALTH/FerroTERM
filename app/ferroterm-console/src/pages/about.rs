@@ -1,91 +1,130 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! Everything about this server and this console, on one screen.
-//!
-//! Three tabs, one shown at a time. They are one screen because none of them
-//! is about a code, and a reader arrives with one of the three questions.
-//!
-//! The tab being read is the `tab` parameter of the address, so the server
-//! renders the pane a link names and the browser goes back to it. A link
-//! written before they were one screen still opens the tab it named, through
-//! the redirects in `shell.rs`.
+//! About: the console, the server it reads and the manufacturer, with the
+//! `CapabilityStatement` of the FHIR version in view.
 
-use ferrohealth_ui::view::surface::{page_header, stack};
+use ferrohealth_ui::highlight::Language;
+use ferrohealth_ui::view::surface::Header;
+use ferrohealth_ui::view::template::about::{Link, Manufacturer, SelfDescription, about_page};
 use leptos::prelude::*;
 use leptos_meta::Title;
 
-use crate::components::detail::{TAB_PARAM, current_tab, detail_tabs};
-use crate::locale::{Msg, tr};
-use crate::pages::evidence;
-use crate::pages::settings;
-use crate::pages::versions;
+use crate::fhir::capability::CapabilityStatement;
+use crate::fhir::version::FhirVersion;
+use crate::locale::{Msg, tr, tr_with};
+use crate::pages::parts::loaded;
+use crate::request::request;
+use crate::shell::{PRODUCT, VERSION};
 
-/// The address parameter naming the tab being read.
-pub(crate) const PANE_PARAM: &str = TAB_PARAM;
+/// The library the console is drawn with, at the version its manifest pins.
+pub(crate) const FERROUI: &str = "ferrohealth-ui 0.3.2";
 
-/// The tabs, in the order the screen draws them; the first is what a reader
-/// who named none of them gets.
-const TABS: &[(&str, Msg)] = &[
-    ("versions", Msg::TheFourFhirVersions),
-    ("evidence", Msg::EvidenceBuildShips),
-    ("settings", Msg::Settings),
-];
+/// The id of the self-description's Copy button.
+const COPY_ID: &str = "about-copy";
 
-/// Shows the three tabs about this server and this console.
+/// The FHIR roots the server answers on, each with its release.
+fn roots() -> String {
+    FhirVersion::ALL
+        .into_iter()
+        .map(|version| {
+            let release = version.release().trim_start_matches("FHIR ");
+            format!("{} ({release})", version.label())
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// About.
 #[component]
 #[expect(
     unreachable_pub,
-    reason = "the leptos component macro emits a pub props type, and a binary crate has no reachable public API"
+    reason = "the leptos component macro emits a pub props type the crate never exports"
 )]
 pub(crate) fn AboutPage() -> impl IntoView {
-    let tab = current_tab(TABS, "versions");
-    let body = move || {
-        let key = tab.get();
-        let (label, body) = match key {
-            "evidence" => (tr(Msg::EvidenceBuildShips), evidence::pane()),
-            "settings" => (tr(Msg::Settings), settings::pane()),
-            _ => (tr(Msg::TheFourFhirVersions), versions::pane()),
-        };
-        pane(key, label, body)
-    };
-    view! {
-        <Title text=tr(Msg::AboutThisServer) />
-        {page_header(tr(Msg::AboutThisServer), Some(tr(Msg::WhatEachFhirRootDeclaresEvidence)), ())}
-        {stack(
-            view! {
-                {detail_tabs(tr(Msg::AboutThisServer), TABS, tab)}
-                {body}
+    let request = request();
+    loaded(async move {
+        let version = request.version;
+        let statement = request.client.capability_statement(version).await.ok();
+        let document = request.client.capability_document(version).await.ok();
+        let server = statement
+            .as_ref()
+            .and_then(CapabilityStatement::software_line)
+            .unwrap_or_else(|| tr(Msg::AboutServerUnanswered));
+        let self_description = document.map(|document| SelfDescription {
+            title: tr_with(
+                Msg::AboutStatementTitle,
+                &[("version", version.label().into())],
+            ),
+            line: tr_with(
+                Msg::AboutStatementLine,
+                &[
+                    ("version", version.label().into()),
+                    ("path", format!("/{}/metadata", version.segment()).into()),
+                ],
+            ),
+            language: Language::Json,
+            text: serde_json::to_string_pretty(&document).unwrap_or_default(),
+            copy_id: String::from(COPY_ID),
+            download: request.client.metadata_url(version),
+        });
+        let page = about_page(ferrohealth_ui::view::template::about::AboutPage {
+            header: Header {
+                title: tr(Msg::AboutTitle).into(),
+                subtitle: Some(tr(Msg::AboutSubtitle).into()),
+                crumbs: Vec::new(),
+                mono: false,
+                badge: None,
             },
-        )}
-    }
+            release: format!("{PRODUCT} {VERSION}"),
+            versions: vec![
+                (tr(Msg::AboutServer), server.into_any()),
+                (tr(Msg::AboutFhirRoots), roots().into_any()),
+                (tr(Msg::AboutFerroui), FERROUI.into_any()),
+            ],
+            manufacturer: Manufacturer {
+                licence: tr(Msg::AboutLicence),
+                support: Link {
+                    label: String::from(SUPPORT),
+                    href: format!("mailto:{SUPPORT}"),
+                },
+                documentation: Some(Link {
+                    label: tr(Msg::AboutBook),
+                    href: String::from(BOOK),
+                }),
+            },
+            cards: Vec::new(),
+            self_description,
+            replica: None,
+        });
+        view! {
+            <Title text=tr(Msg::AboutTitle) />
+            {page}
+        }
+        .into_any()
+    })
 }
 
-/// The element id one tab's pane answers to.
-fn anchor(id: &str) -> String {
-    format!("about-{id}-heading")
-}
+/// The maker's support address.
+const SUPPORT: &str = "info@cadasto.com";
 
-/// One pane, named by its tab.
-fn pane(id: &str, label: String, body: AnyView) -> AnyView {
-    let heading = anchor(id);
-    view! {
-        <section id=heading.clone() aria-labelledby=format!("{heading}-name") class="fui-stack">
-            <h2 id=format!("{heading}-name") class="fui-sr-only">
-                {label}
-            </h2>
-            {body}
-        </section>
-    }
-    .into_any()
-}
+/// The product's documentation.
+const BOOK: &str = "https://ferroterm.eu/docs/";
 
 #[cfg(test)]
 mod tests {
-    use super::anchor;
+    use super::FERROUI;
 
     #[test]
-    fn a_pane_answers_to_an_id_its_tab_names() {
-        assert_eq!(anchor("settings"), "about-settings-heading");
+    fn about_names_the_library_version_the_manifest_pins() {
+        let manifest =
+            std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../Cargo.toml"))
+                .expect("the workspace manifest reads");
+        let pin = manifest
+            .lines()
+            .find_map(|line| line.strip_prefix("ferrohealth-ui = \"="))
+            .and_then(|rest| rest.strip_suffix('"'))
+            .expect("the manifest pins ferrohealth-ui exactly");
+        assert_eq!(format!("ferrohealth-ui {pin}"), FERROUI);
     }
 }

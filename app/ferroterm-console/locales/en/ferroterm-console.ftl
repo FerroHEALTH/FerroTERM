@@ -5,18 +5,17 @@
 # the one every lookup falls back to. Each message is one `Msg` of the
 # crate's `locale` module; a catalog of another language holds the same
 # messages in a directory named by its BCP 47 tag beside this one. The words
-# the FerroUI components draw themselves are that library's catalog.
+
+## The marks FerroUI's number formatter writes numbers with
+
+number-group = ,
+number-decimal = .
 
 ## The document
 
 description = Browse and edit the code systems, value sets and concept maps a FerroTERM server serves.
 
 ## The screen an address that names no page reaches
-
-not-found-title = Not found
-not-found-heading = No such screen
-not-found-body = The console has no page at this address.
-not-found-back = Back to the dashboard
 
 may-edit-conceptmap = May edit ConceptMap
 may-edit-valueset = May edit ValueSet
@@ -39,81 +38,11 @@ server-s-capability-statement-declares-neither = This server's capability statem
 server-holds-no-earlier-version-resource = This server holds no earlier version of this resource.
 what-root-says-serves = What the root says it serves
 software = Software
-not-read = not read
 not-served = not served
-server-did-not-expand-value-set = This server did not expand the value set this control's codes come from, so it offers only what the resource already carries.
-choose-one = Choose one
 answer-did-not-read = The answer did not read
 request-got-no-answer = The request got no answer
 server-refused-request = The server refused the request
-another-version = Another version
-one-server-resolves = The one this server resolves to
-another-canonical = Another canonical
-choose-one-server-holds = Choose one this server holds
-example-en-nl-nl = for example en or nl-NL
-unreachable = Unreachable
-serving = Serving
-checking-the-server = Checking the server
-history-of-this-resource = History of this resource
-not-declared = not declared
-reloaded-server-stated-no-version = Reloaded. The server stated no version for it.
-reading-current-version-from-server = Reading the current version from the server.
-reload-the-current-version = Reload the current version
-each-one-address-made-they-live = Each one is the address that made it. They live in this page and are never sent anywhere.
-runs-made-page = The runs made on this page
-screens = Screens
-console = Console
-signed-in = Signed in
-sign-in = Sign in
-fhir = FHIR
-fhir-version = FHIR version
-code-canonical-phrase = A code, a canonical or a phrase
-find-code-canonical-phrase = Find a code, a canonical or a phrase
-server = Server
-operations = Operations
-browse = Browse
-authoring = Authoring
-about-this-server = About this server
-concept-map-editor = Concept map editor
-value-set-composer = Value set composer
-code-system-editor = Code system editor
-translate-a-code = Translate a code
-expand-a-value-set = Expand a value set
-check-a-code = Check a code
-look-up-a-code = Look up a code
-concept-maps = Concept maps
-value-sets = Value sets
-code-systems = Code systems
-dashboard = Dashboard
-nothing-here = Nothing here
-server-named-no-artifact-version = the server named no artifact for this version
-version-was-not-read-from-built = this version was not read from a built artifact
-server-declared-neither-yes-nor-no = the server declared neither yes nor no
-no = no
-yes = yes
-fhir-version-has-no-such-element = this FHIR version has no such element, or the server declared none
-server-declared-no-version-code-system = this server declared no version for the code system
-declared-without-canonical-uri = Declared without a canonical URI
-validate = Validate
-screen-needs-canonical-system-was-declared = a screen needs the canonical this system was declared without
-actions = Actions
-read-from = Read from
-subsumes = Subsumes
-content = Content
-versions = Versions
-pages-of-code-systems = Pages of code systems
-code-systems-root-serves = The code systems this root serves
-no-code-system-root-serves-matches = No code system this root serves matches the filter.
-no-match = No match
 
-code-system-2 = Code system
-
-concepts-defined = Concepts defined
-supplements = Supplements
-compositional-grammar = Compositional grammar
-hierarchy-meaning = Hierarchy meaning
-case-sensitive = Case sensitive
-code-needs-version = A code needs its version
 description-2 = Description
 last-changed = Last changed
 publisher = Publisher
@@ -137,31 +66,11 @@ translates-from = Translates from
 purpose = Purpose
 address-not-below-server-s-root = the address is not below the server's root
 server-sent-no-diagnostic = the server sent no diagnostic
-run-recorded-no-kind-finding = the run recorded no kind for this finding
-code-no-longer-falls-inside-value = the code no longer falls inside the value set it was included through
-release-no-longer-carries-code = the release no longer carries this code
-release-made-code-inactive = the release made this code inactive
-relationship = Relationship
-equivalence = Equivalence
-concept-inactive-code-system = {" "}The concept is inactive in its code system.
-server-answered-no-result = The server answered no result.
-server-answered-result-false-code-not = The server answered result false: the code is not valid.
-server-answered-result-true-code-valid = The server answered result true: the code is valid.
 locked-to-date = Locked to date
 inactive-codes-selected = Inactive codes selected
 immutable = Immutable
-server-did-not-answer-request-below = The server did not answer. The request is below, to retry by hand.
-server-refused-change-own-words-below = The server refused the change, in its own words below.
-someone-else-changed-resource-since-was = Someone else changed this resource since it was opened. Reload it and apply the change again.
-account-does-not-carry-permission-change = This account does not carry the permission for this change.
-sign-again-make-change = Sign in again to make this change.
 sends-phrase-filter-parameter-code-system = Sends the phrase as the filter parameter, in the code system you pick there.
-search-the-designations = Search the designations
 searches-concept-browser-code-system-you = Searches the concept browser for it, in the code system you pick there.
-find-hierarchy = Find it in a hierarchy
-opens-runner-code-filled-name-system = Opens the runner with the code filled in. Name the system it belongs to.
-translate-this-code = Translate this code
-validate-this-code = Validate this code
 opens-runner-canonical-filled-ready-code = Opens the runner with the canonical filled in, ready for a code.
 validate-code = Validate a code in it
 sends-canonical-url-parameter-valueset-expand = Sends the canonical as the url parameter of ValueSet/$expand.
@@ -173,575 +82,25 @@ open-the-code-system = Open the code system
 a-phrase = a phrase
 a-code = a code
 a-canonical = a canonical
-which-carries-no-id-read = , which carries no id to read it by
-root-holds-no-resource-matching-search = This root holds no resource matching the search.
-search = Search
-search-this-root = Search this root
-version-search-parameter-left-empty-every = The version search parameter. Left empty, every version this root holds matches.
-canonical = Canonical
-what-each-fhir-root-declares-evidence = What each FHIR root declares, the evidence this build ships, and this console's settings.
-the-four-fhir-versions = The four FHIR versions
-settings = Settings
-evidence-build-ships = The evidence this build ships
-choose-a-code-system = Choose a code system
-server-answers-no-child-concept = This server answers no child for this concept.
-nothing-below = Nothing below
-reading-the-children = Reading the children
-arrow-keys-walk-enter-reads-concept = Arrow keys walk it. Enter reads the concept.
-below-this-concept = Below this concept
-concepts-below-one = The concepts below this one
-nothing-declared = Nothing declared
-server-answers-no-property-concept = This server answers no property for this concept.
-property = Property
-value = Value
-meaning = Meaning
-properties = Properties
-server-holds-no-designation-concept = This server holds no designation for this concept.
-term = Term
-language = Language
-use = Use
-designations = Designations
-server-declares-no-child-concept = This server declares no child for this concept.
-children = Children
-server-declares-no-parent-concept = This server declares no parent for this concept.
-parents = Parents
-choose-concept-from-search-results-read = Choose a concept from the search results to read its designations and properties.
-the-concept = The concept
-reading-the-concept = Reading the concept
-concepts-the-search-matched = Concepts the search matched
-no-concept-matched-filter-code-system = No concept matched this filter in this code system.
-n-1-concept-matched = 1 concept matched.
-no-concept-matched = No concept matched.
-searching-the-code-system = Searching the code system
-sent-filter-parameter-expand-over-value = Sent as the filter parameter of $expand over a value set that selects this code system. An empty filter lists the first concepts the server answers.
-filter = Filter
-version-declares-no-designation-language-so = This version declares no designation language, so the server chooses the display and no language is sent.
-languages-version-declares-choice-sent-displaylanguage = The languages this version declares. The choice is sent as displayLanguage on every operation this screen calls.
-display-language = Display language
-server-s-own-choice = The server's own choice
-hierarchy = Hierarchy
 version-declares-no-hierarchy-filter-operator = This version declares no hierarchy filter operator, so its concepts are a flat list and there is no tree to walk.
-root-s-terminology-capabilities-declare-no = This root's terminology capabilities declare no such code system, or no such version of it. Another FHIR version may serve it, so try the version switcher above.
-reading-the-terminology-capabilities = Reading the terminology capabilities
-code-system-being-browsed = The code system being browsed
-what-is-browsed = What is browsed
-search-code-system-read-concept-walk = Search a code system, read a concept, walk its hierarchy.
-browse-concepts = Browse concepts
-root-publishes-no-codesystem-resource-canonical = This root publishes no CodeSystem resource for this canonical. A system served from a built index is declared under Server support and need not be published.
-not-published-resource = Not published as a resource
-filters-expand-accepts = Filters $expand accepts
-operators = Operators
-no-operator-declared = no operator declared
-version-declares-no-expand-filter = This version declares no $expand filter.
-no-filter = No filter
-none-declared = none declared
-lookup-properties = $lookup properties
-designation-languages = Designation languages
-answers = Answers
-request-naming-version = a request naming this version
-an-unversioned-request = an unversioned request
-server-declares-no-version-code-system = This server declares no version for this code system.
-no-version-declared = No version declared
 root-s-terminology-capabilities-do-not = This root's terminology capabilities do not name this code system. Another FHIR version may serve it, so try the version switcher above; otherwise this deployment has not loaded it.
-codesystem-server-sent = The CodeSystem, as the server sent it
-reading-the-published-codesystem = Reading the published CodeSystem
-what-server-can-do = What this server can do with it
-what-code-system-says = What the code system says it is
-expand = Expand
-screens-code-system = Screens for this code system
-edit = Edit
-subsumption = Subsumption
-default-version = Default version
-address-names-no-code-system = This address names no code system
-views-code-system = Views of this code system
-json = JSON
-server-support = Server support
-definition = Definition
-conceptmap-server-sent = The ConceptMap, as the server sent it
-reading-the-concept-map = Reading the concept map
-target-code = Target code
-no-target = no target
-filter-code-display = Filter by code or display
-every-mapping-map-writes = Every mapping the map writes
-no-mapping = No mapping
-no-mapping-matches = No mapping matches.
-what-the-map-maps = What the map maps
-codes-mapped = Codes mapped
-to = To
-what-maps-whatever-server-holds-not = What it maps is whatever the server holds for it, not a table written here.
-no-group = No group
-what-it-declares = What it declares
-mappings = Mappings
-views-concept-map = Views of this concept map
-source-code = Source code
-from = From
-saved-server-stated-no-version = Saved. The server stated no version for it.
-save-this-concept-map = Save this concept map
-create-this-concept-map = Create this concept map
-update-states-version-replaces-so-change = An update states the version it replaces, so a change made elsewhere since this form was opened is refused rather than overwritten.
-save = Save
-saving = Saving
-saved-map-because-server-did-not = the saved map, because this server did not take the map inline
-map-screen = the map on this screen
-translating = Translating
-code-has-no-system-translate-from = This code has no system to translate from yet.
-system = System
-display = Display
-code = Code
-server-stated-no-result = The server stated no result.
-server-translated-nothing-code = The server translated nothing for this code.
-server-translated-code = The server translated the code.
-server-did-not-take-map-inline = This server did not take the map inline, so the preview ran against the saved map.
-translated-through-map-screen-sent-request = Translated through the map on this screen, sent with the request.
-searching = Searching
-comment = Comment
-target-display = Target display
-remove-this-target = Remove this target
-target-code-2 = target code
-add-a-target = Add a target
-maps-to = Maps to
-code-maps-nothing-nomap = This code maps to nothing (noMap)
-remove-this-code = Remove this code
-preview-code-through-translate = Preview this code through $translate
-code-not-chosen-yet = A code not chosen yet
-source-code-2 = source code
-codes = Codes
-target-system-version = Target system version
-target-system = Target system
-source-system-version = Source system version
-source-system = Source system
-remove-this-group = Remove this group
-add-a-code = Add a code
-group-no-systems-yet = A group with no systems yet
-add-a-group = Add a group
-group-maps-codes-one-system-codes = A group maps codes of one system to codes of another, and carries at least one code.
-publication-status = Publication status
-business-version = Business version
-canonical-url = Canonical (url)
-metadata = Metadata
-read-only = Read only.{" "}
-account-carries-no-permission-change-concept = This account carries no permission to change a concept map. Sign in with one that does.
-server-states-no-version-resource-so = The server states no version for this resource, so it is one this deployment loaded rather than one written through the API, and there is nothing an update could state in If-Match.
 
-metadata-systems-each-group-maps-between = Its metadata, the systems each group maps between, and every code with what it maps to.
-
-translate = Translate
-concept-map = Concept map
-concept-maps-root-holds = Concept maps this root holds
-concept-map-pages = Concept map pages
-
-concept-maps-2 = concept maps
-root-holds-no-conceptmap-resource-matching = This root holds no ConceptMap resource matching the filter above. The translate runner still works: a server may translate through a map it holds without publishing it as a resource.
-reading-the-concept-maps = Reading the concept maps
-what-this-root-holds = What this root holds
-url-search-parameter-matched-against-conceptmap = The url search parameter, matched against ConceptMap.url.
-conceptmap-resources-server-publishes-open-one = The ConceptMap resources this server publishes. Open one to see what it maps.
-save-this-code-system = Save this code system
-create-this-code-system = Create this code system
-code-system-needs-canonical-status-content = A code system needs a canonical, a status, and a content mode before it can be saved.
-remove = Remove
-add-a-property-value = Add a property value
-property-values = Property values
-use-system-code = Use (system|code)
-add-a-designation = Add a designation
-on = On
-lifecycle = Lifecycle
-retire = Retire{" "}
-concept-no-code-yet = A concept with no code yet
-add-a-concept = Add a concept
-concept-retired-rather-than-removed-so = A concept is retired rather than removed, so a code that has been published keeps meaning what it meant.
-concepts = Concepts
-property-type = Property type
-property-identifier = Property identifier
-property-code = Property code
-declare-a-property = Declare a property
-type = Type
-identifier-uri = Identifier (uri)
-lifecycle-properties-declared-editor-every-save = The lifecycle properties are declared by the editor on every save, so they are not listed here.
-declared-properties = Declared properties
-codes-are-case-sensitive = Codes are case sensitive
 content-mode = Content mode
-the-server-stated-none = the server stated none
-parameter = Parameter
-codesystem-validate-code-run-against-version = CodeSystem/$validate-code, run against the version that was just saved.
-what-server-says-about-retired-concept = What the server says about the retired concept
-account-carries-no-permission-change-code = This account carries no permission to change a code system. Sign in with one that does.
-server-states-no-version-resource-so-2 = The server states no version for this resource, so there is nothing an update could state in If-Match.
-code-system-served-from-built-index = This code system is served from a built index, which has no write path. It is shown as the server holds it.
-server-s-terminology-capabilities-did-not = This server's terminology capabilities did not read, so whether an artifact backs this code system is unknown, and the screen does not offer to change what it cannot place.
-reading-what-server-can-do-code = Reading what this server can do with this code system.
 
-reading-the-code-system = Reading the code system
-metadata-properties-declares-concepts-their-designations = Its metadata, the properties it declares, and its concepts with their designations and lifecycle.
-
-retired = Retired
-deprecated = Deprecated
-active = Active
-what-system-answered-milliseconds = What the system answered, in milliseconds
-warm-requests = Warm requests
-n-99th = 99th
-n-95th = 95th
-median = Median
-cold = Cold
-no-timing = No timing
-record-timed-no-operation = This record timed no operation.
-record = Record
-taken-at = Taken at
-machine = Machine
-answered-by = Answered by
-served-as = Served as
-resident-memory = Resident memory
-ready-after = Ready after
-built-from = Built from
-offline-build = Offline build
-built-outside-this-run = built outside this run
-one-record-per-code-system-run = One record per code system the run loaded
-the-newest-benchmark-run = The newest benchmark run
-from-2 = From{" "}
-each-benchmark-bar-run-recorded-against = Each benchmark, its bar, and the run recorded against it
-latency-project-claims = The latency the project claims
-bar-drawn-against-slowest-measurement-beside = {"."} A bar is drawn against the slowest measurement beside it.
-recorded-on = Recorded on{" "}
-what-the-bar-claims = What the bar claims
-room = Room
-measured = Measured
-s = {" "}µs
-bar = Bar
-faster-than-run-could-time = faster than the run could time
-cases-each-mode-passes-from-committed = The cases each mode passes, from the committed pass lists
-hl7-terminology-ecosystem-suite = The HL7 terminology ecosystem suite
-and-2 = {" "}and{" "}
-cases-each-mode-passes = The cases each mode passes
-share = Share
-of = {" "}of{" "}
-passed = Passed
-surface = Surface
-not-from-server-answering-page-each = , not from the server answering this page. Each figure names its file.
-read-from-files-repository-committed-ferroterm = Read from files this repository committed for FerroTERM{" "}
-code-systems-newest-run = Code systems in the newest run
-latency-bars-project-claims = Latency bars the project claims
-ecosystem-suite-cases-pass = Ecosystem suite cases pass
-operation = Operation
-benchmark = Benchmark
-mode = Mode
-server-refused-expand-selection-large-one = The server refused to expand a selection this large in one answer. Ask for a page size and the runner walks it a page at a time.
-parameters-server-says-applied = The parameters the server says it applied
-server-echoed-no-parameters-expansion = The server echoed no parameters with this expansion.
-expansion-pages = Expansion pages
-flags = Flags
-concepts-page = The concepts of this page
-page-past-end-selection-empty-so = A page past the end of a selection is empty, and so is a filter nothing matches.
-no-concept-page = No concept on this page
-value-set-admits-codes-expansion-does = this value set admits codes the expansion does not list, so a code missing from the table below is not a code this server rejects.
-unclosed-expansion = Unclosed expansion:{" "}
-server-stated-no-reason = The server stated no reason for it.
-server-answered-valueset-carrying-no-expansion = The server answered a ValueSet carrying no expansion, so there is nothing to page through.
-no-expansion = No expansion
-name-value-set-above-run-canonical = Name a value set above and run it. The canonical is sent exactly as you type it, so an implicit form a code system defines works here too.
-no-expansion-yet = No expansion yet
-running-the-expansion = Running the expansion
-the-expansion = The expansion
-answer = Answer
-sends-includedesignations-true-which-asks-every = Sends includeDesignations=true, which asks for every designation the server holds for a listed concept.
-include-designations = Include designations
-count-parameter-left-empty-run-asks = The count parameter. Left empty, the run asks for no page and the server may refuse a selection it considers too costly.
-page-size = Page size
-selection = Selection
-sends-activeonly-true-which-asks-server = Sends activeOnly=true, which asks the server to leave inactive concepts out of the selection.
-active-concepts-only = Active concepts only
-bcp-47-tag-left-empty-server = A BCP 47 tag. Left empty, the server picks its own display.
-text-server-matches-against-designations-holds = Text the server matches against the designations it holds.
-the-value-set = The value set
-url-parameter-expand-list-what-root = The url parameter of $expand. The list is what this root publishes; an implicit canonical carrying its own query string is typed, and the runner encodes the whole value.
-value-set = Value set
-run-the-expansion = Run the expansion
-no-concepts-page = No concepts on this page.
-which-codes-value-set-holds-from = Which codes a value set holds, from this server's $expand, a page at a time.
 root-declares-none-operations-would-apply = This root declares none of the operations that would apply to what you typed.
-nowhere-to-go = Nowhere to go
-reading-what-root-declares = Reading what this root declares
-where-it-goes = Where it goes
-what-you-typed = What you typed
-what-do = What to do with it
+where-it-goes = Where it can go
 nothing-was-typed = Nothing was typed.
-release = Release
-what-the-release-did = What the release did
-codes-resource-names-release-sync-service = Codes this resource names that the release the sync service last activated changed.
-what-last-synchronisation-found = What the last synchronisation found
-what-changed = What changed
-later = Later
-earlier = Earlier
-change = Change
-element = Element
-choose-a-version = Choose a version
-compare-two-versions = Compare two versions
-compare-these-versions = Compare these versions
-later-version = Later version
-earlier-version = Earlier version
-server-states-nothing-here = The server states nothing here.
-version-one-server-holds-now-account = This version is the one the server holds now, or this account cannot write this resource.
-current = current
-only-most-recent-versions-listed = Only the most recent versions are listed.
-server-declares-version-read-not-history = This server declares the version read and not the history interaction, so the list is built by reading each earlier version back. A version identifier is opaque in FHIR, so a server that does not count its versions shows only the one it states.
-restore = Restore
-interaction = Interaction
-changed = Changed
-restoring = Restoring
 version-carries-no-resource-put-back = This version carries no resource to put back.
-address-names-no-resource-type-so = The address names no resource type, so there is nothing to read the versions of.
-every-version-server-holds-what-any = Every version the server holds, what any two of them differ by, and putting an earlier one back.
-reading-the-versions = Reading the versions
-server-answered-no-property = The server answered no property.
-no-property = No property
-server-answered-no-designation = The server answered no designation.
-no-designation = No designation
-relatives-of-this-concept = Relatives of this concept
-server-answered-no-display = The server answered no display
-looking-the-code-up = Looking the code up
-choose-code-system-type-code-look = Choose a code system, type a code and look it up.
-no-code-read-yet = No code read yet
-the-code-system = The code system
-version-parameter-left-first-choice-server = The version parameter. Left on the first choice, the server answers from the version it resolves to.
-system-parameter-lookup-list-what-root = The system parameter of $lookup. The list is what this root publishes.
-look-up = Look up
-code-read-exactly-system-writes = The code to read, exactly as the system writes it.
-the-code = The code
-code-s-display-designations-properties-from = A code's display, designations and properties, from this server's $lookup.
-designation = Designation
-run-an-operation = Run an operation
-recent-changes = Recent changes
-writes-per-day = Writes per day
-every-resource-root-was-loaded-offline = Every resource on this root was loaded by the offline build.
-nothing-written-yet = Nothing written yet
-reading-what-was-written-lately = Reading what was written lately
-root-serves-none-deployment-loads-one = This root serves none. A deployment loads one with the offline build.
-no-code-system = No code system
-all-code-systems = All code systems
-reading-what-server-serves = Reading what this server serves
-recent-writes = Recent writes
-follow-code-through-concept-maps-server = Follow a code through the concept maps this server holds.
-list-codes-value-set-holds-page = List the codes a value set holds, a page at a time.
-ask-whether-code-code-system-value = Ask whether a code is in a code system or a value set.
-read-code-s-display-designations-properties = Read a code's display, designations and properties in its system.
-preferences = Preferences
-save-the-settings = Save the settings
-kept-console-browser-own-cookies = Kept by this console for this browser, in its own cookies.
-how-many-rows-paged-screen-asks = How many rows a paged screen asks for, from 1 to 1000.
-for-example-nl-nl = for example nl-NL
-bcp-47-tag-sent-displaylanguage-leave = A BCP 47 tag sent as displayLanguage. Leave it empty to take the server default.
-used-when-address-carries-no-version = Used when an address carries no version of its own.
-default-fhir-version = Default FHIR version
-compact-tightens-every-space-row-so = Compact tightens every space and row, so more of a listing fits one screen.
-density = Density
-system-follows-colour-scheme-device-asks = System follows the colour scheme this device asks for.
-theme = Theme
-fhir-base-in-use = FHIR base in use
-filter-name-canonical = Filter by name or canonical
-n-1-match = 1 match.
-no-matches = No matches.
-maps-server-used = The maps the server used
-value-shape-console-draws-no-text = a value shape this console draws no text for
-depends-on = Depends on
-also-produces = Also produces
-what-came-with-it = What came with it
-target-comment = Target comment
-source-comment = Source comment
-from-map = From map
-from-concept = From concept
-none-stated = none stated
-code-maps-nothing-target = This code maps to nothing in the target
-matches-server-reported = The matches the server reported
-server-reported-no-match-code = The server reported no match for this code.
-server-did-not-translate-code = The server did not translate the code.
-running-the-translation = Running the translation
-the-translation = The translation
-name-code-system-belongs-then-translate = Name a code and the system it belongs to, then translate it.
-nothing-translated-yet = Nothing translated yet
-narrows-answer-matches-system-list-what = Narrows the answer to matches in this system. The list is what this root publishes. Left empty, every target the map reaches is returned.
-target-code-system = Target code system
-the-target = The target
-code-translate-sent-exactly-you-type = The code to translate, sent exactly as you type it. The operation needs this and the system together.
-list-versions-root-published-code-system = The list is the versions this root published of the code system named beside it. Left unnamed, the server resolves the code against its default version.
-code-system-version = Code system version
-system-code-belongs-list-what-root = The system the code belongs to. The list is what this root publishes. The operation requires one with a code.
-sent-conceptmapversion-list-versions-root-published = Sent as conceptMapVersion. The list is the versions this root published of the map named beside it.
-concept-map-version = Concept map version
-sent-url-parameter-list-what-root = Sent as the url parameter. The list is what this root publishes. Left empty, the server picks the maps it holds for the code.
-the-map = The map
-root-s-capability-statement-does-not = This root's capability statement does not declare $translate on ConceptMap, so the runner is not offered here. Another FHIR version may declare it, so try the version switcher above.
-reading-what-root-can-do = Reading what this root can do
-one-code-through-concept-maps-server = One code through the concept maps this server holds, from its $translate.
-target = Target
-nothing-run-yet = Nothing run yet
-server-answered-no-outcome = The server answered no outcome.
-server-answered-no-outcome-parameter-so = The server answered no outcome parameter, so there is nothing to report about these two codes.
-issues-server-itemised = The issues the server itemised
-code-systems-server-does-not-hold = Code systems this server does not hold
-text = Text:{" "}
-concept-server-echoed = The concept the server echoed
-concept-inactive-code-system-server-served = This concept is inactive in its code system. The server served it and marked it, which is an answer rather than a refusal.
-inactive-2 = Inactive
-version-validated-in = Version validated in
-code-system-spells = Code as the system spells it
-server-declared-no-result = The server declared no result
-not-valid-result-false = Not valid: result false
-valid-result-true = Valid: result true
-how-do-two-codes-relate = How do two codes relate?
-run-the-subsumption-test = Run the subsumption test
-second-code-both-codes-read-code = The second code. Both codes are read in the code system named above.
-code-b = Code B
-first-code-answer-says-how-relates = The first code. The answer says how it relates to code B.
-code-a = Code A
-the-two-codes = The two codes
-root-declares-instance-level-subsumes-so = This root declares the instance level of $subsumes, so a stored CodeSystem's id can stand in for the canonical. Filled in, the run addresses that resource and sends no system.
-codesystem-id-instance-level = CodeSystem id (instance level)
-runner-offers-subsumes-only-code-system = The runner offers $subsumes only for a code system whose terminology capabilities declare subsumption. Name one above that does, and the form appears here.
-root-s-capability-statement-does-not-2 = This root's capability statement does not declare $subsumes on CodeSystem, so the runner offers no form for it.
-name-two-codes-system-run-them = Name two codes of this system and run them.
-running-the-subsumption-test = Running the subsumption test
-the-relation = The relation
-only-resource-types-root-s-capability = Only the resource types this root's capability statement declares $validate-code on are offered.
-validate-against = Validate against
-value-set-valueset-validate-code = A value set (ValueSet/$validate-code)
-code-system-codesystem-validate-code = A code system (CodeSystem/$validate-code)
-code-check-nothing-sent-until-filled = The code to check. Nothing is sent until this is filled in.
-list-versions-root-published-code-system-2 = The list is the versions this root published of the code system named beside it. Left unnamed, the server resolves the version an unversioned request goes to.
-code-system-code-belongs-list-what = The code system the code belongs to. The list is what this root publishes, and a canonical it does not is typed. It is the url of a CodeSystem run and the system of a value set run, and the $subsumes panel below reads it too.
-what-code-checked-against = What the code is checked against
-root-declares-instance-level-validate-code = This root declares the instance level of $validate-code, so a stored resource's id can stand in for the canonical. Filled in, the run addresses that resource and sends no url.
-resource-id-instance-level = Resource id (instance level)
-valuesetversion-parameter-list-versions-root-published = The valueSetVersion parameter. The list is the versions this root published of the value set named beside it.
-value-set-version = Value set version
-url-parameter-valueset-validate-code-list = The url parameter of ValueSet/$validate-code. The list is what this root publishes; an implicit canonical carrying its own query string is typed, and the runner encodes the whole value.
-is-this-code-valid = Is this code valid?
-run-the-validation = Run the validation
-root-s-capability-statement-does-not-3 = This root's capability statement does not declare $validate-code on the resource type selected, so the runner offers no form for it.
-name-code-resource-check-against-then = Name a code and the resource to check it against, then run it.
-running-the-validation = Running the validation
-the-validation = The validation
-declares-no-hierarchy-filter-operator-so = It declares no hierarchy filter operator, so its concepts are a flat list.
-root-declares-nothing-about-subsumption-system = This root declares nothing about subsumption for this system, so no $subsumes form is offered for it.
-system-declares-does-not-answer-subsumption = This system declares that it does not answer subsumption, so no $subsumes form is offered for it.
-system-declares-subsumption-so-subsumes-panel = This system declares subsumption, so the $subsumes panel below runs against it.
-no-code-system-named-yet-choose = No code system is named yet. Choose one above, name the code, and run it.
-code-system-screen-works-over = The code system this screen works over
-whether-code-valid-code-system-value = Whether a code is valid in a code system or a value set, from this server's $validate-code, and how two codes relate, from its $subsumes.
-valueset-server-sent = The ValueSet, as the server sent it
-reading-the-value-set = Reading the value set
-codes-value-set-expands = The codes the value set expands to
-open-in-the-runner = Open in the runner
-no-code = No code
-expansion-lists-no-code = The expansion lists no code.
-server-answered-without-expansion = The server answered without an expansion.
-expanding-the-value-set = Expanding the value set
-resource-declares-no-canonical-so-there = This resource declares no canonical, so there is nothing to expand.
-no-canonical = No canonical
-the-whole-code-system = the whole code system
-every-code-in = every code in{" "}
-n-1-code-named-one-one = 1 code named one by one
-selects = Selects
-what-the-definition-selects = What the definition selects
-content-whatever-server-holds-not-selection = Its content is whatever the server holds for it, not a selection written here.
-no-compose-element = No compose element
-clauses = Clauses
-compose = Compose
-views-value-set = Views of this value set
-clause = Clause
-expansion = Expansion
-server-refused-preview = The server refused the preview.
-server-answered-no-expansion-definition = The server answered no expansion for this definition.
-next = Next
-previous = Previous
-server-answered-valueset-carrying-no-expansion-2 = The server answered a ValueSet carrying no expansion.
-run-the-preview = Run the preview
-filter-the-preview = Filter the preview
-expanding-the-definition = Expanding the definition
-the-preview = The preview
-run-preview-see-what-definition-selects = Run the preview to see what this definition selects. It expands the definition on screen, saved or not.
-canonical-clause-selects-something-what-save = A canonical and a clause that selects something are what a save needs.
-save-this-value-set = Save this value set
-saved = Saved.
-value-operator-applied = The value the operator is applied with.
-filters = Filters
-server-declares-no-filter-code-system = This server declares no filter for that code system version.
-choose-property-operator = Choose a property and an operator
-compose-include-filter-over-property-code = compose.include.filter, over a property this code system version declares.
-add-filter-server-declares = Add a filter this server declares
-add = Add
-no-concept-code-system-matches-text = No concept of that code system matches that text.
-server-answered-no-expansion-search = The server answered no expansion for that search.
-searching-that-code-system = Searching that code system
-find-code-template = Find the code for that template
-find-code-code-system = Find a code in that code system
-compose-include-concept-display-which-overrides = compose.include.concept.display, which overrides the code system's own.
-display-value-set-gives-code = The display this value set gives that code
-compose-include-version-left-empty-server = compose.include.version. Left empty, the server resolves the version itself.
-choose-one-server-serves = Choose one this server serves
-compose-include-system-code-system-codes = compose.include.system, the code system the codes below are read from.
-what-replaces-placeholder-template = What replaces that placeholder in the template.
-choose-a-template = Choose a template
-implicit-value-set-named-url-template = An implicit value set, named by a URL template the code system publishes.
-add-value-set-code-system-defines = Add a value set the code system defines
-compose-include-valueset-which-draws-whole = compose.include.valueSet, which draws the whole of that value set in.
-add-published-value-set = Add a published value set
-remove-this-clause = Remove this clause
-include = Include
-exclude = Exclude
-add-an-include = Add an include
-add-an-exclude = Add an exclude
-every-exclude-takes-codes-back-out = Every exclude takes codes back out of that union, whichever include drew them in.
-every-include-adds-selection-value-set = Every include adds to the selection: the value set is the union of them all.
-includes = Includes
-excludes = Excludes
-leave-them-out = Leave them out
-include-them = Include them
-leave-server = Leave it to the server
-compose-inactive-left-server-expansion-parameters = compose.inactive. Left to the server, the expansion parameters decide.
-inactive-codes = Inactive codes
-choose-a-status = Choose a status
-valueset-status-which-every-definitional-resource = ValueSet.status, which every definitional resource carries.
-valueset-title-name-written-person = ValueSet.title, the name written for a person.
-valueset-name-computer-friendly-name = ValueSet.name, the computer-friendly name.
-valueset-url-what-everything-else-refers = ValueSet.url, what everything else refers to this value set by.
-value-set-has-no-write-path = This value set has no write path on this server, or this account carries no permission to change it, so it opens read-only.
-sign-save-composing-previewing-work-without = Sign in to save. Composing and previewing work without one.
-account-carries-no-permission-create-value = This account carries no permission to create a value set, so nothing here can be saved. Composing and previewing work anyway.
-draw-published-value-set-add-your = Draw in a published value set, add your own codes, and see what the selection holds.
 
-value-sets-root-holds = Value sets this root holds
-value-set-pages = Value set pages
-
-value-sets-2 = value sets
-root-holds-no-valueset-resource-matching = This root holds no ValueSet resource matching the filter above. A value set a code system defines implicitly is not published as a resource, and the expansion runner takes its canonical directly.
-reading-the-value-sets = Reading the value sets
-url-search-parameter-matched-against-valueset = The url search parameter, matched against ValueSet.url.
-valueset-resources-server-publishes-open-one = The ValueSet resources this server publishes. Open one to see what it selects.
-n-1-operation-note = 1 operation with a note
-root-added-nothing-definitions-release-publishes = This root added nothing to the definitions its release publishes, or did not answer.
-what-each-root-adds-own-definition = What each root adds to its own definition
-one-root-s-own-operation-documentation = One root's own operation.documentation, as it sent it.
-no-answer = no answer
-operations-levels-each-answers = Operations, and the levels each answers at
-no-root-answered-declares-operation = No root that answered declares an operation.
-no-operation = No operation
-did-not-answer = {" "}did not answer
-what-each-root-says-about-itself = What each root says about itself
-declaration = Declaration
-reading-four-capability-statements = Reading the four capability statements
-what-each-root-declares = What each root declares
 back-concept-map = Back to the concept map
 back-value-set = Back to the value set
 back-code-system = Back to the code system
-the-display-language = the display language
 target-fhir-version-requires-comment-target = The target `{ $code }` of `{ $element }` is `{ $relationship }`, and this FHIR version requires a comment on a target that says so.
 target-states-no-relationship-source-which = The target `{ $code }` of `{ $element }` states no relationship to its source, which every served version makes mandatory.
 marked-mapping-nothing-carries-target-well = `{ $element }` is marked as mapping to nothing and carries a target as well. Untick that mark to see the target, or clear the mark.
 elements-differ = { $more } elements differ.
 of-roots-answered = { $answered } of { $answers } roots answered
-reloaded-form-now-shows-version-one = Reloaded. The form now shows version { $version_id }, the one the server holds.
 
-fhir-2 = FHIR { $fhir }, { $software }
-fhir-3 = FHIR { $fhir }
 every-one-value-sets-named-here = is in every one of the { $several } value sets named here
 one-codes-listed = is one of the { $concepts } codes listed
 matches-every-one-filters = matches every one of the { $filters } filters
@@ -751,96 +110,10 @@ same-concept = { $code_a } and { $code_b } are the same concept.
 neither-nor-subsumes-other = Neither { $code_a } nor { $code_b } subsumes the other.
 server-answered-outcome-which-not-one = The server answered the outcome `{ $other }`, which is not one of the four this console has wording for.
 w = W/"{ $version_id }"
-this-root-counted = { $shown } This root counted { $not_declared }.
-root-counted-sent-so-part-answer = { $shown } This root counted { $total } and sent { $carried }, so this is part of the answer.
-this-root-counted-2 = { $shown } This root counted { $total }.
 
-no-on-this-page = No { $noun } on this page.
-showing-to-of = Showing { $noun } { $first } to { $last } of { $matched }.
-version-2 = Version { $not_declared }
 version-declares-operator-filter-so-tree = This version declares the { $child_of_operator } operator on the { $property } filter, so the tree below walks one level at a time.
 version-declares-hierarchy-operators-none-them = This version declares the hierarchy operators { $operators }, and none of them selects the direct children of a code, so the concepts read as a flat list.
-concepts-matched = { $found } concepts matched.
-concepts-which-whole-page-screen-asked = { $found } concepts, which is the whole page this screen asked for. Narrow the filter to see fewer.
-display-2 = Display { $not_declared }
-display-3 = Display { $not_declared }
-read-from-version-server-did-not = Read from a version this server did not name, of the system { $not_declared }
-read-from-version = Read from version { $version }
-of-this-concept = { $label } of this concept
-display-4 = Display { $not_declared }
-more-children-than-page-size-asked = { $display } (more children than this page size asked for)
-version-3 = Version { $not_declared }
-version-4 = Version { $code }
-filter-2 = Filter { $not_declared }
-this-root-counted-3 = this root counted { $not_declared }
-this-root-counted-4 = this root counted { $total }
-n-1-published-resource-and = 1 published resource, and { $counted }
-published-resources-and = { $drawn } published resources, and { $counted }
-version-5 = Version { $not_declared }
-version-6 = Version { $version }
-concept-map-3 = Concept map { $id }
-mappings-2 = { $all } mappings
-of-mappings = { $shown } of { $all } mappings
 
-source-scope = Source scope ({ $element })
-target-scope = Target scope ({ $element })
-to-2 = { $source } to { $target }
-relationship-2 = Relationship ({ $value0 })
-searching-for = Searching for { $asked }
-search-did-not-answer = The search for { $asked } did not answer.
-codes-match = { $rows } codes match { $asked }.
-find-system = Find a { $what } in this system
-map-has-complete-before-can-translated = The map has to be complete before it can be translated through. { $first }
-preview-did-not-answer = The preview did not answer: { $value0 }
-translated-through-matches = Translated through { $through }: { $answer } matches.
-saved-server-now-holds-version = Saved. The server now holds version { $version_id }.
-
-saved-server-now-holds-version-2 = Saved. The server now holds version { $version_id }.
-check-did-not-answer = The check on `{ $code }` did not answer: { $error }
-server-reports-inactive = The server reports `{ $code }` as inactive.
-server-reports-still-active = The server reports `{ $code }` as still active.
-server-stated-no-inactive-flag = The server stated no inactive flag for `{ $code }`.
-of-3 = { $passed } of { $ran }
-times-under-it = { $times } times under it
-s-2 = { $seconds } s
-s-3 = { $ready_seconds } s
-no-concepts-page-selection = No concepts on this page, of { $total } in the selection.
-concepts-to-of = Concepts { $first } to { $last } of { $total }.
-concepts-server-declared-no-total = Concepts { $first } to { $last }. The server declared no total.
-page-of-2 = Page { $page } of { $pages }
-page = Page { $page }
-not-used-address-asked-page-size = Not used: the address asked for a page size of `{ $refused }`, which is not a whole number from 1 to { $max_count }. This run asked for { $used }.
-nested-at-level = nested at level { $row }
-concepts-selection = { $rows } concepts, of { $total } in the selection.
-concepts-2 = { $rows } concepts.
-answer-nests-expand-pages-flat-expansions = { $counted } The answer nests, and $expand pages flat expansions only, so this run was not paged.
-read-from-shape-alone = Read as { $subject } from its shape alone.
-editor-does-not-write-so-reads = This editor does not write { $resource_type }, so it reads no versions of one.
-restore-version = Restore version { $labelled }
-restored-version-server-stated-no-version = Restored version { $chosen }. The server stated no version for the write.
-restored-version-server-now-holds-version = Restored version { $chosen }. The server now holds version { $now }.
-version-7 = Version { $id }
-code-systems-value-sets-concept-maps = The code systems, value sets and concept maps this server serves on FHIR { $version }.
-writes-from-to = { $changes } writes from { $first } to { $last }
-result = Result { $not_declared }.
-target-2 = Target { $not_declared }
-matches = { $matches } matches.
-version-8 = Version { $not_declared }
-declares-operator-filter-so-has-hierarchy = It declares the { $child_of_operator } operator on the { $property } filter, so it has a hierarchy to subsume over.
-declares-hierarchy-operators-none-which-selects = It declares the hierarchy operators { $operators }, none of which selects the direct children of a code.
-version-9 = {" "}(version { $version })
-value-set-3 = Value set { $id }
-codes-named-one-one = { $codes } codes named one by one
-codes-shown = { $listed } codes shown
-of-codes = { $listed } of { $total } codes
-concepts-page-2 = { $rows } of { $total } concepts on this page.
-concepts-page-server-declared-no-total = { $rows } concepts on this page. The server declared no total.
-at-character = { $form }, at character { $column }
-this-definition-selects-concepts = This definition selects { $total } concepts.
-concepts-page-server-declared-no-total-2 = { $expansion } concepts on this page. The server declared no total.
-server-refused-preview-2 = The server refused the preview: { $said }
-fhir-4 = { $column } · FHIR { $release }, { $state }
-operations-with-a-note = { $count } operations with a note
 state-answered = answered
 state-refused-word = refused
 state-declared = declared
@@ -851,16 +124,6 @@ noun-code-systems =
     }
     .empty = No code systems
     .opening = Code systems
-systems-held = { $held ->
-        [one] { $held } code system
-       *[other] { $held } code systems
-    }
-systems-kept = { $shown } of { $held ->
-        [one] { $held } code system
-       *[other] { $held } code systems
-    }
-state-read = read
-default-mark = default
 noun-concept-maps =
     { $count ->
         [one] concept map
@@ -875,37 +138,758 @@ noun-value-sets =
     }
     .empty = No value sets
     .opening = Value sets
-noun-concepts =
-    { $count ->
-        [one] concept
-       *[other] concepts
-    }
-    .empty = No concepts
-    .opening = Concepts
 
-title-code-system-editor =
-    { $mode ->
-        [new] New code system
-       *[edit] Edit { $name }
-    }
-title-concept-map-editor =
-    { $mode ->
-        [new] New concept map
-       *[edit] Edit { $name }
-    }
-title-value-set-composer =
-    { $mode ->
-        [new] New value set
-       *[edit] Edit { $name }
-    }
-no-properties-title = No property declared
-no-properties-line = Declare a property to give the concepts values of it.
-no-concepts-title = No concept yet
-no-concepts-line = Add a concept to define its code, display and definition.
-no-groups-title = No group yet
-no-groups-line = Add a group to map codes from one system to codes of another.
-no-elements-title = No code mapped yet
-no-elements-line = Add a code of the source system and the codes it maps to.
 subsumes-descendant = { $code_a } subsumes { $code_b }: { $code_b } is a descendant of { $code_a }.
 subsumed-descendant = { $code_a } is subsumed by { $code_b }: { $code_a } is a descendant of { $code_b }.
 title-find = Find
+
+## The chrome around every page
+
+shell-console = Console
+shell-navigation = Console
+shell-group-overview = Overview
+shell-group-terminology = Terminology
+shell-group-operations = Operations
+shell-group-console = Console
+shell-dashboard = Dashboard
+shell-code-systems = Code systems
+shell-value-sets = Value sets
+shell-concept-maps = Concept maps
+shell-concept-browser = Concept browser
+shell-operations = Operations
+shell-server = Server
+shell-configuration = Configuration
+shell-about = About
+shell-search-label = Find in the terminology server
+shell-search-placeholder = Resource, code or phrase
+shell-fhir-version = FHIR version
+shell-server-up = Server up
+shell-server-degraded = Server degraded
+shell-server-refused = Server refused 401
+shell-server-unreachable = Server unreachable
+shell-server-at = at { $root }
+shell-sign-in = Sign in
+shell-signed-in = Signed in
+shell-not-signed-in = Not signed in
+shell-visitor-menu = Visitor menu
+shell-visitor-line = Reading is open; Sign in is for editing.
+shell-preferences-menu = Your preferences
+shell-open-line = This console has no sign-in.
+shell-development-title = Development deployment
+shell-development-body = this console has no sign-in, and the server it reaches has authentication switched off. Anyone who reaches it can change the stored resources.
+
+## Where a resource comes from, and its versions in words
+
+source-stored = Stored on this server
+source-stored-tip = Written through the FHIR API and kept in the server's resource store; it can be edited and has a history
+source-index = Offline index
+source-index-tip = Served from an index built offline; read-only
+source-loaded = Loaded at start
+source-loaded-tip = Read from a resource directory, or carried by the server, when it starts; read-only
+versions-none = none declared
+versions-one = Version { $version }
+versions-many = Versions { $versions }
+type-code-system = Code system
+type-value-set = Value set
+type-concept-map = Concept map
+
+## How long ago a moment was
+
+ago-seconds = { $count } s ago
+ago-minutes = { $count } min ago
+ago-hours = { $count } h ago
+ago-yesterday = yesterday
+ago-days = { $count } days ago
+
+## The dashboard
+
+dashboard-subtitle = What { $host } serves on FHIR { $version }, as it answered at { $time }.
+dashboard-subtitle-unanswered = What { $host } serves on FHIR { $version }.
+dashboard-serves-nothing = FHIR { $version } serves no code systems, value sets or concept maps on this server.
+dashboard-read-instead = Read FHIR { $version } instead
+dashboard-stored = { $count } stored on this server
+dashboard-since = since { $day }
+dashboard-recent-writes = Recent writes
+dashboard-recent-changes = Recent changes
+dashboard-resource = Resource
+dashboard-change = Change
+dashboard-when = When
+dashboard-type-version = { $type } · version { $version }
+dashboard-created = Created
+dashboard-updated = Updated
+dashboard-deleted = Deleted
+dashboard-nothing-written = Nothing written yet: every resource on this root was loaded when the server started.
+dashboard-code-system = Code system
+dashboard-source = Source
+dashboard-versions = Versions
+dashboard-all-code-systems = All code systems
+dashboard-failure = Failure
+dashboard-address = Address
+dashboard-try-again = Try again
+dashboard-keeps-no-copy = The console keeps no copy of the server, so nothing shows until it answers; your session is kept.
+dashboard-technical-detail = Technical detail
+
+## Your preferences
+
+preferences-title = Your preferences
+preferences-save = Save
+preferences-accent = Teal
+preferences-default-fhir = Default FHIR version
+preferences-default-fhir-line = Used when an address names no version. The version select in the top bar switches only this session.
+preferences-display-language = Display language
+preferences-display-language-line = Language for concept names, for example nl-NL. Empty takes the server's own choice.
+preferences-display-language-example = for example nl-NL
+preferences-page-size = Page size
+preferences-page-size-line = How many rows a paged screen asks for, from 1 to 1,000.
+
+## About
+
+about-title = About
+about-subtitle = The console, the server it reads, and the manufacturer.
+about-server = Server
+about-server-unanswered = The server did not answer
+about-fhir-roots = FHIR roots
+about-ferroui = FerroUI
+about-licence = Business Source License 1.1
+about-book = The FerroTERM book
+about-statement-title = The CapabilityStatement of FHIR { $version }
+about-statement-line = What the { $version } root declares at GET { $path }; Server compares the four roots.
+
+## Server
+
+server-subtitle = What each FHIR root of { $host } declares, and the evidence this build ships.
+server-sections = Server sections
+server-tab-versions = FHIR versions
+server-tab-operations = Operations
+server-tab-evidence = Evidence
+server-no-answer = no answer
+server-roots-silent = { $roots } did not answer, so its column says so.
+server-retry = Retry
+server-own-operation = FerroTERM's own
+server-operations-title = Operations each root declares
+server-operations-intro = Which operations each root declares, and at which level.
+server-versions-title = What each root declares
+server-base-address = Base address
+server-code-systems = Code systems
+server-declaration = Declaration
+server-evidence-line = Read from the files the FerroTERM { $release } build commits, not from the server answering this page.
+server-mode = Mode
+server-surface = Surface
+server-passed = Passed
+server-needs = Content it needs
+server-needs-nothing = No extra content
+server-passed-of = { $passed } of { $ran }
+server-suite-title = The HL7 terminology ecosystem suite
+server-suite-intro = From the committed pass lists; only general runs in CI.
+server-benchmark = Benchmark
+server-target = Target
+server-measured = Measured
+server-microseconds = { $value } µs
+server-latency-title = Latency
+server-latency-intro = Each target is the project's claim; the measurement is one run on { $machine }.
+
+## Configuration
+
+config-subtitle = The settings in { $file }, read when the console starts.
+config-sections = Configuration sections
+config-connection = Connection
+config-sign-in = Sign-in
+config-sessions = Sessions
+config-listener = Listener
+config-server = Server
+config-server-line = Where the console reaches the terminology server, on your private network.
+config-public = Public address
+config-public-line = The address readers see the FHIR API at, shown on the screens.
+config-sync = Synchronisation service
+config-sync-line = Where the console reads release checks from the synchronisation service.
+config-timeout = Timeout
+config-timeout-line = How long one call to the server may take.
+config-not-set = not set
+config-set-up = Set up
+config-issuer = Identity provider
+config-issuer-line = Where readers sign in to edit, by OpenID Connect.
+config-client = Client
+config-client-line = The console's client at the provider.
+config-secret = Client secret
+config-secret-line = Read from a file; never shown.
+config-redirect = Redirect address
+config-redirect-line = Where the provider sends a reader back.
+config-scopes = Scopes
+config-scopes-line = What the console asks the provider for.
+config-sign-out = Sign-out
+config-sign-out-line = Ends the session at the provider too.
+config-secure-cookie = Secure cookie
+config-secure-cookie-line = The session cookie is sent over HTTPS only.
+config-idle = Idle timeout
+config-idle-line = A session ends after this long without a request.
+config-absolute = Absolute timeout
+config-absolute-line = A session ends after this long, even while in use.
+config-limit = Session limit
+config-limit-line = How many sessions the console holds at once.
+config-listen = Listener
+config-listen-line = Address and port the console listens on.
+config-site-root = Site root
+config-site-root-line = Where the console's built site is read from.
+config-no-sign-in = Sign-in is not set up
+config-no-sign-in-line = Reading stays open; editing needs an [oidc] section.
+config-on = On
+config-off = Off
+config-seconds = { $count } s
+config-minutes = { $count } min
+config-hours = { $count } h
+config-milliseconds = { $count } ms
+
+## Sign in
+
+sign-in-title = Sign in to edit
+sign-in-read-only-title = Read-only console
+sign-in-at = Sign in at
+sign-in-taking = Taking you to
+sign-in-read = Read without signing in
+sign-in-read-line = : every screen is open to read.
+sign-in-note = You sign in at your organisation's identity provider; the console never sees your password and the browser never holds a token.
+sign-in-documentation = Documentation
+sign-in-privacy = Privacy notice
+sign-in-caption = The console of the FerroTERM terminology server. It holds no patient data.
+sign-in-try-again = Try again
+sign-in-signed-out = You are signed out of the console and of the identity provider.
+sign-in-expired = Your session ended after a while without a request. Sign in again to edit.
+sign-in-expired-absolute = Your session ended: a session lasts a fixed time at most, even while in use. Sign in again to edit.
+sign-in-full = The console has no free sessions right now. Try again in a few minutes.
+sign-in-refused = The identity provider refused the sign-in. Try again; if it refuses again, ask whoever runs it.
+sign-in-rejected = The sign-in could not be completed: the provider's answer did not pass the console's checks, so nothing was kept. Ask whoever runs the identity provider to check the console's registration.
+sign-in-unreachable = The console could not reach the identity provider. Try again in a moment; it may be down.
+sign-in-unavailable = This console has no sign-in configured. Every screen is open to read.
+sign-in-unavailable-detail = No [oidc] section.
+
+## The error pages
+
+errors-not-found-title = No such screen
+errors-not-found-body = The console has no page at { $path }. The navigation lists every screen.
+errors-forbidden-body = You are signed in as { $who }, and this account may not do this: { $what }. You can still read everything and preview what you compose.
+errors-forbidden-scope = Needs the scope
+errors-sign-in-again = Sign in again
+
+## The keyboard shortcuts
+
+keys-title = Keyboard shortcuts
+keys-intro = A shortcut acts only when no field has the focus. Every shortcut has a control on the screen that does the same.
+keys-or = or
+keys-everywhere = Everywhere
+keys-find = Find a resource, a code or a phrase
+keys-legend = This legend
+keys-close = Close a dialog, a menu or a panel
+keys-dashboard = Go to the dashboard
+keys-code-systems = Go to code systems
+keys-value-sets = Go to value sets
+keys-concept-maps = Go to concept maps
+keys-browser = Go to the concept browser
+keys-operations = Go to operations
+keys-server = Go to the server
+keys-tree = Concept tree
+keys-tree-move = Previous and next concept
+keys-tree-open = Open a level, or go to its first child
+keys-tree-close = Close a level, or go to the parent
+keys-tree-read = Read the concept
+keys-operations-group = Operations and editors
+keys-run = Run, or run the preview
+keys-save = Save
+
+## The listings
+
+listing-find-chip = Name: { $words }
+listing-source-chip = Source: { $source }
+listing-source = Source
+listing-source-all = Every source
+listing-clear = Clear the filter
+status-active = Active
+status-draft = Draft
+status-retired = Retired
+status-unknown = No status
+content-complete = All concepts
+content-not-present = Not held
+content-example = Examples
+content-fragment = Part
+content-supplement = Supplement
+content-undeclared = Not declared
+hierarchy-tree = Tree
+hierarchy-no-tree = Hierarchy, no tree
+hierarchy-flat = Flat
+
+## Code systems
+
+code-systems-subtitle = Every code system this server offers on FHIR { $version }.
+code-systems-system = Code system
+code-systems-source = Source
+code-systems-versions = Versions
+code-systems-content = Content
+code-systems-hierarchy = Hierarchy
+code-systems-no-match = { $count } code systems are served, and none matches the filter.
+code-systems-pages = Code system pages
+code-systems-find = Name or canonical
+code-systems-new = New code system
+
+## Value sets
+
+value-sets-subtitle = The value sets this server holds for FHIR { $version }.
+value-sets-value-set = Value set
+value-sets-version = Version
+value-sets-status = Status
+value-sets-selects = Selects
+value-sets-none = No value set is held yet.
+value-sets-first = Add the first value set
+value-sets-no-match = { $count } value sets are held, and none matches the filter.
+value-sets-new = New value set
+value-sets-find = Title or canonical
+value-sets-pages = Value set pages
+selects-codes-of = { $count ->
+    [one] 1 code of { $system }
+   *[other] { $count } codes of { $system }
+}
+selects-codes = { $count ->
+    [one] 1 code
+   *[other] { $count } codes
+}
+selects-value-sets = { $count ->
+    [one] 1 value set
+   *[other] { $count } value sets
+}
+selects-whole-system = the whole code system
+selects-nothing-stated = no definition stated
+selects-less = , less { $excluded }
+
+## Concept maps
+
+concept-maps-subtitle = The concept maps this server holds for FHIR { $version }.
+concept-maps-map = Concept map
+concept-maps-mappings = Mappings
+concept-maps-mapping-count = { $count ->
+    [one] 1 mapping
+   *[other] { $count } mappings
+}
+concept-maps-from-to = { $source } → { $target }
+concept-maps-none = No concept map is held yet.
+concept-maps-first = Add the first concept map
+concept-maps-no-match = { $count } concept maps are held, and none matches the filter.
+concept-maps-new = New concept map
+concept-maps-pages = Concept map pages
+
+## A resource page
+
+detail-tabs-code-system = Views of this code system
+detail-tabs-value-set = Views of this value set
+detail-tabs-concept-map = Views of this concept map
+detail-overview = Overview
+detail-versions = Versions
+detail-definition = Definition
+detail-expansion = Expansion
+detail-mappings = Mappings
+detail-history = History
+detail-json = JSON
+detail-stored = stored on this server
+detail-index = offline index
+detail-loaded = loaded at start
+detail-version-line = Version { $version } · { $source }
+detail-more-for = More actions for { $name }
+detail-yes = Yes
+detail-no = No
+detail-json-summary-title = { $path }, summary
+
+## A code system
+
+code-system-no-canonical = The address names no code system
+code-system-on-version = Not served on FHIR { $version }
+code-system-browse = Browse concepts
+code-system-look-up = Look up a code in it
+code-system-check = Check a code in it
+code-system-expand = Expand as a value set
+code-system-edit = Edit
+code-system-index-note = Served from an index built offline, so the console cannot edit it and it keeps no history. A new release arrives as a new directory under the index root.
+code-system-loaded-note = Read when the server starts, from a resource directory or from what the server carries, so the console cannot edit it and it keeps no history.
+code-system-no-resource = The root publishes no CodeSystem resource for this canonical, so there is nothing it says about itself to show.
+code-system-computer-name = Computer name
+code-system-experimental = Experimental
+code-system-publisher = Publisher
+code-system-last-changed = Last changed
+code-system-description = Description
+code-system-content-count = { $content }, { $count } of them
+code-system-hierarchy-meaning = Hierarchy meaning
+code-system-case-sensitive = Case sensitive
+code-system-version-needed = Version needed
+code-system-compositional = Compositional grammar
+code-system-supplements = Supplements
+code-system-property = Property
+code-system-property-type = Type
+code-system-property-meaning = Meaning
+code-system-declared-properties = Declared properties
+code-system-details = Details
+code-system-structure = Structure
+code-system-unnamed-version = no version
+code-system-release = Release { $version }
+code-system-answers-default = For { $version }, and for requests that name no version.
+code-system-answers-only = For { $version } only.
+code-system-subsumes = Yes, so Check offers Relation
+code-system-no-subsumption = No, so Check offers no Relation
+code-system-answers-requests = Answers requests
+code-system-subsumption = Subsumption
+code-system-languages = Designation languages
+code-system-look-up-returns = Properties Look up returns
+code-system-read-from = Read from
+code-system-filters-of = Filters { $version } accepts
+code-system-no-filters = This version declares no filter.
+code-system-operators = Operators
+code-system-versions-intro = What the server declares it can do with each version.
+code-system-json-label = The CodeSystem as JSON
+code-system-summary-note = Read with _summary=true: the concepts are left out. Look up reads one.
+
+## A value set
+
+value-set-check = Check a code in it
+value-set-expand-all = Expand it in Operations
+value-set-selects = What the definition selects
+value-set-no-compose = The value set carries no definition, so what it holds is whatever the server built for it.
+value-set-loaded-note = Read from a resource directory when the server starts, so the console cannot edit it and it keeps no history.
+value-set-open-in-operations = Open in Operations
+value-set-no-expansion = The server answered without an expansion.
+value-set-concept = Concept
+value-set-system = System
+value-set-first-page = The first page of the expansion
+value-set-shown = { $shown } concepts shown.
+value-set-shown-of = Concepts 1 to { $shown } of { $total }.
+value-set-expansion-title = The expansion
+value-set-json-label = The ValueSet as JSON
+clause-no-system = Every system the value sets name
+clause-from = From
+clause-version = , version { $version }
+clause-includes-codes = { $count ->
+    [one] Includes 1 code:
+   *[other] Includes { $count } codes:
+}
+clause-excludes-codes = { $count ->
+    [one] Excludes 1 code:
+   *[other] Excludes { $count } codes:
+}
+clause-value-sets = { $count ->
+    [one] Every code of 1 value set.
+   *[other] Every code the { $count } value sets have in common.
+}
+clause-whole-system = Every code of the code system.
+filter-is-a = Includes CONCEPT and everything below it.
+filter-descendent-of = Includes everything below CONCEPT.
+filter-is-not-a = Includes everything that is not CONCEPT or below it.
+filter-child-of = Includes the children of CONCEPT.
+filter-generalizes = Includes CONCEPT and everything above it.
+filter-equals = Includes CONCEPT.
+filter-other = Where { $property } { $op } { $value }.
+
+## A concept map
+
+concept-map-translate = Translate a code through it
+concept-map-no-system = an unnamed system
+concept-map-to = to
+concept-map-every = Every mapping the map writes
+concept-map-no-mappings = The map writes no mapping.
+concept-map-codes-unmapped = { $unmapped ->
+    [one] { $count }, one of them to nothing
+   *[other] { $count }, { $unmapped } of them to nothing
+}
+concept-map-codes-mapped = Codes mapped
+concept-map-what-it-maps = What it maps
+concept-map-json-label = The ConceptMap as JSON
+
+## The history of a stored resource
+
+history-conflict = Someone changed this resource since you opened it, so the restore was refused.
+history-reload = Reload the revisions
+history-restored = Revision { $revision } is restored as revision { $written }.
+history-created = Created
+history-updated = Updated
+history-deleted = Deleted
+history-revision = Revision
+history-changed = Changed
+history-interaction = Interaction
+history-actions = Actions
+history-current = Current
+history-revision-n = Revision { $revision }
+history-revision-current = Revision { $revision }, current
+history-revisions = Revisions
+history-intro = The revisions the server holds, read back one at a time.
+history-truncated = The latest revisions the server holds. The list stops at 20, so older ones are not shown.
+history-restore = Restore
+history-restore-n = Restore revision { $revision }
+history-restore-question = Restore revision { $revision }?
+history-restore-message = The server writes revision { $revision }'s whole resource back as a new revision. Revision { $current } stays in the history. If someone changed the { $kind } since you opened it, the server refuses the restore and nothing changes.
+history-earlier = Earlier revision
+history-later = Later revision
+history-compare = Compare
+history-choose-two = Choose two revisions to see what differs.
+history-differ = { $count ->
+    [0] Revision { $from } and revision { $to } state the same elements.
+    [one] 1 element differs between revision { $from } and revision { $to }, leaving out the revision id and time the server sets on every write.
+   *[other] { $count } elements differ between revision { $from } and revision { $to }, leaving out the revision id and time the server sets on every write.
+}
+history-what-changed = What changed
+history-compare-title = Compare two revisions
+
+## The operations
+
+ops-title = Operations
+ops-subtitle = Run the server's terminology operations; nothing is saved on the server.
+ops-tabs = Operations
+ops-look-up = Look up
+ops-check = Check
+ops-expand = Expand
+ops-translate = Translate
+ops-running = Running
+ops-request = The request
+
+## Look up
+
+lookup-system = Code system
+lookup-version = Version
+lookup-server-version = The server's default
+lookup-default-version = { $version } (default)
+lookup-code = Code
+lookup-code-hint = The system's code
+lookup-language = Display language
+lookup-server-language = The server's own choice
+lookup-before = Type a code and look it up.
+lookup-open-in-browser = Open in the concept browser
+lookup-raw = The Parameters, as the server sent them
+lookup-found = Found
+lookup-in = in { $system }
+lookup-in-version = in { $system }, version { $version }
+lookup-display = Display
+lookup-term = Term
+lookup-term-language = Language
+lookup-use = Use
+lookup-designations = Designations
+lookup-property = Property
+lookup-value = Value
+lookup-properties = Properties
+
+## Check
+
+check-what = What to check
+check-membership = Membership
+check-relation = Relation
+check-value-set = Value set
+check-its-system = Its code system
+check-choose-system = Choose its code system
+check-before = Type a code and check it against the value set.
+check-needs-system = Choose the code system the code belongs to, then check it.
+check-raw = The Parameters, as the server sent them
+check-valid = Valid:
+check-not-valid = Not valid:
+check-is-in = is in { $set }
+check-is-not-in = is not in { $set }
+check-no-result = The server answered without a result.
+check-system-version = { $system }, version { $version }
+check-inactive = (inactive)
+check-concept = Concept
+check-server-says = What the server says
+check-code-a = Code A
+check-code-b = Code B
+check-the-relation = Check the relation
+check-relation-before = Type two codes of the code system and check how they relate.
+check-no-outcome = The server answered without an outcome.
+
+## Expand
+
+expand-filter = Filter
+expand-filter-hint = Text in a designation
+expand-page-size = Page size
+expand-active-only = Active concepts only
+expand-designations = Include designations
+expand-before = Choose a value set and expand it.
+expand-none = No concept of { $set } matches.
+expand-shown-of = Concepts { $first } to { $last } of { $total } in { $set }
+expand-shown = Concepts { $first } to { $last } in { $set }
+expand-concepts = Concepts
+expand-pages = Expansion pages
+expand-noun = { $count ->
+    [one] concept
+   *[other] concepts
+}
+    .empty = No concepts
+expand-applied = Applied parameters
+
+## Translate
+
+translate-map = The map
+translate-any-map = Any map the server holds
+translate-target = Target code system
+translate-any-target = Any
+translate-before = Type a code and translate it.
+translate-the-maps = the server's maps
+translate-translated = Translated
+translate-through = through { $map }:
+translate-matches = { $count ->
+    [0] no match
+    [one] 1 match
+   *[other] { $count } matches
+}
+translate-target-column = Target
+translate-relationship = Relationship
+translate-matches-title = Matches
+translate-comment = Comment
+translate-no-target = No target
+
+## The concept browser
+
+browse-title = Concept browser
+browse-subtitle = Search a code system, read a concept and walk its hierarchy.
+browse-hierarchy = Hierarchy
+browse-concept = The concept
+browse-search = Search
+browse-choose-system = Choose a code system
+browse-choose-system-tree = Choose a code system to walk its hierarchy.
+browse-choose-concept = Choose a concept to read it.
+browse-choose-concept-tree = Choose a concept to walk the hierarchy around it.
+browse-choose-system-first = Choose a code system first.
+browse-open = Open
+browse-search-hint = Search the designations
+browse-count = { $count ->
+    [one] 1 concept
+   *[other] { $count } concepts
+}
+browse-matches = Matching concepts
+browse-all-properties = All properties
+browse-parent = Parent
+browse-children = Children
+browse-read-from = · read from version { $version }
+
+## Find
+
+find-subtitle = What you typed, read by its shape, and the screens that take it.
+find-read-as = reads as { $subject } from its shape alone. No code system, value set or concept map on FHIR { $version } has it as a name or a canonical.
+find-matches = Resources that match
+find-look-up = Look up { $code }
+find-look-up-detail = Opens Look up with the code filled in. Name the system it belongs to.
+find-check = Check { $code }
+find-check-detail = Opens Check with the code filled in, ready for a value set.
+find-translate = Translate { $code }
+find-translate-detail = Opens Translate with the code filled in. Name the system it belongs to.
+find-search = Search the designations for { $code }
+
+## The editors
+
+editor-new = Not saved yet.
+editor-version = Version { $version }.
+editor-opened = Version { $version }, opened { $since }.
+editor-unchanged = No changes yet.
+editor-changed = Changes not saved yet.
+editor-refused-line = Not saved. Read what the server said above.
+editor-expired-line = Not saved: sign in again first.
+editor-dock = Save
+editor-discard = Discard
+editor-sign-in-again = Sign in again
+editor-expired = Your session ended, so the save was not sent. Sign in again, then open the editor and make the change again.
+editor-conflict = Someone changed this resource since you opened it, so the save was refused.
+editor-reload = Reload the current version
+editor-saved-title = Saved
+editor-saved = Saved. The server now holds version { $version }.
+editor-edit = Edit
+editor-lifecycle-active = Active
+editor-lifecycle-experimental = Experimental
+editor-lifecycle-deprecated = Deprecated
+editor-lifecycle-retired = Retired
+editor-forbidden-code-system = Edit a code system
+editor-code-system-needs = Give the code system a canonical, a status and a content mode to save it.
+editor-create-code-system = Create this code system
+editor-save-code-system = Save this code system
+editor-new-code-system = New code system
+editor-metadata = Metadata
+editor-canonical = Canonical URL
+editor-title = Title
+editor-name = Name
+editor-business-version = Business version
+editor-status = Publication status
+editor-case-sensitive = Codes are case sensitive
+editor-property-code = Property code
+editor-property-type = Type
+editor-remove-property = Remove the property { $code }
+editor-property-kept = The editor writes this property itself, from each concept's lifecycle.
+editor-declared-properties = Declared properties
+editor-declare-property = Declare a property
+editor-no-properties = No property declared yet.
+editor-concept-code = Code
+editor-concept-display = Display
+editor-concept-parent = Parent
+editor-concept-lifecycle = Lifecycle
+editor-remove-concept = Remove this new concept
+editor-top-level = top level
+editor-display-of = Display of { $code }
+editor-lifecycle-of = Lifecycle of { $code }
+editor-concepts = Concepts
+editor-add-concept = Add a concept
+editor-retired-not-removed = A concept is retired, never removed, so a published code keeps meaning what it meant.
+editor-open-code-system = Open the code system
+editor-forbidden-value-set = Compose a value set
+editor-value-set-needs = Give the value set a canonical, a status and at least one complete include to save it.
+editor-create-value-set = Create this value set
+editor-save-value-set = Save this value set
+editor-new-value-set = New value set
+editor-inactive-codes = Inactive codes
+editor-inactive-server = Leave it to the server
+editor-inactive-include = Include them
+editor-inactive-exclude = Leave them out
+editor-published-value-sets = Published value sets
+editor-no-system = No code system
+editor-filter-property = Property
+editor-filter-operator = Operator
+editor-remove-filter = Remove this filter
+editor-remove-code = Remove this code
+editor-value-set-canonical = Value set canonical
+editor-remove-value-set = Remove this value set
+editor-filters = Filters
+editor-add-filter = Add filter
+editor-codes = Codes
+editor-add-code = Add code
+editor-remove-clause = Remove this clause
+editor-includes-excludes = Includes and excludes
+editor-includes-excludes-intro = Includes add codes; excludes take them back out.
+editor-add-include = Add an include
+editor-add-exclude = Add an exclude
+editor-add-value-set = Add a published value set
+editor-run-preview = Run the preview
+editor-preview-before = Run the preview to see what this selects.
+editor-preview = The preview
+editor-open-value-set = Open the value set
+editor-forbidden-concept-map = Edit a concept map
+editor-create-concept-map = Create this concept map
+editor-save-concept-map = Save this concept map
+editor-new-concept-map = New concept map
+editor-no-system-yet = no system yet
+editor-group-title = Group { $place }: { $source } to { $target }
+editor-remove-group = Remove this group
+editor-source-system = Source system
+editor-target-system = Target system
+editor-codes-count = { $count ->
+    [one] 1 code
+   *[other] { $count } codes
+}
+editor-add-map-code = Add a code
+editor-add-group = Add a group
+editor-group-intro = A group maps codes of one system to codes of another, and carries at least one code.
+editor-source-code = Source code
+editor-no-map = Maps to nothing
+editor-target-code = Target code
+editor-no-target = No target
+editor-choose-relationship = Choose a relationship
+editor-optional = Optional
+editor-remove-target = Remove this target
+editor-add-target = Add a target
+editor-remove-map-code = Remove this code
+editor-open-concept-map = Open the concept map
+editor-back-to-resource = Back to the resource
+editor-unmanaged = The server read this resource from its resource directory when it started, so it keeps no version the console could update. Change the file it was read from instead.
+
+## The console's own form routes
+
+post-no-preference = The post names no preference.
+post-one-preference = A post keeps one preference.
+post-not-offered = The preference or its value is not one the console offers.
+post-sidebar = The navigation is either the rail or full.
+post-version = The FHIR version is not one this server serves.
+server-form-too-large = The form is larger than the console takes.

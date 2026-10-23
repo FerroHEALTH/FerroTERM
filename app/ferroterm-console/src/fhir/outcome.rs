@@ -55,37 +55,7 @@ pub(crate) struct Extension {
     pub(crate) value_integer: Option<i64>,
 }
 
-/// The extension stating the line of a fault inside the value
-/// `issue.expression` names
-/// (<https://hl7.org/fhir/extensions/StructureDefinition-operationoutcome-issue-line.html>).
-const ISSUE_LINE: &str = "http://hl7.org/fhir/StructureDefinition/operationoutcome-issue-line";
-
-/// The extension stating the column of that fault
-/// (<https://hl7.org/fhir/extensions/StructureDefinition-operationoutcome-issue-col.html>).
-const ISSUE_COL: &str = "http://hl7.org/fhir/StructureDefinition/operationoutcome-issue-col";
-
-impl Issue {
-    /// The input the issue points into and the 1-based column of the fault
-    /// in it, when the server stated both.
-    ///
-    /// The column is read on the first line only: a filter value the composer
-    /// sends is one line, and a fault the server places on another line is
-    /// one this screen has no line to mark on.
-    pub(crate) fn position(&self) -> Option<(&str, u32)> {
-        let value = |url: &str| self.extension.iter().find(|x| x.url == url);
-        let line = value(ISSUE_LINE).and_then(|x| x.value_integer);
-        if line.is_some_and(|line| line != 1) {
-            return None;
-        }
-        // NOTE: the extension's value is a free `string` (see `ISSUE_COL`), so one that is not a
-        // positive number states no column this screen can mark, and the outcome still renders whole.
-        let column = value(ISSUE_COL)
-            .and_then(|x| x.value_string.as_deref())
-            .and_then(|text| text.trim().parse().ok())
-            .filter(|column: &u32| *column > 0)?;
-        Some((self.expression.first()?.as_str(), column))
-    }
-}
+impl Issue {}
 
 /// The parts of a `CodeableConcept` the viewer renders.
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
@@ -147,23 +117,6 @@ impl OperationOutcome {
                     .unwrap_or_default(),
             })
             .collect()
-    }
-
-    /// Whether any issue is classified as `code`.
-    ///
-    /// The classification is read from `issue.code` and from the codes of
-    /// `issue.details`, because a server states the class in either place and
-    /// the reader is owed the same answer whichever it used.
-    pub(crate) fn carries_code(&self, code: &str) -> bool {
-        self.issue.iter().any(|issue| {
-            issue.code.as_deref() == Some(code)
-                || issue.details.iter().any(|details| {
-                    details
-                        .coding
-                        .iter()
-                        .any(|coding| coding.code.as_deref() == Some(code))
-                })
-        })
     }
 }
 
@@ -231,27 +184,6 @@ mod tests {
     }
 
     #[test]
-    fn a_refusal_is_recognised_by_the_class_the_server_stated() {
-        let by_issue_code = parse(r#"{"issue":[{"code":"too-costly","diagnostics":"too large"}]}"#);
-        assert!(
-            by_issue_code.carries_code("too-costly"),
-            "the IssueType code classifies the refusal"
-        );
-        let by_detail_coding = parse(
-            r#"{"issue":[{"code":"processing",
-                "details":{"coding":[{"code":"too-costly"}]}}]}"#,
-        );
-        assert!(
-            by_detail_coding.carries_code("too-costly"),
-            "a server that classifies in the details is read the same way"
-        );
-        assert!(
-            !by_detail_coding.carries_code("not-found"),
-            "a class the server did not state is not claimed"
-        );
-    }
-
-    #[test]
     fn diagnostics_carry_the_line_when_there_are_no_details() {
         let outcome = parse(
             r#"{"resourceType":"OperationOutcome","issue":[
@@ -296,52 +228,6 @@ mod tests {
             Some("error".to_owned()),
             "severity is 1..1 in the specification; a missing one is still a refusal"
         );
-    }
-
-    #[test]
-    fn the_position_is_read_from_the_expression_and_the_column_extension() {
-        let outcome = parse(
-            r#"{"issue":[{"code":"invalid","diagnostics":"expected a focus concept",
-                "expression":["Parameters.parameter[0].resource.compose.include[0].filter[0].value"],
-                "extension":[
-                  {"url":"http://hl7.org/fhir/StructureDefinition/operationoutcome-issue-line","valueInteger":1},
-                  {"url":"http://hl7.org/fhir/StructureDefinition/operationoutcome-issue-col","valueString":"14"}]}]}"#,
-        );
-        assert_eq!(
-            outcome.issue.first().and_then(Issue::position),
-            Some((
-                "Parameters.parameter[0].resource.compose.include[0].filter[0].value",
-                14
-            )),
-            "the server states the input and the column as data"
-        );
-    }
-
-    #[test]
-    fn an_issue_without_a_readable_column_states_no_position() {
-        let no_column = parse(
-            r#"{"issue":[{"code":"invalid","diagnostics":"at byte 3","expression":["http.url"]}]}"#,
-        );
-        assert_eq!(
-            no_column.issue.first().and_then(Issue::position),
-            None,
-            "the diagnostic's words are never read for a position"
-        );
-        let other_line = parse(
-            r#"{"issue":[{"code":"invalid","expression":["http.url"],"extension":[
-                {"url":"http://hl7.org/fhir/StructureDefinition/operationoutcome-issue-line","valueInteger":2},
-                {"url":"http://hl7.org/fhir/StructureDefinition/operationoutcome-issue-col","valueString":"3"}]}]}"#,
-        );
-        assert_eq!(
-            other_line.issue.first().and_then(Issue::position),
-            None,
-            "a fault on a later line has no mark on a one-line value"
-        );
-        let not_a_number = parse(
-            r#"{"issue":[{"code":"invalid","expression":["http.url"],"extension":[
-                {"url":"http://hl7.org/fhir/StructureDefinition/operationoutcome-issue-col","valueString":"x"}]}]}"#,
-        );
-        assert_eq!(not_a_number.issue.first().and_then(Issue::position), None);
     }
 
     #[test]

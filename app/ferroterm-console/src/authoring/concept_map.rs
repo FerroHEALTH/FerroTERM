@@ -211,6 +211,10 @@ pub(crate) struct MapDraft {
     pub(crate) url: String,
     /// `ConceptMap.version`.
     pub(crate) version: String,
+    /// `ConceptMap.title`, the name written for a person.
+    pub(crate) title: String,
+    /// `ConceptMap.name`, the computer-friendly name.
+    pub(crate) name: String,
     /// `ConceptMap.status`.
     pub(crate) status: String,
     /// The value set the map's source codes are drawn from.
@@ -346,6 +350,16 @@ impl MapDraft {
             version_id: stored.version_id().unwrap_or_default(),
             url: stored.url.clone().unwrap_or_default(),
             version: stored.version.clone().unwrap_or_default(),
+            title: resource
+                .get("title")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned(),
+            name: resource
+                .get("name")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned(),
             status: stored.status.clone().unwrap_or_default(),
             source_scope: stored.source_scope().unwrap_or_default().to_owned(),
             target_scope: stored.target_scope().unwrap_or_default().to_owned(),
@@ -438,6 +452,8 @@ impl MapDraft {
         }
         resource.insert("url".to_owned(), json!(self.url.trim()));
         set(&mut resource, "version", self.version.trim());
+        set(&mut resource, "title", self.title.trim());
+        set(&mut resource, "name", self.name.trim());
         resource.insert("status".to_owned(), json!(self.status));
         // A resource read on one root and saved on another would otherwise
         // reach the server carrying two spellings of the same scope.

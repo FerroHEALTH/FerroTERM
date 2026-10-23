@@ -1,481 +1,431 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
-//! One concept map: what it declares, every mapping it writes, and the
-//! resource as the server sent it.
 
-use ferrohealth_ui::table::view::{Body, Column, DataTable, data_table};
-use ferrohealth_ui::tone::Tone;
-use ferrohealth_ui::view::button::Variant;
-use ferrohealth_ui::view::empty::empty_quiet;
-use ferrohealth_ui::view::status::badge;
+//! One concept map (T2): every mapping it writes (M6), grouped by the
+//! systems each group maps between, what it declares and maps (Overview),
+//! its revisions (History, for one stored on this server) and the resource
+//! itself (JSON).
+//!
+//! R4 and R4B read `equivalence` from the target to the source, R5 and R6
+//! read `relationship` from the source to the target
+//! (<https://hl7.org/fhir/R5/conceptmap.html>); FerroUI says each the way
+//! its version reads.
+
+use std::collections::BTreeMap;
+
+use ferrohealth_ui::highlight::Language;
+use ferrohealth_ui::icon::Glyph;
+use ferrohealth_ui::table::view::{Body, DataTable, Sorting, data_table, group_row};
+use ferrohealth_ui::view::action::ActionGroup;
+use ferrohealth_ui::view::code::{Code, CodeHead, code_section};
+use ferrohealth_ui::view::coding::{Coding, canonical};
+use ferrohealth_ui::view::mapping::{Mapping, Relationship, mapping_columns, mapping_row};
 use ferrohealth_ui::view::surface::{
-    Crumb, Header, definitions, facts_row, page_heading, panel, stack, titled_panel,
+    SectionHead, definitions, or_none, panel_section, panel_sections, section_intro,
 };
-use ferrohealth_ui::widget::filter::{keeps, table_filter};
+use ferrohealth_ui::widget::action_menu::{Act, Action, Item, Menu};
 use leptos::prelude::*;
-use leptos_meta::Title;
-use leptos_router::hooks::use_params;
-use leptos_router::params::Params;
+use leptos_router::hooks::use_params_map;
 
-use crate::components::detail::{current_tab, detail_tabs, json_pane};
-use crate::components::failure::Failure;
-use crate::components::icon;
-use crate::components::not_declared;
-use crate::components::reading::Reading;
-use crate::components::shell::{Console, SelectedVersion};
-use crate::fhir::concept_map::{GroupRow, MappingRow, PublishedConceptMap};
-use crate::fhir::error::FhirError;
-use crate::fhir::translate::TranslateRequest;
+use crate::auth::scopes::Letter;
+use crate::fhir::concept_map::{MappingRow, PublishedConceptMap};
 use crate::fhir::version::FhirVersion;
-use crate::fhir::{CONCEPT_MAP, Document, FhirClient};
-use crate::listing::status_pill;
+use crate::fhir::{CONCEPT_MAP, Document, resources_text};
 use crate::locale::{Msg, tr, tr_with};
-use crate::pages::translate;
-use crate::routes::{editing_link, history_link};
+use crate::pages::detail::{Head, Kind, Links, PANE_PARAM, Pane, header, line, tabbed};
+use crate::pages::parts::{Source, failure, heading, loaded, system_names};
+use crate::request::{Request, request};
+use crate::routes::{
+    CONCEPT_MAPS_PATH, TRANSLATE_PATH, editing_link, resource_link, system_link, ui_link,
+};
 
-/// The tabs of the screen.
-const TABS: &[(&str, Msg)] = &[
-    ("overview", Msg::Definition),
-    ("mappings", Msg::Mappings),
-    ("json", Msg::Json),
-];
-
-/// The columns of the group table.
-fn group_columns() -> [Column; 3] {
-    [
-        Column::text("source", tr(Msg::From)),
-        Column::text("target", tr(Msg::To)),
-        Column::text("codes", tr(Msg::CodesMapped)).numeric(),
-    ]
-}
-
-/// The columns of the mapping table.
-fn mapping_columns() -> [Column; 3] {
-    [
-        Column::text("source", tr(Msg::SourceCode)),
-        Column::text("relationship", tr(Msg::Relationship)),
-        Column::text("target", tr(Msg::TargetCode)),
-    ]
-}
-
-/// The path parameter this screen is addressed by.
-#[derive(Clone, Debug, Params, PartialEq)]
-struct ConceptMapParams {
-    /// The logical id, which the router percent-decodes on read.
-    id: Option<String>,
-}
-
-/// A read the screen makes.
-type Fetched<T> = Resource<Result<T, FhirError>>;
-
-/// Shows one concept map, read by its id.
+/// One concept map, on the tab the address names.
 #[component]
 #[expect(
     unreachable_pub,
-    reason = "the leptos component macro emits a pub props type, and a binary crate has no reachable public API"
+    reason = "the leptos component macro emits a pub props type the crate never exports"
 )]
 pub(crate) fn ConceptMapPage() -> impl IntoView {
-    let client = expect_context::<FhirClient>();
-    let SelectedVersion(version) = expect_context::<SelectedVersion>();
-    let params = use_params::<ConceptMapParams>();
-    let id = Signal::derive(move || {
-        params
-            .read()
-            .as_ref()
-            .ok()
-            .and_then(|params| params.id.clone())
-            .unwrap_or_default()
-    });
-    let read = Resource::new(
-        move || (version.get(), id.get()),
-        move |(version, id)| {
-            let client = client.clone();
-            async move { client.concept_map_read(version, &id).await }
-        },
-    );
-    let tab = current_tab(TABS, "overview");
-    let header = move || header(id, version, read);
-    let body = move || match tab.get() {
-        "mappings" => mappings_tab(read),
-        "json" => json_tab(read),
-        _ => overview_tab(read),
+    let request = request();
+    let params = use_params_map();
+    let id = params
+        .with_untracked(|params| params.get("id"))
+        .unwrap_or_default();
+    let Some(pane) = Pane::of(Kind::ConceptMap, request.param(PANE_PARAM).as_deref()) else {
+        return crate::pages::errors::not_found_page();
     };
-    view! {
-        <Title text=move || tr_with(Msg::ConceptMap3, &[("id", (id.get()).clone().into())]) />
-        {stack(
-            view! {
-                <Transition fallback=move || heading(id.get(), None, ())>{header}</Transition>
-                {detail_tabs(tr(Msg::ViewsConceptMap), TABS, tab)}
-                {body}
-            },
-        )}
+    loaded(async move {
+        match request.client.concept_map_read(request.version, &id).await {
+            Ok(document) => {
+                let names = system_names(&request.client, request.version).await;
+                page(&request, &id, &document, &names, pane)
+            }
+            Err(error) => view! {
+                {heading(id.clone(), None, Vec::new(), ActionGroup::none())}
+                {failure(&error)}
+            }
+            .into_any(),
+        }
+    })
+}
+
+/// A value percent-encoded as one query component.
+fn percent(value: &str) -> String {
+    url::form_urlencoded::byte_serialize(value.as_bytes()).collect()
+}
+
+/// The title row's action group: Edit for a stored map the reader may
+/// write, else Translate a code through it.
+fn actions(
+    request: &Request,
+    id: &str,
+    map: &PublishedConceptMap,
+    source: Source,
+    title: &str,
+) -> ActionGroup {
+    let url = map.url().unwrap_or_default();
+    let mut translate_href = format!(
+        "{}&url={}",
+        ui_link(TRANSLATE_PATH, request.version),
+        percent(url)
+    );
+    if let Some(system) = map.only_source_system() {
+        translate_href.push_str("&system=");
+        translate_href.push_str(&percent(&system));
+    }
+    let translate = Action::new(
+        Some(Glyph::ROUTE),
+        tr(Msg::ConceptMapTranslate),
+        Act::Link(translate_href),
+    );
+    let editable = source == Source::Stored && request.can(CONCEPT_MAP, Letter::Update);
+    let edit = editing_link(CONCEPT_MAP, url, id, request.version)
+        .filter(|_| editable)
+        .map(|href| {
+            Action::new(
+                Some(Glyph::PENCIL),
+                tr(Msg::CodeSystemEdit),
+                Act::Link(href),
+            )
+        });
+    let menu_label = tr_with(Msg::DetailMoreFor, &[("name", title.to_owned().into())]);
+    match edit {
+        Some(edit) => ActionGroup::primary(edit).more(Menu::new(
+            "concept-map-more",
+            menu_label,
+            vec![Item::from(translate)],
+        )),
+        None => ActionGroup::primary(translate),
     }
 }
 
-/// The page heading: the trail, the title, its subtitle and the actions.
-fn heading(title: String, subtitle: Option<String>, actions: impl IntoView) -> AnyView {
+/// The page of `document` on `pane`.
+fn page(
+    request: &Request,
+    id: &str,
+    document: &Document<PublishedConceptMap>,
+    names: &BTreeMap<String, String>,
+    pane: Pane,
+) -> AnyView {
+    let map = &document.value;
+    let source = if map.stored().is_some() {
+        Source::Stored
+    } else {
+        Source::Loaded
+    };
+    let title = map.label().or_else(|| map.url()).unwrap_or(id).to_owned();
+    let head = header(
+        Head {
+            kind: Kind::ConceptMap,
+            title: title.clone(),
+            status: map.status().map(str::to_owned),
+            canonical: map.url().unwrap_or_default().to_owned(),
+            line: line(map.version(), source),
+            actions: actions(request, id, map, source, &title),
+        },
+        request.version,
+    );
+    let panel = match pane {
+        Pane::Second => overview(request, map, names, source),
+        Pane::Json => json(id, document),
+        Pane::First | Pane::History => mappings(request.version, map, names),
+    };
+    let links = Links {
+        page: resource_link(CONCEPT_MAPS_PATH, id, request.version),
+        history: (source == Source::Stored).then(|| id.to_owned()),
+    };
     view! {
-        <div>
-            {page_heading(
-                Header {
-                    title,
-                    subtitle,
-                    crumbs: vec![Crumb::new(tr(Msg::ConceptMaps), "/conceptmaps")],
-                    mono: false,
-                },
-                actions,
-            )}
-        </div>
+        {head}
+        {tabbed(Kind::ConceptMap, pane, &links, request.version, panel)}
     }
     .into_any()
 }
 
-/// The header once the read answered: the name, the facts, the actions.
-fn header(
-    id: Signal<String>,
-    version: Signal<FhirVersion>,
-    read: Fetched<Document<PublishedConceptMap>>,
-) -> AnyView {
-    let resource = read.with(|answered| {
-        answered
-            .as_ref()
-            .and_then(|answer| answer.as_ref().ok())
-            .map(|document| document.value.clone())
-    });
-    let Some(resource) = resource else {
-        return heading(id.get(), None, ());
+/// How `code` relates a target to its source, read the way `version`
+/// writes it; a code neither version defines draws as related.
+pub(crate) fn relationship(version: FhirVersion, code: Option<&str>) -> Relationship {
+    let read = match version {
+        FhirVersion::R4 | FhirVersion::R4B => Relationship::from_r4,
+        FhirVersion::R5 | FhirVersion::R6 => Relationship::from_r5,
     };
-    let title = resource
-        .label()
-        .or_else(|| resource.url())
-        .map_or_else(|| id.get(), str::to_owned);
-    let subtitle = resource.description().map(str::to_owned);
-    let at = version.get();
-    let canonical = resource.url().map(str::to_owned);
-    // NOTE: the runner is handed the map and the one source system it names,
-    // so a reader never retypes a canonical this screen is showing them.
-    let run = canonical.as_ref().map(|canonical| {
-        let filled = TranslateRequest {
-            concept_map: canonical.clone(),
-            concept_map_version: resource.version().unwrap_or_default().to_owned(),
-            system: resource.only_source_system().unwrap_or_default(),
-            ..TranslateRequest::default()
-        };
-        view! {
-            <a href=translate::address(&filled, at) class=Variant::Primary.class()>
-                {ferrohealth_ui::icon::icon(icon::TRANSLATE, "16")}
-                {tr(Msg::TranslateACode)}
-            </a>
-        }
-    });
-    let edit = expect_context::<Console>()
-        .sign_in
-        .then(|| {
-            editing_link(
-                CONCEPT_MAP,
-                canonical.as_deref().unwrap_or_default(),
-                &id.get(),
-                at,
-            )
-        })
-        .flatten()
-        .map(|href| {
+    // NOTE: no specification governs this: our own design; a mapping whose code
+    // the version does not define is still drawn, as related, never dropped.
+    code.and_then(read).unwrap_or(Relationship::RelatedTo)
+}
+
+/// The mapping `row` as FerroUI draws one.
+fn mapping(version: FhirVersion, row: &MappingRow) -> Mapping {
+    Mapping {
+        source: Coding::new(
+            row.source_code.clone(),
+            row.source_display.clone().unwrap_or_default(),
+        ),
+        relationship: relationship(version, row.relationship.as_deref()),
+        target: row
+            .target_code
+            .as_ref()
+            .map(|code| Coding::new(code.clone(), row.target_display.clone().unwrap_or_default())),
+        comment: row.comment.clone(),
+    }
+}
+
+/// A group's system: its name, a link to its page, the canonical in its
+/// tooltip.
+fn system(
+    version: FhirVersion,
+    names: &BTreeMap<String, String>,
+    canonical: Option<&str>,
+) -> AnyView {
+    match canonical {
+        Some(canonical) => {
+            let href = system_link(canonical, version);
+            // NOTE: #775: a system this server names nothing reads as its canonical,
+            // which breaks after each slash so the table keeps inside its card.
+            let shown = names.get(canonical).map_or_else(
+                || ferrohealth_ui::view::coding::canonical(canonical),
+                |name| name.clone().into_any(),
+            );
             view! {
-                <a href=href class=Variant::Secondary.class()>
-                    {ferrohealth_ui::icon::icon(icon::EDIT, "16")}
-                    {tr(Msg::Edit)}
+                <a href=href title=canonical.to_owned()>
+                    {shown}
                 </a>
             }
-        });
-    let history = view! {
-        <a href=history_link(CONCEPT_MAP, &id.get(), at) class=Variant::Secondary.class()>
-            {ferrohealth_ui::icon::icon(ferrohealth_ui::icon::Glyph::FILE_CLOCK, "16")}
-            {tr(Msg::Versions)}
-        </a>
-    };
-    let actions = view! { <div class="fui-cluster">{run} {edit} {history}</div> };
-    let scope = |scope: Option<&str>| {
-        view! { <span class="fui-mono break-all">{scope.unwrap_or("—").to_owned()}</span> }
             .into_any()
+        }
+        None => tr(Msg::ConceptMapNoSystem).into_any(),
+    }
+}
+
+/// The source and the target system a group maps between.
+type Systems = (Option<String>, Option<String>);
+
+/// Mappings: every mapping the map writes, a group row over each group's.
+fn mappings(
+    version: FhirVersion,
+    map: &PublishedConceptMap,
+    names: &BTreeMap<String, String>,
+) -> AnyView {
+    let rows = map.mappings();
+    let comments = rows.iter().any(|row| row.comment.is_some());
+    let columns = mapping_columns(comments);
+    let mut groups: Vec<(Systems, Vec<&MappingRow>)> = Vec::new();
+    for row in &rows {
+        let key = (row.source_system.clone(), row.target_system.clone());
+        match groups.last_mut() {
+            Some((last, members)) if *last == key => members.push(row),
+            _ => groups.push((key, vec![row])),
+        }
+    }
+    let bodies = groups
+        .into_iter()
+        .map(|((from, to), members)| {
+            let heading = view! {
+                {tr(Msg::ClauseFrom)}
+                " "
+                {system(version, names, from.as_deref())}
+                " "
+                {tr(Msg::ConceptMapTo)}
+                " "
+                {system(version, names, to.as_deref())}
+            };
+            let drawn = members
+                .into_iter()
+                .map(|row| mapping_row(&columns, mapping(version, row)))
+                .collect_view();
+            view! { <tbody>{group_row(&columns, heading)} {drawn}</tbody> }
+        })
+        .collect_view()
+        .into_any();
+    let caption = tr(Msg::ConceptMapEvery);
+    let body = if rows.is_empty() {
+        Body::Empty(section_intro(tr(Msg::ConceptMapNoMappings)))
+    } else {
+        Body::Bodies(bodies)
     };
-    let facts = facts_row(vec![
-        (tr(Msg::Canonical), scope(resource.url())),
-        (tr(Msg::Version), scope(resource.version())),
-        (tr(Msg::Status), status_pill(resource.status())),
-        (
-            tr(Msg::Mappings),
-            resource.mappings().len().to_string().into_any(),
-        ),
-    ]);
-    view! {
-        {heading(title, subtitle, actions)}
-        {panel(facts)}
-    }
-    .into_any()
+    let count = u64::try_from(rows.len()).unwrap_or(u64::MAX);
+    panel_sections(panel_section(
+        Some(SectionHead {
+            title: caption.clone(),
+            count: Some(count),
+            actions: None,
+        }),
+        data_table(DataTable {
+            caption: &caption,
+            columns: &columns,
+            sorting: Sorting::default(),
+            body,
+        }),
+    ))
 }
 
-/// The facts the map declares and the groups it is made of.
-fn overview_tab(read: Fetched<Document<PublishedConceptMap>>) -> AnyView {
-    view! {
-        <Reading label=&{
-            tr(Msg::ReadingTheConceptMap)
-        }>
-            {move || {
-                read.with(|answered| {
-                    answered
-                        .as_ref()
-                        .map(|answer| match answer {
-                            Ok(document) => definition_view(&document.value),
-                            Err(error) => failure_view(error),
-                        })
-                })
-            }}
-        </Reading>
+/// A scope the map translates from or to: the system's name, linked when
+/// this server has a page for it, and its canonical.
+fn scope(version: FhirVersion, names: &BTreeMap<String, String>, url: Option<&str>) -> AnyView {
+    match url {
+        None => or_none(String::new()),
+        Some(url) => {
+            let name = names.get(url).map(|name| {
+                let href = system_link(url, version);
+                view! {
+                    <a href=href>{name.clone()}</a>
+                    " "
+                }
+            });
+            view! {
+                {name}
+                {canonical(url)}
+            }
+            .into_any()
+        }
     }
-    .into_any()
 }
 
-/// The map's groups and its facts.
-fn definition_view(resource: &PublishedConceptMap) -> AnyView {
-    let rows = resource
+/// Overview: what the map declares and what it maps.
+fn overview(
+    request: &Request,
+    map: &PublishedConceptMap,
+    names: &BTreeMap<String, String>,
+    source: Source,
+) -> AnyView {
+    let details = map
         .facts()
         .into_iter()
-        .map(|fact| {
-            let value = match fact.value {
-                Some(value) => crate::components::stated(value),
-                None => view! { <span class="fui-muted">{not_declared()}</span> }.into_any(),
-            };
-            (tr(fact.label), value)
-        })
-        .collect();
-    view! {
-        {titled_panel(tr(Msg::WhatTheMapMaps), (), groups_view(&resource.groups()))}
-        {titled_panel(
-            tr(Msg::WhatItDeclares),
-            (),
-            view! { <div class="fui-panel-body">{definitions(rows)}</div> },
-        )}
-    }
-    .into_any()
-}
-
-/// One group a row: the system pair and how many codes it maps.
-fn groups_view(groups: &[GroupRow]) -> AnyView {
-    let body = if groups.is_empty() {
-        Body::Empty(
-            empty_quiet(
-                icon::CONCEPT_MAPS,
-                tr(Msg::NoGroup),
-                tr(Msg::WhatMapsWhateverServerHoldsNot),
+        .filter(|fact| {
+            !matches!(
+                fact.label,
+                Msg::Title
+                    | Msg::Version
+                    | Msg::Status
+                    | Msg::TranslatesFrom
+                    | Msg::TranslatesTo
+                    | Msg::Groups
             )
-            .into_any(),
-        )
+        })
+        .filter_map(|fact| fact.value.map(|value| (tr(fact.label), or_none(value))))
+        .collect::<Vec<_>>();
+    let rows = map.mappings();
+    let total = rows.len();
+    let unmapped = rows.iter().filter(|row| row.target_code.is_none()).count();
+    let codes = if unmapped == 0 {
+        total.to_string()
     } else {
-        Body::Rows(
-            groups
-                .iter()
-                .map(|group| {
-                    view! {
-                        <tr>
-                            <td class="fui-mono break-all">
-                                {group.source.clone().unwrap_or_else(|| String::from("—"))}
-                            </td>
-                            <td data-label=tr(Msg::To) class="fui-mono break-all">
-                                {group.target.clone().unwrap_or_else(|| String::from("—"))}
-                            </td>
-                            <td data-label=tr(Msg::CodesMapped) class="fui-num">
-                                {group.elements.to_string()}
-                            </td>
-                        </tr>
-                    }
-                })
-                .collect_view()
-                .into_any(),
+        tr_with(
+            Msg::ConceptMapCodesUnmapped,
+            &[("count", total.into()), ("unmapped", unmapped.into())],
         )
     };
-    data_table(DataTable {
-        caption: &tr(Msg::WhatTheMapMaps),
-        columns: &group_columns(),
-        sort: None,
-        sort_href: &|_| String::new(),
-        body,
+    let groups = map.groups();
+    let from = map
+        .source_scope()
+        .map(str::to_owned)
+        .or_else(|| map.only_source_system());
+    let to = map.target_scope().map(str::to_owned).or_else(|| {
+        let mut targets = groups.iter().filter_map(|group| group.target.clone());
+        let first = targets.next()?;
+        targets.all(|other| other == first).then_some(first)
+    });
+    let maps = vec![
+        (
+            tr(Msg::TranslatesFrom),
+            scope(request.version, names, from.as_deref()),
+        ),
+        (
+            tr(Msg::TranslatesTo),
+            scope(request.version, names, to.as_deref()),
+        ),
+        (tr(Msg::Groups), groups.len().to_string().into_any()),
+        (tr(Msg::ConceptMapCodesMapped), codes.into_any()),
+    ];
+    let note = (source == Source::Loaded)
+        .then(|| panel_section(None, section_intro(tr(Msg::ValueSetLoadedNote))));
+    panel_sections(view! {
+        {note}
+        {panel_section(
+            Some(SectionHead {
+                title: tr(Msg::CodeSystemDetails),
+                count: None,
+                actions: None,
+            }),
+            definitions(details),
+        )}
+        {panel_section(
+            Some(SectionHead {
+                title: tr(Msg::ConceptMapWhatItMaps),
+                count: None,
+                actions: None,
+            }),
+            definitions(maps),
+        )}
     })
-    .into_any()
 }
 
-/// Every mapping the map writes, with a filter over them.
-fn mappings_tab(read: Fetched<Document<PublishedConceptMap>>) -> AnyView {
-    view! {
-        <Reading label=&{
-            tr(Msg::ReadingTheConceptMap)
-        }>
-            {move || {
-                read.with(|answered| {
-                    answered
-                        .as_ref()
-                        .map(|answer| match answer {
-                            Ok(document) => mappings_view(document.value.mappings()),
-                            Err(error) => failure_view(error),
-                        })
-                })
-            }}
-        </Reading>
-    }
-    .into_any()
-}
-
-/// The mappings `rows`, with the filter that narrows them.
-///
-/// The rows arrive as a value read inside the boundary, so the filter's
-/// signals are the page's own and never read the resource
-/// (Leptos book, `async/11_suspense`).
-fn mappings_view(rows: Vec<MappingRow>) -> AnyView {
-    let words = RwSignal::new(String::new());
-    let held = StoredValue::new(rows);
-    let kept = Memo::new(move |_| {
-        let words = words.get();
-        held.with_value(|rows| {
-            rows.iter()
-                .filter(|row| {
-                    keeps(
-                        &words,
-                        &[
-                            row.source_code.as_str(),
-                            row.source_display.as_deref().unwrap_or_default(),
-                            row.target_code.as_deref().unwrap_or_default(),
-                            row.target_display.as_deref().unwrap_or_default(),
-                        ],
-                    )
-                })
-                .cloned()
-                .collect::<Vec<MappingRow>>()
-        })
-    });
-    let count = Signal::derive(move || {
-        let all = held.with_value(Vec::len);
-        let shown = kept.with(Vec::len);
-        if all == shown {
-            tr_with(Msg::Mappings2, &[("all", (all).to_string().into())])
-        } else {
-            tr_with(
-                Msg::OfMappings,
-                &[
-                    ("shown", (shown).to_string().into()),
-                    ("all", (all).to_string().into()),
-                ],
-            )
-        }
-    });
-    let table = move || {
-        let body = kept.with(|kept| {
-            if kept.is_empty() {
-                Body::Empty(
-                    empty_quiet(
-                        icon::CONCEPT_MAPS,
-                        tr(Msg::NoMapping),
-                        tr(Msg::NoMappingMatches),
-                    )
-                    .into_any(),
-                )
-            } else {
-                Body::Rows(kept.iter().map(mapping_row).collect_view().into_any())
-            }
-        });
-        data_table(DataTable {
-            caption: &tr(Msg::EveryMappingMapWrites),
-            columns: &mapping_columns(),
-            sort: None,
-            sort_href: &|_| String::new(),
-            body,
-        })
+/// JSON: the concept map as the server sent it.
+fn json(id: &str, document: &Document<PublishedConceptMap>) -> AnyView {
+    let code = Code {
+        label: tr(Msg::ConceptMapJsonLabel),
+        language: Language::Json,
+        text: resources_text(&document.text),
+        ids: None,
+        current: None,
+        diagnostics: Vec::new(),
     };
-    view! {
-        {table_filter("mappings-filter", tr(Msg::FilterCodeDisplay), words, count)}
-        {table}
-    }
-    .into_any()
+    panel_sections(code_section(
+        CodeHead {
+            title: format!("ConceptMap/{id}"),
+            tags: vec![String::from("FHIR")],
+            digest: None,
+            copy: Some(String::from("concept-map-copy")),
+            actions: None,
+        },
+        &code,
+    ))
 }
 
-/// The tone a relationship code is drawn in, the same on every screen: a
-/// code that maps to the same meaning, one that maps to none, and the rest.
-pub(crate) fn relationship_tone(code: Option<&str>) -> Tone {
-    match code {
-        Some("equivalent" | "equal") => Tone::Ok,
-        Some("not-related-to" | "unmatched" | "disjoint") => Tone::Bad,
-        Some(_) => Tone::Info,
-        None => Tone::Neutral,
-    }
-}
+#[cfg(test)]
+mod tests {
+    use ferrohealth_ui::view::mapping::Relationship;
 
-/// One mapping: the source code, how it relates, and the target code.
-fn mapping_row(row: &MappingRow) -> AnyView {
-    let tone = relationship_tone(row.relationship.as_deref());
-    let relationship = row
-        .relationship
-        .clone()
-        .unwrap_or_else(|| String::from("—"));
-    let code = |code: Option<String>, display: Option<String>, system: Option<String>| {
-        view! {
-            <span class="fui-mono">{code.unwrap_or_else(|| tr(Msg::NoTarget))}</span>
-            <span class="block">{display.unwrap_or_default()}</span>
-            <span class="block font-normal fui-small fui-muted fui-mono sm:whitespace-nowrap">
-                {system.unwrap_or_default()}
-            </span>
-        }
-    };
-    view! {
-        <tr>
-            <td>
-                {code(
-                    Some(row.source_code.clone()),
-                    row.source_display.clone(),
-                    row.source_system.clone(),
-                )}
-            </td>
-            <td data-label=tr(Msg::Relationship)>{badge(tone, &relationship)}</td>
-            <td data-label=tr(Msg::TargetCode)>
-                <div>
-                    {code(
-                        row.target_code.clone(),
-                        row.target_display.clone(),
-                        row.target_system.clone(),
-                    )}
-                </div>
-            </td>
-        </tr>
-    }
-    .into_any()
-}
+    use super::relationship;
+    use crate::fhir::version::FhirVersion;
 
-/// The resource as the server sent it.
-fn json_tab(read: Fetched<Document<PublishedConceptMap>>) -> AnyView {
-    view! {
-        <Reading label=&{
-            tr(Msg::ReadingTheConceptMap)
-        }>
-            {move || {
-                read.with(|answered| {
-                    answered
-                        .as_ref()
-                        .map(|answer| match answer {
-                            Ok(document) => {
-                                json_pane(
-                                    "conceptmap-json",
-                                    tr(Msg::ConceptmapServerSent),
-                                    document.text.clone(),
-                                )
-                            }
-                            Err(error) => failure_view(error),
-                        })
-                })
-            }}
-        </Reading>
+    #[test]
+    fn each_version_reads_its_own_relationship_codes() {
+        assert_eq!(
+            Relationship::Narrower,
+            relationship(FhirVersion::R4, Some("narrower"))
+        );
+        assert_eq!(
+            Relationship::SourceBroader,
+            relationship(FhirVersion::R5, Some("source-is-broader-than-target"))
+        );
+        assert_eq!(
+            Relationship::RelatedTo,
+            relationship(FhirVersion::R5, Some("narrower")),
+            "an R4 code in an R5 map is drawn, as related"
+        );
+        assert_eq!(
+            Relationship::RelatedTo,
+            relationship(FhirVersion::R4B, None)
+        );
     }
-    .into_any()
-}
-
-/// A refused read, in the server's own words.
-fn failure_view(error: &FhirError) -> AnyView {
-    let error = error.clone();
-    view! { <Failure error=Signal::stored(error) /> }.into_any()
 }

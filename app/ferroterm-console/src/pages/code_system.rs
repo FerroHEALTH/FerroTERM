@@ -1,651 +1,636 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! One code system: what it says it is, what this server can do with it,
-//! and the resource as the server sent it.
+//! One code system (T2): what it says it is (Overview), what the server can
+//! do with each version (Versions), its revisions (History, for one stored
+//! on this server) and the resource itself (JSON).
 //!
-//! Two documents describe a code system and they answer different questions.
-//! The published `CodeSystem` resource says what the code system is;
-//! `TerminologyCapabilities` says what this server can do with it. Each tab
-//! names the document behind it, so a claim can be traced to the request
-//! that produced it rather than blended into one table.
+//! The page reads the root's `TerminologyCapabilities`, which says what the
+//! server serves, and the `CodeSystem` resource, which says what the system
+//! is; nothing here names a system, assumes a hierarchy or a language.
 
-use ferrohealth_ui::table::view::{Body, Column, DataTable, data_table};
-use ferrohealth_ui::tone::Tone;
-use ferrohealth_ui::view::button::Variant;
-use ferrohealth_ui::view::empty::{empty_quiet, empty_state};
-use ferrohealth_ui::view::status::{badge, pill};
-use ferrohealth_ui::view::surface::{
-    Crumb, Header, chip, cluster, definitions, facts_row, grid, page_heading, page_meta, panel,
-    stack, titled_panel,
+use ferrohealth_ui::highlight::Language;
+use ferrohealth_ui::icon::Glyph;
+use ferrohealth_ui::table::view::{
+    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
 };
+use ferrohealth_ui::tone::Tone;
+use ferrohealth_ui::view::action::ActionGroup;
+use ferrohealth_ui::view::code::{Code, CodeHead, code_section};
+use ferrohealth_ui::view::notice::{Announce, notice};
+use ferrohealth_ui::view::surface::{
+    SectionHead, definitions, or_none, panel_section, panel_sections, section_intro,
+};
+use ferrohealth_ui::widget::action_menu::{Act, Action, Item, Menu};
 use leptos::prelude::*;
-use leptos_meta::Title;
-use leptos_router::hooks::use_params;
-use leptos_router::params::Params;
+use leptos_router::hooks::use_params_map;
 
-use crate::components::detail::{current_tab, detail_tabs, json_pane};
-use crate::components::failure::Failure;
-use crate::components::icon;
-use crate::components::not_declared;
-use crate::components::reading::Reading;
-use crate::components::shell::{Console, SelectedVersion};
-use crate::components::state::undeclared;
+use crate::auth::scopes::Letter;
 use crate::fhir::code_system::{CodeSystemSearch, PublishedCodeSystem};
 use crate::fhir::concept::{Hierarchy, chosen_version};
-use crate::fhir::error::FhirError;
-use crate::fhir::terminology::{SystemCard, TerminologyCapabilities, VersionRow};
-use crate::fhir::version::FhirVersion;
-use crate::fhir::{Document, FhirClient, resources_text};
+use crate::fhir::terminology::{SystemCard, VersionRow};
+use crate::fhir::{CODE_SYSTEM, Document, resources_text};
 use crate::locale::{Msg, tr, tr_with};
+use crate::pages::code_systems::content_word;
+use crate::pages::detail::{Head, Kind, Links, PANE_PARAM, Pane, header, line, tabbed};
+use crate::pages::parts::{Source, failure, heading, loaded};
+use crate::request::{Request, request};
 use crate::routes::{
-    BROWSE_PATH, CODE_SYSTEM_EDITOR_PATH, EXPAND_PATH, VALIDATE_PATH, system_tool_link,
+    BROWSE_PATH, EXPAND_PATH, LOOKUP_PATH, VALIDATE_PATH, editing_link, system_link,
+    system_tool_link,
 };
 
-/// The tabs of the screen: the definition, the server's support, the JSON.
-const TABS: &[(&str, Msg)] = &[
-    ("overview", Msg::Definition),
-    ("support", Msg::ServerSupport),
-    ("json", Msg::Json),
-];
-
-/// The columns of a version's filter table.
-fn filter_columns() -> [Column; 2] {
-    [
-        Column::text("property", tr(Msg::Property)),
-        Column::text("operators", tr(Msg::Operators)),
-    ]
+/// What the page read.
+struct Read {
+    /// What the root's capabilities declare of the system.
+    card: SystemCard,
+    /// The published resource, when the root publishes one.
+    published: Option<PublishedCodeSystem>,
+    /// The resource as the server sent it, pretty.
+    text: Option<String>,
+    /// Where it comes from.
+    source: Source,
 }
 
-/// The path parameter this screen is addressed by.
-#[derive(Clone, Debug, Params, PartialEq)]
-struct SystemParams {
-    /// The code system canonical, which the router percent-decodes on read.
-    url: Option<String>,
-}
-
-/// A read the screen makes.
-type Fetched<T> = Resource<Result<T, FhirError>>;
-
-/// Shows one code system, from the two documents that describe it.
-///
-/// The canonical is read reactively. A link from one system to another
-/// matches this same `<Route>`, and `leptos_router` 0.8 then updates the
-/// params signal without re-running this body, so a read taken untracked at
-/// setup would go stale.
+/// One code system, on the tab the address names.
 #[component]
 #[expect(
     unreachable_pub,
-    reason = "the leptos component macro emits a pub props type, and a binary crate has no reachable public API"
+    reason = "the leptos component macro emits a pub props type the crate never exports"
 )]
 pub(crate) fn CodeSystemPage() -> impl IntoView {
-    let client = expect_context::<FhirClient>();
-    let SelectedVersion(version) = expect_context::<SelectedVersion>();
-    let params = use_params::<SystemParams>();
-    // NOTE: an address carrying no canonical is a link a reader typed, so it
-    // reads as the empty system and every section states what it found.
-    let system = Signal::derive(move || {
-        params
-            .read()
+    let request = request();
+    let params = use_params_map();
+    let system = params
+        .with_untracked(|params| params.get("system"))
+        .unwrap_or_default();
+    let Some(pane) = Pane::of(Kind::CodeSystem, request.param(PANE_PARAM).as_deref()) else {
+        return crate::pages::errors::not_found_page();
+    };
+    loaded(async move {
+        let capabilities = match request
+            .client
+            .terminology_capabilities(request.version)
+            .await
+        {
+            Ok(capabilities) => capabilities,
+            Err(error) => return refused(&system, &error),
+        };
+        let Some(card) = capabilities.card(&system) else {
+            return undeclared(&request, &system);
+        };
+        let index = card
+            .versions
+            .iter()
+            .any(|version| version.artifact.is_some());
+        let search: Result<Document<CodeSystemSearch>, _> = if index {
+            request
+                .client
+                .code_system_summary(request.version, &system)
+                .await
+        } else {
+            request
+                .client
+                .code_system_search(request.version, &system)
+                .await
+        };
+        let (published, text) = match search {
+            Ok(document) => (
+                document.value.published().into_iter().next(),
+                Some(resources_text(&document.text)),
+            ),
+            Err(_refused) => (None, None),
+        };
+        let source = if index {
+            Source::Index
+        } else if published
             .as_ref()
-            .ok()
-            .and_then(|params| params.url.clone())
-            .unwrap_or_default()
-    });
-    let capabilities = {
-        let client = client.clone();
-        Resource::new(
-            move || version.get(),
-            move |version| {
-                let client = client.clone();
-                async move { client.terminology_capabilities(version).await }
-            },
-        )
-    };
-    let search = Resource::new(
-        move || (version.get(), system.get()),
-        move |(version, system)| {
-            let client = client.clone();
-            async move { client.code_system_search(version, &system).await }
-        },
-    );
-    let tab = current_tab(TABS, "overview");
+            .and_then(PublishedCodeSystem::stored)
+            .is_some()
+        {
+            Source::Stored
+        } else {
+            Source::Loaded
+        };
+        let read = Read {
+            card,
+            published,
+            text,
+            source,
+        };
+        page(&request, &read, pane)
+    })
+}
 
-    let title = move || system.with(|system| title_of(system));
-    let header = view! {
-        <Transition fallback=move || {
-            system.with(|system| heading(heading_of(system), system, None, ()))
-        }>{move || header(system, version, capabilities, search)}</Transition>
-    };
-    let body = move || match tab.get() {
-        "support" => support_tab(system, capabilities),
-        "json" => json_tab(search),
-        _ => overview_tab(search),
-    };
+/// The page of a read that was refused.
+fn refused(system: &str, error: &crate::fhir::error::FhirError) -> AnyView {
     view! {
-        <Title text=title />
-        {stack(
-            view! {
-                {header}
-                {detail_tabs(tr(Msg::ViewsCodeSystem), TABS, tab)}
-                {body}
-            },
-        )}
+        {heading(system.to_owned(), None, Vec::new(), ActionGroup::none())}
+        {failure(error)}
     }
-}
-
-/// The document title for one canonical.
-fn title_of(system: &str) -> String {
-    if system.is_empty() {
-        tr(Msg::CodeSystem2).clone()
-    } else {
-        system.to_owned()
-    }
-}
-
-/// The heading for one canonical.
-fn heading_of(system: &str) -> String {
-    if system.is_empty() {
-        tr(Msg::AddressNamesNoCodeSystem).clone()
-    } else {
-        system.to_owned()
-    }
-}
-
-/// The page heading: the trail, the title, its subtitle and the actions.
-fn heading(
-    title: String,
-    canonical: &str,
-    subtitle: Option<String>,
-    actions: impl IntoView,
-) -> AnyView {
-    let mono = title == canonical;
-    page_heading(
-        Header {
-            title,
-            subtitle,
-            crumbs: vec![Crumb::new(tr(Msg::CodeSystems), "/systems")],
-            mono,
-        },
-        actions,
-    )
     .into_any()
 }
 
-/// The header once the reads answered: the name the resource carries, the
-/// canonical under it, the facts across a row, and the screens it opens in.
-fn header(
-    system: Signal<String>,
-    version: Signal<FhirVersion>,
-    capabilities: Fetched<TerminologyCapabilities>,
-    search: Fetched<Document<CodeSystemSearch>>,
-) -> AnyView {
-    let canonical = system.get();
-    let published = search.with(|answered| {
-        answered
-            .as_ref()
-            .and_then(|answer| answer.as_ref().ok())
-            .and_then(|document| document.value.published().into_iter().next())
-    });
-    let card = capabilities.with(|answered| {
-        answered
-            .as_ref()
-            .and_then(|answer| answer.as_ref().ok())
-            .and_then(|document| document.card(&canonical))
-    });
-    let title = published
+/// The page of a canonical the root does not declare.
+fn undeclared(request: &Request, system: &str) -> AnyView {
+    let title = if system.is_empty() {
+        tr(Msg::CodeSystemNoCanonical)
+    } else {
+        system.to_owned()
+    };
+    view! {
+        {header(
+            Head {
+                kind: Kind::CodeSystem,
+                title,
+                status: None,
+                canonical: String::new(),
+                line: tr_with(
+                    Msg::CodeSystemOnVersion,
+                    &[("version", request.version.label().into())],
+                ),
+                actions: ActionGroup::none(),
+            },
+            request.version,
+        )}
+        {notice(Tone::Neutral, Announce::Status, None, tr(Msg::RootSTerminologyCapabilitiesDoNot))}
+    }
+    .into_any()
+}
+
+/// The version the root serves by default.
+fn served(card: &SystemCard) -> Option<VersionRow> {
+    chosen_version(card, None)
+}
+
+/// The title row's action group: Edit for a stored system the reader may
+/// write, else Browse concepts where there is a tree, the operations in More.
+fn actions(request: &Request, read: &Read, title: &str) -> ActionGroup {
+    let url = &read.card.url;
+    let version = served(&read.card);
+    let code = version.as_ref().and_then(|row| row.code.clone());
+    let walkable = version
+        .as_ref()
+        .is_some_and(|row| Hierarchy::of(row).walk().is_some());
+    let tool = |path: &str| system_tool_link(path, url, code.as_deref(), request.version);
+    let browse = Action::new(
+        Some(Glyph::NETWORK),
+        tr(Msg::CodeSystemBrowse),
+        Act::Link(tool(BROWSE_PATH)),
+    );
+    let look_up = Action::new(
+        Some(Glyph::SEARCH),
+        tr(Msg::CodeSystemLookUp),
+        Act::Link(tool(LOOKUP_PATH)),
+    );
+    let check = Action::new(
+        Some(Glyph::SHIELD_CHECK),
+        tr(Msg::CodeSystemCheck),
+        Act::Link(tool(VALIDATE_PATH)),
+    );
+    let expand = Action::new(
+        Some(Glyph::LIST_CHECKS),
+        tr(Msg::CodeSystemExpand),
+        Act::Link(tool(EXPAND_PATH)),
+    );
+    let editable = read.source == Source::Stored && request.can(CODE_SYSTEM, Letter::Update);
+    let (primary, mut more) = if editable {
+        let edit = editing_link(CODE_SYSTEM, url, "", request.version).map(|href| {
+            Action::new(
+                Some(Glyph::PENCIL),
+                tr(Msg::CodeSystemEdit),
+                Act::Link(href),
+            )
+        });
+        let mut more = Vec::new();
+        if walkable {
+            more.push(browse);
+        }
+        (edit, more)
+    } else if walkable {
+        (Some(browse), Vec::new())
+    } else {
+        (Some(look_up.clone()), Vec::new())
+    };
+    if primary
+        .as_ref()
+        .is_none_or(|action| action.label != look_up.label)
+    {
+        more.push(look_up);
+    }
+    more.extend([check, expand]);
+    let menu = Menu::new(
+        "code-system-more",
+        tr_with(Msg::DetailMoreFor, &[("name", title.to_owned().into())]),
+        more.into_iter().map(Item::from).collect(),
+    );
+    let group = primary.map_or_else(ActionGroup::none, ActionGroup::primary);
+    group.more(menu)
+}
+
+/// The page of `read` on `pane`.
+fn page(request: &Request, read: &Read, pane: Pane) -> AnyView {
+    let title = read
+        .published
         .as_ref()
         .and_then(PublishedCodeSystem::title)
-        .map_or_else(|| heading_of(&canonical), str::to_owned);
-    let subtitle = published
+        .map_or_else(|| read.card.url.clone(), str::to_owned);
+    let version = read
+        .published
         .as_ref()
-        .and_then(PublishedCodeSystem::description)
-        .map(str::to_owned);
-    let actions = card
-        .as_ref()
-        .map_or_else(|| ().into_any(), |card| actions(card, version.get()));
-    let facts = facts(&canonical, card.as_ref(), published.as_ref());
-    view! {
-        <div>{heading(title, &canonical, subtitle, actions)}</div>
-        {panel(facts)}
-    }
-    .into_any()
-}
-
-/// The facts across the top of the screen.
-fn facts(
-    canonical: &str,
-    card: Option<&SystemCard>,
-    published: Option<&PublishedCodeSystem>,
-) -> AnyView {
-    let default = card
-        .and_then(|card| chosen_version(card, None))
-        .and_then(|row| row.code)
-        .unwrap_or_else(|| String::from("—"));
-    let status = published
-        .and_then(PublishedCodeSystem::status)
-        .map_or_else(|| String::from("—"), str::to_owned);
-    let content = card
-        .and_then(|card| card.content.clone())
-        .unwrap_or_else(|| String::from("—"));
-    let subsumes = match card.and_then(|card| card.subsumption) {
-        Some(true) => pill(Tone::Ok, "yes").into_any(),
-        Some(false) => pill(Tone::Neutral, "no").into_any(),
-        None => view! { <span class="fui-muted">"—"</span> }.into_any(),
-    };
-    facts_row(vec![
-        (
-            tr(Msg::Canonical),
-            view! { <span class="fui-mono break-all">{canonical.to_owned()}</span> }.into_any(),
-        ),
-        (
-            tr(Msg::DefaultVersion),
-            view! { <span class="fui-mono">{default}</span> }.into_any(),
-        ),
-        (tr(Msg::Status), status.into_any()),
-        (tr(Msg::Content), content.into_any()),
-        (tr(Msg::Subsumption), subsumes),
-    ])
-    .into_any()
-}
-
-/// The screens that work over this system, carrying it and its version.
-///
-/// The concept browser appears only where that version declares the
-/// direct-child operator, because a tree with no operator to walk it has
-/// nothing to draw (<https://hl7.org/fhir/R5/codesystem-filter-operator.html>).
-fn actions(card: &SystemCard, version: FhirVersion) -> AnyView {
-    if card.url.is_empty() {
-        return ().into_any();
-    }
-    let served = chosen_version(card, None);
-    let code = served.as_ref().and_then(|row| row.code.clone());
-    let walkable = served.is_some_and(|row| Hierarchy::of(&row).walk().is_some());
-    let link = |path: &str, variant: Variant, glyph, label: String| {
-        let href = system_tool_link(path, &card.url, code.as_deref(), version);
-        view! {
-            <a href=href class=variant.class()>
-                {ferrohealth_ui::icon::icon(glyph, "16")}
-                {label}
-            </a>
-        }
-        .into_any()
-    };
-    let browse = walkable.then(|| {
-        link(
-            BROWSE_PATH,
-            Variant::Primary,
-            icon::BROWSE,
-            tr(Msg::BrowseConcepts),
-        )
-    });
-    // NOTE: no specification governs this: our own design; a console without
-    // a sign-in has no editor, so it offers none.
-    let edit = expect_context::<Console>().sign_in.then(|| {
-        link(
-            CODE_SYSTEM_EDITOR_PATH,
-            Variant::Secondary,
-            icon::EDIT,
-            tr(Msg::Edit),
-        )
-    });
-    view! {
-        <nav aria-label=tr(Msg::ScreensCodeSystem) class="fui-cluster">
-            {browse}
-            {link(VALIDATE_PATH, Variant::Secondary, icon::VALIDATE, tr(Msg::CheckACode))}
-            {link(EXPAND_PATH, Variant::Secondary, icon::EXPAND, tr(Msg::Expand))}
-            {edit}
-        </nav>
-    }
-    .into_any()
-}
-
-/// What the code system itself says it is, from the published resources.
-fn overview_tab(search: Fetched<Document<CodeSystemSearch>>) -> AnyView {
-    view! {
-        <section aria-labelledby="system-published-heading">
-            <h2 id="system-published-heading" class="fui-sr-only">
-                {tr(Msg::WhatCodeSystemSays)}
-            </h2>
-            <Reading label=&{
-                tr(Msg::ReadingThePublishedCodesystem)
-            }>
-                {move || {
-                    search
-                        .with(|answered| {
-                            answered
-                                .as_ref()
-                                .map(|answer| match answer {
-                                    Ok(document) => {
-                                        let meta = page_meta(
-                                            partial(document.value.matched(), document.value.total()),
-                                        );
-                                        view! {
-                                            {meta}
-                                            {resources_view(&document.value.published())}
-                                        }
-                                            .into_any()
-                                    }
-                                    Err(error) => failure_view(error),
-                                })
-                        })
-                }}
-            </Reading>
-        </section>
-    }
-    .into_any()
-}
-
-/// What this server declares it can do with the system, one panel per
-/// served version.
-fn support_tab(system: Signal<String>, capabilities: Fetched<TerminologyCapabilities>) -> AnyView {
-    view! {
-        <section aria-labelledby="system-capability-heading">
-            <h2 id="system-capability-heading" class="fui-sr-only">
-                {tr(Msg::WhatServerCanDo)}
-            </h2>
-            <Reading label=&{
-                tr(Msg::ReadingTheTerminologyCapabilities)
-            }>
-                {move || {
-                    capabilities
-                        .with(|answered| {
-                            answered
-                                .as_ref()
-                                .map(|answer| match answer {
-                                    Ok(document) => {
-                                        match system.with(|system| document.card(system)) {
-                                            Some(card) => support_view(&card),
-                                            None => undeclared_view(),
-                                        }
-                                    }
-                                    Err(error) => failure_view(error),
-                                })
-                        })
-                }}
-            </Reading>
-        </section>
-    }
-    .into_any()
-}
-
-/// The published resources as the server sent them.
-fn json_tab(search: Fetched<Document<CodeSystemSearch>>) -> AnyView {
-    view! {
-        <Reading label=&{
-            tr(Msg::ReadingThePublishedCodesystem)
-        }>
-            {move || {
-                search
-                    .with(|answered| {
-                        answered
-                            .as_ref()
-                            .map(|answer| match answer {
-                                Ok(document) => {
-                                    json_pane(
-                                        "system-json",
-                                        tr(Msg::CodesystemServerSent),
-                                        resources_text(&document.text),
-                                    )
-                                }
-                                Err(error) => failure_view(error),
-                            })
-                    })
-            }}
-        </Reading>
-    }
-    .into_any()
-}
-
-/// The statement that this root's capabilities do not name the system.
-fn undeclared_view() -> AnyView {
-    undeclared(tr(Msg::RootSTerminologyCapabilitiesDoNot))
-}
-
-/// A refused read, in the server's own words.
-fn failure_view(error: &FhirError) -> AnyView {
-    let error = error.clone();
-    view! { <Failure error=Signal::stored(error) /> }.into_any()
-}
-
-/// One panel per served version, or the statement that none is declared.
-///
-/// The panels are a plain `Vec`, which rebuilds every position when the read
-/// settles again. A `<For>` would keep a retained key's old body while its
-/// version code stayed the same (`leptos` 0.8, `for_loop.rs`).
-fn support_view(card: &SystemCard) -> AnyView {
-    if card.versions.is_empty() {
-        return empty_quiet(
-            icon::VERSION,
-            tr(Msg::NoVersionDeclared),
-            tr(Msg::ServerDeclaresNoVersionCodeSystem),
-        )
-        .into_any();
-    }
-    let panels: Vec<AnyView> = card.versions.iter().map(version_view).collect();
-    view! { <div class="fui-stack">{panels}</div> }.into_any()
-}
-
-/// One served version: what it resolves, what it holds, what it filters on
-/// and what it answers.
-fn version_view(row: &VersionRow) -> AnyView {
-    let code = row.code.clone().map_or_else(
-        || tr_with(Msg::Version3, &[("not_declared", not_declared().into())]),
-        |code| tr_with(Msg::Version4, &[("code", (code).clone().into())]),
-    );
-    let mark = row
-        .is_default
-        .then(|| badge(Tone::Accent, &tr(Msg::DefaultMark)));
-    let compositional = match row.compositional {
-        Some(true) => tr(Msg::StateRead),
-        Some(false) => tr(Msg::NotRead),
-        None => not_declared(),
-    };
-    let resolves = if row.is_default {
-        tr(Msg::AnUnversionedRequest)
-    } else {
-        tr(Msg::RequestNamingVersion)
-    };
-    let rows = vec![
-        (tr(Msg::Answers), resolves.into_any()),
-        (tr(Msg::CompositionalGrammar), compositional.into_any()),
-        (
-            tr(Msg::DesignationLanguages),
-            chips(&row.languages, tr(Msg::NoneDeclared)),
-        ),
-        (
-            tr(Msg::LookupProperties),
-            chips(&row.properties, tr(Msg::NoneDeclared)),
-        ),
-    ];
-    let filters = filter_view(row);
-    let body = view! { <div class="fui-panel-body fui-stack">{definitions(rows)} {filters}</div> };
-    titled_panel(code, mark, body).into_any()
-}
-
-/// `values` as chips, or the words `absent` when there are none.
-fn chips(values: &[String], absent: String) -> AnyView {
-    if values.is_empty() {
-        return view! { <span class="fui-muted">{absent}</span> }.into_any();
-    }
-    cluster(
-        values
-            .iter()
-            .map(|value| chip(value.clone()))
-            .collect_view(),
-    )
-    .into_any()
-}
-
-/// The filters `$expand` accepts for one version, with their operators.
-fn filter_view(row: &VersionRow) -> AnyView {
-    let body = if row.filters.is_empty() {
-        Body::Empty(
-            empty_quiet(
-                icon::EXPAND,
-                tr(Msg::NoFilter),
-                tr(Msg::VersionDeclaresNoExpandFilter),
-            )
-            .into_any(),
-        )
-    } else {
-        Body::Rows(
-            row.filters
-                .iter()
-                .map(|filter| {
-                    let code = if filter.code.is_empty() {
-                        tr_with(Msg::Filter2, &[("not_declared", not_declared().into())])
-                    } else {
-                        filter.code.clone()
-                    };
-                    let operators = chips(&filter.operators, tr(Msg::NoOperatorDeclared));
-                    view! {
-                        <tr>
-                            <td class="fui-mono">{code}</td>
-                            <td data-label=tr(Msg::Operators)>{operators}</td>
-                        </tr>
-                    }
-                })
-                .collect_view()
-                .into_any(),
-        )
-    };
-    data_table(DataTable {
-        caption: &tr(Msg::FiltersExpandAccepts),
-        columns: &filter_columns(),
-        sort: None,
-        sort_href: &|_| String::new(),
-        body,
-    })
-    .into_any()
-}
-
-/// How many published resources answered, as a sentence.
-///
-/// The count the server declared is shown beside the number of resources the
-/// answer actually carried, because a `Bundle.total` larger than the entries
-/// means the search was paged.
-fn match_sentence(drawn: usize, total: Option<u32>) -> String {
-    let counted = total.map_or_else(
-        || {
-            tr_with(
-                Msg::ThisRootCounted3,
-                &[("not_declared", not_declared().into())],
-            )
+        .and_then(PublishedCodeSystem::version)
+        .map(str::to_owned)
+        .or_else(|| served(&read.card).and_then(|row| row.code));
+    let head = header(
+        Head {
+            kind: Kind::CodeSystem,
+            title: title.clone(),
+            status: read
+                .published
+                .as_ref()
+                .and_then(PublishedCodeSystem::status)
+                .map(str::to_owned),
+            canonical: read.card.url.clone(),
+            line: line(version.as_deref(), read.source),
+            actions: actions(request, read, &title),
         },
-        |total| {
-            tr_with(
-                Msg::ThisRootCounted4,
-                &[("total", (total).to_string().into())],
-            )
-        },
+        request.version,
     );
-    if drawn == 1 {
-        tr_with(
-            Msg::N1PublishedResourceAnd,
-            &[("counted", (counted).clone().into())],
-        )
-    } else {
-        tr_with(
-            Msg::PublishedResourcesAnd,
+    let panel = match pane {
+        Pane::First | Pane::History => overview(read),
+        Pane::Second => versions(read),
+        Pane::Json => json(read),
+    };
+    let links = Links {
+        page: system_link(&read.card.url, request.version),
+        history: read
+            .published
+            .as_ref()
+            .filter(|_| read.source == Source::Stored)
+            .and_then(PublishedCodeSystem::id)
+            .map(str::to_owned),
+    };
+    view! {
+        {head}
+        {tabbed(Kind::CodeSystem, pane, &links, request.version, panel)}
+    }
+    .into_any()
+}
+
+/// A declared boolean as its word.
+fn yes_no(value: Option<bool>) -> AnyView {
+    match value {
+        Some(true) => tr(Msg::DetailYes).into_any(),
+        Some(false) => tr(Msg::DetailNo).into_any(),
+        None => or_none(String::new()),
+    }
+}
+
+/// A declared text, or the quiet word for none.
+fn text(value: Option<&str>) -> AnyView {
+    or_none(value.unwrap_or_default().to_owned())
+}
+
+/// The quiet note on a system the console cannot edit, saying why.
+fn read_only_note(source: Source) -> Option<AnyView> {
+    let words = match source {
+        Source::Stored => return None,
+        Source::Index => tr(Msg::CodeSystemIndexNote),
+        Source::Loaded => tr(Msg::CodeSystemLoadedNote),
+    };
+    Some(panel_section(
+        None,
+        notice(Tone::Neutral, Announce::Status, None, words),
+    ))
+}
+
+/// Overview: what the code system says it is.
+fn overview(read: &Read) -> AnyView {
+    let note = read_only_note(read.source);
+    let Some(published) = &read.published else {
+        return panel_sections(view! {
+            {note}
+            {panel_section(None, section_intro(tr(Msg::CodeSystemNoResource)))}
+        });
+    };
+    let date = published
+        .date()
+        .map(|raw| ferrohealth_ui::view::time::timestamp(raw).into_any());
+    let details = definitions(vec![
+        (tr(Msg::CodeSystemComputerName), text(published.name())),
+        (
+            tr(Msg::CodeSystemExperimental),
+            yes_no(published.experimental()),
+        ),
+        (tr(Msg::CodeSystemPublisher), text(published.publisher())),
+        (
+            tr(Msg::CodeSystemLastChanged),
+            date.unwrap_or_else(|| or_none(String::new())),
+        ),
+        (
+            tr(Msg::CodeSystemDescription),
+            text(published.description()),
+        ),
+    ]);
+    let content = match (published.content(), published.count()) {
+        (content, Some(count)) => tr_with(
+            Msg::CodeSystemContentCount,
             &[
-                ("drawn", (drawn).to_string().into()),
-                ("counted", (counted).clone().into()),
+                ("content", content_word(content).into()),
+                ("count", count.into()),
             ],
+        ),
+        (content, None) => content_word(content),
+    };
+    let structure = definitions(vec![
+        (tr(Msg::CodeSystemsContent), content.into_any()),
+        (
+            tr(Msg::CodeSystemHierarchyMeaning),
+            text(published.hierarchy_meaning()),
+        ),
+        (
+            tr(Msg::CodeSystemCaseSensitive),
+            yes_no(published.case_sensitive()),
+        ),
+        (
+            tr(Msg::CodeSystemVersionNeeded),
+            yes_no(published.version_needed()),
+        ),
+        (
+            tr(Msg::CodeSystemCompositional),
+            yes_no(published.compositional()),
+        ),
+        (
+            tr(Msg::CodeSystemSupplements),
+            text(published.supplements()),
+        ),
+    ]);
+    let properties = declared_properties(published);
+    panel_sections(view! {
+        {note}
+        {panel_section(
+            Some(SectionHead {
+                title: tr(Msg::CodeSystemDetails),
+                count: None,
+                actions: None,
+            }),
+            details,
+        )}
+        {panel_section(
+            Some(SectionHead {
+                title: tr(Msg::CodeSystemStructure),
+                count: None,
+                actions: None,
+            }),
+            structure,
+        )}
+        {properties}
+    })
+}
+
+/// The properties the code system declares, as a table; nothing when it
+/// declares none.
+fn declared_properties(published: &PublishedCodeSystem) -> Option<AnyView> {
+    let declared = published.properties();
+    (!declared.is_empty()).then(|| {
+        let columns = [
+            Column::text("property", tr(Msg::CodeSystemProperty)).role(Role::Title),
+            Column::text("type", tr(Msg::CodeSystemPropertyType)).role(Role::Sub),
+            Column::text("meaning", tr(Msg::CodeSystemPropertyMeaning)).role(Role::Quiet),
+        ];
+        let [_, kind, meaning] = &columns;
+        let rows = declared
+            .iter()
+            .map(|property| {
+                view! {
+                    <tr>
+                        {title_cell(
+                            None,
+                            view! { <code>{property.code.clone().unwrap_or_default()}</code> },
+                            None,
+                        )} {cell(kind, property.kind.clone().unwrap_or_default())}
+                        {cell(
+                            meaning,
+                            property
+                                .description
+                                .clone()
+                                .or_else(|| property.uri.clone())
+                                .unwrap_or_default(),
+                        )}
+                    </tr>
+                }
+            })
+            .collect_view()
+            .into_any();
+        let caption = tr(Msg::CodeSystemDeclaredProperties);
+        let table = data_table(DataTable {
+            caption: &caption,
+            columns: &columns,
+            sorting: Sorting::default(),
+            body: Body::Rows(rows),
+        });
+        panel_section(
+            Some(SectionHead {
+                title: caption.clone(),
+                count: Some(u64::try_from(declared.len()).unwrap_or(u64::MAX)),
+                actions: None,
+            }),
+            table,
         )
+    })
+}
+
+/// The title of one served version: Release for one read from an index.
+fn version_title(row: &VersionRow) -> String {
+    let code = row
+        .code
+        .clone()
+        .unwrap_or_else(|| tr(Msg::CodeSystemUnnamedVersion));
+    if row.artifact.is_some() {
+        tr_with(Msg::CodeSystemRelease, &[("version", code.into())])
+    } else {
+        tr_with(Msg::VersionsOne, &[("version", code.into())])
     }
 }
 
-/// The sentence for a search the server counted more matches for than it
-/// sent, which means it was paged; nothing when the two agree.
-fn partial(drawn: usize, total: Option<u32>) -> Option<String> {
-    let agrees = total.is_some_and(|total| usize::try_from(total).ok() == Some(drawn));
-    (!agrees).then(|| match_sentence(drawn, total))
-}
-
-/// One panel per published resource, or the statement that there is none.
-fn resources_view(published: &[PublishedCodeSystem]) -> AnyView {
-    if published.is_empty() {
-        return panel(empty_state(
-            icon::CODE_SYSTEMS,
-            tr(Msg::NotPublishedResource),
-            tr(Msg::RootPublishesNoCodesystemResourceCanonical),
-            (),
-        ))
-        .into_any();
-    }
-    let panels: Vec<AnyView> = published.iter().map(resource_view).collect();
-    grid(panels).into_any()
-}
-
-/// One published resource, as a definition grid of its declared facts.
-fn resource_view(resource: &PublishedCodeSystem) -> AnyView {
-    let heading = resource.version().map_or_else(
-        || tr_with(Msg::Version5, &[("not_declared", not_declared().into())]),
-        |version| tr_with(Msg::Version6, &[("version", (version).to_string().into())]),
-    );
-    let rows = resource
-        .facts()
-        .into_iter()
-        .map(|fact| {
-            let value = match fact.value {
-                Some(value) => crate::components::stated(value),
-                None => view! { <span class="fui-muted">{not_declared()}</span> }.into_any(),
-            };
-            (tr(fact.label), value)
+/// The filters one served version declares, as a table.
+fn version_filters(row: &VersionRow, filters_title: &str) -> AnyView {
+    if row.filters.is_empty() {
+        section_intro(tr(Msg::CodeSystemNoFilters))
+    } else {
+        let columns = [
+            Column::text("property", tr(Msg::CodeSystemProperty)).role(Role::Title),
+            Column::text("operators", tr(Msg::CodeSystemOperators)),
+        ];
+        let [_, operators] = &columns;
+        let rows = row
+            .filters
+            .iter()
+            .map(|filter| {
+                let ops = filter
+                    .operators
+                    .iter()
+                    .map(|op| {
+                        view! {
+                            <code>{op.clone()}</code>
+                            " "
+                        }
+                    })
+                    .collect_view();
+                view! {
+                    <tr>
+                        {title_cell(None, view! { <code>{filter.code.clone()}</code> }, None)}
+                        {cell(operators, ops)}
+                    </tr>
+                }
+            })
+            .collect_view()
+            .into_any();
+        data_table(DataTable {
+            caption: filters_title,
+            columns: &columns,
+            sorting: Sorting::default(),
+            body: Body::Rows(rows),
         })
-        .collect();
-    titled_panel(
-        heading,
-        (),
-        view! { <div class="fui-panel-body">{definitions(rows)}</div> },
-    )
-    .into_any()
+        .into_any()
+    }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Versions: what the server declares it can do with each version.
+fn versions(read: &Read) -> AnyView {
+    let sections = read
+        .card
+        .versions
+        .iter()
+        .map(|row| {
+            let title = version_title(row);
+            let answers = if row.is_default {
+                tr_with(
+                    Msg::CodeSystemAnswersDefault,
+                    &[("version", title.clone().into())],
+                )
+            } else {
+                tr_with(
+                    Msg::CodeSystemAnswersOnly,
+                    &[("version", title.clone().into())],
+                )
+            };
+            let subsumption = if read.card.subsumption == Some(true) {
+                tr(Msg::CodeSystemSubsumes)
+            } else {
+                tr(Msg::CodeSystemNoSubsumption)
+            };
+            let languages = if row.languages.is_empty() {
+                or_none(String::new())
+            } else {
+                row.languages.join(", ").into_any()
+            };
+            let properties = if row.properties.is_empty() {
+                or_none(String::new())
+            } else {
+                row.properties
+                    .iter()
+                    .map(|property| {
+                        view! {
+                            <code>{property.clone()}</code>
+                            " "
+                        }
+                    })
+                    .collect_view()
+                    .into_any()
+            };
+            let mut facts = vec![
+                (tr(Msg::CodeSystemAnswersRequests), answers.into_any()),
+                (tr(Msg::CodeSystemSubsumption), subsumption.into_any()),
+                (tr(Msg::CodeSystemLanguages), languages),
+                (tr(Msg::CodeSystemLookUpReturns), properties),
+            ];
+            if let Some(artifact) = &row.artifact {
+                let name = artifact
+                    .name
+                    .clone()
+                    .or_else(|| artifact.release.clone())
+                    .unwrap_or_default();
+                facts.push((
+                    tr(Msg::CodeSystemReadFrom),
+                    view! { <code>{name}</code> }.into_any(),
+                ));
+            }
+            let filters_title = tr_with(
+                Msg::CodeSystemFiltersOf,
+                &[("version", title.clone().into())],
+            );
+            let filters = version_filters(row, &filters_title);
+            view! {
+                {panel_section(
+                    Some(SectionHead {
+                        title,
+                        count: None,
+                        actions: None,
+                    }),
+                    definitions(facts),
+                )}
+                {panel_section(
+                    Some(SectionHead {
+                        title: filters_title.clone(),
+                        count: None,
+                        actions: None,
+                    }),
+                    filters,
+                )}
+            }
+            .into_any()
+        })
+        .collect_view();
+    panel_sections(view! {
+        {panel_section(None, section_intro(tr(Msg::CodeSystemVersionsIntro)))}
+        {sections}
+    })
+}
 
-    #[test]
-    fn an_address_that_names_no_system_still_titles_the_page() {
-        assert_eq!(title_of(""), "Code system");
-        assert_eq!(
-            heading_of(""),
-            "This address names no code system",
-            "the screen states what it found rather than rendering an empty heading"
-        );
-    }
-
-    #[test]
-    fn a_named_system_titles_the_page_with_its_canonical() {
-        assert_eq!(
-            title_of("https://terminology.example/x"),
-            "https://terminology.example/x"
-        );
-        assert_eq!(
-            heading_of("https://terminology.example/x"),
-            "https://terminology.example/x"
-        );
-    }
-
-    #[test]
-    fn the_match_sentence_states_the_drawn_count_and_the_declared_one() {
-        assert_eq!(
-            match_sentence(1, Some(1)),
-            "1 published resource, and this root counted 1"
-        );
-        assert_eq!(
-            match_sentence(0, Some(0)),
-            "0 published resources, and this root counted 0"
-        );
-    }
-
-    #[test]
-    fn a_search_that_counted_nothing_says_so_rather_than_inventing_a_number() {
-        assert_eq!(
-            match_sentence(1, None),
-            "1 published resource, and this root counted not declared"
-        );
-    }
+/// JSON: the resource as the server sent it, read with `_summary=true` for
+/// a system served from an index.
+fn json(read: &Read) -> AnyView {
+    let Some(text) = &read.text else {
+        return panel_sections(panel_section(
+            None,
+            section_intro(tr(Msg::CodeSystemNoResource)),
+        ));
+    };
+    let id = read
+        .published
+        .as_ref()
+        .and_then(PublishedCodeSystem::id)
+        .unwrap_or_default();
+    let summary = read.source == Source::Index;
+    let title = if summary {
+        tr_with(
+            Msg::DetailJsonSummaryTitle,
+            &[("path", format!("CodeSystem/{id}").into())],
+        )
+    } else {
+        format!("CodeSystem/{id}")
+    };
+    let code = Code {
+        label: tr(Msg::CodeSystemJsonLabel),
+        language: Language::Json,
+        text: text.clone(),
+        ids: None,
+        current: None,
+        diagnostics: Vec::new(),
+    };
+    let note = summary.then(|| panel_section(None, section_intro(tr(Msg::CodeSystemSummaryNote))));
+    panel_sections(view! {
+        {note}
+        {code_section(
+            CodeHead {
+                title,
+                tags: vec![String::from("FHIR")],
+                digest: None,
+                copy: Some(String::from("code-system-copy")),
+                actions: None,
+            },
+            &code,
+        )}
+    })
 }

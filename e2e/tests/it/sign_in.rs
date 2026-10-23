@@ -20,6 +20,9 @@ const SIGN_IN: &str = "//a[normalize-space()='Sign in']";
 /// The control that ends one.
 const SIGN_OUT: &str = "//button[normalize-space()='Sign out']";
 
+/// The sign-in page's way to an identity provider.
+const TO_PROVIDER: &str = "a[href^='/auth/login']";
+
 /// The shell's own mark, which proves the bundle booted.
 const LOCKUP: &str = "header a.fui-lockup";
 
@@ -30,7 +33,7 @@ const SCREENS: [&str; 6] = [
     "/expand",
     "/validate",
     "/valuesets",
-    "/about",
+    "/preferences",
 ];
 
 /// A deployment with no issuer offers no sign-in on any screen.
@@ -64,6 +67,20 @@ async fn no_issuer_means_no_sign_in_control_on_any_screen() {
                     "{screen} offers a sign-out with nothing signed in"
                 );
             }
+
+            journey.reopen(&format!("{base}/auth/sign-in")).await;
+            journey
+                .text_becoming(
+                    By::Css("main, body"),
+                    StringMatch::new("no sign-in configured").partial(),
+                    "the sign-in page to say this console offers no sign-in",
+                )
+                .await;
+            assert_eq!(
+                journey.count(By::Css(TO_PROVIDER)).await,
+                0,
+                "the sign-in page offers no provider it does not have"
+            );
 
             journey.no_console_errors().await;
             Ok::<(), WebDriverError>(())

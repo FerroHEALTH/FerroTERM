@@ -31,6 +31,9 @@ pub(crate) struct PublishedValueSet {
     resource_type: Option<String>,
     /// `ValueSet.id`, the id the read interaction addresses.
     id: Option<String>,
+    /// `meta`, whose `versionId` says the resource was written through the
+    /// API.
+    meta: Option<crate::fhir::named::Meta>,
     /// `ValueSet.url`, the canonical the expansion runner takes.
     url: Option<String>,
     /// `ValueSet.version`, the business version of the resource.
@@ -96,6 +99,8 @@ struct ComposeSet {
 struct ComposeConcept {
     /// The code the clause names.
     code: Option<String>,
+    /// The display the clause gives it, when it gives one.
+    display: Option<String>,
 }
 
 /// One `compose.include.filter`, as the screen states it.
@@ -124,6 +129,11 @@ pub(crate) struct ClauseRow {
     pub(crate) codes: u32,
     /// The filters the clause selects with, each as one sentence.
     pub(crate) filters: Vec<String>,
+    /// The codes the clause names, each with the display it gives.
+    pub(crate) concepts: Vec<(String, Option<String>)>,
+    /// The filters the clause selects with, each its property, operator and
+    /// value.
+    pub(crate) filter_parts: Vec<(String, String, String)>,
 }
 
 impl Published for PublishedValueSet {
@@ -150,14 +160,17 @@ impl PublishedValueSet {
         named(self.version.as_deref())
     }
 
+    /// The version the server holds of a resource written through the API;
+    /// `None` for one the deployment loaded, which has no write path.
+    pub(crate) fn stored(&self) -> Option<&str> {
+        self.meta
+            .as_ref()
+            .and_then(crate::fhir::named::Meta::stored)
+    }
+
     /// The publication status, when it declared one.
     pub(crate) fn status(&self) -> Option<&str> {
         named(self.status.as_deref())
-    }
-
-    /// The description, when it declared one.
-    pub(crate) fn description(&self) -> Option<&str> {
-        named(self.description.as_deref())
     }
 
     /// The name a reader recognises: the title, else the name.
@@ -214,6 +227,29 @@ impl PublishedValueSet {
             codes: u32::try_from(set.concept.iter().filter(|c| c.code.is_some()).count())
                 .unwrap_or(u32::MAX),
             filters: set.filter.iter().map(filter_sentence).collect(),
+            concepts: set
+                .concept
+                .iter()
+                .filter_map(|concept| {
+                    let code = named(concept.code.as_deref())?;
+                    Some((
+                        code.to_owned(),
+                        named(concept.display.as_deref()).map(str::to_owned),
+                    ))
+                })
+                .collect(),
+            filter_parts: set
+                .filter
+                .iter()
+                .map(|filter| {
+                    let part = |value: Option<&str>| named(value).unwrap_or_default().to_owned();
+                    (
+                        part(filter.property.as_deref()),
+                        part(filter.op.as_deref()),
+                        part(filter.value.as_deref()),
+                    )
+                })
+                .collect(),
         };
         compose
             .include
@@ -437,7 +473,7 @@ mod tests {
                 "entry":[{{"resource":{ONE}}}]}}"#
         ))
         .expect("the fixture is valid JSON");
-        assert_eq!(found.matched(), 1);
+        assert_eq!(found.found().len(), 1);
         assert_eq!(
             found.found().first().and_then(|resource| resource.id()),
             Some("example-vs")

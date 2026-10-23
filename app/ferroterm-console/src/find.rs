@@ -12,9 +12,10 @@
 //! is a link rather than a command.
 
 use crate::fhir::version::FhirVersion;
-use crate::locale::{Msg, tr};
+use crate::locale::{Msg, tr, tr_with};
 use crate::routes::BROWSE_PATH;
 use crate::routes::EXPAND_PATH;
+use crate::routes::LOOKUP_PATH;
 use crate::routes::TRANSLATE_PATH;
 use crate::routes::VALIDATE_PATH;
 use crate::routes::VERSION_PARAM;
@@ -103,6 +104,18 @@ fn looks_like_uri(typed: &str) -> bool {
         })
 }
 
+/// The `$lookup` operation, as a capability statement names it.
+pub(crate) const LOOKUP: &str = "lookup";
+
+/// The `$validate-code` operation, as a capability statement names it.
+pub(crate) const VALIDATE_CODE: &str = "validate-code";
+
+/// The `$expand` operation, as a capability statement names it.
+pub(crate) const EXPAND: &str = "expand";
+
+/// The `$translate` operation, as a capability statement names it.
+pub(crate) const TRANSLATE: &str = "translate";
+
 /// One thing a reader can do with what they typed.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Offer {
@@ -120,14 +133,24 @@ pub(crate) struct Offer {
 /// so a caller cannot pass them in the wrong order. `$validate-code` is one
 /// fact rather than two, because the runner picks the resource type from what
 /// the root declares once the reader is on it.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct Declared {
-    /// Whether the root declares `$validate-code` on either resource type.
-    pub(crate) validate: bool,
-    /// Whether the root declares `$expand`.
-    pub(crate) expand: bool,
-    /// Whether the root declares `$translate`.
-    pub(crate) translate: bool,
+    /// The operations the root declares, by the name `crate::find` asks
+    /// for: `lookup`, `validate-code`, `expand` and `translate`.
+    operations: Vec<&'static str>,
+}
+
+impl Declared {
+    /// What a root declaring `operations` offers.
+    #[must_use]
+    pub(crate) fn of(operations: Vec<&'static str>) -> Self {
+        Self { operations }
+    }
+
+    /// Whether the root declares `operation`.
+    fn has(&self, operation: &str) -> bool {
+        self.operations.contains(&operation)
+    }
 }
 
 /// Everything this root can do with `subject`, in the order it is offered.
@@ -135,7 +158,7 @@ pub(crate) struct Declared {
 /// An operation the root's capability statement does not declare is left out
 /// rather than offered and refused, which is the same rule every screen
 /// follows (<https://hl7.org/fhir/R5/capabilitystatement.html>).
-pub(crate) fn offers(subject: &Subject, declared: Declared, version: FhirVersion) -> Vec<Offer> {
+pub(crate) fn offers(subject: &Subject, declared: &Declared, version: FhirVersion) -> Vec<Offer> {
     match subject {
         Subject::Canonical(canonical) => canonical_offers(canonical, declared, version),
         Subject::Code(code) => code_offers(code, declared, version),
@@ -148,7 +171,7 @@ pub(crate) fn offers(subject: &Subject, declared: Declared, version: FhirVersion
 /// The viewer cannot tell one from the other without asking the server, and
 /// asking is what this module exists not to do, so both are offered and each
 /// says which it treats the canonical as.
-fn canonical_offers(canonical: &str, declared: Declared, version: FhirVersion) -> Vec<Offer> {
+fn canonical_offers(canonical: &str, declared: &Declared, version: FhirVersion) -> Vec<Offer> {
     let mut found = vec![Offer {
         label: tr(Msg::OpenTheCodeSystem),
         detail: tr(Msg::ReadsWhatRootDeclaresAboutCodesystem),
@@ -159,14 +182,14 @@ fn canonical_offers(canonical: &str, declared: Declared, version: FhirVersion) -
         detail: tr(Msg::WalksHierarchyWhereServedVersionDeclares),
         href: screen_with(BROWSE_PATH, "system", canonical, version),
     });
-    if declared.expand {
+    if declared.has(EXPAND) {
         found.push(Offer {
             label: tr(Msg::ExpandValueSet),
             detail: tr(Msg::SendsCanonicalUrlParameterValuesetExpand),
             href: screen_with(EXPAND_PATH, "url", canonical, version),
         });
     }
-    if declared.validate {
+    if declared.has(VALIDATE_CODE) {
         found.push(Offer {
             label: tr(Msg::ValidateCode),
             detail: tr(Msg::OpensRunnerCanonicalFilledReadyCode),
@@ -181,24 +204,32 @@ fn canonical_offers(canonical: &str, declared: Declared, version: FhirVersion) -
 /// Every one of these needs a code system too, which the reader has not given,
 /// so each offer opens the runner with the code filled in and the system left
 /// for them.
-fn code_offers(code: &str, declared: Declared, version: FhirVersion) -> Vec<Offer> {
+fn code_offers(code: &str, declared: &Declared, version: FhirVersion) -> Vec<Offer> {
+    let named = |msg: Msg| tr_with(msg, &[("code", code.to_owned().into())]);
     let mut found = Vec::new();
-    if declared.validate {
+    if declared.has(LOOKUP) {
         found.push(Offer {
-            label: tr(Msg::ValidateThisCode),
-            detail: tr(Msg::OpensRunnerCodeFilledNameSystem),
+            label: named(Msg::FindLookUp),
+            detail: tr(Msg::FindLookUpDetail),
+            href: screen_with(LOOKUP_PATH, "code", code, version),
+        });
+    }
+    if declared.has(VALIDATE_CODE) {
+        found.push(Offer {
+            label: named(Msg::FindCheck),
+            detail: tr(Msg::FindCheckDetail),
             href: screen_with(VALIDATE_PATH, "code", code, version),
         });
     }
-    if declared.translate {
+    if declared.has(TRANSLATE) {
         found.push(Offer {
-            label: tr(Msg::TranslateThisCode),
-            detail: tr(Msg::OpensRunnerCodeFilledNameSystem),
+            label: named(Msg::FindTranslate),
+            detail: tr(Msg::FindTranslateDetail),
             href: screen_with(TRANSLATE_PATH, "code", code, version),
         });
     }
     found.push(Offer {
-        label: tr(Msg::FindHierarchy),
+        label: named(Msg::FindSearch),
         detail: tr(Msg::SearchesConceptBrowserCodeSystemYou),
         href: screen_with(BROWSE_PATH, "filter", code, version),
     });
@@ -208,7 +239,7 @@ fn code_offers(code: &str, declared: Declared, version: FhirVersion) -> Vec<Offe
 /// What a phrase can be: a search, in the one place that searches designations.
 fn text_offers(text: &str, version: FhirVersion) -> Vec<Offer> {
     vec![Offer {
-        label: tr(Msg::SearchTheDesignations),
+        label: tr_with(Msg::FindSearch, &[("code", text.to_owned().into())]),
         detail: tr(Msg::SendsPhraseFilterParameterCodeSystem),
         href: screen_with(BROWSE_PATH, "filter", text, version),
     }]
@@ -229,11 +260,10 @@ mod tests {
     use crate::routes::UI_BASE;
 
     /// A root that declares everything, so a case about shape is about shape.
-    const EVERYTHING: Declared = Declared {
-        validate: true,
-        expand: true,
-        translate: true,
-    };
+    /// A root that declares everything, so a case about shape is about shape.
+    fn everything() -> Declared {
+        Declared::of(vec![LOOKUP, VALIDATE_CODE, EXPAND, TRANSLATE])
+    }
 
     #[test]
     fn a_string_carrying_a_scheme_is_a_canonical() {
@@ -293,7 +323,7 @@ mod tests {
     fn every_offer_carries_the_subject_into_the_address() {
         for typed in ["http://snomed.info/sct", "404684003", "clinical finding"] {
             let subject = Subject::of(typed).expect("the case types something");
-            let found = offers(&subject, EVERYTHING, FhirVersion::R5);
+            let found = offers(&subject, &everything(), FhirVersion::R5);
             assert!(!found.is_empty(), "`{typed}` reaches no screen at all");
             for offer in found {
                 assert!(
@@ -313,11 +343,9 @@ mod tests {
     #[test]
     fn an_operation_this_root_does_not_declare_is_not_offered() {
         let code = Subject::of("404684003").expect("the case types a code");
-        let nothing = offers(&code, Declared::default(), FhirVersion::R4B);
+        let nothing = offers(&code, &Declared::default(), FhirVersion::R4B);
         assert!(
-            nothing
-                .iter()
-                .all(|offer| offer.label != "Validate this code"),
+            nothing.iter().all(|offer| offer.label != "Check 404684003"),
             "a root that declares no $validate-code is not offered one"
         );
         assert!(
@@ -329,7 +357,7 @@ mod tests {
     #[test]
     fn a_canonical_is_offered_as_both_a_code_system_and_a_value_set() {
         let canonical = Subject::of("http://snomed.info/sct").expect("the case types a canonical");
-        let found = offers(&canonical, EVERYTHING, FhirVersion::R5);
+        let found = offers(&canonical, &everything(), FhirVersion::R5);
         assert!(
             found
                 .iter()

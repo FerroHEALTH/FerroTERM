@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BUSL-1.1
 [package]
 name = "ferroterm-console"
-description = "The FerroTERM Console: a Leptos app rendered on the server and hydrated, with a backend-for-frontend over the terminology server's FHIR API"
+description = "The FerroTERM Console: a Leptos app drawn on the server in islands mode, with a backend-for-frontend over the terminology server's FHIR API"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -13,10 +13,10 @@ authors.workspace = true
 # Never published: the console ships as its own binary and image.
 publish = false
 
-# One crate, two halves (the Leptos book, server-side rendering): the rlib
-# feeds the server binary and the cdylib is the WebAssembly bundle the
-# browser hydrates with. cargo-leptos builds the cdylib for wasm32 and the
-# binary for the host.
+# One crate, two halves (the Leptos book, "Guide: Islands"): the rlib feeds
+# the server binary and the cdylib is the WebAssembly the browser hydrates the
+# islands with. cargo-leptos builds the cdylib for wasm32 and the binary for
+# the host.
 [lib]
 crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
@@ -38,24 +38,22 @@ serde_json.workspace = true
 #
 # The console is a FHIR client and depends on NO workspace crate, so that
 # anything it can do a client can do. scripts/checks/console-boundary.sh fails
-# when an edge into the engine appears.
+# when an edge into the engine appears. The pages are drawn on the host alone,
+# so the browser half takes the components and leptos, whose islands it
+# hydrates, and nothing else.
 [dependencies]
 ferrohealth-ui.workspace = true
-# The console's own string catalogs under locales/, in both halves.
-fluent-templates.workspace = true
-http.workspace = true
-leptos.workspace = true
-leptos_meta.workspace = true
-leptos_router.workspace = true
-percent-encoding.workspace = true
+leptos = { workspace = true, features = ["islands"] }
+# An island's props cross to the browser as JSON, derived through serde.
 serde.workspace = true
-serde_json.workspace = true
-thiserror.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 leptos = { workspace = true, features = ["hydrate"] }
 wasm-bindgen.workspace = true
 console_error_panic_hook.workspace = true
+# The shortcuts island reads the key that was pressed and follows or submits
+# what it names.
+web-sys = { workspace = true, features = ["Document", "Element", "HtmlElement", "HtmlFormElement", "KeyboardEvent", "Location", "Window"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # The per-request script nonce of the Content-Security-Policy rides `nonce`.
@@ -63,11 +61,19 @@ leptos = { workspace = true, features = ["ssr", "nonce"] }
 leptos_axum.workspace = true
 leptos_meta = { workspace = true, features = ["ssr"] }
 leptos_router = { workspace = true, features = ["ssr"] }
+# The console's own string catalogs under locales/.
+fluent-templates.workspace = true
+http.workspace = true
+percent-encoding.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
 aws-lc-rs.workspace = true
 axum.workspace = true
 base64.workspace = true
 clap.workspace = true
 cookie.workspace = true
+# Timestamps read from the server, and the time a page says it answered at.
+jiff.workspace = true
 # The ID Token of a sign-in, verified against the provider's JWK Set
 # (OpenID Connect Core 1.0 §3.1.3.7).
 jsonwebtoken.workspace = true
@@ -92,16 +98,14 @@ wiremock.workspace = true
 [lints]
 workspace = true
 
-# cargo-leptos: the site bundle (the WebAssembly, its JavaScript glue and the
-# stylesheet) under target/site, the server binary beside it.
+# cargo-leptos: the site bundle (the WebAssembly and its JavaScript glue)
+# under target/site, the server binary beside it. The console has no
+# stylesheet of its own: it serves the components' stylesheet and the
+# FerroTERM theme from the library's constants.
 [package.metadata.leptos]
 output-name = "ferroterm-console"
 site-root = "target/site"
 site-pkg-dir = "pkg"
-# The console's own layout utilities: Tailwind 4, built by the standalone CLI
-# at the version scripts/release/console-site.sh sets. The components'
-# stylesheet and the brand theme are served from the binary.
-tailwind-input-file = "style/tailwind.css"
 # Copied into the site root as it stands: the brand favicon.
 assets-dir = "public"
 site-addr = "127.0.0.1:3000"

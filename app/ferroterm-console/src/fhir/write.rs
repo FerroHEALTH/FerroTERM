@@ -10,11 +10,9 @@
 //! editing the same resource cannot silently overwrite each other
 //! (<https://hl7.org/fhir/R4B/http.html#concurrency>).
 
-use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::fhir::error::FhirError;
 use crate::locale::{Msg, tr_with};
 
 /// The resource elements the viewer reads back off a write or a history read.
@@ -263,127 +261,9 @@ pub(crate) fn if_match(version_id: &str) -> String {
     tr_with(Msg::W, &[("version_id", (version_id).to_string().into())])
 }
 
-/// Why a write did not happen, in the terms a screen acts on.
-///
-/// The screens branch on this rather than on a status number or a message
-/// substring, and every variant keeps the server's own `OperationOutcome` in
-/// the error it was read from.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(crate) enum Refusal {
-    /// `401`: no token, or one the server would not take. The held token is
-    /// dropped and the reader is offered sign-in again (RFC 6750 §3.1).
-    SignInRequired,
-    /// `403`: the token is good and carries no scope for this write.
-    NotPermitted,
-    /// `412`: the resource moved on since it was read
-    /// (<https://hl7.org/fhir/R4B/http.html#concurrency>).
-    ConcurrentEdit,
-    /// `409`, `422`, and every other refusal the server explains in its
-    /// outcome.
-    Rejected,
-    /// Nothing answered, or the answer did not parse.
-    NoAnswer,
-}
-
-impl Refusal {
-    /// How `error` reads to a screen.
-    pub(crate) fn of(error: &FhirError) -> Self {
-        match error.status() {
-            Some(StatusCode::UNAUTHORIZED) => Self::SignInRequired,
-            Some(StatusCode::FORBIDDEN) => Self::NotPermitted,
-            Some(StatusCode::PRECONDITION_FAILED) => Self::ConcurrentEdit,
-            Some(_other) => Self::Rejected,
-            None => Self::NoAnswer,
-        }
-    }
-
-    /// Whether the held token is spent and has to be dropped.
-    pub(crate) fn drops_the_token(self) -> bool {
-        matches!(self, Self::SignInRequired)
-    }
-
-    /// The sentence the viewer adds beside the server's own outcome.
-    ///
-    /// The server's wording is rendered verbatim either way; this says what
-    /// the reader can do about it, which the outcome does not.
-    pub(crate) fn what_to_do(self) -> Msg {
-        match self {
-            Self::SignInRequired => Msg::SignAgainMakeChange,
-            Self::NotPermitted => Msg::AccountDoesNotCarryPermissionChange,
-            Self::ConcurrentEdit => Msg::SomeoneElseChangedResourceSinceWas,
-            Self::Rejected => Msg::ServerRefusedChangeOwnWordsBelow,
-            Self::NoAnswer => Msg::ServerDidNotAnswerRequestBelow,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fhir::outcome::OperationOutcome;
-
-    /// A refusal carrying `status`, as the client builds one.
-    fn refused(status: StatusCode) -> FhirError {
-        FhirError::Refused {
-            url: String::from("https://tx.example.org/r4b/CodeSystem/x"),
-            status,
-            outcome: OperationOutcome::default(),
-        }
-    }
-
-    #[test]
-    fn every_refusal_a_write_can_meet_reads_as_its_own_variant() {
-        for (status, expected) in [
-            (StatusCode::UNAUTHORIZED, Refusal::SignInRequired),
-            (StatusCode::FORBIDDEN, Refusal::NotPermitted),
-            (StatusCode::PRECONDITION_FAILED, Refusal::ConcurrentEdit),
-            (StatusCode::CONFLICT, Refusal::Rejected),
-            (StatusCode::UNPROCESSABLE_ENTITY, Refusal::Rejected),
-        ] {
-            assert_eq!(Refusal::of(&refused(status)), expected, "{status}");
-        }
-    }
-
-    #[test]
-    fn only_an_unauthorized_answer_drops_the_token() {
-        assert!(Refusal::of(&refused(StatusCode::UNAUTHORIZED)).drops_the_token());
-        for status in [
-            StatusCode::FORBIDDEN,
-            StatusCode::PRECONDITION_FAILED,
-            StatusCode::CONFLICT,
-        ] {
-            assert!(
-                !Refusal::of(&refused(status)).drops_the_token(),
-                "{status} leaves a working token alone"
-            );
-        }
-    }
-
-    #[test]
-    fn a_transport_failure_is_no_answer_rather_than_a_refusal() {
-        let error = FhirError::Transport {
-            url: String::from("https://tx.example.org/r4b/CodeSystem"),
-            message: String::from("network error"),
-        };
-        assert_eq!(Refusal::of(&error), Refusal::NoAnswer);
-        assert!(!Refusal::of(&error).drops_the_token());
-    }
-
-    #[test]
-    fn every_refusal_tells_the_reader_what_to_do_next() {
-        for refusal in [
-            Refusal::SignInRequired,
-            Refusal::NotPermitted,
-            Refusal::ConcurrentEdit,
-            Refusal::Rejected,
-            Refusal::NoAnswer,
-        ] {
-            assert!(
-                !crate::locale::tr(refusal.what_to_do()).is_empty(),
-                "{refusal:?} renders as nothing"
-            );
-        }
-    }
 
     #[test]
     fn the_if_match_header_is_the_weak_tag_fhir_states() {

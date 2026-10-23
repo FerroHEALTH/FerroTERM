@@ -100,50 +100,11 @@ pub(crate) fn recent(histories: &[(&str, &History)], limit: usize) -> Vec<Change
     changes
 }
 
-/// The writes per day an activity chart draws.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct Days {
-    /// `(day index, count)` for each day a write fell on, oldest first.
-    pub(crate) points: Vec<(u32, u32)>,
-    /// The first day, `YYYY-MM-DD`.
-    pub(crate) first: String,
-    /// The last day, `YYYY-MM-DD`.
-    pub(crate) last: String,
-}
-
-/// How many of `changes` fall on each of the days they span, oldest first.
-/// `None` when no change states its day.
-pub(crate) fn per_day(changes: &[Change]) -> Option<Days> {
-    let mut days: Vec<&str> = changes.iter().filter_map(Change::day).collect();
-    days.sort_unstable();
-    let first = (*days.first()?).to_owned();
-    let last = (*days.last()?).to_owned();
-    let mut points: Vec<(u32, u32)> = Vec::new();
-    let mut distinct: Vec<&str> = Vec::new();
-    for day in &days {
-        if distinct.last() != Some(day) {
-            distinct.push(day);
-        }
-    }
-    for (index, day) in distinct.iter().enumerate() {
-        let count = days.iter().filter(|other| *other == day).count();
-        points.push((
-            u32::try_from(index).unwrap_or(u32::MAX),
-            u32::try_from(count).unwrap_or(u32::MAX),
-        ));
-    }
-    Some(Days {
-        points,
-        first,
-        last,
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use serde_json::json;
 
-    use super::{per_day, recent};
+    use super::recent;
     use crate::fhir::write::History;
 
     fn history(value: serde_json::Value) -> History {
@@ -176,22 +137,5 @@ mod tests {
             1,
             "cut to the limit"
         );
-    }
-
-    #[test]
-    fn the_writes_count_per_day_oldest_first() {
-        let sets = history(json!({"entry": [
-            {"resource": {"id": "a", "meta": {"lastUpdated": "2026-10-03T09:00:00Z"}}},
-            {"resource": {"id": "b", "meta": {"lastUpdated": "2026-10-03T10:00:00Z"}}},
-            {"resource": {"id": "c", "meta": {"lastUpdated": "2026-10-01T10:00:00Z"}}}
-        ]}));
-        let changes = recent(&[("ValueSet", &sets)], 10);
-        let days = per_day(&changes).expect("days");
-        assert_eq!(days.points, [(0, 1), (1, 2)]);
-        assert_eq!(
-            (days.first.as_str(), days.last.as_str()),
-            ("2026-10-01", "2026-10-03")
-        );
-        assert!(per_day(&[]).is_none());
     }
 }

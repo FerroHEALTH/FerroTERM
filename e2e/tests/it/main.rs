@@ -12,13 +12,12 @@
 //! screenshots and runs only when the script is asked for it, so an ordinary
 //! run rewrites no tracked file.
 //!
-//! Client-side rendering shapes all of this. The document is an empty `<body>`
-//! until the WebAssembly bundle boots
-//! (<https://github.com/leptos-rs/book/blob/main/src/csr_wrapping_up.md>), so
-//! every assertion waits for a rendered element first. Nothing here reads the
-//! page source: inert markup satisfies a source assertion even when the
-//! control it describes is unreachable, which is the failure a journey exists
-//! to catch.
+//! The console draws every page on its server in islands mode, so a page
+//! arrives whole and its islands answer once the WebAssembly hydrates them;
+//! the harness waits for the console's hydrated mark before it acts on a
+//! page. Nothing here reads the page source: inert markup satisfies a source
+//! assertion even when the control it describes is unreachable, which is the
+//! failure a journey exists to catch.
 #![allow(
     clippy::expect_used,
     clippy::panic,

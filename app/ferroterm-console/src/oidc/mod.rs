@@ -33,11 +33,81 @@ pub mod logout;
 pub mod refresh;
 
 /// The path of the sign-in route.
-pub const LOGIN: &str = crate::components::shell::SIGN_IN;
+pub const LOGIN: &str = crate::routes::LOGIN_ROUTE;
 
 /// The path of the redirection endpoint the provider sends the operator back
 /// to.
 pub const CALLBACK: &str = "/auth/callback";
+
+/// Why the sign-in page is shown, as its `state` parameter names it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SignInState {
+    /// The reader signed out of the console.
+    SignedOut,
+    /// The session ended after its idle timeout.
+    Expired,
+    /// The session ended at its absolute timeout.
+    ExpiredAbsolute,
+    /// The console holds as many sessions as it may.
+    Full,
+    /// The provider refused the sign-in.
+    Refused,
+    /// The provider's answer failed the console's checks.
+    Rejected,
+    /// The console could not reach the provider.
+    Unreachable,
+    /// The console offers no sign-in.
+    Unavailable,
+}
+
+impl SignInState {
+    /// Every state, in the order the page knows them.
+    pub const ALL: [Self; 8] = [
+        Self::SignedOut,
+        Self::Expired,
+        Self::ExpiredAbsolute,
+        Self::Full,
+        Self::Refused,
+        Self::Rejected,
+        Self::Unreachable,
+        Self::Unavailable,
+    ];
+
+    /// The `state` parameter that names it.
+    #[must_use]
+    pub const fn key(self) -> &'static str {
+        match self {
+            Self::SignedOut => "signed-out",
+            Self::Expired => "expired",
+            Self::ExpiredAbsolute => "expired-absolute",
+            Self::Full => "full",
+            Self::Refused => "refused",
+            Self::Rejected => "rejected",
+            Self::Unreachable => "unreachable",
+            Self::Unavailable => "unavailable",
+        }
+    }
+
+    /// The state `key` names, or `None` for one the page does not know.
+    #[must_use]
+    pub fn parse(key: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|state| state.key() == key)
+    }
+}
+
+/// The redirect to the sign-in page saying `state`.
+#[must_use]
+pub fn to_sign_in(state: SignInState) -> Response {
+    let location = format!("{}?state={}", crate::routes::SIGN_IN_PAGE, state.key());
+    let Ok(location) = HeaderValue::from_str(&location) else {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+    let mut response = StatusCode::SEE_OTHER.into_response();
+    let headers = response.headers_mut();
+    headers.insert(LOCATION, location);
+    headers.insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    response
+}
 
 /// Returns the authorization request for `pending` at the provider `oidc`.
 ///
@@ -71,16 +141,30 @@ pub fn authorization_request(oidc: &OidcSettings, pending: &PendingSignIn) -> Ur
     url
 }
 
-/// Serves `GET /login`: begins a sign-in and redirects to the provider.
-pub async fn login(Extension(state): Extension<ConsoleState>) -> Response {
+/// What the sign-in route takes: the page to return to.
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct LoginQuery {
+    /// The console's page the reader returns to once signed in.
+    pub back: Option<String>,
+}
+
+/// Serves `GET /auth/login`: begins a sign-in and redirects to the
+/// provider, remembering the page to return to.
+pub async fn login(
+    Extension(state): Extension<ConsoleState>,
+    Query(query): Query<LoginQuery>,
+) -> Response {
     let Some(oidc) = state.settings().oidc.as_ref() else {
-        return plain(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "sign-in is not configured on this console",
-        );
+        return to_sign_in(SignInState::Unavailable);
     };
+    let back = query
+        .back
+        .as_deref()
+        .and_then(crate::post::return_path)
+        .map(str::to_owned);
     let pending = match PendingSignIn::mint() {
-        Ok(pending) => pending,
+        Ok(pending) => pending.returning_to(back),
         Err(error) => return refused(&error),
     };
     let location = authorization_request(oidc, &pending);
@@ -166,10 +250,7 @@ async fn redirected(
         );
     }
     if query.error.is_some() {
-        return plain(
-            StatusCode::UNAUTHORIZED,
-            "the OpenID Provider did not sign the operator in",
-        );
+        return to_sign_in(SignInState::Refused);
     }
     let Some(code) = query.code.as_deref() else {
         return plain(StatusCode::BAD_REQUEST, "the redirect carries no code");
@@ -184,20 +265,14 @@ async fn redirected(
         Ok(signed_in) => signed_in,
         Err(error) if error.refuses_the_operator() => {
             tracing::warn!(error = %error, "a sign-in's ID Token was refused");
-            return plain(
-                StatusCode::UNAUTHORIZED,
-                "the OpenID Provider's ID Token did not verify",
-            );
+            return to_sign_in(SignInState::Rejected);
         }
         Err(error) => {
             tracing::error!(
                 error = %crate::command::chain(&error),
                 "a sign-in could not be completed at the OpenID Provider"
             );
-            return plain(
-                StatusCode::BAD_GATEWAY,
-                "the sign-in could not be completed at the OpenID Provider",
-            );
+            return to_sign_in(SignInState::Unreachable);
         }
     };
     // NOTE: no specification governs this: our own design; a new sign-in ends
@@ -221,7 +296,11 @@ async fn redirected(
     };
     let mut response = StatusCode::SEE_OTHER.into_response();
     let headers = response.headers_mut();
-    headers.insert(LOCATION, HeaderValue::from_static("/"));
+    let back = pending
+        .back()
+        .and_then(|back| HeaderValue::from_str(back).ok())
+        .unwrap_or_else(|| HeaderValue::from_static("/"));
+    headers.insert(LOCATION, back);
     headers.insert(SET_COOKIE, cookie);
     headers.insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
     response
@@ -230,10 +309,7 @@ async fn redirected(
 /// The answer to a session store that failed.
 fn refused(error: &SessionError) -> Response {
     match error {
-        SessionError::Full => plain(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "the console holds as many sessions as it may; try again later",
-        ),
+        SessionError::Full => to_sign_in(SignInState::Full),
         SessionError::Random | SessionError::Poisoned => {
             tracing::error!(%error, "a sign-in session could not be begun");
             plain(

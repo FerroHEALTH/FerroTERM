@@ -34,6 +34,9 @@ pub(crate) struct PublishedConceptMap {
     resource_type: Option<String>,
     /// `ConceptMap.id`, the id the read interaction addresses.
     id: Option<String>,
+    /// `meta`, whose `versionId` says the resource was written through the
+    /// API.
+    meta: Option<crate::fhir::named::Meta>,
     /// `ConceptMap.url`, the canonical `$translate` takes as `url`.
     url: Option<String>,
     /// `ConceptMap.version`, the business version of the resource.
@@ -179,6 +182,14 @@ impl PublishedConceptMap {
         named(self.version.as_deref())
     }
 
+    /// The version the server holds of a resource written through the API;
+    /// `None` for one the deployment loaded, which has no write path.
+    pub(crate) fn stored(&self) -> Option<&str> {
+        self.meta
+            .as_ref()
+            .and_then(crate::fhir::named::Meta::stored)
+    }
+
     /// The publication status, when it declared one.
     pub(crate) fn status(&self) -> Option<&str> {
         named(self.status.as_deref())
@@ -296,11 +307,6 @@ impl PublishedConceptMap {
             }
         }
         rows
-    }
-
-    /// The description, when it declared one.
-    pub(crate) fn description(&self) -> Option<&str> {
-        named(self.description.as_deref())
     }
 
     /// How many groups the map declares.
@@ -523,7 +529,7 @@ mod tests {
                 "entry":[{{"resource":{R4_SHAPE}}}]}}"#
         ))
         .expect("the fixture is valid JSON");
-        assert_eq!(found.matched(), 1);
+        assert_eq!(found.found().len(), 1);
         assert_eq!(
             found.found().first().and_then(|resource| resource.id()),
             Some("map-1")

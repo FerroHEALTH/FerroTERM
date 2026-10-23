@@ -39,6 +39,17 @@ impl FhirVersion {
         }
     }
 
+    /// The release the server answers under this version's root, as its
+    /// `CapabilityStatement.fhirVersion` names it.
+    pub(crate) fn release(self) -> &'static str {
+        match self {
+            Self::R4 => "FHIR 4.0.1",
+            Self::R4B => "FHIR 4.3.0",
+            Self::R5 => "FHIR 5.0.0",
+            Self::R6 => "FHIR 6.0.0-ballot5",
+        }
+    }
+
     /// The name a reader recognises.
     pub(crate) fn label(self) -> &'static str {
         match self {

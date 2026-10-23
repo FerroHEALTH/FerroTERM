@@ -46,23 +46,6 @@ pub const COOKIE: &str = "ferroterm_console_session";
 /// the `__Host-` prefix when the cookie is `Secure`.
 pub const SIGN_IN_COOKIE: &str = "ferroterm_console_sign_in";
 
-/// The name of the cookie that carries the operator's theme choice, under
-/// the `__Host-` prefix when the cookie is `Secure`.
-pub const THEME_COOKIE: &str = "ferroterm_console_theme";
-
-/// The name of the cookie that carries the reader's density choice.
-pub const DENSITY_COOKIE: &str = "ferroterm_console_density";
-
-/// The name of the cookie that carries the FHIR version a page opens on when
-/// its address names none.
-pub const VERSION_COOKIE: &str = "ferroterm_console_fhir";
-
-/// The name of the cookie that carries the reader's display language.
-pub const LANGUAGE_COOKIE: &str = "ferroterm_console_language";
-
-/// The name of the cookie that carries the reader's page size.
-pub const PAGE_SIZE_COOKIE: &str = "ferroterm_console_page_size";
-
 /// The cookie name prefix that binds a cookie to the host that set it.
 ///
 /// It holds for a `Secure`, `Path=/` cookie with no `Domain`, so no sibling
@@ -126,6 +109,8 @@ pub struct PendingSignIn {
     nonce: String,
     /// The PKCE code verifier its challenge was made from (RFC 7636 §4.1).
     verifier: SecretString,
+    /// The console's page the reader returns to once signed in.
+    back: Option<String>,
 }
 
 impl PendingSignIn {
@@ -138,7 +123,20 @@ impl PendingSignIn {
             state: random_token()?,
             nonce: random_token()?,
             verifier: SecretString::from(random_token()?),
+            back: None,
         })
+    }
+
+    /// This sign-in, returning to the console's page `back` once it is done.
+    #[must_use]
+    pub fn returning_to(self, back: Option<String>) -> Self {
+        Self { back, ..self }
+    }
+
+    /// The console's page the reader returns to once signed in.
+    #[must_use]
+    pub fn back(&self) -> Option<&str> {
+        self.back.as_deref()
     }
 
     /// The `state` the authorization request carries.
