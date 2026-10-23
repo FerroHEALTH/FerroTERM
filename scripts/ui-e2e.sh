@@ -24,7 +24,8 @@
 #          temporary directory: the signed-in journeys' deployment
 #   18443  the stub issuer, plain HTTP, which both the server and the
 #          console admit on loopback
-#   13000  the console over the first server, offering no sign-in
+#   13000  the console over the first server, offering no sign-in, started
+#          with an empty configuration file, which Configuration names
 #   13001  the console over the second, signing a reader in at the issuer
 #   4444   chromedriver
 #
@@ -237,7 +238,9 @@ console() {
   pids+=("$!")
   await "http://127.0.0.1:$port/health" "$log"
 }
-console 13000 http://127.0.0.1:18080/ "$work/console.log"
+: > "$work/console.toml"
+console 13000 http://127.0.0.1:18080/ "$work/console.log" \
+  FERROTERM_CONSOLE_CONFIG="$work/console.toml"
 console 13001 http://127.0.0.1:18081/ "$work/console-signed-in.log" \
   FERROTERM_CONSOLE__OIDC__ISSUER="$issuer" \
   FERROTERM_CONSOLE__OIDC__AUTHORIZATION_ENDPOINT="$issuer/authorize" \

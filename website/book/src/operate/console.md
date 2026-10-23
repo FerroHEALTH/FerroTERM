@@ -169,7 +169,9 @@ refusal shown in the server's own words.
 conformance and benchmark evidence this build ships. **Configuration** lists
 the settings the console runs with, secrets redacted, and **How configuration
 works**, at the end of the line that names the file, opens a dialog on where
-they come from and how you change them. **About** names the
+they come from and how you change them. When the console was started with a
+configuration file, **More** in the title row offers **Copy the file's path**,
+the path shown under it. **About** names the
 build, the licence and the projects it stands on.
 
 ![The server's roots](img/console/server.png)
