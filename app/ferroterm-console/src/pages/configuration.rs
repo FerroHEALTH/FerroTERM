@@ -10,13 +10,16 @@
 
 use std::time::Duration;
 
+use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
+use ferrohealth_ui::view::dialog::{Explanation, info_dialog};
 use ferrohealth_ui::view::secret::{SecretState, secret_state};
 use ferrohealth_ui::view::status::badge;
 use ferrohealth_ui::view::surface::Header;
 use ferrohealth_ui::view::tabs::{Tab, TabRow};
 use ferrohealth_ui::view::template::settings::{Setting, SettingsPage, Source, settings_page};
+use ferrohealth_ui::widget::action_menu::{Act, Action};
 use leptos::prelude::*;
 use leptos_meta::Title;
 use leptos_router::hooks::use_params_map;
@@ -28,6 +31,9 @@ use crate::server::ConsoleState;
 
 /// Where the book says how the console's configuration works.
 const HOW: &str = "https://ferroterm.eu/docs/operate/console.html#configuration";
+
+/// The id of the dialog that says how configuration works.
+const HOW_DIALOG: &str = "config-how";
 
 /// The file the console reads when it was started with none named.
 const DEFAULT_FILE: &str = "console.toml";
@@ -339,13 +345,18 @@ pub(crate) fn ConfigurationPage() -> impl IntoView {
             subtitle: Some(
                 tr_with(Msg::ConfigSubtitle, &[("file", shown_file.clone().into())]).into(),
             ),
+            subtitle_view: None,
             crumbs: Vec::new(),
             mono: false,
             badge: None,
         },
-        actions: ActionGroup::none(),
+        actions: ActionGroup::primary(Action::new(
+            Some(Glyph::INFO),
+            tr(Msg::ConfigHow),
+            Act::Dialog(String::from(HOW_DIALOG)),
+        )),
         source: Source::File {
-            file: shown_file,
+            file: shown_file.clone(),
             how: String::from(HOW),
         },
         tabs: Some(TabRow {
@@ -359,9 +370,21 @@ pub(crate) fn ConfigurationPage() -> impl IntoView {
         settings: rows,
         replica: None,
     });
+    let how = info_dialog(
+        Explanation {
+            id: HOW_DIALOG.into(),
+            title: tr(Msg::ConfigHow).into(),
+        },
+        view! {
+            <p>{tr_with(Msg::ConfigHowRead, &[("file", shown_file.into())])}</p>
+            <p>{tr(Msg::ConfigHowChange)}</p>
+            <p>{tr(Msg::ConfigHowShown)}</p>
+        },
+    );
     view! {
         <Title text=tr(Msg::ShellConfiguration) />
         {page}
+        {how}
     }
     .into_any()
 }

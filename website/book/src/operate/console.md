@@ -119,7 +119,8 @@ code systems, and the way into each operation.
 
 Every code system the root declares in its `TerminologyCapabilities`, with its
 source, the versions it holds, its content mode and whether it reads as a
-hierarchy. Sort by a column and page through. Each row opens the code
+hierarchy. Sort by a column and page through; past ten rows, find by name or
+canonical and keep the sources you tick in the **Source** menu. Each row opens the code
 system's own screen, whose tabs are links: **Overview** (its definition from
 the published resource), **Versions** (what this server declares it can do
 with each version), **History** for a resource this server stores, and
@@ -166,7 +167,8 @@ refusal shown in the server's own words.
 **Server** shows the four FHIR roots side by side, read from each root's
 `CapabilityStatement`, the operations each root declares, and the
 conformance and benchmark evidence this build ships. **Configuration** lists
-the settings the console runs with, secrets redacted. **About** names the
+the settings the console runs with, secrets redacted, and **How configuration
+works** opens a dialog on where they come from and how you change them. **About** names the
 build, the licence and the projects it stands on.
 
 ![The server's roots](img/console/server.png)

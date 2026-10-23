@@ -351,7 +351,7 @@ async fn relation_tab(
         run(
             "check-run",
             tr(Msg::CheckTheRelation),
-            Glyph::ROUTE,
+            Glyph::GIT_BRANCH,
             "$subsumes",
         ),
     );

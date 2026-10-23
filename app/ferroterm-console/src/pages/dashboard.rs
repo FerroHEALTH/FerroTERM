@@ -17,6 +17,7 @@ use ferrohealth_ui::view::status::badge;
 use ferrohealth_ui::view::surface::{
     Stat, card_action, definitions, disclosure, grid_start, stack, stat_card_marked, stat_grid,
 };
+use ferrohealth_ui::view::template::list::HeadingCount;
 use ferrohealth_ui::view::template::list::{ListCard, list_card, list_empty};
 use leptos::prelude::*;
 
@@ -316,9 +317,10 @@ fn recent_card(activity: &Result<Vec<Change>, FhirError>, version: FhirVersion) 
     ];
     let caption = tr(Msg::DashboardRecentChanges);
     let (body, count) = match activity {
-        Ok(changes) if changes.is_empty() => {
-            (list_empty(tr(Msg::DashboardNothingWritten), None), Some(0))
-        }
+        Ok(changes) if changes.is_empty() => (
+            list_empty(tr(Msg::DashboardNothingWritten), None),
+            Some(shown_of(0, 0)),
+        ),
         Ok(changes) => {
             let rows = changes
                 .iter()
@@ -333,7 +335,10 @@ fn recent_card(activity: &Result<Vec<Change>, FhirError>, version: FhirVersion) 
                 body: Body::Rows(rows),
             })
             .into_any();
-            (table, Some(changes.len().min(ACTIVITY_SHOWN)))
+            (
+                table,
+                Some(shown_of(changes.len().min(ACTIVITY_SHOWN), changes.len())),
+            )
         }
         Err(error) => (failure(error), None),
     };
@@ -341,7 +346,7 @@ fn recent_card(activity: &Result<Vec<Change>, FhirError>, version: FhirVersion) 
         <div id="recent-changes">
             {list_card(ListCard {
                 title: caption.clone(),
-                count: count.map(|count| u64::try_from(count).unwrap_or(u64::MAX)),
+                count,
                 order: None,
                 tabs: None,
                 actions: None,
@@ -351,6 +356,20 @@ fn recent_card(activity: &Result<Vec<Change>, FhirError>, version: FhirVersion) 
         </div>
     }
     .into_any()
+}
+
+/// A card's count: every item when it shows all `total`, else the `shown`
+/// first of them.
+fn shown_of(shown: usize, total: usize) -> HeadingCount {
+    let number = |count: usize| u64::try_from(count).unwrap_or(u64::MAX);
+    if shown < total {
+        HeadingCount::Shown {
+            shown: number(shown),
+            total: number(total),
+        }
+    } else {
+        HeadingCount::All(number(total))
+    }
 }
 
 /// The card of the first code systems, leading to the whole listing.
@@ -403,13 +422,16 @@ fn systems_card(
                 body: Body::Rows(rows),
             })
             .into_any();
-            (table, Some(cards.len()))
+            (
+                table,
+                Some(shown_of(cards.len().min(PREVIEW_ROWS), cards.len())),
+            )
         }
         Err(error) => (failure(error), None),
     };
     list_card(ListCard {
         title: caption,
-        count: count.map(|count| u64::try_from(count).unwrap_or(u64::MAX)),
+        count,
         order: None,
         tabs: None,
         actions: Some(card_action(

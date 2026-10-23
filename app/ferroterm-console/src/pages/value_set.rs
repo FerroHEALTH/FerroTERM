@@ -23,6 +23,7 @@ use ferrohealth_ui::view::coding::{Coding, Layout, coding};
 use ferrohealth_ui::view::surface::{
     SectionHead, card_action, definitions, or_none, panel_section, panel_sections, section_intro,
 };
+use ferrohealth_ui::view::template::list::HeadingCount;
 use ferrohealth_ui::widget::action_menu::{Act, Action, Item, Menu};
 use leptos::prelude::*;
 use leptos_router::hooks::use_params_map;
@@ -188,7 +189,7 @@ fn actions(
             )
         });
     let expand = Action::new(
-        Some(Glyph::LIST_CHECKS),
+        Some(Glyph::LIST_TREE),
         tr(Msg::ValueSetExpandAll),
         Act::Link(expansion_link(url, request.version)),
     );
@@ -420,7 +421,7 @@ fn definition(request: &Request, read: &Read, source: Source) -> AnyView {
         {panel_section(
             Some(SectionHead {
                 title: tr(Msg::ValueSetSelects),
-                count: Some(count),
+                count: Some(HeadingCount::All(count)),
                 actions: None,
             }),
             selects,

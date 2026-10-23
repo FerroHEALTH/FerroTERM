@@ -143,6 +143,16 @@ pub(crate) fn param_in(query: &str, name: &str) -> Option<String> {
         .map(|(_, value)| value.into_owned())
 }
 
+/// Every value of the parameter `name` in `query`, in the order it carries
+/// them.
+#[must_use]
+pub(crate) fn params_in(query: &str, name: &str) -> Vec<String> {
+    url::form_urlencoded::parse(query.as_bytes())
+        .filter(|(key, _)| key == name)
+        .map(|(_, value)| value.into_owned())
+        .collect()
+}
+
 /// The request the page tree provides, read once at its root.
 #[must_use]
 pub(crate) fn request() -> Request {

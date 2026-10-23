@@ -18,7 +18,7 @@ use crate::request::request;
 use crate::shell::{PRODUCT, VERSION};
 
 /// The library the console is drawn with, at the version its manifest pins.
-pub(crate) const FERROUI: &str = "ferrohealth-ui 0.3.2";
+pub(crate) const FERROUI: &str = "ferrohealth-ui 0.3.3";
 
 /// The id of the self-description's Copy button.
 const COPY_ID: &str = "about-copy";
@@ -72,6 +72,7 @@ pub(crate) fn AboutPage() -> impl IntoView {
             header: Header {
                 title: tr(Msg::AboutTitle).into(),
                 subtitle: Some(tr(Msg::AboutSubtitle).into()),
+                subtitle_view: None,
                 crumbs: Vec::new(),
                 mono: false,
                 badge: None,
@@ -122,8 +123,9 @@ mod tests {
                 .expect("the workspace manifest reads");
         let pin = manifest
             .lines()
-            .find_map(|line| line.strip_prefix("ferrohealth-ui = \"="))
-            .and_then(|rest| rest.strip_suffix('"'))
+            .find_map(|line| line.strip_prefix("ferrohealth-ui = "))
+            .and_then(|rest| rest.split_once("\"=").map(|(_, pinned)| pinned))
+            .and_then(|pinned| pinned.split_once('"').map(|(version, _)| version))
             .expect("the manifest pins ferrohealth-ui exactly");
         assert_eq!(format!("ferrohealth-ui {pin}"), FERROUI);
     }

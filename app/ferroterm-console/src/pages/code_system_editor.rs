@@ -18,6 +18,7 @@ use ferrohealth_ui::view::load_report::{Arrival, LoadReport, Outcome, load_repor
 use ferrohealth_ui::view::surface::{
     SectionHead, card_action, panel_section, panel_sections_card, section_intro, stack,
 };
+use ferrohealth_ui::view::template::list::HeadingCount;
 use ferrohealth_ui::widget::repeat::{Fields, Repeat, RepeatAdd, RepeatRow, RowEnd, repeat};
 use leptos::prelude::*;
 
@@ -497,6 +498,7 @@ fn property_row(key: &str, code: &str, kind: &str, end: RowEnd) -> RepeatRow {
     .into_any();
     RepeatRow {
         key: key.to_owned(),
+        heading: None,
         fields,
         end,
         after: None,
@@ -536,7 +538,7 @@ fn properties(draft: &Draft) -> AnyView {
     panel_section(
         Some(SectionHead {
             title: tr(Msg::EditorDeclaredProperties),
-            count: Some(count),
+            count: Some(HeadingCount::All(count)),
             actions: None,
         }),
         repeat(Repeat {
@@ -679,7 +681,7 @@ fn concepts(draft: &Draft, opened: &Draft) -> AnyView {
     panel_section(
         Some(SectionHead {
             title: caption.clone(),
-            count: Some(count),
+            count: Some(HeadingCount::All(count)),
             actions: None,
         }),
         view! {

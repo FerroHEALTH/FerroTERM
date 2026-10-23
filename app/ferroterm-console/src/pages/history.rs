@@ -26,6 +26,7 @@ use ferrohealth_ui::view::form::{Field, SELECT, action_field, field_flow};
 use ferrohealth_ui::view::notice::{Announce, notice};
 use ferrohealth_ui::view::refusal::refusal;
 use ferrohealth_ui::view::surface::{SectionHead, panel_section, panel_sections, section_intro};
+use ferrohealth_ui::view::template::list::HeadingCount;
 use ferrohealth_ui::widget::action_menu::{Act, Action};
 use leptos::prelude::*;
 use serde_json::Value;
@@ -61,32 +62,6 @@ const REVISION_FIELD: &str = "revision";
 
 /// The posted field naming the revision the reader saw as current.
 const CURRENT_FIELD: &str = "current";
-
-/// The id of each row's confirmation dialog, by its place among the
-/// earlier revisions; the list holds at most this many.
-// TODO(#810): name each dialog by its revision once FerroUI's Confirmation takes an owned id.
-const RESTORE_DIALOGS: [&str; 20] = [
-    "restore-0",
-    "restore-1",
-    "restore-2",
-    "restore-3",
-    "restore-4",
-    "restore-5",
-    "restore-6",
-    "restore-7",
-    "restore-8",
-    "restore-9",
-    "restore-10",
-    "restore-11",
-    "restore-12",
-    "restore-13",
-    "restore-14",
-    "restore-15",
-    "restore-16",
-    "restore-17",
-    "restore-18",
-    "restore-19",
-];
 
 /// What a posted restore came to, when the page was posted one.
 enum Restored {
@@ -348,7 +323,6 @@ fn revisions(request: &Request, opened: &Opened, writable: bool) -> AnyView {
     let made = columns.get(2).cloned();
     let act = columns.get(3).cloned();
     let subject = &opened.subject;
-    let mut dialogs = RESTORE_DIALOGS.iter();
     let rows = opened
         .versions
         .iter()
@@ -367,9 +341,7 @@ fn revisions(request: &Request, opened: &Opened, writable: bool) -> AnyView {
                 .as_deref()
                 .map(|raw| relative(raw, now));
             let restore = (!is_current && writable && version.resource.is_some())
-                .then(|| dialogs.next())
-                .flatten()
-                .map(|id| restore_control(request, subject, version, &current, id));
+                .then(|| restore_control(request, subject, version, &current));
             view! {
                 <tr>
                     {title_cell(None, name, None)}
@@ -396,7 +368,7 @@ fn revisions(request: &Request, opened: &Opened, writable: bool) -> AnyView {
     panel_section(
         Some(SectionHead {
             title: caption.clone(),
-            count: Some(count),
+            count: Some(HeadingCount::All(count)),
             actions: None,
         }),
         view! {
@@ -418,13 +390,15 @@ fn restore_control(
     subject: &Subject,
     version: &Version,
     current: &str,
-    id: &'static str,
 ) -> AnyView {
+    // NOTE: https://hl7.org/fhir/R4B/datatypes.html#id: `meta.versionId` is an
+    // `id`, `[A-Za-z0-9\-\.]{1,64}`, so it names an HTML id as it stands.
+    let id = format!("restore-{}", version.id);
     let trigger = action_button(
         Action::new(
             Some(Glyph::ROTATE_CCW),
             tr(Msg::HistoryRestore),
-            Act::Dialog(id.to_owned()),
+            Act::Dialog(id.clone()),
         ),
         Variant::Ghost,
     );
@@ -449,7 +423,7 @@ fn restore_control(
     );
     let dialog = confirm_dialog(
         Confirmation {
-            id,
+            id: id.into(),
             title: tr_with(
                 Msg::HistoryRestoreQuestion,
                 &[("revision", version.id.clone().into())],

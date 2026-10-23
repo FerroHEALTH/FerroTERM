@@ -21,7 +21,7 @@ Stop and report on the first hard failure; run the cheap gates first.
 
 FerroUI leads the console's UI, and its gates hold every component the
 console draws before a release reaches the pin (`ferrohealth-ui` in the
-root `Cargo.toml`, `=0.3.2` today):
+root `Cargo.toml`, `=0.3.3` today):
 
 - the library gates of FerroUI's `.claude/rules/leptos-ui.md` §10 (fmt,
   clippy on the host and wasm32, nextest, the gallery journeys and

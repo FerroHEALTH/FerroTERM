@@ -23,6 +23,7 @@ use ferrohealth_ui::view::mapping::{Mapping, Relationship, mapping_columns, mapp
 use ferrohealth_ui::view::surface::{
     SectionHead, definitions, or_none, panel_section, panel_sections, section_intro,
 };
+use ferrohealth_ui::view::template::list::HeadingCount;
 use ferrohealth_ui::widget::action_menu::{Act, Action, Item, Menu};
 use leptos::prelude::*;
 use leptos_router::hooks::use_params_map;
@@ -94,7 +95,7 @@ fn actions(
         translate_href.push_str(&percent(&system));
     }
     let translate = Action::new(
-        Some(Glyph::ROUTE),
+        Some(Glyph::CORNER_DOWN_RIGHT),
         tr(Msg::ConceptMapTranslate),
         Act::Link(translate_href),
     );
@@ -266,7 +267,7 @@ fn mappings(
     panel_sections(panel_section(
         Some(SectionHead {
             title: caption.clone(),
-            count: Some(count),
+            count: Some(HeadingCount::All(count)),
             actions: None,
         }),
         data_table(DataTable {

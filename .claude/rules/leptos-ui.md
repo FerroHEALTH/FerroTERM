@@ -15,23 +15,23 @@ before any console change:
 - the consumer guide, [`docs/consoles.md`](https://github.com/FerroHEALTH/FerroUI/blob/main/docs/consoles.md):
   how a console takes the library, what it keeps local, how it moves to a
   new release;
-- the component rules, [`.claude/rules/leptos-ui.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.3.2/.claude/rules/leptos-ui.md):
+- the component rules, [`.claude/rules/leptos-ui.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.3.3/.claude/rules/leptos-ui.md):
   the mandates (§0: Rust only, no inline style, no server function in the
   library, no browser storage, no patient identifier in a URL), the
   four-layer interaction contract (§1), reactivity, views, forms, tables and
   paging, accessibility, tokens and themes, icons, the bundle, the catalogs,
   the book's rules and the island rules;
-- the crate discipline, [`crates/ferrohealth-ui/CLAUDE.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.3.2/crates/ferrohealth-ui/CLAUDE.md):
+- the crate discipline, [`crates/ferrohealth-ui/CLAUDE.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.3.3/crates/ferrohealth-ui/CLAUDE.md):
   the interaction contract, islands mode and the list of ready islands;
-- the reviewed design, [`design/README.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.3.2/design/README.md),
-  [`design/COMPONENTS.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.3.2/design/COMPONENTS.md)
+- the reviewed design, [`design/README.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.3.3/design/README.md),
+  [`design/COMPONENTS.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.3.3/design/COMPONENTS.md)
   (the component IDs such as R9, F13 and M1 to M6, the family rules, the
   page templates) and the console's mockup under
-  [`design/consoles/ferroterm/`](https://github.com/FerroHEALTH/FerroUI/tree/v0.3.2/design/consoles/ferroterm).
+  [`design/consoles/ferroterm/`](https://github.com/FerroHEALTH/FerroUI/tree/v0.3.3/design/consoles/ferroterm).
 
 **The pin decides the version you read.** The console pins `ferrohealth-ui
-= "=0.3.2"` (root `Cargo.toml`), so every FerroUI document above is read at
-the tag `v0.3.2`. FerroUI's `design/` is the only design source: a design
+= "=0.3.3"` (root `Cargo.toml`), so every FerroUI document above is read at
+the tag `v0.3.3`. FerroUI's `design/` is the only design source: a design
 folder anywhere else is stale and never synced from.
 
 **Nothing FerroUI has or should have is built here.** A missing component,
@@ -53,11 +53,10 @@ for a Leptos question FerroUI does not settle is the official Leptos book
   chosen by compilation target, never by a Cargo feature: the host half
   links `leptos` with `islands`, `ssr` and `nonce`, the wasm32 half with
   `islands` and `hydrate`. cargo-leptos 0.3.11 builds it
-  (`scripts/release/console-site.sh`), always with `--split`: FerroUI's lazy
-  islands (the tree, the date pickers) leave an import of
-  `__wasm_split_placeholder__` in the glue of a build without it, and then no
-  island hydrates on any page (FerroHEALTH/FerroUI#331). Every lane builds
-  the site through that script. The terminology server serves no UI file.
+  (`scripts/release/console-site.sh`) with `--split`, and the workspace turns
+  on `ferrohealth-ui`'s `split` feature to match, so FerroUI's lazy islands
+  (the tree, the date pickers) load as chunks of their own
+  (FerroHEALTH/FerroUI#331). Every lane builds the site through that script. The terminology server serves no UI file.
 - **The browser half carries islands only:** FerroUI's (the theme menu, the
   copy buttons, the tree, the toasts, the repeat rows) and the console's own
   keyboard shortcuts (`crate::islands`). Every page module compiles for the

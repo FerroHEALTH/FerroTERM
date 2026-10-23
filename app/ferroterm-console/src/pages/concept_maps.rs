@@ -20,7 +20,7 @@ use crate::fhir::CONCEPT_MAP;
 use crate::fhir::concept_map::PublishedConceptMap;
 use crate::fhir::searchset::SearchFilter;
 use crate::locale::{Msg, message, tr, tr_with};
-use crate::pages::listing::{Frame, ListState, NAME_COLUMN, counted, status_badge};
+use crate::pages::listing::{Frame, ListState, NAME_COLUMN, counted, status_state};
 use crate::pages::parts::{Source, failure, heading, loaded, name_of, system_names};
 use crate::request::{Request, request};
 use crate::routes::{CONCEPT_MAP_EDITOR_PATH, CONCEPT_MAPS_PATH, resource_link, ui_link, ui_path};
@@ -161,7 +161,7 @@ fn listing(
                         {cell(
                             mappings,
                             tr_with(Msg::ConceptMapsMappingCount, &[("count", count.into())]),
-                        )} {cell(status, status_badge(map.status()))}
+                        )} {cell(status, status_state(map.status()))}
                     </tr>
                 }
             })

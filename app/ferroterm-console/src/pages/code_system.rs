@@ -21,6 +21,7 @@ use ferrohealth_ui::view::notice::{Announce, notice};
 use ferrohealth_ui::view::surface::{
     SectionHead, definitions, or_none, panel_section, panel_sections, section_intro,
 };
+use ferrohealth_ui::view::template::list::HeadingCount;
 use ferrohealth_ui::widget::action_menu::{Act, Action, Item, Menu};
 use leptos::prelude::*;
 use leptos_router::hooks::use_params_map;
@@ -432,7 +433,9 @@ fn declared_properties(published: &PublishedCodeSystem) -> Option<AnyView> {
         panel_section(
             Some(SectionHead {
                 title: caption.clone(),
-                count: Some(u64::try_from(declared.len()).unwrap_or(u64::MAX)),
+                count: Some(HeadingCount::All(
+                    u64::try_from(declared.len()).unwrap_or(u64::MAX),
+                )),
                 actions: None,
             }),
             table,
