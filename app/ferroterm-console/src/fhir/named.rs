@@ -371,4 +371,58 @@ mod tests {
         assert_eq!(NamedSearch::default().choices(), Vec::<Choice>::new());
         assert!(NamedSearch::default().names().is_empty());
     }
+
+    /// A searchset as the server answers `_elements=url,name,title,version`.
+    const LISTING: &str = r#"{"resourceType":"Bundle","type":"searchset","entry":[
+        {"resource":{"resourceType":"ValueSet","id":"b","url":"https://terminology.example/b",
+          "name":"Bravo","status":"active","meta":{"versionId":"3"}}},
+        {"resource":{"resourceType":"ValueSet","id":"a","url":"https://terminology.example/a",
+          "title":"  ","name":"alpha","version":" 1.0 ","status":"draft"}},
+        {"resource":{"resourceType":"ValueSet","id":"c","url":"https://terminology.example/c",
+          "meta":{"versionId":" "}}},
+        {"search":{"mode":"outcome"}}]}"#;
+
+    #[test]
+    fn a_listing_names_each_resource_by_title_else_name_else_canonical_in_folded_order() {
+        let search: NamedSearch = serde_json::from_str(LISTING).expect("a searchset");
+        let listed = search.listed();
+        assert_eq!(
+            vec!["alpha", "Bravo", "https://terminology.example/c"],
+            listed
+                .iter()
+                .map(|row| row.label.as_str())
+                .collect::<Vec<_>>(),
+            "a blank title gives way to the name, and case does not decide the order"
+        );
+        assert_eq!(
+            Listed {
+                id: String::from("a"),
+                url: String::from("https://terminology.example/a"),
+                label: String::from("alpha"),
+                version: Some(String::from("1.0")),
+                status: Some(String::from("draft")),
+                stored: None,
+            },
+            listed[0]
+        );
+    }
+
+    #[test]
+    fn only_a_resource_written_through_the_api_lists_a_stored_version() {
+        let search: NamedSearch = serde_json::from_str(LISTING).expect("a searchset");
+        let stored: Vec<Option<String>> =
+            search.listed().into_iter().map(|row| row.stored).collect();
+        assert_eq!(
+            vec![None, Some(String::from("3")), None],
+            stored,
+            "a blank versionId is no version"
+        );
+    }
+
+    #[test]
+    fn meta_names_the_stored_version_only_when_it_carries_one() {
+        let written: Meta = serde_json::from_str(r#"{"versionId":"7"}"#).expect("meta");
+        assert_eq!(Some("7"), written.stored());
+        assert_eq!(None, Meta::default().stored());
+    }
 }

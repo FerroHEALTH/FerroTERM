@@ -577,4 +577,47 @@ mod tests {
         assert_eq!(screen_link("ValueSet", system, "", FhirVersion::R4), None);
         assert_eq!(screen_link("Patient", system, "p", FhirVersion::R4), None);
     }
+
+    /// The `back` a link carries, decoded as the route reads it.
+    fn back_of(link: &str) -> String {
+        let (_, query) = link.split_once('?').expect("a query");
+        crate::request::param_in(query, BACK_PARAM).expect("a back parameter")
+    }
+
+    #[test]
+    fn a_page_path_is_rooted_and_drops_empty_segments() {
+        assert_eq!(ui_path(""), under("/"), "the dashboard is the root page");
+        assert_eq!(ui_path("/systems//detail/"), under("/systems/detail"));
+        assert_eq!(
+            ui_path("preferences/reading"),
+            under("/preferences/reading")
+        );
+    }
+
+    #[test]
+    fn the_sign_in_link_carries_the_page_to_return_to_encoded_whole() {
+        let back = "/systems?q=a&fhir=r4";
+        let link = sign_in_link(back);
+        assert_eq!(
+            link,
+            under("/auth/sign-in?back=%2Fsystems%3Fq%3Da%26fhir%3Dr4"),
+            "the page's own query cannot leak into the sign-in page's"
+        );
+        assert_eq!(back_of(&link), back);
+        assert_eq!(
+            crate::post::return_path(&back_of(&link)),
+            Some(back),
+            "the sign-in returns to a page the console accepts as its own"
+        );
+    }
+
+    #[test]
+    fn a_version_choice_keeps_the_page_and_reads_it_through_the_version() {
+        let link = version_choice(&under("/systems"), "q=a&fhir=r4", FhirVersion::R5);
+        assert!(
+            link.starts_with(&under("/fhir-version?fhir=r5&back=")),
+            "{link}"
+        );
+        assert_eq!(back_of(&link), under("/systems?q=a&fhir=r5"));
+    }
 }

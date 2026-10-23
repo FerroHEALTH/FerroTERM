@@ -161,7 +161,179 @@ pub(crate) fn request() -> Request {
 
 #[cfg(test)]
 mod tests {
-    use super::param_in;
+    use leptos::prelude::{Owner, provide_context};
+    use secrecy::SecretString;
+
+    use super::{Request, param_in, params_in, request};
+    use crate::auth::scopes::Letter;
+    use crate::config::{Config, Oidc};
+    use crate::fhir::version::FhirVersion;
+    use crate::server::ConsoleState;
+    use crate::session::SignedIn;
+
+    /// The console's state, reached at `https://tx.example.org/`, with a
+    /// sign-in configured when `sign_in`.
+    fn state(sign_in: bool) -> ConsoleState {
+        let mut config = Config::default();
+        config.ferroterm.public_url = Some(String::from("https://tx.example.org/"));
+        if sign_in {
+            config.oidc = Some(Oidc {
+                issuer: String::from("https://idp.example"),
+                authorization_endpoint: String::from("https://idp.example/authorize"),
+                token_endpoint: String::from("https://idp.example/token"),
+                jwks_uri: String::from("https://idp.example/jwks"),
+                client_id: String::from("ferroterm-console"),
+                redirect_uri: String::from("http://127.0.0.1:3000/auth/callback"),
+                ..Oidc::default()
+            });
+        }
+        ConsoleState::new(config.resolve().expect("the settings resolve")).expect("the clients")
+    }
+
+    /// The request the server reads for `uri` carrying `cookies`, under
+    /// `state`.
+    fn read(state: Option<&ConsoleState>, uri: &str, cookies: &[&str]) -> Request {
+        Owner::new().with(|| {
+            if let Some(state) = state {
+                provide_context(state.clone());
+            }
+            let mut builder = http::Request::get(uri);
+            for cookie in cookies {
+                builder = builder.header(http::header::COOKIE, *cookie);
+            }
+            let (parts, ()) = builder.body(()).expect("a request").into_parts();
+            provide_context(parts);
+            Request::read()
+        })
+    }
+
+    #[test]
+    fn the_page_is_read_from_the_address_and_returns_to_itself() {
+        let state = state(false);
+        let page = read(Some(&state), "/systems?q=%20colours%20&q=other", &[]);
+        assert_eq!("/systems", page.path);
+        assert_eq!("q=%20colours%20&q=other", page.query);
+        assert_eq!("/systems?q=%20colours%20&q=other", page.back());
+        assert_eq!(Some(String::from(" colours ")), page.param("q"));
+        assert_eq!("colours", page.text("q"), "the first value, trimmed");
+        assert_eq!("", page.text("absent"));
+        assert_eq!("/about", read(Some(&state), "/about", &[]).back());
+    }
+
+    #[test]
+    fn the_address_names_the_fhir_version_before_any_preference() {
+        let state = state(false);
+        let page = read(
+            Some(&state),
+            "/systems?fhir=r5",
+            &["__Host-ferroterm_console_session-fhir=r4b; __Host-ferroterm_console_fhir=r6"],
+        );
+        assert_eq!(FhirVersion::R5, page.version);
+        assert!(page.version_named);
+    }
+
+    #[test]
+    fn the_session_s_version_wins_over_the_reader_s_default() {
+        let state = state(false);
+        let page = read(
+            Some(&state),
+            "/systems",
+            &[
+                "__Host-ferroterm_console_fhir=r6",
+                "__Host-ferroterm_console_session-fhir=r4b",
+            ],
+        );
+        assert_eq!(FhirVersion::R4B, page.version);
+        assert!(!page.version_named);
+        let default_only = read(
+            Some(&state),
+            "/systems",
+            &["__Host-ferroterm_console_fhir=r6"],
+        );
+        assert_eq!(FhirVersion::R6, default_only.version);
+    }
+
+    #[test]
+    fn a_preference_cookie_without_the_host_prefix_is_not_read_from_a_secure_console() {
+        let state = state(false);
+        let page = read(Some(&state), "/systems", &["ferroterm_console_fhir=r6"]);
+        assert_eq!(
+            read(Some(&state), "/systems", &[]).version,
+            page.version,
+            "a cookie a sibling host could set is ignored"
+        );
+    }
+
+    #[test]
+    fn the_root_and_the_client_are_the_address_readers_reach_the_server_at() {
+        let state = state(false);
+        let page = read(Some(&state), "/", &[]);
+        assert_eq!("https://tx.example.org", page.root);
+        assert_eq!(
+            "https://tx.example.org/r4/metadata",
+            page.client.metadata_url(FhirVersion::R4)
+        );
+    }
+
+    #[test]
+    fn the_page_offers_a_sign_in_only_when_a_provider_is_configured() {
+        assert!(read(Some(&state(true)), "/", &[]).sign_in);
+        assert!(!read(Some(&state(false)), "/", &[]).sign_in);
+    }
+
+    #[test]
+    fn a_signed_in_reader_is_named_and_may_do_what_the_token_grants() {
+        let state = state(true);
+        let id = state
+            .sessions()
+            .establish(SignedIn {
+                access_token: SecretString::from("synthetic-access-token"),
+                expires_in: None,
+                refresh_token: None,
+                id_token: None,
+                operator: Some(String::from("Synthetic Operator")),
+                scopes: vec![String::from("user/CodeSystem.cu")],
+            })
+            .expect("room");
+        let cookie = format!("__Host-ferroterm_console_session={}", id.as_str());
+        let page = read(Some(&state), "/", &[&cookie]);
+        assert_eq!(Some(String::from("Synthetic Operator")), page.session.who());
+        assert!(page.can("CodeSystem", Letter::Update));
+        assert!(!page.can("ValueSet", Letter::Update));
+        let visitor = read(Some(&state), "/", &[]);
+        assert!(!visitor.session.signed_in());
+        assert!(!visitor.can("CodeSystem", Letter::Update));
+    }
+
+    #[test]
+    fn a_page_drawn_with_no_server_context_reads_the_defaults() {
+        let page = Owner::new().with(Request::read);
+        assert_eq!("/", page.path);
+        assert_eq!("", page.query);
+        assert_eq!("", page.root);
+        assert!(!page.sign_in);
+        assert!(!page.session.signed_in());
+    }
+
+    #[test]
+    fn the_page_tree_reads_the_request_its_root_provided() {
+        let state = state(false);
+        let provided = read(Some(&state), "/expand?fhir=r4", &[]);
+        let path = Owner::new().with(|| {
+            provide_context(provided.clone());
+            request().path
+        });
+        assert_eq!("/expand", path);
+    }
+
+    #[test]
+    fn every_value_of_a_repeated_parameter_is_read_in_order() {
+        assert_eq!(
+            vec![String::from("a b"), String::from("c")],
+            params_in("system=a+b&other=x&system=c", "system")
+        );
+        assert_eq!(Vec::<String>::new(), params_in("other=x", "system"));
+    }
 
     #[test]
     fn a_parameter_is_read_decoded_and_the_first_wins() {

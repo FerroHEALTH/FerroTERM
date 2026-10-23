@@ -432,4 +432,58 @@ mod tests {
             "the viewer carries the fields it renders and nothing more"
         );
     }
+
+    #[test]
+    fn the_header_facts_and_declared_properties_are_read_from_the_resource() {
+        let search = parse(
+            r#"{"entry":[{"resource":{"resourceType":"CodeSystem","id":"colours",
+                "url":"https://terminology.example/colours","name":"Colours",
+                "date":"2031-02-03","caseSensitive":false,"hierarchyMeaning":"part-of",
+                "meta":{"versionId":"4"},
+                "property":[{"code":"hue","type":"string","description":"The hue.",
+                  "uri":"https://terminology.example/hue"}]}}]}"#,
+        );
+        let published = search.published();
+        let resource = published.first().expect("the bundle carries one match");
+        assert_eq!(Some("colours"), resource.id());
+        assert_eq!(Some("Colours"), resource.name());
+        assert_eq!(
+            Some("Colours"),
+            resource.title(),
+            "a system with no title is read by its name"
+        );
+        assert_eq!(Some("2031-02-03"), resource.date());
+        assert_eq!(Some(false), resource.case_sensitive());
+        assert_eq!(Some("part-of"), resource.hierarchy_meaning());
+        assert_eq!(
+            Some("4"),
+            resource.stored(),
+            "a system written through the API names the version the server holds"
+        );
+        assert_eq!(
+            vec![DeclaredProperty {
+                code: Some(String::from("hue")),
+                kind: Some(String::from("string")),
+                description: Some(String::from("The hue.")),
+                uri: Some(String::from("https://terminology.example/hue")),
+            }],
+            resource.properties()
+        );
+    }
+
+    #[test]
+    fn a_loaded_system_has_no_stored_version_and_blank_facts_read_as_absent() {
+        let search = parse(
+            r#"{"entry":[{"resource":{"resourceType":"CodeSystem","id":" ",
+                "url":"https://terminology.example/loaded","name":" ","date":""}}]}"#,
+        );
+        let published = search.published();
+        let resource = published.first().expect("the bundle carries one match");
+        assert_eq!(None, resource.stored());
+        assert_eq!(None, resource.id());
+        assert_eq!(None, resource.name());
+        assert_eq!(None, resource.date());
+        assert_eq!(None, resource.case_sensitive());
+        assert_eq!(Vec::<DeclaredProperty>::new(), resource.properties());
+    }
 }

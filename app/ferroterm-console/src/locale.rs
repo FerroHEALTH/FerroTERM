@@ -134,7 +134,7 @@ mod tests {
     use ferrohealth_ui::i18n::Locale;
     use fluent_templates::fluent_bundle::FluentValue;
 
-    use super::{Msg, catalog, tr_in};
+    use super::{Msg, catalog, languages, offered, tr_in};
 
     fluent_templates::static_loader! {
         static THROWAWAY = {
@@ -335,5 +335,21 @@ mod tests {
             "Concepts 1 to 10 of 12,345.", words,
             "a number is grouped by the catalog's mark"
         );
+    }
+
+    #[test]
+    fn the_languages_offered_are_the_catalog_directories_and_no_others() {
+        let shipped = catalog_directories(&Path::new(env!("CARGO_MANIFEST_DIR")).join("locales"));
+        assert_eq!(
+            shipped,
+            languages().iter().map(Locale::tag).collect::<Vec<_>>(),
+            "a language joins as one catalog directory"
+        );
+        for tag in &shipped {
+            assert!(offered(tag), "{tag}");
+        }
+        for tag in ["", "qaa", "xx", "EN-zz"] {
+            assert!(!offered(tag), "{tag} has no catalog");
+        }
     }
 }

@@ -623,6 +623,45 @@ mod tests {
     }
 
     #[test]
+    fn a_sign_in_remembers_the_page_to_return_to_through_the_pool() {
+        let sessions = Sessions::new(settings());
+        assert_eq!(None, sign_in().back(), "a fresh sign-in returns nowhere");
+        let pending = sign_in().returning_to(Some(String::from("/systems?fhir=r4")));
+        let state = pending.state().to_owned();
+        let id = sessions.begin(pending).expect("usable");
+        let taken = sessions
+            .take_pending(&id)
+            .expect("usable")
+            .expect("pending");
+        assert_eq!(Some("/systems?fhir=r4"), taken.back());
+        assert!(taken.answers(&state), "the page changes nothing else");
+    }
+
+    #[test]
+    fn the_operator_and_scopes_are_read_only_from_a_live_session() {
+        let sessions = Sessions::new(settings());
+        let id = sessions.establish(signed_in()).expect("room");
+        assert_eq!(
+            Some(String::from("Synthetic Operator")),
+            sessions.operator(&id).expect("usable")
+        );
+        assert_eq!(
+            Some(vec![String::from("user/CodeSystem.cud")]),
+            sessions.scopes(&id).expect("usable")
+        );
+        let unknown = SessionId::from_cookie("not-a-session");
+        assert_eq!(None, sessions.operator(&unknown).expect("usable"));
+        assert_eq!(None, sessions.scopes(&unknown).expect("usable"));
+        let idle = Sessions::new(SessionSettings {
+            idle_timeout: Duration::ZERO,
+            ..settings()
+        });
+        let id = idle.establish(signed_in()).expect("room");
+        assert_eq!(None, idle.operator(&id).expect("usable"));
+        assert_eq!(None, idle.scopes(&id).expect("usable"));
+    }
+
+    #[test]
     fn a_full_sign_in_pool_drops_its_oldest_and_never_touches_the_sessions() {
         let sessions = Sessions::new(settings());
         let operator = sessions.establish(signed_in()).expect("room for a session");

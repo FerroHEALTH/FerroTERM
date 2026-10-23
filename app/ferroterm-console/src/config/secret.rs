@@ -58,3 +58,94 @@ fn read(key: &str, path: &Path) -> Result<SecretString, Error> {
     }
     Ok(SecretString::from(value))
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use secrecy::{ExposeSecret, SecretString};
+
+    use super::resolve;
+    use crate::config::error::Error;
+
+    /// A secret file holding `text` in a fresh directory.
+    fn secret_file(text: &str) -> (tempfile::TempDir, std::path::PathBuf) {
+        let dir = tempfile::tempdir().expect("a directory");
+        let path = dir.path().join("client_secret");
+        std::fs::write(&path, text).expect("the file is written");
+        (dir, path)
+    }
+
+    #[test]
+    fn an_inline_secret_is_taken_as_it_stands() {
+        let inline = SecretString::from("inline-secret");
+        let resolved = resolve("oidc.client_secret", Some(&inline), None).expect("resolved");
+        assert_eq!(
+            Some("inline-secret"),
+            resolved.as_ref().map(ExposeSecret::expose_secret)
+        );
+    }
+
+    #[test]
+    fn a_secret_file_is_read_and_trimmed() {
+        let (_dir, path) = secret_file("  file-secret\n");
+        let resolved = resolve("oidc.client_secret", None, Some(&path)).expect("resolved");
+        assert_eq!(
+            Some("file-secret"),
+            resolved.as_ref().map(ExposeSecret::expose_secret)
+        );
+    }
+
+    #[test]
+    fn no_secret_at_all_is_none() {
+        assert!(
+            resolve("oidc.client_secret", None, None)
+                .expect("resolved")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn a_secret_set_both_inline_and_in_a_file_is_refused_by_its_key() {
+        let (_dir, path) = secret_file("file-secret");
+        let inline = SecretString::from("inline-secret");
+        let error = resolve("oidc.client_secret", Some(&inline), Some(&path))
+            .expect_err("both are refused");
+        assert!(
+            matches!(&error, Error::Conflict { key } if key == "oidc.client_secret"),
+            "{error:?}"
+        );
+    }
+
+    #[test]
+    fn a_secret_file_that_cannot_be_read_is_refused_by_its_file_key() {
+        let missing = Path::new("/nonexistent/ferroterm-console/client_secret");
+        let error = resolve("oidc.client_secret", None, Some(missing)).expect_err("refused");
+        assert!(
+            matches!(&error, Error::Secret { key, path, .. }
+                if key == "oidc.client_secret_file" && path == missing),
+            "{error:?}"
+        );
+    }
+
+    #[test]
+    fn a_secret_file_of_whitespace_alone_is_refused() {
+        let (_dir, path) = secret_file(" \n\t\n");
+        let error = resolve("oidc.client_secret", None, Some(&path)).expect_err("refused");
+        assert!(
+            matches!(&error, Error::EmptySecret { key, .. } if key == "oidc.client_secret_file"),
+            "{error:?}"
+        );
+    }
+
+    #[test]
+    fn a_refusal_never_shows_the_secret() {
+        let (_dir, path) = secret_file("file-secret");
+        let inline = SecretString::from("inline-secret");
+        let error = resolve("oidc.client_secret", Some(&inline), Some(&path))
+            .expect_err("both are refused");
+        let shown = format!("{error} {error:?}");
+        assert!(!shown.contains("inline-secret"), "{shown}");
+        assert!(!shown.contains("file-secret"), "{shown}");
+    }
+}

@@ -4,7 +4,7 @@
 //! The one integration-test binary for `ferroterm-console`; one module per
 //! topic.
 //!
-//! The sign-in tests drive the console's router with
+//! The service, form and sign-in tests drive the console's router with
 //! `tower::ServiceExt::oneshot` against a `wiremock` OpenID Provider whose
 //! signing key is generated per run, so no private key is committed.
 #![allow(
@@ -15,8 +15,11 @@
     reason = "test assertions"
 )]
 
+mod command;
 mod exchange;
+mod forms;
 mod logout;
 mod provider;
 mod refresh;
+mod service;
 mod sign_in;
