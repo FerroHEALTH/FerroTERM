@@ -30,7 +30,7 @@ commands (git diff, git log, `git -C <FerroUI checkout> show`, grep, dry-run
 clippy).
 
 **First, read FerroUI, which leads the console's UI.** The console pins
-`ferrohealth-ui` in the root `Cargo.toml` (`=0.3.4` today, tag `v0.3.4`).
+`ferrohealth-ui` in the root `Cargo.toml` (`=0.3.5` today, tag `v0.3.5`).
 Read, from a FerroUI checkout or from GitHub (FerroHEALTH/FerroUI):
 
 - `.claude/rules/leptos-ui.md` at the tag matching the pin: the component

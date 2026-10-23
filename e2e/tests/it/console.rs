@@ -730,6 +730,49 @@ async fn the_configuration_file_line_opens_how_configuration_works() {
     outcome.expect("the journey ran and the browser session ended cleanly");
 }
 
+/// Configuration's title row offers More, and its one item copies the path
+/// of the file the console was started with, shown under the item; the item
+/// shows once the menu's island runs, since only script can copy.
+#[tokio::test]
+async fn configuration_more_copies_the_file_path() {
+    let Some(base) = server() else {
+        return;
+    };
+    let outcome = session()
+        .await
+        .run_and_quit(|driver| async move {
+            let journey = Journey::open(driver, &base, "/configuration").await;
+            journey
+                .press(
+                    By::Css("main summary[aria-label='More configuration actions']"),
+                    "the title row's More",
+                )
+                .await?;
+            let copy = journey
+                .visible(
+                    By::XPath(
+                        "//button[@role='menuitem'][.//*[normalize-space()=\"Copy the file's path\"]]",
+                    ),
+                    "Copy the file's path",
+                )
+                .await;
+            let path = copy.attr("data-fui-copy").await?.unwrap_or_default();
+            assert!(
+                path.ends_with("/console.toml"),
+                "the item copies the configuration file's path: {path:?}"
+            );
+            let shown = copy.text().await?;
+            assert!(
+                shown.contains(&path),
+                "the path is shown under the item: {shown:?}"
+            );
+            journey.no_console_errors().await;
+            Ok::<(), WebDriverError>(())
+        })
+        .await;
+    outcome.expect("the journey ran and the browser session ended cleanly");
+}
+
 /// A preference is kept in its cookie and every page is drawn in it.
 #[tokio::test]
 async fn a_preference_is_kept_and_every_page_is_drawn_in_it() {

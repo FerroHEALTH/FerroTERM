@@ -1,0 +1,1 @@
+- The console moves to FerroUI 0.3.5 (`ferrohealth-ui` =0.3.5, with its `split` feature). When the console was started with a configuration file, Configuration's title row has More, whose "Copy the file's path" puts the file's path on the clipboard, the path shown under it.

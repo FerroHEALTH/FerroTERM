@@ -10,6 +10,7 @@
 
 use std::time::Duration;
 
+use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::dialog::{Explanation, info_dialog};
@@ -18,6 +19,7 @@ use ferrohealth_ui::view::status::badge;
 use ferrohealth_ui::view::surface::Header;
 use ferrohealth_ui::view::tabs::{Tab, TabRow};
 use ferrohealth_ui::view::template::settings::{How, Setting, SettingsPage, Source, settings_page};
+use ferrohealth_ui::widget::action_menu::{Act, Action, Item, Menu};
 use leptos::prelude::*;
 use leptos_meta::Title;
 use leptos_router::hooks::use_params_map;
@@ -29,6 +31,9 @@ use crate::server::ConsoleState;
 
 /// The id of the dialog that says how configuration works.
 const HOW_DIALOG: &str = "config-how";
+
+/// The id of the title row's More menu.
+const MORE_MENU: &str = "config-more";
 
 /// The file the console reads when it was started with none named.
 const DEFAULT_FILE: &str = "console.toml";
@@ -299,6 +304,28 @@ fn listener(settings: &Settings) -> Vec<Setting> {
     ]
 }
 
+/// The title row's actions: a More menu that copies the path of the
+/// configuration file `file`, and none when the console was started with no
+/// file named.
+fn more(file: Option<&std::path::Path>) -> ActionGroup {
+    let Some(file) = file else {
+        return ActionGroup::none();
+    };
+    let path = file.display().to_string();
+    ActionGroup::more_only(Menu::new(
+        MORE_MENU,
+        tr(Msg::ConfigMore),
+        vec![
+            Item::new(Action::new(
+                Some(Glyph::COPY),
+                tr(Msg::ConfigCopyPath),
+                Act::Copy(path.clone()),
+            ))
+            .note(path),
+        ],
+    ))
+}
+
 /// Configuration, on the tab the route names.
 #[component]
 #[expect(
@@ -345,7 +372,7 @@ pub(crate) fn ConfigurationPage() -> impl IntoView {
             mono: false,
             badge: None,
         },
-        actions: ActionGroup::none(),
+        actions: more(settings.file.as_deref()),
         source: Source::File {
             file: shown_file.clone(),
             how: How::Dialog(HOW_DIALOG.into()),
@@ -384,7 +411,33 @@ pub(crate) fn ConfigurationPage() -> impl IntoView {
 mod tests {
     use std::time::Duration;
 
-    use super::{ConfigTab, duration};
+    use std::path::Path;
+
+    use ferrohealth_ui::widget::action_menu::Act;
+
+    use super::{ConfigTab, duration, more};
+
+    #[test]
+    fn more_copies_the_path_of_the_file_named() {
+        assert!(
+            more(None).is_empty(),
+            "with no file named there is no path to copy"
+        );
+        let group = more(Some(Path::new("/etc/ferroterm/console.toml")));
+        let menu = group
+            .more
+            .expect("a named file gives the title row its More menu");
+        let [item] = menu.items.as_slice() else {
+            panic!("one item, not {}", menu.items.len());
+        };
+        assert_eq!(
+            Act::Copy(String::from("/etc/ferroterm/console.toml")),
+            item.action.act
+        );
+        assert_eq!(Some("/etc/ferroterm/console.toml"), item.note.as_deref());
+        assert_eq!("Copy the file's path", item.action.label);
+        assert_eq!("More configuration actions", menu.label);
+    }
 
     #[test]
     fn each_tab_is_a_route() {
