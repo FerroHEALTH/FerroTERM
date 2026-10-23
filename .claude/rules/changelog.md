@@ -9,6 +9,9 @@ paths:
   - "scripts/checks/release-notes.sh"
 ---
 
+<!-- SPDX-FileCopyrightText: Cadasto B.V. -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
+
 # Changelog discipline (Keep a Changelog 1.1.0)
 
 `CHANGELOG.md` is the release record (<https://keepachangelog.com/en/1.1.0/>
