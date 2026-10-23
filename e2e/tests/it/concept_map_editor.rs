@@ -58,14 +58,12 @@ async fn one_mapping_is_authored_and_saved() {
                 .await?;
             for side in ["source", "target"] {
                 journey
-                    .element(
+                    .press(
                         By::Css(format!(
                             "select[name^='group.'][name$='.{side}'] option[value='{TAXONOMY}']"
                         )),
                         "the taxonomy offered to the group",
                     )
-                    .await
-                    .click()
                     .await?;
             }
             journey
@@ -91,14 +89,12 @@ async fn one_mapping_is_authored_and_saved() {
                 .send_keys("cb-leaf")
                 .await?;
             journey
-                .element(
+                .press(
                     By::Css(
                         "select[name^='target.'][name$='.relationship'] option[value='relatedto']",
                     ),
                     "the relationship",
                 )
-                .await
-                .click()
                 .await?;
             journey.press(By::Css(SAVE), "Save").await?;
             journey

@@ -134,14 +134,13 @@ async fn the_version_select_moves_the_page_onto_another_version() {
             journey
                 .press(By::Css(VERSION_SELECT), "the FHIR version select")
                 .await?;
-            journey
+            let r5 = journey
                 .visible(
                     By::XPath("//a[@role='menuitemradio'][.//span[normalize-space()='R5']]"),
                     "the R5 choice",
                 )
-                .await
-                .click()
-                .await?;
+                .await;
+            journey.press_on(&r5, "the R5 choice").await?;
             let address = journey.address_carrying("fhir=r5", "the page on R5").await;
             assert!(
                 address.contains("/systems"),
@@ -286,7 +285,7 @@ async fn a_listed_row_opens_the_resource_it_names() {
                 journey.reopen(&format!("{base}{listing}")).await;
                 let row = journey.element(By::Css(link), "the first listed row").await;
                 let named = row.text().await?;
-                row.click().await?;
+                journey.press_on(&row, "the first listed row").await?;
                 journey
                     .text_becoming(
                         By::Css(TITLE),
@@ -364,12 +363,10 @@ async fn a_code_is_looked_up_from_a_picked_code_system() {
                 .await?;
             journey.address_carrying("/lookup", "the Look up tab").await;
             journey
-                .element(
+                .press(
                     By::Css(format!("#lookup-system option[value='{TAXONOMY}']")),
                     "the taxonomy offered",
                 )
-                .await
-                .click()
                 .await?;
             journey
                 .press(By::Css("#lookup-code"), "the code field")

@@ -110,19 +110,19 @@ async fn an_earlier_revision_is_restored() {
             sign_in(&journey, &deployment).await;
             two_revisions(&journey, &deployment, &run_canonical("e2e-restored")).await?;
             let restores = journey.all(By::XPath(RESTORE)).await?;
-            restores
+            let restore = restores
                 .last()
-                .expect("the first revision offers a restore")
-                .click()
-                .await?;
+                .expect("the first revision offers a restore");
             journey
+                .press_on(restore, "the first revision's restore")
+                .await?;
+            let confirmation = journey
                 .visible(
                     By::Css("dialog[open] button[type='submit']"),
                     "the confirmation",
                 )
-                .await
-                .click()
-                .await?;
+                .await;
+            journey.press_on(&confirmation, "the confirmation").await?;
             journey
                 .text_becoming(
                     By::Css("main [role='status']"),
@@ -151,20 +151,16 @@ async fn two_revisions_are_compared() {
             sign_in(&journey, &deployment).await;
             two_revisions(&journey, &deployment, &run_canonical("e2e-compared")).await?;
             journey
-                .element(
+                .press(
                     By::Css("#history-from option[value='1']"),
                     "the first revision",
                 )
-                .await
-                .click()
                 .await?;
             journey
-                .element(
+                .press(
                     By::Css("#history-to option[value='2']"),
                     "the second revision",
                 )
-                .await
-                .click()
                 .await?;
             journey
                 .press(

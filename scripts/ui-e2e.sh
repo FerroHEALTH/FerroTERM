@@ -5,9 +5,15 @@
 # (https://www.w3.org/TR/webdriver2/), against the console and the server
 # this checkout builds, all on loopback.
 #
-#   scripts/ui-e2e.sh
-#   scripts/ui-e2e.sh --docs-shots
-#   scripts/ui-e2e.sh --review DIR
+#   scripts/ui-e2e.sh [-- NEXTEST_ARGS...]
+#   scripts/ui-e2e.sh --docs-shots [-- NEXTEST_ARGS...]
+#   scripts/ui-e2e.sh --review DIR [-- NEXTEST_ARGS...]
+#
+# Whatever follows `--` goes to `cargo nextest run` after the run's own
+# filter, so a name filter narrows the battery to one journey and
+# `--stress-count` runs it in a loop:
+#
+#   scripts/ui-e2e.sh -- composer::the_preview_and_the_save_are_reached_from_the_keyboard --stress-count 20
 #
 # The script owns everything it drives and stops it again by process id. It
 # builds the server, the console and its site bundle, and the stub identity
@@ -49,19 +55,25 @@ cd "$root"
 
 docs_shots=""
 review=""
+nextest_args=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --)
+      shift
+      nextest_args=("$@")
+      break
+      ;;
     --docs-shots)
       docs_shots=1
       shift
       ;;
     --review)
-      [[ $# -ge 2 ]] || { echo "usage: scripts/ui-e2e.sh --review DIR" >&2; exit 2; }
+      [[ $# -ge 2 ]] || { echo "usage: scripts/ui-e2e.sh --review DIR [-- NEXTEST_ARGS...]" >&2; exit 2; }
       review="$2"
       shift 2
       ;;
     *)
-      echo "usage: scripts/ui-e2e.sh [--docs-shots | --review DIR]" >&2
+      echo "usage: scripts/ui-e2e.sh [--docs-shots | --review DIR] [-- NEXTEST_ARGS...]" >&2
       exit 2
       ;;
   esac
@@ -252,7 +264,7 @@ journeys() {
     FERROTERM_UI_E2E_WEBDRIVER=http://127.0.0.1:4444 \
     FERROTERM_UI_E2E_FAILURES="$FAILURES_DIR" \
     cargo nextest run --manifest-path e2e/Cargo.toml --locked \
-    --test-threads "$BROWSER_SESSIONS" "$@"
+    --test-threads "$BROWSER_SESSIONS" "$@" ${nextest_args[@]+"${nextest_args[@]}"}
 }
 
 if [[ -n "$review" ]]; then

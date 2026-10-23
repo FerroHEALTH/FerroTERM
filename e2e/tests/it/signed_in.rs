@@ -48,9 +48,7 @@ const TAXONOMY_PAGE: &str =
 /// Opens the signed-in reader's menu.
 async fn open_menu(journey: &Journey) {
     journey
-        .element(By::Css(MENU), "the signed-in reader's menu button")
-        .await
-        .click()
+        .press(By::Css(MENU), "the signed-in reader's menu button")
         .await
         .unwrap_or_else(|error| panic!("the menu button refused the press: {error}"));
 }
@@ -189,9 +187,12 @@ async fn signing_out_revokes_the_token_and_drops_it() {
             let out = journey
                 .visible(By::XPath(SIGN_OUT), "the sign-out control")
                 .await;
-            out.click().await.unwrap_or_else(|error| {
-                panic!("the sign-out control refused the press: {error}");
-            });
+            journey
+                .press_on(&out, "the sign-out control")
+                .await
+                .unwrap_or_else(|error| {
+                    panic!("the sign-out control refused the press: {error}");
+                });
             journey
                 .text_becoming(
                     By::Css("body"),

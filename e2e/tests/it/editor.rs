@@ -65,9 +65,7 @@ async fn open_new(journey: &Journey, deployment: &SignedIn, profile: &str, tag: 
         .reopen(&format!("{}/systems?fhir=r4b", deployment.base))
         .await;
     journey
-        .element(By::XPath(NEW), "the way to a new code system")
-        .await
-        .click()
+        .press(By::XPath(NEW), "the way to a new code system")
         .await
         .unwrap_or_else(|error| panic!("the new code system link refused the press: {error}"));
     journey.element(By::Css(URL_FIELD), "the editor").await;
@@ -162,12 +160,13 @@ async fn a_local_code_system_is_authored_retired_and_read_back() {
                 .count_becoming(By::Css(LIFECYCLES), 2, "both concepts read back")
                 .await;
             let lifecycles = journey.all(By::Css(LIFECYCLES)).await?;
-            lifecycles
+            let retired = lifecycles
                 .last()
                 .expect("the second concept's lifecycle")
                 .find(By::Css("option[value='retired']"))
-                .await?
-                .click()
+                .await?;
+            journey
+                .press_on(&retired, "the second concept's retired lifecycle")
                 .await?;
             save(&journey).await?;
 
