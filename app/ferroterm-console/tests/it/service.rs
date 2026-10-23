@@ -272,3 +272,46 @@ async fn a_posted_form_over_the_limit_is_refused_as_too_large() {
         text(response).await
     );
 }
+
+#[tokio::test]
+async fn a_bundle_file_that_is_not_there_is_a_plain_not_found() {
+    let site = tempfile::tempdir().expect("a site root");
+    std::fs::create_dir_all(site.path().join("pkg")).expect("the bundle directory");
+    let state = console(None, &site_root(site.path()));
+    let response = send(&state, get("/pkg/x.wasm", &[])).await;
+    assert_eq!(StatusCode::NOT_FOUND, response.status());
+    assert_eq!(
+        Some("no-store"),
+        header(response.headers(), &CACHE_CONTROL),
+        "a miss is never kept"
+    );
+    assert_eq!(
+        "",
+        text(response).await,
+        "no page is drawn for a missing file"
+    );
+}
+
+#[tokio::test]
+async fn a_bundle_file_is_served_as_it_stands_and_revalidated() {
+    let site = tempfile::tempdir().expect("a site root");
+    std::fs::create_dir_all(site.path().join("pkg")).expect("the bundle directory");
+    std::fs::write(site.path().join("pkg/x.wasm"), b"\0asm\x01\0\0\0").expect("a module");
+    let state = console(None, &site_root(site.path()));
+    let response = send(&state, get("/pkg/x.wasm", &[])).await;
+    assert_eq!(StatusCode::OK, response.status());
+    assert_eq!(
+        Some("application/wasm"),
+        header(response.headers(), &CONTENT_TYPE)
+    );
+    assert_eq!(Some("no-cache"), header(response.headers(), &CACHE_CONTROL));
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("a body");
+    assert_eq!(&b"\0asm\x01\0\0\0"[..], &*body);
+}
+
+/// The configuration that serves the site from `root`.
+fn site_root(root: &std::path::Path) -> String {
+    format!("[server]\nsite_root = {:?}\n", root.display().to_string())
+}

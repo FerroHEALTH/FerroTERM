@@ -31,6 +31,7 @@ use leptos_axum::LeptosRoutes as _;
 use serde::Serialize;
 use tower_http::compression::CompressionLayer;
 use tower_http::compression::predicate::{And, Predicate as _, SizeAbove};
+use tower_http::services::ServeDir;
 use tower_http::set_header::SetResponseHeaderLayer;
 
 use crate::config::settings::{OidcSettings, Settings};
@@ -41,6 +42,9 @@ pub const HEALTH: &str = "/health";
 
 /// The name cargo-leptos gives the site bundle's files under `pkg/`.
 pub const OUTPUT_NAME: &str = "ferroterm-console";
+
+/// The path the site bundle is served under.
+pub const BUNDLE: &str = "/pkg";
 
 /// The path the components' stylesheet is served at.
 pub const COMPONENTS_CSS: &str = "/ferrohealth-ui.css";
@@ -177,6 +181,7 @@ pub fn router(state: ConsoleState) -> axum::Router {
             let options = options.clone();
             move || crate::app::document(options.clone())
         })
+        .nest_service(BUNDLE, bundle(&options))
         .fallback(leptos_axum::file_and_error_handler_with_context(
             context,
             crate::app::document,
@@ -187,6 +192,20 @@ pub fn router(state: ConsoleState) -> axum::Router {
         .layer(axum::middleware::from_fn(same_origin_only))
         .layer(Extension(state));
     with_security_headers(pages.layer(bundle_compression()), form_action).with_state(options)
+}
+
+/// Serves the site bundle under [`BUNDLE`] from the site root, its br and
+/// gzip variants where the build wrote them.
+///
+/// A bundle file that is not there is a plain 404 with no body. Left to the
+/// page fallback, the miss would be drawn as a page of the shell, and a
+/// browser fetching its WebAssembly would read that page as the module.
+fn bundle(options: &LeptosOptions) -> ServeDir {
+    let directory =
+        std::path::Path::new(options.site_root.as_ref()).join(options.site_pkg_dir.as_ref());
+    ServeDir::new(directory)
+        .precompressed_br()
+        .precompressed_gzip()
 }
 
 /// Draws the page a form was posted to, the posted fields in its context
