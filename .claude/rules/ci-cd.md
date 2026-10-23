@@ -41,7 +41,10 @@ Scorecard) is in `docs/ci-cd.md`; this file is the enforceable discipline.
 - **Tracker helpers and changelog fragments are checked on every event:** the
   `tracker-helpers` job runs the `--self-test` of every `scripts/gh/` helper,
   and the `changelog` job runs `scripts/release/changelog.sh --check` plus
-  both self-tests. `changelog-guard` fails a pull request with no fragment
+  the self-tests, and holds the assembled `[Unreleased]` preview to the
+  release section's rules (`changelog.sh --check-preview`:
+  `changelog-structure.sh` and `changelog-security.sh`,
+  `.claude/rules/changelog.md`). `changelog-guard` fails a pull request with no fragment
   under `changelog.d/` unless it carries `no-changelog`.
 
 ## Rust CI lanes (activate with the Cargo workspace)

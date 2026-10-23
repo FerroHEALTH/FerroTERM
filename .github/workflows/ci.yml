@@ -655,8 +655,10 @@ jobs:
   # The changelog fragments under changelog.d/ (no specification governs
   # them: our own design). Every fragment's name and content is checked on
   # every event, so a malformed one never reaches the release cut that
-  # assembles them. The self-tests prove the check, the assembly and the
-  # pull-request guard below over stub repositories.
+  # assembles them, and the assembled [Unreleased] preview is held to the
+  # release section's rules: Keep a Changelog types, and the Security reason
+  # and advisory (CRA Annex I Part II(2), (4) and (8)). The self-tests prove
+  # the checks, the assembly, the plan list and the pull-request guard below.
   changelog:
     name: changelog
     runs-on: ubuntu-latest
@@ -673,6 +675,11 @@ jobs:
           bash scripts/checks/changelog-guard.sh --self-test
           bash scripts/release/changelog.sh --check
           bash scripts/release/milestone.sh --self-test
+          bash scripts/checks/changelog-security.sh --self-test
+          bash scripts/checks/release-notes.sh --self-test
+          bash scripts/release/plan.sh --self-test
+          bash scripts/checks/changelog-structure.sh
+          bash scripts/release/changelog.sh --check-preview
 
   # A pull request records its user-visible effect as a fragment under
   # changelog.d/, or as an edit of CHANGELOG.md while pull requests opened
