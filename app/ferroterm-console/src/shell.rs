@@ -204,6 +204,7 @@ fn development_banner() -> AnyView {
         Glyph::TRIANGLE_ALERT,
         tr(Msg::ShellDevelopmentTitle),
         &tr(Msg::ShellDevelopmentBody),
+        None,
     )
 }
 
@@ -235,7 +236,7 @@ fn navigation() -> Vec<Group> {
                 entry(
                     routes::SYSTEMS_PATH,
                     Msg::ShellCodeSystems,
-                    Glyph::BOOK_A,
+                    Glyph::BOOK_OPEN,
                     false,
                 ),
                 entry(
@@ -247,7 +248,7 @@ fn navigation() -> Vec<Group> {
                 entry(
                     routes::CONCEPT_MAPS_PATH,
                     Msg::ShellConceptMaps,
-                    Glyph::ROUTE,
+                    Glyph::ARROW_LEFT_RIGHT,
                     false,
                 ),
                 entry(
@@ -371,6 +372,7 @@ fn end(request: &Request, probe: Probe, open: bool) -> AnyView {
             choices,
             shortcuts: Some(routes::ui_path(routes::SHORTCUTS_PATH)),
             sign_out: Some(String::from(routes::SIGN_OUT_ROUTE)),
+            links: Vec::new(),
         }
     } else {
         let (label, line) = if open {
@@ -389,6 +391,7 @@ fn end(request: &Request, probe: Probe, open: bool) -> AnyView {
             choices,
             shortcuts: Some(routes::ui_path(routes::SHORTCUTS_PATH)),
             sign_out: None,
+            links: Vec::new(),
         }
     };
     view! {

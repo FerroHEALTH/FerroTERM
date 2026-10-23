@@ -168,7 +168,8 @@ refusal shown in the server's own words.
 `CapabilityStatement`, the operations each root declares, and the
 conformance and benchmark evidence this build ships. **Configuration** lists
 the settings the console runs with, secrets redacted, and **How configuration
-works** opens a dialog on where they come from and how you change them. **About** names the
+works**, at the end of the line that names the file, opens a dialog on where
+they come from and how you change them. **About** names the
 build, the licence and the projects it stands on.
 
 ![The server's roots](img/console/server.png)

@@ -181,7 +181,7 @@ fn dashboard(request: &Request, reads: &Reads) -> AnyView {
     };
     let stats = stat_grid(view! {
         {counted_stat(
-            Glyph::BOOK_A,
+            Glyph::BOOK_OPEN,
             cards.len(),
             Msg::ShellCodeSystems,
             stored_systems,
@@ -195,7 +195,7 @@ fn dashboard(request: &Request, reads: &Reads) -> AnyView {
             &ui_path(VALUE_SETS_PATH),
         )}
         {counted_stat(
-            Glyph::ROUTE,
+            Glyph::ARROW_LEFT_RIGHT,
             maps.len(),
             Msg::ShellConceptMaps,
             stored(&maps),

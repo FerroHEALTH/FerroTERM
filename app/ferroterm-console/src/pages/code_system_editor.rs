@@ -19,7 +19,7 @@ use ferrohealth_ui::view::surface::{
     SectionHead, card_action, panel_section, panel_sections_card, section_intro, stack,
 };
 use ferrohealth_ui::view::template::list::HeadingCount;
-use ferrohealth_ui::widget::repeat::{Fields, Repeat, RepeatAdd, RepeatRow, RowEnd, repeat};
+use ferrohealth_ui::widget::repeat::{Fields, ROW, Repeat, RepeatAdd, RepeatRow, RowEnd, repeat};
 use leptos::prelude::*;
 
 use crate::auth::scopes::Letter;
@@ -547,6 +547,7 @@ fn properties(draft: &Draft) -> AnyView {
             fields: Fields::Two,
             head: Vec::new(),
             rows: drawn,
+            token: ROW,
             blank: None,
             add: Some(RepeatAdd {
                 label: tr(Msg::EditorDeclareProperty),
