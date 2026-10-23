@@ -19,11 +19,13 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-    # `edited` re-runs the contribution-licence guard when the checkbox is
-    # ticked. `labeled` and `unlabeled` too: the label escapes
-    # (`no-crate-bump`, `no-changelog`) are read from the event payload, so a
-    # label added after the run started takes effect without a new push.
-    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+    # Only the activity types that change the code under test, so a commit
+    # gets one run: `edited`, `labeled` and `unlabeled` started a second run on
+    # the same commit, the concurrency group cancelled the first, and its
+    # `conclusion` reported a failure on the head commit (#848). The guards
+    # read their labels and the description from the API when they run, and
+    # pr-guards.yml re-runs the one a change affects once this run completes.
+    types: [opened, synchronize, reopened]
   merge_group:
   workflow_dispatch:
 
@@ -732,11 +734,11 @@ jobs:
     if: >-
       github.event_name == 'pull_request'
       && github.event.pull_request.user.type != 'Bot'
-      && !contains(github.event.pull_request.labels.*.name, 'no-changelog')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
+      pull-requests: read # the labels when the step runs
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -744,9 +746,19 @@ jobs:
           fetch-depth: 0
       - name: The pull request carries a changelog entry
         env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
-        run: bash scripts/checks/changelog-guard.sh "$BASE" "$HEAD"
+        run: |
+          set -euo pipefail
+          # Read when the step runs: a re-run replays the event payload (#848).
+          if [ "$(gh api "repos/${GH_REPO}/pulls/${PR}" --jq 'any(.labels[].name; . == "no-changelog")')" = true ]; then
+            echo "the no-changelog label is set: the guard does not apply"
+            exit 0
+          fi
+          bash scripts/checks/changelog-guard.sh "$BASE" "$HEAD"
 
   # The crate-line bump rule (.claude/rules/crates-publishing.md): a PR that
   # changes packaged content of a crates/* member bumps the lockstep crate
@@ -754,11 +766,12 @@ jobs:
   # that provably does not alter packaged bytes.
   crate-version-guard:
     name: crate-version-guard
-    if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'no-crate-bump')
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
+      pull-requests: read # the labels when the step runs
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -766,9 +779,19 @@ jobs:
           fetch-depth: 0
       - name: Packaged crate content moved with its version
         env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
-        run: scripts/checks/crate-version-guard.sh "$BASE" "$HEAD"
+        run: |
+          set -euo pipefail
+          # Read when the step runs: a re-run replays the event payload (#848).
+          if [ "$(gh api "repos/${GH_REPO}/pulls/${PR}" --jq 'any(.labels[].name; . == "no-crate-bump")')" = true ]; then
+            echo "the no-crate-bump label is set: the guard does not apply"
+            exit 0
+          fi
+          scripts/checks/crate-version-guard.sh "$BASE" "$HEAD"
 
   # Every publishable crate packages and verifies as crates.io would build it
   # (no cache: the dry run verifies the bytes a publish would upload).
@@ -917,7 +940,8 @@ jobs:
   # terms (CONTRIBUTING.md § Licensing of contributions) through the template's
   # checkbox; this gate is what makes the checkbox binding. Bot authors are
   # skipped: a bot cannot accept terms and its bumps carry no expression of its
-  # own. `edited` is in the pull_request trigger so ticking the box re-runs it.
+  # own. The body is read when the step runs, and pr-guards.yml re-runs this
+  # job when the description changes, so ticking the box takes effect (#848).
   contribution-licence:
     name: contribution-licence-guard
     if: github.event_name == 'pull_request' && github.event.pull_request.user.type != 'Bot'
@@ -925,14 +949,21 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      pull-requests: read # the description when the step runs
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: The pull request body accepts the contribution licensing terms
         env:
-          PR_BODY: ${{ github.event.pull_request.body }}
-        run: bash scripts/checks/contribution-licence.sh
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          PR_BODY=$(gh api "repos/${GH_REPO}/pulls/${PR}" --jq '.body // ""')
+          export PR_BODY
+          bash scripts/checks/contribution-licence.sh
 
   conclusion:
     name: conclusion

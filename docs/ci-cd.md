@@ -19,6 +19,7 @@ exist.
 | `ci.yml` (workflows lane) | `actionlint`, `zizmor --min-severity=low` over `.github/workflows/`, `shellcheck` over tracked shell | now |
 | `ci.yml` (Rust lanes) | fmt, clippy `-D warnings`, nextest `--locked` + doctests, rustdoc `-D warnings`, `cargo deny` with no stale advisory exception (`advisory-exceptions.sh`) and every VEX statement's dependency path against the graph (`vex-reachability.sh`), MSRV (`cargo hack check --rust-version`), dependency-review (PR) | on workspace |
 | `ci.yml` (`versions` job) | `scripts/checks/versions.sh`, version-drift guard | now |
+| `pr-guards.yml` | on a label or description change, re-runs the guard it affects (`changelog-guard`, `crate-version-guard`, `contribution-licence-guard`) in the head commit's CI run once that run completes | now |
 | `scorecard.yml` | OpenSSF Scorecard, results published, SARIF → code scanning | now |
 | `codeql.yml` | CodeQL: `actions` now, `rust` self-activates when the workspace lands | actions now |
 | `sonar.yml` | SonarQube Cloud (advisory; `.claude/rules/ai-code-review.md`) | now (sweep); coverage on workspace |
@@ -222,9 +223,16 @@ a rebase just because another one merged first.
 commit. The jobs that read a pull-request payload (`contribution-licence-guard`,
 `crate-version-guard`, `changelog-guard`, `dependency-review`) skip on a merge
 group: each pull request passed them on its own before it joined the queue, and
-`conclusion` counts a skip as a pass. The pull-request trigger also listens for
-`labeled` and `unlabeled`, so adding `no-crate-bump` or `no-changelog` re-runs
-CI without a new push.
+`conclusion` counts a skip as a pass.
+
+The pull-request trigger lists `opened`, `synchronize` and `reopened` only, so
+a commit gets one CI run: a label or description event would start a second
+run on the same commit, the concurrency group would cancel the first, and its
+`conclusion` would report a failure. The guards read their escape labels and
+the description from the API when they run. `pr-guards.yml` listens for
+`labeled`, `unlabeled` and `edited`, waits for the CI run on the head commit to
+complete, and re-runs the guard the change affects, which re-runs `conclusion`
+with it (<https://docs.github.com/en/rest/actions/workflow-runs#re-run-a-job-from-a-workflow-run>).
 
 ## Owner actions (one-time, cannot be scripted)
 
