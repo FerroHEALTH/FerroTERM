@@ -261,6 +261,9 @@ apply always. Read the relevant one before working in that area.
 - `.claude/rules/ci-cd.md`, `ai-code-review.md`: the CI/CD and supply-chain
   discipline (SLSA L3, signed SBOM, pinned actions) and the advisory-Sonar
   policy.
+- `.claude/rules/changelog.md`: the changelog, the Security rules of a
+  release section (a reason when a fix ships beside functional changes, an
+  advisory on every entry) and the release notes' CRA facts.
 - `.claude/rules/crates-publishing.md`: the published `crates/*` line (plain
   names on crates.io, the lockstep bump rule, Trusted Publishing lanes).
 - `.claude/rules/leptos-ui.md`: the console's own rules (the backend-for-frontend,
