@@ -1,0 +1,1 @@
+- The console's sign-in page says the identity provider refused the sign-in when its token endpoint refuses the code exchange, and that the provider's answer failed the console's checks when it carries no token response, no bearer token or no ID Token, where it said the provider could not be reached.
