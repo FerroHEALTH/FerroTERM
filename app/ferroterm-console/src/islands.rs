@@ -222,7 +222,7 @@ fn listen(goto: Vec<(String, String)>, set_shown: WriteSignal<bool>) {
 
 #[cfg(test)]
 mod tests {
-    use super::{Context, Press, RUN, SAVE, press};
+    use super::{Context, Press, RUN, SAVE, Shortcuts, press, submitter_of};
 
     fn targets() -> Vec<(String, String)> {
         vec![
@@ -275,5 +275,80 @@ mod tests {
             Press::Nothing,
             press("?", false, Context::of(true, false, false), &targets())
         );
+    }
+
+    #[test]
+    fn a_key_with_no_shortcut_does_nothing_in_any_context() {
+        for context in [Context::Control, Context::Free] {
+            assert_eq!(
+                Press::Nothing,
+                press("x", false, context, &targets()),
+                "{context:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_go_to_key_and_its_pair_read_in_either_case() {
+        assert_eq!(Press::Wait, press("G", false, Context::Free, &targets()));
+        assert_eq!(
+            Press::Go(String::from("/")),
+            press("D", true, Context::Free, &targets())
+        );
+        assert_eq!(
+            Press::Submit(SAVE),
+            press("S", false, Context::Control, &targets())
+        );
+    }
+
+    #[test]
+    fn a_save_form_is_submitted_by_its_save_button_and_a_run_form_by_its_run_button() {
+        assert_eq!(&["button[name='intent'][value='save']"], submitter_of(SAVE));
+        assert_eq!(
+            &[
+                "button[name='intent'][value='preview']",
+                "form[data-run] .fui-transform-run button[type='submit']",
+            ],
+            submitter_of(RUN)
+        );
+    }
+
+    #[test]
+    fn the_island_draws_the_legend_and_carries_its_props_to_the_browser() {
+        use ferrohealth_ui::view::kbd::{Shortcut, ShortcutGroup};
+        use ferrohealth_ui::widget::shortcuts::LegendWords;
+        use leptos::prelude::{Owner, RenderHtml, view};
+        let groups = vec![ShortcutGroup {
+            title: String::from("Go to"),
+            shortcuts: vec![Shortcut {
+                keys: String::from("g c"),
+                does: String::from("Code systems"),
+            }],
+        }];
+        let words = LegendWords {
+            title: "Keyboard shortcuts".into(),
+            intro: "Press a key.".into(),
+            or: "or".into(),
+            close: "Close".into(),
+        };
+        let html = Owner::new().with(|| {
+            view! { <Shortcuts groups=groups words=words goto=targets() open=true /> }.to_html()
+        });
+        assert!(
+            html.starts_with("<leptos-island data-component=\"Shortcuts_"),
+            "{html}"
+        );
+        let props = html.replace("&quot;", "\"");
+        assert!(
+            props.contains(r#""goto":[["d","/"],["c","/systems"]],"open":true"#),
+            "the browser hydrates with the go-to targets and the open state: {props}"
+        );
+        assert!(html.contains("<dialog id=\"shortcuts\""), "{html}");
+        assert!(
+            html.contains("<h3 id=\"shortcuts-group-1\">Go to</h3>"),
+            "{html}"
+        );
+        assert!(html.contains("<dd>Code systems</dd>"), "{html}");
+        assert!(html.contains("Close</button>"), "{html}");
     }
 }

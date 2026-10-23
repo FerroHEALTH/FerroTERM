@@ -523,7 +523,8 @@ async fn an_id_token_with_another_nonce_shows_the_rejected_sign_in_page() {
     let provider = Provider::start().await;
     let state = console(Some(provider.oidc()), "");
     let started = start(&state, "/auth/login").await;
-    let id_token = provider.id_token(&provider.claims("a-replayed-nonce"));
+    let other = start(&state, "/auth/login").await;
+    let id_token = provider.id_token(&provider.claims(other.nonce()));
     provider.answer_tokens(200, &token_answer(&id_token)).await;
     let response = send(
         &state,
