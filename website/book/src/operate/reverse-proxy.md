@@ -255,7 +255,7 @@ audience says which server, not which version.
 Set `FERROTERM_BASE_URL` to the exact address readers' browsers use, down to
 the scheme, the host, and the port. An audience is compared as a string, so
 `https://tx.example.org` and `https://tx.example.org:443` are two audiences,
-and a value that differs from the one the viewer sends refuses every write
+and a value that differs from the one the console sends refuses every write
 from a reader who signed in successfully.
 
 The root URL is not in the set: the server serves no FHIR base there. Name it

@@ -19,7 +19,7 @@ cut follows, in order.
 2. **The version moves everywhere**, not only in the manifests: the workspace
    `version`, `CITATION.cff`, the README, the landing page, the book.
    `scripts/checks/versions.sh` fails on any file left behind.
-   The viewer's recorded capability documents carry the software version, so
+   The console's recorded capability documents carry the software version, so
    re-record them in the same commit:
    `FERROTERM_RECORD_VIEWER_FIXTURES=1 cargo nextest run -p ferroterm-server
    -E 'test(the_viewer_capability_fixtures)'`.
@@ -43,13 +43,13 @@ cut follows, in order.
    --workspace --locked`, `RUSTDOCFLAGS="-D warnings" cargo doc`, and the
    guards under `scripts/checks/`, run as CI runs them. The two that compare a
    change against its base take `origin/main HEAD` on the release branch, and
-   the viewer's two bundle checks read the site `scripts/release/viewer-site.sh
+   the console's two bundle checks read the site `scripts/release/console-site.sh
    --release` builds:
 
    ```sh
    bash scripts/checks/versions.sh
    bash scripts/checks/comment-style.sh --all
-   bash scripts/checks/stray-literals.sh app/ferroterm-viewer/src
+   bash scripts/checks/stray-literals.sh app/ferroterm-console/src
    bash scripts/checks/spdx-headers.sh
    bash scripts/checks/copyright-holder.sh
    bash scripts/checks/vendor-dests.sh
@@ -60,15 +60,15 @@ cut follows, in order.
    bash scripts/checks/brand-contrast.sh
    bash scripts/checks/code-systems.sh
    bash scripts/checks/bench-table.sh check
-   bash scripts/checks/viewer-boundary.sh
-   bash scripts/checks/viewer-tokens.sh
+   bash scripts/checks/console-boundary.sh
+   bash scripts/checks/console-tokens.sh
    bash scripts/checks/addon-boundary.sh
    bash scripts/checks/no-client-in-server.sh
    bash scripts/checks/changelog-guard.sh origin/main HEAD
    bash scripts/checks/crate-version-guard.sh origin/main HEAD
-   bash scripts/release/viewer-site.sh --release
-   bash scripts/checks/viewer-bundle.sh
-   bash scripts/checks/viewer-paths.sh
+   bash scripts/release/console-site.sh --release
+   bash scripts/checks/console-bundle.sh
+   bash scripts/checks/console-paths.sh
    ```
 
    `contribution-licence.sh` reads the pull request body, so it runs in CI

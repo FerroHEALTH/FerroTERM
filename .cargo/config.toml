@@ -7,6 +7,6 @@
 [env]
 # Leptos reads the name of the console's site bundle at compile time and names
 # the WebAssembly file it loads after it. cargo-leptos sets the same value, so a
-# plain cargo build of app/ferroterm-viewer, the release lane's among them,
+# plain cargo build of app/ferroterm-console, the release lane's among them,
 # renders a page that loads the bundle cargo-leptos wrote.
-LEPTOS_OUTPUT_NAME = "ferroterm-viewer"
+LEPTOS_OUTPUT_NAME = "ferroterm-console"

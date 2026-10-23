@@ -299,7 +299,7 @@ leaves both listeners reachable only inside the compose network.
 
 The console's history screen reads `GET /runs` and `GET /runs/{id}` to show
 what the last run found about the resource a terminologist has open
-([The console](viewer.md)). The console's own server makes the call, at
+([The console](console.md)). The console's own server makes the call, at
 `[ferroterm] sync_url`, with the signed-in reader's access token, so a reader
 sees the findings when the identity provider grants them the product scope
 and lists the sync's audience in the token. A visitor, a reader without the

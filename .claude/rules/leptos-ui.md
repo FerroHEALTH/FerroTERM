@@ -1,11 +1,11 @@
 ---
-paths: ["app/ferroterm-viewer/**"]
+paths: ["app/ferroterm-console/**"]
 ---
 
 <!-- SPDX-FileCopyrightText: Cadasto B.V. -->
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 
-# The FerroTERM Console's own rules (`app/ferroterm-viewer`)
+# The FerroTERM Console's own rules (`app/ferroterm-console`)
 
 **FerroUI leads the console's UI.** FerroUI (`ferrohealth-ui` on crates.io,
 repository FerroHEALTH/FerroUI) is the family's component library and the
@@ -53,12 +53,12 @@ for a Leptos question FerroUI does not settle is the official Leptos book
 ## 1. What the console is
 
 - **A backend-for-frontend binary, rendered on the server and hydrated.**
-  `ferroterm-viewer` (`serve`, `config check`, `healthcheck`) serves the
+  `ferroterm-console` (`serve`, `config check`, `healthcheck`) serves the
   pages, the server functions, the site bundle and the components' and the
   brand's stylesheets. The halves are chosen by compilation target, never by
   a Cargo feature: the host half links `leptos` with `ssr` and `nonce`, the
   wasm32 half with `hydrate`. cargo-leptos 0.3.11 builds it
-  (`scripts/release/viewer-site.sh`). The terminology server serves no UI
+  (`scripts/release/console-site.sh`). The terminology server serves no UI
   file.
 - **A FHIR client and nothing else.** Every request is an ordinary request to
   the server's public FHIR API, built in `crate::fhir` and sent as one
@@ -66,7 +66,7 @@ for a Leptos question FerroUI does not settle is the official Leptos book
   (`crate::upstream`), the browser half through the `forward` server
   function, which sends it from the console's server. The console depends on
   **no** workspace crate, not `fhir-terminology`, not `fhir-types`;
-  `scripts/checks/viewer-boundary.sh` walks the resolved closure and fails on
+  `scripts/checks/console-boundary.sh` walks the resolved closure and fails on
   an edge into the engine.
 - **No code system is a special case.** Every screen renders from
   `TerminologyCapabilities` and the operations; the test
@@ -122,7 +122,7 @@ for a Leptos question FerroUI does not settle is the official Leptos book
   imports Tailwind's theme and utilities and **not its preflight** (it would
   reset what the components' stylesheet draws), and maps the FerroUI roles,
   steps and spacing in an `@theme inline reference` block.
-- `scripts/checks/viewer-tokens.sh` refuses a palette entry, a per-element
+- `scripts/checks/console-tokens.sh` refuses a palette entry, a per-element
   `dark:` variant, a raw type size and a spacing value off the four steps.
 - A screen draws with FerroUI components. What FerroUI does not have yet is
   filed on FerroHEALTH/FerroUI and drawn with the nearest FerroUI piece, its
@@ -149,10 +149,10 @@ compressed (`server.rs`).
 - Business logic lives outside components, in plain types with unit tests
   (URL building, `OperationOutcome` flattening, the paging arithmetic, the
   tree model, the authoring models, the exchange's path check).
-- `cargo fmt` and `leptosfmt` clean; `cargo clippy -p ferroterm-viewer
+- `cargo fmt` and `leptosfmt` clean; `cargo clippy -p ferroterm-console
   --all-targets -- -D warnings` on the host and `cargo clippy -p
-  ferroterm-viewer --lib --target wasm32-unknown-unknown -- -D warnings`;
-  `cargo nextest run -p ferroterm-viewer`.
+  ferroterm-console --lib --target wasm32-unknown-unknown -- -D warnings`;
+  `cargo nextest run -p ferroterm-console`.
 - **The journeys are a merge gate, Rust only**: `scripts/ui-e2e.sh` builds
   the server, the console and the stub issuer, starts them on loopback with
   chromedriver, and runs `e2e/` (thirtyfour). Every journey fails on a
@@ -162,7 +162,7 @@ compressed (`server.rs`).
 
 ## 7. Bundle
 
-`scripts/checks/viewer-bundle.sh` fails when the brotli-compressed
+`scripts/checks/console-bundle.sh` fails when the brotli-compressed
 WebAssembly of the release site bundle is over the number below, which it
 reads from this table. The console carries the reader and the editor in one
 bundle.
@@ -186,7 +186,7 @@ string the console draws lives outside a catalog, and a language joins as a
 catalog file with no code change. What is particular here:
 
 - The console's catalog is
-  `app/ferroterm-viewer/locales/<tag>/ferroterm-viewer.ftl`, embedded by
+  `app/ferroterm-console/locales/<tag>/ferroterm-console.ftl`, embedded by
   `fluent_templates::static_loader!` in `crate::locale`, where each message
   is one `Msg`. A test holds every catalog directory to the full message
   set, and a throwaway catalog under `tests/locales/` shows the words change
@@ -197,7 +197,7 @@ catalog file with no code change. What is particular here:
   provides it with `ferrohealth_ui::i18n::provide_locale` so the console's
   words and the components' switch together, and the document writes it as
   `<html lang>`.
-- `scripts/checks/stray-literals.sh app/ferroterm-viewer/src` runs in CI
+- `scripts/checks/stray-literals.sh app/ferroterm-console/src` runs in CI
   against `scripts/checks/stray-literals.baseline`: a file may hold no more
   stray literals than its count, and a change that moves strings into the
   catalog lowers the count with `--update`. Most of the remaining strings

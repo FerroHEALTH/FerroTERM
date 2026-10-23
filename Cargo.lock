@@ -1317,6 +1317,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "ferroterm-console"
+version = "0.1.10"
+dependencies = [
+ "aws-lc-rs",
+ "axum",
+ "base64 0.23.1",
+ "clap",
+ "console_error_panic_hook",
+ "cookie",
+ "ferrohealth-ui",
+ "fluent-templates",
+ "http",
+ "jsonwebtoken",
+ "leptos",
+ "leptos_axum",
+ "leptos_meta",
+ "leptos_router",
+ "percent-encoding",
+ "reqwest",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "toml",
+ "tower",
+ "tower-http 0.7.1",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "wasm-bindgen",
+ "wiremock",
+]
+
+[[package]]
 name = "ferroterm-server"
 version = "0.1.10"
 dependencies = [
@@ -1401,42 +1437,6 @@ dependencies = [
  "rxnorm-rrf",
  "serde_json",
  "tempfile",
-]
-
-[[package]]
-name = "ferroterm-viewer"
-version = "0.1.10"
-dependencies = [
- "aws-lc-rs",
- "axum",
- "base64 0.23.1",
- "clap",
- "console_error_panic_hook",
- "cookie",
- "ferrohealth-ui",
- "fluent-templates",
- "http",
- "jsonwebtoken",
- "leptos",
- "leptos_axum",
- "leptos_meta",
- "leptos_router",
- "percent-encoding",
- "reqwest",
- "secrecy",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
- "toml",
- "tower",
- "tower-http 0.7.1",
- "tracing",
- "tracing-subscriber",
- "url",
- "wasm-bindgen",
- "wiremock",
 ]
 
 [[package]]

@@ -10,7 +10,7 @@ metadata:
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 
 Measured 2026-09-07 with `twiggy` 0.8.0 over
-`target/wasm32-unknown-unknown/wasm-release/ferroterm-viewer.wasm`, the module
+`target/wasm32-unknown-unknown/wasm-release/ferroterm-console.wasm`, the module
 before `wasm-opt` strips the name section, aggregated by the crate that owns
 each item, and confirmed by an A/B rebuild of the gzipped `dist/` bundle.
 
@@ -33,5 +33,5 @@ induced, 37,155 gzipped bytes of the shipped bundle, 15.5%.
 **The rule this gives a reviewer.** Refuse an unmeasured claim about what is
 heavy in the bundle. `cargo tree` shows what resolves, never what ships. The
 question is what the viewer *calls*, and the answer comes from `twiggy` plus a
-rebuild without the suspect, in that order. `docs/viewer.md` §12 records the
+rebuild without the suspect, in that order. `docs/console.md` §12 records the
 method as the path a breaching slice follows.

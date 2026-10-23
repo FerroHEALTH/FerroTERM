@@ -26,8 +26,8 @@ exist.
 | `release.yml` | `v*` orchestrator: draft → per-arch build → image → verify assets → publish last | on tag |
 | `release-image.yml` | reusable SLSA Build L3 lane: the distroless static image from the attested musl binaries, pushed to GHCR with provenance and SBOM attestations on the index and on each platform manifest | on tag |
 | `ci.yml` (`hadolint` job) | `hadolint` over every `Dockerfile` in the tree, plus `docker/Dockerfile.sync` by name | now |
-| `ci.yml` (`viewer` job) | the console's browser half: `cargo fmt` and `leptosfmt --check` over `app/ferroterm-viewer`, `cargo clippy --target wasm32-unknown-unknown -D warnings`, the release site bundle built by cargo-leptos (`scripts/release/viewer-site.sh --release`), its size against the budget (`scripts/checks/viewer-bundle.sh`) and no build-host path in it (`scripts/checks/viewer-paths.sh`) | on workspace |
-| `ci.yml` (`viewer-boundary` job) | the viewer's resolved dependency closure links no workspace crate (`scripts/checks/viewer-boundary.sh`) | on workspace |
+| `ci.yml` (`console` job) | the console's browser half: `cargo fmt` and `leptosfmt --check` over `app/ferroterm-console`, `cargo clippy --target wasm32-unknown-unknown -D warnings`, the release site bundle built by cargo-leptos (`scripts/release/console-site.sh --release`), its size against the budget (`scripts/checks/console-bundle.sh`) and no build-host path in it (`scripts/checks/console-paths.sh`) | on workspace |
+| `ci.yml` (`console-boundary` job) | the console's resolved dependency closure links no workspace crate (`scripts/checks/console-boundary.sh`) | on workspace |
 | `ci.yml` (`no-client-in-server` job) | the server binary's resolved dependency tree carries no HTTP client outside `ferrohealth-smart`, so its only outbound calls are the authorization server `[auth]` names and the usage report (`scripts/checks/no-client-in-server.sh`) | on workspace |
 | `ci.yml` (`addon-boundary` job) | only `app/ferroterm-sync` links an `addons/*` crate, and an add-on links the syndication client and the leaf crates the script names (`scripts/checks/addon-boundary.sh`, run with `--self-test` first) | on workspace |
 | `ci.yml` (`tree-guards` job) | every `scripts/vendor/*.sh` fetcher writes into the tree (`vendor-dests.sh`), every workspace member is named in the repo map and the architecture table (`repo-map.sh`), and every evidence citation in `docs/claims.md` resolves to a symbol or a test and names no line number (`claims.sh`), and every `https://ferroterm.eu/fhir/StructureDefinition/` canonical the Rust sources emit has its definition under `website/landing/fhir/StructureDefinition` (`extension-definitions.sh`) | always |
@@ -74,16 +74,16 @@ artifact digest and signed by the pinnable workflow identity, verifiable with
 
 ## The console
 
-`app/ferroterm-viewer` is the FerroTERM Console, its own binary and image
-(`ghcr.io/ferrohealth/ferroterm-viewer`), rendered on the server and hydrated
+`app/ferroterm-console` is the FerroTERM Console, its own binary and image
+(`ghcr.io/ferrohealth/ferroterm-console`), rendered on the server and hydrated
 in the browser. cargo-leptos builds the WebAssembly half and the site bundle;
 the Tailwind standalone CLI and Binaryen's `wasm-opt` are downloaded and
-checked against their SHA-256 by `scripts/release/viewer-tools.sh`, so there
+checked against their SHA-256 by `scripts/release/console-tools.sh`, so there
 is no Node in any lane. `scripts/checks/versions.sh` fails when a tool pin of
 `docs/VERSIONS.md` and a workflow or script drift apart.
 
 On a pull request the workspace lanes build, lint and test the console's
-server half like any other crate, and the `viewer` job gates its browser half:
+server half like any other crate, and the `console` job gates its browser half:
 `cargo fmt` plus `leptosfmt --check`, clippy against `wasm32-unknown-unknown`
 (the only place a dependency that cannot compile for WebAssembly shows up),
 the release site bundle, its brotli-compressed size against the budget in
@@ -98,7 +98,7 @@ in at the provider, and runs the journeys against them with Chrome for Testing
 and its chromedriver at the release `docs/VERSIONS.md` pins. On a developer
 machine without them the script fetches that release into
 `target/journey-tools` with `scripts/release/journey-tools.sh`, and the site
-build's tools into `target/viewer-tools`, each checked against its pinned
+build's tools into `target/console-tools`, each checked against its pinned
 SHA-256. Every address is loopback, so no certificate is needed and no check
 is turned off. The journeys
 are plain `#[tokio::test]`s in `e2e/`, a crate the root manifest excludes:
@@ -112,9 +112,9 @@ A failing journey leaves the page it failed on: the harness writes a
 screenshot and the whole document into `target/ui-e2e-failures`, and the job
 uploads that directory as the `ui-e2e-failure` artifact.
 
-On a tag, `release-viewer.yml` (called by `release.yml`) builds the console's
+On a tag, `release-console.yml` (called by `release.yml`) builds the console's
 binary per architecture and its site bundle once, attests both, and publishes
-the multi-platform image from `docker/viewer/Dockerfile`, which copies what
+the multi-platform image from `docker/console/Dockerfile`, which copies what
 the lane staged and compiles nothing. The terminology server's image carries
 no user interface.
 

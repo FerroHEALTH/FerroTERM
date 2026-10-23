@@ -12,7 +12,7 @@ metadata:
 The shape: a visible `<p class=styles::LABEL>{"Relationship (equivalence)"}</p>`
 over a `<select>` whose own `<label for=...>` is `sr-only` and reads something
 else ("Relationship to the source code"). Seen in
-`app/ferroterm-viewer/src/pages/concept_map_editor.rs`, `relationship_control`
+`app/ferroterm-console/src/pages/concept_map_editor.rs`, `relationship_control`
 (#636).
 
 Two failures:

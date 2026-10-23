@@ -10,7 +10,7 @@ metadata:
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 
 Confirmed reviewing the FerroTERM concept browser tree
-(`app/ferroterm-viewer/src/pages/browse.rs`, `src/tree.rs`), against
+(`app/ferroterm-console/src/pages/browse.rs`, `src/tree.rs`), against
 `.claude/rules/leptos-ui.md` §9 and the ARIA Authoring Practices tree view
 pattern (<https://www.w3.org/WAI/ARIA/apg/patterns/treeview/>).
 

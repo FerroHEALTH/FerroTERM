@@ -13,7 +13,7 @@ page that already gives it.
 Annex II opens: "At minimum, the product with digital elements shall be
 accompanied by:". The product is each tagged FerroTERM release, as Cadasto
 B.V. publishes it: the `ferroterm` and `ferroterm-build` binaries, the
-`ferroterm` container image, the console's `ferroterm-viewer` binaries, site
+`ferroterm` container image, the console's `ferroterm-console` binaries, site
 bundle and image, and the source archive
 ([the scope of the risk assessment](cra-risk-assessment.md#scope-and-dates)).
 
@@ -171,7 +171,7 @@ lifetime of the product with digital elements to ensure its secure use;"
   writes or the admin listener, name an issuer and an audience in `[auth]`
   ([authentication](../operate/configuration.md#authentication)). Run the
   console with `secure_cookie = true` behind TLS
-  ([the console](../operate/viewer.md)).
+  ([the console](../operate/console.md)).
 - **Throughout its lifetime:** follow the release feed and the security
   advisories, upgrade to each new release, and replace an index by building it
   in a new directory and renaming it into place

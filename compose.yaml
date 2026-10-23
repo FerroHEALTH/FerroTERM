@@ -192,48 +192,48 @@ services:
 
   # The FerroTERM Console, its own image, beside the server:
   #
-  #   docker compose --profile viewer up
+  #   docker compose --profile console up
   #
   # then open http://localhost:3000. It reaches the server over the compose
   # network, server to server, and serves no FHIR request itself. Reading is
-  # open, as the server's read surface is; set the FERROTERM_VIEWER__OIDC__*
+  # open, as the server's read surface is; set the FERROTERM_CONSOLE__OIDC__*
   # variables in your shell or .env to offer a sign-in for editing, with the
-  # client secret in ./secrets/viewer_oidc_client_secret.
-  viewer:
-    image: ghcr.io/ferrohealth/ferroterm-viewer:${FERROTERM_VERSION:-0.1.10}
-    profiles: [viewer]
+  # client secret in ./secrets/console_oidc_client_secret.
+  console:
+    image: ghcr.io/ferrohealth/ferroterm-console:${FERROTERM_VERSION:-0.1.10}
+    profiles: [console]
     restart: unless-stopped
     depends_on:
       ferroterm:
         condition: service_healthy
     ports:
-      - "${FERROTERM_BIND_HOST:-127.0.0.1}:${FERROTERM_VIEWER_PORT:-3000}:3000"
+      - "${FERROTERM_BIND_HOST:-127.0.0.1}:${FERROTERM_CONSOLE_PORT:-3000}:3000"
     environment:
       # The image sets the same value; repeated so `docker compose config`
       # shows the address the container binds.
-      FERROTERM_VIEWER__SERVER__LISTEN: 0.0.0.0:3000
+      FERROTERM_CONSOLE__SERVER__LISTEN: 0.0.0.0:3000
       # The server, over the compose network.
-      FERROTERM_VIEWER__FERROTERM__BASE_URL: http://ferroterm:8080/
+      FERROTERM_CONSOLE__FERROTERM__BASE_URL: http://ferroterm:8080/
       # The address readers reach the server at, which the console shows
       # beside every request it makes; the base URL when unset.
-      FERROTERM_VIEWER__FERROTERM__PUBLIC_URL:
+      FERROTERM_CONSOLE__FERROTERM__PUBLIC_URL:
       # Passed through only when set in your shell or .env: without an issuer
       # the console offers no sign-in, while an empty one is a boot error.
-      FERROTERM_VIEWER__OIDC__ISSUER:
-      FERROTERM_VIEWER__OIDC__AUTHORIZATION_ENDPOINT:
-      FERROTERM_VIEWER__OIDC__TOKEN_ENDPOINT:
-      FERROTERM_VIEWER__OIDC__JWKS_URI:
-      FERROTERM_VIEWER__OIDC__CLIENT_ID:
-      FERROTERM_VIEWER__OIDC__CLIENT_SECRET_FILE:
-      FERROTERM_VIEWER__OIDC__REDIRECT_URI:
-      FERROTERM_VIEWER__OIDC__SCOPES:
-      FERROTERM_VIEWER__OIDC__OFFLINE_ACCESS:
-      FERROTERM_VIEWER__OIDC__END_SESSION_ENDPOINT:
-      FERROTERM_VIEWER__OIDC__REVOCATION_ENDPOINT:
-      FERROTERM_VIEWER__OIDC__POST_LOGOUT_REDIRECT_URI:
-      FERROTERM_VIEWER__SESSION__SECURE_COOKIE:
+      FERROTERM_CONSOLE__OIDC__ISSUER:
+      FERROTERM_CONSOLE__OIDC__AUTHORIZATION_ENDPOINT:
+      FERROTERM_CONSOLE__OIDC__TOKEN_ENDPOINT:
+      FERROTERM_CONSOLE__OIDC__JWKS_URI:
+      FERROTERM_CONSOLE__OIDC__CLIENT_ID:
+      FERROTERM_CONSOLE__OIDC__CLIENT_SECRET_FILE:
+      FERROTERM_CONSOLE__OIDC__REDIRECT_URI:
+      FERROTERM_CONSOLE__OIDC__SCOPES:
+      FERROTERM_CONSOLE__OIDC__OFFLINE_ACCESS:
+      FERROTERM_CONSOLE__OIDC__END_SESSION_ENDPOINT:
+      FERROTERM_CONSOLE__OIDC__REVOCATION_ENDPOINT:
+      FERROTERM_CONSOLE__OIDC__POST_LOGOUT_REDIRECT_URI:
+      FERROTERM_CONSOLE__SESSION__SECURE_COOKIE:
     secrets:
-      - viewer_oidc_client_secret
+      - console_oidc_client_secret
     # The console keeps its sessions in memory and writes no file, so the
     # root filesystem is read-only and no volume is mounted.
     read_only: true
@@ -244,9 +244,9 @@ services:
 
 secrets:
   # The console's OIDC client secret at your OpenID Provider, read once at
-  # boot through FERROTERM_VIEWER__OIDC__CLIENT_SECRET_FILE.
-  viewer_oidc_client_secret:
-    file: ${FERROTERM_VIEWER_OIDC_CLIENT_SECRET_FILE:-./secrets/viewer_oidc_client_secret}
+  # boot through FERROTERM_CONSOLE__OIDC__CLIENT_SECRET_FILE.
+  console_oidc_client_secret:
+    file: ${FERROTERM_CONSOLE_OIDC_CLIENT_SECRET_FILE:-./secrets/console_oidc_client_secret}
 
 volumes:
   ferroterm-state:

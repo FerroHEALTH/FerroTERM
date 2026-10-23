@@ -36,7 +36,7 @@ discovery-phase repo.
 | Edition | 2024 |
 | Cargo resolver | 3 |
 | MSRV | 1.98 (`rust-version` in the root `Cargo.toml`, checked by `cargo hack check --rust-version`); the toolchain is the newest stable Rust release and the MSRV the toolchain minus one minor release, the rule every FerroHEALTH repository follows; an MSRV is only ever raised |
-| Container base image | `gcr.io/distroless/static-debian13:nonroot@sha256:d62067879de890a1def9da0e7766b7d20810a5e5555cef8506b752437d7a3e88` (`ca-certificates` 20250419+deb13u1), the `FROM` of `docker/Dockerfile`, `docker/Dockerfile.sync` and `docker/viewer/Dockerfile`, and each one's `org.opencontainers.image.base.name` label without the digest |
+| Container base image | `gcr.io/distroless/static-debian13:nonroot@sha256:d62067879de890a1def9da0e7766b7d20810a5e5555cef8506b752437d7a3e88` (`ca-certificates` 20250419+deb13u1), the `FROM` of `docker/Dockerfile`, `docker/Dockerfile.sync` and `docker/console/Dockerfile`, and each one's `org.opencontainers.image.base.name` label without the digest |
 
 ## openEHR: n/a
 
@@ -91,7 +91,7 @@ version is a conformance fact, not a build detail.
 
 ## Console toolchain
 
-The console (`app/ferroterm-viewer`) is a Leptos app rendered on the server
+The console (`app/ferroterm-console`) is a Leptos app rendered on the server
 and hydrated in the browser. cargo-leptos builds its WebAssembly half and the
 site bundle; the server half is an ordinary `cargo build`. Its crate versions
 live in the root `Cargo.toml` like every other dependency, `ferrohealth-ui`
@@ -100,9 +100,9 @@ among them; the pins below are the tools.
 | Item | Pin |
 |---|---|
 | Compilation target | `wasm32-unknown-unknown` (`rustup target add wasm32-unknown-unknown`) |
-| cargo-leptos | 0.3.11, installed by `ci.yml` and `release-viewer.yml` |
+| cargo-leptos | 0.3.11, installed by `ci.yml` and `release-console.yml` |
 | `wasm-bindgen` CLI | 0.2.129, the version of the `wasm-bindgen` crate the root `Cargo.toml` pins |
-| Tailwind CSS standalone CLI | 4.3.3, downloaded and checked against its SHA-256 by `scripts/release/viewer-tools.sh`, so there is no Node and no npm |
+| Tailwind CSS standalone CLI | 4.3.3, downloaded and checked against its SHA-256 by `scripts/release/console-tools.sh`, so there is no Node and no npm |
 | Binaryen `wasm-opt` | version_133, downloaded and checked the same way |
 | `leptosfmt` | 0.1.33, the `view!` macro formatter |
 | Chrome for Testing | 155.0.8059.79 with its chromedriver, installed by `browser-actions/setup-chrome` in the `ui-e2e` job of `ci.yml`, and on a developer machine by `scripts/release/journey-tools.sh`, which checks each zip against its SHA-256 |

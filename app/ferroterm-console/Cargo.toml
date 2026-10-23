@@ -1,0 +1,109 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+[package]
+name = "ferroterm-console"
+description = "The FerroTERM Console: a Leptos app rendered on the server and hydrated, with a backend-for-frontend over the terminology server's FHIR API"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+# Never published: the console ships as its own binary and image.
+publish = false
+
+# One crate, two halves (the Leptos book, server-side rendering): the rlib
+# feeds the server binary and the cdylib is the WebAssembly bundle the
+# browser hydrates with. cargo-leptos builds the cdylib for wasm32 and the
+# binary for the host.
+[lib]
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[[bin]]
+name = "ferroterm-console"
+path = "src/main.rs"
+
+# The evidence pane states figures the repository already commits, so the
+# build script reads those files and emits the document the page carries.
+[build-dependencies]
+serde_json.workspace = true
+
+# Both halves on every target. The server half and the browser half are
+# chosen by target rather than by Cargo feature, so `--all-features` over the
+# workspace can never turn both on at once; a target dependency's features
+# apply only to a build for that target (the Cargo reference, resolver
+# version 2 and later). No specification governs this: our own design.
+#
+# The console is a FHIR client and depends on NO workspace crate, so that
+# anything it can do a client can do. scripts/checks/console-boundary.sh fails
+# when an edge into the engine appears.
+[dependencies]
+ferrohealth-ui.workspace = true
+# The console's own string catalogs under locales/, in both halves.
+fluent-templates.workspace = true
+http.workspace = true
+leptos.workspace = true
+leptos_meta.workspace = true
+leptos_router.workspace = true
+percent-encoding.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+leptos = { workspace = true, features = ["hydrate"] }
+wasm-bindgen.workspace = true
+console_error_panic_hook.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# The per-request script nonce of the Content-Security-Policy rides `nonce`.
+leptos = { workspace = true, features = ["ssr", "nonce"] }
+leptos_axum.workspace = true
+leptos_meta = { workspace = true, features = ["ssr"] }
+leptos_router = { workspace = true, features = ["ssr"] }
+aws-lc-rs.workspace = true
+axum.workspace = true
+base64.workspace = true
+clap.workspace = true
+cookie.workspace = true
+# The ID Token of a sign-in, verified against the provider's JWK Set
+# (OpenID Connect Core 1.0 §3.1.3.7).
+jsonwebtoken.workspace = true
+# The terminology server's FHIR API, the OpenID Provider, and the
+# healthcheck job asking the console beside it.
+reqwest.workspace = true
+secrecy.workspace = true
+# `sync` holds one refresh of a session's access token at a time.
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "signal", "sync", "time"] }
+toml.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+url.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tempfile.workspace = true
+# The router driven in-process with `ServiceExt::oneshot`.
+tower = { workspace = true, features = ["util"] }
+wiremock.workspace = true
+
+[lints]
+workspace = true
+
+# cargo-leptos: the site bundle (the WebAssembly, its JavaScript glue and the
+# stylesheet) under target/site, the server binary beside it.
+[package.metadata.leptos]
+output-name = "ferroterm-console"
+site-root = "target/site"
+site-pkg-dir = "pkg"
+# The console's own layout utilities: Tailwind 4, built by the standalone CLI
+# at the version scripts/release/console-site.sh sets. The components'
+# stylesheet and the brand theme are served from the binary.
+tailwind-input-file = "style/tailwind.css"
+# Copied into the site root as it stands: the brand favicon.
+assets-dir = "public"
+site-addr = "127.0.0.1:3000"
+reload-port = 3001
+lib-profile-release = "wasm-release"

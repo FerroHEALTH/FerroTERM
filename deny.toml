@@ -15,7 +15,7 @@ version = 2
 # zero, re-checked at every dependency-bump cycle, never a permanent waiver).
 yanked = "deny"
 ignore = [
-  # Both arrived with the viewer's leptos tree, both are `unmaintained` rather
+  # Both arrived with the console's leptos tree, both are `unmaintained` rather
   # than a vulnerability, and both are compile-time only, so neither reaches
   # the server binary or the WebAssembly bundle. Driven to zero on #432; each
   # is deleted when the upstream release that drops it is picked up.
@@ -71,7 +71,7 @@ exceptions = [
   { allow = ["BUSL-1.1"], crate = "addon-nts" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-server" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-sync" },
-  { allow = ["BUSL-1.1"], crate = "ferroterm-viewer" },
+  { allow = ["BUSL-1.1"], crate = "ferroterm-console" },
   # The FerroHEALTH console components, published by the same Licensor under
   # the same licence, which the console links from crates.io.
   { allow = ["BUSL-1.1"], crate = "ferrohealth-ui" },

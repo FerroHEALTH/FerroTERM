@@ -16,7 +16,7 @@ The two together are a data-loss defect the moment an authoring screen sends a
 body it rebuilt from its own narrow model: every element the model does not
 carry is deleted from the stored resource, with nothing on screen saying so.
 
-Caught in review of #634, in `app/ferroterm-viewer/src/editor.rs`
+Caught in review of #634, in `app/ferroterm-console/src/editor.rs`
 (`Draft::of` / `Draft::body`), whose model carries `url`, `version`, `status`,
 `content`, `caseSensitive`, `property`, and a FLAT `concept` list. A save would
 have dropped `name`, `title`, `description`, `identifier`, `hierarchyMeaning`,

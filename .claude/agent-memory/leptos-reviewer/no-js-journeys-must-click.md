@@ -20,7 +20,7 @@ to a rendering mode that sends one complete document, which emits no
 no-JavaScript journey to write. Without JavaScript the page is an empty
 `<body>`, which the Leptos book states plainly for CSR
 (`src/csr_wrapping_up.md`). Do not file a finding asking for progressive
-enhancement here; `docs/viewer.md` §1 records the trade deliberately.
+enhancement here; `docs/console.md` §1 records the trade deliberately.
 
 **The half that survives, and it is the important one.** A
 `source.contains("name=\"filter\"")`-style assertion matches inert markup too,

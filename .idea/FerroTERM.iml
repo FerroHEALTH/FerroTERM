@@ -36,7 +36,7 @@
       <sourceFolder url="file://$MODULE_DIR$/crates/labcodeset/tests" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/tools/ferroterm-bench/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/app/ferroterm-server/benches" isTestSource="true" />
-      <sourceFolder url="file://$MODULE_DIR$/app/ferroterm-viewer/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/app/ferroterm-console/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/addons/nts/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/addons/nts/tests" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/app/ferroterm-sync/src" isTestSource="false" />

@@ -12,7 +12,7 @@ metadata:
 **Kept for the record.** Nothing in this entry applies to a client-side
 rendered viewer: there is no `SsrMode`, no `leptos_axum`, and no server-side
 redirect. It is preserved because the mechanism is worth knowing if this
-project ever revisits the rendering decision (`docs/viewer.md` §1, "What would
+project ever revisits the rendering decision (`docs/console.md` §1, "What would
 change the decision").
 
 `leptos_router::components::Redirect` is `#[component(transparent)]`: its body

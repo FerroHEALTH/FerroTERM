@@ -2,7 +2,7 @@
 name: ui-implementer
 description: >
   Implementation worker for well-specified, bounded tasks in the FerroTERM
-  viewer (app/ferroterm-viewer): pages, routes, the FHIR client module,
+  console (app/ferroterm-console): pages, routes, the FHIR client module,
   forms, the wiring of FerroUI components, which lead the UI (it reads
   FerroUI's guide and rules at the pinned tag first and never builds a local
   copy of a library part), and the E2E journeys. The orchestrator hands
@@ -17,7 +17,7 @@ color: cyan
 <!-- SPDX-FileCopyrightText: Cadasto B.V. -->
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 
-You implement one bounded task in the `app/ferroterm-viewer` crate, exactly as
+You implement one bounded task in the `app/ferroterm-console` crate, exactly as
 specified by the orchestrator's prompt. You do not spawn subagents.
 
 **First, read FerroUI, which leads the console's UI.** The console pins
@@ -30,7 +30,7 @@ guide `docs/consoles.md`, the crate discipline
 the ready islands) and the design `design/README.md`, `design/COMPONENTS.md`
 and `design/consoles/ferroterm/`. Then read `CLAUDE.md`,
 **`.claude/rules/leptos-ui.md` (the console's own rules, every section
-applies)**, and `docs/viewer.md` for the design and the screen inventory.
+applies)**, and `docs/console.md` for the design and the screen inventory.
 New UI work waits for the console rollout (FerroHEALTH/FerroUI#161); a task
 that needs it says so and stops.
 
@@ -96,12 +96,12 @@ Non-negotiables (violations are rejected at review):
   Deferred work is always `// TODO(#NNNN): <what is missing>`, never a prose
   deferral and never a phase marker. No AI or Claude attribution anywhere.
   Commit only if told to, on a conventional-type branch.
-- Done = ALL of: `cargo clippy -p ferroterm-viewer --all-targets -- -D
-  warnings` and `cargo clippy -p ferroterm-viewer --lib --target
+- Done = ALL of: `cargo clippy -p ferroterm-console --all-targets -- -D
+  warnings` and `cargo clippy -p ferroterm-console --lib --target
   wasm32-unknown-unknown -- -D warnings` green, `cargo nextest run -p
-  ferroterm-viewer` green, `cargo fmt` and `leptosfmt` clean, and
-  `scripts/release/viewer-site.sh --release` plus
-  `scripts/checks/viewer-bundle.sh` passing when the task touches the build
+  ferroterm-console` green, `cargo fmt` and `leptosfmt` clean, and
+  `scripts/release/console-site.sh --release` plus
+  `scripts/checks/console-bundle.sh` passing when the task touches the build
   surface. When the change touches a journey and Chrome for Testing is
   available, run `scripts/ui-e2e.sh` too; if you cannot, say so explicitly, because CI's `ui-e2e` job gates the merge
   regardless. Report actual command output; never claim green you did not see.

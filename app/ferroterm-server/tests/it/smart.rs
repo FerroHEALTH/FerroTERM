@@ -569,7 +569,7 @@ async fn the_configuration_publishes_what_a_public_client_needs() {
     }
 }
 
-// The console is a confidential client of its own (app/ferroterm-viewer) and
+// The console is a confidential client of its own (app/ferroterm-console) and
 // is configured with its client there, so the discovery document carries the
 // members SMART defines and no client of this server's.
 #[tokio::test]
@@ -580,8 +580,8 @@ async fn the_configuration_names_no_client_of_its_own() {
     for version in ["r4", "r4b", "r5", "r6"] {
         let document = configuration(&server, version).await;
         assert!(
-            document["ferroterm_viewer_client_id"].is_null(),
-            "{version}: the server publishes no viewer client: {document}"
+            document["ferroterm_console_client_id"].is_null(),
+            "{version}: the server publishes no console client: {document}"
         );
     }
 }

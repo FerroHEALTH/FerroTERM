@@ -93,7 +93,7 @@ jobs:
         # `ferroterm-server` produces the `ferroterm` binary; `ferroterm-build`
         # produces the offline index builder shipped beside it. Adjust here and
         # in the Package/SBOM steps if a crate or bin is renamed. The console
-        # is its own binary and image (release-viewer.yml).
+        # is its own binary and image (release-console.yml).
         env:
           TARGET: ${{ inputs.target }}
         run: |

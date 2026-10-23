@@ -6,8 +6,8 @@
 # attests them in the SLSA L3 lane (release-build.yml), verifies each
 # attestation, and stages the binaries under dist/<os>/<arch>/ before this
 # file is built for linux/amd64 and linux/arm64 (release-image.yml). The
-# viewer bundle is compiled into the server binary by that same lane, so the
-# image gains no stage, no file, and no second binary for the web UI.
+# server serves no web UI: the console is its own image
+# (docker/console/Dockerfile), so this image gains no stage for it.
 #
 # Build locally from a staged dist/ tree, from the repository root:
 #   docker buildx build -f docker/Dockerfile --platform linux/arm64 .

@@ -39,7 +39,7 @@ FerroTERM's own part. The information and instructions Annex II asks for are on
 
 - **The product assessed.** Each tagged release as Cadasto B.V. publishes it:
   the `ferroterm` and `ferroterm-build` binaries in the release tarballs, the
-  `ferroterm` container image, the console's `ferroterm-viewer` binaries, site
+  `ferroterm` container image, the console's `ferroterm-console` binaries, site
   bundle and image, and the source archive. The library crates FerroTERM
   publishes on crates.io are products of their own; this page covers them only
   where a row says so, and [the crates](#the-crates-on-cratesio) says how.
@@ -187,7 +187,7 @@ reset the product to its original state"
   same indexes ([CRA information for users, 8(d)](cra-user-information.md#8d-secure-decommissioning-and-removing-user-data)).
 - **Evidence:** `app/ferroterm-server/src/config.rs`;
   [configuration](../operate/configuration.md); `docker/Dockerfile`;
-  `docker/viewer/Dockerfile`; `compose.yaml`.
+  `docker/console/Dockerfile`; `compose.yaml`.
 - **Status:** met for the defaults. The image binds `0.0.0.0:8080` in plain
   HTTP, because TLS belongs to the proxy in the environment above. The reset
   is documented and not exercised by a test.
@@ -236,7 +236,7 @@ systems, and report on possible unauthorised access"
 - **Evidence:** `app/ferroterm-server/src/smart/`;
   [authentication](../operate/configuration.md#authentication);
   [validating tokens in the server](../operate/reverse-proxy.md#validating-tokens-in-the-server);
-  `app/ferroterm-viewer/src/oidc/`.
+  `app/ferroterm-console/src/oidc/`.
 - **Status:** met for writes and the admin listener. Reporting is the request
   log and `ferroterm_http_requests_total` by status; there is no separate
   security event record.
@@ -255,7 +255,7 @@ transit by state of the art mechanisms, and by using other technical means"
   are never logged; secrets are read from files; the Basic users carry
   password hashes, never passwords.
 - **Evidence:** [what the server logs](../operate/configuration.md#what-the-server-logs);
-  [the console, signing in](../operate/viewer.md#signing-in).
+  [the console, signing in](../operate/console.md#signing-in).
 - **Status:** partial. The server and the console speak plain HTTP on their
   own listeners and rely on the proxy for TLS. FerroTERM does not encrypt the
   indexes or the resource database at rest
@@ -336,7 +336,7 @@ external interfaces"
   `POST /reload` alone and is off by default; writes are off without a
   database; the images are distroless static with no shell or package manager;
   the console is a separate program and the server serves no UI.
-- **Evidence:** `docker/Dockerfile`; `docker/viewer/Dockerfile`;
+- **Evidence:** `docker/Dockerfile`; `docker/console/Dockerfile`;
   [the admin listener stays behind the proxy](../operate/reverse-proxy.md#the-admin-listener-stays-behind-the-proxy).
 - **Status:** met. `/health` and `/metrics` answer on the FHIR listener, and
   the book says to keep them off the public route.
