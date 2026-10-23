@@ -160,6 +160,7 @@ pub(crate) fn heading(
         Header {
             title: title.into(),
             subtitle: Some(line.into()),
+            subtitle_view: None,
             crumbs,
             mono: false,
             badge: None,

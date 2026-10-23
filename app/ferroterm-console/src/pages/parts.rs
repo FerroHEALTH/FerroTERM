@@ -47,6 +47,7 @@ pub(crate) fn heading(
         Header {
             title: title.into(),
             subtitle: subtitle.map(Into::into),
+            subtitle_view: None,
             crumbs,
             mono: false,
             badge: None,

@@ -17,8 +17,10 @@ use ferrohealth_ui::table::view::{
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::load_report::{Arrival, LoadReport, Outcome, load_report};
 use ferrohealth_ui::view::root_matrix::{MatrixRoot, MatrixRow, RootMatrix, root_matrix};
+use ferrohealth_ui::view::state::{Mark, state};
 use ferrohealth_ui::view::surface::{SectionHead, panel_section, panel_sections, section_intro};
 use ferrohealth_ui::view::tabs::{Tab, binder};
+use ferrohealth_ui::view::template::list::HeadingCount;
 use leptos::prelude::*;
 use leptos_router::hooks::use_params_map;
 
@@ -360,10 +362,16 @@ fn suite(conformance: Conformance) -> AnyView {
         .modes
         .iter()
         .map(|mode| {
-            let counted = tr_with(
+            let words = tr_with(
                 Msg::ServerPassedOf,
                 &[("passed", mode.passed.into()), ("ran", mode.ran.into())],
             );
+            let mark = if mode.passed == mode.ran {
+                Mark::Ok
+            } else {
+                Mark::Warn
+            };
+            let counted = state(mark, words, None);
             let content = if mode.needs == "nothing" {
                 tr(Msg::ServerNeedsNothing)
             } else {
@@ -389,7 +397,9 @@ fn suite(conformance: Conformance) -> AnyView {
     panel_section(
         Some(SectionHead {
             title: caption.clone(),
-            count: Some(u64::try_from(conformance.modes.len()).unwrap_or(u64::MAX)),
+            count: Some(HeadingCount::All(
+                u64::try_from(conformance.modes.len()).unwrap_or(u64::MAX),
+            )),
             actions: None,
         }),
         view! {
@@ -433,7 +443,9 @@ fn latency(latency: Latency) -> AnyView {
     panel_section(
         Some(SectionHead {
             title: caption.clone(),
-            count: Some(u64::try_from(latency.bars.len()).unwrap_or(u64::MAX)),
+            count: Some(HeadingCount::All(
+                u64::try_from(latency.bars.len()).unwrap_or(u64::MAX),
+            )),
             actions: None,
         }),
         view! {

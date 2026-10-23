@@ -15,6 +15,7 @@ use ferrohealth_ui::view::coding::{Coding, Layout, coding};
 use ferrohealth_ui::view::load_report::Outcome;
 use ferrohealth_ui::view::mapping::{Relationship, relation};
 use ferrohealth_ui::view::surface::{SectionHead, panel_section};
+use ferrohealth_ui::view::template::list::HeadingCount;
 use leptos::prelude::*;
 
 use crate::fhir::translate::{TranslateRequest, TranslationMatch};
@@ -110,7 +111,7 @@ pub(crate) fn TranslatePage() -> impl IntoView {
             run(
                 "translate-run",
                 tr(Msg::OpsTranslate),
-                Glyph::ROUTE,
+                Glyph::CORNER_DOWN_RIGHT,
                 "$translate",
             ),
         );
@@ -260,7 +261,9 @@ fn table(
     Some(panel_section(
         Some(SectionHead {
             title: caption.clone(),
-            count: Some(u64::try_from(matches.len()).unwrap_or(u64::MAX)),
+            count: Some(HeadingCount::All(
+                u64::try_from(matches.len()).unwrap_or(u64::MAX),
+            )),
             actions: None,
         }),
         data_table(DataTable {

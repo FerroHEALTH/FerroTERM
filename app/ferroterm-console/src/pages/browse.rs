@@ -28,6 +28,7 @@ use ferrohealth_ui::view::coding::{Coding, Layout, coding};
 use ferrohealth_ui::view::surface::{
     SectionHead, card_action, definitions, panel_section, section_intro,
 };
+use ferrohealth_ui::view::template::list::HeadingCount;
 use ferrohealth_ui::view::transform::{Density, transform_options};
 use ferrohealth_ui::widget::tree::{TreeData, TreeKind, TreeNode, TreeWords, path_key};
 use leptos::prelude::*;
@@ -425,21 +426,15 @@ fn search_pane(
                     let drawn = Coding::new(
                         concept.code.clone(),
                         concept.display.clone().unwrap_or_default(),
-                    );
+                    )
+                    .href(state.selecting(&concept.code).href(request.version))
+                    .current(concept.code == state.code);
                     let drawn = if concept.inactive {
                         drawn.inactive()
                     } else {
                         drawn
                     };
-                    let href = state.selecting(&concept.code).href(request.version);
-                    let current = (concept.code == state.code).then_some("true");
-                    // TODO(#810): link through Coding::href once FerroUI rings a focused match.
-                    view! {
-                        <a href=href aria-current=current>
-                            {coding(drawn, Layout::Stacked)}
-                        </a>
-                    }
-                    .into_any()
+                    coding(drawn, Layout::Stacked)
                 })
                 .collect();
             view! {
@@ -786,7 +781,9 @@ fn designations(concept: &Concept) -> Option<AnyView> {
     Some(panel_section(
         Some(SectionHead {
             title: caption.clone(),
-            count: Some(u64::try_from(concept.designations.len()).unwrap_or(u64::MAX)),
+            count: Some(HeadingCount::All(
+                u64::try_from(concept.designations.len()).unwrap_or(u64::MAX),
+            )),
             actions: None,
         }),
         data_table(DataTable {
@@ -828,7 +825,9 @@ fn properties(concept: &Concept) -> Option<AnyView> {
     Some(panel_section(
         Some(SectionHead {
             title: caption.clone(),
-            count: Some(u64::try_from(concept.properties.len()).unwrap_or(u64::MAX)),
+            count: Some(HeadingCount::All(
+                u64::try_from(concept.properties.len()).unwrap_or(u64::MAX),
+            )),
             actions: None,
         }),
         data_table(DataTable {

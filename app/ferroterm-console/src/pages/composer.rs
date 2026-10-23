@@ -22,6 +22,7 @@ use ferrohealth_ui::view::load_report::{Arrival, LoadReport, Outcome, load_repor
 use ferrohealth_ui::view::surface::{
     SectionHead, card_action, panel_section, panel_sections_card, section_intro, stack,
 };
+use ferrohealth_ui::view::template::list::HeadingCount;
 use ferrohealth_ui::view::transform::transform_quiet;
 use leptos::prelude::*;
 
@@ -515,7 +516,7 @@ fn compose(draft: &Draft, offers: &Offers<'_>) -> AnyView {
     panel_section(
         Some(SectionHead {
             title: tr(Msg::EditorIncludesExcludes),
-            count: Some(count),
+            count: Some(HeadingCount::All(count)),
             actions: None,
         }),
         view! {

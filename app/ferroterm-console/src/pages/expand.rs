@@ -206,7 +206,7 @@ pub(crate) fn ExpandPage() -> impl IntoView {
             run(
                 "expand-run",
                 tr(Msg::OpsExpand),
-                Glyph::LIST_CHECKS,
+                Glyph::LIST_TREE,
                 "$expand",
             ),
         );

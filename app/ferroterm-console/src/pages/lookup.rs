@@ -12,6 +12,7 @@ use ferrohealth_ui::view::action::small_action_button;
 use ferrohealth_ui::view::button::Variant;
 use ferrohealth_ui::view::load_report::Outcome;
 use ferrohealth_ui::view::surface::{SectionHead, panel_section};
+use ferrohealth_ui::view::template::list::HeadingCount;
 use ferrohealth_ui::widget::action_menu::{Act, Action};
 use leptos::prelude::*;
 
@@ -277,7 +278,9 @@ fn concept_sections(concept: &Concept) -> AnyView {
         panel_section(
             Some(SectionHead {
                 title: caption.clone(),
-                count: Some(u64::try_from(concept.designations.len()).unwrap_or(u64::MAX)),
+                count: Some(HeadingCount::All(
+                    u64::try_from(concept.designations.len()).unwrap_or(u64::MAX),
+                )),
                 actions: None,
             }),
             data_table(DataTable {
@@ -315,7 +318,9 @@ fn concept_sections(concept: &Concept) -> AnyView {
         panel_section(
             Some(SectionHead {
                 title: caption.clone(),
-                count: Some(u64::try_from(concept.properties.len()).unwrap_or(u64::MAX)),
+                count: Some(HeadingCount::All(
+                    u64::try_from(concept.properties.len()).unwrap_or(u64::MAX),
+                )),
                 actions: None,
             }),
             data_table(DataTable {

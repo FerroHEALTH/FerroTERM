@@ -12,13 +12,14 @@
 //! is a query parameter the next link or form carries. No specification
 //! governs the listing: our own design.
 
+use ferrohealth_ui::icon::Glyph;
+use ferrohealth_ui::table::filter::{FilterChoice, FilterMenu, MenuForm, filter_menu};
 use ferrohealth_ui::table::model::{
     Direction, ORDER_KEY, PAGE_KEY, Paging, SIZE_KEY, SORT_KEY, Sort, Window,
 };
-use ferrohealth_ui::tone::Tone;
-use ferrohealth_ui::view::status::badge;
+use ferrohealth_ui::view::state::{Mark, state};
+use ferrohealth_ui::view::template::list::HeadingCount;
 use ferrohealth_ui::view::template::list::{ActiveFilters, FilterChip};
-use ferrohealth_ui::widget::action_menu::{Choice, Listbox, Pick, listbox};
 use leptos::prelude::*;
 
 use crate::locale::{Msg, tr, tr_with};
@@ -40,8 +41,8 @@ pub(crate) const NAME_COLUMN: &str = "name";
 pub(crate) struct ListState {
     /// The words the find field holds, trimmed.
     pub(crate) query: String,
-    /// The source the filter keeps, if one is set.
-    pub(crate) source: Option<Source>,
+    /// The sources the filter keeps; every source when it names none.
+    pub(crate) sources: Vec<Source>,
     /// The order the names are listed in.
     pub(crate) direction: Direction,
     /// The page and its size.
@@ -63,9 +64,10 @@ impl ListState {
         );
         Self {
             query: request.text(QUERY_PARAM),
-            source: request
-                .param(SOURCE_PARAM)
-                .and_then(|key| Source::parse(&key)),
+            sources: crate::request::params_in(&request.query, SOURCE_PARAM)
+                .iter()
+                .filter_map(|key| Source::parse(key))
+                .collect(),
             direction: sort.map_or(Direction::Ascending, |sort| sort.direction),
             paging: Paging::read(request.param(PAGE_KEY).as_deref(), Some(&size)),
         }
@@ -88,7 +90,7 @@ impl ListState {
         let found = words.is_empty()
             || label.to_lowercase().contains(&words)
             || url.to_lowercase().contains(&words);
-        found && self.source.is_none_or(|kept| kept == source)
+        found && (self.sources.is_empty() || self.sources.contains(&source))
     }
 
     /// `rows` kept by the filter, named by `name`, its canonical by `url` and
@@ -132,10 +134,9 @@ impl ListState {
             push(VERSION_PARAM, request.version.segment().to_owned());
         }
         push(QUERY_PARAM, self.query.clone());
-        push(
-            SOURCE_PARAM,
-            self.source.map(Source::key).unwrap_or_default().to_owned(),
-        );
+        for source in &self.sources {
+            push(SOURCE_PARAM, source.key().to_owned());
+        }
         if self.direction == Direction::Descending {
             push(SORT_KEY, String::from(NAME_COLUMN));
             push(ORDER_KEY, String::from("desc"));
@@ -170,10 +171,17 @@ impl ListState {
                 remove: Self::href(path, &self.fields(request, &[QUERY_PARAM, PAGE_KEY])),
             });
         }
-        if let Some(source) = self.source {
+        for source in &self.sources {
+            let mut kept = self.fields(request, &[SOURCE_PARAM, PAGE_KEY]);
+            kept.extend(
+                self.sources
+                    .iter()
+                    .filter(|other| *other != source)
+                    .map(|other| (String::from(SOURCE_PARAM), other.key().to_owned())),
+            );
             chips.push(FilterChip {
                 label: tr_with(Msg::ListingSourceChip, &[("source", source.word().into())]),
-                remove: Self::href(path, &self.fields(request, &[SOURCE_PARAM, PAGE_KEY])),
+                remove: Self::href(path, &kept),
             });
         }
         ActiveFilters {
@@ -186,58 +194,32 @@ impl ListState {
         }
     }
 
-    /// The Source filter (R29): one choice per source among `counts`, each
-    /// a link with its count, and All.
+    /// The Source filter (T1's filter menu): a checkbox per source among
+    /// `counts` that holds a row, each with its count, sent with the find
+    /// field's form.
     #[must_use]
-    pub(crate) fn source_filter(
-        &self,
-        request: &Request,
-        path: &str,
-        counts: &[(Source, usize)],
-    ) -> AnyView {
-        let link = |source: Option<Source>| {
-            let mut fields = self.fields(request, &[SOURCE_PARAM, PAGE_KEY]);
-            if let Some(source) = source {
-                fields.push((String::from(SOURCE_PARAM), source.key().to_owned()));
-            }
-            Self::href(path, &fields)
-        };
-        let total: usize = counts.iter().map(|(_, count)| count).sum();
-        let mut choices = vec![Choice {
-            label: tr(Msg::ListingSourceAll).into(),
-            note: Some(
-                ferrohealth_ui::i18n::number::grouped(u64::try_from(total).unwrap_or(u64::MAX))
-                    .into(),
-            ),
-            lang: None,
-            selected: self.source.is_none(),
-            pick: Pick::Link(link(None)),
-        }];
-        choices.extend(
-            counts
-                .iter()
-                .filter(|(_, count)| *count > 0)
-                .map(|(source, count)| Choice {
-                    label: source.word().into(),
-                    note: Some(
-                        ferrohealth_ui::i18n::number::grouped(
-                            u64::try_from(*count).unwrap_or(u64::MAX),
-                        )
-                        .into(),
-                    ),
-                    lang: None,
-                    selected: self.source == Some(*source),
-                    pick: Pick::Link(link(Some(*source))),
-                }),
-        );
-        let value = self
-            .source
-            .map_or_else(|| tr(Msg::ListingSourceAll), Source::word);
-        listbox(Listbox {
-            id: String::from("source-filter"),
-            label: tr(Msg::ListingSource),
-            value: value.into(),
+    pub(crate) fn source_filter(&self, counts: &[(Source, usize)]) -> AnyView {
+        let choices = counts
+            .iter()
+            .filter(|(_, count)| *count > 0)
+            .map(|(source, count)| {
+                FilterChoice::new(
+                    source.key(),
+                    source.word(),
+                    u64::try_from(*count).unwrap_or(u64::MAX),
+                    self.sources.is_empty() || self.sources.contains(source),
+                )
+            })
+            .collect();
+        filter_menu(FilterMenu {
+            id: "source-filter",
+            name: SOURCE_PARAM,
+            glyph: Glyph::LIST_FILTER,
+            label: tr(Msg::ListingSource).into(),
+            title: tr(Msg::ListingSourceShow),
             choices,
+            note: None,
+            form: MenuForm::Enclosing,
         })
     }
 }
@@ -308,7 +290,7 @@ impl ListState {
                 },
             )
         });
-        let fields = self.fields(request, &[]);
+        let fields = self.fields(request, &[SOURCE_PARAM]);
         let toolbar = find_form(
             Find {
                 id: "listing-find",
@@ -319,12 +301,13 @@ impl ListState {
                 action: None,
                 fields: &fields,
             },
-            self.source_filter(request, &path, &counts),
+            self.source_filter(&counts),
         );
         let page = list_page(ListPage {
             header: Header {
                 title: title.clone().into(),
                 subtitle: Some(subtitle.into()),
+                subtitle_view: None,
                 crumbs: Vec::new(),
                 mono: false,
                 badge: None,
@@ -336,7 +319,7 @@ impl ListState {
             filters: self.chips(request, &path, kept),
             card: ListCard {
                 title: title.clone(),
-                count: Some(u64::try_from(kept).unwrap_or(u64::MAX)),
+                count: Some(HeadingCount::All(u64::try_from(kept).unwrap_or(u64::MAX))),
                 order: None,
                 tabs: None,
                 actions: None,
@@ -392,18 +375,18 @@ pub(crate) fn counted(sources: impl Iterator<Item = Source>) -> Vec<(Source, usi
     counts.to_vec()
 }
 
-/// A publication status as its word with a capital in its tone: Active,
-/// Draft, Retired, or the code as the resource wrote it.
+/// A publication status as the F12 state: Active, Draft, Retired, or the
+/// code as the resource wrote it.
 #[must_use]
-pub(crate) fn status_badge(status: Option<&str>) -> AnyView {
-    let (tone, words) = match status {
-        Some("active") => (Tone::Ok, tr(Msg::StatusActive)),
-        Some("draft") => (Tone::Neutral, tr(Msg::StatusDraft)),
-        Some("retired") => (Tone::Neutral, tr(Msg::StatusRetired)),
-        Some(other) => (Tone::Neutral, other.to_owned()),
-        None => (Tone::Neutral, tr(Msg::StatusUnknown)),
+pub(crate) fn status_state(status: Option<&str>) -> AnyView {
+    let (mark, words) = match status {
+        Some("active") => (Mark::Ok, tr(Msg::StatusActive)),
+        Some("draft") => (Mark::Neutral, tr(Msg::StatusDraft)),
+        Some("retired") => (Mark::Off, tr(Msg::StatusRetired)),
+        Some(other) => (Mark::Neutral, other.to_owned()),
+        None => (Mark::Neutral, tr(Msg::StatusUnknown)),
     };
-    badge(tone, words).into_any()
+    state(mark, words, None)
 }
 
 #[cfg(test)]
@@ -413,10 +396,10 @@ mod tests {
     use super::{ListState, counted};
     use crate::pages::parts::Source;
 
-    fn state(query: &str, source: Option<Source>, direction: Direction) -> ListState {
+    fn state(query: &str, sources: &[Source], direction: Direction) -> ListState {
         ListState {
             query: query.to_owned(),
-            source,
+            sources: sources.to_vec(),
             direction,
             paging: Paging::default(),
         }
@@ -424,23 +407,40 @@ mod tests {
 
     #[test]
     fn the_find_field_matches_the_name_or_the_canonical_in_any_case() {
-        let listing = state("RESP", None, Direction::Ascending);
+        let listing = state("RESP", &[], Direction::Ascending);
         assert!(listing.keeps("Respiratory findings", "http://x/a", Source::Stored));
         assert!(listing.keeps("A", "http://x/respiratory", Source::Loaded));
         assert!(!listing.keeps("Skin", "http://x/skin", Source::Stored));
     }
 
     #[test]
-    fn the_source_filter_keeps_its_source_alone() {
-        let listing = state("", Some(Source::Index), Direction::Ascending);
+    fn the_source_filter_keeps_the_sources_it_names() {
+        let listing = state("", &[Source::Index, Source::Loaded], Direction::Ascending);
         assert!(listing.keeps("A", "u", Source::Index));
+        assert!(listing.keeps("A", "u", Source::Loaded));
         assert!(!listing.keeps("A", "u", Source::Stored));
+        assert!(state("", &[], Direction::Ascending).keeps("A", "u", Source::Stored));
+    }
+
+    #[test]
+    fn the_source_filter_offers_a_checkbox_per_source_that_holds_a_row() {
+        use leptos::prelude::{Owner, RenderHtml};
+        let counts = [(Source::Stored, 2), (Source::Index, 0), (Source::Loaded, 3)];
+        let html = Owner::new().with(|| {
+            state("", &[Source::Loaded], Direction::Ascending)
+                .source_filter(&counts)
+                .to_html()
+        });
+        assert_eq!(2, html.matches("type=\"checkbox\"").count(), "{html}");
+        assert!(html.contains("value=\"loaded\" checked"), "{html}");
+        assert!(!html.contains("value=\"stored\" checked"), "{html}");
+        assert!(!html.contains("value=\"index\""), "{html}");
     }
 
     #[test]
     fn the_rows_sort_by_name_in_the_order_in_force() {
         let rows = vec!["b", "C", "a"];
-        let kept = state("", None, Direction::Descending).kept(
+        let kept = state("", &[], Direction::Descending).kept(
             rows,
             |row| (*row).to_owned(),
             |_| String::new(),

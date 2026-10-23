@@ -10,6 +10,7 @@
 //! Edit. No specification governs the page: our own design.
 
 use ferrohealth_ui::view::action::ActionGroup;
+use ferrohealth_ui::view::coding::canonical;
 use ferrohealth_ui::view::surface::{Crumb, Header};
 use ferrohealth_ui::view::tabs::{Tab, binder};
 use leptos::prelude::*;
@@ -17,7 +18,7 @@ use leptos::prelude::*;
 use crate::fhir::version::FhirVersion;
 use crate::fhir::{CODE_SYSTEM, CONCEPT_MAP, VALUE_SET};
 use crate::locale::{Msg, tr, tr_with};
-use crate::pages::listing::status_badge;
+use crate::pages::listing::status_state;
 use crate::pages::parts::{Source, headed};
 use crate::routes::{CONCEPT_MAPS_PATH, SYSTEMS_PATH, VALUE_SETS_PATH, history_link, ui_link};
 
@@ -152,18 +153,26 @@ pub(crate) struct Head {
 /// The heading of a resource page.
 #[must_use]
 pub(crate) fn header(head: Head, version: FhirVersion) -> AnyView {
-    let subtitle = if head.canonical.is_empty() {
-        head.line
+    let (subtitle, subtitle_view) = if head.canonical.is_empty() {
+        (Some(head.line.into()), None)
     } else {
-        format!("{} · {}", head.canonical, head.line)
+        let line = head.line;
+        let drawn = view! {
+            {canonical(&head.canonical)}
+            " · "
+            {line}
+        }
+        .into_any();
+        (None, Some(drawn))
     };
     headed(
         Header {
             title: head.title.into(),
-            subtitle: Some(subtitle.into()),
+            subtitle,
+            subtitle_view,
             crumbs: vec![head.kind.listing(version)],
             mono: false,
-            badge: Some(status_badge(head.status.as_deref())),
+            badge: Some(status_state(head.status.as_deref())),
         },
         head.actions,
     )

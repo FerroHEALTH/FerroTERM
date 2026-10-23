@@ -14,6 +14,7 @@ use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::notice::{Announce, notice};
 use ferrohealth_ui::view::surface::{SectionHead, panel_section, panel_sections_card, stack};
+use ferrohealth_ui::view::template::list::HeadingCount;
 use leptos::prelude::*;
 
 use crate::fhir::capability::CapabilityStatement;
@@ -167,7 +168,9 @@ fn found_card(request: &Request, groups: &[(&str, String, Vec<Listed>)]) -> AnyV
             panel_section(
                 Some(SectionHead {
                     title: kind.clone(),
-                    count: Some(u64::try_from(found.len()).unwrap_or(u64::MAX)),
+                    count: Some(HeadingCount::All(
+                        u64::try_from(found.len()).unwrap_or(u64::MAX),
+                    )),
                     actions: None,
                 }),
                 data_table(DataTable {
@@ -205,7 +208,9 @@ fn offers_card(offered: &[Offer]) -> AnyView {
         panel_section(
             Some(SectionHead {
                 title: title.clone(),
-                count: Some(u64::try_from(offered.len()).unwrap_or(u64::MAX)),
+                count: Some(HeadingCount::All(
+                    u64::try_from(offered.len()).unwrap_or(u64::MAX),
+                )),
                 actions: None,
             }),
             data_table(DataTable {

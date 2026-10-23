@@ -19,7 +19,7 @@ use crate::fhir::VALUE_SET;
 use crate::fhir::searchset::SearchFilter;
 use crate::fhir::value_set::{ClauseRow, PublishedValueSet};
 use crate::locale::{Msg, message, tr, tr_with};
-use crate::pages::listing::{Frame, ListState, NAME_COLUMN, counted, status_badge};
+use crate::pages::listing::{Frame, ListState, NAME_COLUMN, counted, status_state};
 use crate::pages::parts::{Source, failure, heading, loaded, name_of, system_names};
 use crate::request::{Request, request};
 use crate::routes::{COMPOSE_PATH, VALUE_SETS_PATH, resource_link, ui_link, ui_path};
@@ -182,7 +182,7 @@ fn listing(
                     <tr>
                         {title_cell(Some(&href), label_of(value_set), Some(canonical(url)))}
                         {cell(source, source_of(value_set).tag())} {cell(version, version_words)}
-                        {cell(status, status_badge(value_set.status()))}
+                        {cell(status, status_state(value_set.status()))}
                         {cell(selection, selects(&value_set.clauses(), names))}
                     </tr>
                 }
