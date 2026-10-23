@@ -87,10 +87,10 @@ fi
 
 # Whether anything is listening on a local port. The runner talks to whatever
 # answers, so a port another process holds must never be measured (#425).
+# Bash connects on any redirection of a /dev/tcp path, and the subshell closes
+# the socket as it exits.
 port_taken() {
-  (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null || return 1
-  exec 3<&-
-  return 0
+  (: <"/dev/tcp/127.0.0.1/$1") 2>/dev/null
 }
 
 started=""
