@@ -692,6 +692,44 @@ async fn the_shortcuts_open_their_legend_and_go_to_a_screen() {
     outcome.expect("the journey ran and the browser session ended cleanly");
 }
 
+/// Configuration says "How configuration works" once, at the end of the
+/// line that names the file, and that button opens its dialog with no
+/// script.
+#[tokio::test]
+async fn the_configuration_file_line_opens_how_configuration_works() {
+    let Some(base) = server() else {
+        return;
+    };
+    let outcome = session()
+        .await
+        .run_and_quit(|driver| async move {
+            let how = "//main//*[normalize-space()='How configuration works']\
+                       [self::a or self::button][not(ancestor::dialog)]";
+            let journey = Journey::open(driver, &base, "/configuration").await;
+            journey
+                .element(By::Css(TITLE), "the configuration's title")
+                .await;
+            assert_eq!(
+                1,
+                journey.count(By::XPath(how)).await,
+                "How configuration works is offered once, on the file line"
+            );
+            journey
+                .press(
+                    By::Css("button.fui-link-button[commandfor='config-how']"),
+                    "How configuration works on the file line",
+                )
+                .await?;
+            journey
+                .visible(By::Css("dialog#config-how[open]"), "the dialog it opens")
+                .await;
+            journey.no_console_errors().await;
+            Ok::<(), WebDriverError>(())
+        })
+        .await;
+    outcome.expect("the journey ran and the browser session ended cleanly");
+}
+
 /// A preference is kept in its cookie and every page is drawn in it.
 #[tokio::test]
 async fn a_preference_is_kept_and_every_page_is_drawn_in_it() {

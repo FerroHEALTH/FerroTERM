@@ -256,6 +256,7 @@ pub(crate) fn dock(save: String, standing: &Standing) -> AnyView {
                 label: tr(Msg::EditorDiscard),
                 variant: Variant::Secondary,
                 glyph: Some(Glyph::X),
+                leaves: true,
                 ..Decision::default()
             },
             Decision {
@@ -266,6 +267,7 @@ pub(crate) fn dock(save: String, standing: &Standing) -> AnyView {
                 glyph: Some(Glyph::SAVE),
                 shortcut: Some(String::from("Ctrl S")),
                 state,
+                leaves: false,
             },
         ],
     })

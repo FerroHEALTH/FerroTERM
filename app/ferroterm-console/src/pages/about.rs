@@ -18,7 +18,7 @@ use crate::request::request;
 use crate::shell::{PRODUCT, VERSION};
 
 /// The library the console is drawn with, at the version its manifest pins.
-pub(crate) const FERROUI: &str = "ferrohealth-ui 0.3.3";
+pub(crate) const FERROUI: &str = "ferrohealth-ui 0.3.4";
 
 /// The id of the self-description's Copy button.
 const COPY_ID: &str = "about-copy";

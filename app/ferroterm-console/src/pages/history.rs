@@ -528,7 +528,7 @@ fn comparison(request: &Request, opened: &Opened) -> AnyView {
                     {action_field(
                         view! {
                             <button type="submit" class=Variant::Secondary.class()>
-                                {ferrohealth_ui::icon::icon(Glyph::EQUAL_NOT, "16")}
+                                {ferrohealth_ui::icon::icon(Glyph::GIT_COMPARE, "16")}
                                 {tr(Msg::HistoryCompare)}
                             </button>
                         },

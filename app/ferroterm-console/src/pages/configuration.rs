@@ -10,7 +10,6 @@
 
 use std::time::Duration;
 
-use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::dialog::{Explanation, info_dialog};
@@ -18,8 +17,7 @@ use ferrohealth_ui::view::secret::{SecretState, secret_state};
 use ferrohealth_ui::view::status::badge;
 use ferrohealth_ui::view::surface::Header;
 use ferrohealth_ui::view::tabs::{Tab, TabRow};
-use ferrohealth_ui::view::template::settings::{Setting, SettingsPage, Source, settings_page};
-use ferrohealth_ui::widget::action_menu::{Act, Action};
+use ferrohealth_ui::view::template::settings::{How, Setting, SettingsPage, Source, settings_page};
 use leptos::prelude::*;
 use leptos_meta::Title;
 use leptos_router::hooks::use_params_map;
@@ -28,9 +26,6 @@ use crate::config::settings::Settings;
 use crate::locale::{Msg, tr, tr_with};
 use crate::routes::{CONFIGURATION_PATH, ui_path};
 use crate::server::ConsoleState;
-
-/// Where the book says how the console's configuration works.
-const HOW: &str = "https://ferroterm.eu/docs/operate/console.html#configuration";
 
 /// The id of the dialog that says how configuration works.
 const HOW_DIALOG: &str = "config-how";
@@ -350,14 +345,10 @@ pub(crate) fn ConfigurationPage() -> impl IntoView {
             mono: false,
             badge: None,
         },
-        actions: ActionGroup::primary(Action::new(
-            Some(Glyph::INFO),
-            tr(Msg::ConfigHow),
-            Act::Dialog(String::from(HOW_DIALOG)),
-        )),
+        actions: ActionGroup::none(),
         source: Source::File {
             file: shown_file.clone(),
-            how: String::from(HOW),
+            how: How::Dialog(HOW_DIALOG.into()),
         },
         tabs: Some(TabRow {
             label: tr(Msg::ConfigSections),
