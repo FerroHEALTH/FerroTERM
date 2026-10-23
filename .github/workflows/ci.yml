@@ -434,6 +434,45 @@ jobs:
       # Reads the same RustSec advisory DB as cargo-audit and adds
       # yanked/licenses/bans/sources, so no separate cargo-audit job exists.
       - run: cargo deny check
+      # An exception in deny.toml that no longer names a finding fails, so the
+      # published VEX justification never outlives the advisory it argues.
+      - name: Every advisory exception still names a finding
+        run: bash scripts/checks/advisory-exceptions.sh
+      # Each VEX statement's dependency path against the graph cargo resolves.
+      - name: Every VEX statement names the paths cargo resolves
+        run: bash scripts/checks/vex-reachability.sh
+
+  # The Rust-advisory OpenVEX document is generated from deny.toml and
+  # security/vex/rust-advisories.toml; this regenerates it and fails on any
+  # difference, and checks every hand-written document is well-formed OpenVEX
+  # (no specification governs the pairing: our own design, FerroEHR's gate).
+  vex:
+    name: vex
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # deny.toml and the prose file are TOML, which jq cannot read. Pinned by
+      # version and verified by checksum: this binary decides whether the gate
+      # passes.
+      - name: Install yq
+        env:
+          YQ_VERSION: v4.53.3
+          YQ_SHA256: fa52a4e758c63d38299163fbdd1edfb4c4963247918bf9c1c5d31d84789eded4
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors -o /tmp/yq "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
+          echo "${YQ_SHA256}  /tmp/yq" | sha256sum -c -
+          sudo install -m 0755 /tmp/yq /usr/local/bin/yq
+          yq --version
+      - name: Every accepted advisory has a published VEX justification
+        run: bash scripts/checks/vex-advisories.sh
+      - name: The release record's coverage check refuses what it claims to refuse
+        run: bash scripts/checks/vex-coverage.sh --self-test
 
   # The console is a FHIR client and links no crate from this workspace, so
   # anything it can do a client can do. One dependency edge into the engine
@@ -915,6 +954,7 @@ jobs:
       - test
       - doc
       - cargo-deny
+      - vex
       - console-boundary
       - addon-boundary
       - console-tokens

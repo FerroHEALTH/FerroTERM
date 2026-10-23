@@ -17,8 +17,10 @@
 # site bundle with cargo-leptos; each attests what it built and attaches it to
 # the draft. `image` verifies both against this workflow's signer identity
 # before it stages them, so the image provenance chains to attested inputs,
-# then pushes the index, attests the index and both platform manifests as OCI
-# referrers, and verifies its own output as a consumer would.
+# then pushes the index by digest, attests the index and both platform
+# manifests as OCI referrers, and verifies its own output as a consumer would.
+# The index is tagged by scan-and-tag.yml only after its scan and the
+# release's vulnerability record pass.
 #
 # Verify a published image (the tag resolves to the index):
 #   gh attestation verify oci://ghcr.io/ferrohealth/ferroterm-console:<version> \
@@ -47,6 +49,13 @@ on:
       digest:
         description: The digest of the pushed image index.
         value: ${{ jobs.image.outputs.digest }}
+      tags:
+        description: >-
+          The newline-separated tag list the metadata step computed. The index
+          is pushed by digest with no tag; release.yml applies these through
+          scan-and-tag.yml once the image's scan and the release's
+          vulnerability record pass.
+        value: ${{ jobs.image.outputs.tags }}
 
 permissions: {}
 
@@ -319,6 +328,7 @@ jobs:
       attestations: write # store them against this repository
     outputs:
       digest: ${{ steps.build.outputs.digest }}
+      tags: ${{ steps.meta.outputs.tags }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -412,11 +422,13 @@ jobs:
           context: .
           file: docker/console/Dockerfile
           platforms: linux/amd64,linux/arm64
-          push: true
+          # By digest, untagged: scan-and-tag.yml tags the index only after the
+          # scan and the vulnerability record pass. Attestations bind the
+          # digest, so they are the same either way.
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
           no-cache: true
           provenance: false
           sbom: false
-          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
 
@@ -507,7 +519,6 @@ jobs:
         run: |
           set -euo pipefail
           signer="${GITHUB_REPOSITORY}/.github/workflows/release-console.yml"
-          gh attestation verify "oci://${IMAGE}:${VERSION}" --repo "$GITHUB_REPOSITORY" --signer-workflow "$signer"
           gh attestation verify "oci://${IMAGE}@${DIGEST}" --repo "$GITHUB_REPOSITORY" --signer-workflow "$signer"
           for manifest in "$AMD64" "$ARM64"; do
             gh attestation verify "oci://${IMAGE}@${manifest}" --repo "$GITHUB_REPOSITORY" --signer-workflow "$signer"

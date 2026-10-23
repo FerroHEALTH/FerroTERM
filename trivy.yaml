@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+#
+# Trivy configuration for the image gate (scan-and-tag.yml), the weekly
+# published-image scan (image-scan.yml) and scripts/security/scan-images.sh.
+# The release's vulnerability record does not read it: that job passes an
+# empty configuration so it sees every finding.
+#
+# Two deliberate choices:
+#
+#   * `ignore-unfixed` (set under `vulnerability:`). A finding in the upstream
+#     base image with no fix available is not something a rebuild can resolve,
+#     so it does not block the gate; the release record still judges it against
+#     security/vex/. The nesting matters: Trivy ignores a top-level
+#     `ignore-unfixed` key.
+#   * HIGH and CRITICAL only. The two images are static distroless with musl
+#     binaries, so the OS surface is a handful of Debian packages; the record
+#     covers every other severity.
+#
+# The adjudicated-exception path for a specific finding is `.trivyignore.yaml`.
+severity:
+  - HIGH
+  - CRITICAL
+
+vulnerability:
+  ignore-unfixed: true
+
+ignorefile: .trivyignore.yaml
+
+# The OpenVEX documents under security/vex/ are not listed here: Trivy takes
+# VEX sources only as `--vex` arguments, so image-scan.yml and
+# scripts/security/scan-images.sh pass them explicitly. The gate in
+# scan-and-tag.yml passes none, because a `pkg:oci/...` product matches only a
+# published reference, never the untagged digest the gate scans.

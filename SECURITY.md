@@ -110,6 +110,17 @@ FerroTERM-specific impact (report those upstream; Dependabot and `cargo deny`
 track advisories here), and issues that require an already-compromised host or
 a misconfiguration outside FerroTERM's control.
 
+- A dependency advisory the advisory gate accepts, and any finding in an
+  inherited container layer we have argued does not affect FerroTERM, is
+  published as an OpenVEX statement under [`security/vex/`](security/vex/),
+  with the justification and an impact statement you can check. If you think
+  one of those arguments is wrong, that is a valid report.
+- Every release carries its vulnerability record
+  (`ferroterm-<tag>-vulnerability-record.json`): a scan of both images and the
+  server tarballs at every severity, each finding joined with the statement
+  that judges it. A release with an unjudged finding is not published, and
+  its images are scanned before they are tagged.
+
 ## How releases are verified
 
 Release binaries are built in an isolated reusable workflow (SLSA Build Level

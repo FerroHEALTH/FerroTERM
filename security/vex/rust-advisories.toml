@@ -1,0 +1,113 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+#
+# The prose half of the Rust-dependency VEX document.
+#
+# `security/vex/rust-advisories.openvex.json` is GENERATED from this file joined
+# with `deny.toml`, by `scripts/security/vex-generate.sh`. Never hand-edit the
+# JSON: `scripts/checks/vex-advisories.sh` regenerates it and fails on any
+# difference.
+#
+# WHY TWO FILES RATHER THAN ONE. The set of accepted advisory ids has exactly
+# one authority, the `[advisories].ignore` array in `deny.toml`, which is the
+# gate that actually decides whether a build passes. Duplicating that list here
+# would create a second list that drifts (FerroEHR was bitten by a stale
+# `.cargo/audit.toml` nothing read). So the ids come from `deny.toml` and
+# only the reasoning lives here, and the generator REFUSES to run if the two
+# sets disagree in either direction.
+#
+# The OpenVEX vocabulary is not free text: `status` and `justification` are
+# controlled fields from the specification
+# (https://github.com/openvex/spec/blob/main/OPENVEX-SPEC.md). A justification
+# must be one of `component_not_present`, `vulnerable_code_not_present`,
+# `vulnerable_code_not_in_execute_path`,
+# `vulnerable_code_cannot_be_controlled_by_adversary`,
+# `inline_mitigations_already_exist`, and the `impact` below has to actually
+# argue for the one chosen. "Low risk" is not a justification.
+#
+# Aliases are transcribed from the advisory's own RustSec entry
+# (https://rustsec.org/advisories/) so a scanner keyed on a CVE or GHSA
+# identifier rather than a RUSTSEC one still matches the statement.
+#
+# THE DEPENDENCY PATH IS STRUCTURED, NOT ONLY PROSE. Every statement's argument
+# rests on WHERE the affected crate enters the build, and an impact statement
+# that names the wrong path is a false claim that reads perfectly. That
+# happened in FerroEHR: its `rsa` statement asserted the crate was reached only through
+# `openidconnect` while `cargo tree -i rsa` had shown a second path through
+# `pgp` all along. So each statement declares the path as data, and
+# `scripts/checks/vex-reachability.sh` compares it against the graph cargo
+# resolves:
+#
+#   crate            the affected package name
+#   version          optional; pins the `cargo tree -i` query when several
+#                    versions of the crate coexist in the graph, and states
+#                    which one the argument is about
+#   carriers         the crates that depend DIRECTLY on it (depth 1 of the
+#                    inverted tree), exhaustive, in both directions
+#   workspace_roots  the workspace members it is reachable from: a graph fact
+#                    over every feature, target and dependency kind, so test
+#                    and tooling crates appear here; it is NOT a claim about
+#                    what the shipped artifacts contain (that argument belongs
+#                    in `impact`)
+#
+# Both sets are exhaustive: naming a crate the graph does not have fails, and
+# so does a crate in the graph the statement does not name. An empty pair
+# asserts the crate is absent from the resolved graph entirely, which is what
+
+[document]
+# A stable IRI for the document, and a timestamp that is HAND-SET rather than
+# taken from the clock: the generator must be deterministic, or the drift check
+# would fail on every run. Bump `version` and `timestamp` together whenever a
+# statement changes.
+id = "https://ferroterm.eu/vex/rust-dependency-advisories"
+author = "Cadasto B.V."
+role = "vendor"
+timestamp = "2026-10-23T00:00:00Z"
+version = 1
+
+# What the statements are about: the released server tarballs, the server image
+# built from the same graph, and the console image. Every statement names the
+# workspace members it reaches in `workspace_roots`.
+products = [
+  "pkg:cargo/ferroterm-server",
+  "pkg:oci/ferroterm",
+  "pkg:oci/ferroterm-console",
+]
+
+# ── Accepted by the advisory gate ───────────────────────────────────────────
+# Every id here MUST appear in `deny.toml`'s `[advisories].ignore`, and every id
+# there MUST appear here. The generator enforces both directions.
+
+[[accepted]]
+id = "RUSTSEC-2024-0436"
+crate = "paste"
+version = "1.0.15"
+carriers = [
+  "either_of",
+  "leptos",
+  "reactive_graph",
+  "reactive_stores",
+  "tachys",
+]
+workspace_roots = ["ferroterm-console"]
+status = "not_affected"
+justification = "vulnerable_code_not_present"
+impact = """
+An UNMAINTAINED-crate advisory, not a vulnerability: the author archived the \
+repository and RustSec records no flaw and no patched version. `paste` is a \
+procedural macro that pastes tokens at compile time, reached only through five \
+crates of the Leptos 0.8 family in the console (`cargo tree -i paste@1.0.15`). \
+Like every proc-macro it runs inside the compiler and links into nothing that \
+ships, so it is absent from the server binaries, the console binary and its \
+WebAssembly bundle. Re-evaluate on the next Leptos release (#432).\
+"""
+
+# ── Reported by lock-file scanners only ─────────────────────────────────────
+# Advisories `cargo-deny` never raises, because it resolves FEATURES, while a
+# scanner reading `Cargo.lock` alone cannot. These must NOT be in `deny.toml`'s
+# ignore list: an ignore for an advisory the gate never raises records nothing
+# and would start applying silently if the tool ever became lock-file-based,
+# and the generator refuses if one appears there.
+#
+# The section is EMPTY today: `trivy fs Cargo.lock` with every severity and no
+# configuration reported no finding on 2026-10-23.
