@@ -140,9 +140,12 @@ descendants() {
 
 # Stops everything this run started, by the process id it recorded, and the
 # browsers below them first, so no Chrome outlives the run to hold a port the
-# next run's sessions need.
+# next run's sessions need. A failing run first keeps the logs of the servers,
+# the consoles, the issuer and chromedriver in FAILURES_DIR/logs, once every
+# process has stopped and written its last line, so the failure artifact
+# carries what the processes said beside what the browser saw.
 cleanup() {
-  local pid child
+  local status=$? pid child log
   for pid in ${pids[@]+"${pids[@]}"}; do
     for child in $(descendants "$pid"); do
       kill "$child" 2> /dev/null || true
@@ -152,6 +155,16 @@ cleanup() {
   for pid in ${pids[@]+"${pids[@]}"}; do
     wait "$pid" 2> /dev/null || true
   done
+  if [[ "$status" -ne 0 ]]; then
+    for log in "$work"/*.log; do
+      [[ -f "$log" ]] || continue
+      mkdir -p "$FAILURES_DIR/logs"
+      cp -- "$log" "$FAILURES_DIR/logs/" || true
+    done
+    if [[ -d "$FAILURES_DIR/logs" ]]; then
+      echo "ui-e2e: the run failed; its process logs are in $FAILURES_DIR/logs" >&2
+    fi
+  fi
   rm -f -- "$work"/*.log "$work"/*.redb
   rmdir -- "$work" 2> /dev/null || true
 }

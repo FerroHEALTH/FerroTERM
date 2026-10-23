@@ -661,8 +661,9 @@ jobs:
           FERROTERM_UI_E2E_CHROME: ${{ steps.chrome.outputs.chrome-path }}
           FERROTERM_UI_E2E_CHROMEDRIVER: ${{ steps.chrome.outputs.chromedriver-path }}
       # What the browser was looking at when a journey failed: a screenshot and
-      # the whole document, per failed wait. A passing run writes nothing, so
-      # this attaches only where there is something to look at.
+      # the whole document, per failed wait, and under logs/ what the servers,
+      # the consoles, the issuer and chromedriver logged. A passing run writes
+      # nothing, so this attaches only where there is something to look at.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
