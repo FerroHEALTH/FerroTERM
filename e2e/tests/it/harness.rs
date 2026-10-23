@@ -107,9 +107,14 @@ const SIGN_IN_CONTROL: &str = "//a[normalize-space()='Sign in']";
 /// The shell's own mark, which proves a bundle booted.
 const SHELL_MARK: &str = "header a.fui-lockup";
 
-/// The island that marks `<html>` once the page has hydrated; the sign-in
-/// page draws the shell's header without it.
-const MARKING_ISLAND: &str = "leptos-island[data-component^='Shortcuts']";
+/// Whether the page in front of the browser has finished loading and, when
+/// it carries the island that marks `<html>` once the page has hydrated, has
+/// been marked. The sign-in page draws the shell's header without the island.
+const HYDRATED: &str = r#"
+return document.readyState === "complete"
+    && (document.documentElement.hasAttribute("data-hydrated")
+        || document.querySelector("leptos-island[data-component^='Shortcuts']") === null);
+"#;
 
 /// Opens the issuer's profile address, which decides what the sign-in grants.
 ///
@@ -319,19 +324,20 @@ impl Journey {
     /// the form's state. The console marks `<html>` with `data-hydrated` when
     /// it is done. A page that is not the console's (the issuer's, a refusal
     /// in plain text) carries no shell, and the sign-in page no island that
-    /// marks it, so neither is waited on.
+    /// marks it, so neither is waited on. A document still loading is waited
+    /// on, because the island may not be parsed yet.
     async fn hydrated(&self) {
-        // Both are read on every poll, so a navigation still settling when the
-        // wait starts is judged on the page it lands on.
+        // The page is read whole on every poll, so a navigation still settling
+        // when the wait starts is judged on the page it lands on, and a script
+        // the navigation interrupts reads as not yet hydrated.
         let started = std::time::Instant::now();
-        let found = |selector: &'static str| async move {
-            self.driver
-                .find_all(By::Css(selector))
-                .await
-                .is_ok_and(|found| !found.is_empty())
-        };
         while started.elapsed() <= WAIT {
-            if found("html[data-hydrated]").await || !found(MARKING_ISLAND).await {
+            let ready = self
+                .driver
+                .execute(HYDRATED, Vec::new())
+                .await
+                .is_ok_and(|answer| answer.convert::<bool>().is_ok_and(|ready| ready));
+            if ready {
                 return;
             }
             tokio::time::sleep(POLL).await;
@@ -581,10 +587,11 @@ impl Journey {
     ///
     /// Every other reading here is a WebDriver primitive, because inert markup
     /// satisfies a source assertion even when the control it describes is
-    /// unreachable. Three things have no primitive: the element focus is on
-    /// after a key press, the colour a browser actually painted, and the height
+    /// unreachable. Four things have no primitive: the element focus is on
+    /// after a key press, the colour a browser actually painted, the height
     /// of the viewport, because Get Window Rect reports the window around it
-    /// (<https://www.w3.org/TR/webdriver2/#get-window-rect>). They are read
+    /// (<https://www.w3.org/TR/webdriver2/#get-window-rect>), and whether a
+    /// document has finished loading, which `hydrated` reads. They are read
     /// through a script (<https://www.w3.org/TR/webdriver2/#execute-script>)
     /// and nothing else is.
     pub async fn evaluate(&self, script: &str) -> WebDriverResult<String> {
@@ -620,10 +627,15 @@ impl Journey {
     /// (<https://www.w3.org/TR/webdriver2/#key-actions>). A leading Control
     /// is held down over the rest, as a chord.
     ///
+    /// A shortcut answers only once the page has hydrated, and the last press
+    /// may have loaded a page whose controls are on screen before then, so
+    /// the keys wait for the page.
+    ///
     /// # Errors
     ///
     /// Returns the WebDriver error when the browser refused the keys.
     pub async fn type_here(&self, text: &str) -> WebDriverResult<()> {
+        self.hydrated().await;
         let chain = self.driver.action_chain();
         match text.strip_prefix('\u{e009}') {
             Some(chord) => {
