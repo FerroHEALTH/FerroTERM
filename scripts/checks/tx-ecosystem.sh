@@ -90,7 +90,8 @@ fi
 # Bash connects on any redirection of a /dev/tcp path, and the subshell closes
 # the socket as it exits.
 port_taken() {
-  (: <"/dev/tcp/127.0.0.1/$1") 2>/dev/null
+  local probe=$1
+  (: <"/dev/tcp/127.0.0.1/$probe") 2>/dev/null
 }
 
 started=""
