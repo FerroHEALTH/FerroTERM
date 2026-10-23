@@ -1,410 +1,215 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The concept maps this root holds, as the resources it publishes.
-//!
-//! The screen reads and never writes. The RESTful API defines create, update,
-//! and delete beside read and search
-//! (<https://hl7.org/fhir/R4B/http.html>), and this server answers all of
-//! them; the viewer calls none, so nothing here offers one.
+//! Concept maps (T1): every concept map the root holds, with where it comes
+//! from, what it maps from and to, how many mappings it carries and its
+//! status.
 
-use leptos::ev::SubmitEvent;
-use leptos::html::Input;
-use leptos::prelude::*;
-use leptos_meta::Title;
-use leptos_router::NavigateOptions;
-use leptos_router::components::Redirect;
-use leptos_router::hooks::use_navigate;
-use leptos_router::hooks::use_query_map;
+use std::collections::BTreeMap;
 
-use crate::components::failure::Failure;
-use crate::components::reading::Reading;
-use crate::components::shell::SelectedVersion;
-use crate::components::state::empty;
-use crate::fhir::FhirClient;
-use crate::fhir::concept_map::PublishedConceptMap;
-use crate::fhir::error::FhirError;
-use crate::fhir::searchset::SearchFilter;
-use crate::fhir::searchset::SearchSet;
-use crate::fhir::translate::TranslateRequest;
-use crate::fhir::version::FhirVersion;
-use crate::listing::Action;
-use crate::listing::ListParams;
-use crate::listing::Published;
-use crate::listing::SortOrder;
-use crate::listing::count_sentence;
-use crate::listing::filter_form;
-use crate::listing::pager_view;
-use crate::listing::published_row;
-use crate::listing::published_table;
-use crate::listing::window;
-use crate::locale::{Msg, message, tr};
-use crate::pages::translate;
-use crate::routes::CONCEPT_MAPS_PATH;
-use crate::routes::resource_link;
-use crate::settings::Settings;
+use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::model::Noun;
-use ferrohealth_ui::table::view::Listing;
-use ferrohealth_ui::view::surface::{page_header, stack};
+use ferrohealth_ui::table::view::{Body, Column, DataTable, Role, cell, data_table, title_cell};
+use ferrohealth_ui::view::action::ActionGroup;
+use ferrohealth_ui::view::coding::canonical;
+use ferrohealth_ui::widget::action_menu::{Act, Action};
+use leptos::prelude::*;
 
-/// The address parameter carrying the concept map the runner translates with.
-const MAP_PARAM: &str = "map";
+use crate::auth::scopes::Letter;
+use crate::fhir::CONCEPT_MAP;
+use crate::fhir::concept_map::PublishedConceptMap;
+use crate::fhir::searchset::SearchFilter;
+use crate::locale::{Msg, message, tr, tr_with};
+use crate::pages::listing::{Frame, ListState, NAME_COLUMN, counted, status_badge};
+use crate::pages::parts::{Source, failure, heading, loaded, name_of, system_names};
+use crate::request::{Request, request};
+use crate::routes::{CONCEPT_MAP_EDITOR_PATH, CONCEPT_MAPS_PATH, resource_link, ui_link, ui_path};
 
-/// The address parameter carrying that concept map's business version.
-const MAP_VERSION_PARAM: &str = "mapVersion";
-
-/// The address parameter carrying the code system the code belongs to.
-const SYSTEM_PARAM: &str = "system";
-
-/// The address parameter carrying that code system's version.
-const SYSTEM_VERSION_PARAM: &str = "systemVersion";
-
-/// The address parameter carrying the code to translate.
-const CODE_PARAM: &str = "code";
-
-/// The address parameter carrying the code system an answer is wanted in.
-const TARGET_PARAM: &str = "target";
-
-/// Lists the `ConceptMap` resources this root holds, and translates with them.
-///
-/// The filter, the page, the map being read, and every parameter of a run all
-/// live in the address, so a translation is a link you can share and the back
-/// button walks the runs. Each is read reactively: a submit is a navigation
-/// onto this same route, and `leptos_router` 0.8.15 then updates the params
-/// without re-running this body (`src/nested_router.rs`, the same-route-id
-/// branch).
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type, and a binary crate has no reachable public API"
-)]
-pub(crate) fn ConceptMapsPage() -> impl IntoView {
-    let client = expect_context::<FhirClient>();
-    let SelectedVersion(version) = expect_context::<SelectedVersion>();
-    let page_size = expect_context::<Settings>().page_size;
-    let _help = ferrohealth_ui::widget::help::provide_help();
-
-    let query = use_query_map();
-    let params: Signal<ListParams> =
-        Memo::new(move |_| query.with(|map| ListParams::read(&|name| map.get(name), page_size)))
-            .into();
-    // An address written before the runner had its own screen still names a
-    // run, so it is sent to the screen that answers it rather than listing
-    // maps and dropping what the link asked for.
-    let carried = Memo::new(move |_| query.with(|map| read_run(&|name| map.get(name))));
-    let navigate = StoredValue::new(use_navigate());
-    Effect::new(move |_| {
-        let run = carried.get();
-        if run.runnable() {
-            let target = translate::address(&run, version.get());
-            navigate.with_value(|navigate| navigate(&target, unresolved()));
-        }
-    });
-
-    let heading = view! {
-        <Title text=tr(Msg::ConceptMaps) />
-        {page_header(
-            tr(Msg::ConceptMaps),
-            Some(tr(Msg::ConceptmapResourcesServerPublishesOpenOne)),
-            (),
-        )}
-    }
-    .into_any();
-
-    let form = search_form(params, version);
-    // The order lives in the address, so an ordered list is a link.
-    let order = Memo::new(move |_| query.with(|map| SortOrder::read(&|name| map.get(name))));
-    let list = list_section(&client, version, params, order);
-    // NOTE: no specification governs this: our own design; an address from
-    // before the detail screen named the resource as `?id=`, now its path.
-    let moved = move || {
-        params.with(|params| {
-            (!params.id.is_empty()).then(|| {
-                let target = resource_link(CONCEPT_MAPS_PATH, &params.id, version.get());
-                view! { <Redirect path=target /> }
-            })
-        })
-    };
-
-    view! {
-        {moved}
-        {heading}
-        {stack(
-            view! {
-                {form}
-                {list}
-            },
-        )}
-    }
-}
-
-/// The parameters of a run, as the address carries them.
-fn read_run(query: &dyn Fn(&str) -> Option<String>) -> TranslateRequest {
-    let text = |name: &str| query(name).unwrap_or_default().trim().to_owned();
-    TranslateRequest {
-        concept_map: text(MAP_PARAM),
-        concept_map_version: text(MAP_VERSION_PARAM),
-        system: text(SYSTEM_PARAM),
-        system_version: text(SYSTEM_VERSION_PARAM),
-        code: text(CODE_PARAM),
-        target_system: text(TARGET_PARAM),
-    }
-}
-
-/// The address the list is at, for a link or a navigation.
-fn address(params: &ListParams, version: FhirVersion) -> String {
-    params.address(CONCEPT_MAPS_PATH, version)
-}
-
-/// The search filter, as a form that navigates rather than reloading.
-fn search_form(params: Signal<ListParams>, version: Signal<FhirVersion>) -> AnyView {
-    let canonical: NodeRef<Input> = NodeRef::new();
-    let resource_version: NodeRef<Input> = NodeRef::new();
-    let navigate = use_navigate();
-    let submit = move |event: SubmitEvent| {
-        event.prevent_default();
-        let searched = params.with(|params| {
-            params.searching(SearchFilter {
-                url: typed_value(canonical),
-                version: typed_value(resource_version),
-            })
-        });
-        navigate(&address(&searched, version.get()), unresolved());
-    };
-    filter_form(
-        &tr(Msg::UrlSearchParameterMatchedAgainstConceptmap),
-        canonical,
-        resource_version,
-        params,
-        Box::new(submit),
-    )
-}
-
-/// A refused read, in the server's own words.
-fn failure_view(error: &FhirError) -> AnyView {
-    let error = error.clone();
-    view! {
-        <div class="mt-default">
-            <Failure error=Signal::stored(error) />
-        </div>
-    }
-    .into_any()
-}
-
-/// The navigation options an address that already carries the base needs.
-// NOTE: the router resolves a navigation against its base, so an address that
-// already carries the base is passed unresolved (`leptos_router` 0.8.15
-// `matching/resolve_path.rs`).
-fn unresolved() -> NavigateOptions {
-    NavigateOptions {
-        resolve: false,
-        ..NavigateOptions::default()
-    }
-}
-
-/// The resources the search answered, a page at a time.
-fn list_section(
-    client: &FhirClient,
-    version: Signal<FhirVersion>,
-    params: Signal<ListParams>,
-    order: Memo<SortOrder>,
-) -> AnyView {
-    let read_client = client.clone();
-    let filter = Memo::new(move |_| params.with(|params| params.filter.clone()));
-    let found = Resource::new(
-        move || (version.get(), filter.get()),
-        move |(version, filter)| {
-            let client = read_client.clone();
-            async move { client.concept_map_search(version, &filter).await }
-        },
-    );
-
-    // The live region is in the document before the read settles, which is
-    // what lets a screen reader announce the count when it arrives. Every
-    // number in it comes from the answer rather than from the address, because
-    // the transition boundary keeps the previous rows on screen while the next
-    // read runs and a sentence built from the address would describe rows that
-    // are not there yet.
-    let announcement = move || {
-        let params = params.get();
-        found.with(|answered| {
-            answered
-                .as_ref()
-                .and_then(|result| result.as_ref().ok())
-                .map(|found| {
-                    let view = window(params.page(), params.size(), found.matched());
-                    count_sentence(view, &tr(Msg::ConceptMaps2), found.total())
-                })
-                .unwrap_or_default()
-        })
-    };
-
-    view! {
-        <section class="fui-card fui-panel" aria-labelledby="conceptmaps-heading">
-            <div class="fui-panel-head">
-                <h2 id="conceptmaps-heading" class="fui-card-title">
-                    {tr(Msg::WhatThisRootHolds)}
-                </h2>
-                <p aria-live="polite" class="fui-muted fui-small">
-                    <Transition fallback=|| ()>{announcement}</Transition>
-                </p>
-            </div>
-            <Reading label=&{
-                tr(Msg::ReadingTheConceptMaps)
-            }>
-                {move || {
-                    let params = params.get();
-                    let version = version.get();
-                    found
-                        .with(|answered| {
-                            answered
-                                .as_ref()
-                                .map(|result| match result {
-                                    Ok(found) => list_view(order.get(), found, &params, version),
-                                    Err(error) => failure_view(error),
-                                })
-                        })
-                }}
-            </Reading>
-        </section>
-    }
-    .into_any()
-}
-
-/// The rows of one page, with the controls that walk the rest.
-fn list_view(
-    order: SortOrder,
-    found: &SearchSet<PublishedConceptMap>,
-    params: &ListParams,
-    version: FhirVersion,
-) -> AnyView {
-    let resources = found.found();
-    if resources.is_empty() {
-        return empty(tr(Msg::RootHoldsNoConceptmapResourceMatching));
-    }
-    // The whole answer is ordered before it is paged, so a walk through the
-    // pages walks the order the reader asked for rather than the server's.
-    let mut ordered: Vec<(Published<'_>, usize)> = resources
-        .iter()
-        .enumerate()
-        .map(|(index, resource)| (facts(resource), index))
-        .collect();
-    order.ordering(&mut ordered);
-    let view = window(params.page(), params.size(), resources.len());
-    let rows: Vec<AnyView> = view
-        .indexes()
-        .filter_map(|index| ordered.get(index))
-        .filter_map(|(_, index)| resources.get(*index))
-        .map(|resource| row_view(resource, version))
-        .collect();
-    let pager = pager_view(
-        Listing::new(tr(Msg::ConceptMapPages)).noun(Noun::new(message(Msg::NounConceptMaps))),
-        view,
-        params,
-        CONCEPT_MAPS_PATH,
-        version,
-        &[],
-    );
-    view! {
-        {published_table(
-            &tr(Msg::ConceptMapsRootHolds),
-            tr(Msg::ConceptMap),
-            rows,
-            order,
-            params,
-            CONCEPT_MAPS_PATH,
-            version,
-        )}
-        {pager}
-    }
-    .into_any()
-}
-
-/// The four facts a row draws about one published concept map.
-fn facts(resource: &PublishedConceptMap) -> Published<'_> {
-    Published {
-        title: resource.label(),
-        canonical: resource.url(),
-        version: resource.version(),
-        status: resource.status(),
-    }
-}
-
-/// One published concept map, as a row that opens it and one that runs it.
-fn row_view(resource: &PublishedConceptMap, version: FhirVersion) -> AnyView {
-    // The runner is handed the map and the source system this resource
-    // already names, so a reader never retypes a canonical the row shows them.
-    let filled = resource.url().map(|canonical| TranslateRequest {
-        concept_map: canonical.to_owned(),
-        concept_map_version: resource.version().unwrap_or_default().to_owned(),
-        system: resource.only_source_system().unwrap_or_default(),
-        ..TranslateRequest::default()
-    });
-    published_row(
-        &facts(resource),
-        resource
-            .id()
-            .map(|id| resource_link(CONCEPT_MAPS_PATH, id, version)),
-        filled.map(|run| Action {
-            label: tr(Msg::Translate),
-            href: translate::address(&run, version),
-        }),
-    )
-}
-
-/// What a control holds now, trimmed, or the empty string when it is gone.
-fn typed_value(node: NodeRef<Input>) -> String {
-    node.get()
-        .map(|input| input.value())
+/// The name a reader reads a concept map by.
+fn label_of(map: &PublishedConceptMap) -> String {
+    map.label()
+        .or_else(|| map.url())
         .unwrap_or_default()
-        .trim()
         .to_owned()
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// What a concept map maps from and to, in words: the systems of its first
+/// group, named, else its scopes.
+#[must_use]
+pub(crate) fn from_to(
+    map: &PublishedConceptMap,
+    names: &BTreeMap<String, String>,
+) -> Option<String> {
+    let group = map.groups().into_iter().next();
+    let source = group
+        .as_ref()
+        .and_then(|group| group.source.clone())
+        .or_else(|| map.source_scope().map(str::to_owned))?;
+    let target = group
+        .and_then(|group| group.target)
+        .or_else(|| map.target_scope().map(str::to_owned))?;
+    Some(tr_with(
+        Msg::ConceptMapsFromTo,
+        &[
+            ("source", name_of(names, &source).into()),
+            ("target", name_of(names, &target).into()),
+        ],
+    ))
+}
 
-    /// A stand-in for the address, which reads the same way a `ParamsMap` does.
-    fn query<'a>(pairs: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<String> + use<'a> {
-        move |name| {
-            pairs
-                .iter()
-                .find(|(key, _)| *key == name)
-                .map(|(_, value)| (*value).to_owned())
+/// Concept maps.
+#[component]
+#[expect(
+    unreachable_pub,
+    reason = "the leptos component macro emits a pub props type the crate never exports"
+)]
+pub(crate) fn ConceptMapsPage() -> impl IntoView {
+    let request = request();
+    loaded(async move {
+        let found = request
+            .client
+            .concept_map_search(request.version, &SearchFilter::default())
+            .await;
+        let names = system_names(&request.client, request.version).await;
+        match found {
+            Ok(found) => listing(
+                &request,
+                found.found().into_iter().cloned().collect(),
+                &names,
+            ),
+            Err(error) => view! {
+                {heading(tr(Msg::ShellConceptMaps), None, Vec::new(), ActionGroup::none())}
+                {failure(&error)}
+            }
+            .into_any(),
         }
-    }
+    })
+}
 
-    #[test]
-    fn opening_a_map_keeps_the_page_the_reader_is_on() {
-        let params = ListParams::read(&query(&[("page", "2")]), 25);
-        let opened = address(&params.reading("m-tight"), FhirVersion::R5);
-        assert!(opened.contains("id=m-tight"), "{opened}");
-        assert!(opened.contains("page=2"), "{opened}");
+/// Where a listed map comes from: stored on the server, or loaded at start.
+fn source_of(map: &PublishedConceptMap) -> Source {
+    if map.stored().is_some() {
+        Source::Stored
+    } else {
+        Source::Loaded
     }
+}
 
-    #[test]
-    fn an_address_written_before_the_runner_moved_still_names_a_run() {
-        let run = read_run(&query(&[
-            ("map", "https://terminology.example/ConceptMap/m"),
-            ("system", "https://terminology.example/a"),
-            ("code", "x"),
-        ]));
-        assert!(
-            run.runnable(),
-            "a link shared before the split still says what to translate"
-        );
-    }
+/// The listing of `all` the root holds, as the address filters it.
+fn listing(
+    request: &Request,
+    all: Vec<PublishedConceptMap>,
+    names: &BTreeMap<String, String>,
+) -> AnyView {
+    let state = ListState::read(request);
+    let path = ui_path(CONCEPT_MAPS_PATH);
+    let counts = counted(all.iter().map(source_of));
+    let total = all.len();
+    let kept = state.kept(
+        all,
+        label_of,
+        |map| map.url().unwrap_or_default().to_owned(),
+        source_of,
+    );
+    let columns = [
+        Column::text(NAME_COLUMN, tr(Msg::ConceptMapsMap))
+            .role(Role::Title)
+            .sortable(),
+        Column::text("source", tr(Msg::CodeSystemsSource)).role(Role::Meta),
+        Column::text("mappings", tr(Msg::ConceptMapsMappings)).numeric(),
+        Column::text("status", tr(Msg::ValueSetsStatus)).role(Role::Meta),
+    ];
+    let [_, source, mappings, status] = &columns;
+    let title = tr(Msg::ShellConceptMaps);
+    let body = if kept.is_empty() && total == 0 {
+        let first = request.can(CONCEPT_MAP, Letter::Create).then(|| {
+            (
+                tr(Msg::ConceptMapsFirst),
+                ui_link(CONCEPT_MAP_EDITOR_PATH, request.version),
+            )
+        });
+        ferrohealth_ui::view::template::list::list_empty(tr(Msg::ConceptMapsNone), first)
+    } else if kept.is_empty() {
+        state.emptied(
+            request,
+            &path,
+            tr_with(Msg::ConceptMapsNoMatch, &[("count", total.into())]),
+        )
+    } else {
+        let drawn = state
+            .window(kept.len())
+            .slice(&kept)
+            .iter()
+            .map(|map| {
+                let href = resource_link(
+                    CONCEPT_MAPS_PATH,
+                    map.id().unwrap_or_default(),
+                    request.version,
+                );
+                let url = map.url().unwrap_or_default();
+                let sub = view! {
+                    {canonical(url)}
+                    {from_to(map, names)
+                        .map(|words| view! { <span class="fui-row-sub">{words}</span> })}
+                }
+                .into_any();
+                let count = u32::try_from(map.mappings().len()).unwrap_or(u32::MAX);
+                view! {
+                    <tr>
+                        {title_cell(Some(&href), label_of(map), Some(sub))}
+                        {cell(source, source_of(map).tag())}
+                        {cell(
+                            mappings,
+                            tr_with(Msg::ConceptMapsMappingCount, &[("count", count.into())]),
+                        )} {cell(status, status_badge(map.status()))}
+                    </tr>
+                }
+            })
+            .collect_view()
+            .into_any();
+        let fields = state.fields(request, &[]);
+        let sort = state.sort();
+        data_table(DataTable {
+            caption: &title,
+            columns: &columns,
+            sorting: ListState::sorting(&sort, &fields),
+            body: Body::Rows(drawn),
+        })
+        .into_any()
+    };
+    let actions = create_action(request);
+    state.frame(
+        request,
+        Frame {
+            title,
+            subtitle: tr_with(
+                Msg::ConceptMapsSubtitle,
+                &[("version", request.version.label().into())],
+            ),
+            actions,
+            path,
+            total,
+            kept: kept.len(),
+            counts,
+            find: tr(Msg::ValueSetsFind),
+            body,
+            pages: (
+                tr(Msg::ConceptMapsPages),
+                Noun::new(message(Msg::NounConceptMaps)),
+            ),
+        },
+    )
+}
 
-    #[test]
-    fn an_address_naming_no_code_is_a_listing_rather_than_a_run() {
-        let run = read_run(&query(&[(
-            "url",
-            "https://terminology.example/ConceptMap/m",
-        )]));
-        assert!(
-            !run.runnable(),
-            "a search filter is not a run, so the screen lists rather than redirecting"
-        );
+/// The title row's action: a new resource, for a reader who may create one.
+fn create_action(request: &Request) -> ActionGroup {
+    if request.can(CONCEPT_MAP, Letter::Create) {
+        ActionGroup::primary(Action::new(
+            Some(Glyph::FILE_PLUS),
+            tr(Msg::ConceptMapsNew),
+            Act::Link(ui_link(CONCEPT_MAP_EDITOR_PATH, request.version)),
+        ))
+    } else {
+        ActionGroup::none()
     }
 }

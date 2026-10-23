@@ -1,0 +1,1 @@
+- The concept browser's Hierarchy note reads its sentence from the catalog, naming the operator and the property, where it showed a raw catalog key, and a test fails when a `tr_with` call leaves out a variable its message names.

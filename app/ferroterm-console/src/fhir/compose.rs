@@ -189,11 +189,6 @@ impl Draft {
         draft
     }
 
-    /// Whether this draft names a resource the server already holds.
-    pub(crate) fn saved(&self) -> bool {
-        !self.id.is_empty()
-    }
-
     /// Mints a key nothing in this draft has carried.
     fn mint(&mut self) -> u32 {
         let key = self.next_key;
@@ -210,16 +205,6 @@ impl Draft {
             ..Clause::default()
         });
         key
-    }
-
-    /// Removes the clause `key` names.
-    pub(crate) fn remove_clause(&mut self, key: u32) {
-        self.clauses.retain(|clause| clause.key != key);
-    }
-
-    /// The clause `key` names.
-    pub(crate) fn clause(&self, key: u32) -> Option<&Clause> {
-        self.clauses.iter().find(|clause| clause.key == key)
     }
 
     /// The clause `key` names, to change.
@@ -278,64 +263,6 @@ impl Draft {
                 value: String::new(),
             });
         }
-    }
-
-    /// Writes what the reader typed into the value set row `row` names.
-    pub(crate) fn write_value_set(&mut self, key: u32, row: u32, typed: &str) {
-        if let Some(held) = self
-            .clause_mut(key)
-            .and_then(|clause| clause.value_sets.iter_mut().find(|held| held.key == row))
-        {
-            typed.clone_into(&mut held.canonical);
-        }
-    }
-
-    /// The filter value a refusal points into, and the column to mark.
-    ///
-    /// The server names the filter by `issue.expression`, a path into the
-    /// `Parameters` the preview sent
-    /// (<https://hl7.org/fhir/R4B/operationoutcome.html#expression>), and the
-    /// column by the `operationoutcome-issue-col` extension. The path indexes
-    /// the compose as [`Draft::resource`] wrote it, so this walks the clauses
-    /// and filters the same way to find the row. A refusal about anything
-    /// else answers `None` and the screen marks nothing; the outcome is
-    /// rendered verbatim either way.
-    pub(crate) fn marked_value(
-        &self,
-        expression: &str,
-        column: u32,
-    ) -> Option<(String, String, u32)> {
-        // NOTE: no FHIR spec governs this, our own design: a path of any other shape is a refusal
-        // about another input, which has no row to mark.
-        let (_, path) = expression.split_once("].resource.compose.")?;
-        let (side, rest) = path.split_once('[')?;
-        let included = match side {
-            "include" => true,
-            "exclude" => false,
-            _ => return None,
-        };
-        let (rule, rest) = rest.split_once("].filter[")?;
-        let (filter, rest) = rest.split_once(']')?;
-        if rest != ".value" {
-            return None;
-        }
-        let rule: usize = rule.parse().ok()?;
-        let filter: usize = filter.parse().ok()?;
-        let clause = self
-            .clauses
-            .iter()
-            .filter(|clause| clause.included == included)
-            .nth(rule)?;
-        let row = clause
-            .filters
-            .iter()
-            .filter(|row| !row.property.trim().is_empty())
-            .nth(filter)?;
-        Some((
-            format!("{} {}", row.property, row.op),
-            row.value.trim().to_owned(),
-            column,
-        ))
     }
 
     /// Every invariant any clause breaks, in the order the clauses are drawn.
@@ -641,22 +568,6 @@ impl Clause {
         }
         Value::Object(set)
     }
-}
-
-/// `value` split around the character at the 1-based `column`, for marking it.
-///
-/// The server counts the column in Unicode scalar values, so the marked run is
-/// one whole character. A column past the end marks the end, which is where a
-/// refusal of a truncated value points.
-pub(crate) fn mark(value: &str, column: u32) -> (String, String, String) {
-    let skipped = usize::try_from(column.saturating_sub(1)).unwrap_or(usize::MAX);
-    let mut characters = value.chars();
-    let before: String = characters.by_ref().take(skipped).collect();
-    let at: String = characters.by_ref().take(1).collect();
-    if at.is_empty() {
-        return (before, String::from(" "), String::new());
-    }
-    (before, at, characters.collect())
 }
 
 /// The entry of `list` in `held` whose `key` element is `value`.
@@ -981,7 +892,12 @@ mod tests {
             draft.broken().is_empty(),
             "vsd-3 forbids concepts beside filters, not beside a value set"
         );
-        let rule = draft.clause(key).map(Clause::rule).unwrap_or_default();
+        let rule = draft
+            .clauses
+            .iter()
+            .find(|clause| clause.key == key)
+            .map(Clause::rule)
+            .unwrap_or_default();
         assert!(
             rule.contains("is in the value set named here")
                 && rule.contains("comes from the code system named here")
@@ -996,7 +912,12 @@ mod tests {
         let (mut draft, key) = over("");
         draft.add_value_set(key, "https://terminology.example/vs/a");
         draft.add_value_set(key, "https://terminology.example/vs/b");
-        let rule = draft.clause(key).map(Clause::rule).unwrap_or_default();
+        let rule = draft
+            .clauses
+            .iter()
+            .find(|clause| clause.key == key)
+            .map(Clause::rule)
+            .unwrap_or_default();
         assert!(
             rule.contains("is in every one of the 2 value sets named here"),
             "several valueSet references in one include intersect: `{rule}`"
@@ -1008,7 +929,12 @@ mod tests {
         let mut draft = Draft::new();
         let key = draft.add_clause(false);
         draft.add_value_set(key, "https://terminology.example/vs/a");
-        let rule = draft.clause(key).map(Clause::rule).unwrap_or_default();
+        let rule = draft
+            .clauses
+            .iter()
+            .find(|clause| clause.key == key)
+            .map(Clause::rule)
+            .unwrap_or_default();
         assert!(
             rule.starts_with("This clause takes back out"),
             "exclude subtracts from the union of the includes: `{rule}`"
@@ -1143,7 +1069,7 @@ mod tests {
         let mut draft = Draft::new();
         draft.url = String::from("https://terminology.example/vs/local");
         let key = draft.clause_keys(true)[0];
-        draft.remove_clause(key);
+        draft.clauses.retain(|clause| clause.key != key);
         assert!(
             !draft.savable(),
             "a value set with no include is not offered for saving"
@@ -1160,7 +1086,7 @@ mod tests {
         let mut draft = Draft::new();
         draft.url = String::from("https://terminology.example/vs/local");
         let key = draft.clause_keys(true)[0];
-        draft.remove_clause(key);
+        draft.clauses.retain(|clause| clause.key != key);
         let excluded = draft.add_clause(false);
         if let Some(clause) = draft.clause_mut(excluded) {
             clause.system = String::from("https://terminology.example/x");
@@ -1168,123 +1094,6 @@ mod tests {
         assert!(
             !draft.savable(),
             "an exclude subtracts from a union that has to exist"
-        );
-    }
-
-    #[test]
-    fn a_refusal_points_into_the_filter_value_it_names() {
-        let (mut draft, key) = over("https://terminology.example/x");
-        draft.add_filter(key, "constraint", "=");
-        if let Some(row) = draft
-            .clause_mut(key)
-            .and_then(|clause| clause.filters.last_mut())
-        {
-            row.value = String::from("<<73211009 OR");
-        }
-        // The path the server names a refused filter value by, into the
-        // `Parameters` the preview sent, and the column it states.
-        let named = "Parameters.parameter[0].resource.compose.include[0].filter[0].value";
-        assert_eq!(
-            draft.marked_value(named, 14),
-            Some((
-                String::from("constraint ="),
-                String::from("<<73211009 OR"),
-                14
-            )),
-            "the filter the server named is the one the screen marks"
-        );
-        assert_eq!(
-            draft.marked_value("http.url", 3),
-            None,
-            "a refusal about another input marks nothing"
-        );
-        assert_eq!(
-            draft.marked_value(
-                "Parameters.parameter[0].resource.compose.include[0].filter[1].value",
-                1
-            ),
-            None,
-            "and one naming a filter the draft does not hold marks nothing either"
-        );
-        assert_eq!(
-            draft.marked_value(
-                "Parameters.parameter[0].resource.compose.exclude[0].filter[0].value",
-                1
-            ),
-            None,
-            "an exclude is counted apart from the includes"
-        );
-    }
-
-    #[test]
-    fn a_refusal_counts_the_filters_and_clauses_the_resource_sends() {
-        let (mut draft, key) = over("https://terminology.example/x");
-        // A row with no property is not sent, so it takes no index on the wire.
-        draft.add_filter(key, "", "=");
-        draft.add_filter(key, "constraint", "=");
-        let excluded = draft.add_clause(false);
-        draft.add_filter(excluded, "constraint", "=");
-        for (clause, value) in [(key, "<< 1 OR"), (excluded, "<< 2 OR")] {
-            if let Some(row) = draft
-                .clause_mut(clause)
-                .and_then(|clause| clause.filters.last_mut())
-            {
-                row.value = format!(" {value} ");
-            }
-        }
-        assert_eq!(
-            draft
-                .marked_value(
-                    "Parameters.parameter[0].resource.compose.include[0].filter[0].value",
-                    6
-                )
-                .map(|(_, value, _)| value),
-            Some(String::from("<< 1 OR")),
-            "the row without a property is skipped, and the value is the trimmed one sent"
-        );
-        assert_eq!(
-            draft
-                .marked_value(
-                    "Parameters.parameter[0].resource.compose.exclude[0].filter[0].value",
-                    6
-                )
-                .map(|(_, value, _)| value),
-            Some(String::from("<< 2 OR")),
-            "the first exclude is `exclude[0]`"
-        );
-    }
-
-    #[test]
-    fn the_marked_character_is_one_whole_character() {
-        assert_eq!(
-            mark("<<73211009", 3),
-            (
-                String::from("<<"),
-                String::from("7"),
-                String::from("3211009")
-            ),
-            "column 3 is the third character"
-        );
-        let multibyte = "<<73211009 |diabetes mellitus\u{2014}type 2|";
-        let (before, at, after) = mark(multibyte, 30);
-        assert_eq!(
-            format!("{before}{at}{after}"),
-            multibyte,
-            "the three parts are the value, whole"
-        );
-        assert_eq!(
-            at, "\u{2014}",
-            "column 30 is the dash, counted in characters"
-        );
-        let (before, at, after) = mark("<<7", 99);
-        assert_eq!(before, "<<7", "a column past the end marks the end");
-        assert_eq!(at, " ");
-        assert_eq!(after, "");
-        let (before, at, _) = mark("<<7", 4);
-        assert_eq!(
-            (before.as_str(), at.as_str()),
-            ("<<7", " "),
-            "the column after the last character is the end"
         );
     }
 
@@ -1368,8 +1177,11 @@ mod tests {
             1,
             "one exclude was read back"
         );
+        let second = draft.clause_keys(true)[1];
         let coded = draft
-            .clause(draft.clause_keys(true)[1])
+            .clauses
+            .iter()
+            .find(|clause| clause.key == second)
             .expect("the second include");
         assert_eq!(coded.system_version, "2.0");
         assert_eq!(
@@ -1398,7 +1210,7 @@ mod tests {
             "content the server serves out of its loaded indexes has no write path"
         );
         assert!(
-            stored.draft(&document).saved(),
+            !stored.draft(&document).id.is_empty(),
             "it still opens, to be read"
         );
     }
@@ -1423,7 +1235,11 @@ mod tests {
         draft.add_concept(key, "A", "Alpha");
         draft.add_concept(key, "A", "Alpha again");
         assert_eq!(
-            draft.clause(key).map(|clause| clause.concepts.len()),
+            draft
+                .clauses
+                .iter()
+                .find(|clause| clause.key == key)
+                .map(|clause| clause.concepts.len()),
             Some(1),
             "picking the same code twice adds one row"
         );
@@ -1439,7 +1255,7 @@ mod tests {
             .expect("one include");
         let second = draft.add_clause(true);
         let third = draft.add_clause(false);
-        draft.remove_clause(second);
+        draft.clauses.retain(|clause| clause.key != second);
         assert_eq!(draft.clause_keys(true), vec![first]);
         assert_eq!(draft.clause_keys(false), vec![third]);
         let fourth = draft.add_clause(true);

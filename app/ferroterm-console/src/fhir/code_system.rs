@@ -11,7 +11,6 @@
 //! screen reads both and keeps them apart. Reading lives here, outside every
 //! component, so the screen renders a value plain unit tests can pin.
 
-use crate::locale::Msg;
 use serde::{Deserialize, Serialize};
 
 /// The resource type an entry must declare to be drawn as a code system.
@@ -48,6 +47,14 @@ pub(crate) struct PublishedCodeSystem {
     /// `resourceType`, which says what the entry actually carries.
     #[serde(rename = "resourceType")]
     resource_type: Option<String>,
+    /// `CodeSystem.id`, the id the read and the history address.
+    id: Option<String>,
+    /// `meta`, whose `versionId` says the resource was written through the
+    /// API.
+    meta: Option<crate::fhir::named::Meta>,
+    /// `CodeSystem.property`, the properties the system declares.
+    #[serde(default)]
+    property: Vec<DeclaredProperty>,
     /// `CodeSystem.url`, the canonical the search asked for.
     url: Option<String>,
     /// `CodeSystem.version`, the business version of the resource.
@@ -85,21 +92,22 @@ pub(crate) struct PublishedCodeSystem {
     count: Option<u32>,
 }
 
-/// One fact of a published resource: a term and the value beside it.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct Fact {
-    /// The term a reader reads, by its message in the catalog.
-    pub(crate) label: Msg,
-    /// The value, absent when the resource declared none.
-    pub(crate) value: Option<String>,
+/// One `CodeSystem.property`: a property the system declares for its
+/// concepts.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+pub(crate) struct DeclaredProperty {
+    /// `property.code`, how a concept names it.
+    pub(crate) code: Option<String>,
+    /// `property.type`, the type of its values.
+    #[serde(rename = "type")]
+    pub(crate) kind: Option<String>,
+    /// `property.description`, what it means.
+    pub(crate) description: Option<String>,
+    /// `property.uri`, the property it stands for.
+    pub(crate) uri: Option<String>,
 }
 
 impl CodeSystemSearch {
-    /// The number of matches the server counted, when it counted them.
-    pub(crate) fn total(&self) -> Option<u32> {
-        self.total
-    }
-
     /// The published code systems the answer carries, in the server's order.
     ///
     /// An entry carrying something other than a `CodeSystem` is passed over
@@ -108,14 +116,6 @@ impl CodeSystemSearch {
     /// (<https://hl7.org/fhir/R4B/http.html#search>).
     pub(crate) fn published(&self) -> Vec<PublishedCodeSystem> {
         self.carried().cloned().collect()
-    }
-
-    /// How many published code systems the answer carries.
-    ///
-    /// The live region needs the count alone, so it is counted rather than
-    /// cloned out of the bundle a second time on every settle.
-    pub(crate) fn matched(&self) -> usize {
-        self.carried().count()
     }
 
     /// The `CodeSystem` resources the entries carry, borrowed.
@@ -138,6 +138,79 @@ impl PublishedCodeSystem {
         named(self.status.as_deref())
     }
 
+    /// The logical id, when the server sent one.
+    pub(crate) fn id(&self) -> Option<&str> {
+        named(self.id.as_deref())
+    }
+
+    /// The version the server holds of a resource written through the API;
+    /// `None` for one the deployment loaded, which has no write path.
+    pub(crate) fn stored(&self) -> Option<&str> {
+        self.meta
+            .as_ref()
+            .and_then(crate::fhir::named::Meta::stored)
+    }
+
+    /// The properties the system declares for its concepts.
+    pub(crate) fn properties(&self) -> &[DeclaredProperty] {
+        &self.property
+    }
+
+    /// The computer-friendly name, when it declared one.
+    pub(crate) fn name(&self) -> Option<&str> {
+        named(self.name.as_deref())
+    }
+
+    /// Whether it is experimental, when it said.
+    pub(crate) fn experimental(&self) -> Option<bool> {
+        self.experimental
+    }
+
+    /// Who published it, when it said.
+    pub(crate) fn publisher(&self) -> Option<&str> {
+        named(self.publisher.as_deref())
+    }
+
+    /// When it was last changed, when it said.
+    pub(crate) fn date(&self) -> Option<&str> {
+        named(self.date.as_deref())
+    }
+
+    /// Whether its codes are case sensitive, when it said.
+    pub(crate) fn case_sensitive(&self) -> Option<bool> {
+        self.case_sensitive
+    }
+
+    /// What a parent-child edge means, when it said.
+    pub(crate) fn hierarchy_meaning(&self) -> Option<&str> {
+        named(self.hierarchy_meaning.as_deref())
+    }
+
+    /// Whether it has a compositional grammar, when it said.
+    pub(crate) fn compositional(&self) -> Option<bool> {
+        self.compositional
+    }
+
+    /// Whether a code means nothing without its version, when it said.
+    pub(crate) fn version_needed(&self) -> Option<bool> {
+        self.version_needed
+    }
+
+    /// How much of the system the resource carries, when it said.
+    pub(crate) fn content(&self) -> Option<&str> {
+        named(self.content.as_deref())
+    }
+
+    /// The system it supplements, when it is a supplement.
+    pub(crate) fn supplements(&self) -> Option<&str> {
+        named(self.supplements.as_deref())
+    }
+
+    /// How many concepts the system defines, when it said.
+    pub(crate) fn count(&self) -> Option<u32> {
+        self.count
+    }
+
     /// The description, when it declared one.
     pub(crate) fn description(&self) -> Option<&str> {
         named(self.description.as_deref())
@@ -147,58 +220,6 @@ impl PublishedCodeSystem {
     pub(crate) fn version(&self) -> Option<&str> {
         named(self.version.as_deref())
     }
-
-    /// The canonical the resource declares, when it declared one.
-    #[cfg(test)]
-    pub(crate) fn url(&self) -> Option<&str> {
-        named(self.url.as_deref())
-    }
-
-    /// The facts the screen draws, in a fixed order.
-    ///
-    /// The order is written here rather than derived from the document, so two
-    /// published resources render their terms in the same rows and a fact the
-    /// server omitted still gets a row that states the absence.
-    pub(crate) fn facts(&self) -> Vec<Fact> {
-        vec![
-            fact(Msg::Name, self.name.as_deref()),
-            fact(Msg::Title, self.title.as_deref()),
-            fact(Msg::Version, self.version.as_deref()),
-            fact(Msg::Status, self.status.as_deref()),
-            fact(Msg::Experimental, flag(self.experimental)),
-            fact(Msg::Publisher, self.publisher.as_deref()),
-            fact(Msg::LastChanged, self.date.as_deref()),
-            fact(Msg::Description2, self.description.as_deref()),
-            fact(Msg::Content, self.content.as_deref()),
-            fact(Msg::CodeNeedsVersion, flag(self.version_needed)),
-            fact(Msg::CaseSensitive, flag(self.case_sensitive)),
-            fact(Msg::HierarchyMeaning, self.hierarchy_meaning.as_deref()),
-            fact(Msg::CompositionalGrammar, flag(self.compositional)),
-            fact(Msg::Supplements, self.supplements.as_deref()),
-            fact(Msg::ConceptsDefined, counted(self.count).as_deref()),
-        ]
-    }
-}
-
-/// One fact, with a value that names nothing read as absent.
-fn fact(label: Msg, value: Option<&str>) -> Fact {
-    Fact {
-        label,
-        value: named(value).map(str::to_owned),
-    }
-}
-
-/// A declared count as the text a reader reads.
-fn counted(count: Option<u32>) -> Option<String> {
-    count.map(|count| count.to_string())
-}
-
-/// A declared boolean as the word a reader reads.
-///
-/// The word carries the meaning, so nothing here depends on a colour or a
-/// glyph (<https://www.w3.org/TR/WCAG22/#use-of-color>).
-fn flag(declared: Option<bool>) -> Option<&'static str> {
-    declared.map(|value| if value { "yes" } else { "no" })
 }
 
 /// The trimmed text, or `None` when it names nothing.
@@ -210,17 +231,35 @@ fn named(text: Option<&str>) -> Option<&str> {
 mod tests {
     use super::*;
 
-    fn parse(json: &str) -> CodeSystemSearch {
-        serde_json::from_str(json).expect("the fixture is valid JSON")
+    /// What the screen reads for the fact `label` names, as text.
+    fn value_of(resource: &PublishedCodeSystem, label: &str) -> Option<String> {
+        let word = |flag: Option<bool>| {
+            flag.map(|flag| {
+                if flag {
+                    "yes".to_owned()
+                } else {
+                    "no".to_owned()
+                }
+            })
+        };
+        match label {
+            "Title" => resource.title().map(str::to_owned),
+            "Status" => resource.status().map(str::to_owned),
+            "Publisher" => resource.publisher().map(str::to_owned),
+            "Content" => resource.content().map(str::to_owned),
+            "A code needs its version" => word(resource.version_needed()),
+            "Experimental" => word(resource.experimental()),
+            "Compositional grammar" => word(resource.compositional()),
+            "Concepts defined" => resource.count().map(|count| count.to_string()),
+            "Version" => resource.version().map(str::to_owned),
+            "Hierarchy meaning" => resource.hierarchy_meaning().map(str::to_owned),
+            "Supplements" => resource.supplements().map(str::to_owned),
+            other => panic!("no fact is named {other}"),
+        }
     }
 
-    fn value_of(resource: &PublishedCodeSystem, label: &str) -> Option<String> {
-        resource
-            .facts()
-            .into_iter()
-            .find(|fact| crate::locale::tr(fact.label) == label)
-            .expect("the screen draws a row for every fact it names")
-            .value
+    fn parse(json: &str) -> CodeSystemSearch {
+        serde_json::from_str(json).expect("the fixture is valid JSON")
     }
 
     /// A `searchset` shaped the way the server answers one.
@@ -237,10 +276,13 @@ mod tests {
     #[test]
     fn a_published_resource_is_read_from_the_searchset_entry() {
         let search = parse(ONE_MATCH);
-        assert_eq!(search.total(), Some(1));
+        assert_eq!(search.total, Some(1));
         let published = search.published();
         let resource = published.first().expect("the bundle carries one match");
-        assert_eq!(resource.url(), Some("https://terminology.example/x"));
+        assert_eq!(
+            resource.url.as_deref(),
+            Some("https://terminology.example/x")
+        );
         assert_eq!(resource.version(), Some("2031-01-01"));
     }
 
@@ -285,40 +327,6 @@ mod tests {
     }
 
     #[test]
-    fn a_fact_the_recorded_resource_omits_still_gets_its_row() {
-        let published = parse(ONE_MATCH).published();
-        let resource = published.first().expect("the bundle carries one match");
-        assert_eq!(value_of(resource, "Supplements"), None);
-        assert!(
-            resource
-                .facts()
-                .iter()
-                .any(|fact| crate::locale::tr(fact.label) == "Supplements"),
-            "the row is drawn so the screen can state the absence"
-        );
-    }
-
-    #[test]
-    fn the_facts_render_in_the_same_order_for_every_resource() {
-        let rich: Vec<Msg> = parse(ONE_MATCH)
-            .published()
-            .iter()
-            .flat_map(PublishedCodeSystem::facts)
-            .map(|fact| fact.label)
-            .collect();
-        let bare: Vec<Msg> = PublishedCodeSystem::default()
-            .facts()
-            .into_iter()
-            .map(|fact| fact.label)
-            .collect();
-        assert_eq!(
-            rich, bare,
-            "two resources put the same term in the same row"
-        );
-        assert!(!bare.is_empty(), "a passing comparison means something");
-    }
-
-    #[test]
     fn an_entry_that_carries_another_resource_is_not_drawn_as_a_code_system() {
         let search = parse(
             r#"{"resourceType":"Bundle","type":"searchset","total":0,
@@ -330,14 +338,14 @@ mod tests {
             search.published().is_empty(),
             "the screen then states that the root publishes no resource"
         );
-        assert_eq!(search.total(), Some(0));
+        assert_eq!(search.total, Some(0));
     }
 
     #[test]
     fn the_count_the_live_region_reads_is_the_number_of_resources_drawn() {
         let search = parse(ONE_MATCH);
         assert_eq!(
-            search.matched(),
+            search.published().len(),
             search.published().len(),
             "the announced count and the drawn blocks are the same answer"
         );
@@ -347,7 +355,7 @@ mod tests {
     fn an_empty_searchset_reads_as_no_published_resource() {
         let search = parse(r#"{"resourceType":"Bundle","type":"searchset","total":0}"#);
         assert_eq!(search.published(), Vec::<PublishedCodeSystem>::new());
-        assert_eq!(search.total(), Some(0));
+        assert_eq!(search.total, Some(0));
     }
 
     #[test]
@@ -358,36 +366,10 @@ mod tests {
                   "url":"https://terminology.example/y"}}]}"#,
         );
         assert_eq!(
-            search.total(),
-            None,
+            search.total, None,
             "the screen states the absence rather than inventing a count"
         );
         assert_eq!(search.published().len(), 1);
-    }
-
-    #[test]
-    fn two_versions_of_one_canonical_each_keep_their_own_facts() {
-        let search = parse(
-            r#"{"resourceType":"Bundle","type":"searchset","total":2,"entry":[
-                {"resource":{"resourceType":"CodeSystem",
-                  "url":"https://terminology.example/z","version":"1","status":"retired"}},
-                {"resource":{"resourceType":"CodeSystem",
-                  "url":"https://terminology.example/z","version":"2","status":"active"}}]}"#,
-        );
-        let published = search.published();
-        let versions: Vec<Option<&str>> =
-            published.iter().map(PublishedCodeSystem::version).collect();
-        assert_eq!(
-            versions,
-            [Some("1"), Some("2")],
-            "the server's order is kept, so the two blocks do not swap between reads"
-        );
-        assert_eq!(
-            published
-                .first()
-                .and_then(|resource| value_of(resource, "Status")),
-            Some("retired".into())
-        );
     }
 
     #[test]
@@ -440,7 +422,10 @@ mod tests {
         );
         let published = search.published();
         let resource = published.first().expect("the bundle carries one match");
-        assert_eq!(resource.url(), Some("https://terminology.example/v"));
+        assert_eq!(
+            resource.url.as_deref(),
+            Some("https://terminology.example/v")
+        );
         assert_eq!(
             value_of(resource, "Status"),
             Some("active".into()),

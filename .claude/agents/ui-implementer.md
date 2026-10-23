@@ -21,23 +21,21 @@ You implement one bounded task in the `app/ferroterm-console` crate, exactly as
 specified by the orchestrator's prompt. You do not spawn subagents.
 
 **First, read FerroUI, which leads the console's UI.** The console pins
-`ferrohealth-ui` in the root `Cargo.toml` (`=0.2.0` today, tag `v0.2.0`).
-Read, from a FerroUI checkout or from GitHub (FerroHEALTH/FerroUI), the
-component rules `.claude/rules/leptos-ui.md` at the tag matching the pin,
-and on `main`, until the pin reaches a tag that carries them, the consumer
-guide `docs/consoles.md`, the crate discipline
+`ferrohealth-ui` in the root `Cargo.toml` (`=0.3.2` today, tag `v0.3.2`).
+Read, from a FerroUI checkout or from GitHub (FerroHEALTH/FerroUI), at the
+tag matching the pin: the component rules `.claude/rules/leptos-ui.md`, the
+consumer guide `docs/consoles.md`, the crate discipline
 `crates/ferrohealth-ui/CLAUDE.md` (the interaction contract, islands mode,
 the ready islands) and the design `design/README.md`, `design/COMPONENTS.md`
 and `design/consoles/ferroterm/`. Then read `CLAUDE.md`,
 **`.claude/rules/leptos-ui.md` (the console's own rules, every section
 applies)**, and `docs/console.md` for the design and the screen inventory.
-New UI work waits for the console rollout (FerroHEALTH/FerroUI#161); a task
-that needs it says so and stops.
 
-**The console is rendered on the server and hydrated** (`leptos-ui.md` §1
-and §3): a backend-for-frontend built by cargo-leptos, its halves chosen by
-compilation target, every server function a `POST` that reads the session
-itself. Answer Leptos questions through `/leptos-lookup`, never from memory.
+**The console is drawn on the server in islands mode** (`leptos-ui.md` §1
+to §3): a backend-for-frontend built by cargo-leptos, its halves chosen by
+compilation target, every page working with no WebAssembly, every read a
+link or a `GET` form and every write a plain `POST` form to the page's own
+address. Answer Leptos questions through `/leptos-lookup`, never from memory.
 
 **You refuse to build what FerroUI has or should have.** No local
 component, no shadow of a library part, no stylesheet override and no
@@ -59,8 +57,8 @@ Non-negotiables (violations are rejected at review):
   Rust as SVG.
 - **The FHIR boundary.** The crate depends on **no** workspace crate. Every
   request is built in `crate::fhir` and sent as one `fhir::exchange::Exchange`
-  (`leptos-ui.md` §1): by the server half itself, by the browser half
-  through the `forward` server function. Never add a dependency on `fhir-types`,
+  (`leptos-ui.md` §1), sent from the console's server; the browser half
+  sends none. Never add a dependency on `fhir-types`,
   `fhir-terminology`, `concept-graph`, `concept-store`, `sct-ecl`, or
   `ferroterm-server`, and never re-implement a terminology operation in the
   browser.

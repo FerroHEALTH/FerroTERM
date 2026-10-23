@@ -1,165 +1,237 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! What the command bar was given, and what this root can do with it.
+//! Find: what the top bar's search was given, the resources whose name or
+//! canonical holds it, and the screens that take it.
 //!
-//! The classification is the viewer's own reading of the string's shape, in
-//! `crate::find`, and it happens before any request. What gates the offers is
-//! the one request this screen makes: the root's `CapabilityStatement`, which
-//! is where a server states the operations it answers per resource type
-//! (<https://hl7.org/fhir/R5/capabilitystatement.html>). An operation it does
-//! not declare is left out rather than offered and refused.
+//! The string is read by its shape alone (`crate::find`); the offers are
+//! gated on what the root's `CapabilityStatement` declares
+//! (<https://hl7.org/fhir/R5/capabilitystatement.html>), so an operation it
+//! does not declare is left out rather than offered and refused.
 
+use ferrohealth_ui::table::view::{Body, Column, DataTable, Role, Sorting, data_table, title_cell};
+use ferrohealth_ui::tone::Tone;
+use ferrohealth_ui::view::action::ActionGroup;
+use ferrohealth_ui::view::notice::{Announce, notice};
+use ferrohealth_ui::view::surface::{SectionHead, panel_section, panel_sections_card, stack};
 use leptos::prelude::*;
-use leptos_meta::Title;
-use leptos_router::hooks::use_query_map;
 
-use crate::components::failure::Failure;
-use crate::components::reading::Reading;
-use crate::components::shell::SelectedVersion;
-use crate::fhir::CODE_SYSTEM;
-use crate::fhir::CONCEPT_MAP;
-use crate::fhir::FhirClient;
-use crate::fhir::VALUE_SET;
 use crate::fhir::capability::CapabilityStatement;
-use crate::find::Declared;
-use crate::find::Offer;
-use crate::find::QUERY_PARAM;
-use crate::find::Subject;
-use crate::find::offers;
+use crate::fhir::named::Listed;
+use crate::fhir::{CODE_SYSTEM, CONCEPT_MAP, VALUE_SET};
+use crate::find::{
+    Declared, EXPAND, LOOKUP, Offer, QUERY_PARAM, Subject, TRANSLATE, VALIDATE_CODE, offers,
+};
 use crate::locale::{Msg, tr, tr_with};
-use ferrohealth_ui::icon::Glyph;
-use ferrohealth_ui::view::empty::empty_state;
-use ferrohealth_ui::view::surface::{facts_row, link_card, page_header, panel, stack};
+use crate::pages::parts::{failure, heading, loaded};
+use crate::request::{Request, request};
+use crate::routes::{CONCEPT_MAPS_PATH, VALUE_SETS_PATH, resource_link, system_link};
 
-/// The `$expand` operation, as a capability statement names it.
-const EXPAND: &str = "expand";
-
-/// The `$validate-code` operation, as a capability statement names it.
-const VALIDATE_CODE: &str = "validate-code";
-
-/// The `$translate` operation, as a capability statement names it.
-const TRANSLATE: &str = "translate";
-
-/// Shows what the command bar was given and where it can go.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type, and a binary crate has no reachable public API"
-)]
-pub(crate) fn FindPage() -> impl IntoView {
-    let client = expect_context::<FhirClient>();
-    let SelectedVersion(version) = expect_context::<SelectedVersion>();
-    let query = use_query_map();
-    let typed = Memo::new(move |_| {
-        query.with(|map| map.get(QUERY_PARAM).unwrap_or_default().trim().to_owned())
-    });
-    let subject = Memo::new(move |_| typed.with(|typed| Subject::of(typed)));
-
-    let read_client = client.clone();
-    let statement = Resource::new(
-        move || version.get(),
-        move |version| {
-            let client = read_client.clone();
-            async move { client.capability_statement(version).await }
-        },
-    );
-
-    let heading = view! {
-        <Title text=tr(Msg::TitleFind) />
-        {move || {
-            let line = subject
-                .with(|subject| match subject {
-                    Some(subject) => {
-                        tr_with(
-                            Msg::ReadFromShapeAlone,
-                            &[("subject", (subject.label()).clone().into())],
-                        )
-                    }
-                    None => tr(Msg::NothingWasTyped).clone(),
-                });
-            page_header(tr(Msg::WhatDo), Some(line), ())
-        }}
-    }
-    .into_any();
-
-    let subject_view = move || {
-        subject.with(|subject| {
-            subject.as_ref().map(|subject| {
-                panel(facts_row(vec![(
-                    tr(Msg::WhatYouTyped),
-                    view! { <span class="fui-mono break-all">{subject.typed().to_owned()}</span> }
-                        .into_any(),
-                )]))
-                .into_any()
-            })
-        })
-    };
-
-    let body = move || {
-        statement.with(|answered| {
-            answered.as_ref().map(|result| match result {
-                Ok(statement) => subject.with(|subject| match subject {
-                    Some(subject) => {
-                        offers_view(&offers(subject, declared_by(statement), version.get()))
-                    }
-                    None => ().into_any(),
-                }),
-                Err(error) => {
-                    let error = error.clone();
-                    view! { <Failure error=Signal::stored(error) /> }.into_any()
-                }
-            })
-        })
-    };
-
-    view! {
-        {heading}
-        {stack(
-            view! {
-                {subject_view}
-                <section class="fui-stack" aria-labelledby="find-offers-heading">
-                    <h2 id="find-offers-heading" class="fui-card-title">
-                        {tr(Msg::WhereItGoes)}
-                    </h2>
-                    <Reading label=tr(Msg::ReadingWhatRootDeclares)>{body}</Reading>
-                </section>
-            },
-        )}
-    }
-}
+/// The most matches one kind lists.
+const MATCHES: usize = 10;
 
 /// What the root declares, as the offers read it.
 fn declared_by(statement: &CapabilityStatement) -> Declared {
-    Declared {
-        validate: statement.declares_operation(CODE_SYSTEM, VALIDATE_CODE)
-            || statement.declares_operation(VALUE_SET, VALIDATE_CODE),
-        expand: statement.declares_operation(VALUE_SET, EXPAND),
-        translate: statement.declares_operation(CONCEPT_MAP, TRANSLATE),
+    let mut operations = Vec::new();
+    if statement.declares_operation(CODE_SYSTEM, LOOKUP) {
+        operations.push(LOOKUP);
     }
+    if statement.declares_operation(CODE_SYSTEM, VALIDATE_CODE)
+        || statement.declares_operation(VALUE_SET, VALIDATE_CODE)
+    {
+        operations.push(VALIDATE_CODE);
+    }
+    if statement.declares_operation(VALUE_SET, EXPAND) {
+        operations.push(EXPAND);
+    }
+    if statement.declares_operation(CONCEPT_MAP, TRANSLATE) {
+        operations.push(TRANSLATE);
+    }
+    Declared::of(operations)
 }
 
-/// The offers, as the list of links they are.
-fn offers_view(found: &[Offer]) -> AnyView {
-    if found.is_empty() {
-        return panel(empty_state(
-            Glyph::SEARCH_X,
-            tr(Msg::NowhereToGo),
-            tr(Msg::RootDeclaresNoneOperationsWouldApply),
-            (),
-        ))
-        .into_any();
-    }
-    let rows: Vec<AnyView> = found
+/// Whether `resource`'s name or canonical holds `typed`, ignoring case.
+fn matches(resource: &Listed, typed: &str) -> bool {
+    let typed = typed.to_lowercase();
+    resource.label.to_lowercase().contains(&typed) || resource.url.to_lowercase().contains(&typed)
+}
+
+/// The Find page.
+#[component]
+#[expect(
+    unreachable_pub,
+    reason = "the leptos component macro emits a pub props type the crate never exports"
+)]
+pub(crate) fn FindPage() -> impl IntoView {
+    let request = request();
+    let typed = request.text(QUERY_PARAM);
+    loaded(async move {
+        let head = heading(
+            tr(Msg::TitleFind),
+            Some(tr(Msg::FindSubtitle)),
+            Vec::new(),
+            ActionGroup::none(),
+        );
+        let Some(subject) = Subject::of(&typed) else {
+            return view! {
+                {head}
+                {notice(Tone::Info, Announce::Status, None, tr(Msg::NothingWasTyped))}
+            }
+            .into_any();
+        };
+        let statement = match request.client.capability_statement(request.version).await {
+            Ok(statement) => statement,
+            Err(error) => {
+                return view! {
+                    {head}
+                    {failure(&error)}
+                }
+                .into_any();
+            }
+        };
+        let mut groups = Vec::new();
+        for (resource_type, kind) in [
+            (CODE_SYSTEM, Msg::ShellCodeSystems),
+            (VALUE_SET, Msg::ShellValueSets),
+            (CONCEPT_MAP, Msg::ShellConceptMaps),
+        ] {
+            let listed = request
+                .client
+                .published_names(request.version, resource_type)
+                .await
+                .map(|named| named.listed())
+                .unwrap_or_default();
+            let found: Vec<Listed> = listed
+                .into_iter()
+                .filter(|resource| matches(resource, subject.typed()))
+                .take(MATCHES)
+                .collect();
+            if !found.is_empty() {
+                groups.push((resource_type, tr(kind), found));
+            }
+        }
+        let read = if groups.is_empty() {
+            notice(
+                Tone::Info,
+                Announce::Status,
+                None,
+                view! {
+                    <code>{subject.typed().to_owned()}</code>
+                    " "
+                    {tr_with(
+                        Msg::FindReadAs,
+                        &[
+                            ("subject", subject.label().into()),
+                            ("version", request.version.label().into()),
+                        ],
+                    )}
+                },
+            )
+            .into_any()
+        } else {
+            found_card(&request, &groups)
+        };
+        let offered = offers(&subject, &declared_by(&statement), request.version);
+        view! {
+            {head}
+            {stack(
+                view! {
+                    {read}
+                    {offers_card(&offered)}
+                },
+            )}
+        }
+        .into_any()
+    })
+}
+
+/// The resources whose name or canonical holds what was typed, by kind.
+fn found_card(request: &Request, groups: &[(&str, String, Vec<Listed>)]) -> AnyView {
+    let sections = groups
         .iter()
-        .map(|offer| {
-            let card = link_card(
-                offer.href.clone(),
-                offer.label.clone(),
-                view! { <p class="fui-muted">{offer.detail.clone()}</p> },
-            );
-            view! { <li class="grid">{card}</li> }.into_any()
+        .map(|(resource_type, kind, found)| {
+            let columns = [Column::text("resource", kind.clone()).role(Role::Title)];
+            let rows = found
+                .iter()
+                .map(|resource| {
+                    let href = match *resource_type {
+                        CODE_SYSTEM => system_link(&resource.url, request.version),
+                        VALUE_SET => resource_link(VALUE_SETS_PATH, &resource.id, request.version),
+                        _ => resource_link(CONCEPT_MAPS_PATH, &resource.id, request.version),
+                    };
+                    let sub = view! { <code>{resource.url.clone()}</code> }.into_any();
+                    view! { <tr>{title_cell(Some(&href), resource.label.clone(), Some(sub))}</tr> }
+                })
+                .collect_view()
+                .into_any();
+            panel_section(
+                Some(SectionHead {
+                    title: kind.clone(),
+                    count: Some(u64::try_from(found.len()).unwrap_or(u64::MAX)),
+                    actions: None,
+                }),
+                data_table(DataTable {
+                    caption: kind,
+                    columns: &columns,
+                    sorting: Sorting::default(),
+                    body: Body::Rows(rows),
+                }),
+            )
         })
-        .collect();
-    view! { <ul class="fui-grid sm:grid-cols-2 xl:grid-cols-4">{rows}</ul> }.into_any()
+        .collect_view();
+    panel_sections_card(tr(Msg::FindMatches), sections)
+}
+
+/// Where what was typed can go: one link per screen that takes it.
+fn offers_card(offered: &[Offer]) -> AnyView {
+    let title = tr(Msg::WhereItGoes);
+    let columns = [Column::text("screen", title.clone()).role(Role::Title)];
+    let body = if offered.is_empty() {
+        Body::Empty(view! { <p>{tr(Msg::RootDeclaresNoneOperationsWouldApply)}</p> }.into_any())
+    } else {
+        Body::Rows(
+            offered
+                .iter()
+                .map(|offer| {
+                    let sub = view! { {offer.detail.clone()} }.into_any();
+                    view! { <tr>{title_cell(Some(&offer.href), offer.label.clone(), Some(sub))}</tr> }
+                })
+                .collect_view()
+                .into_any(),
+        )
+    };
+    panel_sections_card(
+        title.clone(),
+        panel_section(
+            Some(SectionHead {
+                title: title.clone(),
+                count: Some(u64::try_from(offered.len()).unwrap_or(u64::MAX)),
+                actions: None,
+            }),
+            data_table(DataTable {
+                caption: &title,
+                columns: &columns,
+                sorting: Sorting::default(),
+                body,
+            }),
+        ),
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::matches;
+    use crate::fhir::named::Listed;
+
+    #[test]
+    fn a_resource_matches_by_name_or_canonical_ignoring_case() {
+        let resource = Listed {
+            url: String::from("https://x/fhir/ValueSet/respiratory"),
+            label: String::from("Synthetic respiratory findings"),
+            ..Listed::default()
+        };
+        assert!(matches(&resource, "RESPIR"));
+        assert!(matches(&resource, "ValueSet/resp"));
+        assert!(!matches(&resource, "cardiac"));
+    }
 }

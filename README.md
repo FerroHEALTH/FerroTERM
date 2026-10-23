@@ -142,6 +142,12 @@ It is one of the FerroHEALTH consoles and draws with their shared components.
   publishes and putting every parameter in the address.
 - **The concept browser** walks a hierarchy with the keyboard and offers only
   what the served version declares it can do.
+- **Server, Configuration and Your preferences** compare the four FHIR roots,
+  list the settings the console runs with, and keep your theme, density,
+  default version and page size.
+
+Every page works with scripting off; the browser adds the theme menu, the
+concept tree and the keyboard shortcuts on top.
 
 Reading is open. Signing in, at your OpenID Provider through the console's
 own server, is for editing; the browser never holds a token. The

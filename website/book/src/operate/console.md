@@ -49,7 +49,7 @@ site_root = "/site"
 base_url = "http://ferroterm:8080/"
 # The address readers see the FHIR API at, shown on the screens.
 public_url = "https://terminology.example.org/"
-# The synchronisation service's admin listener, for the release findings.
+# The synchronisation service's admin listener, shown on Configuration.
 sync_url = "http://ferroterm-sync:8090/"
 timeout_ms = 30000
 
@@ -99,9 +99,13 @@ endpoint when one is configured.
 
 ## The screens
 
-The top bar carries the command bar, the FHIR version you are reading through,
-the server's health, and the theme. The version switch keeps the version as
-your default, so every screen you open next reads the same root.
+Every screen is drawn whole on the console's server and works with scripting
+off; the browser adds the theme menu, the copy buttons, the concept tree and
+the keyboard shortcuts on top. The top bar carries the command bar, the FHIR
+version you are reading through, the server's health, and the menu under your
+name with the theme. The version menu keeps the version for your session, so
+every screen you open next reads the same root. An address that names a
+version with `?fhir=` reads that version for that page.
 
 ### Dashboard
 
@@ -113,12 +117,13 @@ code systems, and the way into each operation.
 
 ### Code systems
 
-Every code system the root declares in its `TerminologyCapabilities`, with the
-versions it holds, its content mode, whether it answers subsumption, and the
-screens it opens in. Filter by name or canonical, sort by a column, page
-through. Each row opens the code system's own screen: its definition from the
-published resource, what this server declares it can do with each version, and
-the resource as the server sent it.
+Every code system the root declares in its `TerminologyCapabilities`, with its
+source, the versions it holds, its content mode and whether it reads as a
+hierarchy. Sort by a column and page through. Each row opens the code
+system's own screen, whose tabs are links: **Overview** (its definition from
+the published resource), **Versions** (what this server declares it can do
+with each version), **History** for a resource this server stores, and
+**JSON**, the resource as the server sent it.
 
 ![The code system listing](img/console/code-systems.png)
 
@@ -134,9 +139,10 @@ Every move is in the address, so a walk is a link you can send.
 
 ### Value sets and concept maps
 
-The resources the root publishes, searched by canonical and version. A value
-set opens on what its definition selects, the codes it expands to, and its
-JSON; a concept map on its groups, every mapping it writes, and its JSON.
+The resources the root publishes. A value set opens on **Definition** (what
+its definition selects), **Expansion** (the codes it expands to, a page at a
+time) and **JSON**; a concept map on **Mappings** (every mapping it writes,
+group by group), **Overview** and **JSON**.
 
 ![A value set](img/console/value-set.png)
 
@@ -155,24 +161,39 @@ refusal shown in the server's own words.
 
 ![Expanding a value set](img/console/expand.png)
 
-### About this server
+### Server, Configuration and About
 
-The four FHIR roots side by side, read from each root's `CapabilityStatement`;
-the conformance and benchmark evidence this build ships, read from the files
-the repository commits; and your preferences: the theme, the density, the
-default FHIR version, a display language and the page size, kept by the console
-in its own cookies for your browser.
+**Server** shows the four FHIR roots side by side, read from each root's
+`CapabilityStatement`, the operations each root declares, and the
+conformance and benchmark evidence this build ships. **Configuration** lists
+the settings the console runs with, secrets redacted. **About** names the
+build, the licence and the projects it stands on.
 
-![About this server](img/console/about.png)
+![The server's roots](img/console/server.png)
+
+![About](img/console/about.png)
+
+### Your preferences
+
+Open from the menu under your name: the theme and the density, reduced
+motion, the default FHIR version, the display language concept names are
+asked for in, the page size (25 rows unless you choose another) and the
+keyboard hints. The console keeps each in a cookie of its own for your
+browser and draws the next page in it.
+
+![Your preferences](img/console/preferences.png)
 
 ### Editing
 
 Signed in with the write scopes, the **Code system editor**, the **Value set
-composer** and the **Concept map editor** write local resources through the same REST API any
-client uses. Every save states `If-Match`, so a resource someone changed since
-you opened it is refused with `412` and the screen offers to reload. Content
-your server serves from its loaded indexes has no write path, so it opens to
-read and offers no save.
+composer** and the **Concept map editor** write local resources through the
+same REST API any client uses. Each is a plain form: **Save** posts it, the
+console sends the resource, and the page says which version the server wrote.
+`Ctrl S` presses Save. Every save states `If-Match`, so a resource someone
+changed since you opened it is refused with `412`, your draft stays in the
+form, and the screen offers to reload the current version. Content your
+server serves from its loaded indexes has no write path, so it opens to read
+and offers no save.
 
 ## Composing a value set
 
@@ -198,9 +219,8 @@ offers it here, a system declaring none offers none, and a clause pinned to a
 code system version is offered that version's filters. A filter value the
 server refuses is shown with the character its diagnostic points at marked.
 
-Own codes are picked out of the clause's code system through a search, so a
-clause cannot name a code the system does not hold, and each one can carry the
-display this value set gives it.
+Own codes are typed one per row, and each one can carry the display this value
+set gives it; the preview shows any code the code system does not hold.
 
 **Run the preview** expands the definition on screen, saved or not: it posts it
 to `ValueSet/$expand` in the `valueSet` parameter and pages the answer
@@ -218,49 +238,37 @@ write path, so it opens here to read and offers no save under any role.
 
 ## History and restoring a version
 
-Every editing screen, and the detail screen of a value set or a concept map,
-carries a link to the versions once the server holds the resource, which opens
-`/history` on it. The screen
-lists the versions the server holds, newest first, with when each was written,
-the interaction that wrote it where the answer states one, and `meta.source`
-where your server states one. `meta.source` is a source system rather than a
-person: FHIR keeps who changed a resource in `Provenance` and `AuditEvent`, so
-the column is headed **Source system** and is usually empty.
+A resource this server stores has a **History** tab, which opens `/history` on
+it. The screen lists the revisions the server holds, newest first, with when
+each was written and the interaction that wrote it where the answer states
+one.
 
 How the list is read depends on what your server declares in its
 `CapabilityStatement`. A server declaring `history-instance` answers the whole
 list at once. FerroTERM declares `vread`, so the console reads each earlier
-version back one request at a time, counting down from the version the resource
-states, and the screen says so. Only the most recent versions are listed.
+revision back one request at a time, counting down from the revision the
+resource states, and the screen says so. Only the 20 most recent revisions are
+listed.
 
-**Compare two versions** picks an earlier and a later one and lists the
-elements they disagree about: the path, whether it was added, removed or
-changed, and both values. It compares the two documents structurally rather
-than as text, so what you read is which elements moved.
-`meta.versionId` and `meta.lastUpdated` are left out, because your server
-assigns both on every write and they differ between any two versions. The two
-versions are in the address, so a comparison is a link you can send.
+**Compare** takes an earlier and a later revision and lists the elements they
+disagree about: the path, whether it was added, removed or changed, and both
+values. It compares the two documents structurally, so what you read is which
+elements moved. `meta.versionId` and `meta.lastUpdated` are left out, because
+your server assigns both on every write. The two revisions are in the address,
+so a comparison is a link you can send.
 
-**Restore this version** writes that version's whole resource back as a new
-version. It states `If-Match` of the version the server holds now, not the one
-being restored, so a change someone else made since you opened the screen is
-refused with 412 and the screen offers to reload. The restore control appears
-only for an account whose token carries the write scope for the resource type;
-everyone else reads the same versions and restores nothing.
+**Restore** on an earlier revision asks first, in a dialog that names the
+revision, and then writes that revision's whole resource back as a new one.
+It states `If-Match` of the revision the server holds now, so a change someone
+else made since you opened the screen is refused with 412 and the screen
+offers to reload the revisions. The page then says which revision the restore
+wrote. Restore appears only for an account whose token carries the write scope
+for the resource type; everyone else reads the same revisions and restores
+nothing.
 
-### Seeing what a release changed
-
-Where the [synchronisation service](sync.md) is running and the console names
-its admin listener in `[ferroterm] sync_url`, the screen also lists what the
-newest run found about the resource you have open: the codes it names that the
-activated release made inactive, removed, or pushed outside the value set they
-came through. The console's server reads the listener itself, with the
-signed-in reader's access token, so the listener stays on your private network.
-The listener admits a token carrying its product scope, `__ferroterm.sync` by
-default ([The admin listener](sync.md#the-admin-listener)): add it to the
-console's `[oidc] scopes` and have the identity provider grant it to the
-readers who should see the findings. Without `sync_url`, for a visitor, or for
-a reader without the scope, the screen does not show the section.
+What a release of the [synchronisation service](sync.md) changed about the
+resource is planned work for this screen; the console no longer reads the
+service's admin listener.
 
 ## About these screenshots
 

@@ -9,8 +9,7 @@
 #   scripts/checks/console-tokens.sh
 #
 # The roles and the steps are ferrohealth-ui's (its stylesheet, served by the
-# console), the brand is `app/ferroterm-console/style/theme.css`, the utilities
-# that name them `app/ferroterm-console/style/tailwind.css`, and the class
+# console), the brand is `ferrohealth_ui::style::Brand::Term`, and the class
 # strings a screen paints with `app/ferroterm-console/src/styles.rs`.
 set -euo pipefail
 
@@ -45,18 +44,12 @@ report "a screen names a palette entry" \
   "$(grep -rnE "\b$palette\b" --include='*.rs' "$SOURCE_DIR" || true)"
 
 report "a screen carries a per-element dark variant" \
-  "one role, redefined once per theme by ferrohealth-ui and style/theme.css" \
+  "one role, redefined once per theme by ferrohealth-ui" \
   "$(grep -rnE '\bdark:[a-z-]' --include='*.rs' "$SOURCE_DIR" || true)"
 
 report "a screen names a raw type size" \
   "a step: text-display, text-title, text-heading, text-body, text-small, text-micro" \
   "$(grep -rnE '\btext-(xs|sm|base|lg|xl|[2-9]xl)\b' --include='*.rs' "$SOURCE_DIR" || true)"
-
-# `break-words` was renamed in Tailwind 4 and still parses, so it fails quietly
-# rather than loudly (https://tailwindcss.com/docs/upgrade-guide).
-report "a screen uses a class Tailwind 4 renamed" \
-  "wrap-break-word" \
-  "$(grep -rnE '\bbreak-words\b' --include='*.rs' "$SOURCE_DIR" || true)"
 
 # Margin, padding and gap come from the four steps and nothing between them, so
 # the rhythm of one screen is the rhythm of every screen. Sizes (h-4, w-56,
@@ -65,6 +58,14 @@ spacing='(m|p|mt|mr|mb|ml|mx|my|pt|pr|pb|pl|px|py|gap|gap-x|gap-y|space-x|space-
 report "a screen names a spacing value off the scale" \
   "a step: tight, default, loose, section" \
   "$(grep -rnE "\b$spacing-([0-9]|\[)" --include='*.rs' "$SOURCE_DIR" || true)"
+
+# Layout is FerroUI's: every class a screen writes in a literal names a
+# ferrohealth-ui class, so the console carries no layout utility of its own.
+utilities="$(grep -rnoE '(class=|class=format!\()"[^"]*"' --include='*.rs' "$SOURCE_DIR" \
+  | awk -F'"' '{ n = split($2, t, " "); for (i = 1; i <= n; i++) if (t[i] !~ /^(fui-|\{)/) { print $0; break } }' || true)"
+report "a screen writes a class that is not ferrohealth-ui's" \
+  "the ferrohealth-ui class or component that lays it out" \
+  "$utilities"
 
 if [[ $failures -gt 0 ]]; then
   echo "console-tokens: $failures rule(s) broken."

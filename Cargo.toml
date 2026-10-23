@@ -96,11 +96,11 @@ anyhow = "1.0.104"
 jiff = "0.2.35"
 # Expansion identifiers (`ValueSet.expansion.identifier`, a `urn:uuid:`).
 uuid = { version = "1.26.0", features = ["v4"] }
-# The console (app/ferroterm-console): a Leptos app rendered on the server and
-# hydrated in the browser, with a backend-for-frontend that reaches the FHIR
-# API server to server. The halves are chosen by target, so the workspace pins
-# leptos with no render-mode feature and the console turns `ssr` on for the
-# host and `hydrate` for wasm32. The wasm-bindgen CLI cargo-leptos runs must
+# The console (app/ferroterm-console): a Leptos app rendered on the server in
+# islands mode, its islands hydrated in the browser, with a backend-for-frontend
+# that reaches the FHIR API server to server. The halves are chosen by target,
+# so the workspace pins leptos with no render-mode feature and the console
+# turns `islands` on for both, `ssr` for the host and `hydrate` for wasm32. The wasm-bindgen CLI cargo-leptos runs must
 # equal the crate (docs/VERSIONS.md). Verified against crates.io on 2026-10-18.
 leptos = "0.8.22"
 leptos_axum = "0.8.10"
@@ -108,9 +108,13 @@ leptos_meta = "0.8.7"
 leptos_router = "0.8.17"
 wasm-bindgen = "=0.2.129"
 console_error_panic_hook = "0.1.7"
+# The console's own island binds its keyboard shortcuts in the browser, at the
+# release wasm-bindgen 0.2.129 resolves with. Verified against crates.io on
+# 2026-10-23.
+web-sys = { version = "0.3.106", default-features = false }
 # The shared FerroHEALTH UI components, pinned exactly: a console moves its pin
-# after looking at its own screens. Verified against crates.io on 2026-10-19.
-ferrohealth-ui = "=0.2.0"
+# after looking at its own screens. Verified against crates.io on 2026-10-23.
+ferrohealth-ui = "=0.3.2"
 # The console's string catalogs: Project Fluent messages embedded at build
 # time from app/ferroterm-console/locales/, the crate and version
 # ferrohealth-ui catalogs its own words with, so one locale drives both.

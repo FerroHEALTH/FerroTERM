@@ -140,11 +140,6 @@ impl Lifecycle {
         }
     }
 
-    /// Whether this state takes a date.
-    pub(crate) fn dated(&self) -> bool {
-        matches!(self, Self::Deprecated { .. } | Self::Retired { .. })
-    }
-
     /// Whether a concept in this state is inactive.
     pub(crate) fn inactive(&self) -> bool {
         matches!(self, Self::Retired { .. })
@@ -275,6 +270,10 @@ pub(crate) struct Draft {
     pub(crate) url: String,
     /// `CodeSystem.version`.
     pub(crate) version: String,
+    /// `CodeSystem.title`, the name written for a person.
+    pub(crate) title: String,
+    /// `CodeSystem.name`, the computer-friendly name.
+    pub(crate) name: String,
     /// `CodeSystem.status`.
     pub(crate) status: String,
     /// `CodeSystem.content`.
@@ -395,6 +394,8 @@ impl Draft {
                 .unwrap_or_default(),
             url: stored.url.clone().unwrap_or_default(),
             version: stored.version.clone().unwrap_or_default(),
+            title: text_of(resource, "title"),
+            name: text_of(resource, "name"),
             status: stored.status.clone().unwrap_or_default(),
             content: stored.content.clone().unwrap_or_default(),
             case_sensitive: stored.case_sensitive.unwrap_or(true),
@@ -424,13 +425,6 @@ impl Draft {
         !self.url.trim().is_empty()
             && !self.status.trim().is_empty()
             && !self.content.trim().is_empty()
-    }
-
-    /// The first concept this draft retires, when it retires one.
-    pub(crate) fn retired(&self) -> Option<&Concept> {
-        self.concepts
-            .iter()
-            .find(|concept| concept.lifecycle.inactive() && !concept.code.trim().is_empty())
     }
 
     /// The declared type of the property `code` names.
@@ -467,6 +461,8 @@ impl Draft {
         } else {
             resource.insert("version".to_owned(), json!(self.version.trim()));
         }
+        set(&mut resource, "title", self.title.trim());
+        set(&mut resource, "name", self.name.trim());
         resource.insert("status".to_owned(), json!(self.status));
         resource.insert("content".to_owned(), json!(self.content));
         resource.insert("caseSensitive".to_owned(), json!(self.case_sensitive));
@@ -552,6 +548,15 @@ impl Draft {
         written.insert("property".to_owned(), Value::Array(values));
         Value::Object(written)
     }
+}
+
+/// The string element `name` of `resource`, empty when it states none.
+fn text_of(resource: &Value, name: &str) -> String {
+    resource
+        .get(name)
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_owned()
 }
 
 /// The object `resource` carries, or an empty one when it is not an object.
@@ -1169,19 +1174,5 @@ mod tests {
         assert!(draft.savable());
         draft.status = String::new();
         assert!(!draft.savable(), "status is mandatory on a CodeSystem");
-    }
-
-    #[test]
-    fn the_first_retired_concept_is_the_one_a_check_is_run_on() {
-        let draft = drafted();
-        assert_eq!(
-            draft.retired().map(|concept| concept.code.as_str()),
-            Some("vermilion")
-        );
-        assert_eq!(
-            Draft::new().retired(),
-            None,
-            "a draft that retires nothing has nothing to check"
-        );
     }
 }

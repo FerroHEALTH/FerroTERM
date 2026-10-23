@@ -5,4 +5,4 @@
 # (ISO 639-2, reserved for local use), with invented words. It never ships:
 # the console's catalogs are the directories under `locales/`.
 
-not-found-title = Qot qound
+errors-not-found-title = Qo quch qcreen

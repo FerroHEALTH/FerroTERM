@@ -12,5 +12,17 @@ allow ^Cadasto B\.V\.$                      # the maker's legal name
 allow ^[a-z]+[A-Z][A-Za-z]*$                # a JSON member name (resourceType, valueString)
 allow ^[A-Z][a-z]+[A-Z][A-Za-z]+$           # a FHIR resource type name (OperationOutcome)
 allow ^https?://                            # a canonical URL
-allow ^(GET|PUT|POST|DELETE)$               # an HTTP method
+allow ^(GET|PUT|POST|PATCH|DELETE)$         # an HTTP method
 allow ^R(4|4B|5|6)$                         # a FHIR release name
+allow ^FHIR( |$)                            # FHIR and its release numbers, the same in every language
+allow ^(CodeSystem|ValueSet|ConceptMap)/\{id\}$  # a FHIR resource path
+allow ^ferrohealth-ui                       # a crate name and its version
+allow ^(GET|PUT|POST|DELETE) \{             # an HTTP request line
+allow ^user/                                # a SMART scope
+allow ^Coding$                              # a FHIR data type name
+allow ^CONCEPT$                             # the marker a filter sentence places its concept at
+allow ^%                                    # a time format
+allow ^[A-Z]$                               # a KeyboardEvent.key letter with Shift held
+allow ^(Ctrl (Enter|s|S)|Esc|g [a-z]|up \| down)$   # key caps of the shortcuts, written as the keys read
+allow ^CARGO_                               # a variable cargo sets at build time
+allow ^form\[data-                          # a CSS selector the shortcuts island presses a form's button by

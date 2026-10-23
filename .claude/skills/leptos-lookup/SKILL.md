@@ -24,15 +24,15 @@ pre-1.0 and moves, so training data drifts. FerroUI leads the console's UI,
 so its documents come first; the Leptos book answers what FerroUI does not
 settle. The console's own rules live in `.claude/rules/leptos-ui.md`.
 
-**The console is rendered on the server and hydrated** (`leptos-ui.md` §1
-and §3), so the book's SSR, hydration and server-function chapters apply;
-its CSR-only chapters do not.
+**The console is drawn on the server in islands mode** (`leptos-ui.md` §1
+to §3), so the book's SSR and "Guide: Islands" chapters apply; its CSR-only
+chapters do not, and the console has no server function.
 
 ## Procedure
 
 1. **Read FerroUI first** (FerroHEALTH/FerroUI; a local checkout or
    GitHub). Take the tag from the console's pin (`ferrohealth-ui` in the
-   root `Cargo.toml`, `=0.2.0` today, tag `v0.2.0`):
+   root `Cargo.toml`, `=0.3.2` today, tag `v0.3.2`):
 
    ```bash
    UI=~/.cache/ferroterm/ferroui

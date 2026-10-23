@@ -18,10 +18,8 @@
 //! one as the other.
 
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 
 use crate::fhir::version::FhirVersion;
-use crate::locale::{Msg, tr};
 use crate::url::RequestUrl;
 
 /// The `$translate` parameter naming the concept map to translate through.
@@ -29,9 +27,6 @@ const URL_PARAMETER: &str = "url";
 
 /// The `$translate` parameter carrying the concept map's business version.
 const MAP_VERSION_PARAMETER: &str = "conceptMapVersion";
-
-/// The `$translate` parameter carrying a concept map inline.
-const CONCEPT_MAP_PARAMETER: &str = "conceptMap";
 
 /// The names one FHIR version gives the parameters of `$translate`.
 ///
@@ -121,35 +116,6 @@ impl TranslateRequest {
             }
         }
         url
-    }
-
-    /// The `Parameters` body a `POST` run sends, carrying `map` inline.
-    ///
-    /// An operation invoked by `POST` carries every parameter in a
-    /// `Parameters` body (<https://hl7.org/fhir/R4B/operations.html#request>),
-    /// and `$translate` defines a `conceptMap` parameter that carries the map
-    /// itself, "provided directly as part of the request"
-    /// (<https://hl7.org/fhir/R4B/conceptmap-operation-translate.html>). That
-    /// is what lets a map that has never been saved be translated through.
-    /// `url` is left out: the two name the map two ways, and a server that
-    /// took both would have to choose between them.
-    pub(crate) fn body(&self, version: FhirVersion, map: &serde_json::Value) -> String {
-        let names = spelling(version);
-        let mut parameters = vec![json!({"name": CONCEPT_MAP_PARAMETER, "resource": map})];
-        // Each `value[x]` is the type that version's OperationDefinition
-        // declares for the parameter: the code is a `code`, a system is a
-        // `uri`, and a system version is a `string`.
-        for (name, kind, value) in [
-            (names.code, "valueCode", &self.code),
-            (names.system, "valueUri", &self.system),
-            (names.system_version, "valueString", &self.system_version),
-            (names.target_system, "valueUri", &self.target_system),
-        ] {
-            if !value.is_empty() {
-                parameters.push(json!({"name": name, kind: value}));
-            }
-        }
-        json!({"resourceType": tr(Msg::Parameters), "parameter": parameters}).to_string()
     }
 }
 
@@ -256,15 +222,6 @@ pub(crate) struct NamedValue {
     pub(crate) value: Option<String>,
 }
 
-/// How a match states the way its target relates to the source.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct Relation {
-    /// The element that carried it, which differs by FHIR version.
-    pub(crate) label: Msg,
-    /// The code, as the server wrote it.
-    pub(crate) code: String,
-}
-
 impl TranslateAnswer {
     /// `result`, whether the server considers the code translated.
     pub(crate) fn result(&self) -> Option<bool> {
@@ -306,30 +263,7 @@ impl TranslateAnswer {
     }
 }
 
-impl TranslationMatch {
-    /// How this match states its relation, under the element that carried it.
-    ///
-    /// R4 and R4B answer a `ConceptMapEquivalence` code and R5 and the R6
-    /// ballot a `ConceptMapRelationship` code, and the two code sets are not
-    /// the same. Both are reported under their own name, so a reader is never
-    /// shown one version's answer as though it were another's.
-    pub(crate) fn relations(&self) -> Vec<Relation> {
-        let mut stated = Vec::new();
-        if let Some(code) = self.equivalence.clone() {
-            stated.push(Relation {
-                label: Msg::Equivalence,
-                code,
-            });
-        }
-        if let Some(code) = self.relationship.clone() {
-            stated.push(Relation {
-                label: Msg::Relationship,
-                code,
-            });
-        }
-        stated
-    }
-}
+impl TranslationMatch {}
 
 /// One `match` parameter, read into the elements the screen draws.
 fn read_match(parameter: &WireParameter) -> TranslationMatch {
@@ -437,53 +371,6 @@ mod tests {
         request().append(RequestUrl::new(), version).render("")
     }
 
-    /// The `conceptMap` parameter carries the map itself, and `url` is left
-    /// out, because the two name the map two ways
-    /// (<https://hl7.org/fhir/R4B/conceptmap-operation-translate.html>).
-    #[test]
-    fn a_post_body_carries_the_map_inline_under_each_version_s_own_names() {
-        let map = serde_json::json!({"resourceType": "ConceptMap", "status": "draft"});
-        let r4b = request().body(FhirVersion::R4B, &map);
-        assert_eq!(
-            r4b,
-            r#"{"parameter":[{"name":"conceptMap","resource":{"resourceType":"ConceptMap","status":"draft"}},{"name":"code","valueCode":"x"},{"name":"system","valueUri":"https://terminology.example/a"},{"name":"version","valueString":"2031"},{"name":"targetsystem","valueUri":"https://terminology.example/b"}],"resourceType":"Parameters"}"#
-        );
-        let r5 = request().body(FhirVersion::R5, &map);
-        assert!(
-            r5.contains(r#"{"name":"sourceCode","valueCode":"x"}"#)
-                && r5.contains(r#"{"name":"system","valueUri""#)
-                && r5.contains(r#"{"name":"targetSystem","valueUri""#),
-            "R5 renamed the code and the target system and kept `system`: {r5}"
-        );
-        let r6 = request().body(FhirVersion::R6, &map);
-        assert!(
-            r6.contains(r#"{"name":"sourceSystem","valueUri""#)
-                && r6.contains(r#"{"name":"sourceVersion","valueString""#),
-            "the R6 ballot renamed the source system and its version: {r6}"
-        );
-        for body in [r4b, r5, r6] {
-            assert!(
-                !body.contains(r#""name":"url""#),
-                "a map sent inline is never also named by canonical: {body}"
-            );
-        }
-    }
-
-    /// A parameter the reader left empty is left out, so the server's own
-    /// default applies to it rather than an empty string the viewer invented.
-    #[test]
-    fn a_post_body_leaves_out_every_parameter_that_was_not_set() {
-        let map = serde_json::json!({"resourceType": "ConceptMap"});
-        let request = TranslateRequest {
-            system: "https://terminology.example/a".to_owned(),
-            code: "x".to_owned(),
-            ..TranslateRequest::default()
-        };
-        let body = request.body(FhirVersion::R4B, &map);
-        assert!(!body.contains("targetsystem"), "{body}");
-        assert!(!body.contains(r#""name":"version""#), "{body}");
-    }
-
     /// An R4 or R4B answer, as `map_r4` writes one.
     const R4_ANSWER: &str = r#"{"resourceType":"Parameters","parameter":[
         {"name":"result","valueBoolean":true},
@@ -570,35 +457,6 @@ mod tests {
             "the operation requires a system with a code"
         );
         assert!(request().runnable());
-    }
-
-    #[test]
-    fn an_r4_answer_reports_an_equivalence_and_never_a_relationship() {
-        let matches = parse(R4_ANSWER).matches();
-        let first = matches.first().expect("the answer carries one match");
-        assert_eq!(
-            first.relations(),
-            vec![Relation {
-                label: Msg::Equivalence,
-                code: "wider".to_owned(),
-            }],
-            "`wider` is a ConceptMapEquivalence code and means nothing as a relationship"
-        );
-        assert_eq!(first.relationship, None);
-    }
-
-    #[test]
-    fn an_r5_answer_reports_a_relationship_and_never_an_equivalence() {
-        let matches = parse(R5_ANSWER).matches();
-        let first = matches.first().expect("the answer carries one match");
-        assert_eq!(
-            first.relations(),
-            vec![Relation {
-                label: Msg::Relationship,
-                code: "source-is-narrower-than-target".to_owned(),
-            }]
-        );
-        assert_eq!(first.equivalence, None);
     }
 
     #[test]
@@ -689,7 +547,7 @@ mod tests {
         let first = matches.first().expect("the answer carries one match");
         assert!(first.no_map);
         assert!(
-            first.relations().is_empty(),
+            first.relationship.is_none() && first.equivalence.is_none(),
             "a no-map match states no relation, which is what the server sent"
         );
         assert_eq!(answer.result(), Some(false));

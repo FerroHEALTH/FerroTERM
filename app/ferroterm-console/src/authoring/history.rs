@@ -250,16 +250,7 @@ pub(crate) enum Change {
     Changed,
 }
 
-impl Change {
-    /// The word a row carries, so the change is never a colour alone.
-    pub(crate) fn word(self) -> &'static str {
-        match self {
-            Self::Added => "added",
-            Self::Removed => "removed",
-            Self::Changed => "changed",
-        }
-    }
-}
+impl Change {}
 
 /// What a comparison of two chosen versions came to.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -484,7 +475,13 @@ mod tests {
     fn rows(before: &Value, after: &Value) -> Vec<String> {
         differences(before, after)
             .into_iter()
-            .map(|row| format!("{}:{}", row.path, row.change.word()))
+            .map(|row| {
+                format!(
+                    "{}:{}",
+                    row.path,
+                    format!("{:?}", row.change).to_lowercase()
+                )
+            })
             .collect()
     }
 

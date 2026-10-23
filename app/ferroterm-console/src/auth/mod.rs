@@ -11,7 +11,6 @@
 
 pub(crate) mod scopes;
 
-use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::auth::scopes::Letter;
@@ -26,28 +25,24 @@ pub struct Operator {
     pub scopes: Vec<String>,
 }
 
-/// The signed-in reader, for every screen to consult.
-///
-/// It is a context newtype so the type is unambiguous, and a signal because a
-/// write the server refuses with `401` ends what the page believes.
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct Session(pub(crate) RwSignal<Option<Operator>>);
+/// The signed-in reader of the request, for every screen to consult.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Session(Option<Operator>);
 
 impl Session {
     /// A session for `operator`, the reader the server rendered the page for.
     pub(crate) fn new(operator: Option<Operator>) -> Self {
-        Self(RwSignal::new(operator))
+        Self(operator)
     }
 
-    /// Whether a reader is signed in, read reactively.
+    /// Whether a reader is signed in.
     pub(crate) fn signed_in(&self) -> bool {
-        self.0.with(Option::is_some)
+        self.0.is_some()
     }
 
-    /// The name of whoever is signed in, read reactively.
+    /// The name of whoever is signed in.
     pub(crate) fn who(&self) -> Option<String> {
-        self.0
-            .with(|held| held.as_ref().and_then(|operator| operator.name.clone()))
+        self.0.as_ref().and_then(|operator| operator.name.clone())
     }
 
     /// Whether the reader's token opens `letter` on `resource_type`.
@@ -56,25 +51,16 @@ impl Session {
     /// the same scopes itself, so a reader who gets past this is still refused
     /// there; the point is not to offer what would be refused.
     pub(crate) fn can(&self, resource_type: &str, letter: Letter) -> bool {
-        self.0.with(|held| {
-            held.as_ref()
-                .is_some_and(|operator| scopes::can_any(&operator.scopes, resource_type, letter))
-        })
+        self.0
+            .as_ref()
+            .is_some_and(|operator| scopes::can_any(&operator.scopes, resource_type, letter))
     }
 
-    /// What the reader may change, as the line under their name says it,
-    /// read reactively.
+    /// What the reader may change, as the line under their name says it.
     pub(crate) fn standing(&self) -> String {
-        self.0.with(|held| {
-            held.as_ref()
-                .map_or_else(read_only, |operator| standing(&operator.scopes))
-        })
-    }
-
-    /// Forgets the reader, which a `401` from the server means: their session
-    /// on the console's server has ended, and they sign in again.
-    pub(crate) fn release(&self) {
-        self.0.set(None);
+        self.0
+            .as_ref()
+            .map_or_else(read_only, |operator| standing(&operator.scopes))
     }
 }
 
@@ -105,8 +91,6 @@ pub(crate) fn standing(granted: &[String]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use leptos::prelude::Owner;
-
     use super::{Operator, Session, read_only, standing};
     use crate::auth::scopes::Letter;
 
@@ -131,8 +115,6 @@ mod tests {
 
     #[test]
     fn a_control_is_drawn_for_the_scopes_the_token_grants_and_no_other() {
-        let owner = Owner::new();
-        owner.set();
         let session = Session::new(Some(Operator {
             name: Some(String::from("Synthetic Reader")),
             scopes: vec![String::from("openid"), String::from("user/ValueSet.cud")],
@@ -144,8 +126,7 @@ mod tests {
             !session.can("CodeSystem", Letter::Create),
             "a type not granted"
         );
-        session.release();
-        assert!(!session.signed_in(), "a 401 ends what the page believes");
-        assert!(!session.can("ValueSet", Letter::Create));
+        assert!(!Session::new(None).signed_in(), "a visitor");
+        assert!(!Session::new(None).can("ValueSet", Letter::Create));
     }
 }

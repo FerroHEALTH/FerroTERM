@@ -3,7 +3,6 @@
 
 //! The part of a `CapabilityStatement` the shell renders.
 
-use crate::locale::{Msg, tr_with};
 use serde::{Deserialize, Serialize};
 
 /// The canonical a root declares an operation's invocation levels under.
@@ -148,23 +147,6 @@ pub(crate) struct Software {
 }
 
 impl CapabilityStatement {
-    /// The one line the shell shows about a root, or `None` when the server
-    /// declared nothing the viewer reads.
-    pub(crate) fn summary(&self) -> Option<String> {
-        let software = self.software_line();
-        match (self.fhir_version.as_deref(), software) {
-            (Some(fhir), Some(software)) => Some(tr_with(
-                Msg::Fhir2,
-                &[
-                    ("fhir", (fhir).to_string().into()),
-                    ("software", (software).clone().into()),
-                ],
-            )),
-            (Some(fhir), None) => Some(tr_with(Msg::Fhir3, &[("fhir", (fhir).to_string().into())])),
-            (None, software) => software,
-        }
-    }
-
     /// The name of the running software, with its version where it gave one.
     pub(crate) fn software_line(&self) -> Option<String> {
         let software = self.software.as_ref()?;
@@ -294,33 +276,6 @@ mod tests {
     }
 
     #[test]
-    fn the_summary_names_the_release_and_the_software() {
-        let statement = parse(
-            r#"{"resourceType":"CapabilityStatement","fhirVersion":"4.3.0",
-                "software":{"name":"FerroTERM","version":"0.1.0"}}"#,
-        );
-        assert_eq!(
-            statement.summary(),
-            Some("FHIR 4.3.0, FerroTERM 0.1.0".to_owned())
-        );
-    }
-
-    #[test]
-    fn a_statement_without_software_still_names_its_release() {
-        let statement = parse(r#"{"fhirVersion":"5.0.0"}"#);
-        assert_eq!(statement.summary(), Some("FHIR 5.0.0".to_owned()));
-    }
-
-    #[test]
-    fn a_statement_that_declares_neither_summarises_to_nothing() {
-        assert_eq!(
-            parse(r#"{"resourceType":"CapabilityStatement","status":"active"}"#).summary(),
-            None,
-            "the shell then says the root answered without saying what it is"
-        );
-    }
-
-    #[test]
     fn an_operation_is_declared_only_where_the_statement_names_it() {
         let statement = parse(
             r#"{"resourceType":"CapabilityStatement","rest":[{"mode":"server","resource":[
@@ -344,19 +299,6 @@ mod tests {
         assert!(
             !parse(r#"{"fhirVersion":"4.3.0"}"#).declares_operation("ConceptMap", "translate"),
             "the screen then says the root does not declare the operation"
-        );
-    }
-
-    #[test]
-    fn the_rest_of_the_statement_is_ignored_rather_than_re_modelled() {
-        let statement = parse(
-            r#"{"fhirVersion":"6.0.0-ballot5","rest":[{"mode":"server","resource":[]}],
-                "software":{"name":"FerroTERM"}}"#,
-        );
-        assert_eq!(
-            statement.summary(),
-            Some("FHIR 6.0.0-ballot5, FerroTERM".to_owned()),
-            "the viewer carries the fields it renders and nothing more"
         );
     }
 

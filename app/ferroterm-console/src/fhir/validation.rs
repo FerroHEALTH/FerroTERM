@@ -22,7 +22,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::fhir::CODE_SYSTEM;
 use crate::fhir::VALUE_SET;
-use crate::fhir::capability::CapabilityStatement;
 use crate::fhir::concept::CODE_PARAMETER;
 use crate::fhir::concept::SYSTEM_PARAMETER;
 use crate::fhir::concept::VERSION_PARAMETER;
@@ -51,20 +50,6 @@ pub(crate) const CODE_A_PARAMETER: &str = "codeA";
 /// The `$subsumes` parameter carrying the second code.
 pub(crate) const CODE_B_PARAMETER: &str = "codeB";
 
-/// The operation code of `$validate-code`, without the `$` a URL spells it with.
-pub(crate) const VALIDATE_CODE_OPERATION: &str = "validate-code";
-
-/// The operation code of `$subsumes`, without the `$` a URL spells it with.
-pub(crate) const SUBSUMES_OPERATION: &str = "subsumes";
-
-/// The invocation level a request against one stored resource is made at.
-///
-/// `OperationDefinition.instance` declares it
-/// (<https://hl7.org/fhir/R4B/operationdefinition-definitions.html#OperationDefinition.instance>),
-/// and the server states the levels it declares on each operation of its
-/// `CapabilityStatement`.
-const INSTANCE_LEVEL: &str = "instance";
-
 /// Which resource type a `$validate-code` run is invoked on.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(crate) enum ValidateOn {
@@ -82,59 +67,6 @@ impl ValidateOn {
             Self::CodeSystem => CODE_SYSTEM,
             Self::ValueSet => VALUE_SET,
         }
-    }
-
-    /// The word the viewer's own address carries this choice as.
-    pub(crate) fn segment(self) -> &'static str {
-        match self {
-            Self::CodeSystem => "codesystem",
-            Self::ValueSet => "valueset",
-        }
-    }
-
-    /// The choice `segment` names, falling back to the code system form.
-    ///
-    /// An address a reader typed names anything at all, and a word that names
-    /// no form reads as the default rather than wedging the screen.
-    pub(crate) fn read(segment: &str) -> Self {
-        if segment.trim() == Self::ValueSet.segment() {
-            Self::ValueSet
-        } else {
-            Self::CodeSystem
-        }
-    }
-}
-
-/// What one root declares about running an operation on a resource type.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(crate) struct Offered {
-    /// Whether the root declares the operation at all.
-    pub(crate) declared: bool,
-    /// Whether it declares the instance level, where a stored resource's id
-    /// stands in for the canonical.
-    pub(crate) instance: bool,
-}
-
-/// What `statement` declares about `operation` on `resource_type`.
-///
-/// An affordance appears only where the statement declares it, so the screen
-/// never offers a run this root then refuses, and the instance-level field
-/// appears only where the version's own `OperationDefinition` declares that
-/// level. Nothing here is a table of versions: the document answers.
-pub(crate) fn offered(
-    statement: &CapabilityStatement,
-    resource_type: &str,
-    operation: &str,
-) -> Offered {
-    let wanted = operation.trim_start_matches('$');
-    let instance = statement
-        .declarations()
-        .into_iter()
-        .filter(|declared| declared.resource == resource_type && declared.code == wanted)
-        .any(|declared| declared.levels.iter().any(|level| level == INSTANCE_LEVEL));
-    Offered {
-        declared: statement.declares_operation(resource_type, operation),
-        instance,
     }
 }
 
@@ -485,28 +417,7 @@ impl WireParameter {
     }
 }
 
-impl Validation {
-    /// The one sentence a live region announces about this answer.
-    ///
-    /// The result is a word rather than a tint, and an inactive concept is
-    /// announced as an answer rather than as a failure
-    /// (<https://www.w3.org/TR/WCAG22/#use-of-color>).
-    pub(crate) fn sentence(&self) -> String {
-        let mut said = match self.result {
-            Some(true) => tr(Msg::ServerAnsweredResultTrueCodeValid),
-            Some(false) => tr(Msg::ServerAnsweredResultFalseCodeNot),
-            None => tr(Msg::ServerAnsweredNoResult),
-        };
-        if self.inactive == Some(true) {
-            said.push_str(&tr(Msg::ConceptInactiveCodeSystem));
-        }
-        if let Some(message) = &self.message {
-            said.push(' ');
-            said.push_str(message);
-        }
-        said
-    }
-}
+impl Validation {}
 
 /// What one `ConceptSubsumptionOutcome` code says about two codes.
 ///
@@ -555,15 +466,8 @@ pub(crate) fn subsumption_sentence(outcome: &str, code_a: &str, code_b: &str) ->
 mod tests {
     use super::*;
 
-    /// The `CapabilityStatement` `GET /r4b/metadata` answered.
-    const R4B: &str = include_str!("../../fixtures/capability-statement-r4b.json");
-
     fn parse(json: &str) -> ParametersAnswer {
         serde_json::from_str(json).expect("the fixture is valid JSON")
-    }
-
-    fn statement() -> CapabilityStatement {
-        serde_json::from_str(R4B).expect("the recorded statement is valid JSON")
     }
 
     fn code_system_run() -> ValidateRequest {
@@ -680,57 +584,6 @@ mod tests {
     }
 
     #[test]
-    fn the_levels_an_affordance_needs_are_read_from_the_recorded_statement() {
-        let statement = statement();
-        assert_eq!(
-            offered(&statement, CODE_SYSTEM, VALIDATE_CODE_OPERATION),
-            Offered {
-                declared: true,
-                instance: true,
-            },
-            "this root declares the operation and the instance level of it"
-        );
-        assert_eq!(
-            offered(&statement, CODE_SYSTEM, SUBSUMES_OPERATION),
-            Offered {
-                declared: true,
-                instance: true,
-            }
-        );
-        assert!(offered(&statement, VALUE_SET, VALIDATE_CODE_OPERATION).declared);
-        assert_eq!(
-            offered(&statement, VALUE_SET, SUBSUMES_OPERATION),
-            Offered::default(),
-            "an operation no resource type declares is offered nowhere"
-        );
-    }
-
-    #[test]
-    fn a_root_that_declares_nothing_offers_nothing() {
-        assert_eq!(
-            offered(
-                &CapabilityStatement::default(),
-                CODE_SYSTEM,
-                VALIDATE_CODE_OPERATION
-            ),
-            Offered::default(),
-            "a statement the viewer could not read offers no affordance at all"
-        );
-    }
-
-    #[test]
-    fn the_choice_of_resource_type_survives_the_address() {
-        for on in [ValidateOn::CodeSystem, ValidateOn::ValueSet] {
-            assert_eq!(ValidateOn::read(on.segment()), on);
-        }
-        assert_eq!(
-            ValidateOn::read("neither"),
-            ValidateOn::CodeSystem,
-            "an address a reader typed cannot wedge the screen"
-        );
-    }
-
-    #[test]
     fn a_wrong_display_comes_back_corrected_with_its_classification() {
         let answer = parse(
             r#"{"resourceType":"Parameters","parameter":[
@@ -768,10 +621,6 @@ mod tests {
             }],
             "the coding leads, and the IssueType code travels beside it"
         );
-        assert_eq!(
-            read.sentence(),
-            "The server answered result false: the code is not valid. Wrong display name"
-        );
     }
 
     #[test]
@@ -787,12 +636,6 @@ mod tests {
         assert_eq!(read.result, Some(true));
         assert_eq!(read.inactive, Some(true));
         assert_eq!(read.status.as_deref(), Some("retired"));
-        assert_eq!(
-            read.sentence(),
-            "The server answered result true: the code is valid. \
-             The concept is inactive in its code system. The concept is retired.",
-            "the inactivity is announced as part of the answer"
-        );
     }
 
     #[test]
@@ -845,17 +688,12 @@ mod tests {
     fn an_answer_with_no_issues_reads_as_an_empty_list_rather_than_a_failure() {
         let read = parse(r#"{"parameter":[{"name":"result","valueBoolean":true}]}"#).validation();
         assert_eq!(read.issues, Vec::<ValidationIssue>::new());
-        assert_eq!(
-            read.sentence(),
-            "The server answered result true: the code is valid."
-        );
     }
 
     #[test]
     fn an_answer_the_viewer_cannot_read_states_that_rather_than_inventing_one() {
         let read = parse(r#"{"resourceType":"Parameters"}"#).validation();
         assert_eq!(read, Validation::default());
-        assert_eq!(read.sentence(), "The server answered no result.");
     }
 
     #[test]

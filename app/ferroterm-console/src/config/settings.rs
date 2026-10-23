@@ -31,6 +31,9 @@ pub struct Settings {
     pub session: SessionSettings,
     /// The OpenID Provider operators sign in with, when one is configured.
     pub oidc: Option<OidcSettings>,
+    /// The configuration file the settings were read from, when one was
+    /// named, which the Configuration page names.
+    pub file: Option<PathBuf>,
 }
 
 /// The resolved `[ferroterm]`.
@@ -88,6 +91,9 @@ pub struct OidcSettings {
     pub client_id: String,
     /// The console's client secret, when it is a confidential client.
     pub client_secret: Option<SecretString>,
+    /// The file the client secret was read from, when it was read from one,
+    /// which the Configuration page names in its place.
+    pub client_secret_file: Option<PathBuf>,
     /// The console's redirection endpoint.
     pub redirect_uri: Url,
     /// The scopes requested, `openid` among them.
@@ -190,6 +196,7 @@ impl Config {
             },
             session,
             oidc,
+            file: None,
         })
     }
 }
@@ -264,6 +271,7 @@ fn resolve_oidc(oidc: &Oidc) -> Result<OidcSettings, Error> {
         jwks_uri,
         client_id: oidc.client_id.clone(),
         client_secret,
+        client_secret_file: oidc.client_secret_file.clone(),
         redirect_uri,
         scopes: oidc.scopes.clone(),
         offline_access: oidc.offline_access,

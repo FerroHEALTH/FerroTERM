@@ -26,46 +26,38 @@ use crate::harness::session;
 
 /// Every shipped screen, as the address a reader opens.
 ///
-/// The code system screen is absent: its address carries a canonical this
-/// module would have to name, and the sidebar does not offer it. The overview
-/// links to it, and `console` walks that link.
-///
-/// The last four are the editor bundle's own screens, which the one server
-/// serves at its own mount. The code system and concept map ones are
-/// opened on the fixtures this deployment holds, because an empty form has
-/// none of the rows whose markup this pass exists to read; the composer opens
-/// on a new draft, which is where its own clause carries every control it
-/// draws. This deployment publishes no issuer, so every form opens read-only,
-/// and the controls a token opens are walked by the keyboard journeys in
-/// `editor`, `composer`, `concept_map_editor` and `history` against the
-/// deployment that has one.
-///
-/// The version screen names no resource, because this deployment has written
-/// none: every resource it holds was loaded rather than written, and an id it
-/// does not hold would make the screen render a refusal instead of itself.
-/// What this pass reads there is the heading, the sentence that says there are
-/// no versions, and the chrome around them; the table and the restore control
-/// are walked by the keyboard journey in `history`.
-const SCREENS: [&str; 19] = [
+/// Each resource page is opened on every tab, because a tab is its own
+/// address and its own markup; the concept browser on a concept, so its tree
+/// is drawn. This deployment publishes no issuer, so the editors are walked
+/// by the keyboard journeys of `editor`, `composer`, `concept_map_editor`
+/// and `history` against the deployment that has one. The shortcuts' own
+/// address opens their legend as a modal dialog, which the walk would only
+/// tab inside, so `console` reads it instead.
+const SCREENS: [&str; 24] = [
     "/",
     "/systems",
     "/systems/https%3A%2F%2Fferroterm.eu%2Ffhir%2FCodeSystem%2Fe2e-taxonomy",
-    "/valuesets/e2e-taxonomy-all",
-    "/conceptmaps/e2e-taxonomy-map",
-    "/lookup",
-    "/about?tab=settings",
-    "/browse",
-    "/expand",
-    "/validate",
+    "/systems/https%3A%2F%2Fferroterm.eu%2Ffhir%2FCodeSystem%2Fe2e-taxonomy?pane=versions",
     "/valuesets",
+    "/valuesets/e2e-taxonomy-all",
+    "/valuesets/e2e-taxonomy-all?pane=expansion",
     "/conceptmaps",
+    "/conceptmaps/e2e-taxonomy-map",
+    "/conceptmaps/e2e-taxonomy-map?pane=overview",
+    "/browse?system=https%3A%2F%2Fferroterm.eu%2Ffhir%2FCodeSystem%2Fe2e-taxonomy&code=ba-branch",
+    "/lookup",
+    "/validate",
+    "/expand",
     "/translate",
-    "/find",
+    "/find?q=ca-leaf",
+    "/server",
+    "/server/operations",
+    "/server/evidence",
+    "/configuration",
+    "/preferences",
+    "/preferences/reading",
+    "/preferences/keyboard",
     "/about",
-    "/codesystem?system=https%3A%2F%2Fferroterm.eu%2Ffhir%2FCodeSystem%2Fe2e-taxonomy",
-    "/compose",
-    "/conceptmap?map=https%3A%2F%2Fferroterm.eu%2Ffhir%2FConceptMap%2Fe2e-taxonomy-map",
-    "/history?type=CodeSystem",
 ];
 
 /// The version every screen is opened on.
@@ -75,24 +67,17 @@ const SCREENS: [&str; 19] = [
 /// (<https://www.w3.org/TR/WCAG22/#keyboard>).
 const VERSION: &str = "r5";
 
-/// The theme control in that pane.
-const THEME_CONTROL: &str = "#viewer-theme";
-
-/// The density control on the settings screen.
-const DENSITY_CONTROL: &str = "#viewer-density";
-
 /// The two densities a reader can choose between.
 const DENSITIES: [&str; 2] = ["comfortable", "compact"];
 
 /// The heading every screen renders once it has booted.
 const HEADING: &str = "h1";
 
-/// The ring a section draws while it is still reading.
+/// A part of the page still waiting on an answer.
 ///
-/// Every read on a screen has to have landed before the walk counts controls,
-/// because an answer that arrives mid-walk adds tab stops the count did not
-/// budget for.
-const SPINNER: &str = ".animate-spin";
+/// The server sends a page whole, so none is ever drawn; the wait stays so a
+/// page that one day streams a part in is still measured once it has landed.
+const SPINNER: &str = "[aria-busy='true']";
 
 /// How many focusable elements the screen offers right now.
 ///
@@ -133,10 +118,13 @@ const TAG_FOCUSABLE: &str = r#"
 // walking with them shut would either miss those controls or call them
 // unreachable (https://html.spec.whatwg.org/multipage/interactive-elements.html#the-details-element).
 document.querySelectorAll('details:not([open])').forEach((el) => { el.open = true; });
+// A negative tabindex takes an element out of the tab order on purpose: the
+// items of a menu or a tree are reached with the arrow keys once the widget
+// holds focus (https://html.spec.whatwg.org/multipage/interaction.html#attr-tabindex).
 const focusable = Array.from(document.querySelectorAll(
   'a[href], button:enabled, input:enabled, select:enabled,'
-  + ' textarea:enabled, summary, [tabindex]:not([tabindex="-1"])'
-)).filter((el) => {
+  + ' textarea:enabled, summary, [tabindex]'
+)).filter((el) => el.getAttribute('tabindex') !== '-1').filter((el) => {
   const box = el.getBoundingClientRect();
   if (box.width < 2 || box.height < 2) { return false; }
   return el.checkVisibility({
@@ -153,11 +141,29 @@ document.addEventListener('focusin', (event) => {
   // presses can record a stop before the browser has resolved the pseudo-class
   // for it, and an outline read then is the resting one, not the focused one.
   if (!el.matches(':focus-visible')) { return; }
-  const style = getComputedStyle(el);
+  // A composite control draws its ring on the part that shows it: the search
+  // field's box, a tree item's row, and a table row whose name is the link,
+  // whose cells draw the ring as an inset shadow on a wide screen.
+  const draws = (node) => {
+    const style = getComputedStyle(node);
+    return style.outlineStyle !== 'none' && !style.outlineWidth.startsWith('0');
+  };
+  let ring = Array.from(el.children).find(draws) || el;
+  for (let node = el.parentElement, depth = 0; node && depth < 4; node = node.parentElement, depth += 1) {
+    if (draws(ring)) { break; }
+    if (node.matches(':focus-within') && draws(node)) { ring = node; }
+  }
+  const cell = el.closest('tr') && el.closest('tr').firstElementChild;
+  const shadowed = !draws(ring) && cell && getComputedStyle(cell).boxShadow.includes('inset');
+  const style = shadowed
+    ? { outlineStyle: 'inset-shadow', outlineWidth: '2px' }
+    : getComputedStyle(ring);
   const tag = el.getAttribute('data-walk');
   window.walkStops.push([tag === null ? '' : tag, style.outlineStyle, style.outlineWidth,
     el.tagName.toLowerCase() + (el.id ? '#' + el.id : '')].join('|'));
-});
+// The capture phase, so a widget that stops the event on its way up (the tree
+// handles its own focus) is still recorded.
+}, true);
 // The walk starts from the document rather than from wherever the last screen
 // left focus, so the first control is reached inside the budget below.
 document.body.setAttribute('tabindex', '-1');
@@ -223,6 +229,16 @@ const parse = (colour) => {
     return from_oklab(parts[0], parts[1] * Math.cos(hue), parts[1] * Math.sin(hue),
       parts.length > 3 ? parts[3] : 1);
   }
+  // A colour the page mixes (`color-mix()` in srgb) computes to the `color()`
+  // form, whose channels are gamma-encoded on 0 to 1
+  // (https://www.w3.org/TR/css-color-4/#color-function).
+  if (text.startsWith('color(srgb ')) {
+    if (parts.length < 3) { return null; }
+    return {
+      r: linear(parts[0] * 255), g: linear(parts[1] * 255), b: linear(parts[2] * 255),
+      a: parts.length > 3 ? parts[3] : 1,
+    };
+  }
   if (text.startsWith('oklab')) {
     if (parts.length < 3) { return null; }
     return from_oklab(parts[0], parts[1], parts[2], parts.length > 3 ? parts[3] : 1);
@@ -231,11 +247,15 @@ const parse = (colour) => {
 };
 // A colour with alpha shows what is behind it, so it is composited onto the
 // colour behind before either is measured
-// (https://www.w3.org/TR/compositing-1/#simplealphacompositing).
+// (https://www.w3.org/TR/compositing-1/#simplealphacompositing). A browser
+// blends the gamma-encoded sRGB values, so the blend is taken there.
+const encoded = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(Math.max(c, 0), 1 / 2.4) - 0.055);
+const blend = (top, bottom, alpha) =>
+  linear(255 * (encoded(top) * alpha + encoded(bottom) * (1 - alpha)));
 const over = (top, bottom) => ({
-  r: top.r * top.a + bottom.r * (1 - top.a),
-  g: top.g * top.a + bottom.g * (1 - top.a),
-  b: top.b * top.a + bottom.b * (1 - top.a),
+  r: blend(top.r, bottom.r, top.a),
+  g: blend(top.g, bottom.g, top.a),
+  b: blend(top.b, bottom.b, top.a),
   a: 1,
 });
 const luminance = (c) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
@@ -261,7 +281,7 @@ const owns_text = (el) => Array.from(el.childNodes).some(
 const failures = [];
 for (const el of document.querySelectorAll('body *')) {
   if (!owns_text(el)) { continue; }
-  if (el.closest('.sr-only') || el.tagName === 'OPTION') { continue; }
+  if (el.closest('.sr-only, .fui-sr-only') || el.tagName === 'OPTION') { continue; }
   const box = el.getBoundingClientRect();
   if (box.width < 2 || box.height < 2) { continue; }
   const style = getComputedStyle(el);
@@ -317,7 +337,11 @@ for (const control of document.querySelectorAll('input, select, textarea')) {
   const named = labelled || control.closest('label')
     || control.getAttribute('aria-label') || control.getAttribute('aria-labelledby');
   if (!named) { findings.push('control with no label: ' + name(control)); }
-  if (!control.id) { findings.push('control with no id: ' + name(control)); }
+  // An id is what a `label for` names; a control inside its label is named by
+  // containment (https://html.spec.whatwg.org/multipage/forms.html#the-label-element).
+  if (!control.id && !control.closest('label')) {
+    findings.push('control with no id: ' + name(control));
+  }
 }
 const seen = new Set();
 for (const el of document.querySelectorAll('[id]')) {
@@ -370,8 +394,8 @@ const SYSTEM: &str = "https://ferroterm.eu/fhir/CodeSystem/e2e-taxonomy";
 /// A code that system holds.
 const CODE: &str = "ca-leaf";
 
-/// A live region on the screen, once it carries something.
-const ANNOUNCEMENT: &str = "p[aria-live='polite']";
+/// The verdict of a run, which the page marks a status message.
+const ANNOUNCEMENT: &str = "main [role='status'].fui-load-report";
 
 /// The address of one screen on the version the pass runs.
 fn address(base: &str, path: &str) -> String {
@@ -396,19 +420,19 @@ async fn announcement(journey: &Journey, what: &str) -> String {
     panic!("{what}: the live region stayed empty");
 }
 
-/// Puts the console in `mode`, which the settings pane keeps in a cookie, so
+/// Puts the console in `mode`, which Your preferences keeps in a cookie, so
 /// every screen opened afterwards in this session is drawn in it.
 async fn choose_theme(journey: &Journey, base: &str, mode: &str) -> WebDriverResult<()> {
     journey
-        .keep_setting(base, THEME_CONTROL, mode, Some("data-theme"))
+        .keep_setting(base, "theme", mode, "data-theme")
         .await
 }
 
-/// Puts the console in `density`, which the settings pane keeps in a cookie,
+/// Puts the console in `density`, which Your preferences keeps in a cookie,
 /// so every screen opened afterwards in this session is drawn at it.
 async fn choose_density(journey: &Journey, base: &str, density: &str) -> WebDriverResult<()> {
     journey
-        .keep_setting(base, DENSITY_CONTROL, density, Some("data-density"))
+        .keep_setting(base, "density", density, "data-density")
         .await
 }
 
@@ -615,15 +639,15 @@ async fn every_screen_renders_the_markup_a_screen_reader_needs() {
     outcome.expect("the journey ran and the browser session ended cleanly");
 }
 
-/// A search, an expansion and a validation each announce their outcome in a
-/// live region.
+/// A lookup, an expansion and a validation each announce their outcome as a
+/// status message.
 ///
 /// A reader who cannot see the answer arrive is told it did
-/// (<https://www.w3.org/TR/WCAG22/#status-messages>). The announcement is read
-/// out of the region the page marks `aria-live`, so a count printed somewhere
-/// else on the screen does not satisfy this.
+/// (<https://www.w3.org/TR/WCAG22/#status-messages>). The verdict carries
+/// `role="status"`, so a count printed somewhere else on the screen does not
+/// satisfy this.
 #[tokio::test]
-async fn a_search_an_expansion_and_a_validation_are_each_announced() {
+async fn a_lookup_an_expansion_and_a_validation_are_each_announced() {
     let Some(base) = server() else {
         return;
     };
@@ -633,12 +657,14 @@ async fn a_search_an_expansion_and_a_validation_are_each_announced() {
             let journey = Journey::open(driver, &base, &format!("/?fhir={VERSION}")).await;
 
             journey
-                .reopen(&format!("{base}/browse?fhir={VERSION}&system={SYSTEM}"))
+                .reopen(&format!(
+                    "{base}/lookup?fhir={VERSION}&system={SYSTEM}&code={CODE}"
+                ))
                 .await;
-            let searched = announcement(&journey, "the search to announce what it matched").await;
+            let found = announcement(&journey, "the lookup to announce what it found").await;
             assert!(
-                searched.chars().any(|glyph| glyph.is_ascii_digit()),
-                "the browse search announced `{searched}`, which carries no count"
+                found.contains(CODE),
+                "the lookup announced `{found}`, which names no code"
             );
 
             journey
@@ -653,7 +679,7 @@ async fn a_search_an_expansion_and_a_validation_are_each_announced() {
 
             journey
                 .reopen(&format!(
-                    "{base}/validate?fhir={VERSION}&system={SYSTEM}&code={CODE}"
+                    "{base}/validate?fhir={VERSION}&url={EXPANDED}&system={SYSTEM}&code={CODE}"
                 ))
                 .await;
             let validated = announcement(&journey, "the validation to announce its verdict").await;

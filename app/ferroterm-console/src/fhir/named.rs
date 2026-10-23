@@ -36,6 +36,13 @@ struct NamedEntry {
 /// One published resource, as little of it as a name needs.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 struct Named {
+    /// The logical id.
+    id: Option<String>,
+    /// The publication status.
+    status: Option<String>,
+    /// The record's metadata: a resource written through the API carries
+    /// the version the server holds.
+    meta: Option<Meta>,
     /// The canonical a request carries.
     url: Option<String>,
     /// The computer-friendly name.
@@ -44,6 +51,40 @@ struct Named {
     title: Option<String>,
     /// The business version of this resource.
     version: Option<String>,
+}
+
+/// `Resource.meta`, as much of it as a listing reads.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+pub(crate) struct Meta {
+    /// `meta.versionId`, which a resource written through the API carries
+    /// and one the deployment loaded does not.
+    #[serde(rename = "versionId")]
+    version_id: Option<String>,
+}
+
+impl Meta {
+    /// The version the server holds of a resource written through the API.
+    pub(crate) fn stored(&self) -> Option<&str> {
+        named(self.version_id.as_deref())
+    }
+}
+
+/// One published resource as a listing shows it.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct Listed {
+    /// The logical id, empty when the server sent none.
+    pub(crate) id: String,
+    /// The canonical, empty when the resource carries none.
+    pub(crate) url: String,
+    /// The name a reader reads: the title, else the name, else the canonical.
+    pub(crate) label: String,
+    /// The business version, when the resource states one.
+    pub(crate) version: Option<String>,
+    /// The publication status, when the resource states one.
+    pub(crate) status: Option<String>,
+    /// The version the server holds of a resource written through the API;
+    /// `None` for one the deployment loaded, which has no write path.
+    pub(crate) stored: Option<String>,
 }
 
 /// One offer a picker makes: what a reader reads, and what the run carries.
@@ -127,6 +168,39 @@ impl NamedSearch {
             .collect()
     }
 
+    /// Every published resource as a listing shows it, in the order the
+    /// name a reader reads sorts, case-folded.
+    pub(crate) fn listed(&self) -> Vec<Listed> {
+        let mut listed: Vec<Listed> = self
+            .published()
+            .map(|published| {
+                let url = published.url.clone().unwrap_or_default();
+                let label = named(published.title.as_deref())
+                    .or_else(|| named(published.name.as_deref()))
+                    .map_or_else(|| url.clone(), str::to_owned);
+                Listed {
+                    id: published.id.clone().unwrap_or_default(),
+                    label,
+                    url,
+                    version: named(published.version.as_deref()).map(str::to_owned),
+                    status: named(published.status.as_deref()).map(str::to_owned),
+                    stored: published
+                        .meta
+                        .as_ref()
+                        .and_then(|meta| named(meta.version_id.as_deref()))
+                        .map(str::to_owned),
+                }
+            })
+            .collect();
+        listed.sort_by(|left, right| {
+            left.label
+                .to_lowercase()
+                .cmp(&right.label.to_lowercase())
+                .then_with(|| left.url.cmp(&right.url))
+        });
+        listed
+    }
+
     /// The resources the answer carried.
     fn published(&self) -> impl Iterator<Item = &Named> {
         self.entry
@@ -151,6 +225,9 @@ mod tests {
                 .iter()
                 .map(|(url, name, title)| NamedEntry {
                     resource: Some(Named {
+                        id: None,
+                        status: None,
+                        meta: None,
                         url: Some((*url).to_owned()),
                         name: name.map(str::to_owned),
                         title: title.map(str::to_owned),
@@ -168,6 +245,9 @@ mod tests {
                 .iter()
                 .map(|(url, version)| NamedEntry {
                     resource: Some(Named {
+                        id: None,
+                        status: None,
+                        meta: None,
                         url: Some((*url).to_owned()),
                         name: None,
                         title: None,
@@ -241,6 +321,9 @@ mod tests {
         let search = NamedSearch {
             entry: vec![NamedEntry {
                 resource: Some(Named {
+                    id: None,
+                    status: None,
+                    meta: None,
                     url: None,
                     name: Some("Nameless".to_owned()),
                     title: None,

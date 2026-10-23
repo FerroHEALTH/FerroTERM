@@ -11,8 +11,9 @@
 # loud when Cargo.lock does not satisfy every manifest and leaves the second
 # resolution nothing to change, and --locked is passed to the compile itself.
 #
-# The bundle is target/site: pkg/ferroterm-console.wasm, its JavaScript glue
-# and the stylesheet, and the favicon from public/. The server binary is built
+# The bundle is target/site: pkg/ferroterm-console.wasm and its JavaScript
+# glue, the chunks of the lazy islands with their loader and manifest, and the
+# favicon and the brand marks from public/. The server binary is built
 # apart from it, with cargo, because the bundle is the same for every
 # architecture.
 #
@@ -54,25 +55,25 @@ for dir in "$cargo_home" "$sysroot" "$root"; do
 done
 export CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS="--remap-path-prefix=$cargo_home=/cargo --remap-path-prefix=$sysroot=/rustc-sysroot --remap-path-prefix=$root=/ferroterm"
 
-# cargo-leptos runs the Tailwind CSS standalone CLI and wasm-opt it finds on
-# PATH and downloads either one unchecked when it finds none, so the build
-# refuses to start until PATH holds both at their pinned, verified releases
-# (scripts/release/console-tools.sh installs them; no specification governs
-# this: our own design).
+# cargo-leptos runs the wasm-opt it finds on PATH and downloads one unchecked
+# when it finds none, so the build refuses to start until PATH holds it at its
+# pinned, verified release (scripts/release/console-tools.sh installs it; no
+# specification governs this: our own design).
 bash "$root/scripts/release/console-tools.sh" --check
-# The variable never picks the binary, which is the one on PATH. cargo-leptos
-# 0.3.11 reads it for one decision (src/config/tailwind.rs): a version that
-# starts with v4 takes the configuration from the CSS input alone and looks
-# for no tailwind.config.js. It names the pinned release so both agree.
-export LEPTOS_TAILWIND_VERSION="v4.3.3"
 
 # cargo-leptos reads its configuration from the crate's own manifest
 # directory, so the build runs from there.
+# The chunks of an earlier build would outlive a split that no longer names
+# them, so the bundle's pkg/ starts empty. --split cuts FerroUI's lazy
+# islands (`#[island(lazy)]`, the tree among them) out of the entry into
+# chunks the loader __wasm_split.*.js fetches by its manifest.
+rm -rf -- "$root/target/site/pkg"
 cd "$console"
-cargo leptos build --frontend-only --lib-cargo-args=--locked "$@"
+cargo leptos build --frontend-only --split --lib-cargo-args=--locked "$@"
 
 missing=0
-for file in pkg/ferroterm-console.wasm pkg/ferroterm-console.js pkg/ferroterm-console.css favicon.ico; do
+for file in pkg/ferroterm-console.wasm pkg/ferroterm-console.js \
+  pkg/__wasm_split_manifest.json favicon.ico; do
   if [ ! -s "$root/target/site/$file" ]; then
     echo "console-site: the bundle has no $file" >&2
     missing=1

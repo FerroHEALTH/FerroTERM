@@ -72,16 +72,6 @@ struct Entry<T> {
 }
 
 impl<T: Published> SearchSet<T> {
-    /// The number of matches the server counted, when it counted them.
-    pub(crate) fn total(&self) -> Option<u32> {
-        self.total
-    }
-
-    /// How many resources of this type the answer carries.
-    pub(crate) fn matched(&self) -> usize {
-        self.carried().count()
-    }
-
     /// The resources the answer carries, in the server's own order.
     ///
     /// The order is the server's and is never re-sorted here: a search states
@@ -137,7 +127,7 @@ mod tests {
             [Some("b".to_owned()), Some("a".to_owned())],
             "the server's order is the answer's order"
         );
-        assert_eq!(found.total(), Some(2));
+        assert_eq!(found.total, Some(2));
     }
 
     #[test]
@@ -149,7 +139,7 @@ mod tests {
                 {"resource":{"resourceType":"Thing","id":"a"}}]}"#,
         );
         assert_eq!(
-            found.matched(),
+            found.found().len(),
             1,
             "an outcome describing the search is not one of its matches"
         );
@@ -159,17 +149,16 @@ mod tests {
     fn an_answer_that_counts_nothing_still_renders_what_it_carries() {
         let found = parse(r#"{"entry":[{"resource":{"resourceType":"Thing"}}]}"#);
         assert_eq!(
-            found.total(),
-            None,
+            found.total, None,
             "the screen states the absence rather than inventing a count"
         );
-        assert_eq!(found.matched(), 1);
+        assert_eq!(found.found().len(), 1);
     }
 
     #[test]
     fn an_empty_searchset_reads_as_no_match_rather_than_as_a_decode_error() {
         let found = parse(r#"{"resourceType":"Bundle","type":"searchset","total":0}"#);
         assert_eq!(found.found(), Vec::<&Thing>::new());
-        assert_eq!(found.total(), Some(0));
+        assert_eq!(found.total, Some(0));
     }
 }

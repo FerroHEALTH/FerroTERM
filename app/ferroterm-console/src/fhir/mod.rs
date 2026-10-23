@@ -23,7 +23,6 @@ pub(crate) mod facts;
 pub(crate) mod named;
 pub(crate) mod outcome;
 pub(crate) mod searchset;
-pub(crate) mod sync;
 pub(crate) mod terminology;
 pub(crate) mod translate;
 pub(crate) mod validation;
@@ -134,6 +133,31 @@ impl FhirClient {
         }
     }
 
+    /// The status `GET /health` answers, or `None` when the server did not
+    /// answer at all.
+    pub(crate) async fn probe(&self) -> Option<StatusCode> {
+        match self.health().await {
+            Ok(status) => Some(status),
+            Err(error) => error.status(),
+        }
+    }
+
+    /// Whether the root of `version` serves with no sign-in: it answers its
+    /// SMART discovery document `404`, as a deployment with authentication
+    /// switched off does
+    /// (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
+    pub(crate) async fn serves_without_sign_in(&self, version: FhirVersion) -> bool {
+        let url = RequestUrl::new()
+            .segment(version.segment())
+            .segment(".well-known")
+            .segment("smart-configuration")
+            .render(&self.root);
+        let Ok(answer) = self.send(Method::Get, &url, PLAIN_JSON).await else {
+            return false;
+        };
+        status_of(&answer, &url).is_ok_and(|status| status == StatusCode::NOT_FOUND)
+    }
+
     /// The address of the `CapabilityStatement` of one served FHIR version.
     ///
     /// Every read has a paired builder, so a screen can disclose the exact
@@ -174,6 +198,33 @@ impl FhirClient {
             .render(&self.root)
     }
 
+    /// The address of the `CodeSystem` resources one root publishes for a
+    /// canonical, read with `_summary=true`: a large system's concepts are
+    /// left out (<https://hl7.org/fhir/R4B/search.html#summary>).
+    pub(crate) fn code_system_summary_url(&self, version: FhirVersion, system: &str) -> String {
+        RequestUrl::new()
+            .segment(version.segment())
+            .segment("CodeSystem")
+            .query("url", system)
+            .query("_summary", "true")
+            .render(&self.root)
+    }
+
+    /// Reads the `CodeSystem` resources one root publishes for a canonical,
+    /// their concepts left out.
+    ///
+    /// # Errors
+    ///
+    /// Returns the variant of [`FhirError`] describing what went wrong.
+    pub(crate) async fn code_system_summary(
+        &self,
+        version: FhirVersion,
+        system: &str,
+    ) -> Result<Document<CodeSystemSearch>, FhirError> {
+        self.get_document(&self.code_system_summary_url(version, system))
+            .await
+    }
+
     /// The address the name of every published resource of one type is read
     /// from.
     ///
@@ -185,7 +236,7 @@ impl FhirClient {
         RequestUrl::new()
             .segment(version.segment())
             .segment(resource_type)
-            .query("_elements", "url,name,title,version")
+            .query("_elements", "url,name,title,version,status,meta")
             .render(&self.root)
     }
 
@@ -201,6 +252,19 @@ impl FhirClient {
     ) -> Result<NamedSearch, FhirError> {
         self.get_json(&self.published_names_url(version, resource_type))
             .await
+    }
+
+    /// Reads the `CapabilityStatement` of one served FHIR version as the
+    /// server sent it, for a screen that shows the whole document.
+    ///
+    /// # Errors
+    ///
+    /// Returns the variant of [`FhirError`] describing what went wrong.
+    pub(crate) async fn capability_document(
+        &self,
+        version: FhirVersion,
+    ) -> Result<serde_json::Value, FhirError> {
+        self.get_json(&self.metadata_url(version)).await
     }
 
     /// Reads the `CapabilityStatement` of one served FHIR version.
@@ -345,8 +409,8 @@ impl FhirClient {
         &self,
         version: FhirVersion,
         request: &LookupRequest,
-    ) -> Result<LookupAnswer, FhirError> {
-        self.get_json(&self.lookup_url(version, request)).await
+    ) -> Result<Document<LookupAnswer>, FhirError> {
+        self.get_document(&self.lookup_url(version, request)).await
     }
 
     /// The address a `ValueSet/$expand` sent as a `POST` is addressed to.
@@ -473,8 +537,8 @@ impl FhirClient {
         &self,
         version: FhirVersion,
         request: &ValidateRequest,
-    ) -> Result<ParametersAnswer, FhirError> {
-        self.get_json(&self.validate_code_url(version, request))
+    ) -> Result<Document<ParametersAnswer>, FhirError> {
+        self.get_document(&self.validate_code_url(version, request))
             .await
     }
 
@@ -503,8 +567,9 @@ impl FhirClient {
         &self,
         version: FhirVersion,
         request: &SubsumesRequest,
-    ) -> Result<ParametersAnswer, FhirError> {
-        self.get_json(&self.subsumes_url(version, request)).await
+    ) -> Result<Document<ParametersAnswer>, FhirError> {
+        self.get_document(&self.subsumes_url(version, request))
+            .await
     }
 
     /// The address one `ConceptMap/$translate` run reads.
@@ -536,8 +601,9 @@ impl FhirClient {
         &self,
         version: FhirVersion,
         request: &TranslateRequest,
-    ) -> Result<TranslateAnswer, FhirError> {
-        self.get_json(&self.translate_url(version, request)).await
+    ) -> Result<Document<TranslateAnswer>, FhirError> {
+        self.get_document(&self.translate_url(version, request))
+            .await
     }
 }
 
@@ -846,43 +912,6 @@ impl FhirClient {
         Ok(answer.first_of(CONCEPT_MAP))
     }
 
-    /// The address a `ConceptMap/$translate` sent as a `POST` is addressed to.
-    ///
-    /// An operation invoked by `POST` carries every parameter in its
-    /// `Parameters` body (<https://hl7.org/fhir/R4B/operations.html#request>),
-    /// so the address is the operation itself and nothing else.
-    pub(crate) fn translate_post_url(&self, version: FhirVersion) -> String {
-        RequestUrl::new()
-            .segment(version.segment())
-            .segment(CONCEPT_MAP)
-            .segment("$translate")
-            .render(&self.root)
-    }
-
-    /// Translates a code through a concept map the browser sends inline.
-    ///
-    /// This is how a map that has never been saved is previewed: the operation
-    /// defines a `conceptMap` parameter carrying the map itself, and a server
-    /// is free not to accept one
-    /// (<https://hl7.org/fhir/R4B/conceptmap-operation-translate.html>), which
-    /// arrives here as an ordinary refusal for the caller to fall back from.
-    ///
-    /// # Errors
-    ///
-    /// Returns the variant of [`FhirError`] describing what went wrong.
-    pub(crate) async fn translate_inline(
-        &self,
-        version: FhirVersion,
-        request: &TranslateRequest,
-        map: &serde_json::Value,
-    ) -> Result<TranslateAnswer, FhirError> {
-        self.post_json(
-            &self.translate_post_url(version),
-            &request.body(version, map),
-        )
-        .await
-    }
-
     /// The address one version of one resource is read from.
     ///
     /// `vread` addresses a version below the instance
@@ -937,76 +966,6 @@ impl FhirClient {
     ) -> Result<serde_json::Value, FhirError> {
         self.get_json(&self.version_read_url(version, resource_type, id, version_id))
             .await
-    }
-
-    /// The address the sync service's run list is read from.
-    ///
-    /// The listener is the sync service's own, which the console's server
-    /// reaches when its configuration names one; nothing answers there by
-    /// default.
-    pub(crate) fn runs_url(&self) -> String {
-        RequestUrl::new().segment("runs").render(&self.root)
-    }
-
-    /// The address one whole run record is read from.
-    pub(crate) fn run_url(&self, id: &str) -> String {
-        RequestUrl::new()
-            .segment("runs")
-            .segment(id)
-            .render(&self.root)
-    }
-
-    /// What the newest recorded synchronisation run found when it revalidated
-    /// the deployment's own resources.
-    ///
-    /// A deployment with no run list reachable answers a failure, which the
-    /// screen takes as nothing to show rather than as something to report.
-    ///
-    /// # Errors
-    ///
-    /// Returns the variant of [`FhirError`] describing what went wrong.
-    pub(crate) async fn latest_findings(&self) -> Result<Vec<sync::Finding>, FhirError> {
-        let listed: serde_json::Value = self.get_plain_json(&self.runs_url()).await?;
-        let Some(newest) = sync::newest_run(&listed) else {
-            return Ok(Vec::new());
-        };
-        let record: serde_json::Value = self.get_plain_json(&self.run_url(&newest)).await?;
-        Ok(sync::findings_of(&record))
-    }
-
-    /// Sends a plain JSON `GET` and decodes what it answers.
-    ///
-    /// The sync service's admin listener is not a FHIR endpoint, so the
-    /// request asks for ordinary JSON and a refusal carries no
-    /// `OperationOutcome`.
-    async fn get_plain_json<T: DeserializeOwned>(&self, url: &str) -> Result<T, FhirError> {
-        let answer = self.send(Method::Get, url, PLAIN_JSON).await?;
-        read_json(&answer, url)
-    }
-
-    /// The codes one value set expands to, in the order the server sent them.
-    ///
-    /// The editor's coded controls offer what the served root says the element
-    /// admits rather than a list compiled into the bundle, so a root whose
-    /// FHIR version admits another code offers it without a new build.
-    ///
-    /// # Errors
-    ///
-    /// Returns the variant of [`FhirError`] describing what went wrong.
-    pub(crate) async fn value_set_codes(
-        &self,
-        version: FhirVersion,
-        canonical: &str,
-    ) -> Result<Vec<expansion::ConceptRow>, FhirError> {
-        let request = ExpandRequest {
-            url: canonical.to_owned(),
-            ..ExpandRequest::default()
-        };
-        let expanded = self.expand(version, &request).await?;
-        Ok(expanded
-            .expansion()
-            .map(|expansion| expansion.concepts)
-            .unwrap_or_default())
     }
 }
 

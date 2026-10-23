@@ -26,8 +26,6 @@ pub(crate) enum RootAnswer {
     Absent,
     /// The root answered a failure, which the screen renders as it arrived.
     Refused(Box<FhirError>),
-    /// The read has not settled yet.
-    Unread,
 }
 
 impl RootAnswer {
@@ -50,7 +48,7 @@ impl RootAnswer {
     fn statement(&self) -> Option<&CapabilityStatement> {
         match self {
             Self::Declared(statement) => Some(statement),
-            Self::Absent | Self::Refused(_) | Self::Unread => None,
+            Self::Absent | Self::Refused(_) => None,
         }
     }
 
@@ -58,7 +56,7 @@ impl RootAnswer {
     pub(crate) fn failure(&self) -> Option<&FhirError> {
         match self {
             Self::Refused(error) => Some(error),
-            Self::Declared(_) | Self::Absent | Self::Unread => None,
+            Self::Declared(_) | Self::Absent => None,
         }
     }
 
@@ -68,7 +66,6 @@ impl RootAnswer {
             Self::Declared(_) => tr(Msg::StateAnswered),
             Self::Absent => tr(Msg::NotServed),
             Self::Refused(_) => tr(Msg::StateRefusedWord),
-            Self::Unread => tr(Msg::NotRead),
         }
     }
 
@@ -100,8 +97,6 @@ pub(crate) struct RootColumn {
     pub(crate) version: FhirVersion,
     /// The release the root declared, absent when it declared none.
     pub(crate) fhir_version: Option<String>,
-    /// The one word the header carries about the read.
-    pub(crate) state: String,
 }
 
 /// One row of the comparison, with one cell per root, in column order.
@@ -137,7 +132,6 @@ pub(crate) fn compare(answers: &[(FhirVersion, RootAnswer)]) -> Comparison {
                 fhir_version: answer
                     .statement()
                     .and_then(|statement| statement.fhir_version.clone()),
-                state: answer.state(),
             })
             .collect(),
         facts: facts(answers),
@@ -418,7 +412,8 @@ mod tests {
         answers[3] = (FhirVersion::R6, answer);
         let comparison = compare(&answers);
         assert_eq!(
-            comparison.columns[3].state, "not served",
+            answers[3].1.state(),
+            "not served",
             "the header says so in words"
         );
         assert_eq!(
@@ -442,7 +437,7 @@ mod tests {
         let mut answers = recorded();
         answers[2] = (FhirVersion::R5, answer);
         let comparison = compare(&answers);
-        assert_eq!(comparison.columns[2].state, "refused");
+        assert_eq!(answers[2].1.state(), "refused");
         let cells = &row(&comparison.operations, "CodeSystem/$lookup").cells;
         assert_eq!(cells[2], Cell::Unread);
         assert_eq!(cells[0], Cell::Stated("type".to_owned()));
@@ -475,7 +470,7 @@ mod tests {
         let answers = vec![(FhirVersion::R4B, RootAnswer::read(Ok(empty)))];
         let comparison = compare(&answers);
         assert_eq!(comparison.columns.len(), 1);
-        assert_eq!(comparison.columns[0].state, "answered");
+        assert_eq!(answers[0].1.state(), "answered");
         assert!(
             comparison.operations.is_empty(),
             "there is nothing to compare, and the screen says so"
@@ -522,14 +517,5 @@ mod tests {
             "3 of 4 roots answered: R6 not served.",
             "a reader who cannot see the table still hears which root is missing"
         );
-    }
-
-    #[test]
-    fn an_unread_root_states_nothing_anywhere() {
-        let answers = vec![(FhirVersion::R4B, RootAnswer::Unread)];
-        let comparison = compare(&answers);
-        assert_eq!(comparison.columns[0].state, "not read");
-        assert_eq!(row(&comparison.facts, "Software").cells, [Cell::Unread]);
-        assert_eq!(notes(&RootAnswer::Unread), Vec::<(String, String)>::new());
     }
 }

@@ -28,7 +28,7 @@
 # FERROTERM_UI_E2E_CHROME and FERROTERM_UI_E2E_CHROMEDRIVER, or found on PATH;
 # CI installs both at the release docs/VERSIONS.md pins. Without either, the
 # script fetches that release into target/journey-tools, and the site build's
-# tailwindcss and wasm-opt into target/console-tools, so a fresh checkout runs
+# wasm-opt into target/console-tools, so a fresh checkout runs
 # with nothing installed by hand beyond cargo-nextest and cargo-leptos.
 #
 # The battery must not change a tracked file. The documentation capture pass
@@ -94,13 +94,13 @@ if [[ -z "$chromedriver" ]]; then
 fi
 [[ -x "$chromedriver" ]] || die "$chromedriver is not an executable chromedriver"
 
-# The site build's tools, tailwindcss and wasm-opt: the pinned ones on PATH,
-# else the ones in target/console-tools, fetched there on first use.
+# The site build's tool, wasm-opt: the pinned one on PATH, else the one in
+# target/console-tools, fetched there on first use.
 if ! bash scripts/release/console-tools.sh --check > /dev/null 2>&1; then
   tools="$root/target/console-tools"
   export PATH="$tools/bin:$PATH"
   if ! bash scripts/release/console-tools.sh --check > /dev/null 2>&1; then
-    echo "ui-e2e: the pinned tailwindcss and wasm-opt are not on PATH; fetching them into $tools"
+    echo "ui-e2e: the pinned wasm-opt is not on PATH; fetching it into $tools"
     bash scripts/release/console-tools.sh "$tools"
   fi
 fi

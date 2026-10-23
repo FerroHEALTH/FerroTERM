@@ -1,517 +1,553 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
-//! One value set: what its definition selects, the codes it expands to, and
-//! the resource as the server sent it.
 
-use ferrohealth_ui::table::view::{Body, Column, DataTable, data_table};
-use ferrohealth_ui::tone::Tone;
-use ferrohealth_ui::view::button::Variant;
-use ferrohealth_ui::view::empty::{empty_quiet, empty_state};
-use ferrohealth_ui::view::status::badge;
-use ferrohealth_ui::view::surface::{
-    Crumb, Header, chip, definitions, facts_row, page_heading, panel, stack, titled_panel,
+//! One value set (T2): what its definition selects, clause by clause (M4),
+//! the first page of its expansion, its revisions (History, for one stored
+//! on this server) and the resource itself (JSON).
+//!
+//! The definition is the value set as its publisher wrote it; expanding it
+//! is a separate operation the Expansion tab runs and the Operations
+//! workbench pages through (<https://hl7.org/fhir/R4B/valueset.html>).
+
+use std::collections::BTreeMap;
+
+use ferrohealth_ui::highlight::Language;
+use ferrohealth_ui::icon::Glyph;
+use ferrohealth_ui::table::view::{
+    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
 };
+use ferrohealth_ui::view::action::ActionGroup;
+use ferrohealth_ui::view::clause::{Clause, ClauseCode, ClauseKind, clause, clause_codes, clauses};
+use ferrohealth_ui::view::code::{Code, CodeHead, code_section};
+use ferrohealth_ui::view::coding::{Coding, Layout, coding};
+use ferrohealth_ui::view::surface::{
+    SectionHead, card_action, definitions, or_none, panel_section, panel_sections, section_intro,
+};
+use ferrohealth_ui::widget::action_menu::{Act, Action, Item, Menu};
 use leptos::prelude::*;
-use leptos_meta::Title;
-use leptos_router::hooks::use_params;
-use leptos_router::params::Params;
+use leptos_router::hooks::use_params_map;
 
-use crate::components::detail::{current_tab, detail_tabs, json_pane};
-use crate::components::failure::Failure;
-use crate::components::icon;
-use crate::components::not_declared;
-use crate::components::reading::Reading;
-use crate::components::shell::{Console, SelectedVersion};
+use crate::auth::scopes::Letter;
+use crate::fhir::concept::LookupRequest;
 use crate::fhir::error::FhirError;
 use crate::fhir::expansion::{ExpandRequest, ExpandedValueSet};
 use crate::fhir::value_set::{ClauseRow, PublishedValueSet};
 use crate::fhir::version::FhirVersion;
-use crate::fhir::{Document, FhirClient, VALUE_SET};
-use crate::listing::status_pill;
+use crate::fhir::{Document, FhirClient, VALUE_SET, resources_text};
 use crate::locale::{Msg, tr, tr_with};
-use crate::routes::{editing_link, expansion_link, history_link};
+use crate::pages::detail::{Head, Kind, Links, PANE_PARAM, Pane, header, line, tabbed};
+use crate::pages::parts::{Source, failure, heading, loaded, name_of, system_names};
+use crate::request::{Request, request};
+use crate::routes::{
+    VALIDATE_PATH, VALUE_SETS_PATH, editing_link, expansion_link, resource_link, system_link,
+    ui_link,
+};
 
-/// The tabs of the screen.
-const TABS: &[(&str, Msg)] = &[
-    ("overview", Msg::Definition),
-    ("expansion", Msg::Expansion),
-    ("json", Msg::Json),
-];
+/// How many concepts the Expansion tab shows of an expansion.
+const PREVIEW: u32 = 10;
 
-/// How many codes the expansion tab shows before it leads to the runner.
-const PREVIEW_CODES: u32 = 25;
-
-/// The columns of the definition's clause table.
-fn clause_columns() -> [Column; 3] {
-    [
-        Column::text("clause", tr(Msg::Clause)),
-        Column::text("system", tr(Msg::CodeSystem2)),
-        Column::text("selects", tr(Msg::Selects)),
-    ]
+/// What the page read.
+struct Read {
+    /// The value set as the server holds it.
+    document: Document<PublishedValueSet>,
+    /// The name each code system goes by, by canonical.
+    names: BTreeMap<String, String>,
+    /// The display of each filter value the clauses name, by system and
+    /// code.
+    displays: BTreeMap<(String, String), String>,
 }
 
-/// The columns of the expansion preview.
-fn code_columns() -> [Column; 3] {
-    [
-        Column::text("code", tr(Msg::Code)),
-        Column::text("display", tr(Msg::Display)),
-        Column::text("system", tr(Msg::System)),
-    ]
-}
-
-/// The path parameter this screen is addressed by.
-#[derive(Clone, Debug, Params, PartialEq)]
-struct ValueSetParams {
-    /// The logical id, which the router percent-decodes on read.
-    id: Option<String>,
-}
-
-/// A read the screen makes.
-type Fetched<T> = Resource<Result<T, FhirError>>;
-
-/// Shows one value set, read by its id.
+/// One value set, on the tab the address names.
 #[component]
 #[expect(
     unreachable_pub,
-    reason = "the leptos component macro emits a pub props type, and a binary crate has no reachable public API"
+    reason = "the leptos component macro emits a pub props type the crate never exports"
 )]
 pub(crate) fn ValueSetPage() -> impl IntoView {
-    let client = expect_context::<FhirClient>();
-    let SelectedVersion(version) = expect_context::<SelectedVersion>();
-    let params = use_params::<ValueSetParams>();
-    let id = Signal::derive(move || {
-        params
-            .read()
-            .as_ref()
-            .ok()
-            .and_then(|params| params.id.clone())
-            .unwrap_or_default()
-    });
-    let read = {
-        let client = client.clone();
-        Resource::new(
-            move || (version.get(), id.get()),
-            move |(version, id)| {
-                let client = client.clone();
-                async move { client.value_set_read(version, &id).await }
-            },
-        )
+    let request = request();
+    let params = use_params_map();
+    let id = params
+        .with_untracked(|params| params.get("id"))
+        .unwrap_or_default();
+    let Some(pane) = Pane::of(Kind::ValueSet, request.param(PANE_PARAM).as_deref()) else {
+        return crate::pages::errors::not_found_page();
     };
-    let tab = current_tab(TABS, "overview");
-    let header = move || header(id, version, read);
-    let body = move || match tab.get() {
-        "expansion" => expansion_tab(&client, version, read),
-        "json" => json_tab(read),
-        _ => overview_tab(read),
-    };
-    view! {
-        <Title text=move || tr_with(Msg::ValueSet3, &[("id", (id.get()).clone().into())]) />
-        {stack(
-            view! {
-                <Transition fallback=move || { heading(id.get(), None, ()) }>{header}</Transition>
-                {detail_tabs(tr(Msg::ViewsValueSet), TABS, tab)}
-                {body}
-            },
-        )}
-    }
-}
-
-/// The page heading: the trail, the title, its subtitle and the actions.
-fn heading(title: String, subtitle: Option<String>, actions: impl IntoView) -> AnyView {
-    view! {
-        <div>
-            {page_heading(
-                Header {
-                    title,
-                    subtitle,
-                    crumbs: vec![Crumb::new(tr(Msg::ValueSets), "/valuesets")],
-                    mono: false,
-                },
-                actions,
-            )}
-        </div>
-    }
-    .into_any()
-}
-
-/// The header once the read answered: the name, the facts, the actions.
-fn header(
-    id: Signal<String>,
-    version: Signal<FhirVersion>,
-    read: Fetched<Document<PublishedValueSet>>,
-) -> AnyView {
-    let resource = read.with(|answered| {
-        answered
-            .as_ref()
-            .and_then(|answer| answer.as_ref().ok())
-            .map(|document| document.value.clone())
-    });
-    let Some(resource) = resource else {
-        return heading(id.get(), None, ());
-    };
-    let title = resource
-        .label()
-        .or_else(|| resource.url())
-        .map_or_else(|| id.get(), str::to_owned);
-    let subtitle = resource.description().map(str::to_owned);
-    let at = version.get();
-    let canonical = resource.url().map(str::to_owned);
-    let expand = canonical.clone().map(|canonical| {
-        view! {
-            <a href=expansion_link(&canonical, at) class=Variant::Primary.class()>
-                {ferrohealth_ui::icon::icon(icon::EXPAND, "16")}
-                {tr(Msg::Expand)}
-            </a>
-        }
-    });
-    let console = expect_context::<Console>();
-    let edit = console
-        .sign_in
-        .then(|| {
-            editing_link(
-                VALUE_SET,
-                canonical.as_deref().unwrap_or_default(),
-                &id.get(),
-                at,
-            )
-        })
-        .flatten()
-        .map(|href| {
-            view! {
-                <a href=href class=Variant::Secondary.class()>
-                    {ferrohealth_ui::icon::icon(icon::EDIT, "16")}
-                    {tr(Msg::Compose)}
-                </a>
-            }
-        });
-    let history = view! {
-        <a href=history_link(VALUE_SET, &id.get(), at) class=Variant::Secondary.class()>
-            {ferrohealth_ui::icon::icon(ferrohealth_ui::icon::Glyph::FILE_CLOCK, "16")}
-            {tr(Msg::Versions)}
-        </a>
-    };
-    let actions = view! { <div class="fui-cluster">{expand} {edit} {history}</div> };
-    let facts = facts_row(vec![
-        (
-            tr(Msg::Canonical),
-            view! { <span class="fui-mono break-all">{canonical.unwrap_or_else(|| String::from("—"))}</span> }
-                .into_any(),
-        ),
-        (
-            tr(Msg::Version),
-            view! { <span class="fui-mono">{resource.version().unwrap_or("—").to_owned()}</span> }
-                .into_any(),
-        ),
-        (tr(Msg::Status), status_pill(resource.status())),
-        (tr(Msg::Clauses), resource.clauses().len().to_string().into_any()),
-    ]);
-    view! {
-        {heading(title, subtitle, actions)}
-        {panel(facts)}
-    }
-    .into_any()
-}
-
-/// The facts the resource declares and the clauses its definition holds.
-fn overview_tab(read: Fetched<Document<PublishedValueSet>>) -> AnyView {
-    view! {
-        <Reading label=&{
-            tr(Msg::ReadingTheValueSet)
-        }>
-            {move || {
-                read.with(|answered| {
-                    answered
-                        .as_ref()
-                        .map(|answer| match answer {
-                            Ok(document) => definition_view(&document.value),
-                            Err(error) => failure_view(error),
-                        })
-                })
-            }}
-        </Reading>
-    }
-    .into_any()
-}
-
-/// The resource's facts and its definition.
-fn definition_view(resource: &PublishedValueSet) -> AnyView {
-    let rows = resource
-        .facts()
-        .into_iter()
-        .map(|fact| {
-            let value = match fact.value {
-                Some(value) => crate::components::stated(value),
-                None => view! { <span class="fui-muted">{not_declared()}</span> }.into_any(),
-            };
-            (tr(fact.label), value)
-        })
-        .collect();
-    let facts = titled_panel(
-        tr(Msg::WhatItDeclares),
-        (),
-        view! { <div class="fui-panel-body">{definitions(rows)}</div> },
-    );
-    let clauses = titled_panel(
-        tr(Msg::WhatTheDefinitionSelects),
-        (),
-        clauses_view(&resource.clauses()),
-    );
-    view! {
-        {clauses}
-        {facts}
-    }
-    .into_any()
-}
-
-/// What the definition selects, one clause a row.
-fn clauses_view(clauses: &[ClauseRow]) -> AnyView {
-    let body = if clauses.is_empty() {
-        Body::Empty(
-            empty_quiet(
-                icon::VALUE_SETS,
-                tr(Msg::NoComposeElement),
-                tr(Msg::ContentWhateverServerHoldsNotSelection),
-            )
-            .into_any(),
-        )
-    } else {
-        Body::Rows(clauses.iter().map(clause_row).collect_view().into_any())
-    };
-    data_table(DataTable {
-        caption: &tr(Msg::WhatTheDefinitionSelects),
-        columns: &clause_columns(),
-        sort: None,
-        sort_href: &|_| String::new(),
-        body,
-    })
-    .into_any()
-}
-
-/// One clause, with the word that says whether it draws codes in or out.
-fn clause_row(clause: &ClauseRow) -> AnyView {
-    let kind = if clause.included {
-        badge(Tone::Ok, "include").into_any()
-    } else {
-        badge(Tone::Bad, "exclude").into_any()
-    };
-    let system = match (clause.system.as_deref(), clause.version.as_deref()) {
-        (Some(system), Some(version)) => format!("{system}|{version}"),
-        (Some(system), None) => system.to_owned(),
-        (None, _) => String::from("—"),
-    };
-    view! {
-        <tr>
-            <td>{kind}</td>
-            <td data-label=tr(Msg::CodeSystem2) class="fui-mono break-all">
-                {system}
-            </td>
-            <td data-label=tr(Msg::Selects)>{selection_view(clause)}</td>
-        </tr>
-    }
-    .into_any()
-}
-
-/// What one clause selects, as the lines the publisher wrote.
-fn selection_view(clause: &ClauseRow) -> AnyView {
-    let mut lines: Vec<AnyView> = Vec::new();
-    if clause.codes > 0 {
-        lines.push(
-            match clause.codes {
-                1 => tr(Msg::N1CodeNamedOneOne),
-                codes => tr_with(
-                    Msg::CodesNamedOneOne,
-                    &[("codes", (codes).to_string().into())],
-                ),
-            }
-            .into_any(),
-        );
-    }
-    lines.extend(
-        clause
-            .filters
-            .iter()
-            .map(|filter| chip(filter.clone()).into_any()),
-    );
-    lines.extend(clause.value_sets.iter().map(|url| {
-        view! {
-            {tr(Msg::EveryCodeIn)}
-            <span class="fui-mono break-all">{url.clone()}</span>
-        }
-        .into_any()
-    }));
-    if lines.is_empty() {
-        return tr(Msg::TheWholeCodeSystem).into_any();
-    }
-    view! { <div class="fui-stack">{lines}</div> }.into_any()
-}
-
-/// The first codes the value set expands to, from this root's `$expand`.
-fn expansion_tab(
-    client: &FhirClient,
-    version: Signal<FhirVersion>,
-    read: Fetched<Document<PublishedValueSet>>,
-) -> AnyView {
-    let client = client.clone();
-    // NOTE: Leptos book, `async/10_resources`: a resource that needs another's
-    // answer awaits it, so the server renders the expansion and not its absence.
-    let expansion = Resource::new(
-        move || version.get(),
-        move |version| {
-            let client = client.clone();
-            async move {
-                let canonical = read
-                    .await
-                    .ok()
-                    .and_then(|document| document.value.url().map(str::to_owned));
-                match canonical {
-                    Some(url) => Some((
-                        url.clone(),
-                        client
-                            .expand(
-                                version,
-                                &ExpandRequest {
-                                    url,
-                                    count: Some(PREVIEW_CODES),
-                                    ..ExpandRequest::default()
-                                },
-                            )
-                            .await,
-                    )),
-                    None => None,
+    loaded(async move {
+        let document = match request.client.value_set_read(request.version, &id).await {
+            Ok(document) => document,
+            Err(error) => {
+                return view! {
+                    {heading(id.clone(), None, Vec::new(), ActionGroup::none())}
+                    {failure(&error)}
                 }
+                .into_any();
             }
-        },
+        };
+        let names = system_names(&request.client, request.version).await;
+        let displays =
+            filter_displays(&request.client, request.version, &document.value.clauses()).await;
+        let expansion = if pane == Pane::Second {
+            Some(expand(&request, &document.value).await)
+        } else {
+            None
+        };
+        page(
+            &request,
+            &id,
+            &Read {
+                document,
+                names,
+                displays,
+            },
+            pane,
+            expansion,
+        )
+    })
+}
+
+/// The display of each concept a clause's filter names, read with
+/// `$lookup`; a value that does not read keeps its code alone.
+async fn filter_displays(
+    client: &FhirClient,
+    version: FhirVersion,
+    clauses: &[ClauseRow],
+) -> BTreeMap<(String, String), String> {
+    let mut displays = BTreeMap::new();
+    for row in clauses {
+        let Some(system) = &row.system else { continue };
+        for (_, op, value) in &row.filter_parts {
+            if !matches!(
+                op.as_str(),
+                "is-a" | "descendent-of" | "is-not-a" | "=" | "generalizes" | "child-of"
+            ) || value.is_empty()
+            {
+                continue;
+            }
+            let request = LookupRequest {
+                system: system.clone(),
+                system_version: row.version.clone(),
+                code: value.clone(),
+                display_language: None,
+            };
+            // NOTE: no specification governs this: our own design; a value that does
+            // not look up is still stated by its code, so nothing is hidden.
+            if let Ok(answer) = client.lookup(version, &request).await
+                && let Some(display) = answer.value.concept().display
+            {
+                displays.insert((system.clone(), value.clone()), display);
+            }
+        }
+    }
+    displays
+}
+
+/// The first page of the value set's expansion.
+async fn expand(
+    request: &Request,
+    value_set: &PublishedValueSet,
+) -> Result<ExpandedValueSet, FhirError> {
+    let expand = ExpandRequest {
+        url: value_set.url().unwrap_or_default().to_owned(),
+        count: Some(PREVIEW),
+        offset: Some(0),
+        display_language: Some(request.prefs.display_language.clone())
+            .filter(|tag| !tag.is_empty()),
+        ..ExpandRequest::default()
+    };
+    request.client.expand(request.version, &expand).await
+}
+
+/// The title row's action group: Edit for a stored value set the reader may
+/// write, else Check a code in it.
+fn actions(
+    request: &Request,
+    id: &str,
+    value_set: &PublishedValueSet,
+    source: Source,
+    title: &str,
+) -> ActionGroup {
+    let url = value_set.url().unwrap_or_default();
+    let check_href = format!(
+        "{}&url={}",
+        ui_link(VALIDATE_PATH, request.version),
+        percent(url)
     );
-    let drawn = move || {
-        let at = version.get();
-        expansion.with(|answered| {
-            answered.as_ref().map(|answer| match answer {
-                None => panel(empty_state(
-                    icon::EXPAND,
-                    tr(Msg::NoCanonical),
-                    tr(Msg::ResourceDeclaresNoCanonicalSoThere),
-                    (),
-                ))
-                .into_any(),
-                Some((canonical, Ok(expanded))) => preview(expanded, Some(canonical.clone()), at),
-                Some((_, Err(error))) => failure_view(error),
+    let check = Action::new(
+        Some(Glyph::SHIELD_CHECK),
+        tr(Msg::ValueSetCheck),
+        Act::Link(check_href),
+    );
+    let editable = source == Source::Stored && request.can(VALUE_SET, Letter::Update);
+    let edit = editing_link(VALUE_SET, url, id, request.version)
+        .filter(|_| editable)
+        .map(|href| {
+            Action::new(
+                Some(Glyph::PENCIL),
+                tr(Msg::CodeSystemEdit),
+                Act::Link(href),
+            )
+        });
+    let expand = Action::new(
+        Some(Glyph::LIST_CHECKS),
+        tr(Msg::ValueSetExpandAll),
+        Act::Link(expansion_link(url, request.version)),
+    );
+    let menu_label = tr_with(Msg::DetailMoreFor, &[("name", title.to_owned().into())]);
+    match edit {
+        Some(edit) => ActionGroup::primary(edit).more(Menu::new(
+            "value-set-more",
+            menu_label,
+            vec![Item::from(check), Item::from(expand)],
+        )),
+        None => ActionGroup::primary(check).more(Menu::new(
+            "value-set-more",
+            menu_label,
+            vec![Item::from(expand)],
+        )),
+    }
+}
+
+/// A value percent-encoded as one query component.
+fn percent(value: &str) -> String {
+    url::form_urlencoded::byte_serialize(value.as_bytes()).collect()
+}
+
+/// The page of `read` on `pane`.
+fn page(
+    request: &Request,
+    id: &str,
+    read: &Read,
+    pane: Pane,
+    expansion: Option<Result<ExpandedValueSet, FhirError>>,
+) -> AnyView {
+    let value_set = &read.document.value;
+    let source = if value_set.stored().is_some() {
+        Source::Stored
+    } else {
+        Source::Loaded
+    };
+    let title = value_set
+        .label()
+        .or_else(|| value_set.url())
+        .unwrap_or(id)
+        .to_owned();
+    let head = header(
+        Head {
+            kind: Kind::ValueSet,
+            title: title.clone(),
+            status: value_set.status().map(str::to_owned),
+            canonical: value_set.url().unwrap_or_default().to_owned(),
+            line: line(value_set.version(), source),
+            actions: actions(request, id, value_set, source, &title),
+        },
+        request.version,
+    );
+    let panel = match (pane, expansion) {
+        (Pane::Second, Some(expansion)) => expansion_panel(request, value_set, &expansion),
+        (Pane::Json, _) => json(id, &read.document),
+        _ => definition(request, read, source),
+    };
+    let links = Links {
+        page: resource_link(VALUE_SETS_PATH, id, request.version),
+        history: (source == Source::Stored).then(|| id.to_owned()),
+    };
+    view! {
+        {head}
+        {tabbed(Kind::ValueSet, pane, &links, request.version, panel)}
+    }
+    .into_any()
+}
+
+/// The sentence a clause's filter reads as.
+fn filter_sentence(part: &(String, String, String), display: Option<&String>) -> AnyView {
+    let (property, op, value) = part;
+    let named = match display {
+        Some(display) => view! {
+            <code>{value.clone()}</code>
+            " "
+            {display.clone()}
+        }
+        .into_any(),
+        None => view! { <code>{value.clone()}</code> }.into_any(),
+    };
+    let msg = match op.as_str() {
+        "is-a" => Msg::FilterIsA,
+        "descendent-of" => Msg::FilterDescendentOf,
+        "is-not-a" => Msg::FilterIsNotA,
+        "child-of" => Msg::FilterChildOf,
+        "generalizes" => Msg::FilterGeneralizes,
+        "=" if property == "concept" => Msg::FilterEquals,
+        _ => {
+            let words = tr_with(
+                Msg::FilterOther,
+                &[
+                    ("property", property.clone().into()),
+                    ("op", op.clone().into()),
+                    ("value", value.clone().into()),
+                ],
+            );
+            return words.into_any();
+        }
+    };
+    let (before, after) = split_sentence(&tr(msg));
+    view! {
+        {before}
+        {named}
+        {after}
+    }
+    .into_any()
+}
+
+/// The words of a filter sentence before and after the concept it names,
+/// which the catalog marks with `{ $concept }` written as `CONCEPT`.
+fn split_sentence(sentence: &str) -> (String, String) {
+    sentence.split_once("CONCEPT").map_or_else(
+        || (sentence.to_owned(), String::new()),
+        |(before, after)| (before.to_owned(), after.to_owned()),
+    )
+}
+
+/// The sentence under a clause: its filters, how many codes or value sets it
+/// names, or the whole code system.
+fn clause_sentence(row: &ClauseRow, system: &str, read: &Read) -> AnyView {
+    if !row.filter_parts.is_empty() {
+        row.filter_parts
+            .iter()
+            .map(|part| {
+                filter_sentence(
+                    part,
+                    read.displays.get(&(system.to_owned(), part.2.clone())),
+                )
+            })
+            .collect_view()
+            .into_any()
+    } else if !row.concepts.is_empty() {
+        let words = tr_with(
+            if row.included {
+                Msg::ClauseIncludesCodes
+            } else {
+                Msg::ClauseExcludesCodes
+            },
+            &[("count", row.concepts.len().into())],
+        );
+        words.into_any()
+    } else if !row.value_sets.is_empty() {
+        tr_with(
+            Msg::ClauseValueSets,
+            &[("count", row.value_sets.len().into())],
+        )
+        .into_any()
+    } else {
+        tr(Msg::ClauseWholeSystem).into_any()
+    }
+}
+
+/// Definition: the clauses (M4), read-only, and what the value set declares.
+fn definition(request: &Request, read: &Read, source: Source) -> AnyView {
+    let value_set = &read.document.value;
+    let rows = value_set.clauses();
+    let drawn = rows
+        .iter()
+        .map(|row| {
+            let system = row.system.clone().unwrap_or_default();
+            let named = name_of(&read.names, &system);
+            let title = if system.is_empty() {
+                tr(Msg::ClauseNoSystem).into_any()
+            } else {
+                let href = system_link(&system, request.version);
+                let version = row.version.as_ref().map(|version| {
+                    tr_with(Msg::ClauseVersion, &[("version", version.clone().into())])
+                });
+                view! {
+                    {tr(Msg::ClauseFrom)}
+                    " "
+                    <a href=href>{named.clone()}</a>
+                    {version}
+                }
+                .into_any()
+            };
+            let sentence = clause_sentence(row, &system, read);
+            let body = (!row.concepts.is_empty()).then(|| {
+                clause_codes(
+                    row.concepts
+                        .iter()
+                        .map(|(code, display)| ClauseCode {
+                            coding: Coding {
+                                display: display.clone(),
+                                code: code.clone(),
+                                system: None,
+                                inactive: false,
+                                href: None,
+                                current: false,
+                            },
+                            remove: None,
+                        })
+                        .collect(),
+                    None,
+                )
+            });
+            clause(Clause {
+                kind: if row.included {
+                    ClauseKind::Include
+                } else {
+                    ClauseKind::Exclude
+                },
+                title,
+                source: named,
+                sentence,
+                body,
+                actions: None,
+                issues: Vec::new(),
             })
         })
+        .collect_view();
+    let count = u64::try_from(rows.len()).unwrap_or(u64::MAX);
+    let selects = if rows.is_empty() {
+        section_intro(tr(Msg::ValueSetNoCompose))
+    } else {
+        clauses(drawn)
     };
-    view! { <Reading label=&{ tr(Msg::ExpandingTheValueSet) }>{drawn}</Reading> }.into_any()
+    let facts = value_set
+        .facts()
+        .into_iter()
+        .filter(|fact| !matches!(fact.label, Msg::Title | Msg::Version | Msg::Status))
+        .filter_map(|fact| fact.value.map(|value| (tr(fact.label), or_none(value))))
+        .collect::<Vec<_>>();
+    let note = (source == Source::Loaded)
+        .then(|| panel_section(None, section_intro(tr(Msg::ValueSetLoadedNote))));
+    panel_sections(view! {
+        {note}
+        {panel_section(
+            Some(SectionHead {
+                title: tr(Msg::ValueSetSelects),
+                count: Some(count),
+                actions: None,
+            }),
+            selects,
+        )}
+        {panel_section(
+            Some(SectionHead {
+                title: tr(Msg::CodeSystemDetails),
+                count: None,
+                actions: None,
+            }),
+            definitions(facts),
+        )}
+    })
 }
 
-/// The preview table of an expansion, with the way into the runner.
-fn preview(
-    expanded: &ExpandedValueSet,
-    canonical: Option<String>,
-    version: FhirVersion,
+/// Expansion: the first page of `$expand`, with its total, and the way to
+/// every page in Operations.
+fn expansion_panel(
+    request: &Request,
+    value_set: &PublishedValueSet,
+    expansion: &Result<ExpandedValueSet, FhirError>,
 ) -> AnyView {
-    let Some(expansion) = expanded.expansion() else {
-        return panel(empty_state(
-            icon::EXPAND,
-            tr(Msg::NoExpansion),
-            tr(Msg::ServerAnsweredWithoutExpansion),
-            (),
-        ))
-        .into_any();
-    };
-    let listed = expansion.listed();
-    let total = expansion.total.map_or_else(
-        || tr_with(Msg::CodesShown, &[("listed", (listed).to_string().into())]),
-        |total| {
-            tr_with(
-                Msg::OfCodes,
-                &[
-                    ("listed", (listed).to_string().into()),
-                    ("total", (total).to_string().into()),
-                ],
-            )
-        },
+    let url = value_set.url().unwrap_or_default();
+    let open = card_action(
+        expansion_link(url, request.version),
+        tr(Msg::ValueSetOpenInOperations),
     );
-    let body = if expansion.concepts.is_empty() {
-        Body::Empty(
-            empty_quiet(icon::EXPAND, tr(Msg::NoCode), tr(Msg::ExpansionListsNoCode)).into_any(),
-        )
-    } else {
-        Body::Rows(
-            expansion
+    let body = match expansion.as_ref().map(ExpandedValueSet::expansion) {
+        Err(error) => failure(error),
+        Ok(None) => section_intro(tr(Msg::ValueSetNoExpansion)),
+        Ok(Some(expanded)) => {
+            let columns = [
+                Column::text("concept", tr(Msg::ValueSetConcept)).role(Role::Title),
+                Column::text("system", tr(Msg::ValueSetSystem)).role(Role::Quiet),
+            ];
+            let [_, system] = &columns;
+            let rows = expanded
                 .concepts
                 .iter()
                 .map(|concept| {
-                    let display = concept.display.clone().unwrap_or_default();
+                    let mut drawn = Coding::new(
+                        concept.code.clone(),
+                        concept.display.clone().unwrap_or_default(),
+                    );
+                    if concept.inactive {
+                        drawn = drawn.inactive();
+                    }
                     view! {
                         <tr>
-                            <td class="fui-mono">{concept.code.clone()}</td>
-                            <td data-label=tr(Msg::Display)>{display}</td>
-                            <td
-                                data-label=tr(Msg::System)
-                                class="fui-mono fui-small fui-muted sm:whitespace-nowrap"
-                            >
-                                {concept.system.clone()}
-                            </td>
+                            {title_cell(None, coding(drawn, Layout::Inline), None)}
+                            {cell(system, ferrohealth_ui::view::coding::canonical(&concept.system))}
                         </tr>
                     }
                 })
                 .collect_view()
-                .into_any(),
-        )
-    };
-    let all = canonical.map(|canonical| {
-        view! {
-            <a
-                href=expansion_link(&canonical, version)
-                class="fui-button fui-button-ghost fui-button-small"
-            >
-                {tr(Msg::OpenInTheRunner)}
-            </a>
+                .into_any();
+            let caption = tr(Msg::ValueSetFirstPage);
+            let table = data_table(DataTable {
+                caption: &caption,
+                columns: &columns,
+                sorting: Sorting::default(),
+                body: Body::Rows(rows),
+            });
+            let total = expanded.total.map_or_else(
+                || tr_with(Msg::ValueSetShown, &[("shown", expanded.listed().into())]),
+                |total| {
+                    tr_with(
+                        Msg::ValueSetShownOf,
+                        &[("shown", expanded.listed().into()), ("total", total.into())],
+                    )
+                },
+            );
+            view! {
+                {section_intro(total)}
+                {table}
+            }
+            .into_any()
         }
-    });
-    let table = data_table(DataTable {
-        caption: &tr(Msg::CodesValueSetExpands),
-        columns: &code_columns(),
-        sort: None,
-        sort_href: &|_| String::new(),
-        body,
-    });
-    let aside = view! {
-        <span class="inline-flex items-center gap-default">
-            <span class="fui-small fui-muted">{total}</span>
-            {all}
-        </span>
     };
-    view! { {titled_panel(tr(Msg::TheExpansion), aside, table)} }.into_any()
+    panel_sections(panel_section(
+        Some(SectionHead {
+            title: tr(Msg::ValueSetExpansionTitle),
+            count: None,
+            actions: Some(open),
+        }),
+        body,
+    ))
 }
 
-/// The resource as the server sent it.
-fn json_tab(read: Fetched<Document<PublishedValueSet>>) -> AnyView {
-    view! {
-        <Reading label=&{
-            tr(Msg::ReadingTheValueSet)
-        }>
-            {move || {
-                read.with(|answered| {
-                    answered
-                        .as_ref()
-                        .map(|answer| match answer {
-                            Ok(document) => {
-                                json_pane(
-                                    "valueset-json",
-                                    tr(Msg::ValuesetServerSent),
-                                    document.text.clone(),
-                                )
-                            }
-                            Err(error) => failure_view(error),
-                        })
-                })
-            }}
-        </Reading>
+/// JSON: the value set as the server sent it.
+fn json(id: &str, document: &Document<PublishedValueSet>) -> AnyView {
+    let code = Code {
+        label: tr(Msg::ValueSetJsonLabel),
+        language: Language::Json,
+        text: resources_text(&document.text),
+        ids: None,
+        current: None,
+        diagnostics: Vec::new(),
+    };
+    panel_sections(code_section(
+        CodeHead {
+            title: format!("ValueSet/{id}"),
+            tags: vec![String::from("FHIR")],
+            digest: None,
+            copy: Some(String::from("value-set-copy")),
+            actions: None,
+        },
+        &code,
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::split_sentence;
+
+    #[test]
+    fn a_filter_sentence_splits_around_the_concept_it_names() {
+        assert_eq!(
+            (
+                String::from("Includes "),
+                String::from(" and everything below it.")
+            ),
+            split_sentence("Includes CONCEPT and everything below it.")
+        );
+        assert_eq!(
+            (String::from("No concept"), String::new()),
+            split_sentence("No concept")
+        );
     }
-    .into_any()
-}
-
-/// A refused read, in the server's own words.
-fn failure_view(error: &FhirError) -> AnyView {
-    let error = error.clone();
-    view! { <Failure error=Signal::stored(error) /> }.into_any()
 }

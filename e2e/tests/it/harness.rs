@@ -9,6 +9,7 @@ use std::time::Instant;
 
 use thirtyfour::LoggingPrefsLogLevel;
 use thirtyfour::common::keys::TypingData;
+use thirtyfour::error::WebDriverErrorInner;
 use thirtyfour::prelude::*;
 use thirtyfour::stringmatch::Needle;
 use thirtyfour::stringmatch::StringMatch;
@@ -71,6 +72,10 @@ return [on.id || '', on.getAttribute('name') || '', (on.textContent || '').trim(
 /// How often a wait re-reads the page while it waits.
 const POLL: Duration = Duration::from_millis(100);
 
+/// How often [`Journey::element`] looks an element up again after a reload
+/// replaced it.
+const STALE_TRIES: usize = 3;
+
 /// The level chromedriver reports for `console.error` and for an uncaught
 /// panic, which `console_error_panic_hook` turns into one.
 const SEVERE: &str = "SEVERE";
@@ -102,6 +107,10 @@ const SIGN_IN_CONTROL: &str = "//a[normalize-space()='Sign in']";
 /// The shell's own mark, which proves a bundle booted.
 const SHELL_MARK: &str = "header a.fui-lockup";
 
+/// The island that marks `<html>` once the page has hydrated; the sign-in
+/// page draws the shell's header without it.
+const MARKING_ISLAND: &str = "leptos-island[data-component^='Shortcuts']";
+
 /// Opens the issuer's profile address, which decides what the sign-in grants.
 ///
 /// `profile` is the issuer's own vocabulary: `writer` for the full grant,
@@ -124,8 +133,9 @@ pub async fn choose(journey: &Journey, deployment: &SignedIn, profile: &str, tag
 /// Presses the sign-in control and waits for the shell to name the reader.
 ///
 /// The console signs the reader in on its own server: the control leads to
-/// its sign-in route, the issuer sends the browser back to the console's
-/// callback, and the page the console then draws names the reader.
+/// its sign-in page, whose control leads to the sign-in route, the issuer
+/// sends the browser back to the console's callback, and the page the
+/// console then draws names the reader.
 pub async fn sign_in(journey: &Journey, deployment: &SignedIn) -> String {
     journey.reopen(&format!("{}/", deployment.base)).await;
     journey
@@ -137,6 +147,17 @@ pub async fn sign_in(journey: &Journey, deployment: &SignedIn) -> String {
     control.click().await.unwrap_or_else(|error| {
         panic!("the sign-in control refused the press: {error}");
     });
+    journey
+        .element(
+            By::Css("a[href^='/auth/login']"),
+            "the sign-in page's way to the identity provider",
+        )
+        .await
+        .click()
+        .await
+        .unwrap_or_else(|error| {
+            panic!("the sign-in page's control refused the press: {error}");
+        });
     journey
         .text_becoming(
             By::XPath("//*[contains(text(), 'Practitioner/')]"),
@@ -297,27 +318,29 @@ impl Journey {
     /// their handlers are; a key typed in between reaches the field and never
     /// the form's state. The console marks `<html>` with `data-hydrated` when
     /// it is done. A page that is not the console's (the issuer's, a refusal
-    /// in plain text) carries no shell and is not waited on.
+    /// in plain text) carries no shell, and the sign-in page no island that
+    /// marks it, so neither is waited on.
     async fn hydrated(&self) {
-        let console = self
-            .driver
-            .find_all(By::Css(SHELL_MARK))
-            .await
-            .is_ok_and(|found| !found.is_empty());
-        if console
-            && let Err(error) = self
-                .driver
-                .query(By::Css("html[data-hydrated]"))
-                .wait(WAIT, POLL)
-                .first()
+        // Both are read on every poll, so a navigation still settling when the
+        // wait starts is judged on the page it lands on.
+        let started = std::time::Instant::now();
+        let found = |selector: &'static str| async move {
+            self.driver
+                .find_all(By::Css(selector))
                 .await
-        {
-            panic!(
-                "{}",
-                self.failure("the page to hydrate", &error.to_string())
-                    .await
-            );
+                .is_ok_and(|found| !found.is_empty())
+        };
+        while started.elapsed() <= WAIT {
+            if found("html[data-hydrated]").await || !found(MARKING_ISLAND).await {
+                return;
+            }
+            tokio::time::sleep(POLL).await;
         }
+        panic!(
+            "{}",
+            self.failure("the page to hydrate", "no data-hydrated mark")
+                .await
+        );
     }
 
     /// Opens `address` in the same session, as a fresh load.
@@ -381,17 +404,37 @@ impl Journey {
     /// nothing here sleeps for a fixed time and hopes. A press may have loaded
     /// a whole new page, so the wait starts with that page's hydration.
     pub async fn element(&self, selector: By, what: &str) -> WebElement {
-        self.hydrated().await;
-        let element = match self.driver.query(selector).wait(WAIT, POLL).first().await {
-            Ok(element) => element,
-            Err(error) => panic!("{}", self.failure(what, &error.to_string()).await),
-        };
-        // NOTE: WebDriver 2, Element Click: a press on an element whose centre
-        // is under the sticky top bar is refused, so the element is centred.
-        if let Err(error) = element.scroll_into_view().await {
-            panic!("{}", self.failure(what, &error.to_string()).await);
+        // A page a press reloads can replace the element between finding it
+        // and centring it, so a stale element is looked up again.
+        for _ in 0..STALE_TRIES {
+            self.hydrated().await;
+            let element = match self
+                .driver
+                .query(selector.clone())
+                .wait(WAIT, POLL)
+                .first()
+                .await
+            {
+                Ok(element) => element,
+                Err(error) => panic!("{}", self.failure(what, &error.to_string()).await),
+            };
+            // NOTE: WebDriver 2, Element Click: a press on an element whose centre
+            // is under the sticky top bar is refused, so the element is centred.
+            match element.scroll_into_view().await {
+                Ok(()) => return element,
+                Err(error)
+                    if matches!(
+                        error.as_inner(),
+                        WebDriverErrorInner::StaleElementReference(_)
+                    ) => {}
+                Err(error) => panic!("{}", self.failure(what, &error.to_string()).await),
+            }
         }
-        element
+        panic!(
+            "{}",
+            self.failure(what, "the element went stale on every look")
+                .await
+        )
     }
 
     /// The first element matching `selector` once the browser draws it.
@@ -422,9 +465,10 @@ impl Journey {
         self.element(selector, what).await.click().await
     }
 
-    /// Keeps one preference of the About screen's settings pane: `control`
-    /// takes `value`, the form is saved, and the console's answer is waited
-    /// for on `<html>`, where the theme and the density are drawn.
+    /// Keeps one preference of Your preferences: the choice card of `key`
+    /// carrying `value` is chosen, the hydrated page keeps it on the change,
+    /// and the console's answer is waited for on `<html>`, where `drawn`
+    /// carries the theme or the density.
     ///
     /// The preferences are the console's cookies, so every screen opened
     /// afterwards in this session reads them.
@@ -435,32 +479,25 @@ impl Journey {
     pub async fn keep_setting(
         &self,
         base: &str,
-        control: &str,
+        key: &str,
         value: &str,
-        drawn: Option<&str>,
+        drawn: &str,
     ) -> WebDriverResult<()> {
-        self.reopen(&format!("{base}/about?tab=settings")).await;
-        self.visible(By::Css(control), "the settings control")
-            .await
-            .find(By::Css(format!("option[value='{value}']")))
-            .await?
-            .click()
-            .await?;
+        self.reopen(&format!("{base}/preferences")).await;
+        let kept = By::Css(format!("html[{drawn}='{value}']"));
+        if self.count(kept.clone()).await == 1 {
+            return Ok(());
+        }
         self.visible(
-            By::Css("#about-settings-heading form button[type='submit']"),
-            "the settings save button",
+            By::Css(format!("label:has(input[name='{key}'][value='{value}'])")),
+            "the choice of the preference",
         )
         .await
         .click()
         .await?;
-        if let Some(attribute) = drawn {
-            self.count_becoming(
-                By::Css(format!("html[{attribute}='{value}']")),
-                1,
-                "the console to draw the kept setting",
-            )
+        self.count_becoming(kept, 1, "the console to draw the kept setting")
             .await;
-        }
+        self.hydrated().await;
         Ok(())
     }
 
@@ -540,29 +577,6 @@ impl Journey {
         }
     }
 
-    /// Waits until the live region matching `selector` says `needle`, read
-    /// from `textContent` because a live region may be visually hidden and
-    /// WebDriver's element text leaves hidden text out
-    /// (<https://www.w3.org/TR/webdriver2/#get-element-text>).
-    pub async fn live_region_saying(&self, selector: By, needle: &str, what: &str) -> String {
-        let deadline = Instant::now() + WAIT;
-        loop {
-            let said = match self.driver.find(selector.clone()).await {
-                Ok(region) => region.prop("textContent").await.ok().flatten(),
-                Err(_absent) => None,
-            };
-            if let Some(said) = said.filter(|said| said.contains(needle)) {
-                return said;
-            }
-            if Instant::now() >= deadline {
-                let reason = format!("the live region never said `{needle}`");
-                let failure = self.failure(what, &reason).await;
-                panic!("{failure}");
-            }
-            tokio::time::sleep(POLL).await;
-        }
-    }
-
     /// What one script evaluated to in the page, as the string it returned.
     ///
     /// Every other reading here is a WebDriver primitive, because inert markup
@@ -599,33 +613,29 @@ impl Journey {
         self.evaluate(FOCUSED).await
     }
 
-    /// Waits until the keyboard is on the control `wanted` names.
-    ///
-    /// A screen that moves the focus itself does so a paint after the press
-    /// that asked for it, so a reading taken straight afterwards can still be
-    /// the control that was pressed.
-    pub async fn focus_becoming(&self, wanted: &str, what: &str) {
-        let deadline = Instant::now() + WAIT;
-        loop {
-            let on = self.focused().await.unwrap_or_default();
-            if on.contains(wanted) {
-                return;
-            }
-            if Instant::now() >= deadline {
-                let reason = format!("the keyboard is on `{on}`");
-                panic!("{}", self.failure(what, &reason).await);
-            }
-            tokio::time::sleep(POLL).await;
-        }
-    }
-
     /// Types `text` wherever the keyboard is, with no pointer involved.
+    ///
+    /// The keys go through the keyboard input source, as a reader's do, so
+    /// focus left on a dialog that just closed still takes them
+    /// (<https://www.w3.org/TR/webdriver2/#key-actions>). A leading Control
+    /// is held down over the rest, as a chord.
     ///
     /// # Errors
     ///
     /// Returns the WebDriver error when the browser refused the keys.
     pub async fn type_here(&self, text: &str) -> WebDriverResult<()> {
-        self.driver.active_element().await?.send_keys(text).await
+        let chain = self.driver.action_chain();
+        match text.strip_prefix('\u{e009}') {
+            Some(chord) => {
+                chain
+                    .key_down(Key::Control)
+                    .send_keys(chord)
+                    .key_up(Key::Control)
+                    .perform()
+                    .await
+            }
+            None => chain.send_keys(text).perform().await,
+        }
     }
 
     /// Presses tab until the keyboard is on the control `wanted` names.

@@ -27,12 +27,12 @@ use crate::harness::signed_in;
 /// The control that starts a sign-in.
 const SIGN_IN: &str = "//a[normalize-space()='Sign in']";
 
-/// The button that opens the signed-in reader's menu.
-const MENU: &str = "button[popovertarget='operator-menu']";
+/// The button that opens the reader's menu.
+const MENU: &str = "button[popovertarget='user-menu']";
 
 /// The line under the reader's name in that menu, which says what they may
 /// change.
-const STANDING: &str = "#operator-menu .fui-muted";
+const STANDING: &str = "#user-menu .fui-menu-header span";
 
 /// The control that ends a sign-in, inside the menu.
 const SIGN_OUT: &str = "//button[normalize-space()='Sign out']";
@@ -40,6 +40,10 @@ const SIGN_OUT: &str = "//button[normalize-space()='Sign out']";
 /// A control that saves a resource, on any authoring screen.
 const SAVE: &str = "//button[starts-with(normalize-space(), 'Save this') \
                     or starts-with(normalize-space(), 'Create this')]";
+
+/// The code system the deployment loads at start.
+const TAXONOMY_PAGE: &str =
+    "/systems/https%3A%2F%2Fferroterm.eu%2Ffhir%2FCodeSystem%2Fe2e-taxonomy";
 
 /// Opens the signed-in reader's menu.
 async fn open_menu(journey: &Journey) {
@@ -135,7 +139,11 @@ async fn a_reader_without_a_write_scope_is_offered_nothing_to_change() {
                 .reopen(&format!("{}/codesystem", deployment.base))
                 .await;
             journey
-                .element(By::Css("#editor-url"), "the authoring form")
+                .text_becoming(
+                    By::Css("main h1, body h1"),
+                    StringMatch::new("Edit a code system").partial(),
+                    "the editor to say this account may not do this",
+                )
                 .await;
             assert_eq!(
                 journey.count(By::XPath(SAVE)).await,
@@ -143,7 +151,11 @@ async fn a_reader_without_a_write_scope_is_offered_nothing_to_change() {
                 "nothing offers this account a save"
             );
 
-            journey.no_console_errors().await;
+            // The editor answers a reader with 403 Forbidden, the refusal the
+            // journey asked for.
+            journey
+                .no_console_errors_but(&["/codesystem - Failed to load resource: the server responded with a status of 403"])
+                .await;
             Ok::<(), WebDriverError>(())
         })
         .await;
@@ -182,9 +194,9 @@ async fn signing_out_revokes_the_token_and_drops_it() {
             });
             journey
                 .text_becoming(
-                    By::XPath(SIGN_IN),
-                    StringMatch::new("Sign in").partial(),
-                    "the sign-in control to come back, which is the session ending",
+                    By::Css("body"),
+                    StringMatch::new("You are signed out").partial(),
+                    "the sign-in page to say the session ended",
                 )
                 .await;
             assert_eq!(
@@ -230,17 +242,21 @@ async fn a_visitor_is_offered_the_sign_in_and_nothing_that_writes() {
     let outcome = session()
         .await
         .run_and_quit(|driver| async move {
-            let journey = Journey::open(driver, &deployment.base, "/codesystem").await;
-            journey
-                .element(By::Css("#editor-url"), "the authoring form")
-                .await;
+            let journey = Journey::open(driver, &deployment.base, TAXONOMY_PAGE).await;
             let offered = journey
                 .element(By::XPath(SIGN_IN), "the sign-in control")
                 .await;
             let href = offered.attr("href").await?.unwrap_or_default();
+            assert!(
+                href.starts_with("/auth/sign-in?back="),
+                "the control opens the console's own sign-in, returning here: {href}"
+            );
             assert_eq!(
-                href, "/login",
-                "the control starts the console's own sign-in"
+                journey
+                    .count(By::XPath("//main//a[normalize-space()='Edit']"))
+                    .await,
+                0,
+                "a visitor is offered no edit"
             );
             assert_eq!(
                 journey.count(By::XPath(SAVE)).await,

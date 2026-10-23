@@ -76,7 +76,17 @@ br() {
 
 wasm="$pkg/$name.wasm"
 js="$pkg/$name.js"
-wasm_br="$(br "$wasm")"
+entry_br="$(br "$wasm")"
+# The lazy islands' chunks count too: a page that draws every one of them
+# loads them all beside the entry.
+chunks_br=0
+chunks_raw=0
+for chunk in "$pkg"/chunk_*.wasm "$pkg"/split_*.wasm; do
+  [[ -f "$chunk" ]] || continue
+  chunks_br=$((chunks_br + $(br "$chunk")))
+  chunks_raw=$((chunks_raw + $(raw "$chunk")))
+done
+wasm_br=$((entry_br + chunks_br))
 percent=$((wasm_br * 100 / budget))
 
 table="$(
@@ -84,10 +94,11 @@ table="$(
   echo
   echo "| File | Raw | gzip -9 | brotli -q 11 |"
   echo "|---|---:|---:|---:|"
-  echo "| \`$name.wasm\` | $(raw "$wasm") | $(gz "$wasm") | $wasm_br |"
+  echo "| \`$name.wasm\` | $(raw "$wasm") | $(gz "$wasm") | $entry_br |"
+  echo "| the lazy islands' chunks | $chunks_raw | | $chunks_br |"
   echo "| \`$name.js\` | $(raw "$js") | $(gz "$js") | $(br "$js") |"
   echo
-  echo "Sizes in bytes. Budget: $budget bytes of brotli-compressed WebAssembly; this build is $wasm_br bytes, $percent% of it."
+  echo "Sizes in bytes. Budget: $budget bytes of brotli-compressed WebAssembly; this build is $wasm_br bytes with every chunk, $percent% of it."
 )"
 
 echo "$table"

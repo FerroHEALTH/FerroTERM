@@ -2,30 +2,17 @@
 # SPDX-License-Identifier: BUSL-1.1
 # The stray literals each file may still hold while its strings move to
 # the catalogs; rewritten by scripts/checks/stray-literals.sh --update.
-1 app/ferroterm-console/src/authoring/code_system.rs
 9 app/ferroterm-console/src/command.rs
-3 app/ferroterm-console/src/components/mod.rs
-1 app/ferroterm-console/src/components/runs.rs
-1 app/ferroterm-console/src/components/shell.rs
 8 app/ferroterm-console/src/config/error.rs
 1 app/ferroterm-console/src/config/load.rs
 2 app/ferroterm-console/src/config/mod.rs
 9 app/ferroterm-console/src/config/settings.rs
-6 app/ferroterm-console/src/evidence.rs
+1 app/ferroterm-console/src/evidence.rs
 1 app/ferroterm-console/src/fhir/write.rs
-1 app/ferroterm-console/src/listing.rs
 1 app/ferroterm-console/src/oidc/exchange.rs
 3 app/ferroterm-console/src/oidc/logout.rs
-15 app/ferroterm-console/src/oidc/mod.rs
+10 app/ferroterm-console/src/oidc/mod.rs
 2 app/ferroterm-console/src/oidc/refresh.rs
-3 app/ferroterm-console/src/pages/concept_map_editor.rs
-8 app/ferroterm-console/src/pages/editor.rs
-1 app/ferroterm-console/src/pages/expand.rs
-9 app/ferroterm-console/src/pages/history.rs
-10 app/ferroterm-console/src/pages/value_set_composer.rs
-2 app/ferroterm-console/src/pages/versions.rs
 7 app/ferroterm-console/src/server.rs
 1 app/ferroterm-console/src/session/mod.rs
-2 app/ferroterm-console/src/settings.rs
-6 app/ferroterm-console/src/styles.rs
 2 app/ferroterm-console/src/upstream.rs
