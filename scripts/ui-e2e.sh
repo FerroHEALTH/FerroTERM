@@ -28,19 +28,19 @@
 # FERROTERM_UI_E2E_CHROME and FERROTERM_UI_E2E_CHROMEDRIVER, or found on PATH;
 # CI installs both at the release docs/VERSIONS.md pins. Without either, the
 # script fetches that release into target/journey-tools, and the site build's
-# tailwindcss and wasm-opt into target/viewer-tools, so a fresh checkout runs
+# tailwindcss and wasm-opt into target/console-tools, so a fresh checkout runs
 # with nothing installed by hand beyond cargo-nextest and cargo-leptos.
 #
 # The battery must not change a tracked file. The documentation capture pass
 # is the one exception, and it runs alone when --docs-shots asks for it: it
 # writes one PNG per screen the book embeds into
-# website/book/src/operate/img/viewer (FERROTERM_UI_E2E_SHOTS_DIR sends it
+# website/book/src/operate/img/console (FERROTERM_UI_E2E_SHOTS_DIR sends it
 # elsewhere). --review DIR runs only the capture, writing every screen at
 # desktop and phone width in both themes, and the hover, focus and open
 # states, into DIR for a visual review.
 #
 # The image the release lane builds is not what the journeys drive; CI builds
-# docker/viewer/Dockerfile from a staged tree on its own (no specification
+# docker/console/Dockerfile from a staged tree on its own (no specification
 # governs this: our own design).
 set -Eeuo pipefail
 
@@ -95,13 +95,13 @@ fi
 [[ -x "$chromedriver" ]] || die "$chromedriver is not an executable chromedriver"
 
 # The site build's tools, tailwindcss and wasm-opt: the pinned ones on PATH,
-# else the ones in target/viewer-tools, fetched there on first use.
-if ! bash scripts/release/viewer-tools.sh --check > /dev/null 2>&1; then
-  tools="$root/target/viewer-tools"
+# else the ones in target/console-tools, fetched there on first use.
+if ! bash scripts/release/console-tools.sh --check > /dev/null 2>&1; then
+  tools="$root/target/console-tools"
   export PATH="$tools/bin:$PATH"
-  if ! bash scripts/release/viewer-tools.sh --check > /dev/null 2>&1; then
+  if ! bash scripts/release/console-tools.sh --check > /dev/null 2>&1; then
     echo "ui-e2e: the pinned tailwindcss and wasm-opt are not on PATH; fetching them into $tools"
-    bash scripts/release/viewer-tools.sh "$tools"
+    bash scripts/release/console-tools.sh "$tools"
   fi
 fi
 
@@ -173,10 +173,10 @@ done
 # server build is not, and two halves built apart that way do not hydrate.
 echo "ui-e2e: building the server, the console and the stub issuer"
 cargo build --locked -p ferroterm-server
-cargo build --locked --release -p ferroterm-viewer
+cargo build --locked --release -p ferroterm-console
 cargo build --locked --manifest-path e2e/Cargo.toml --bin stub-issuer
 echo "ui-e2e: building the console's site bundle"
-bash scripts/release/viewer-site.sh --release
+bash scripts/release/console-site.sh --release
 
 issuer="http://127.0.0.1:18443"
 e2e/target/debug/stub-issuer --plain --listen 127.0.0.1:18443 --issuer "$issuer" \
@@ -204,24 +204,24 @@ serve 18081 "$work/server-smart.log" FERROTERM_RESOURCES="$work/resources-smart.
 console() {
   local port="$1" upstream="$2" log="$3"
   shift 3
-  env FERROTERM_VIEWER__SERVER__LISTEN="127.0.0.1:$port" \
-    FERROTERM_VIEWER__SERVER__SITE_ROOT=target/site \
-    FERROTERM_VIEWER__FERROTERM__BASE_URL="$upstream" \
-    FERROTERM_VIEWER__SESSION__SECURE_COOKIE=false "$@" \
-    target/release/ferroterm-viewer serve > "$log" 2>&1 &
+  env FERROTERM_CONSOLE__SERVER__LISTEN="127.0.0.1:$port" \
+    FERROTERM_CONSOLE__SERVER__SITE_ROOT=target/site \
+    FERROTERM_CONSOLE__FERROTERM__BASE_URL="$upstream" \
+    FERROTERM_CONSOLE__SESSION__SECURE_COOKIE=false "$@" \
+    target/release/ferroterm-console serve > "$log" 2>&1 &
   pids+=("$!")
   await "http://127.0.0.1:$port/health" "$log"
 }
 console 13000 http://127.0.0.1:18080/ "$work/console.log"
 console 13001 http://127.0.0.1:18081/ "$work/console-signed-in.log" \
-  FERROTERM_VIEWER__OIDC__ISSUER="$issuer" \
-  FERROTERM_VIEWER__OIDC__AUTHORIZATION_ENDPOINT="$issuer/authorize" \
-  FERROTERM_VIEWER__OIDC__TOKEN_ENDPOINT="$issuer/token" \
-  FERROTERM_VIEWER__OIDC__JWKS_URI="$issuer/jwks" \
-  FERROTERM_VIEWER__OIDC__REVOCATION_ENDPOINT="$issuer/revoke" \
-  FERROTERM_VIEWER__OIDC__CLIENT_ID=ferroterm-viewer \
-  FERROTERM_VIEWER__OIDC__REDIRECT_URI=http://127.0.0.1:13001/auth/callback \
-  FERROTERM_VIEWER__OIDC__SCOPES='["openid", "fhirUser", "user/CodeSystem.cud", "user/ValueSet.cud", "user/ConceptMap.cud"]'
+  FERROTERM_CONSOLE__OIDC__ISSUER="$issuer" \
+  FERROTERM_CONSOLE__OIDC__AUTHORIZATION_ENDPOINT="$issuer/authorize" \
+  FERROTERM_CONSOLE__OIDC__TOKEN_ENDPOINT="$issuer/token" \
+  FERROTERM_CONSOLE__OIDC__JWKS_URI="$issuer/jwks" \
+  FERROTERM_CONSOLE__OIDC__REVOCATION_ENDPOINT="$issuer/revoke" \
+  FERROTERM_CONSOLE__OIDC__CLIENT_ID=ferroterm-console \
+  FERROTERM_CONSOLE__OIDC__REDIRECT_URI=http://127.0.0.1:13001/auth/callback \
+  FERROTERM_CONSOLE__OIDC__SCOPES='["openid", "fhirUser", "user/CodeSystem.cud", "user/ValueSet.cud", "user/ConceptMap.cud"]'
 
 "$chromedriver" --port=4444 > "$work/chromedriver.log" 2>&1 &
 pids+=("$!")

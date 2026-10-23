@@ -7,8 +7,8 @@ description: >
   the pin), then in the official Leptos book, cached locally (signals,
   effects, <For>, resources, Suspense and Transition, router, forms, server
   rendering and hydration, server functions, islands, binary size,
-  cargo-leptos). Use before implementing or reviewing any viewer
-  (app/ferroterm-viewer) behaviour the rule file does not fully settle, or
+  cargo-leptos). Use before implementing or reviewing any console
+  (app/ferroterm-console) behaviour the rule file does not fully settle, or
   when a "how does Leptos do X" question comes up.
 allowed-tools: Read, Grep, Glob, Bash
 argument-hint: "<signal / resource / router / form / ssr / bundle-size topic>"
@@ -65,7 +65,7 @@ its CSR-only chapters do not.
    (`git -C "$BOOK" log -1 --format=%cr`), `git -C "$BOOK" pull --ff-only`
    first. The book's `main` targets the current Leptos 0.x line, so
    cross-check any version-sensitive answer against the pinned version in the
-   viewer crate's `Cargo.toml`.
+   console crate's `Cargo.toml`.
 
 3. **Route to the owning chapter** (`src/SUMMARY.md` is the index):
    - server rendering, hydration and its bugs: `src/ssr/*`; server

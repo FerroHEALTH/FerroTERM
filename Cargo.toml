@@ -96,7 +96,7 @@ anyhow = "1.0.104"
 jiff = "0.2.35"
 # Expansion identifiers (`ValueSet.expansion.identifier`, a `urn:uuid:`).
 uuid = { version = "1.26.0", features = ["v4"] }
-# The console (app/ferroterm-viewer): a Leptos app rendered on the server and
+# The console (app/ferroterm-console): a Leptos app rendered on the server and
 # hydrated in the browser, with a backend-for-frontend that reaches the FHIR
 # API server to server. The halves are chosen by target, so the workspace pins
 # leptos with no render-mode feature and the console turns `ssr` on for the
@@ -112,7 +112,7 @@ console_error_panic_hook = "0.1.7"
 # after looking at its own screens. Verified against crates.io on 2026-10-19.
 ferrohealth-ui = "=0.2.0"
 # The console's string catalogs: Project Fluent messages embedded at build
-# time from app/ferroterm-viewer/locales/, the crate and version
+# time from app/ferroterm-console/locales/, the crate and version
 # ferrohealth-ui catalogs its own words with, so one locale drives both.
 # Verified against crates.io on 2026-10-19.
 fluent-templates = { version = "0.15.1", default-features = false, features = ["macros", "walkdir"] }
@@ -309,7 +309,7 @@ debug = "line-tables-only"
 
 # The console's WebAssembly is downloaded by every reader, so it optimizes for
 # size where the server optimizes for speed. cargo-leptos selects this profile
-# with `lib-profile-release` in app/ferroterm-viewer/Cargo.toml.
+# with `lib-profile-release` in app/ferroterm-console/Cargo.toml.
 [profile.wasm-release]
 inherits = "release"
 opt-level = "z"

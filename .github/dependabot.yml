@@ -79,7 +79,7 @@ updates:
 
   - package-ecosystem: "docker"
     # The server's and the console's recipes share the base image and digest.
-    directories: ["/docker", "/docker/viewer"]
+    directories: ["/docker", "/docker/console"]
     labels:
       - "dependencies"
     schedule:

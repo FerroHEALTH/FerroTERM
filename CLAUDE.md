@@ -68,7 +68,7 @@ server. Every crate carries its own `CLAUDE.md` with crate-local discipline.
 - `addons/*`: the source add-ons the sync service compiles in, one per national
   terminology service (`addons/nts`, the Nictiz Nationale Terminologieserver,
   is the first). Each depends on `crates/terminology-syndication` and the
-  leaf crates the guard names, never on the server, the viewer, or another
+  leaf crates the guard names, never on the server, the console, or another
   add-on; only `app/ferroterm-sync` links an add-on, and nothing else in the
   workspace may. `scripts/checks/addon-boundary.sh` enforces both directions.
   None is published.
@@ -79,16 +79,16 @@ server. Every crate carries its own `CLAUDE.md` with crate-local discipline.
   activation, retention, the run records, and its own admin listener. The one
   member that may link an `addons/*` crate. Designed in
   `website/book/src/operate/sync.md`, tracked under issue #579.
-- `app/ferroterm-viewer`: the FerroTERM Console, its own binary and image
-  (`ferroterm-viewer`, `docker/viewer/Dockerfile`): a Leptos app rendered on
+- `app/ferroterm-console`: the FerroTERM Console, its own binary and image
+  (`ferroterm-console`, `docker/console/Dockerfile`): a Leptos app rendered on
   the server and hydrated, drawn with the shared FerroHEALTH components of
   `ferrohealth-ui`, and a backend-for-frontend in front of the server: it
   signs the reader in with OpenID Connect and calls the FHIR API server to
   server, so no token reaches the browser. A pure FHIR client that depends on
-  no other crate in the workspace, which `scripts/checks/viewer-boundary.sh`
-  enforces. Built by cargo-leptos (`scripts/release/viewer-site.sh`); its
+  no other crate in the workspace, which `scripts/checks/console-boundary.sh`
+  enforces. Built by cargo-leptos (`scripts/release/console-site.sh`); its
   `target/site` is never committed. The terminology server serves no UI.
-  Designed in `docs/viewer.md`.
+  Designed in `docs/console.md`.
 - `tools/ferroterm-build`: the offline build, from an RF2 release to the
   graph/store/text artifacts the server reads, once per edition.
 - `tools/ferroterm-bench`: the benchmark harness that measures ingest,
@@ -265,15 +265,15 @@ apply always. Read the relevant one before working in that area.
   names on crates.io, the lockstep bump rule, Trusted Publishing lanes).
 - `.claude/rules/leptos-ui.md`: the console's own rules (the backend-for-frontend,
   server rendering and hydration, the FHIR-client boundary, code-system
-  neutrality), scoped to `app/ferroterm-viewer`. FerroUI leads the console's
+  neutrality), scoped to `app/ferroterm-console`. FerroUI leads the console's
   UI: its [consumer guide](https://github.com/FerroHEALTH/FerroUI/blob/main/docs/consoles.md),
   component rules and design, read at the tag matching the `ferrohealth-ui`
-  pin, come before this file. The design is `docs/viewer.md`.
+  pin, come before this file. The design is `docs/console.md`.
 - `.claude/rules/issue-workflow.md`, `issue-relationships.md`, `project-board.md`:
   the tracker work-style.
 - Skills: `/spec-lookup` (find the authoritative spec answer in oracle order),
   `/next-task`, `/phase-done`, `/phase-status` (the issue loop),
-  `/leptos-lookup` and `/ui-gates` (the viewer).
+  `/leptos-lookup` and `/ui-gates` (the console).
 - Agents: `spec-researcher`, `fhir-conformance-reviewer`, `implementer`,
   `leptos-reviewer`, `ui-implementer` (all on Opus 5).
 
@@ -289,7 +289,7 @@ tx.fhir.org) are behavioural oracles for spec-silent edge cases only.
   scope; this list is what the server must do, and release contents are decided
   during development. See `.claude/rules/writing-style.md` §Scope framing.
 - @docs/ci-cd.md: the CI/CD and supply-chain design.
-- `docs/viewer.md`: the console design (the packaging, the stack, the screen
+- `docs/console.md`: the console design (the packaging, the stack, the screen
   inventory, the sign-in).
 - `docs/release.md`: the release checklist (the cut, in order).
 - @docs/VERSIONS.md: the pinned version matrix.

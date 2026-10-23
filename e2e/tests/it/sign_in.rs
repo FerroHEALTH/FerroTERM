@@ -36,7 +36,7 @@ const SCREENS: [&str; 6] = [
 /// A deployment with no issuer offers no sign-in on any screen.
 ///
 /// The control is what every edit control will hang off, so its absence here
-/// is the whole of "without an issuer the viewer stays read only".
+/// is the whole of "without an issuer the console stays read only".
 #[tokio::test]
 async fn no_issuer_means_no_sign_in_control_on_any_screen() {
     let Some(base) = server() else {

@@ -23,7 +23,7 @@ SMART App Launch for where the token endpoint is discovered, and the FHIR
 - **In `crates/terminology-syndication`:** the Atom dialect, the selection
   rules, the checksum-verified download, and the `Source` seam. Never copy a
   type from there into here; a gap in the model is a change there.
-- **Never here:** the server, the viewer, another add-on, or anything that
+- **Never here:** the server, the console, another add-on, or anything that
   reads an artifact. An add-on takes `terminology-syndication` and leaf crates
   only.
 

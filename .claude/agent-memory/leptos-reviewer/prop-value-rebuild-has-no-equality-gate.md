@@ -35,7 +35,7 @@ forms): a text input seeded with `prop:value=move || params.with(|p|
 p.term.clone())`, where `params` is a memo over the WHOLE query map. Any other
 parameter changing (the reader clicks a result, a version switches, a node
 opens) re-runs the closure and discards what the reader was typing. Fixed in
-`app/ferroterm-viewer/src/pages/browse.rs` (the search filter is seeded from a
+`app/ferroterm-console/src/pages/browse.rs` (the search filter is seeded from a
 memo over the one field); still open in the same shape in `pages/expand.rs`,
 whose doc comment claims the opposite.
 

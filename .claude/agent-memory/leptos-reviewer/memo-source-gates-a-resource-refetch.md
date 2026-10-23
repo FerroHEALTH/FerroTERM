@@ -36,7 +36,7 @@ resource to the WHOLE `draft` signal.
 a per-row `LocalResource` in an editing form whose source reads one field of the
 form's own draft through a derive. Every keystroke in every other field of the
 form re-issues that row's HTTP request. Found in
-`app/ferroterm-viewer/src/pages/concept_map_editor.rs` (the code picker's
+`app/ferroterm-console/src/pages/concept_map_editor.rs` (the code picker's
 `system` source, #636).
 
 **The fix:** `Memo::new(move |_| ...)`, which needs the projected type to derive

@@ -303,7 +303,7 @@ async fn a_local_code_system_is_authored_retired_and_read_back() {
 /// A write the token carries no scope for is refused, in the server's words.
 ///
 /// The issuer's `response-only` profile states the write scope in the token
-/// response and leaves it out of the access token, so the viewer draws the
+/// response and leaves it out of the access token, so the console draws the
 /// control its answer opened and the server refuses the request that control
 /// sent. What the screen does with the refusal is the point: the outcome text
 /// is announced in the live region, and the outcome itself is rendered whole

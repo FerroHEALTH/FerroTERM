@@ -97,7 +97,7 @@ const IDENTITY_ONLY: [&str; 2] = ["openid", "fhirUser"];
 ///
 /// It is the URL of the resource describing the person
 /// (<https://hl7.org/fhir/smart-app-launch/scopes-and-launch-context.html>),
-/// and the viewer's shell shows it as the name of whoever is signed in.
+/// and the console's shell shows it as the name of whoever is signed in.
 const FHIR_USER: &str = "Practitioner/e2e-terminologist";
 
 /// The name the cookie carries the journey's choice under.
@@ -114,7 +114,7 @@ enum Profile {
     /// the access token.
     ///
     /// This is the issuer that states a grant in its answer and leaves it out
-    /// of the credential, so the viewer draws a control the server then
+    /// of the credential, so the console draws a control the server then
     /// refuses. RFC 6749 §3.3 has the response state the granted scope; the
     /// server reads the token's own `scope` claim.
     ResponseOnly,
@@ -258,7 +258,7 @@ impl Stub {
     /// `token_endpoint_auth_methods_supported` names `none` and
     /// `grant_types_supported` names the authorization code grant, which is
     /// what makes FerroTERM declare `client-public` and `launch-standalone`
-    /// and the viewer offer a sign-in
+    /// and the console offer a sign-in
     /// (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
     fn discovery(&self) -> Value {
         let issuer = &self.issuer;
@@ -331,7 +331,7 @@ impl Stub {
     /// `GET /authorize`: hands out a code and sends the browser back.
     ///
     /// Nothing is shown and nobody is asked: the journey is about what the
-    /// viewer does with what comes back (RFC 6749 §4.1.2).
+    /// console does with what comes back (RFC 6749 §4.1.2).
     fn authorize(&self, query: &str, cookie: &str) -> Reply {
         let asked = parameters(query);
         let Some(redirect_uri) = asked.get("redirect_uri") else {
@@ -471,7 +471,7 @@ impl Stub {
     /// `GET /revocations?tag=…`: what one journey has revoked so far.
     ///
     /// The journey opens this in the browser after signing out, which is how a
-    /// revocation the viewer sent from a page is observed.
+    /// revocation the console sent from a page is observed.
     fn revocations(&self, query: &str) -> Reply {
         let tag = parameters(query).get("tag").cloned().unwrap_or_default();
         let count = self
@@ -592,7 +592,7 @@ impl Reply {
     /// SMART requires an issuer serving browser clients to support CORS on the
     /// endpoints one reaches
     /// (<https://hl7.org/fhir/smart-app-launch/conformance.html>), and the
-    /// viewer is such a client: it exchanges its code from the page.
+    /// console is such a client: it exchanges its code from the page.
     fn preflight() -> Self {
         Self::text(StatusCode::NO_CONTENT, "")
     }
@@ -643,7 +643,7 @@ struct Options {
     /// The names the issuer's own certificate is issued for.
     names: Vec<String>,
     /// The name a second certificate is issued for, when the harness asks for
-    /// one: the TLS terminator in front of the viewer, which the sign-in needs
+    /// one: the TLS terminator in front of the console, which the sign-in needs
     /// because a browser gives `crypto.subtle` to a secure context alone
     /// (<https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts>).
     serve_name: Option<String>,
@@ -725,7 +725,7 @@ struct Issued {
 ///
 /// One run, one authority: the harness installs it in the server container and
 /// in the browser once, and the issuer and the TLS terminator in front of the
-/// viewer are both issued from it.
+/// console are both issued from it.
 #[derive(Debug)]
 struct Authority {
     /// The authority's own certificate.

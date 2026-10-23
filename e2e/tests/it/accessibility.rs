@@ -28,7 +28,7 @@ use crate::harness::session;
 ///
 /// The code system screen is absent: its address carries a canonical this
 /// module would have to name, and the sidebar does not offer it. The overview
-/// links to it, and `viewer` walks that link.
+/// links to it, and `console` walks that link.
 ///
 /// The last four are the editor bundle's own screens, which the one server
 /// serves at its own mount. The code system and concept map ones are

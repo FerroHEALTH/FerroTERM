@@ -347,7 +347,7 @@ fi
 
 # --- the console tool pins (docs/VERSIONS.md <-> Cargo.toml <-> the scripts <-> the workflows) ---
 echo "== console tool pins (docs/VERSIONS.md <-> Cargo.toml <-> the scripts <-> the workflows)"
-if [[ -d app/ferroterm-viewer ]] && [[ -f docs/VERSIONS.md ]]; then
+if [[ -d app/ferroterm-console ]] && [[ -f docs/VERSIONS.md ]]; then
   pin_leptos="$(sed -n 's/^| cargo-leptos | \([0-9][0-9.]*\),.*/\1/p' docs/VERSIONS.md | head -n1)"
   pin_bindgen="$(sed -n 's/^| .wasm-bindgen. CLI | \([0-9][0-9.]*\),.*/\1/p' docs/VERSIONS.md | head -n1)"
   pin_tailwind="$(sed -n 's/^| Tailwind CSS standalone CLI | \([0-9][0-9.]*\),.*/\1/p' docs/VERSIONS.md | head -n1)"
@@ -360,17 +360,17 @@ if [[ -d app/ferroterm-viewer ]] && [[ -f docs/VERSIONS.md ]]; then
     crate_bindgen="$(sed -n 's/^wasm-bindgen[[:space:]]*=[[:space:]]*"=\([0-9][0-9.]*\)".*/\1/p' Cargo.toml | head -n1)"
     [[ "$crate_bindgen" == "$pin_bindgen" ]] \
       || bad "Cargo.toml wasm-bindgen (${crate_bindgen:-unset}) != docs/VERSIONS.md pin ($pin_bindgen)"
-    tools_tailwind="$(sed -n 's/^tailwind_version="\([0-9][0-9.]*\)"/\1/p' scripts/release/viewer-tools.sh | head -n1)"
-    tools_binaryen="$(sed -n 's/^binaryen_version="\(version_[0-9]*\)"/\1/p' scripts/release/viewer-tools.sh | head -n1)"
+    tools_tailwind="$(sed -n 's/^tailwind_version="\([0-9][0-9.]*\)"/\1/p' scripts/release/console-tools.sh | head -n1)"
+    tools_binaryen="$(sed -n 's/^binaryen_version="\(version_[0-9]*\)"/\1/p' scripts/release/console-tools.sh | head -n1)"
     [[ "$tools_tailwind" == "$pin_tailwind" ]] \
-      || bad "viewer-tools.sh Tailwind (${tools_tailwind:-unset}) != docs/VERSIONS.md pin ($pin_tailwind)"
+      || bad "console-tools.sh Tailwind (${tools_tailwind:-unset}) != docs/VERSIONS.md pin ($pin_tailwind)"
     [[ "$tools_binaryen" == "$pin_binaryen" ]] \
-      || bad "viewer-tools.sh Binaryen (${tools_binaryen:-unset}) != docs/VERSIONS.md pin ($pin_binaryen)"
+      || bad "console-tools.sh Binaryen (${tools_binaryen:-unset}) != docs/VERSIONS.md pin ($pin_binaryen)"
     tools_chrome="$(sed -n 's/^chrome_version="\([0-9][0-9.]*\)"/\1/p' scripts/release/journey-tools.sh | head -n1)"
     [[ "$tools_chrome" == "$pin_chrome" ]] \
       || bad "journey-tools.sh Chrome (${tools_chrome:-unset}) != docs/VERSIONS.md pin ($pin_chrome)"
     # Every workflow that installs a console tool installs the pinned version.
-    for wf in .github/workflows/ci.yml .github/workflows/release-viewer.yml; do
+    for wf in .github/workflows/ci.yml .github/workflows/release-console.yml; do
       [[ -f "$wf" ]] || continue
       while read -r got; do
         [[ "$got" == "$pin_leptos" ]] || bad "$wf installs cargo-leptos@$got, docs/VERSIONS.md pins $pin_leptos"

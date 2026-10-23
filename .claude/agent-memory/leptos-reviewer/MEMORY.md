@@ -5,7 +5,7 @@
 
 Ported from the sibling FerroEHR viewer programme, where each entry was
 confirmed against pinned crate source or a live gate failure. **The FerroTERM
-viewer is client-side rendered** (`docs/viewer.md` §1), so every entry carries a
+viewer is client-side rendered** (`docs/console.md` §1), so every entry carries a
 `csr` classification in its front matter: `still-applies`, `changed`, or
 `moot`. A moot entry is kept for the record, never deleted, because the fact it
 records is true and the reasoning is reusable.

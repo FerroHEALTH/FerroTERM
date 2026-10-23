@@ -7,7 +7,7 @@
 # The graph:
 #
 #   plan ── github-release (draft) ─┬─ build-binaries ── build-image ─┬─ finalize-release (publish) ── crates ── milestone
-#                                   └─ build-viewer ─────────────────┘
+#                                   └─ build-console ─────────────────┘
 #
 # `plan` refuses a tag whose milestone (titled exactly as the tag) is missing
 # or still holds an open item, and `milestone` closes it once every leg
@@ -58,7 +58,7 @@ jobs:
       # The console ships as an image on distroless static, so its binary is
       # built for the two static targets alone, each named by the platform
       # it fills.
-      viewer-targets: '{"include":[{"runner":"ubuntu-latest","target":"x86_64-unknown-linux-musl","arch":"amd64"},{"runner":"ubuntu-24.04-arm","target":"aarch64-unknown-linux-musl","arch":"arm64"}]}'
+      console-targets: '{"include":[{"runner":"ubuntu-latest","target":"x86_64-unknown-linux-musl","arch":"amd64"},{"runner":"ubuntu-24.04-arm","target":"aarch64-unknown-linux-musl","arch":"arm64"}]}'
       is-prerelease: ${{ steps.tag.outputs.is_prerelease }}
       have-notes: ${{ steps.notes.outputs.have_notes }}
     steps:
@@ -249,27 +249,27 @@ jobs:
       tag: ${{ needs.plan.outputs.tag }}
       sha: ${{ github.sha }}
 
-  # ── build-viewer: the console's binaries, site bundle and image ─────────────
+  # ── build-console: the console's binaries, site bundle and image ─────────────
   # A call and nothing else, for the same L3 reason. It attaches the console's
   # assets to the draft, so it waits for the draft to exist.
-  build-viewer:
-    name: viewer (binaries, site bundle, image)
+  build-console:
+    name: console (binaries, site bundle, image)
     needs: [plan, github-release]
     permissions:
       contents: write # attach the console's assets to the draft release
       packages: write # push the image and its attestations to GHCR
       id-token: write # Sigstore, for the provenance and SBOM attestations
       attestations: write # store them against this repository
-    uses: ./.github/workflows/release-viewer.yml
+    uses: ./.github/workflows/release-console.yml
     with:
       tag: ${{ needs.plan.outputs.tag }}
       version: ${{ needs.plan.outputs.version }}
-      targets: ${{ needs.plan.outputs.viewer-targets }}
+      targets: ${{ needs.plan.outputs.console-targets }}
 
   # ── finalize-release: verify the asset set, then PUBLISH (freeze) ───────────
   finalize-release:
     name: github release (publish)
-    needs: [plan, build-binaries, build-image, build-viewer]
+    needs: [plan, build-binaries, build-image, build-console]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -308,7 +308,7 @@ jobs:
               | grep -Fxq "ferroterm-build-${TAG}-${target}.cdx.json" \
               || missing="$missing ferroterm-build-${TAG}-${target}.cdx.json"
           done
-          # Every suffix release-viewer.yml uploads: per console target, and
+          # Every suffix release-console.yml uploads: per console target, and
           # once for the architecture-independent site bundle.
           for target in x86_64-unknown-linux-musl aarch64-unknown-linux-musl; do
             for suffix in \
@@ -318,13 +318,13 @@ jobs:
               ".tar.gz.sbom.sigstore.json" \
               ".tar.gz.intoto.jsonl" \
               ".spdx.json"; do
-              printf '%s\n' "$assets" | grep -Fxq "ferroterm-viewer-${TAG}-${target}${suffix}" \
-                || missing="$missing ferroterm-viewer-${TAG}-${target}${suffix}"
+              printf '%s\n' "$assets" | grep -Fxq "ferroterm-console-${TAG}-${target}${suffix}" \
+                || missing="$missing ferroterm-console-${TAG}-${target}${suffix}"
             done
           done
           for suffix in ".tar.gz" ".tar.gz.sha256sum" ".tar.gz.sigstore.json" ".tar.gz.intoto.jsonl"; do
-            printf '%s\n' "$assets" | grep -Fxq "ferroterm-viewer-${TAG}-site${suffix}" \
-              || missing="$missing ferroterm-viewer-${TAG}-site${suffix}"
+            printf '%s\n' "$assets" | grep -Fxq "ferroterm-console-${TAG}-site${suffix}" \
+              || missing="$missing ferroterm-console-${TAG}-site${suffix}"
           done
           printf '%s\n' "$assets" | grep -Fxq "compose.yaml" || missing="$missing compose.yaml"
           [ -z "$missing" ] || {
@@ -381,7 +381,7 @@ jobs:
   # already-closed milestone counts as done.
   milestone:
     name: close the milestone
-    needs: [plan, github-release, build-binaries, build-image, build-viewer, finalize-release, crates]
+    needs: [plan, github-release, build-binaries, build-image, build-console, finalize-release, crates]
     if: ${{ always() && needs.plan.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5

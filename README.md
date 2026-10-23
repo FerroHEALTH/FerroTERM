@@ -121,11 +121,11 @@ Warm p50 over 200 HTTP round trips on one machine (Apple M2, 17.18 GB, macos/aar
 ## The console
 
 The FerroTERM Console is the browser interface, its own image beside the
-server. Start it with the quickstart's `viewer` profile and open
+server. Start it with the quickstart's `console` profile and open
 `http://localhost:3000`:
 
 ```console
-docker compose --profile viewer up
+docker compose --profile console up
 ```
 
 It renders every page on its own server and reaches FerroTERM over the same
@@ -145,7 +145,7 @@ It is one of the FerroHEALTH consoles and draws with their shared components.
 
 Reading is open. Signing in, at your OpenID Provider through the console's
 own server, is for editing; the browser never holds a token. The
-[console page](https://ferroterm.eu/docs/operate/viewer.html) has the screens
+[console page](https://ferroterm.eu/docs/operate/console.html) has the screens
 and the configuration.
 
 ## The API

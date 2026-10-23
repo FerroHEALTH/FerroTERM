@@ -7,7 +7,7 @@
 # and this is the check that fails instead:
 #
 #   1. a workspace member outside `app/ferroterm-sync` depending on an add-on,
-#      which makes that add-on load-bearing for the server, the viewer, or a
+#      which makes that add-on load-bearing for the server, the console, or a
 #      library;
 #   2. an add-on depending on a workspace crate other than the syndication
 #      client and the leaf crates listed below, which ties one service's add-on

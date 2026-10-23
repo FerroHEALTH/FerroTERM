@@ -10,7 +10,7 @@
 //! ordinary journey run rewrites no tracked image:
 //!
 //! - [`GATE_ENV`], the book: one light image per screen the book page
-//!   `website/book/src/operate/viewer.md` embeds, at [`BOOK_WIDTH`].
+//!   `website/book/src/operate/console.md` embeds, at [`BOOK_WIDTH`].
 //! - [`REVIEW_ENV`], the review: every screen at [`REVIEW_WIDTHS`] in both
 //!   themes, numbered in walking order, plus the hover, focus and open states,
 //!   into the directory the variable names (dark images under `dark/`).
@@ -44,7 +44,7 @@ const SHOTS_DIR_ENV: &str = "FERROTERM_UI_E2E_SHOTS_DIR";
 const REVIEW_ENV: &str = "FERROTERM_UI_E2E_REVIEW_DIR";
 
 /// Where the book's images live, resolved from this crate's manifest.
-const BOOK_IMAGES: &str = "../website/book/src/operate/img/viewer";
+const BOOK_IMAGES: &str = "../website/book/src/operate/img/console";
 
 /// The FHIR version every capture is taken on.
 ///
@@ -58,7 +58,7 @@ const CAPTURED_VERSION: &str = "r5";
 const MAPPED_CODE: &str = "ca-leaf";
 
 /// The cookie the console keeps its theme in.
-const THEME_COOKIE: &str = "ferroterm_viewer_theme";
+const THEME_COOKIE: &str = "ferroterm_console_theme";
 
 /// A code system row whose version declares the direct-child operator: the
 /// row offers the concept browser, so the browse link is the mark.

@@ -12,7 +12,7 @@ metadata:
 The alternative to [[seed-once-form-idiom]]: instead of creating the form's
 signals in the setup function and seeding them, the editor creates the whole
 `RwSignal<Draft>` **inside** the closure that reads the resource
-(`app/ferroterm-viewer/src/pages/editor.rs`, `form_section` called from the
+(`app/ferroterm-console/src/pages/editor.rs`, `form_section` called from the
 `<Transition>` child). A refetch then disposes the form and builds a new one
 over what came back, which needs no seed guard at all.
 

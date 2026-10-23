@@ -12,7 +12,7 @@ metadata:
 The viewer's page controls render an available step as
 `<a class="… text-brand-700 hover:underline">` and an unavailable one as
 `<span class="… text-slate-500">{text} <span class="sr-only">", unavailable"</span></span>`
-(`app/ferroterm-viewer/src/pages/expand.rs`, the expansion runner's pager). The
+(`app/ferroterm-console/src/pages/expand.rs`, the expansion runner's pager). The
 doc comment above it claims "a tint alone carries no meaning", but the words
 that carry the meaning are `sr-only`, so the only cue a sighted reader gets is
 the hue and the missing hover underline.

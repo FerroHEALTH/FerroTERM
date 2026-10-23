@@ -152,7 +152,7 @@ pub fn server() -> Option<String> {
         Ok(base) => Some(base.trim_end_matches('/').to_owned()),
         Err(_absent) => {
             println!(
-                "skipped: {BASE_URL_ENV} is unset, so there is no served viewer to drive. \
+                "skipped: {BASE_URL_ENV} is unset, so there is no served console to drive. \
                  scripts/ui-e2e.sh sets it, and the ui-e2e CI job always runs that."
             );
             None
