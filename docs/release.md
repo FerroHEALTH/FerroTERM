@@ -152,13 +152,14 @@ merged release commit, then `git push origin vX.Y.Z`. `release.yml` takes it
 from there: the plan job (the preflight's list), the draft release, the four
 per-architecture builds, the server and console images pushed by digest, the
 vulnerability record, the image scan that tags both digests only once it
-passes, the asset verification, the publish, the crates.io leg behind the
-`crates-io` environment's required reviewer, and last the `milestone` job, which closes
-the milestone titled as the tag once every other leg has succeeded. When a
-leg fails or the crates.io approval is refused, that job names the leg in its
-log and leaves the milestone open; a re-run of the failed jobs closes it. An
-already-closed milestone counts as done, and a pre-release tag finishes no
-milestone, so neither milestone step reads or changes one for it.
+passes, the asset verification, the publish, the dispatch that deploys the
+book, the crates.io leg behind the `crates-io` environment's required reviewer,
+and last the `milestone` job, which closes the milestone titled as the tag once
+every other leg has succeeded. When a leg fails or the crates.io approval is
+refused, that job names the leg in its log and leaves the milestone open; a
+re-run of the failed jobs closes it. An already-closed milestone counts as
+done, and a pre-release tag finishes no milestone, so neither milestone step
+reads or changes one for it.
 
 A refused vulnerability record names each finding without a judging
 statement. Fix the finding with a rebuild or a dependency bump, or add its
@@ -167,6 +168,20 @@ patch: the refused release stays a draft and its images stay untagged. The
 same scan runs locally over the published images with
 `bash scripts/security/scan-images.sh`, or over a candidate image with
 `--candidate <ref>`.
+
+## When the book is published
+
+The site at ferroterm.eu names only released versions. The release PR moves
+the book and the landing page to the coming version, so from its merge until
+the release publishes, main's book names a version with no image, tarball or
+compose file. The Docs workflow refuses to deploy while that is so:
+`scripts/checks/site-released.sh` fails when a version the site names is not a
+published release carrying its `compose.yaml`, and ferroterm.eu keeps serving
+the book of the last release. Once `release.yml` publishes the release, its
+`site` leg dispatches the Docs workflow on main, which passes the check and
+deploys the new book. A documentation change merged in between is published
+with it. To publish by hand after a recovery release, run
+`gh workflow run docs.yml --ref main`.
 
 ## After the tag
 

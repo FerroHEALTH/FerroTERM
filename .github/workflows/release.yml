@@ -432,6 +432,24 @@ jobs:
           TAG: ${{ needs.plan.outputs.tag }}
         run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
 
+  # ── site: publish the book of the release just published ───────────────────
+  # docs.yml refuses to deploy while the site names an unreleased version, so
+  # main's book waits for this release. A release published with the
+  # workflow's token starts no workflow, but a workflow_dispatch does, so this
+  # leg dispatches docs.yml on main, which now passes its check and deploys.
+  site:
+    name: publish the site
+    needs: [plan, finalize-release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write # dispatch docs.yml
+    steps:
+      - name: Dispatch the Docs workflow on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run docs.yml --repo "$GITHUB_REPOSITORY" --ref main
+
   # ── crates: the crates.io publish, approval-gated, after the release exists ─
   # Runs in the `crates-io` environment (a required reviewer pauses it) with
   # Trusted Publishing (OIDC); the per-crate, resumable script is shared with
@@ -476,7 +494,7 @@ jobs:
   # already-closed milestone counts as done.
   milestone:
     name: close the milestone
-    needs: [plan, github-release, build-binaries, build-image, build-console, vulnerability-record, scan-and-tag, finalize-release, crates]
+    needs: [plan, github-release, build-binaries, build-image, build-console, vulnerability-record, scan-and-tag, finalize-release, site, crates]
     if: ${{ always() && needs.plan.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
