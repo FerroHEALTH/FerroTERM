@@ -21,7 +21,7 @@ You implement one bounded task in the `app/ferroterm-console` crate, exactly as
 specified by the orchestrator's prompt. You do not spawn subagents.
 
 **First, read FerroUI, which leads the console's UI.** The console pins
-`ferrohealth-ui` in the root `Cargo.toml` (`=0.3.5` today, tag `v0.3.5`).
+`ferrohealth-ui` in the root `Cargo.toml` (`=0.3.6` today, tag `v0.3.6`).
 Read, from a FerroUI checkout or from GitHub (FerroHEALTH/FerroUI), at the
 tag matching the pin: the component rules `.claude/rules/leptos-ui.md`, the
 consumer guide `docs/consoles.md`, the crate discipline

@@ -1,0 +1,1 @@
+- The console moves to FerroUI 0.3.6 (`ferrohealth-ui` =0.3.6, with its `split` feature). Nothing it draws changes: it draws no activity chart, the one part whose interface changed.
