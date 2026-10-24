@@ -79,7 +79,7 @@ jobs:
     # files.
     if: github.event_name == 'push' || (github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository && needs.changes.outputs.code == 'true')
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     permissions:
       contents: read
       pull-requests: read # PR decoration reads the PR metadata
@@ -111,6 +111,36 @@ jobs:
       - name: Instrumented tests → lcov
         if: ${{ hashFiles('Cargo.toml') != '' }}
         run: cargo llvm-cov nextest --locked --workspace --all-features --no-tests=pass --lcov --output-path lcov.info
+
+      # The console's screens are proven by the browser journeys, which the
+      # nextest run above never drives, so the journeys run here against an
+      # instrumented console and their coverage is a second report.
+      - name: Add the WebAssembly target
+        if: ${{ hashFiles('Cargo.toml') != '' }}
+        run: rustup target add wasm32-unknown-unknown
+      - name: Install cargo-leptos, wasm-bindgen
+        if: ${{ hashFiles('Cargo.toml') != '' }}
+        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
+        with:
+          tool: cargo-leptos@0.3.11, wasm-bindgen@0.2.129
+      - name: Install wasm-opt
+        if: ${{ hashFiles('Cargo.toml') != '' }}
+        run: |
+          bash scripts/release/console-tools.sh "$RUNNER_TEMP/console-tools"
+          echo "$RUNNER_TEMP/console-tools/bin" >> "$GITHUB_PATH"
+      - name: Install Chrome and chromedriver
+        if: ${{ hashFiles('Cargo.toml') != '' }}
+        id: chrome
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # v2.2.0
+        with:
+          chrome-version: 155.0.8059.79
+          install-chromedriver: true
+      - name: The journeys against an instrumented console → lcov
+        if: ${{ hashFiles('Cargo.toml') != '' }}
+        env:
+          FERROTERM_UI_E2E_CHROME: ${{ steps.chrome.outputs.chrome-path }}
+          FERROTERM_UI_E2E_CHROMEDRIVER: ${{ steps.chrome.outputs.chromedriver-path }}
+        run: bash scripts/ui-e2e-coverage.sh console-journeys.lcov
 
       # sonar.projectVersion anchors the "Previous version" New Code window: the
       # workspace version bumps at every release cut, so "new code" means "since

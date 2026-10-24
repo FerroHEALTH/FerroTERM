@@ -22,7 +22,7 @@ exist.
 | `pr-guards.yml` | on a label or description change, re-runs the guard it affects (`changelog-guard`, `crate-version-guard`, `contribution-licence-guard`) in the head commit's CI run once that run completes | now |
 | `scorecard.yml` | OpenSSF Scorecard, results published, SARIF → code scanning | now |
 | `codeql.yml` | CodeQL: `actions` now, `rust` self-activates when the workspace lands | actions now |
-| `sonar.yml` | SonarQube Cloud (advisory; `.claude/rules/ai-code-review.md`) | now (sweep); coverage on workspace |
+| `sonar.yml` | SonarQube Cloud (advisory; `.claude/rules/ai-code-review.md`) | now (sweep); coverage of the workspace tests and of the console under the browser journeys (`scripts/ui-e2e-coverage.sh`) |
 | `release-build.yml` | reusable SLSA Build L3 lane: build + SBOM + keyless attest | on tag |
 | `release.yml` | `v*` orchestrator: plan → draft → per-arch build → images by digest → vulnerability record → scan and tag → verify assets → publish last | on tag |
 | `release-image.yml` | reusable SLSA Build L3 lane: the distroless static image from the attested musl binaries, pushed to GHCR by digest with provenance and SBOM attestations on the index and on each platform manifest | on tag |
