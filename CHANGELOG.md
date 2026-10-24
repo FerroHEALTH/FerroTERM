@@ -17,6 +17,48 @@ fragments here under the version and its date.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-24
+
+### Added
+
+- Every release publishes the synchronisation service as its own image,
+  `ghcr.io/ferrohealth/ferroterm-sync`, for `linux/amd64` and `linux/arm64`,
+  built by the same SLSA Build Level 3 lane as the server image with
+  provenance and an SBOM per platform. The release tarballs carry
+  `ferroterm-sync` beside `ferroterm` and `ferroterm-build`, with its own
+  CycloneDX SBOM, and the release is not published until all three images
+  are tagged at the digests their lanes pushed (#798).
+- The console draws the synchronisation service's runs as screens of their
+  own: the runs newest first, one run's summary with a download of its
+  record, and its findings linked to the resources they name, with Run now
+  and Activate behind a confirmation. Server offers Reload the served set
+  through the server's admin listener (`[ferroterm] admin_url`), and a stored
+  value set offers Delete. Each is drawn only for a reader whose token
+  carries the scope it needs, and each works with no WebAssembly (#811).
+
+### Changed
+
+- `SECURITY.md` states the fix-time targets every product of the Ferro family
+  commits to, counted from the confirmed assessment: a fixed release within
+  7 days for a Critical vulnerability, 30 days for High, 90 days for Medium
+  and with the next release for Low, beside the acknowledgement within about
+  5 business days and the initial assessment within about 10, both best
+  effort as before (#867).
+
+### Fixed
+
+- The landing page scrolls smoothly to an anchor only for a reader who has
+  not asked for reduced motion (#785).
+- The published book and landing page name only released versions. The Docs
+  workflow refuses to deploy while the site names a version that is not a
+  published release with its `compose.yaml`, and the release workflow
+  dispatches the Docs deploy once the release is published, so a reader never
+  meets install commands for an image that does not exist yet (#801).
+- The History tab names the revision a restore put back and the one it wrote
+  on the page answering the restore itself, as well as on the page its
+  redirect leads to, so the outcome is stated whichever page the browser ends
+  on (#870).
+
 ## [0.2.0] - 2026-10-24
 
 The console is renamed `ferroterm-console` and rebuilt on FerroUI 0.3.6, which breaks a console deployment: its image, configuration variables, compose profile and secret, sign-in routes and preference cookies change. The two Breaking entries under Changed list each rename and what an operator changes. The server's FHIR surface does not change.
@@ -1863,7 +1905,8 @@ binary answers `GET /health` only.
 - No existing Rust terminology or FHIR crate is a dependency; the README
   records the evaluation and the reasons.
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.10...v0.2.0
 [0.1.10]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.8...v0.1.10
 [0.1.8]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.7...v0.1.8
