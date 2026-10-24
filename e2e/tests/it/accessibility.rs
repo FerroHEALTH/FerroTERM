@@ -113,11 +113,47 @@ const EXTRA_STOPS: usize = 6;
 /// cannot otherwise be named, and a selector built from position would move
 /// the moment the screen re-renders.
 const TAG_FOCUSABLE: &str = r#"
+// A ring counts only where focus changes it, so each candidate part's outline
+// and shadow are read at rest, before any control holds focus, and compared
+// with what it draws once focus arrives: a row whose cells always carry an
+// inset shadow (a stripe, a selection) shows nothing new on focus.
+const look = (node) => {
+  const style = getComputedStyle(node);
+  return [style.outlineStyle, style.outlineWidth, style.outlineColor, style.boxShadow].join(' ');
+};
+const parts = (el) => {
+  const found = [el, ...el.children];
+  for (let node = el.parentElement, depth = 0; node && depth < 4; node = node.parentElement, depth += 1) {
+    found.push(node);
+  }
+  const cell = el.closest('tr') && el.closest('tr').firstElementChild;
+  if (cell) { found.push(cell); }
+  return found;
+};
+const resting = new WeakMap();
+const rest = (node) => {
+  if (!resting.has(node) && !node.matches(':focus')) { resting.set(node, look(node)); }
+};
+// Every element, read before any disclosure is opened below: a stop the tags
+// below leave out (a skip link drawn off screen until it is focused) still
+// needs its resting look, and a disclosure's summary rests closed.
+document.querySelectorAll('body, body *').forEach(rest);
+// An island that hydrates may put new nodes in place of the ones read above,
+// so every element added later is read at rest as it arrives.
+new MutationObserver((changes) => changes.forEach((change) => change.addedNodes.forEach((added) => {
+  if (added.nodeType !== Node.ELEMENT_NODE) { return; }
+  [added, ...added.querySelectorAll('*')].forEach(rest);
+}))).observe(document.body, { childList: true, subtree: true });
 // Every disclosure is opened first. A control inside a closed <details> is
 // not in the tab order and a reader reaches it by opening the disclosure, so
 // walking with them shut would either miss those controls or call them
 // unreachable (https://html.spec.whatwg.org/multipage/interactive-elements.html#the-details-element).
-document.querySelectorAll('details:not([open])').forEach((el) => { el.open = true; });
+// A summary that declares a popup (a select's listbox) is a widget, whose
+// options are reached with the arrow keys once it is open, so it stays shut
+// (https://www.w3.org/WAI/ARIA/apg/patterns/listbox/), and its summary is
+// walked as a reader meets it.
+document.querySelectorAll('details:not([open]):not(:has(> summary[aria-haspopup]))')
+  .forEach((el) => { el.open = true; });
 // A negative tabindex takes an element out of the tab order on purpose: the
 // items of a menu or a tree are reached with the arrow keys once the widget
 // holds focus (https://html.spec.whatwg.org/multipage/interaction.html#attr-tabindex).
@@ -144,9 +180,13 @@ document.addEventListener('focusin', (event) => {
   // A composite control draws its ring on the part that shows it: the search
   // field's box, a tree item's row, and a table row whose name is the link,
   // whose cells draw the ring as an inset shadow on a wide screen.
+  // A ring that fades in is read at its end: each part's running transitions
+  // are finished first, or a stop read at its first frame looks like rest.
+  parts(el).forEach((node) => node.getAnimations().forEach((animation) => animation.finish()));
+  const changed = (node) => resting.has(node) && resting.get(node) !== look(node);
   const draws = (node) => {
     const style = getComputedStyle(node);
-    return style.outlineStyle !== 'none' && !style.outlineWidth.startsWith('0');
+    return style.outlineStyle !== 'none' && !style.outlineWidth.startsWith('0') && changed(node);
   };
   let ring = Array.from(el.children).find(draws) || el;
   for (let node = el.parentElement, depth = 0; node && depth < 4; node = node.parentElement, depth += 1) {
@@ -154,10 +194,11 @@ document.addEventListener('focusin', (event) => {
     if (node.matches(':focus-within') && draws(node)) { ring = node; }
   }
   const cell = el.closest('tr') && el.closest('tr').firstElementChild;
-  const shadowed = !draws(ring) && cell && getComputedStyle(cell).boxShadow.includes('inset');
+  const shadowed = !draws(ring) && cell && getComputedStyle(cell).boxShadow.includes('inset')
+    && changed(cell);
   const style = shadowed
     ? { outlineStyle: 'inset-shadow', outlineWidth: '2px' }
-    : getComputedStyle(ring);
+    : draws(ring) ? getComputedStyle(ring) : { outlineStyle: 'none', outlineWidth: '0px' };
   const tag = el.getAttribute('data-walk');
   window.walkStops.push([tag === null ? '' : tag, style.outlineStyle, style.outlineWidth,
     el.tagName.toLowerCase() + (el.id ? '#' + el.id : '')].join('|'));
@@ -172,6 +213,38 @@ return focusable.map((el) => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '
   + ' "' + (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 30) + '"'
 ).join('\n');
 "#;
+
+/// Two table rows the console never draws, added to a screen to prove the
+/// walk: in the first the cell carries an inset shadow at rest and focus
+/// changes nothing, in the second the shadow arrives with focus.
+///
+/// The rules go in through a constructed style sheet, which the console's
+/// nonce-based Content Security Policy leaves to the page's own script.
+const ROW_FIXTURES: &str = r##"
+const sheet = new CSSStyleSheet();
+sheet.replaceSync('#walk-fixtures a { outline: none; }'
+  + ' #walk-fixtures tr.permanent td { box-shadow: inset 3px 0 0 #000; }'
+  + ' #walk-fixtures tr.on-focus:focus-within td { box-shadow: inset 3px 0 0 #000; }');
+document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+const table = document.createElement('table');
+table.id = 'walk-fixtures';
+table.innerHTML = '<caption>Walk fixtures</caption><tbody>'
+  + '<tr class="permanent"><td><a id="walk-permanent" href="#permanent">Permanent</a></td></tr>'
+  + '<tr class="on-focus"><td><a id="walk-on-focus" href="#on-focus">On focus</a></td></tr>'
+  + '</tbody>';
+document.querySelector('main').appendChild(table);
+return '';
+"##;
+
+/// Shuts every popup a summary declares (a select's listbox), which
+/// [`OPEN_DISCLOSURES`] opened for the other checks, so the walk meets each
+/// select as a reader does: shut, its options reached with the arrow keys
+/// once it is open (<https://www.w3.org/WAI/ARIA/apg/patterns/listbox/>).
+const SHUT_POPUPS: &str = r"
+document.querySelectorAll('details[open]:has(> summary[aria-haspopup])')
+  .forEach((el) => { el.open = false; });
+return 'shut';
+";
 
 /// Every stop the walk reached, one per line, as the recorder wrote them.
 const WALK_STOPS: &str = "return (window.walkStops || []).join('\\n');";
@@ -479,6 +552,10 @@ async fn open(journey: &Journey, base: &str, path: &str) -> WebDriverResult<()> 
 /// Tabs through one screen and reports every control the keyboard never
 /// reached, and every stop the browser drew no outline on.
 async fn walk(journey: &Journey, path: &str, theme: &str) -> WebDriverResult<Vec<String>> {
+    journey.evaluate(SHUT_POPUPS).await?;
+    // The select's island answers the toggle a moment later, and the resting
+    // looks are read after it has.
+    tokio::time::sleep(SETTLE).await;
     let named = journey.evaluate(TAG_FOCUSABLE).await?;
     let controls: Vec<&str> = named.lines().collect();
     assert!(
@@ -551,6 +628,41 @@ async fn every_control_on_every_screen_is_reached_by_the_keyboard_alone() {
                 findings.join("\n")
             );
             journey.no_console_errors().await;
+            Ok::<(), WebDriverError>(())
+        })
+        .await;
+    outcome.expect("the journey ran and the browser session ended cleanly");
+}
+
+/// The walk counts a row's inset shadow as a focus indicator only when focus
+/// draws it, so a row whose shadow is there at rest fails Focus Visible
+/// (<https://www.w3.org/TR/WCAG22/#focus-visible>) and a row whose shadow
+/// arrives with focus passes.
+#[tokio::test]
+async fn a_row_shadow_counts_as_a_focus_ring_only_when_focus_draws_it() {
+    let Some(base) = server() else {
+        return;
+    };
+    let outcome = session()
+        .await
+        .run_and_quit(|driver| async move {
+            let journey = Journey::open(driver, &base, &format!("/?fhir={VERSION}")).await;
+            open(&journey, &base, "/about").await?;
+            journey.evaluate(ROW_FIXTURES).await?;
+            let findings = walk(&journey, "/about", "row fixtures").await?;
+            assert!(
+                findings
+                    .iter()
+                    .any(|finding| finding.contains("a#walk-permanent")
+                        && finding.contains("draws no outline")),
+                "a row whose shadow is there at rest passed the walk: {findings:#?}"
+            );
+            assert!(
+                !findings
+                    .iter()
+                    .any(|finding| finding.contains("a#walk-on-focus")),
+                "a row whose shadow arrives with focus failed the walk: {findings:#?}"
+            );
             Ok::<(), WebDriverError>(())
         })
         .await;
