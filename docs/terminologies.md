@@ -135,7 +135,7 @@ and it does so **without reading an openEHR artefact**.
   or archetypes itself. The alternative would give a FHIR/SNOMED project an
   openEHR dependency it does not have (`docs/VERSIONS.md`), and it would buy
   nothing: the producer already holds the archetype, and the derivation is a
-  mapping onto resources this server already serves. FerroCHART is the
+  mapping onto resources this server already serves. FerroFORMS (formerly FerroCHART) is the
   producer side (`docs/architecture.md` §7.2 in that repository).
 - **The shape.** One archetype's `at`-codes become a `CodeSystem` whose
   concepts carry the rubric as the display and the description as the
