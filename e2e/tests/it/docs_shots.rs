@@ -13,7 +13,8 @@
 //!   `website/book/src/operate/console.md` embeds, at [`BOOK_WIDTH`].
 //! - [`REVIEW_ENV`], the review: every screen at [`REVIEW_WIDTHS`] in both
 //!   themes, numbered in walking order, plus the hover, focus and open states,
-//!   into the directory the variable names (dark images under `dark/`).
+//!   into the directory the variable names (dark images under `dark/`), in
+//!   the language [`REVIEW_LANGUAGE_ENV`] names when it is set.
 //!
 //! Every shot is taken over the synthetic fixture in `e2e/fixtures/codesystems`,
 //! which the script mounts. No licensed release is ever the subject of a
@@ -42,6 +43,13 @@ const SHOTS_DIR_ENV: &str = "FERROTERM_UI_E2E_SHOTS_DIR";
 
 /// Names the directory of the review capture.
 const REVIEW_ENV: &str = "FERROTERM_UI_E2E_REVIEW_DIR";
+
+/// Names the language a review draws every screen in, such as the
+/// pseudo-locale `scripts/ui-e2e.sh --pseudo-locale` builds the console with.
+const REVIEW_LANGUAGE_ENV: &str = "FERROTERM_UI_E2E_REVIEW_LANGUAGE";
+
+/// The cookie the console keeps the reader's chosen language in.
+const LANGUAGE_COOKIE: &str = "ferroterm_console_language";
 
 /// Where the book's images live, resolved from this crate's manifest.
 const BOOK_IMAGES: &str = "../website/book/src/operate/img/console";
@@ -329,6 +337,12 @@ async fn capture(
     screens: &[Screen],
     first: usize,
 ) -> WebDriverResult<usize> {
+    if let Mode::Review(_) = mode
+        && let Ok(language) = std::env::var(REVIEW_LANGUAGE_ENV)
+        && !language.is_empty()
+    {
+        journey.set_cookie(LANGUAGE_COOKIE, &language).await?;
+    }
     let mut number = first;
     for screen in screens {
         let wanted = matches!(mode, Mode::Review(_)) || screen.book.is_some();
