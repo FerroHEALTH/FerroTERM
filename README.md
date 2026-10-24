@@ -34,7 +34,7 @@ The image serves UCUM, BCP 47, BCP 13, and ISO 3166-1 with no configuration,
 so the first call needs nothing beyond Docker:
 
 ```console
-$ docker run --rm -p 8080:8080 ghcr.io/ferrohealth/ferroterm:0.2.0
+$ docker run --rm -p 8080:8080 ghcr.io/ferrohealth/ferroterm:0.3.0
 $ curl 'http://localhost:8080/r4b/CodeSystem/$lookup?system=http://unitsofmeasure.org&code=mg/dL'
 ```
 
@@ -184,18 +184,16 @@ Every route answers FHIR JSON or FHIR XML, by `_format` or `Accept`.
 
 ## What is next
 
-v0.2.0 is the current release. The tracker's milestones are the roadmap, and
+v0.3.0 is the current release. The tracker's milestones are the roadmap, and
 the open issues under each are the worklist:
 
-- **[v0.3.0](https://github.com/FerroHEALTH/FerroTERM/milestone/16)**: the
-  console's pseudo-locale check, a published `ferroterm-sync` image, a book
-  that names only released versions, the benchmark record set retaken after
-  the memory change, the SonarQube Cloud triage, and the work that waits on
-  outside access or an upstream release: the differential check against the
-  Nictiz Nationale Terminologieserver, the NHG tables once Nictiz grants that
-  licence, the suite modes that need an edition or a vocabulary this
-  repository cannot hold, the two unmaintained advisories in the console's
-  dependency tree, and the OpenSSF Best Practices badge.
+- **[v0.3.1](https://github.com/FerroHEALTH/FerroTERM/milestone/25)**: the
+  benchmark record set retaken after the memory change on the owner's
+  machine, and the work that waits on outside access or an upstream release:
+  the differential check against the Nictiz Nationale Terminologieserver, the
+  NHG tables once Nictiz grants that licence, the suite modes that need an
+  edition this repository cannot hold, and the two unmaintained advisories in
+  the console's dependency tree.
 
 FerroTERM is one product of the FerroHEALTH family, made by Cadasto B.V.
 What holds for every product is written once, in the family book at
