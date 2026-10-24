@@ -54,10 +54,19 @@ FerroTERM's own part. The information and instructions Annex II asks for are on
 - **When.** Annex I and Art. 13 apply from 11 December 2027, Art. 14 from 11
   September 2026 (CRA Art. 71(2)). The assessment runs now so that the gaps
   are closed before that date.
-- **Default or important product.** Whether FerroTERM has the core
-  functionality of a product category in CRA Annex III is open, and the
-  FerroHEALTH book records it as open
-  ([default product, or important product](https://ferrohealth.eu/docs/cra.html#default-product-or-important-product)).
+- **Default or important product.** FerroTERM is a default product, the
+  owner's decision of 2026-10-24. CRA Art. 7(1) makes a product an important
+  product when it has "the core functionality of a product category set out
+  in Annex III", and a terminology server answering the FHIR `CodeSystem`,
+  `ValueSet` and `ConceptMap` operations matches no category of Annex III.
+  Of the procedures CRA Art. 32(1) offers, the owner chose "the internal
+  control procedure (based on module A) set out in Annex VIII" (Art. 32(1)(a),
+  Annex VIII Part I), under which the manufacturer declares conformity on its
+  sole responsibility, with no notified body. The assessment, the EU
+  declaration of conformity (Art. 28) and the CE marking apply from 11
+  December 2027 (Art. 71(2)). No assessment has been carried out and no
+  declaration exists yet
+  ([how conformity is assessed](https://ferrohealth.eu/docs/cra.html#how-conformity-is-assessed-product-by-product)).
 
 ## The basis: intended purpose, use and environment
 

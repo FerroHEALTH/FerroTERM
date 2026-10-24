@@ -126,12 +126,15 @@ risks;"
 "where applicable, the internet address at which the EU declaration of
 conformity can be accessed;"
 
-No EU declaration of conformity has been drawn up, so there is no address to
-give. The declaration applies from 11 December 2027 (CRA Art. 71(2)), and the
-FerroHEALTH book records the conformity route of FerroTERM as open
-([how conformity is assessed](https://ferrohealth.eu/docs/cra.html#how-conformity-is-assessed-product-by-product)).
-When it exists, it is published with each release it covers, and this section
-gives its address.
+No EU declaration of conformity (CRA Art. 28) has been drawn up, so there is
+no address to give. FerroTERM is a default product, and its conformity is
+assessed by internal control, module A (CRA Art. 32(1)(a), Annex VIII Part I),
+the owner's decision of 2026-10-24
+([default or important product](cra-risk-assessment.md#scope-and-dates)). No
+conformity assessment has been carried out yet. The assessment and the
+declaration apply from 11 December 2027 (CRA Art. 71(2)). When the declaration
+exists, it is published with each release it covers, and this section gives
+its address.
 
 ## 7. Technical security support and the end of the support period
 
