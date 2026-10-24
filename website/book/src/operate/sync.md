@@ -58,7 +58,7 @@ mkdir -p dist/linux/amd64
 cp target/x86_64-unknown-linux-musl/release/ferroterm-sync \
   target/x86_64-unknown-linux-musl/release/ferroterm-build dist/linux/amd64/
 docker buildx build -f docker/Dockerfile.sync --platform linux/amd64 \
-  -t ghcr.io/ferrohealth/ferroterm-sync:0.1.10 --load .
+  -t ghcr.io/ferrohealth/ferroterm-sync:0.2.0 --load .
 ```
 
 The tag is the one `compose.sync.yaml` names, so Compose runs the image you

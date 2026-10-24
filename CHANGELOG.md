@@ -17,6 +17,85 @@ fragments here under the version and its date.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-24
+
+The console is renamed `ferroterm-console` and rebuilt on FerroUI 0.3.6, which breaks a console deployment: its image, configuration variables, compose profile and secret, sign-in routes and preference cookies change. The two Breaking entries under Changed list each rename and what an operator changes. The server's FHIR surface does not change.
+
+### Added
+
+- The book carries FerroTERM's own Cyber Resilience Act documentation: the
+  cybersecurity risk assessment of Art. 13(2) and (3), point by point against
+  Annex I, and the information and instructions to the user of Annex II, each
+  point stated or linked, with the manufacturer-level points linked to the
+  FerroHEALTH book (#790).
+
+### Changed
+
+- The console's site bundle is built with `cargo leptos build --split`, which cuts FerroUI's lazy islands into chunks fetched on first use; without it no island hydrates. The bundle is 502,374 brotli bytes, entry and chunks together, 43% of the 1 MiB budget, where it was 97%, and `scripts/checks/console-bundle.sh` sums the chunks with the entry (#733).
+- Every string the console draws comes from its Fluent catalog, the catalog carries the number marks FerroUI's number formatter writes with (`number-group`, `number-decimal`), and the unused messages are pruned; a test locale proves a second catalog needs no code change (#749).
+- Breaking: the console is renamed from `ferroterm-viewer` to `ferroterm-console`: the crate and its binary (`app/ferroterm-console`), the image (`ghcr.io/ferrohealth/ferroterm-console`, built from `docker/console/Dockerfile` by the `release-console.yml` lane), the configuration file variable (`FERROTERM_CONSOLE_CONFIG`) and every environment override (`FERROTERM_CONSOLE__…` in place of `FERROTERM_VIEWER__…`), and the quickstart's compose service, profile and secret (`docker compose --profile console up`, `console_oidc_client_secret`, `FERROTERM_CONSOLE_OIDC_CLIENT_SECRET_FILE`). The old image is not published again. Upgrade: pull `ghcr.io/ferrohealth/ferroterm-console` in place of `ghcr.io/ferrohealth/ferroterm-viewer`, rename every `FERROTERM_VIEWER__` variable to `FERROTERM_CONSOLE__` and `FERROTERM_VIEWER_CONFIG` to `FERROTERM_CONSOLE_CONFIG`, start the quickstart with `--profile console`, and rename `./secrets/viewer_oidc_client_secret` to `./secrets/console_oidc_client_secret`. The book's console page moves to `operate/console.html` (#800).
+- Breaking: the console is rewritten on FerroUI 0.3.2 (`ferrohealth-ui` =0.3.2) in Leptos islands mode. Every page is drawn whole on the console's server and works with scripting off; every change is a plain form post to the page's own address, answered by a redirect, and the WebAssembly carries only FerroUI's islands (the theme menu, the copy buttons, the concept tree, the toasts, the repeat rows) and the keyboard shortcuts. The server functions under `/api/` are gone. The sign-in routes move: `/login` is `/auth/login`, `/logout` is `/auth/sign-out`, and `/auth/sign-in` is a page of its own that says why a reader is there (signed out, expired, refused). The screens follow the FerroUI design: binder tabs on each resource (Overview, Versions, History and JSON for a code system; Definition, Expansion and JSON for a value set; Mappings, Overview and JSON for a concept map), the four runners under one Operations screen, About split into Server (the roots, their operations and the build's evidence), Configuration and About, and Your preferences opened from the menu under your name in three tabs. The navigation entries are plain paths, and the version menu keeps the FHIR version for the session. The editors draw their Save in a docked bar (`Ctrl S`) and keep a refused draft in the form; a restore on the revisions screen asks first in a dialog and the page says which revision it wrote. The preferences are one cookie each, named `ferroterm_console_<key>`: the display language moves from `ferroterm_console_language` to `ferroterm_console_display-language` (`ferroterm_console_language` is now the console's own language), the page size from `ferroterm_console_page_size` to `ferroterm_console_page-size`, and the default page size is 25 rows, where it was 50. The composer takes a clause's codes typed one per row, and the list of recent runs on the operation screens is dropped. Upgrade: point bookmarks and the identity provider's links at `/auth/login` and `/auth/sign-out` (the registered redirect address `/auth/callback` is unchanged); readers choose their display language and page size again once, in Your preferences (#808).
+- The console moves to FerroUI 0.3.3 (`ferrohealth-ui` =0.3.3, with its `split` feature for the site's `--split` build) and drops the stand-ins 0.3.2 needed. The listings filter by several sources at once through T1's Source menu, sent with the find field's form (`?source=stored&source=loaded`), where they kept one source at a time. Configuration opens "How configuration works" as a dialog. A dashboard card that shows the start of a listing says so ("6 of 15"). A publication status is drawn as FerroUI's state mark, the resource pages show their canonical in the code face, the conformance table marks a mode that passed every case, the concept browser's matches link through FerroUI's own coding row with its focus ring, every revision's restore dialog is named by its revision, so a restore is offered on every earlier revision the screen lists, and Translate, Check the relation and Expand draw the design's glyphs. Upgrade: a link that names one `source` keeps working (#810).
+- The release notes end with the support period, the month Cadasto B.V.'s
+  commitment to ship security fixes for the release ends (five years from its
+  date, Regulation (EU) 2024/2847 Art 13(8) and (19)), and a link to the CRA
+  information and instructions to the user in the book (Art 13(18)). Every
+  Security entry names its GitHub security advisory, published with the
+  release, and a Security section that ships beside functional changes opens
+  with the reason. `SECURITY.md` names `info@cadasto.com`, the manufacturer's
+  single point of contact, as the second reporting route, and states how an
+  advisory is drafted and published. `scripts/release/preflight.sh <tag>` runs
+  the release's plan checks before the tag (#816).
+- Each release scans the `ferroterm` and `ferroterm-console` images before it
+  tags them: both are pushed by digest, a vulnerability record scans them and
+  the server's glibc tarballs at every severity, and the release is refused
+  while a finding has no OpenVEX statement under `security/vex/` judging it
+  (Regulation (EU) 2024/2847 Annex I Part I(2)(a)). The record,
+  `ferroterm-<tag>-vulnerability-record.json`, and the raw Trivy reports are
+  release assets, and the image tags and the published release follow only a
+  passing record and a scan with no fixable HIGH or CRITICAL finding. The one
+  accepted Rust advisory (`paste`, RUSTSEC-2024-0436) is published as the
+  generated `security/vex/rust-advisories.openvex.json`, and a weekly scan of
+  the published images applies it. The stale `deny.toml` exception for
+  RUSTSEC-2026-0173 (`proc-macro-error2`, no longer in the dependency graph)
+  is dropped (#817).
+- The console moves to FerroUI 0.3.4 (`ferrohealth-ui` =0.3.4, with its `split` feature for the site's `--split` build) and drops the stand-ins 0.3.3 needed. Code systems and Concept maps draw the design's book and two-way arrow in the sidebar and on the dashboard's cards, and Compare in the history draws the design's compare glyph. On Configuration, "How configuration works" is the end of the line that names the file and opens its dialog, so the title row no longer repeats it. Discard in the editors' docked bar leaves without the form's checks, so an empty required field no longer holds you on the page (#823).
+- The console moves to FerroUI 0.3.5 (`ferrohealth-ui` =0.3.5, with its `split` feature). When the console was started with a configuration file, Configuration's title row has More, whose "Copy the file's path" puts the file's path on the clipboard, the path shown under it (#852).
+- The console moves to FerroUI 0.3.6 (`ferrohealth-ui` =0.3.6, with its `split` feature). Nothing it draws changes: it draws no activity chart, the one part whose interface changed (#854).
+- The book's CRA pages record the conformity route: FerroTERM is a default
+  product under Regulation (EU) 2024/2847, the owner's decision of 2026-10-24,
+  and its conformity is assessed by internal control, module A (Art. 32(1)(a),
+  Annex VIII Part I). No assessment has been carried out and no EU declaration
+  of conformity exists yet; both apply from 11 December 2027 (Art. 71(2)) (#858).
+
+### Removed
+
+- The revisions screen no longer lists what the newest synchronisation run found about the resource in view, and the console no longer reads the service's admin listener; `[ferroterm] sync_url` stays valid and is shown on Configuration. The runs and their findings return as screens of their own (#811) (#808).
+
+### Fixed
+
+- The concept browser's Hierarchy note reads its sentence from the catalog, naming the operator and the property, where it showed a raw catalog key, and a test fails when a `tr_with` call leaves out a variable its message names (#774).
+- A concept map's Mappings table breaks a long canonical at its slashes and stays inside its card at 1440 and 390 px (#775).
+- Look up and Expand draw one heading level where they stacked the Parameters heading on a section heading (#776).
+- The weekly published-image scan skips an image not yet published at `latest` with a warning, so `ferroterm-console` no longer fails the run before its first release under that name (#821).
+- The console's sign-in page says the identity provider refused the sign-in when its token endpoint refuses the code exchange, and that the provider's answer failed the console's checks when it carries no token response, no bearer token or no ID Token, where it said the provider could not be reached (#835).
+- The console answers a request for a site-bundle file under `/pkg/` that is not there with a plain `404 Not Found` and no body, where it drew a page of the shell, which a browser loading its WebAssembly read as the module.
+  The bundle is served from the site root on its own route, so a miss never reaches the page fallback (#844).
+
+### Security
+
+Shipped with functional changes because: only the newest release is supported (`SECURITY.md`), so a security-only patch published beside this release would be out of support the moment this release lands and give no one a release to stay on; both fixes are a dependency bump and a base-image digest with no behaviour change of their own.
+
+- The server, sync and console images no longer trust the compromised
+  eMudhra (emSign) intermediates in the system trust store (Debian
+  DSA-6572-1, GHSA-7hfh-24x8-936h). The distroless base `gcr.io/distroless/static-debian13:nonroot`
+  moves to index digest `d620678`, which ships `ca-certificates`
+  20250419+deb13u1, in the `FROM` of `docker/Dockerfile`,
+  `docker/Dockerfile.sync` and `docker/console/Dockerfile`, and the pin matrix
+  records it. `rustls-webpki` 0.103.16 and `webpki-root-certs` 1.0.10 were
+  already in the lock file (#803).
+- The lock moves `ctutils` from 0.4.3 to 0.4.5, which the server and the synchronisation service reach through `argon2`, past RUSTSEC-2026-0385 (GHSA-2cmc-fgqj-cfcv): 0.4.3 could branch on a secret value while generating a constant-time mask (#812).
+
 ## [0.1.10] - 2026-10-22
 
 The v0.1.9 tag was pushed but its release never published: the console tarball lacked its README. 0.1.10 is the same release with that README added, and no 0.1.9 artifacts exist.
@@ -1784,7 +1863,8 @@ binary answers `GET /health` only.
 - No existing Rust terminology or FHIR crate is a dependency; the README
   records the evaluation and the reasons.
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.10...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.10...v0.2.0
 [0.1.10]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.8...v0.1.10
 [0.1.8]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.6...v0.1.7

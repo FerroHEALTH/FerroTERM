@@ -30,10 +30,10 @@ platform.
 ## Verify the provenance
 
 ```console
-$ gh attestation verify ferroterm-v0.1.10-x86_64-unknown-linux-musl.tar.gz \
+$ gh attestation verify ferroterm-v0.2.0-x86_64-unknown-linux-musl.tar.gz \
     -R FerroHEALTH/FerroTERM \
     --signer-workflow FerroHEALTH/FerroTERM/.github/workflows/release-build.yml
-$ gh attestation verify oci://ghcr.io/ferrohealth/ferroterm:0.1.10 \
+$ gh attestation verify oci://ghcr.io/ferrohealth/ferroterm:0.2.0 \
     -R FerroHEALTH/FerroTERM \
     --signer-workflow FerroHEALTH/FerroTERM/.github/workflows/release-image.yml
 ```
@@ -53,7 +53,7 @@ stay with the account that signed them, so verify one of those with
 ## Check the checksum
 
 ```console
-$ sha256sum -c ferroterm-v0.1.10-x86_64-unknown-linux-musl.tar.gz.sha256sum
+$ sha256sum -c ferroterm-v0.2.0-x86_64-unknown-linux-musl.tar.gz.sha256sum
 ```
 
 Run both checks. The checksum tells you the bytes are intact, and the

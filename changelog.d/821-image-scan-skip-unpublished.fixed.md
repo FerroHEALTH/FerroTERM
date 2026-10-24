@@ -1,1 +1,0 @@
-- The weekly published-image scan skips an image not yet published at `latest` with a warning, so `ferroterm-console` no longer fails the run before its first release under that name (#821).

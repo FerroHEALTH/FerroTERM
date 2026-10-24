@@ -1,1 +1,0 @@
-- Every string the console draws comes from its Fluent catalog, the catalog carries the number marks FerroUI's number formatter writes with (`number-group`, `number-decimal`), and the unused messages are pruned; a test locale proves a second catalog needs no code change.

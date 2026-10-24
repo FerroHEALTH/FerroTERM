@@ -1,1 +1,0 @@
-- The revisions screen no longer lists what the newest synchronisation run found about the resource in view, and the console no longer reads the service's admin listener; `[ferroterm] sync_url` stays valid and is shown on Configuration. The runs and their findings return as screens of their own (#811).
