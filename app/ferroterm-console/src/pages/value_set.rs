@@ -119,17 +119,7 @@ pub(crate) fn ValueSetPage() -> impl IntoView {
         };
         view! {
             {refused.as_ref().map(failure)}
-            {page(
-                &request,
-                &id,
-                &Read {
-                    document,
-                    names,
-                    displays,
-                },
-                pane,
-                expansion,
-            )}
+            {page(&request, &id, &Read { document, names, displays }, pane, expansion)}
         }
         .into_any()
     })

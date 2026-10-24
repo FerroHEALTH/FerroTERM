@@ -278,12 +278,7 @@ fn ran_notice(request: &Request) -> Option<AnyView> {
     );
     Some(
         view! {
-            {notice(
-                tone,
-                Announce::Status,
-                None,
-                tr_with(msg, &[("id", id.clone().into())]),
-            )}
+            {notice(tone, Announce::Status, None, tr_with(msg, &[("id", id.clone().into())]))}
             <p>{open}</p>
         }
         .into_any(),
@@ -308,8 +303,7 @@ fn runs_section(runs: &[RunSummary]) -> AnyView {
                 <tr>
                     {title_cell(Some(&href), timestamp(&run.started), None)}
                     {cell(trigger, trigger_words(&run.trigger))}
-                    {cell(outcome, outcome_view(run.outcome))}
-                    {cell(what, did(run))}
+                    {cell(outcome, outcome_view(run.outcome))} {cell(what, did(run))}
                     {cell(
                         findings,
                         tr_with(
@@ -753,8 +747,7 @@ fn findings_section(
                             " "
                             <span class="fui-muted">{finding.system.clone()}</span>
                         },
-                    )}
-                    {cell(change, kind_words(&finding.kind))}
+                    )} {cell(change, kind_words(&finding.kind))}
                     {cell(
                         release,
                         finding.release.clone().unwrap_or_else(|| tr(Msg::SyncReleaseNone)),

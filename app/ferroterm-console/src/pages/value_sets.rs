@@ -104,11 +104,7 @@ pub(crate) fn ValueSetsPage() -> impl IntoView {
         match found {
             Ok(found) => view! {
                 {said}
-                {listing(
-                    &request,
-                    found.found().into_iter().cloned().collect(),
-                    &names,
-                )}
+                {listing(&request, found.found().into_iter().cloned().collect(), &names)}
             }
             .into_any(),
             Err(error) => view! {
