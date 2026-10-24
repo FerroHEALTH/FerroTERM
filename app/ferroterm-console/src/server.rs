@@ -174,6 +174,9 @@ pub fn router(state: ConsoleState) -> axum::Router {
             get(crate::post::fhir_version),
         )
         .route(crate::routes::HISTORY_ROUTE, post(posted_page))
+        .route(crate::routes::SYNC_ROUTE, post(posted_page))
+        .route(crate::routes::SERVER_ROUTE, post(posted_page))
+        .route("/valuesets/{id}", post(posted_page))
         .route(crate::routes::CODE_SYSTEM_EDITOR_ROUTE, post(posted_page))
         .route(crate::routes::COMPOSE_ROUTE, post(posted_page))
         .route(crate::routes::CONCEPT_MAP_EDITOR_ROUTE, post(posted_page))

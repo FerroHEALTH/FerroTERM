@@ -325,6 +325,9 @@ fn write_screens() -> Vec<Screen> {
         screen("code-system-editor", "/codesystem"),
         screen("value-set-composer", "/compose"),
         screen("concept-map-editor", "/conceptmap"),
+        screen("sync-runs", "/sync"),
+        screen("sync-run", "/sync/20261021T030000Z"),
+        screen("sync-run-findings", "/sync/20261021T030000Z/findings"),
     ]
 }
 

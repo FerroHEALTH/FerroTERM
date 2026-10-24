@@ -25,6 +25,8 @@
 #          temporary directory: the signed-in journeys' deployment
 #   18443  the stub issuer, plain HTTP, which both the server and the
 #          console admit on loopback
+#   18090  the stub sync listener (e2e/src/bin/stub_sync.rs), the
+#          signed-in console's synchronisation service
 #   13000  the console over the first server, offering no sign-in, started
 #          with an empty configuration file, which Configuration names
 #   13001  the console over the second, signing a reader in at the issuer
@@ -213,7 +215,7 @@ await() {
 # Every port must be free before anything starts: a process left on one
 # answers the readiness probe, and the journeys would drive it instead of
 # this checkout.
-for port in 18080 18081 18443 13000 13001 4444; do
+for port in 18080 18081 18443 18090 13000 13001 4444; do
   if curl --silent --output /dev/null "http://127.0.0.1:$port/"; then
     die "127.0.0.1:$port already answers; stop whatever holds it first"
   fi
@@ -233,7 +235,7 @@ fi
 echo "ui-e2e: building the server, the console and the stub issuer"
 cargo build --locked -p ferroterm-server
 cargo build --locked --release -p ferroterm-console
-cargo build --locked --manifest-path e2e/Cargo.toml --bin stub-issuer
+cargo build --locked --manifest-path e2e/Cargo.toml --bin stub-issuer --bin stub-sync
 echo "ui-e2e: building the console's site bundle"
 bash scripts/release/console-site.sh --release
 
@@ -242,6 +244,10 @@ e2e/target/debug/stub-issuer --plain --listen 127.0.0.1:18443 --issuer "$issuer"
   --ca "$work/ca.pem" > "$work/issuer.log" 2>&1 &
 pids+=("$!")
 await "$issuer/.well-known/openid-configuration" "$work/issuer.log"
+
+e2e/target/debug/stub-sync --listen 127.0.0.1:18090 > "$work/sync.log" 2>&1 &
+pids+=("$!")
+await "http://127.0.0.1:18090/health" "$work/sync.log"
 
 serve() {
   local port="$1" log="$2"
@@ -282,7 +288,8 @@ console 13001 http://127.0.0.1:18081/ "$work/console-signed-in.log" \
   FERROTERM_CONSOLE__OIDC__REVOCATION_ENDPOINT="$issuer/revoke" \
   FERROTERM_CONSOLE__OIDC__CLIENT_ID=ferroterm-console \
   FERROTERM_CONSOLE__OIDC__REDIRECT_URI=http://127.0.0.1:13001/auth/callback \
-  FERROTERM_CONSOLE__OIDC__SCOPES='["openid", "fhirUser", "user/CodeSystem.cud", "user/ValueSet.cud", "user/ConceptMap.cud"]'
+  FERROTERM_CONSOLE__OIDC__SCOPES='["openid", "fhirUser", "user/CodeSystem.cud", "user/ValueSet.cud", "user/ConceptMap.cud", "__ferroterm.sync"]' \
+  FERROTERM_CONSOLE__FERROTERM__SYNC_URL=http://127.0.0.1:18090/
 
 "$chromedriver" --port=4444 > "$work/chromedriver.log" 2>&1 &
 pids+=("$!")

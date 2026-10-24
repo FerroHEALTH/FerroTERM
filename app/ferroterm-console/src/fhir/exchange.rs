@@ -105,12 +105,17 @@ pub struct Answer {
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum ExchangeError {
     /// The path is not one the console forwards: it names none of the
-    /// server's FHIR roots, its health route, or the sync service's runs.
+    /// server's FHIR roots, its health route, its reload, or the sync
+    /// service's runs.
     #[error("the console forwards no request to this path")]
     Forbidden,
     /// The console has no sync service configured to forward the runs to.
     #[error("the console reaches no sync service")]
     NoSync,
+    /// The console has no admin listener of the server configured to forward
+    /// a reload to.
+    #[error("the console reaches no admin listener of the server")]
+    NoAdmin,
     /// The server could not be reached, or its answer could not be read.
     #[error("the terminology server could not be reached: {message}")]
     Unreachable {

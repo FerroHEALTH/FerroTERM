@@ -46,6 +46,9 @@ pub struct FerrotermSettings {
     pub public: Url,
     /// The root of the sync service's admin listener, when one is configured.
     pub sync: Option<Url>,
+    /// The root of the terminology server's admin listener, when one is
+    /// configured.
+    pub admin: Option<Url>,
     /// How long one call to the server may take.
     pub timeout: Duration,
 }
@@ -160,6 +163,12 @@ impl Config {
             .as_deref()
             .map(|text| base_url("ferroterm.sync_url", text))
             .transpose()?;
+        let admin = self
+            .ferroterm
+            .admin_url
+            .as_deref()
+            .map(|text| base_url("ferroterm.admin_url", text))
+            .transpose()?;
         let timeout = positive("ferroterm.timeout_ms", self.ferroterm.timeout_ms)
             .map(Duration::from_millis)?;
         let seconds = |key: &str, value: u64| positive(key, value).map(Duration::from_secs);
@@ -192,6 +201,7 @@ impl Config {
                 base,
                 public,
                 sync,
+                admin,
                 timeout,
             },
             session,

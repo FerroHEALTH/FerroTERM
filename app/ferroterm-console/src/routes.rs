@@ -165,6 +165,16 @@ pub(crate) const OPERATIONS_PATH: &str = "lookup";
 /// The Server screen's path below the base.
 pub(crate) const SERVER_PATH: &str = "server";
 
+/// The Server screen's address, which it posts a reload to.
+pub(crate) const SERVER_ROUTE: &str = "/server";
+
+/// The Synchronisation screens' path below the base.
+pub(crate) const SYNC_PATH: &str = "sync";
+
+/// The Synchronisation screen's address, which it posts Run now and
+/// Activate to.
+pub(crate) const SYNC_ROUTE: &str = "/sync";
+
 /// The Configuration screen's path below the base.
 pub(crate) const CONFIGURATION_PATH: &str = "configuration";
 

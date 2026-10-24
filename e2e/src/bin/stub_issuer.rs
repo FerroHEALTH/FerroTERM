@@ -81,13 +81,16 @@ const AUDIENCE: &str = "ferroterm";
 ///
 /// The three resource scopes are the ones FerroTERM's write gate honours, in
 /// the `user` compartment a person signs in under
-/// (<https://hl7.org/fhir/smart-app-launch/scopes-and-launch-context.html>).
-const GRANTABLE: [&str; 5] = [
+/// (<https://hl7.org/fhir/smart-app-launch/scopes-and-launch-context.html>);
+/// `__ferroterm.sync` is the sync service's product scope, which its admin
+/// listener admits.
+const GRANTABLE: [&str; 6] = [
     "openid",
     "fhirUser",
     "user/CodeSystem.cud",
     "user/ValueSet.cud",
     "user/ConceptMap.cud",
+    "__ferroterm.sync",
 ];
 
 /// The scopes a sign-in that identifies the person and changes nothing gets.

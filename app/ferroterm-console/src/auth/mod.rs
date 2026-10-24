@@ -56,6 +56,14 @@ impl Session {
             .is_some_and(|operator| scopes::can_any(&operator.scopes, resource_type, letter))
     }
 
+    /// Whether the reader's token carries the product scope `scope` as it
+    /// stands, such as the sync service's `__ferroterm.sync`.
+    pub(crate) fn holds(&self, scope: &str) -> bool {
+        self.0
+            .as_ref()
+            .is_some_and(|operator| operator.scopes.iter().any(|granted| granted == scope))
+    }
+
     /// What the reader may change, as the line under their name says it.
     pub(crate) fn standing(&self) -> String {
         self.0
