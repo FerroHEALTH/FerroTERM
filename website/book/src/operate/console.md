@@ -291,5 +291,10 @@ $ scripts/ui-e2e.sh --docs-shots
 
 `--review DIR` captures every screen at desktop and phone width in both
 themes, with the hover, focus and open states, into `DIR` for a visual review
-of a change. Without either flag the battery changes no file in the checkout,
-which is why an ordinary run on a pull request never rewrites an image here.
+of a change. With `--pseudo-locale` as well, the review draws every screen in
+`en-XA`, a pseudo-locale written from the English catalog with every message
+40 percent longer, accented and bracketed, so the capture shows where a
+screen has no room for a longer translation. The console's words come from
+one catalog per language, so a language joins as one catalog file. Without
+either flag the battery changes no file in the checkout, which is why an
+ordinary run on a pull request never rewrites an image here.

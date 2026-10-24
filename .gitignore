@@ -58,3 +58,6 @@ der2_*
 # Agent worktrees: a subagent working in isolation gets a checkout here, and it
 # is a working copy of this repository, never content of it.
 /.claude/worktrees/
+
+# The pseudo-locale catalog scripts/ui-e2e.sh --pseudo-locale writes for one run.
+/app/ferroterm-console/locales/en-XA/

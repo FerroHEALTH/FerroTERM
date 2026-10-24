@@ -8,6 +8,7 @@
 #   scripts/ui-e2e.sh [-- NEXTEST_ARGS...]
 #   scripts/ui-e2e.sh --docs-shots [-- NEXTEST_ARGS...]
 #   scripts/ui-e2e.sh --review DIR [-- NEXTEST_ARGS...]
+#   scripts/ui-e2e.sh --review DIR --pseudo-locale [-- NEXTEST_ARGS...]
 #
 # Whatever follows `--` goes to `cargo nextest run` after the run's own
 # filter, so a name filter narrows the battery to one journey and
@@ -44,7 +45,13 @@
 # website/book/src/operate/img/console (FERROTERM_UI_E2E_SHOTS_DIR sends it
 # elsewhere). --review DIR runs only the capture, writing every screen at
 # desktop and phone width in both themes, and the hover, focus and open
-# states, into DIR for a visual review.
+# states, into DIR for a visual review. With --pseudo-locale the console is
+# built with one more catalog, `en-XA`, which scripts/pseudo-locale.sh
+# writes from the English one with every message 40 percent longer, and the
+# review draws every screen in it, so the capture shows where a layout has no
+# room for a longer translation. The catalog is written into the console's
+# `locales/` for the build alone (git ignores it) and deleted when the run
+# ends.
 #
 # The image the release lane builds is not what the journeys drive; CI builds
 # docker/console/Dockerfile from a staged tree on its own (no specification
@@ -56,6 +63,7 @@ cd "$root"
 
 docs_shots=""
 review=""
+pseudo_locale=""
 nextest_args=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -73,8 +81,12 @@ while [[ $# -gt 0 ]]; do
       review="$2"
       shift 2
       ;;
+    --pseudo-locale)
+      pseudo_locale=1
+      shift
+      ;;
     *)
-      echo "usage: scripts/ui-e2e.sh [--docs-shots | --review DIR] [-- NEXTEST_ARGS...]" >&2
+      echo "usage: scripts/ui-e2e.sh [--docs-shots | --review DIR [--pseudo-locale]] [-- NEXTEST_ARGS...]" >&2
       exit 2
       ;;
   esac
@@ -85,8 +97,14 @@ die() {
   exit 1
 }
 
+if [[ -n "$pseudo_locale" && -z "$review" ]]; then
+  echo "usage: --pseudo-locale draws the --review capture, so it needs --review DIR" >&2
+  exit 2
+fi
+
 need() {
-  command -v "$1" > /dev/null || die "$1 is not on PATH; $2"
+  local tool="$1" install="$2"
+  command -v "$tool" > /dev/null || die "$tool is not on PATH; $install"
 }
 
 need cargo-nextest "cargo install cargo-nextest --locked"
@@ -125,6 +143,8 @@ fi
 readonly BROWSER_SESSIONS=4
 
 work="$(mktemp -d)"
+readonly PSEUDO_TAG=en-XA
+readonly PSEUDO_CATALOG="$root/app/ferroterm-console/locales/$PSEUDO_TAG/ferroterm-console.ftl"
 FAILURES_DIR="${FERROTERM_UI_E2E_FAILURES:-$root/target/ui-e2e-failures}"
 mkdir -p "$FAILURES_DIR"
 pids=()
@@ -132,8 +152,8 @@ pids=()
 # Prints the process ids of every process below PID, deepest first: the
 # browsers chromedriver started, and the helpers each browser started.
 descendants() {
-  local child
-  for child in $(pgrep -P "$1" 2> /dev/null || true); do
+  local parent="$1" child
+  for child in $(pgrep -P "$parent" 2> /dev/null || true); do
     descendants "$child"
     echo "$child"
   done
@@ -168,6 +188,11 @@ cleanup() {
   fi
   rm -f -- "$work"/*.log "$work"/*.redb
   rmdir -- "$work" 2> /dev/null || true
+  if [[ -n "$pseudo_locale" ]]; then
+    rm -f -- "$PSEUDO_CATALOG"
+    rmdir -- "$(dirname "$PSEUDO_CATALOG")" 2> /dev/null || true
+    touch "$root/app/ferroterm-console/src/locale.rs"
+  fi
 }
 trap cleanup EXIT
 
@@ -197,6 +222,14 @@ done
 # The console's two halves are built the way the release lane builds them:
 # a debug build of cargo-leptos's front end is compiled with a cfg the plain
 # server build is not, and two halves built apart that way do not hydrate.
+if [[ -n "$pseudo_locale" ]]; then
+  echo "ui-e2e: writing the pseudo-locale catalog $PSEUDO_TAG"
+  mkdir -p "$(dirname "$PSEUDO_CATALOG")"
+  bash scripts/pseudo-locale.sh app/ferroterm-console/locales/en/ferroterm-console.ftl "$PSEUDO_CATALOG"
+  # The catalogs are embedded when locale.rs compiles, and cargo tracks the
+  # files it embedded, not the directory, so a new catalog needs a rebuild.
+  touch app/ferroterm-console/src/locale.rs
+fi
 echo "ui-e2e: building the server, the console and the stub issuer"
 cargo build --locked -p ferroterm-server
 cargo build --locked --release -p ferroterm-console
@@ -286,7 +319,9 @@ journeys() {
 if [[ -n "$review" ]]; then
   mkdir -p "$review"
   echo "ui-e2e: capturing every screen into $review"
-  FERROTERM_UI_E2E_REVIEW_DIR="$(cd "$review" && pwd)" journeys -E 'test(/^docs_shots::/)'
+  FERROTERM_UI_E2E_REVIEW_DIR="$(cd "$review" && pwd)" \
+    FERROTERM_UI_E2E_REVIEW_LANGUAGE="${pseudo_locale:+$PSEUDO_TAG}" \
+    journeys -E 'test(/^docs_shots::/)'
   exit 0
 fi
 if [[ -n "$docs_shots" ]]; then
