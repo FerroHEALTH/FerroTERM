@@ -74,10 +74,10 @@ cargo leptos build --frontend-only --split --lib-cargo-args=--locked "$@"
 missing=0
 for file in pkg/ferroterm-console.wasm pkg/ferroterm-console.js \
   pkg/__wasm_split_manifest.json favicon.ico; do
-  if [ ! -s "$root/target/site/$file" ]; then
+  if [[ ! -s "$root/target/site/$file" ]]; then
     echo "console-site: the bundle has no $file" >&2
     missing=1
   fi
 done
-[ "$missing" -eq 0 ] || exit 1
+[[ "$missing" -eq 0 ]] || exit 1
 echo "console-site: the bundle is in target/site"
