@@ -658,6 +658,8 @@ jobs:
           set -euo pipefail
           cargo fmt --manifest-path e2e/Cargo.toml --check
           cargo clippy --manifest-path e2e/Cargo.toml --locked --all-targets -- -D warnings
+      - name: The pseudo-locale the review can draw in proves itself
+        run: bash scripts/pseudo-locale.sh --self-test
       - run: bash scripts/ui-e2e.sh
         env:
           FERROTERM_UI_E2E_CHROME: ${{ steps.chrome.outputs.chrome-path }}
