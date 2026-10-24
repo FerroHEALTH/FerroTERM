@@ -89,9 +89,11 @@ jobs:
         with:
           tool: cargo-auditable@0.7.5
 
-      - name: Build the server and the build tool
+      - name: Build the server, the build tool and the sync service
         # `ferroterm-server` produces the `ferroterm` binary; `ferroterm-build`
-        # produces the offline index builder shipped beside it. Adjust here and
+        # produces the offline index builder shipped beside it, and
+        # `ferroterm-sync` the synchronisation service, whose image
+        # (docker/Dockerfile.sync) carries it with the builder. Adjust here and
         # in the Package/SBOM steps if a crate or bin is renamed. The console
         # is its own binary and image (release-console.yml).
         env:
@@ -102,6 +104,8 @@ jobs:
             -p ferroterm-server
           cargo auditable build --release --locked --target "$TARGET" \
             -p ferroterm-build
+          cargo auditable build --release --locked --target "$TARGET" \
+            -p ferroterm-sync
 
       - name: Package
         shell: bash
@@ -112,8 +116,8 @@ jobs:
           set -euo pipefail
           out="ferroterm-${TAG}-${TARGET}.tar.gz"
           bindir="target/${TARGET}/release"
-          strip "${bindir}/ferroterm" "${bindir}/ferroterm-build"
-          tar -C "$bindir" -czf "$out" ferroterm ferroterm-build
+          strip "${bindir}/ferroterm" "${bindir}/ferroterm-build" "${bindir}/ferroterm-sync"
+          tar -C "$bindir" -czf "$out" ferroterm ferroterm-build ferroterm-sync
           echo "ASSET=$out" >> "$GITHUB_ENV"
           # A plain checksum beside the tarball — the only verification available
           # to an operator with neither `gh` nor a network path to Sigstore
@@ -163,6 +167,15 @@ jobs:
           [ -n "$src" ] || { echo "::error::cargo-cyclonedx produced no .cdx.json for ferroterm-build"; exit 1; }
           mv "$src" "$build_sbom"
           echo "BUILD_SBOM=$build_sbom" >> "$GITHUB_ENV"
+          # So does the sync service.
+          cargo cyclonedx \
+            --manifest-path app/ferroterm-sync/Cargo.toml \
+            --format json --describe binaries --spec-version 1.5
+          sync_sbom="ferroterm-sync-${TAG}-${TARGET}.cdx.json"
+          src="$(find app/ferroterm-sync -maxdepth 1 -name '*.cdx.json' | head -n1)"
+          [ -n "$src" ] || { echo "::error::cargo-cyclonedx produced no .cdx.json for ferroterm-sync"; exit 1; }
+          mv "$src" "$sync_sbom"
+          echo "SYNC_SBOM=$sync_sbom" >> "$GITHUB_ENV"
 
       # `actions/attest` is the one attestation action: no sbom/predicate input
       # = provenance mode; `sbom-path` = SBOM mode.
@@ -183,6 +196,12 @@ jobs:
         with:
           subject-path: ${{ env.ASSET }}
           sbom-path: ${{ env.BUILD_SBOM }}
+      - name: Attest the sync service SBOM
+        id: sync-sbom-attestation
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ${{ env.ASSET }}
+          sbom-path: ${{ env.SYNC_SBOM }}
 
       # The attestations live in GitHub's attestations API (what `gh attestation
       # verify` reads without a --bundle flag). Publishing them as assets adds
@@ -197,11 +216,13 @@ jobs:
           PROVENANCE_BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
           SBOM_BUNDLE: ${{ steps.sbom-attestation.outputs.bundle-path }}
           BUILD_SBOM_BUNDLE: ${{ steps.build-sbom-attestation.outputs.bundle-path }}
+          SYNC_SBOM_BUNDLE: ${{ steps.sync-sbom-attestation.outputs.bundle-path }}
         run: |
           set -euo pipefail
           cp "$PROVENANCE_BUNDLE" "${ASSET_NAME}.sigstore.json"
           cp "$SBOM_BUNDLE" "${ASSET_NAME}.sbom.sigstore.json"
           cp "$BUILD_SBOM_BUNDLE" "${ASSET_NAME}.build-sbom.sigstore.json"
+          cp "$SYNC_SBOM_BUNDLE" "${ASSET_NAME}.sync-sbom.sigstore.json"
           jq -c '.dsseEnvelope' "$PROVENANCE_BUNDLE" > "${ASSET_NAME}.intoto.jsonl"
           # Refuse to publish an empty or malformed provenance line rather than
           # attaching a file that looks like provenance and is not.
@@ -219,6 +240,7 @@ jobs:
             echo "PROVENANCE_BUNDLE_ASSET=${ASSET_NAME}.sigstore.json"
             echo "SBOM_BUNDLE_ASSET=${ASSET_NAME}.sbom.sigstore.json"
             echo "BUILD_SBOM_BUNDLE_ASSET=${ASSET_NAME}.build-sbom.sigstore.json"
+            echo "SYNC_SBOM_BUNDLE_ASSET=${ASSET_NAME}.sync-sbom.sigstore.json"
             echo "PROVENANCE_JSONL_ASSET=${ASSET_NAME}.intoto.jsonl"
           } >> "$GITHUB_ENV"
 
@@ -246,7 +268,9 @@ jobs:
             ${{ env.CHECKSUM }}
             ${{ env.SBOM }}
             ${{ env.BUILD_SBOM }}
+            ${{ env.SYNC_SBOM }}
             ${{ env.PROVENANCE_BUNDLE_ASSET }}
             ${{ env.SBOM_BUNDLE_ASSET }}
             ${{ env.BUILD_SBOM_BUNDLE_ASSET }}
+            ${{ env.SYNC_SBOM_BUNDLE_ASSET }}
             ${{ env.PROVENANCE_JSONL_ASSET }}

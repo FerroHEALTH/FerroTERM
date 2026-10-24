@@ -95,7 +95,7 @@ jobs:
           # dual-arch, so every variant is scanned explicitly.
           total=0
           : > findings.md
-          for image in ferroterm ferroterm-console; do
+          for image in ferroterm ferroterm-sync ferroterm-console; do
             ref="ghcr.io/${OWNER}/${image}:${SCAN_TAG}"
             # An image never yet published at the tag is skipped with a
             # warning; any other inspect failure fails the run.

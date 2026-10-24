@@ -32,6 +32,18 @@ on:
         description: The newline-separated tag list to apply to the server digest.
         required: true
         type: string
+      sync-image:
+        description: The sync image name (ghcr.io/...).
+        required: true
+        type: string
+      sync-digest:
+        description: The sync image's pushed index digest.
+        required: true
+        type: string
+      sync-tags:
+        description: The newline-separated tag list to apply to the sync digest.
+        required: true
+        type: string
       console-image:
         description: The console image name (ghcr.io/...).
         required: true
@@ -102,6 +114,34 @@ jobs:
           ignore-unfixed: true
           trivy-config: trivy.yaml
 
+      - name: Scan the sync image (linux/amd64)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: linux/amd64
+        with:
+          version: v${{ env.TRIVY_VERSION }}
+          scan-type: image
+          image-ref: ${{ inputs.sync-image }}@${{ inputs.sync-digest }}
+          scanners: vuln
+          exit-code: "1"
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivy-config: trivy.yaml
+
+      - name: Scan the sync image (linux/arm64)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: linux/arm64
+        with:
+          version: v${{ env.TRIVY_VERSION }}
+          scan-type: image
+          image-ref: ${{ inputs.sync-image }}@${{ inputs.sync-digest }}
+          scanners: vuln
+          exit-code: "1"
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivy-config: trivy.yaml
+
       - name: Scan the console image (linux/amd64)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
@@ -152,6 +192,18 @@ jobs:
           IMAGE: ${{ inputs.server-image }}
           DIGEST: ${{ inputs.server-digest }}
           TAGS: ${{ inputs.server-tags }}
+        run: |
+          set -euo pipefail
+          args=()
+          while IFS= read -r t; do [ -n "$t" ] && args+=(-t "$t"); done <<< "$TAGS"
+          [ "${#args[@]}" -gt 0 ] || { echo "::error::no tags to apply to ${IMAGE}@${DIGEST}"; exit 1; }
+          docker buildx imagetools create "${args[@]}" "${IMAGE}@${DIGEST}"
+
+      - name: Tag the sync image
+        env:
+          IMAGE: ${{ inputs.sync-image }}
+          DIGEST: ${{ inputs.sync-digest }}
+          TAGS: ${{ inputs.sync-tags }}
         run: |
           set -euo pipefail
           args=()

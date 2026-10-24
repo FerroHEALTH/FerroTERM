@@ -62,15 +62,16 @@
 id = "https://ferroterm.eu/vex/rust-dependency-advisories"
 author = "Cadasto B.V."
 role = "vendor"
-timestamp = "2026-10-23T00:00:00Z"
-version = 1
+timestamp = "2026-10-24T00:00:00Z"
+version = 2
 
 # What the statements are about: the released server tarballs, the server image
-# built from the same graph, and the console image. Every statement names the
+# built from the same graph, the sync image, and the console image. Every statement names the
 # workspace members it reaches in `workspace_roots`.
 products = [
   "pkg:cargo/ferroterm-server",
   "pkg:oci/ferroterm",
+  "pkg:oci/ferroterm-sync",
   "pkg:oci/ferroterm-console",
 ]
 

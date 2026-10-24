@@ -218,6 +218,27 @@ jobs:
       tag: ${{ needs.plan.outputs.tag }}
       sha: ${{ github.sha }}
 
+  # ── build-sync-image: the sync service's image from the same musl binaries ──
+  # A call and nothing else, for the same L3 reason. The image carries the
+  # service and the index builder it runs as a subprocess.
+  build-sync-image:
+    name: sync image (linux/amd64, linux/arm64)
+    needs: [plan, build-binaries]
+    permissions:
+      contents: read
+      packages: write # push the image and its attestations to GHCR
+      id-token: write # Sigstore
+      attestations: write
+    uses: ./.github/workflows/release-image.yml
+    with:
+      tag: ${{ needs.plan.outputs.tag }}
+      sha: ${{ github.sha }}
+      name: ferroterm-sync
+      dockerfile: docker/Dockerfile.sync
+      binaries: ferroterm-sync ferroterm-build
+      title: FerroTERM sync
+      description: "The FerroTERM synchronisation service: one way from a terminology syndication feed into a running FerroTERM"
+
   # ── build-console: the console's binaries, site bundle and image ─────────────
   # A call and nothing else, for the same L3 reason. It attaches the console's
   # assets to the draft, so it waits for the draft to exist.
@@ -245,7 +266,7 @@ jobs:
   # security/vex/. The record and the raw reports are release assets.
   vulnerability-record:
     name: vulnerability record
-    needs: [plan, github-release, build-binaries, build-image, build-console]
+    needs: [plan, github-release, build-binaries, build-image, build-sync-image, build-console]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -274,6 +295,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.plan.outputs.tag }}
           SERVER_DIGEST: ${{ needs.build-image.outputs.digest }}
+          SYNC_DIGEST: ${{ needs.build-sync-image.outputs.digest }}
           CONSOLE_DIGEST: ${{ needs.build-console.outputs.digest }}
         run: |
           set -euo pipefail
@@ -287,7 +309,7 @@ jobs:
             --ignore-unfixed=false --format json --quiet)
           mkdir -p reports
           targets=()
-          for entry in "ferroterm|$SERVER_DIGEST" "ferroterm-console|$CONSOLE_DIGEST"; do
+          for entry in "ferroterm|$SERVER_DIGEST" "ferroterm-sync|$SYNC_DIGEST" "ferroterm-console|$CONSOLE_DIGEST"; do
             image="${entry%%|*}"
             digest="${entry#*|}"
             [ -n "$digest" ] || { echo "::error::no pushed digest for ${image}"; exit 1; }
@@ -343,7 +365,7 @@ jobs:
   # refuses gets no image tags.
   scan-and-tag:
     name: scan + tag
-    needs: [build-image, build-console, vulnerability-record]
+    needs: [build-image, build-sync-image, build-console, vulnerability-record]
     permissions:
       contents: read
       packages: write # pull the pushed digests, then tag them
@@ -352,6 +374,9 @@ jobs:
       server-image: ghcr.io/ferrohealth/ferroterm
       server-digest: ${{ needs.build-image.outputs.digest }}
       server-tags: ${{ needs.build-image.outputs.tags }}
+      sync-image: ghcr.io/ferrohealth/ferroterm-sync
+      sync-digest: ${{ needs.build-sync-image.outputs.digest }}
+      sync-tags: ${{ needs.build-sync-image.outputs.tags }}
       console-image: ghcr.io/ferrohealth/ferroterm-console
       console-digest: ${{ needs.build-console.outputs.digest }}
       console-tags: ${{ needs.build-console.outputs.tags }}
@@ -361,11 +386,12 @@ jobs:
     name: github release (publish)
     # The record and the tags first: the published page and its compose.yaml
     # point at the image tags, which exist only once both passed.
-    needs: [plan, build-binaries, build-image, build-console, vulnerability-record, scan-and-tag]
+    needs: [plan, build-binaries, build-image, build-sync-image, build-console, vulnerability-record, scan-and-tag]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: write
+      packages: read # resolve the image tags scan-and-tag applied
     steps:
       - name: Every expected asset is attached before the release is frozen
         env:
@@ -390,6 +416,7 @@ jobs:
               ".tar.gz.sigstore.json" \
               ".tar.gz.sbom.sigstore.json" \
               ".tar.gz.build-sbom.sigstore.json" \
+              ".tar.gz.sync-sbom.sigstore.json" \
               ".tar.gz.intoto.jsonl" \
               ".cdx.json"; do
               printf '%s\n' "$assets" \
@@ -399,6 +426,9 @@ jobs:
             printf '%s\n' "$assets" \
               | grep -Fxq "ferroterm-build-${TAG}-${target}.cdx.json" \
               || missing="$missing ferroterm-build-${TAG}-${target}.cdx.json"
+            printf '%s\n' "$assets" \
+              | grep -Fxq "ferroterm-sync-${TAG}-${target}.cdx.json" \
+              || missing="$missing ferroterm-sync-${TAG}-${target}.cdx.json"
           done
           # Every suffix release-console.yml uploads: per console target, and
           # once for the architecture-independent site bundle.
@@ -424,6 +454,33 @@ jobs:
           done
           [ -z "$missing" ] || {
             echo "::error::the draft is missing assets, so it will not be published:$missing"
+            exit 1
+          }
+      # The release page and the compose files name three images by the
+      # version tag, so each must resolve to the digest its lane pushed.
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Every image is tagged with the version, at the digest its lane pushed
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+          SERVER_DIGEST: ${{ needs.build-image.outputs.digest }}
+          SYNC_DIGEST: ${{ needs.build-sync-image.outputs.digest }}
+          CONSOLE_DIGEST: ${{ needs.build-console.outputs.digest }}
+        run: |
+          set -euo pipefail
+          wrong=""
+          for entry in "ferroterm|$SERVER_DIGEST" "ferroterm-sync|$SYNC_DIGEST" "ferroterm-console|$CONSOLE_DIGEST"; do
+            image="ghcr.io/ferrohealth/${entry%%|*}"
+            want="${entry#*|}"
+            found="$(docker buildx imagetools inspect "${image}:${VERSION}" --format '{{json .Manifest}}' | jq -r .digest || true)"
+            echo "${image}:${VERSION} -> ${found:-nothing}"
+            [ -n "$want" ] && [ "$found" = "$want" ] || wrong="$wrong ${image}:${VERSION}"
+          done
+          [ -z "$wrong" ] || {
+            echo "::error::these images are not tagged at the digest their lane pushed, so the release will not be published:$wrong"
             exit 1
           }
       - name: Publish the release
@@ -494,7 +551,7 @@ jobs:
   # already-closed milestone counts as done.
   milestone:
     name: close the milestone
-    needs: [plan, github-release, build-binaries, build-image, build-console, vulnerability-record, scan-and-tag, finalize-release, site, crates]
+    needs: [plan, github-release, build-binaries, build-image, build-sync-image, build-console, vulnerability-record, scan-and-tag, finalize-release, site, crates]
     if: ${{ always() && needs.plan.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5

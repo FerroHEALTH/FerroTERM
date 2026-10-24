@@ -17,15 +17,20 @@ For each target (`x86_64` and `aarch64`, glibc and musl), the release holds:
 
 | File | What it is |
 |---|---|
-| `ferroterm-<tag>-<target>.tar.gz` | `ferroterm` and `ferroterm-build`, built with `cargo auditable` so the dependency list is embedded in the binary |
+| `ferroterm-<tag>-<target>.tar.gz` | `ferroterm`, `ferroterm-build` and `ferroterm-sync`, built with `cargo auditable` so the dependency list is embedded in the binary |
 | `….tar.gz.sha256sum` | the checksum |
 | `….tar.gz.sigstore.json` and `….tar.gz.intoto.jsonl` | the SLSA provenance, signed keyless through Sigstore by the release workflow's identity |
-| `ferroterm-<tag>-<target>.cdx.json` and `ferroterm-build-<tag>-<target>.cdx.json` | CycloneDX SBOMs of the two binaries |
-| `….tar.gz.sbom.sigstore.json` and `….tar.gz.build-sbom.sigstore.json` | the SBOMs' attestations |
+| `ferroterm-<tag>-<target>.cdx.json`, `ferroterm-build-<tag>-<target>.cdx.json` and `ferroterm-sync-<tag>-<target>.cdx.json` | CycloneDX SBOMs of the three binaries |
+| `….tar.gz.sbom.sigstore.json`, `….tar.gz.build-sbom.sigstore.json` and `….tar.gz.sync-sbom.sigstore.json` | the SBOMs' attestations |
 | `compose.yaml` | the quickstart, pinned to the release's image tag |
 
-The container image carries the same provenance and SBOM attestations per
-platform.
+The container images carry the same provenance and SBOM attestations per
+platform: `ghcr.io/ferrohealth/ferroterm` (the server),
+`ghcr.io/ferrohealth/ferroterm-sync` (the synchronisation service, from
+v0.3.0), both signed by `release-image.yml`, and
+`ghcr.io/ferrohealth/ferroterm-console` (the console), signed by
+`release-console.yml`. Verify the sync image the way the server image is
+verified below, with its name in the reference.
 
 ## Verify the provenance
 

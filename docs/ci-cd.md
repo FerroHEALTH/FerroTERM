@@ -140,7 +140,10 @@ or build output enters the context.
 
 The image is built in its own reusable lane (`release-image.yml`) for the same
 L3 reason as the binaries: the signing identity names that workflow and no
-caller step can reach it. The lane downloads the two musl tarballs the binary
+caller step can reach it. The release calls the lane twice, once for the
+server image (`docker/Dockerfile`, `ferroterm` and `ferroterm-build`) and once
+for the sync image `ghcr.io/ferrohealth/ferroterm-sync` (`docker/Dockerfile.sync`,
+`ferroterm-sync` and `ferroterm-build`), both from the same musl tarballs. The lane downloads the two musl tarballs the binary
 lane built in the same run, verifies each against `release-build.yml`'s identity
 before extracting the binary, builds both platforms with no cache and BuildKit
 `provenance: mode=max`, then attests with `actions/attest` and
@@ -152,7 +155,7 @@ verifying its own output as a consumer would, and the release does not publish
 without it.
 
 The lane pushes the index by digest with no tag. The release's
-`vulnerability-record` job then scans both images and the server's glibc
+`vulnerability-record` job then scans every image and the server's glibc
 tarballs with every severity, unfixed findings included, and
 `scripts/checks/vex-coverage.sh` refuses the release while a finding has no
 judging statement under `security/vex/` (CRA Annex I Part I(2)(a));
