@@ -148,7 +148,7 @@ fn chrome(request: &Request, probe: Probe, open: bool, content: AnyView) -> AnyV
     let nav = sidebar(Sidebar {
         id: NAV_ID,
         label: tr(Msg::ShellNavigation),
-        groups: navigation(),
+        groups: navigation(request.reads_sync()),
         current: request.path.clone(),
         rail: Some(rail),
         nest: None,
@@ -209,8 +209,9 @@ fn development_banner() -> AnyView {
 }
 
 /// The navigation's groups, each entry a plain path, so the page in view is
-/// marked whatever its query.
-fn navigation() -> Vec<Group> {
+/// marked whatever its query, with Synchronisation when `sync` (the reader
+/// may read the sync service's runs).
+fn navigation(sync: bool) -> Vec<Group> {
     let entry = |path: &str, label: Msg, glyph: Glyph, exact: bool| Entry {
         href: Cow::Owned(routes::ui_path(path)),
         label: Cow::Owned(tr(label)),
@@ -218,6 +219,32 @@ fn navigation() -> Vec<Group> {
         exact,
         count: None,
     };
+    let mut console = vec![entry(
+        routes::SERVER_PATH,
+        Msg::ShellServer,
+        Glyph::SERVER,
+        false,
+    )];
+    if sync {
+        console.push(entry(
+            routes::SYNC_PATH,
+            Msg::ShellSynchronisation,
+            Glyph::REFRESH_CW,
+            false,
+        ));
+    }
+    console.push(entry(
+        routes::CONFIGURATION_PATH,
+        Msg::ShellConfiguration,
+        Glyph::FILE_TEXT,
+        false,
+    ));
+    console.push(entry(
+        routes::ABOUT_PATH,
+        Msg::ShellAbout,
+        Glyph::INFO,
+        true,
+    ));
     vec![
         Group {
             id: "nav-overview",
@@ -272,16 +299,7 @@ fn navigation() -> Vec<Group> {
         Group {
             id: "nav-console",
             title: Cow::Owned(tr(Msg::ShellGroupConsole)),
-            entries: vec![
-                entry(routes::SERVER_PATH, Msg::ShellServer, Glyph::SERVER, false),
-                entry(
-                    routes::CONFIGURATION_PATH,
-                    Msg::ShellConfiguration,
-                    Glyph::FILE_TEXT,
-                    false,
-                ),
-                entry(routes::ABOUT_PATH, Msg::ShellAbout, Glyph::INFO, true),
-            ],
+            entries: console,
         },
     ]
 }

@@ -23,6 +23,7 @@ pub(crate) mod facts;
 pub(crate) mod named;
 pub(crate) mod outcome;
 pub(crate) mod searchset;
+pub(crate) mod sync;
 pub(crate) mod terminology;
 pub(crate) mod translate;
 pub(crate) mod validation;
@@ -739,10 +740,6 @@ impl FhirClient {
     ///
     /// Returns the variant of [`FhirError`] describing what went wrong. A
     /// server that refuses says why in an `OperationOutcome`.
-    #[expect(
-        dead_code,
-        reason = "no authoring screen deletes a resource: a published code is retired in place"
-    )]
     pub(crate) async fn delete(
         &self,
         version: FhirVersion,

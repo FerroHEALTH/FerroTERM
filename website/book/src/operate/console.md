@@ -49,8 +49,10 @@ site_root = "/site"
 base_url = "http://ferroterm:8080/"
 # The address readers see the FHIR API at, shown on the screens.
 public_url = "https://terminology.example.org/"
-# The synchronisation service's admin listener, shown on Configuration.
+# The synchronisation service's admin listener, which Synchronisation reads.
 sync_url = "http://ferroterm-sync:8090/"
+# The server's admin listener, which Reload the served set posts to.
+admin_url = "http://ferroterm:8081/"
 timeout_ms = 30000
 
 [session]
@@ -67,7 +69,7 @@ jwks_uri = "https://idp.example.org/realms/ferroterm/protocol/openid-connect/cer
 client_id = "ferroterm-console"
 client_secret_file = "/run/secrets/console-client-secret"
 redirect_uri = "https://console.example.org/auth/callback"
-scopes = ["openid", "fhirUser", "user/CodeSystem.cud", "user/ValueSet.cud", "user/ConceptMap.cud"]
+scopes = ["openid", "fhirUser", "user/CodeSystem.cud", "user/ValueSet.cud", "user/ConceptMap.cud", "__ferroterm.sync", "__ferroterm.admin"]
 end_session_endpoint = "https://idp.example.org/realms/ferroterm/protocol/openid-connect/logout"
 revocation_endpoint = "https://idp.example.org/realms/ferroterm/protocol/openid-connect/revoke"
 post_logout_redirect_uri = "https://console.example.org/"
@@ -174,6 +176,12 @@ configuration file, **More** in the title row offers **Copy the file's path**,
 the path shown under it. **About** names the
 build, the licence and the projects it stands on.
 
+With `admin_url` set and a token that carries `__ferroterm.admin`, **More**
+on Server offers **Reload the served set**. It asks first, then posts the
+server admin listener's `POST /reload`, and the page says what the server
+answered: the new set is in front of readers, or the old one stays and the
+reason is shown.
+
 ![The server's roots](img/console/server.png)
 
 ![About](img/console/about.png)
@@ -271,9 +279,34 @@ wrote. Restore appears only for an account whose token carries the write scope
 for the resource type; everyone else reads the same revisions and restores
 nothing.
 
-What a release of the [synchronisation service](sync.md) changed about the
-resource is planned work for this screen; the console no longer reads the
-service's admin listener.
+### Synchronisation
+
+With `sync_url` set and a token that carries the
+[synchronisation service](sync.md)'s product scope (`__ferroterm.sync`), the
+Console group of the navigation has **Synchronisation**. It lists the runs the
+service made, newest first, read from its admin listener: when each started,
+what started it, how it ended, what it did and how many findings it made.
+
+A run opens on **Summary**: its sources, the releases it took, what it left
+behind, the activation and the revalidation of your own resources, with
+**Download the record** for the whole run record as JSON. **Findings** lists
+what the release did to the codes your own resources name, each row linked to
+the resource.
+
+**Run now** asks first and then posts the service's `POST /run`. The service
+answers once the run has finished, which can take as long as a build, and the
+list then names the run with a link to it. **Activate what is staged**, under
+**More**, posts `POST /activate` the same way. Neither needs WebAssembly. A
+reader without the scope, or a console without `sync_url`, has no
+Synchronisation entry and its address is not found.
+
+### Deleting a value set
+
+A value set stored on this server offers **Delete this value set** last under
+**More**, for a token that opens delete on value sets
+(`user/ValueSet.d`, SMART App Launch scopes). It asks first, then sends the
+server a FHIR `DELETE` (<https://hl7.org/fhir/R4B/http.html#delete>), and the
+value set listing says it is gone. Its revisions stay in the server's history.
 
 ## About these screenshots
 

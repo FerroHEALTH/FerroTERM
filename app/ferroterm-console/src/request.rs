@@ -19,6 +19,15 @@ use crate::prefs::{PREFIX, Prefs};
 use crate::routes::VERSION_PARAM;
 use crate::server::ConsoleState;
 
+/// The admin listeners the console is configured to reach.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Listeners {
+    /// The sync service's admin listener.
+    pub(crate) sync: bool,
+    /// The terminology server's admin listener.
+    pub(crate) admin: bool,
+}
+
 /// The request a page is drawn for.
 #[derive(Clone, Debug)]
 pub(crate) struct Request {
@@ -38,6 +47,8 @@ pub(crate) struct Request {
     /// Whether the console offers a sign-in: an OpenID Provider is
     /// configured.
     pub(crate) sign_in: bool,
+    /// The admin listeners the console reaches.
+    pub(crate) listeners: Listeners,
     /// The client of the terminology server.
     pub(crate) client: FhirClient,
     /// The address readers reach the terminology server at.
@@ -97,6 +108,14 @@ impl Request {
             sign_in: state
                 .as_ref()
                 .is_some_and(|state| state.settings().oidc.is_some()),
+            listeners: Listeners {
+                sync: state
+                    .as_ref()
+                    .is_some_and(|state| state.settings().ferroterm.sync.is_some()),
+                admin: state
+                    .as_ref()
+                    .is_some_and(|state| state.settings().ferroterm.admin.is_some()),
+            },
             client: FhirClient::new(root.clone()),
             root,
         }
@@ -131,6 +150,20 @@ impl Request {
     #[must_use]
     pub(crate) fn can(&self, resource_type: &str, letter: Letter) -> bool {
         self.session.can(resource_type, letter)
+    }
+
+    /// Whether the console reaches a sync service and the reader's token
+    /// carries its product scope, so the synchronisation screens are drawn.
+    #[must_use]
+    pub(crate) fn reads_sync(&self) -> bool {
+        self.listeners.sync && self.session.holds(crate::auth::scopes::SYNC)
+    }
+
+    /// Whether the console reaches the server's admin listener and the
+    /// reader's token carries its scope, so Reload the served set is offered.
+    #[must_use]
+    pub(crate) fn reloads(&self) -> bool {
+        self.listeners.admin && self.session.holds(crate::auth::scopes::ADMIN)
     }
 }
 

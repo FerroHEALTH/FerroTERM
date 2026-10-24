@@ -108,6 +108,9 @@ pub fn App() -> impl IntoView {
                     <Route path=path!("expand") view=pages::expand::ExpandPage />
                     <Route path=path!("translate") view=pages::translate::TranslatePage />
                     <Route path=path!("find") view=pages::find::FindPage />
+                    <Route path=path!("sync") view=pages::sync::SyncPage />
+                    <Route path=path!("sync/:id") view=pages::sync::RunPage />
+                    <Route path=path!("sync/:id/:tab") view=pages::sync::RunPage />
                     <Route path=path!("server") view=pages::server::ServerPage />
                     <Route path=path!("server/:tab") view=pages::server::ServerPage />
                     <Route

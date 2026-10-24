@@ -24,6 +24,12 @@ pub(crate) const USER: &str = "user";
 /// The compartment a client authorized in its own right sits in.
 pub(crate) const SYSTEM: &str = "system";
 
+/// The product scope the sync service's admin listener admits by default.
+pub(crate) const SYNC: &str = "__ferroterm.sync";
+
+/// The product scope the terminology server's admin listener admits.
+pub(crate) const ADMIN: &str = "__ferroterm.admin";
+
 /// The compartments a granted scope may open a control under.
 const COMPARTMENTS: [&str; 2] = [USER, SYSTEM];
 
@@ -38,13 +44,6 @@ pub(crate) enum Letter {
     /// Instance-level update, the `u` letter.
     Update,
     /// Instance-level delete, the `d` letter.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "no screen deletes a resource, as a published code is retired in place; the tests read the letter"
-        )
-    )]
     Delete,
 }
 

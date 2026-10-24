@@ -42,8 +42,9 @@ shape, and one operator experience. That is the reason for the shape:
   is drawn. The terminology server checks the token on every write as before.
 - **The API-completeness claim still holds.** The console sends nothing but
   ordinary requests to the server's public FHIR API, all of them from its own
-  server, whose target is checked against the four FHIR roots, `/health` and
-  the sync service's run list.
+  server, whose target is checked against the four FHIR roots, `/health`,
+  the sync service's admin routes (`/runs`, `/run`, `/activate`) and the
+  server admin listener's `/reload`.
   Anything the console can do, a client can do.
 - **Reading is open.** The server's read surface asks for no token, so a
   visitor reads every screen. The sign-in is for editing, and a console

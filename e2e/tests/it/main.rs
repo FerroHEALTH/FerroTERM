@@ -36,3 +36,4 @@ mod harness;
 mod history;
 mod sign_in;
 mod signed_in;
+mod sync;

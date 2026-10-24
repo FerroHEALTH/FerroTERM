@@ -5,9 +5,10 @@
 //! [`Exchange`] leaves the console, server to server.
 //!
 //! A path below one of the FHIR roots (`/r4`, `/r4b`, `/r5`, `/r6`) or the
-//! health route goes to the configured FHIR server, and `/runs` to the
-//! configured sync service's admin listener; any other path is refused
-//! before a request is sent. A signed-in reader's access token rides every
+//! health route goes to the configured FHIR server, `/runs`, `/run` and
+//! `/activate` to the configured sync service's admin listener, and
+//! `/reload` to the configured server's admin listener; any other path is
+//! refused before a request is sent. A signed-in reader's access token rides every
 //! request to either as a bearer credential (RFC 6750 §2.1), so a write is
 //! the reader's own and the server decides what it allows, and the sync
 //! service admits the reader whose token carries its product scope; a
@@ -35,6 +36,15 @@ pub const HEALTH: &str = "health";
 /// The sync service's run list, served by its admin listener.
 pub const RUNS: &str = "runs";
 
+/// The sync service's manual run, on its admin listener.
+pub const RUN: &str = "run";
+
+/// The sync service's activation of what is staged, on its admin listener.
+pub const ACTIVATE: &str = "activate";
+
+/// The terminology server's reload of its served set, on its admin listener.
+pub const RELOAD: &str = "reload";
+
 /// The largest body the console reads from an answer.
 pub const BODY_LIMIT: usize = 32 * 1024 * 1024;
 
@@ -45,6 +55,8 @@ pub enum Target {
     Fhir,
     /// The sync service's admin listener.
     Sync,
+    /// The terminology server's admin listener.
+    Admin,
 }
 
 /// Where `path` goes, or `None` for a path the console forwards nowhere.
@@ -66,8 +78,10 @@ pub fn target(path: &str) -> Option<Target> {
     let first = route.split('/').next().unwrap_or_default();
     if FHIR_ROOTS.contains(&first) || route == HEALTH {
         Some(Target::Fhir)
-    } else if first == RUNS {
+    } else if first == RUNS || route == RUN || route == ACTIVATE {
         Some(Target::Sync)
+    } else if route == RELOAD {
+        Some(Target::Admin)
     } else {
         None
     }
@@ -98,7 +112,8 @@ fn joined(base: &Url, path: &str, expected: Target) -> Result<Url, ExchangeError
 /// # Errors
 /// Returns [`ExchangeError::Forbidden`] for a path the console forwards
 /// nowhere, [`ExchangeError::NoSync`] for the runs on a console with no sync
-/// service, [`ExchangeError::Sessions`] when the session store cannot be
+/// service, [`ExchangeError::NoAdmin`] for a reload on a console with no
+/// admin listener, [`ExchangeError::Sessions`] when the session store cannot be
 /// read, [`ExchangeError::Unavailable`] outside a request, and
 /// [`ExchangeError::Unreachable`] when no answer came.
 pub async fn forward(exchange: Exchange) -> Result<Answer, ExchangeError> {
@@ -113,6 +128,15 @@ pub async fn forward(exchange: Exchange) -> Result<Answer, ExchangeError> {
                 .sync
                 .as_ref()
                 .ok_or(ExchangeError::NoSync)?;
+            joined(base, &exchange.path, target)?
+        }
+        Target::Admin => {
+            let base = state
+                .settings()
+                .ferroterm
+                .admin
+                .as_ref()
+                .ok_or(ExchangeError::NoAdmin)?;
             joined(base, &exchange.path, target)?
         }
     };
@@ -193,6 +217,9 @@ mod tests {
             assert_eq!(Some(Target::Fhir), target(path), "{path}");
         }
         assert_eq!(Some(Target::Sync), target("/runs/abc"));
+        assert_eq!(Some(Target::Sync), target("/run"));
+        assert_eq!(Some(Target::Sync), target("/activate"));
+        assert_eq!(Some(Target::Admin), target("/reload"));
         for path in [
             "",
             "r4/metadata",
@@ -203,6 +230,9 @@ mod tests {
             "/r4\\x",
             "//attacker.example/r4",
             "/metrics",
+            "/run/x",
+            "/reload/x",
+            "/activate/../reload",
         ] {
             assert_eq!(None, target(path), "{path}");
         }

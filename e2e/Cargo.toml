@@ -32,6 +32,12 @@ path = "tests/it/main.rs"
 name = "stub-issuer"
 path = "src/bin/stub_issuer.rs"
 
+# The synchronisation service's admin listener the Synchronisation journeys
+# read, a test double like the issuer.
+[[bin]]
+name = "stub-sync"
+path = "src/bin/stub_sync.rs"
+
 [dependencies]
 base64 = "0.22.1"
 form_urlencoded = "1.2.2"

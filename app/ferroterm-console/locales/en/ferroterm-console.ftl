@@ -899,3 +899,98 @@ post-not-offered = The preference or its value is not one the console offers.
 post-sidebar = The navigation is either the rail or full.
 post-version = The FHIR version is not one this server serves.
 server-form-too-large = The form is larger than the console takes.
+
+## Synchronisation
+
+shell-synchronisation = Synchronisation
+sync-subtitle = The runs the synchronisation service made, newest first, read from its admin listener.
+sync-runs = Runs
+sync-column-run = Run
+sync-column-trigger = Trigger
+sync-column-outcome = Outcome
+sync-column-did = What it did
+sync-column-findings = Findings
+sync-trigger-schedule = Schedule
+sync-trigger-manual = Run now
+sync-trigger-run-once = Run once
+sync-trigger-activate = Activate
+sync-outcome-ok = Succeeded
+sync-outcome-failed = Failed
+sync-outcome-other = Ended another way
+sync-did-nothing = Nothing new
+sync-did = { $taken ->
+    [one] 1 release taken
+   *[other] { $taken } releases taken
+}, { $activated } activated
+sync-findings-count = { $count ->
+    [0] No findings
+    [one] 1 finding
+   *[other] { $count } findings
+}
+sync-no-runs = The service has recorded no run yet.
+sync-run-now = Run now
+sync-run-now-question = Run the synchronisation now?
+sync-run-now-message = The service reads the feed, takes what you subscribed to and do not hold, builds it, and asks the server to reload. A run that fails leaves the served set as it was. This page answers once the run has finished, which can take as long as a build.
+sync-more = More synchronisation actions
+sync-activate = Activate what is staged
+sync-activate-question = Activate what is staged?
+sync-activate-message = The service puts what it holds staged in front of the server and asks the server to reload.
+sync-ran-ok = The run { $id } finished and succeeded.
+sync-ran-failed = The run { $id } finished and failed. Open it to read why.
+sync-open-run = Open the run
+sync-run-title = Run of { $when }
+sync-took = Took { $duration }.
+sync-duration-minutes = { $minutes } min { $seconds } s
+sync-duration-seconds = { $seconds } s
+sync-tabs = Views of this run
+sync-tab-summary = Summary
+sync-tab-findings = Findings
+sync-download = Download the record
+sync-what = What the run did
+sync-fact-trigger = Trigger
+sync-fact-started = Started
+sync-fact-ended = Ended
+sync-fact-sources = Sources
+sync-fact-taken = Taken
+sync-fact-left = Left behind
+sync-fact-activation = Activation
+sync-fact-revalidation = Revalidation
+sync-fact-errors = What went wrong
+sync-source-line = { $source }: the feed offered { $seen } entries
+sync-source-line-api = { $source }: the feed offered { $seen } entries, and its FHIR API listed { $listed } resources
+sync-taken-entry = { $title } { $version }
+sync-taken-failed = { $title } { $version }: { $error }
+sync-nothing = Nothing
+sync-left-line = { $skipped } entries for another reason, { $unsubscribed } outside your subscription
+sync-activation-line = { $activated } activated, { $staged } still staged, { $reloads } reloads asked of the server
+sync-activation-failed = { $activated } activated, then it failed: { $error }
+sync-revalidation-line = { $resources } locally written resources read, { $checked } codes checked: { $statement }
+sync-revalidation-skipped = Not run: { $reason }
+sync-effect = Effect on your content
+sync-effect-intro = What the release did to the codes your own resources name.
+sync-column-resource = Resource
+sync-column-code = Code
+sync-column-change = What changed
+sync-column-release = Release
+sync-kind-inactive = The release made this code inactive
+sync-kind-absent = The release no longer carries this code
+sync-kind-outside-value-set = The code no longer falls inside the value set it was included through
+sync-release-none = No release
+sync-no-findings = The run found nothing that changed your own content.
+sync-not-found = The synchronisation service holds no record of the run { $id }.
+
+## Reload and delete
+
+server-more = More server actions
+server-reload = Reload the served set
+server-reload-question = Reload the served set?
+server-reload-message = The server opens every package and resource folder again and swaps the whole set only when every one opens. A request in flight finishes on the old set. The resources stored on this server stay as they are.
+server-reloaded = The server reloaded its served set and answered { $status }.
+server-reload-refused = The server answered the reload { $status }, so the served set stays as it was: { $body }
+value-set-delete = Delete this value set
+value-set-delete-question = Delete { $name }?
+value-set-delete-message = The server removes the value set, and a request for its canonical then finds nothing. Its revisions stay in the server's history, so it can be restored.
+value-set-delete-confirm = Delete the value set
+value-sets-deleted = The value set { $id } was deleted. Its revisions stay in the server's history.
+config-admin = Server admin listener
+config-admin-line = The terminology server's admin listener, which Reload the served set on Server posts to.

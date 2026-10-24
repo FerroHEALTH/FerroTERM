@@ -21,6 +21,7 @@
 //! base_url = "http://ferroterm:8080/"
 //! public_url = "https://terminology.example.org/"
 //! sync_url = "http://ferroterm-sync:8090/"
+//! admin_url = "http://ferroterm:8081/"
 //! timeout_ms = 30000
 //!
 //! [oidc]
@@ -103,11 +104,16 @@ pub struct Ferroterm {
     /// The root the server's readers reach it at, which the console shows
     /// beside every request it makes; the base URL when unset.
     pub public_url: Option<String>,
-    /// The root of the sync service's admin listener, whose newest run's
-    /// findings the console shows; none when unset. The console reads it with
-    /// the signed-in reader's access token, so the reader's token must carry
-    /// the listener's product scope (`__ferroterm.sync` by default).
+    /// The root of the sync service's admin listener, whose runs the
+    /// Synchronisation screens show and whose Run now and Activate they post;
+    /// none when unset. The console calls it with the signed-in reader's
+    /// access token, so the reader's token must carry the listener's product
+    /// scope (`__ferroterm.sync` by default).
     pub sync_url: Option<String>,
+    /// The root of the terminology server's admin listener, whose
+    /// `POST /reload` the Server screen offers as Reload the served set; none
+    /// when unset. The reader's token must carry `__ferroterm.admin`.
+    pub admin_url: Option<String>,
     /// How long one call to the server may take, in milliseconds.
     pub timeout_ms: u64,
 }
@@ -118,6 +124,7 @@ impl Default for Ferroterm {
             base_url: String::from("http://127.0.0.1:8080/"),
             public_url: None,
             sync_url: None,
+            admin_url: None,
             timeout_ms: 30_000,
         }
     }

@@ -16,10 +16,12 @@ use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::view::{
     Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
 };
-use ferrohealth_ui::view::action::ActionGroup;
+use ferrohealth_ui::view::action::{ActionGroup, action_button};
+use ferrohealth_ui::view::button::Variant;
 use ferrohealth_ui::view::clause::{Clause, ClauseCode, ClauseKind, clause, clause_codes, clauses};
 use ferrohealth_ui::view::code::{Code, CodeHead, code_section};
 use ferrohealth_ui::view::coding::{Coding, Layout, coding};
+use ferrohealth_ui::view::dialog::{Confirmation, danger_dialog};
 use ferrohealth_ui::view::surface::{
     SectionHead, card_action, definitions, or_none, panel_section, panel_sections, section_intro,
 };
@@ -38,11 +40,19 @@ use crate::fhir::{Document, FhirClient, VALUE_SET, resources_text};
 use crate::locale::{Msg, tr, tr_with};
 use crate::pages::detail::{Head, Kind, Links, PANE_PARAM, Pane, header, line, tabbed};
 use crate::pages::parts::{Source, failure, heading, loaded, name_of, system_names};
+use crate::pages::value_sets::DELETED_PARAM;
+use crate::posted::{INTENT, posted};
 use crate::request::{Request, request};
 use crate::routes::{
     VALIDATE_PATH, VALUE_SETS_PATH, editing_link, expansion_link, resource_link, system_link,
     ui_link,
 };
+
+/// The intent of the delete form.
+const DELETE: &str = "delete";
+
+/// The id of the delete confirmation.
+const DELETE_DIALOG: &str = "value-set-delete";
 
 /// How many concepts the Expansion tab shows of an expansion.
 const PREVIEW: u32 = 10;
@@ -73,7 +83,22 @@ pub(crate) fn ValueSetPage() -> impl IntoView {
     let Some(pane) = Pane::of(Kind::ValueSet, request.param(PANE_PARAM).as_deref()) else {
         return crate::pages::errors::not_found_page();
     };
+    let form = posted().filter(|form| form.intent() == DELETE);
     loaded(async move {
+        let refused = match form {
+            Some(_) => match request.client.delete(request.version, VALUE_SET, &id).await {
+                Ok(()) => {
+                    leptos_axum::redirect(&format!(
+                        "{}&{DELETED_PARAM}={}",
+                        ui_link(VALUE_SETS_PATH, request.version),
+                        percent(&id)
+                    ));
+                    return ().into_any();
+                }
+                Err(error) => Some(error),
+            },
+            None => None,
+        };
         let document = match request.client.value_set_read(request.version, &id).await {
             Ok(document) => document,
             Err(error) => {
@@ -92,17 +117,21 @@ pub(crate) fn ValueSetPage() -> impl IntoView {
         } else {
             None
         };
-        page(
-            &request,
-            &id,
-            &Read {
-                document,
-                names,
-                displays,
-            },
-            pane,
-            expansion,
-        )
+        view! {
+            {refused.as_ref().map(failure)}
+            {page(
+                &request,
+                &id,
+                &Read {
+                    document,
+                    names,
+                    displays,
+                },
+                pane,
+                expansion,
+            )}
+        }
+        .into_any()
     })
 }
 
@@ -194,18 +223,71 @@ fn actions(
         Act::Link(expansion_link(url, request.version)),
     );
     let menu_label = tr_with(Msg::DetailMoreFor, &[("name", title.to_owned().into())]);
+    let destructive = if deletable(request, source) {
+        vec![Item::from(Action::new(
+            Some(Glyph::TRASH),
+            tr(Msg::ValueSetDelete),
+            Act::Dialog(String::from(DELETE_DIALOG)),
+        ))]
+    } else {
+        Vec::new()
+    };
     match edit {
-        Some(edit) => ActionGroup::primary(edit).more(Menu::new(
-            "value-set-more",
-            menu_label,
-            vec![Item::from(check), Item::from(expand)],
-        )),
-        None => ActionGroup::primary(check).more(Menu::new(
-            "value-set-more",
-            menu_label,
-            vec![Item::from(expand)],
-        )),
+        Some(edit) => ActionGroup::primary(edit).more(
+            Menu::new(
+                "value-set-more",
+                menu_label,
+                vec![Item::from(check), Item::from(expand)],
+            )
+            .destructive(destructive),
+        ),
+        None => ActionGroup::primary(check).more(
+            Menu::new("value-set-more", menu_label, vec![Item::from(expand)])
+                .destructive(destructive),
+        ),
     }
+}
+
+/// Whether the reader may delete the value set: one stored on this server,
+/// with a token that opens delete on value sets
+/// (<https://hl7.org/fhir/R4B/http.html#delete>).
+fn deletable(request: &Request, source: Source) -> bool {
+    source == Source::Stored && request.can(VALUE_SET, Letter::Delete)
+}
+
+/// The confirmation Delete opens, posting the delete to this screen.
+fn delete_dialog(request: &Request, id: &str, title: &str) -> AnyView {
+    let confirm = action_button(
+        Action::new(
+            Some(Glyph::TRASH),
+            tr(Msg::ValueSetDeleteConfirm),
+            Act::Post {
+                action: format!(
+                    "{}?{}",
+                    resource_link(VALUE_SETS_PATH, id, request.version)
+                        .split('?')
+                        .next()
+                        .unwrap_or_default(),
+                    request.query
+                ),
+                fields: vec![(String::from(INTENT), String::from(DELETE))],
+            },
+        ),
+        Variant::Destructive,
+    );
+    danger_dialog(
+        Confirmation {
+            id: DELETE_DIALOG.into(),
+            title: tr_with(
+                Msg::ValueSetDeleteQuestion,
+                &[("name", title.to_owned().into())],
+            )
+            .into(),
+            message: tr(Msg::ValueSetDeleteMessage).into(),
+        },
+        confirm,
+    )
+    .into_any()
 }
 
 /// A value percent-encoded as one query component.
@@ -254,6 +336,7 @@ fn page(
     };
     view! {
         {head}
+        {deletable(request, source).then(|| delete_dialog(request, id, &title))}
         {tabbed(Kind::ValueSet, pane, &links, request.version, panel)}
     }
     .into_any()

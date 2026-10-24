@@ -39,6 +39,7 @@ pub(crate) mod preferences;
 pub(crate) mod server;
 pub(crate) mod shortcuts;
 pub(crate) mod sign_in;
+pub(crate) mod sync;
 pub(crate) mod translate;
 pub(crate) mod validate;
 pub(crate) mod value_set;

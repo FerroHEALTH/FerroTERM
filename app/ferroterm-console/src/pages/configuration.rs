@@ -171,6 +171,10 @@ fn connection(settings: &Settings) -> Vec<Setting> {
         || view! { <span class="fui-muted">{tr(Msg::ConfigNotSet)}</span> }.into_any(),
         |url| code(url.as_str()),
     );
+    let admin = settings.ferroterm.admin.as_ref().map_or_else(
+        || view! { <span class="fui-muted">{tr(Msg::ConfigNotSet)}</span> }.into_any(),
+        |url| code(url.as_str()),
+    );
     vec![
         row(
             Msg::ConfigServer,
@@ -189,6 +193,12 @@ fn connection(settings: &Settings) -> Vec<Setting> {
             Msg::ConfigSyncLine,
             sync,
             "ferroterm.sync_url",
+        ),
+        row(
+            Msg::ConfigAdmin,
+            Msg::ConfigAdminLine,
+            admin,
+            "ferroterm.admin_url",
         ),
         row(
             Msg::ConfigTimeout,
