@@ -82,10 +82,21 @@ shaped, synthetic content the test fixtures use, or describe the request.
 ## Response times
 
 FerroTERM is solo-maintained, so these are best effort rather than a
-contractual service-level agreement: an acknowledgement within about 5
-business days, and an initial assessment (is it valid, how severe) within
-about 10. A confirmed vulnerability is fixed as a priority in a new patch
-version; the family policy says how that release and its advisory reach you.
+contractual service-level agreement. They are the times every product of the
+Ferro family states: an acknowledgement within about 5 business days, and
+an initial assessment (is it valid, how severe) within about 10 business days
+of the report. A confirmed vulnerability is fixed in a new patch version,
+published within the target for its severity, counted from the confirmed
+assessment:
+
+| Severity | Fixed release published within |
+|---|---|
+| Critical | 7 days |
+| High | 30 days |
+| Medium | 90 days |
+| Low | the next release |
+
+The family policy says how that release and its advisory reach you.
 
 ## Security advisories
 
