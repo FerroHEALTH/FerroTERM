@@ -32,7 +32,7 @@ chapters do not, and the console has no server function.
 
 1. **Read FerroUI first** (FerroHEALTH/FerroUI; a local checkout or
    GitHub). Take the tag from the console's pin (`ferrohealth-ui` in the
-   root `Cargo.toml`, `=0.3.5` today, tag `v0.3.5`):
+   root `Cargo.toml`, `=0.3.6` today, tag `v0.3.6`):
 
    ```bash
    UI=~/.cache/ferroterm/ferroui
