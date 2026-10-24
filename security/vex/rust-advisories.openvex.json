@@ -38,6 +38,14 @@
           ]
         },
         {
+          "@id": "pkg:oci/ferroterm-sync",
+          "subcomponents": [
+            {
+              "@id": "pkg:cargo/paste"
+            }
+          ]
+        },
+        {
           "@id": "pkg:oci/ferroterm-console",
           "subcomponents": [
             {
@@ -52,7 +60,7 @@
       }
     }
   ],
-  "timestamp": "2026-10-23T00:00:00Z",
+  "timestamp": "2026-10-24T00:00:00Z",
   "tooling": "scripts/security/vex-generate.sh from security/vex/rust-advisories.toml + deny.toml",
-  "version": 1
+  "version": 2
 }

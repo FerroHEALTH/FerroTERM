@@ -150,8 +150,8 @@ To add a release fact, add a function and a line to the list in
 The signed tag is the owner's: `git tag -s vX.Y.Z -m "vX.Y.Z" <commit>` on the
 merged release commit, then `git push origin vX.Y.Z`. `release.yml` takes it
 from there: the plan job (the preflight's list), the draft release, the four
-per-architecture builds, the server and console images pushed by digest, the
-vulnerability record, the image scan that tags both digests only once it
+per-architecture builds, the server, sync and console images pushed by digest,
+the vulnerability record, the image scan that tags both digests only once it
 passes, the asset verification, the publish, the dispatch that deploys the
 book, the crates.io leg behind the `crates-io` environment's required reviewer,
 and last the `milestone` job, which closes the milestone titled as the tag once

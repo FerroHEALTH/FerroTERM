@@ -5,8 +5,8 @@
 
 Vulnerability Exploitability eXchange documents, in [OpenVEX](https://openvex.dev)
 format, asserting the exploitability of specific findings in the artefacts
-FerroTERM publishes: the server tarballs, the `ferroterm` image and the
-`ferroterm-console` image.
+FerroTERM publishes: the server tarballs, the `ferroterm` image, the
+`ferroterm-sync` image and the `ferroterm-console` image.
 
 A VEX document is the machine-readable form of an argument, and it carries the
 argument with it: each statement names the vulnerability, the product, a
@@ -30,13 +30,14 @@ and nobody can re-evaluate it later.
   stays in every scan with its action statement beside it in the release
   record, which is intended: it applies to the reader until the fix ships.
 - **Every finding a release ships carries a statement.** The release pipeline
-  (`.github/workflows/release.yml`, job `vulnerability-record`) scans both
-  images and the server's glibc tarballs with no severity floor and unfixed
+  (`.github/workflows/release.yml`, job `vulnerability-record`) scans every
+  image and the server's glibc tarballs with no severity floor and unfixed
   findings included, and `scripts/checks/vex-coverage.sh` refuses the release
   while a finding has no statement here that judges it: `not_affected` with a
   `justification` or `impact_statement`, `affected` with an
   `action_statement`, or `fixed`. Products are named `pkg:oci/ferroterm`,
-  `pkg:oci/ferroterm-console` and `pkg:cargo/ferroterm-server`, and a statement
+  `pkg:oci/ferroterm-sync`, `pkg:oci/ferroterm-console` and
+  `pkg:cargo/ferroterm-server`, and a statement
   matches a finding by its `vulnerability.name` or an `aliases` entry. The
   record is a release asset, `ferroterm-<tag>-vulnerability-record.json`.
 - **A Security changelog entry may name a statement here** in place of a
@@ -61,7 +62,7 @@ and nobody can re-evaluate it later.
 |---|---|---|
 | `rust-advisories.openvex.json` | The Rust dependency advisories the advisory gate accepts. Each statement additionally carries a `ferroterm:reachability` block (our own extension, since OpenVEX defines none) naming the crates the affected package is reached through. | **generated** |
 
-There is no document for the operating-system layer. Both images are static
+There is no document for the operating-system layer. Every image is static
 distroless (`gcr.io/distroless/static-debian13`, musl binaries), and a scan
 of the base at the pinned digest reports no finding. A finding the release
 record reports in that layer gets a hand-written `ferroterm-os.openvex.json`,

@@ -44,10 +44,15 @@ touched.
 
 ## Running it
 
-The service runs as its own image, carrying `ferroterm-sync` and
-`ferroterm-build`, and the Compose overlay runs it beside the server over one
-volume. No release publishes that image yet (#798), so build it from
-`docker/Dockerfile.sync` first. The file copies the two binaries from a staged
+The service runs as its own image, `ghcr.io/ferrohealth/ferroterm-sync`,
+carrying `ferroterm-sync` and `ferroterm-build`, and the Compose overlay runs
+it beside the server over one volume. Every release from v0.3.0 publishes the
+image for `linux/amd64` and `linux/arm64`, with the same provenance and SBOM
+attestations as the server image ([Verifying releases](verifying-releases.md)),
+and `compose.sync.yaml` pulls it at the release's tag.
+
+To run a commit no release carries, or a release before v0.3.0, build the image
+from `docker/Dockerfile.sync`. The file copies the two binaries from a staged
 `dist/linux/<arch>/` tree, built for the musl target of your platform (on
 Linux, with `musl-tools` installed):
 
@@ -62,7 +67,7 @@ docker buildx build -f docker/Dockerfile.sync --platform linux/amd64 \
 ```
 
 The tag is the one `compose.sync.yaml` names, so Compose runs the image you
-built:
+built. With a published release, skip the build and run the overlay:
 
 ```bash
 FERROTERM_SYNC_DATA=/srv/ferroterm FERROTERM_SYNC_CONFIG=/srv/sync.toml \

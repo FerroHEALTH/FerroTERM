@@ -1,7 +1,10 @@
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
-# Release image (reusable): the container image from the attested static
-# binaries, pushed to GHCR with SLSA provenance and SBOM attestations.
+# Release image (reusable): a container image from the attested static
+# binaries, pushed to GHCR with SLSA provenance and SBOM attestations. The
+# release calls it twice: the server image (docker/Dockerfile, ferroterm and
+# ferroterm-build) and the sync image (docker/Dockerfile.sync, ferroterm-sync
+# and ferroterm-build), both from the same musl tarballs.
 #
 # A reusable workflow for the same reason release-build.yml is one: SLSA Build
 # L3 needs the signing identity out of reach of caller-defined steps, and a
@@ -41,6 +44,36 @@ on:
         description: The commit the tag points at.
         required: true
         type: string
+      name:
+        description: >-
+          The image name under ghcr.io/ferrohealth, which also names its SBOM
+          files: ferroterm for the server, ferroterm-sync for the
+          synchronisation service.
+        required: false
+        type: string
+        default: ferroterm
+      dockerfile:
+        description: The Dockerfile that copies the staged binaries.
+        required: false
+        type: string
+        default: docker/Dockerfile
+      binaries:
+        description: >-
+          The space-separated binaries the Dockerfile copies, each taken from
+          the attested musl tarball.
+        required: false
+        type: string
+        default: ferroterm ferroterm-build
+      title:
+        description: The image title, for the OCI labels and annotations.
+        required: false
+        type: string
+        default: FerroTERM
+      description:
+        description: The image description, for the OCI labels and annotations.
+        required: false
+        type: string
+        default: A pure-Rust FHIR terminology server for SNOMED CT, LOINC, and other clinical code systems
     outputs:
       digest:
         description: The digest of the pushed image index.
@@ -57,7 +90,7 @@ permissions: {}
 
 env:
   # Lowercase by GHCR's rule; the owner segment is derived, not typed.
-  IMAGE: ghcr.io/ferrohealth/ferroterm
+  IMAGE: ghcr.io/ferrohealth/${{ inputs.name }}
   # Annotate the index as well as the manifests: GHCR reads the package
   # description from the index (https://docs.docker.com/build/ci/github-actions/annotations/).
   DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
@@ -98,8 +131,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
+          BINARIES: ${{ inputs.binaries }}
         run: |
           set -euo pipefail
+          read -r -a binaries <<< "$BINARIES"
+          [ "${#binaries[@]}" -gt 0 ] || { echo "::error::no binaries to stage"; exit 1; }
           for arch in amd64 arm64; do
             case "$arch" in
               amd64) target=x86_64-unknown-linux-musl ;;
@@ -110,9 +146,10 @@ jobs:
               --repo "$GITHUB_REPOSITORY" \
               --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/release-build.yml"
             mkdir -p "dist/linux/${arch}"
-            tar -C "dist/linux/${arch}" -xzf "$tarball" ferroterm ferroterm-build
-            test -x "dist/linux/${arch}/ferroterm"
-            test -x "dist/linux/${arch}/ferroterm-build"
+            tar -C "dist/linux/${arch}" -xzf "$tarball" "${binaries[@]}"
+            for binary in "${binaries[@]}"; do
+              test -x "dist/linux/${arch}/${binary}"
+            done
           done
 
       # The docker-container driver builds both platforms; no QEMU, because
@@ -136,8 +173,8 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
           labels: |
-            org.opencontainers.image.title=FerroTERM
-            org.opencontainers.image.description=A pure-Rust FHIR terminology server for SNOMED CT, LOINC, and other clinical code systems
+            org.opencontainers.image.title=${{ inputs.title }}
+            org.opencontainers.image.description=${{ inputs.description }}
             org.opencontainers.image.url=https://ferroterm.eu
             org.opencontainers.image.documentation=https://ferroterm.eu/docs/
             org.opencontainers.image.vendor=FerroTERM
@@ -146,8 +183,8 @@ jobs:
           # the custom lines above never reach the index; GHCR reads the package
           # description from the index annotation, hence the repeat here.
           annotations: |
-            org.opencontainers.image.title=FerroTERM
-            org.opencontainers.image.description=A pure-Rust FHIR terminology server for SNOMED CT, LOINC, and other clinical code systems
+            org.opencontainers.image.title=${{ inputs.title }}
+            org.opencontainers.image.description=${{ inputs.description }}
             org.opencontainers.image.url=https://ferroterm.eu
             org.opencontainers.image.documentation=https://ferroterm.eu/docs/
             org.opencontainers.image.vendor=FerroTERM
@@ -163,7 +200,7 @@ jobs:
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
-          file: docker/Dockerfile
+          file: ${{ inputs.dockerfile }}
           platforms: linux/amd64,linux/arm64
           # By digest, untagged: scan-and-tag.yml tags the index only after the
           # scan and the vulnerability record pass. Attestations bind the
@@ -199,13 +236,14 @@ jobs:
       - name: Generate one SBOM per platform
         env:
           TAG: ${{ inputs.tag }}
+          NAME: ${{ inputs.name }}
           AMD64: ${{ steps.manifests.outputs.amd64 }}
           ARM64: ${{ steps.manifests.outputs.arm64 }}
         run: |
           set -euo pipefail
-          syft scan "registry:${IMAGE}@${AMD64}" --platform linux/amd64 -o "spdx-json=ferroterm-${TAG}-image-amd64.spdx.json"
-          syft scan "registry:${IMAGE}@${ARM64}" --platform linux/arm64 -o "spdx-json=ferroterm-${TAG}-image-arm64.spdx.json"
-          for f in ferroterm-"${TAG}"-image-*.spdx.json; do
+          syft scan "registry:${IMAGE}@${AMD64}" --platform linux/amd64 -o "spdx-json=${NAME}-${TAG}-image-amd64.spdx.json"
+          syft scan "registry:${IMAGE}@${ARM64}" --platform linux/arm64 -o "spdx-json=${NAME}-${TAG}-image-arm64.spdx.json"
+          for f in "${NAME}-${TAG}"-image-*.spdx.json; do
             jq -e '.packages | length > 2' "$f" >/dev/null || {
               echo "::error::${f} lists no crate dependencies; is the binary built with cargo auditable?"
               exit 1
@@ -236,7 +274,7 @@ jobs:
         with:
           subject-name: ${{ env.IMAGE }}
           subject-digest: ${{ steps.manifests.outputs.amd64 }}
-          sbom-path: ferroterm-${{ inputs.tag }}-image-amd64.spdx.json
+          sbom-path: ${{ inputs.name }}-${{ inputs.tag }}-image-amd64.spdx.json
           push-to-registry: true
       - name: Attest the linux/arm64 provenance
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
@@ -249,7 +287,7 @@ jobs:
         with:
           subject-name: ${{ env.IMAGE }}
           subject-digest: ${{ steps.manifests.outputs.arm64 }}
-          sbom-path: ferroterm-${{ inputs.tag }}-image-arm64.spdx.json
+          sbom-path: ${{ inputs.name }}-${{ inputs.tag }}-image-arm64.spdx.json
           push-to-registry: true
 
       # The lane checks its own output the way a consumer would, so a broken
