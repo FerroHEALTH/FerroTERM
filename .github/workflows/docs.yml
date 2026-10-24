@@ -9,6 +9,11 @@
 # the github-pages environment. The build runs on pull requests too, so a broken
 # book fails the PR; only a push to main (or a manual dispatch) deploys.
 #
+# The deployed site names only released versions. The release PR moves the
+# book to the coming version before its tag exists, so the build refuses to
+# deploy while the site names a version that is not a published release, and
+# release.yml dispatches this workflow on main once the release is published.
+#
 # OWNER ACTION REQUIRED once, before the first deploy: enable GitHub Pages with
 # Source = GitHub Actions (repository Settings -> Pages). Without it the deploy
 # job cannot publish.
@@ -42,6 +47,15 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/docs-toolchain
+      - name: The released-version check proves itself on a synthetic site
+        run: bash scripts/checks/site-released.sh --self-test
+      # Only a deploy needs the versions released: a pull request, the release
+      # PR among them, may name the version its merge will release.
+      - name: Every version the site names is a published release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/checks/site-released.sh
       - name: Assemble the site (landing at /, the book under /docs/)
         env:
           GH_TOKEN: ${{ github.token }}
