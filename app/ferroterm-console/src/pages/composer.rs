@@ -320,6 +320,21 @@ fn target<'a>(intent: &'a str, action: &str) -> Option<&'a str> {
         .and_then(|rest| rest.strip_prefix(':'))
 }
 
+/// The fields of each row of `rows` that belongs to the clause `key` and
+/// that `intent` does not remove with the action `remove`.
+fn kept<'a>(
+    rows: &'a [(String, BTreeMap<String, String>)],
+    key: &'a str,
+    intent: &'a str,
+    remove: &'a str,
+) -> impl Iterator<Item = &'a BTreeMap<String, String>> + 'a {
+    rows.iter()
+        .filter(move |(row, each)| {
+            field(each, "clause") == key && target(intent, remove) != Some(row.as_str())
+        })
+        .map(|(_, each)| each)
+}
+
 /// Writes the posted fields over `draft`, the row a Remove names left out
 /// and the row an Add asks for added.
 fn apply(form: &Posted, draft: &mut Draft) {
@@ -347,13 +362,7 @@ fn apply(form: &Posted, draft: &mut Draft) {
             clause.system = field(&fields, "system");
             clause.system_version = field(&fields, "version");
         }
-        for (row, each) in filters
-            .iter()
-            .filter(|(_, each)| field(each, "clause") == key)
-        {
-            if target(intent, "remove-filter") == Some(row.as_str()) {
-                continue;
-            }
+        for each in kept(&filters, &key, intent, "remove-filter") {
             draft.add_filter(made, &field(each, "property"), &field(each, "op"));
             if let Some(last) = draft
                 .clause_mut(made)
@@ -362,13 +371,7 @@ fn apply(form: &Posted, draft: &mut Draft) {
                 last.value = field(each, "value");
             }
         }
-        for (row, each) in codes
-            .iter()
-            .filter(|(_, each)| field(each, "clause") == key)
-        {
-            if target(intent, "remove-code") == Some(row.as_str()) {
-                continue;
-            }
+        for each in kept(&codes, &key, intent, "remove-code") {
             draft.add_concept(made, &field(each, "code"), &field(each, "served"));
             if let Some(last) = draft
                 .clause_mut(made)
@@ -377,10 +380,8 @@ fn apply(form: &Posted, draft: &mut Draft) {
                 last.display = field(each, "display");
             }
         }
-        for (row, each) in sets.iter().filter(|(_, each)| field(each, "clause") == key) {
-            if target(intent, "remove-vs") != Some(row.as_str()) {
-                draft.add_value_set(made, &field(each, "url"));
-            }
+        for each in kept(&sets, &key, intent, "remove-vs") {
+            draft.add_value_set(made, &field(each, "url"));
         }
         if target(intent, "add-filter") == Some(key.as_str()) {
             draft.add_filter(made, "concept", "is-a");

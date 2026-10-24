@@ -36,10 +36,11 @@ die() {
 
 # Prints the SHA-256 of FILE, with the tool the platform has.
 digest_of() {
+  local file="$1"
   if command -v sha256sum > /dev/null; then
-    sha256sum "$1" | cut -d' ' -f1
+    sha256sum "$file" | cut -d' ' -f1
   else
-    shasum -a 256 "$1" | cut -d' ' -f1
+    shasum -a 256 "$file" | cut -d' ' -f1
   fi
 }
 
@@ -47,14 +48,14 @@ digest_of() {
 verify() {
   local file="$1" digest="$2" found
   found="$(digest_of "$file")"
-  [ "$found" = "$digest" ] || die "$file has SHA-256 $found, the pin is $digest"
+  [[ "$found" = "$digest" ]] || die "$file has SHA-256 $found, the pin is $digest"
 }
 
 # Prints FILE with every symbolic link on its way resolved, so the digest is
 # taken of the file a link on PATH runs.
 resolve() {
   local file="$1" link
-  while [ -L "$file" ]; do
+  while [[ -L "$file" ]]; do
     link="$(readlink "$file")"
     case "$link" in
       /*) file="$link" ;;
@@ -92,14 +93,15 @@ check() {
   esac
   wasm_opt="$(resolve "$wasm_opt")"
   verify "$wasm_opt" "$wasm_opt_sha"
-  if [ -n "$libbinaryen_sha" ]; then
+  if [[ -n "$libbinaryen_sha" ]]; then
     verify "$(dirname "$wasm_opt")/../lib/libbinaryen.dylib" "$libbinaryen_sha"
   fi
 }
 
 # Downloads URL into FILE.
 fetch() {
-  curl --fail --silent --show-error --location --retry 3 --output "$2" "$1"
+  local url="$1" file="$2"
+  curl --fail --silent --show-error --location --retry 3 --output "$file" "$url"
 }
 
 install() {

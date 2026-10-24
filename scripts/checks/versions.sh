@@ -20,6 +20,14 @@ fail=0
 note() { printf '  %s\n' "$*"; }
 bad() { printf '  DRIFT: %s\n' "$*" >&2; fail=1; }
 
+# The character class `tr -d` strips from a value read out of a file.
+readonly BLANKS='[:space:]'
+
+# The [workspace.package] version of the root Cargo.toml.
+workspace_version() {
+  awk '/^\[workspace\.package\]/{f=1;next} /^\[/{f=0} f && /^version[[:space:]]*=/{gsub(/[" ]/,""); sub(/^version=/,""); print; exit}' Cargo.toml
+}
+
 # --- the server bin is named `ferroterm`, as release-build.yml packages it -------
 echo "== server binary name (app/ferroterm-server/Cargo.toml <-> release-build.yml)"
 if [[ -f app/ferroterm-server/Cargo.toml ]]; then
@@ -36,8 +44,8 @@ fi
 # --- compose.yaml image tag default == root Cargo.toml workspace version --------
 echo "== quickstart image tag (compose.yaml <-> Cargo.toml)"
 if [[ -f compose.yaml ]] && [[ -f Cargo.toml ]]; then
-  compose_ver="$(grep -m1 'image: ghcr.io/ferrohealth/ferroterm:' compose.yaml | sed -E 's/.*:-([^}]*)\}.*/\1/' | tr -d '[:space:]' || true)"
-  cargo_ver_c="$(awk '/^\[workspace\.package\]/{f=1;next} /^\[/{f=0} f && /^version[[:space:]]*=/{gsub(/[" ]/,""); sub(/^version=/,""); print; exit}' Cargo.toml || true)"
+  compose_ver="$(grep -m1 'image: ghcr.io/ferrohealth/ferroterm:' compose.yaml | sed -E 's/.*:-([^}]*)\}.*/\1/' | tr -d "$BLANKS" || true)"
+  cargo_ver_c="$(workspace_version || true)"
   if [[ -z "$compose_ver" ]]; then
     bad "compose.yaml has no ghcr.io/ferrohealth/ferroterm image tag default"
   elif [[ "$compose_ver" != "$cargo_ver_c" ]]; then
@@ -52,8 +60,8 @@ fi
 # --- compose.sync.yaml image tag default == the workspace version -------------
 echo "== sync image tag (compose.sync.yaml <-> Cargo.toml)"
 if [[ -f compose.sync.yaml ]] && [[ -f Cargo.toml ]]; then
-  sync_ver="$(grep -m1 'image: ghcr.io/ferrohealth/ferroterm-sync:' compose.sync.yaml | sed -E 's/.*:-([^}]*)\}.*/\1/' | tr -d '[:space:]' || true)"
-  cargo_ver_s="$(awk '/^\[workspace\.package\]/{f=1;next} /^\[/{f=0} f && /^version[[:space:]]*=/{gsub(/[" ]/,""); sub(/^version=/,""); print; exit}' Cargo.toml || true)"
+  sync_ver="$(grep -m1 'image: ghcr.io/ferrohealth/ferroterm-sync:' compose.sync.yaml | sed -E 's/.*:-([^}]*)\}.*/\1/' | tr -d "$BLANKS" || true)"
+  cargo_ver_s="$(workspace_version || true)"
   if [[ -z "$sync_ver" ]]; then
     bad "compose.sync.yaml has no ghcr.io/ferrohealth/ferroterm-sync image tag default"
   elif [[ "$sync_ver" != "$cargo_ver_s" ]]; then
@@ -68,10 +76,10 @@ fi
 # --- CITATION.cff version == root Cargo.toml [workspace.package] version -------
 echo "== product version (CITATION.cff <-> Cargo.toml)"
 cff_ver=""
-[[ -f CITATION.cff ]] && cff_ver="$(grep -m1 '^version:' CITATION.cff | sed -E 's/^version:[[:space:]]*//; s/["'\'']//g' | tr -d '[:space:]' || true)"
+[[ -f CITATION.cff ]] && cff_ver="$(grep -m1 '^version:' CITATION.cff | sed -E 's/^version:[[:space:]]*//; s/["'\'']//g' | tr -d "$BLANKS" || true)"
 if [[ -f Cargo.toml ]]; then
   # The version line inside the [workspace.package] table.
-  cargo_ver="$(awk '/^\[workspace\.package\]/{f=1;next} /^\[/{f=0} f && /^version[[:space:]]*=/{gsub(/[" ]/,""); sub(/^version=/,""); print; exit}' Cargo.toml || true)"
+  cargo_ver="$(workspace_version || true)"
   if [[ -z "$cff_ver" ]]; then
     bad "Cargo.toml exists but CITATION.cff has no version"
   elif [[ -z "$cargo_ver" ]]; then
@@ -113,7 +121,7 @@ drop_rendered_benchmarks() {
 # the roadmap and is allowed. The changelog and the lock file keep history.
 echo "== stale product versions (README, website, docs <-> Cargo.toml)"
 if [[ -f Cargo.toml ]]; then
-  current="$(awk '/^\[workspace\.package\]/{f=1;next} /^\[/{f=0} f && /^version[[:space:]]*=/{gsub(/[" ]/,""); sub(/^version=/,""); print; exit}' Cargo.toml || true)"
+  current="$(workspace_version || true)"
   if [[ -n "$current" ]]; then
     stale=0
     while IFS= read -r hit; do
@@ -160,7 +168,7 @@ fi
 echo "== vendored ECL grammar (PROVENANCE.md <-> docs/VERSIONS.md)"
 ecl_prov="crates/sct-ecl/vendor/PROVENANCE.md"
 if [[ -f "$ecl_prov" ]]; then
-  ecl_tag="$(sed -nE 's/^- Tag:[[:space:]]*//p' "$ecl_prov" | head -n1 | tr -d '[:space:]')"
+  ecl_tag="$(sed -nE 's/^- Tag:[[:space:]]*//p' "$ecl_prov" | head -n1 | tr -d "$BLANKS")"
   ecl_pin="$(awk -F'|' '$2 ~ /^[[:space:]]*ECL[[:space:]]*$/ { v = $3; gsub(/^[[:space:]]+/, "", v); split(v, w, /[[:space:]]/); print w[1]; exit }' docs/VERSIONS.md)"
   if [[ -z "$ecl_tag" ]]; then
     bad "$ecl_prov has no '- Tag:' line"
@@ -179,7 +187,7 @@ fi
 echo "== vendored SCG syntax (PROVENANCE.md <-> docs/VERSIONS.md)"
 scg_prov="crates/sct-scg/vendor/PROVENANCE.md"
 if [[ -f "$scg_prov" ]]; then
-  scg_commit="$(sed -nE 's/^- Commit:[[:space:]]*//p' "$scg_prov" | head -n1 | tr -d '[:space:]')"
+  scg_commit="$(sed -nE 's/^- Commit:[[:space:]]*//p' "$scg_prov" | head -n1 | tr -d "$BLANKS")"
   scg_pin="$(awk -F'|' '$2 ~ /^[[:space:]]*SCG[[:space:]]*$/ { v = $3; gsub(/^[[:space:]]+/, "", v); split(v, w, /[[:space:]]/); print w[1]; exit }' docs/VERSIONS.md)"
   if [[ -z "$scg_commit" ]]; then
     bad "$scg_prov has no '- Commit:' line"
@@ -198,7 +206,7 @@ fi
 echo "== vendored FerroPULSE report v2 (PROVENANCE.md <-> docs/VERSIONS.md)"
 pulse_prov="app/ferroterm-server/tests/fixtures/ferropulse/PROVENANCE.md"
 if [[ -f "$pulse_prov" ]]; then
-  pulse_commit="$(sed -nE 's/^- Commit:[[:space:]]*//p' "$pulse_prov" | head -n1 | tr -d '[:space:]')"
+  pulse_commit="$(sed -nE 's/^- Commit:[[:space:]]*//p' "$pulse_prov" | head -n1 | tr -d "$BLANKS")"
   pulse_pin="$(awk -F'|' '$2 ~ /^[[:space:]]*FerroPULSE report v2[[:space:]]*$/ { v = $3; gsub(/^[[:space:]]+/, "", v); split(v, w, /[[:space:]]/); print w[1]; exit }' docs/VERSIONS.md)"
   if [[ -z "$pulse_commit" ]]; then
     bad "$pulse_prov has no '- Commit:' line"
@@ -240,7 +248,7 @@ fi
 # --- Conformance suite pin: the suite script and the badges read the same commit
 echo "== conformance suite (tx-ecosystem.sh <-> docs/VERSIONS.md)"
 if [[ -f scripts/checks/tx-ecosystem.sh ]]; then
-  script_commit="$(grep -m1 '^SUITE_COMMIT=' scripts/checks/tx-ecosystem.sh | sed 's/^SUITE_COMMIT=//' | tr -d '[:space:]')"
+  script_commit="$(grep -m1 '^SUITE_COMMIT=' scripts/checks/tx-ecosystem.sh | sed 's/^SUITE_COMMIT=//' | tr -d "$BLANKS")"
   table_commit="$(grep -oE 'fhir-tx-ecosystem-ig. at .[0-9a-f]{40}' docs/VERSIONS.md | head -1 | grep -oE '[0-9a-f]{40}' || true)"
   if [[ -z "$table_commit" ]]; then
     bad "docs/VERSIONS.md names no tx-ecosystem suite commit"
@@ -249,8 +257,8 @@ if [[ -f scripts/checks/tx-ecosystem.sh ]]; then
   else
     note "OK: the suite commit is $table_commit"
   fi
-  script_validator="$(grep -m1 '^VALIDATOR_VERSION=' scripts/checks/tx-ecosystem.sh | sed 's/^VALIDATOR_VERSION=//' | tr -d '[:space:]')"
-  script_sha="$(grep -m1 '^VALIDATOR_SHA256=' scripts/checks/tx-ecosystem.sh | sed 's/^VALIDATOR_SHA256=//' | tr -d '[:space:]')"
+  script_validator="$(grep -m1 '^VALIDATOR_VERSION=' scripts/checks/tx-ecosystem.sh | sed 's/^VALIDATOR_VERSION=//' | tr -d "$BLANKS")"
+  script_sha="$(grep -m1 '^VALIDATOR_SHA256=' scripts/checks/tx-ecosystem.sh | sed 's/^VALIDATOR_SHA256=//' | tr -d "$BLANKS")"
   table_validator="$(grep -oE 'FHIR Validator .[^|]*\| [0-9]+\.[0-9]+\.[0-9]+' docs/VERSIONS.md | grep -oE '[0-9]+\.[0-9]+\.[0-9]+$' || true)"
   if [[ -z "$table_validator" ]]; then
     bad "docs/VERSIONS.md names no FHIR Validator version"
@@ -311,7 +319,7 @@ fi
 # --- rust-toolchain.toml present (sanity; channel recorded in VERSIONS.md) -----
 echo "== rust toolchain"
 if [[ -f rust-toolchain.toml ]]; then
-  chan="$(grep -m1 -E '^channel[[:space:]]*=' rust-toolchain.toml | sed -E 's/.*=[[:space:]]*//; s/["'\'']//g' | tr -d '[:space:]' || true)"
+  chan="$(grep -m1 -E '^channel[[:space:]]*=' rust-toolchain.toml | sed -E 's/.*=[[:space:]]*//; s/["'\'']//g' | tr -d "$BLANKS" || true)"
   note "rust-toolchain.toml channel: ${chan:-unset}"
 else
   note "no rust-toolchain.toml yet — skipped (lands with the workspace)"

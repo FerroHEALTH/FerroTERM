@@ -81,6 +81,7 @@ case "${1:-}" in
     page_url "$2"
     exit 0
     ;;
+  *) ;; # NOTES TAG, checked below
 esac
 [[ "$#" -eq 2 ]] || guard_usage "$GRAMMAR"
 guard_known_flags "$GRAMMAR" "" "$@"
