@@ -65,6 +65,14 @@ const CURRENT_FIELD: &str = "current";
 
 /// What a posted restore came to, when the page was posted one.
 enum Restored {
+    /// The server took the update: the revision put back, and the one the
+    /// write made.
+    Written {
+        /// The revision the reader chose.
+        revision: String,
+        /// The revision the server wrote.
+        written: String,
+    },
     /// The server refused the update.
     Refused(FhirError),
     /// The chosen revision holds no resource to put back.
@@ -118,7 +126,10 @@ fn refused_page(subject: &Subject, error: &FhirError) -> AnyView {
 }
 
 /// Sends the restore `form` asks for and, when the server takes it,
-/// redirects to the history saying so; `None` once redirected.
+/// redirects to the history saying so.
+///
+/// The page drawn in answer to the post says what was written too, so the
+/// outcome stands whichever of the two pages the browser ends on.
 async fn send_restore(
     request: &Request,
     support: Support,
@@ -156,7 +167,7 @@ async fn send_restore(
                 percent(&written)
             );
             leptos_axum::redirect(&back);
-            None
+            Some(Restored::Written { revision, written })
         }
         Err(error) => Some(Restored::Refused(error)),
     }
@@ -244,6 +255,9 @@ fn page(request: &Request, kind: Kind, opened: &Opened, restored: Option<&Restor
 fn outcome(request: &Request, opened: &Opened, restored: Option<&Restored>) -> Option<AnyView> {
     let subject = &opened.subject;
     match restored {
+        Some(Restored::Written { revision, written }) => {
+            Some(restored_notice(revision.clone(), written.clone()))
+        }
         Some(Restored::Refused(error)) => {
             let mut refused = refusal_of(error);
             if error.status() == Some(http::StatusCode::PRECONDITION_FAILED) {
@@ -280,21 +294,23 @@ fn outcome(request: &Request, opened: &Opened, restored: Option<&Restored>) -> O
         ),
         None => {
             let restored = request.param(RESTORED_PARAM)?;
-            let written = request.text(AS_PARAM);
-            Some(
-                notice(
-                    Tone::Ok,
-                    Announce::Status,
-                    None,
-                    tr_with(
-                        Msg::HistoryRestored,
-                        &[("revision", restored.into()), ("written", written.into())],
-                    ),
-                )
-                .into_any(),
-            )
+            Some(restored_notice(restored, request.text(AS_PARAM)))
         }
     }
+}
+
+/// The status message that names the revision put back and the one written.
+fn restored_notice(revision: String, written: String) -> AnyView {
+    notice(
+        Tone::Ok,
+        Announce::Status,
+        None,
+        tr_with(
+            Msg::HistoryRestored,
+            &[("revision", revision.into()), ("written", written.into())],
+        ),
+    )
+    .into_any()
 }
 
 /// The words of the interaction that made `version`.
