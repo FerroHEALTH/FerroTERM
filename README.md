@@ -187,15 +187,13 @@ Every route answers FHIR JSON or FHIR XML, by `_format` or `Accept`.
 v0.3.0 is the current release. The tracker's milestones are the roadmap, and
 the open issues under each are the worklist:
 
-- **[v0.3.0](https://github.com/FerroHEALTH/FerroTERM/milestone/16)**: the
-  console's pseudo-locale check, a published `ferroterm-sync` image, a book
-  that names only released versions, the benchmark record set retaken after
-  the memory change, the SonarQube Cloud triage, and the work that waits on
-  outside access or an upstream release: the differential check against the
-  Nictiz Nationale Terminologieserver, the NHG tables once Nictiz grants that
-  licence, the suite modes that need an edition or a vocabulary this
-  repository cannot hold, the two unmaintained advisories in the console's
-  dependency tree, and the OpenSSF Best Practices badge.
+- **[v0.3.1](https://github.com/FerroHEALTH/FerroTERM/milestone/25)**: the
+  benchmark record set retaken after the memory change on the owner's
+  machine, and the work that waits on outside access or an upstream release:
+  the differential check against the Nictiz Nationale Terminologieserver, the
+  NHG tables once Nictiz grants that licence, the suite modes that need an
+  edition this repository cannot hold, and the two unmaintained advisories in
+  the console's dependency tree.
 
 FerroTERM is one product of the FerroHEALTH family, made by Cadasto B.V.
 What holds for every product is written once, in the family book at
