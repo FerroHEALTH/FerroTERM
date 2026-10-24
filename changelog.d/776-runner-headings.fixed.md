@@ -1,1 +1,0 @@
-- Look up and Expand draw one heading level where they stacked the Parameters heading on a section heading.

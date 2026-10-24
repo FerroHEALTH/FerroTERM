@@ -1,1 +1,0 @@
-Shipped with functional changes because: only the newest release is supported (`SECURITY.md`), so a security-only patch published beside this release would be out of support the moment this release lands and give no one a release to stay on; both fixes are a dependency bump and a base-image digest with no behaviour change of their own.
