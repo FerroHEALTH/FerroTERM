@@ -109,6 +109,14 @@ name with the theme. The version menu keeps the version for your session, so
 every screen you open next reads the same root. An address that names a
 version with `?fhir=` reads that version for that page.
 
+From the second character you type into the command bar, a panel under it
+shows the code systems, value sets and concept maps whose name or canonical
+holds the words, five of a kind, and the screens that take what you typed.
+The arrow keys move through it, Enter opens a hit and Escape closes it. The
+panel asks `GET /find/answer?q=`, which answers as JSON and says when a read
+the server refused leaves the matches short. Submitting the command bar
+opens Find, which lists every match in the page.
+
 ### Dashboard
 
 What the server serves on the version in view: the number of code systems,

@@ -17,6 +17,7 @@
 
 mod command;
 mod exchange;
+mod find;
 mod forms;
 mod logout;
 mod provider;
