@@ -36,7 +36,9 @@ impl Config {
         let environment: BTreeMap<String, String> = std::env::vars()
             .filter(|(name, _)| name.starts_with(ENV_PREFIX))
             .collect();
-        Self::from_sources(text.as_deref(), &environment)
+        let mut config = Self::from_sources(text.as_deref(), &environment)?;
+        config.file = named;
+        Ok(config)
     }
 
     /// Reads `text` as TOML and applies `environment` over it.
@@ -136,6 +138,28 @@ mod tests {
     use crate::config::Config;
     use crate::config::error::Error;
     use crate::config::origin::Origin;
+
+    #[test]
+    fn the_settings_name_the_file_they_were_read_from() {
+        let path = std::env::temp_dir().join(format!(
+            "ferroterm-console-{}-named.toml",
+            std::process::id()
+        ));
+        std::fs::write(
+            &path,
+            "[ferroterm]\nbase_url = \"http://ferroterm:8080/\"\n",
+        )
+        .expect("the file is written");
+        let settings = Config::load(Some(&path))
+            .and_then(|config| config.resolve())
+            .expect("the file reads");
+        std::fs::remove_file(&path).expect("the file is removed");
+        assert_eq!(Some(path), settings.file);
+        let none = Config::from_sources(None, &BTreeMap::new())
+            .and_then(|config| config.resolve())
+            .expect("the defaults resolve");
+        assert_eq!(None, none.file, "no file was read");
+    }
 
     #[test]
     fn the_configuration_knows_where_each_key_came_from() {

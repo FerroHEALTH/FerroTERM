@@ -72,6 +72,9 @@ pub struct Config {
     /// Where each key took its value from, which no file writes.
     #[serde(skip)]
     pub origins: origin::Origins,
+    /// The configuration file the tree was read from, when one was.
+    #[serde(skip)]
+    pub file: Option<PathBuf>,
 }
 
 /// `[server]`.

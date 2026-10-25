@@ -209,7 +209,7 @@ impl Config {
             session,
             oidc,
             origins: self.origins.clone(),
-            file: None,
+            file: self.file.clone(),
         })
     }
 }
