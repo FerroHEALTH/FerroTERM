@@ -44,12 +44,8 @@ where
             return u8::try_from(code).map_or(ExitCode::FAILURE, ExitCode::from);
         }
     };
-    let file = cli
-        .config
-        .clone()
-        .or_else(|| std::env::var_os(crate::config::CONFIG_PATH_ENV).map(std::path::PathBuf::from));
     let settings = match Config::load(cli.config.as_deref()).and_then(|config| config.resolve()) {
-        Ok(settings) => Settings { file, ..settings },
+        Ok(settings) => settings,
         Err(error) if cli.command == Command::Healthcheck => {
             eprintln!("ferroterm-console: not up: {}", chain(&error));
             return ExitCode::FAILURE;
