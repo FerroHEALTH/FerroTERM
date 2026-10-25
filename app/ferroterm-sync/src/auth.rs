@@ -55,6 +55,12 @@ pub enum AuthError {
         #[source]
         source: Box<ConfigError>,
     },
+    /// `[auth] mode = "introspection"` is set, which the admin listener does
+    /// not serve yet.
+    #[error(
+        "[auth] mode = \"introspection\" is not supported; check tokens as JWTs with mode = \"jwt\""
+    )]
+    Introspection,
     /// An issuer's metadata or key set could not be read, or breaks a rule.
     #[error("the authorization server {issuer} could not be read")]
     Issuer {
@@ -87,7 +93,8 @@ impl AdminAuth {
     /// # Errors
     ///
     /// Returns [`AuthError::Config`] for a section that breaks a rule, an
-    /// enabled one admitting no credential among them, and
+    /// enabled one admitting no credential among them,
+    /// [`AuthError::Introspection`] for `mode = "introspection"`, and
     /// [`AuthError::Issuer`] for an issuer whose metadata or key set could
     /// not be read.
     pub async fn start(section: &AuthSection) -> Result<Option<Self>, AuthError> {
@@ -97,6 +104,10 @@ impl AdminAuth {
         let resolved = section.resolve().map_err(|source| AuthError::Config {
             source: Box::new(source),
         })?;
+        // TODO(#881): serve introspection through the crate's `Introspector`.
+        if resolved.introspection.is_some() {
+            return Err(AuthError::Introspection);
+        }
         let realm = resolved.realm.unwrap_or_else(|| String::from(REALM));
         let mut gate = Gate::open().with_realm(realm.clone());
         if !resolved.issuers.is_empty() {

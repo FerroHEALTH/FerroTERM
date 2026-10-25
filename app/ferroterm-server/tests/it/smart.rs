@@ -17,9 +17,11 @@ use argon2::Argon2;
 use argon2::password_hash::PasswordHasher;
 use axum::body::Body;
 use base64::Engine;
-use ferrohealth_smart::config::{BasicSection, BasicUser};
+use ferrohealth_smart::config::{
+    AuthMode, BasicSection, BasicUser, IntrospectionSection, OauthSection,
+};
 use ferroterm_server::config::Config;
-use ferroterm_server::smart::Smart;
+use ferroterm_server::smart::{Smart, StartError};
 use http::header::{AUTHORIZATION, WWW_AUTHENTICATE};
 use http::{Request, StatusCode};
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
@@ -1117,6 +1119,31 @@ async fn a_guarded_surface_without_an_issuer_refuses_the_start() {
         assert!(reason.contains(named), "{reason}");
         assert!(reason.contains("FERROTERM_AUTH__ISSUER"), "{reason}");
     }
+}
+
+// The server checks tokens as JWTs only (#881), so `mode = "introspection"`
+// refuses the start by name rather than starting a gate that admits no token.
+#[tokio::test]
+async fn introspection_mode_refuses_the_start() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mut setup = SmartSetup::for_issuer("https://auth.example.org/realms/tx");
+    setup.auth.mode = AuthMode::Introspection;
+    setup.auth.introspection = Some(IntrospectionSection {
+        client: Some(OauthSection {
+            client_id: String::from("ferroterm"),
+            client_secret: Some(SecretString::from("synthetic-secret")),
+            ..OauthSection::default()
+        }),
+        ..IntrospectionSection::default()
+    });
+    let config = Server::smart_config(dir.path(), setup);
+    let error = Smart::start(&config)
+        .await
+        .expect_err("the start is refused");
+    assert!(
+        matches!(error, StartError::Introspection),
+        "the refusal names the mode: {error:?}"
+    );
 }
 
 #[tokio::test]

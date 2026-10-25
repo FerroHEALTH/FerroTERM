@@ -94,6 +94,12 @@ pub enum StartError {
         #[source]
         source: Box<ResourceError>,
     },
+    /// `[auth] mode = "introspection"` is set, which this server does not
+    /// serve yet.
+    #[error(
+        "[auth] mode = \"introspection\" is not supported; check tokens as JWTs with mode = \"jwt\""
+    )]
+    Introspection,
     /// The first issuer publishes no token endpoint, which the discovery
     /// document requires (SMART App Launch 2.2.0, Conformance, §Metadata,
     /// `token_endpoint`: REQUIRED).
@@ -143,6 +149,7 @@ impl Smart {
     ///
     /// Returns [`StartError::Unconfigured`] for a guarded surface without an
     /// issuer, [`StartError::Auth`] for a section that breaks a rule,
+    /// [`StartError::Introspection`] for `mode = "introspection"`,
     /// [`StartError::Issuer`] for an issuer whose metadata or key set could
     /// not be read, and [`StartError::NoTokenEndpoint`] when the first issuer
     /// names no token endpoint.
@@ -161,6 +168,10 @@ impl Smart {
         let resolved = auth.resolve().map_err(|source| StartError::Auth {
             source: Box::new(source),
         })?;
+        // TODO(#881): serve introspection through the crate's `Introspector`.
+        if resolved.introspection.is_some() {
+            return Err(StartError::Introspection);
+        }
         let bases = version_bases(config.base_url.as_deref());
         let mut fhir = IssuerSet::new();
         let mut admin = IssuerSet::new();
