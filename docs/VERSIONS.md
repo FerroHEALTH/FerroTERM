@@ -52,7 +52,7 @@ mints a canonical from, and it is cited rather than pinned.
 
 The FHIR model is the `fhir-types` crate: generated from the machine-readable
 HL7 FHIR packages and published by the FerroBRIDGE repository
-(<https://github.com/rubentalstra/FerroBRIDGE>), which vendors and pins those
+(<https://github.com/FerroHEALTH/FerroBRIDGE>), which vendors and pins those
 packages. FerroTERM consumes the crate from crates.io like any other
 dependency, so no HL7 package is vendored here and a change to the model is
 requested on that repository's tracker.

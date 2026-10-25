@@ -19,7 +19,7 @@ in the R5 module because the R5 package declares it.
 ## Where it comes from
 
 The model is the [`fhir-types`](https://crates.io/crates/fhir-types) crate. The
-[FerroBRIDGE](https://github.com/rubentalstra/FerroBRIDGE) repository vendors
+[FerroBRIDGE](https://github.com/FerroHEALTH/FerroBRIDGE) repository vendors
 the pinned HL7 packages, runs the generator, and publishes the crate.
 FerroTERM depends on it from crates.io, at the version `docs/VERSIONS.md` pins
 and the root `Cargo.toml` requires. No HL7 package is vendored in this

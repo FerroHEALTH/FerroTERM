@@ -111,7 +111,7 @@ and its provider. See `docs/architecture.md` for the evidence.
 The FHIR layer is generated, and the generator is not here. HL7 publishes the
 whole type system and every operation as machine-readable resources in
 versioned packages; the FerroBRIDGE repository
-(<https://github.com/rubentalstra/FerroBRIDGE>) vendors and pins those
+(<https://github.com/FerroHEALTH/FerroBRIDGE>) vendors and pins those
 packages, generates the `fhir-types` crate from them, and publishes it. This
 repository takes the crate from crates.io, pinned in the root `Cargo.toml`
 `[workspace.dependencies]` and recorded in `docs/VERSIONS.md`.
