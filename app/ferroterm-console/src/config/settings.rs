@@ -31,6 +31,8 @@ pub struct Settings {
     pub session: SessionSettings,
     /// The OpenID Provider operators sign in with, when one is configured.
     pub oidc: Option<OidcSettings>,
+    /// Where each key took its value from.
+    pub origins: crate::config::origin::Origins,
     /// The configuration file the settings were read from, when one was
     /// named, which the Configuration page names.
     pub file: Option<PathBuf>,
@@ -206,6 +208,7 @@ impl Config {
             },
             session,
             oidc,
+            origins: self.origins.clone(),
             file: None,
         })
     }

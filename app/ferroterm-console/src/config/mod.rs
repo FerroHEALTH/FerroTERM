@@ -40,6 +40,7 @@
 
 pub mod error;
 pub mod load;
+pub mod origin;
 pub mod secret;
 pub mod settings;
 
@@ -68,6 +69,9 @@ pub struct Config {
     /// `[oidc]`: the OpenID Provider operators sign in with; without it the
     /// console offers no sign-in.
     pub oidc: Option<Oidc>,
+    /// Where each key took its value from, which no file writes.
+    #[serde(skip)]
+    pub origins: origin::Origins,
 }
 
 /// `[server]`.

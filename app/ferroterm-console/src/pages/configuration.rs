@@ -18,12 +18,15 @@ use ferrohealth_ui::view::secret::{SecretState, secret_state};
 use ferrohealth_ui::view::status::badge;
 use ferrohealth_ui::view::surface::Header;
 use ferrohealth_ui::view::tabs::{Tab, TabRow};
-use ferrohealth_ui::view::template::settings::{How, Setting, SettingsPage, Source, settings_page};
+use ferrohealth_ui::view::template::settings::{
+    How, Setting, SettingsPage, Source, ValueSource, settings_page,
+};
 use ferrohealth_ui::widget::action_menu::{Act, Action, Item, Menu};
 use leptos::prelude::*;
 use leptos_meta::Title;
 use leptos_router::hooks::use_params_map;
 
+use crate::config::origin::Origin;
 use crate::config::settings::Settings;
 use crate::locale::{Msg, tr, tr_with};
 use crate::routes::{CONFIGURATION_PATH, ui_path};
@@ -158,11 +161,30 @@ fn on(value: bool) -> AnyView {
 
 /// The settings of `tab` from `settings`.
 fn settings_of(tab: ConfigTab, settings: &Settings) -> Vec<Setting> {
-    match tab {
+    let rows = match tab {
         ConfigTab::Connection => connection(settings),
         ConfigTab::SignIn => sign_in(settings),
         ConfigTab::Sessions => sessions(settings),
         ConfigTab::Listener => listener(settings),
+    };
+    rows.into_iter()
+        .map(|row| Setting {
+            source: row
+                .keys
+                .first()
+                .and_then(|key| marker(settings.origins.of(key))),
+            ..row
+        })
+        .collect()
+}
+
+/// How a value that does not come from the file is marked: the file is the
+/// page's own source, so it carries no mark.
+fn marker(origin: Origin) -> Option<ValueSource> {
+    match origin {
+        Origin::File => None,
+        Origin::Environment => Some(ValueSource::Environment),
+        Origin::Default => Some(ValueSource::Default),
     }
 }
 

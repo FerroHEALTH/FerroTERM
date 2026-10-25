@@ -177,8 +177,9 @@ refusal shown in the server's own words.
 **Server** shows the four FHIR roots side by side, read from each root's
 `CapabilityStatement`, the operations each root declares, and the
 conformance and benchmark evidence this build ships. **Configuration** lists
-the settings the console runs with, secrets redacted, and **How configuration
-works**, at the end of the line that names the file, opens a dialog on where
+the settings the console runs with, secrets redacted, a value an
+environment override sets marked **From the environment** and one nothing
+sets marked **Default**, and **How configuration works**, at the end of the line that names the file, opens a dialog on where
 they come from and how you change them. When the console was started with a
 configuration file, **More** in the title row offers **Copy the file's path**,
 the path shown under it. **About** names the
