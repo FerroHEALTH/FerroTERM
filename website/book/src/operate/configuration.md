@@ -70,6 +70,8 @@ The keys of `[auth]`, in the file `FERROTERM_AUTH_FILE` names or as
 | `jwks_refresh_interval_seconds` | The shortest time between two reads of the key set, so an unknown `kid` reads it at most once per interval. | `60` |
 | `jwks_file` | A key set file handed over out of band, read in place of the issuer's `jwks_uri`. | none |
 | `timeout_ms` | How long one call to the authorization server may take. | `10000` |
+| `mode` | How a bearer token is checked: `jwt`, as an RFC 9068 JWT against the issuer's key set, or `introspection`, by posting it to the issuer's introspection endpoint (RFC 7662), for an authorization server that issues tokens the server cannot read. `introspection` takes one flat `issuer` and no `jwks_file`. | `jwt` |
+| `[auth.introspection]` | The introspection check under `mode = "introspection"`: `endpoint` (the issuer metadata's `introspection_endpoint` when empty), `cache_max_age_seconds` (how long an active response is used, at most until its `exp`; `60`), `cache_capacity` (`10000`), and exactly one of `client` (the client authentication of the call, with the keys of a client credentials grant: `client_id`, `client_auth`, `client_secret` or `client_secret_file`, `private_key_file`) and `bearer` (a client credentials grant whose token authorizes the call). | none |
 | `realm` | The realm every challenge names. | `FERROTERM_BASE_URL`, else `FerroTERM` |
 | `scopes_supported` | The scopes the discovery document lists. List only scopes the server honours: "the server SHALL support all scopes listed here". | none (the member is omitted) |
 | `capabilities` | SMART capabilities the discovery document adds to the ones it derives. | none |
@@ -89,6 +91,25 @@ audience = ["https://tx.example.org"]
 user = "ferroterm-sync"
 password_hash_file = "/run/secrets/sync-password-hash"
 scopes = ["__ferroterm.admin"]
+```
+
+An authorization server whose access tokens are opaque is read through its
+introspection endpoint instead. The server reads the issuer's metadata at the
+start, takes the endpoint from it (or from `endpoint`), and refuses to start
+when the issuer names none. An active response must carry `scope`,
+`client_id` and `exp` (SMART App Launch 2.2.0, Token Introspection) and is
+held until its `exp` and at most `cache_max_age_seconds`; an inactive one
+answers `401`, and an endpoint that cannot answer `503`:
+
+```toml
+[auth]
+issuer = "https://auth.example.org/realms/tx"
+audience = ["https://tx.example.org"]
+mode = "introspection"
+
+[auth.introspection.client]
+client_id = "ferroterm"
+client_secret_file = "/run/secrets/introspection-secret"
 ```
 
 A refused credential answers `401` with an `OperationOutcome` and a

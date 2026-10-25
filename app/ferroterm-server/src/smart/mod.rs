@@ -7,7 +7,8 @@
 //! one: it validates a presented credential and issues none
 //! (<https://hl7.org/fhir/smart-app-launch/conformance.html>). The crate reads
 //! each configured issuer's metadata and key set, validates every access token
-//! under RFC 9068, checks the Basic users of `[[auth.basic.users]]`, answers
+//! under RFC 9068 or, under `[auth] mode = "introspection"`, posts it to the
+//! issuer's introspection endpoint (RFC 7662), checks the Basic users of `[[auth.basic.users]]`, answers
 //! the status and challenge of every refusal (RFC 6750 §3.1) and writes the
 //! audit line. This module holds what is the server's own: which surfaces need
 //! `[auth]`, the audiences each surface accepts, the admin scope, the
@@ -31,7 +32,11 @@ use ferrohealth_smart::extract::HeaderOnly;
 use ferrohealth_smart::guard::{Gate, Render};
 use ferrohealth_smart::metadata::ServerMetadata;
 use ferrohealth_smart::refusal::Refusal;
-use ferrohealth_smart::resource::{IssuerSet, ResourceError, ResourceServer, Settings};
+use ferrohealth_smart::resource::configuration::SmartOptions;
+use ferrohealth_smart::resource::introspection::{
+    IntrospectionError, IntrospectionSettings, Introspector,
+};
+use ferrohealth_smart::resource::{IssuerSet, ResourceError, ResourceServer, Settings, Verifier};
 use http::request::Parts;
 use http::{HeaderMap, StatusCode};
 
@@ -94,12 +99,17 @@ pub enum StartError {
         #[source]
         source: Box<ResourceError>,
     },
-    /// `[auth] mode = "introspection"` is set, which this server does not
-    /// serve yet.
-    #[error(
-        "[auth] mode = \"introspection\" is not supported; check tokens as JWTs with mode = \"jwt\""
-    )]
-    Introspection,
+    /// The introspecting issuer's metadata could not be read, names no
+    /// introspection endpoint, or the `[auth.introspection]` settings break a
+    /// rule.
+    #[error("the introspection endpoint of {issuer} could not be set up")]
+    Introspector {
+        /// The issuer identifier.
+        issuer: String,
+        /// What the introspection check reported.
+        #[source]
+        source: Box<IntrospectionError>,
+    },
     /// The first issuer publishes no token endpoint, which the discovery
     /// document requires (SMART App Launch 2.2.0, Conformance, §Metadata,
     /// `token_endpoint`: REQUIRED).
@@ -120,7 +130,7 @@ pub struct Smart {
     /// binds no admin listener, so the admin routes refuse every caller.
     admin: Option<Gate>,
     /// The issuer the discovery document and the capability statement name.
-    primary: Arc<ResourceServer>,
+    primary: Primary,
     /// The token endpoint that issuer's metadata names.
     token_endpoint: String,
     /// The protection space the challenges name (RFC 6750 §3, RFC 7617 §2).
@@ -149,7 +159,8 @@ impl Smart {
     ///
     /// Returns [`StartError::Unconfigured`] for a guarded surface without an
     /// issuer, [`StartError::Auth`] for a section that breaks a rule,
-    /// [`StartError::Introspection`] for `mode = "introspection"`,
+    /// [`StartError::Introspector`] for an introspecting issuer that cannot be
+    /// set up,
     /// [`StartError::Issuer`] for an issuer whose metadata or key set could
     /// not be read, and [`StartError::NoTokenEndpoint`] when the first issuer
     /// names no token endpoint.
@@ -168,39 +179,54 @@ impl Smart {
         let resolved = auth.resolve().map_err(|source| StartError::Auth {
             source: Box::new(source),
         })?;
-        // TODO(#881): serve introspection through the crate's `Introspector`.
-        if resolved.introspection.is_some() {
-            return Err(StartError::Introspection);
-        }
         let bases = version_bases(config.base_url.as_deref());
-        let mut fhir = IssuerSet::new();
-        let mut admin = IssuerSet::new();
-        let mut primary = None;
-        for settings in resolved.issuers {
-            let mut widened = settings.clone();
-            widened.audience.extend(bases.iter().cloned());
-            let server = discover(widened).await?;
-            primary.get_or_insert_with(|| Arc::clone(&server));
-            fhir = fhir.with(Arc::clone(&server));
-            if config.admin_listen.is_some() {
-                // NOTE: no specification governs the admin surface: our own design;
-                // it serves no FHIR base, so only the configured audiences open it.
-                let narrow = if bases.is_empty() {
-                    server
+        let admin_listens = config.admin_listen.is_some();
+        let (primary, fhir, admin): (Primary, Arc<dyn Verifier>, Arc<dyn Verifier>) =
+            if let Some(settings) = resolved.introspection {
+                let mut widened = settings.clone();
+                widened.audience.extend(bases.iter().cloned());
+                let checker = introspect(widened).await?;
+                let narrow = if admin_listens && !bases.is_empty() {
+                    introspect(settings).await?
                 } else {
-                    discover(settings).await?
+                    Arc::clone(&checker)
                 };
-                admin = admin.with(narrow);
-            }
-        }
-        let Some(primary) = primary else {
-            return Err(StartError::Auth {
-                source: Box::new(ConfigError::Missing { key: "auth.issuer" }),
-            });
-        };
+                (
+                    Primary::Introspection(Arc::clone(&checker)),
+                    checker,
+                    narrow,
+                )
+            } else {
+                let mut fhir = IssuerSet::new();
+                let mut admin = IssuerSet::new();
+                let mut primary = None;
+                for settings in resolved.issuers {
+                    let mut widened = settings.clone();
+                    widened.audience.extend(bases.iter().cloned());
+                    let server = discover(widened).await?;
+                    primary.get_or_insert_with(|| Arc::clone(&server));
+                    fhir = fhir.with(Arc::clone(&server));
+                    if admin_listens {
+                        // NOTE: no specification governs the admin surface: our own design;
+                        // it serves no FHIR base, so only the configured audiences open it.
+                        let narrow = if bases.is_empty() {
+                            server
+                        } else {
+                            discover(settings).await?
+                        };
+                        admin = admin.with(narrow);
+                    }
+                }
+                let Some(primary) = primary else {
+                    return Err(StartError::Auth {
+                        source: Box::new(ConfigError::Missing { key: "auth.issuer" }),
+                    });
+                };
+                (Primary::Jwt(primary), Arc::new(fhir), Arc::new(admin))
+            };
         let token_endpoint = primary.metadata().token_endpoint.clone().ok_or_else(|| {
             StartError::NoTokenEndpoint {
-                issuer: primary.settings().issuer.clone(),
+                issuer: primary.issuer().to_owned(),
             }
         })?;
         let realm = resolved
@@ -208,11 +234,8 @@ impl Smart {
             .or_else(|| config.base_url.clone())
             .unwrap_or_else(|| String::from(REALM));
         let basic = resolved.basic.map(Arc::new);
-        let fhir = gate_of(Arc::new(fhir), basic.as_ref(), &realm);
-        let admin = config
-            .admin_listen
-            .is_some()
-            .then(|| gate_of(Arc::new(admin), basic.as_ref(), &realm));
+        let fhir = gate_of(fhir, basic.as_ref(), &realm);
+        let admin = admin_listens.then(|| gate_of(admin, basic.as_ref(), &realm));
         Ok(Some(Self {
             fhir,
             admin,
@@ -255,7 +278,7 @@ impl Smart {
     /// The issuer the discovery documents name, the first one configured.
     #[must_use]
     pub fn issuer(&self) -> &str {
-        &self.primary.settings().issuer
+        self.primary.issuer()
     }
 
     /// That issuer's metadata.
@@ -320,6 +343,55 @@ impl Smart {
     }
 }
 
+/// The issuer the discovery documents are built from: the first JWT issuer,
+/// or the introspecting one.
+#[derive(Debug)]
+enum Primary {
+    /// The first issuer whose tokens are checked as JWTs.
+    Jwt(Arc<ResourceServer>),
+    /// The issuer whose tokens are introspected.
+    Introspection(Arc<Introspector>),
+}
+
+impl Primary {
+    /// The issuer identifier.
+    fn issuer(&self) -> &str {
+        match self {
+            Self::Jwt(server) => &server.settings().issuer,
+            Self::Introspection(checker) => &checker.settings().issuer,
+        }
+    }
+
+    /// The issuer's metadata.
+    fn metadata(&self) -> &ServerMetadata {
+        match self {
+            Self::Jwt(server) => server.metadata(),
+            Self::Introspection(checker) => checker.metadata(),
+        }
+    }
+
+    /// The SMART discovery document under `options`.
+    fn smart_configuration(&self, options: &SmartOptions) -> serde_json::Value {
+        match self {
+            Self::Jwt(server) => server.smart_configuration(options),
+            Self::Introspection(checker) => checker.smart_configuration(options),
+        }
+    }
+}
+
+/// Reads the introspecting issuer's metadata and the endpoint it names, or
+/// the one `[auth.introspection] endpoint` names.
+async fn introspect(settings: IntrospectionSettings) -> Result<Arc<Introspector>, StartError> {
+    let issuer = settings.issuer.clone();
+    Introspector::discover(settings)
+        .await
+        .map(Arc::new)
+        .map_err(|source| StartError::Introspector {
+            issuer,
+            source: Box::new(source),
+        })
+}
+
 /// Reads one issuer's metadata and key set.
 async fn discover(settings: Settings) -> Result<Arc<ResourceServer>, StartError> {
     let issuer = settings.issuer.clone();
@@ -334,7 +406,7 @@ async fn discover(settings: Settings) -> Result<Arc<ResourceServer>, StartError>
 
 /// The gate admitting the bearer tokens `verifier` checks and the Basic users
 /// of `basic`, naming `realm` on every challenge.
-fn gate_of(verifier: Arc<IssuerSet>, basic: Option<&Arc<PasswordStore>>, realm: &str) -> Gate {
+fn gate_of(verifier: Arc<dyn Verifier>, basic: Option<&Arc<PasswordStore>>, realm: &str) -> Gate {
     let gate = Gate::open().with_bearer(verifier).with_realm(realm);
     match basic {
         Some(store) => gate.with_basic(Arc::clone(store)),
@@ -399,7 +471,7 @@ const fn diagnostics(refusal: &Refusal) -> (&'static str, &'static str) {
         ),
         Refusal::Unavailable => (
             "transient",
-            "the credential could not be checked: the authorization server's keys could not be read",
+            "the credential could not be checked: the authorization server could not be reached",
         ),
         _ => ("security", "the request was refused at the gate"),
     }

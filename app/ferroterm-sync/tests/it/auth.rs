@@ -19,6 +19,8 @@ use ferrohealth_smart::config::{
 use ferroterm_sync::auth::{AdminAuth, AuthError, SYNC_SCOPE};
 use secrecy::SecretString;
 use tower::ServiceExt as _;
+use wiremock::matchers::{body_string_contains, method, path};
+use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use crate::support::{Harness, TestClock};
 
@@ -176,29 +178,164 @@ async fn a_section_admitting_no_credential_refuses_the_start() {
     );
 }
 
-// The admin listener checks tokens as JWTs only (#881), so `mode =
-// "introspection"` refuses the start by name rather than starting a gate that
-// admits no token.
-#[tokio::test]
-async fn introspection_mode_refuses_the_start() {
-    let introspecting = AuthSection {
-        issuer: IssuerKey::Flat(String::from("https://auth.example.org/realms/tx")),
-        audience: vec![String::from("ferroterm-sync")],
+/// The audience the introspection tests name.
+const AUDIENCE: &str = "ferroterm-sync";
+
+/// A `wiremock` issuer whose metadata names an introspection endpoint
+/// (RFC 8414 §2, `introspection_endpoint`), and nothing mounted there yet.
+async fn introspecting_issuer() -> MockServer {
+    let server = MockServer::start().await;
+    let base = server.uri();
+    let metadata = format!(
+        r#"{{"issuer":"{base}","token_endpoint":"{base}/token","introspection_endpoint":"{base}/introspect","jwks_uri":"{base}/jwks"}}"#
+    );
+    Mock::given(method("GET"))
+        .and(path("/.well-known/openid-configuration"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(metadata, "application/json"))
+        .mount(&server)
+        .await;
+    server
+}
+
+/// An `[auth]` introspecting the tokens of `issuer` under a client secret.
+fn introspecting(issuer: &str) -> AuthSection {
+    AuthSection {
+        issuer: IssuerKey::Flat(issuer.to_owned()),
+        audience: vec![String::from(AUDIENCE)],
         mode: AuthMode::Introspection,
         introspection: Some(IntrospectionSection {
             client: Some(OauthSection {
                 client_id: String::from("ferroterm-sync"),
-                client_secret: Some(SecretString::from("synthetic-secret")),
+                client_secret: Some(SecretString::from("a-synthetic-secret")),
                 ..OauthSection::default()
             }),
             ..IntrospectionSection::default()
         }),
         ..AuthSection::default()
-    };
-    let refused = AdminAuth::start(&introspecting).await;
+    }
+}
+
+/// The endpoint answers `body` with `status` for the token `token`.
+async fn answers(issuer: &MockServer, token: &str, status: u16, body: String) {
+    Mock::given(method("POST"))
+        .and(path("/introspect"))
+        .and(body_string_contains(format!("token={token}")))
+        .respond_with(ResponseTemplate::new(status).set_body_raw(body, "application/json"))
+        .mount(issuer)
+        .await;
+}
+
+/// An active introspection response (RFC 7662 §2.2) for `issuer` carrying
+/// `scope`, with the members SMART App Launch 2.2.0, Token Introspection,
+/// requires.
+fn active(issuer: &str, scope: &str) -> String {
+    let exp = jiff::Timestamp::now().as_second() + 300;
+    format!(
+        r#"{{"active":true,"iss":"{issuer}","aud":"{AUDIENCE}","sub":"operator","client_id":"operator","scope":"{scope}","exp":{exp}}}"#
+    )
+}
+
+/// The guarded admin router over an introspecting `[auth]`.
+async fn introspected(issuer: &MockServer) -> Router {
+    let harness = Harness::new().await;
+    let service = harness.service(Vec::new(), TestClock::new("2026-10-01T03:00:00Z", 0));
+    let auth = AdminAuth::start(&introspecting(&issuer.uri()))
+        .await
+        .expect("the introspecting section starts")
+        .expect("authentication is on");
+    auth.guard(ferroterm_sync::admin::router(service))
+}
+
+// RFC 7662 §2.2: an active response admits the token with the scope it
+// names, so the product scope opens the records and another scope does not.
+#[tokio::test]
+async fn an_active_introspected_token_is_admitted_with_its_scopes() {
+    let issuer = introspecting_issuer().await;
+    answers(
+        &issuer,
+        "operator-token",
+        200,
+        active(&issuer.uri(), SYNC_SCOPE),
+    )
+    .await;
+    answers(
+        &issuer,
+        "reader-token",
+        200,
+        active(&issuer.uri(), "system/CodeSystem.rs"),
+    )
+    .await;
+    let router = introspected(&issuer).await;
+    assert_eq!(
+        status(&router, "GET", "/runs", Some("Bearer operator-token"))
+            .await
+            .0,
+        StatusCode::OK
+    );
+    assert_eq!(
+        status(&router, "GET", "/runs", Some("Bearer reader-token"))
+            .await
+            .0,
+        StatusCode::FORBIDDEN
+    );
+}
+
+// RFC 7662 §2.2: a response whose `active` is false refuses the token, and
+// RFC 6750 §3.1 answers it `invalid_token`.
+#[tokio::test]
+async fn an_inactive_introspected_token_is_refused() {
+    let issuer = introspecting_issuer().await;
+    answers(
+        &issuer,
+        "revoked-token",
+        200,
+        String::from(r#"{"active":false}"#),
+    )
+    .await;
+    let router = introspected(&issuer).await;
+    let (answered, challenge) = status(&router, "GET", "/runs", Some("Bearer revoked-token")).await;
+    assert_eq!(answered, StatusCode::UNAUTHORIZED);
     assert!(
-        matches!(refused, Err(AuthError::Introspection)),
-        "the refusal names the mode: {refused:?}"
+        challenge.is_some_and(|sent| sent.contains("error=\"invalid_token\"")),
+        "the challenge names invalid_token"
+    );
+}
+
+// An endpoint that cannot answer is an upstream failure, never a refusal of
+// the token: our own design over the crate's `503`.
+#[tokio::test]
+async fn a_failing_introspection_endpoint_answers_503() {
+    let issuer = introspecting_issuer().await;
+    answers(&issuer, "any-token", 500, String::from("{}")).await;
+    let router = introspected(&issuer).await;
+    assert_eq!(
+        status(&router, "GET", "/runs", Some("Bearer any-token"))
+            .await
+            .0,
+        StatusCode::SERVICE_UNAVAILABLE
+    );
+}
+
+// The introspecting issuer is read at the start, so one whose metadata names
+// no introspection endpoint refuses the start by name.
+#[tokio::test]
+async fn an_issuer_without_an_introspection_endpoint_refuses_the_start() {
+    let issuer = MockServer::start().await;
+    let base = issuer.uri();
+    Mock::given(method("GET"))
+        .and(path("/.well-known/openid-configuration"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(
+            format!(
+                r#"{{"issuer":"{base}","token_endpoint":"{base}/token","jwks_uri":"{base}/jwks"}}"#
+            ),
+            "application/json",
+        ))
+        .mount(&issuer)
+        .await;
+    let refused = AdminAuth::start(&introspecting(&base)).await;
+    assert!(
+        matches!(refused, Err(AuthError::Introspector { .. })),
+        "the refusal names the introspection endpoint: {refused:?}"
     );
 }
 

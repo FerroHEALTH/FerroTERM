@@ -30,7 +30,7 @@ use ring::signature::{ECDSA_P256_SHA256_FIXED_SIGNING, EcdsaKeyPair, KeyPair};
 use secrecy::SecretString;
 use serde_json::{Value, json};
 use tower::ServiceExt;
-use wiremock::matchers::{method, path};
+use wiremock::matchers::{body_string_contains, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use crate::fixture::{self, Server, SmartSetup};
@@ -1121,28 +1121,143 @@ async fn a_guarded_surface_without_an_issuer_refuses_the_start() {
     }
 }
 
-// The server checks tokens as JWTs only (#881), so `mode = "introspection"`
-// refuses the start by name rather than starting a gate that admits no token.
-#[tokio::test]
-async fn introspection_mode_refuses_the_start() {
-    let dir = tempfile::tempdir().expect("tempdir");
-    let mut setup = SmartSetup::for_issuer("https://auth.example.org/realms/tx");
+/// A `wiremock` issuer publishing the discovery document, whose
+/// `introspection_endpoint` is `/introspect`, with nothing mounted there yet.
+async fn introspecting_issuer() -> MockServer {
+    let server = MockServer::start().await;
+    let base = server.uri();
+    Mock::given(method("GET"))
+        .and(path("/.well-known/openid-configuration"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(discovery(&base)))
+        .mount(&server)
+        .await;
+    server
+}
+
+/// The `[auth]` of a server introspecting the tokens of `issuer` under a
+/// client secret.
+fn introspecting(issuer: &str) -> SmartSetup {
+    let mut setup = SmartSetup::for_issuer(issuer);
     setup.auth.mode = AuthMode::Introspection;
     setup.auth.introspection = Some(IntrospectionSection {
         client: Some(OauthSection {
             client_id: String::from("ferroterm"),
-            client_secret: Some(SecretString::from("synthetic-secret")),
+            client_secret: Some(SecretString::from("a-synthetic-secret")),
             ..OauthSection::default()
         }),
         ..IntrospectionSection::default()
     });
-    let config = Server::smart_config(dir.path(), setup);
+    setup
+}
+
+/// The introspection endpoint of `issuer` answers `body` with `status` for
+/// `token`.
+async fn introspects(issuer: &MockServer, token: &str, status: u16, body: Value) {
+    Mock::given(method("POST"))
+        .and(path("/introspect"))
+        .and(body_string_contains(format!("token={token}")))
+        .respond_with(ResponseTemplate::new(status).set_body_json(body))
+        .mount(issuer)
+        .await;
+}
+
+/// An active introspection response (RFC 7662 §2.2) for `issuer` carrying
+/// `scope`, with the members SMART App Launch 2.2.0, Token Introspection,
+/// requires.
+fn active(issuer: &str, scope: &str) -> Value {
+    let mut response = claims(issuer, scope, 300);
+    if let Value::Object(members) = &mut response {
+        members.insert(String::from("active"), json!(true));
+    }
+    response
+}
+
+// RFC 7662 §2.2: an active response admits the token with the scope it names,
+// so a write scope writes and a read scope is refused `403`.
+#[tokio::test]
+async fn an_active_introspected_token_is_admitted_with_its_scopes() {
+    let mock = introspecting_issuer().await;
+    let base = mock.uri();
+    introspects(
+        &mock,
+        "writer-token",
+        200,
+        active(&base, "system/CodeSystem.cud"),
+    )
+    .await;
+    introspects(
+        &mock,
+        "reader-token",
+        200,
+        active(&base, "system/CodeSystem.rs"),
+    )
+    .await;
+    let server = Server::start_persisting_with_smart_setup(introspecting(&base)).await;
+
+    let response = put_colours(&server, Some("reader-token")).await;
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    let (status, body) = fixture::json(put_colours(&server, Some("writer-token")).await).await;
+    assert_eq!(status, StatusCode::CREATED, "{body}");
+}
+
+// RFC 7662 §2.2: a response whose `active` is false refuses the token, which
+// RFC 6750 §3.1 answers `401` with `invalid_token`.
+#[tokio::test]
+async fn an_inactive_introspected_token_is_refused() {
+    let mock = introspecting_issuer().await;
+    introspects(&mock, "revoked-token", 200, json!({"active": false})).await;
+    let server = Server::start_persisting_with_smart_setup(introspecting(&mock.uri())).await;
+
+    let response = put_colours(&server, Some("revoked-token")).await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let sent = challenge(&response);
+    assert!(sent.contains("error=\"invalid_token\""), "{sent}");
+}
+
+// An endpoint that cannot answer is an upstream failure the write is answered
+// `503` for, never a refusal of the token: our own design over the crate's
+// `Rejection::Upstream`.
+#[tokio::test]
+async fn a_failing_introspection_endpoint_answers_503() {
+    let mock = introspecting_issuer().await;
+    introspects(&mock, "any-token", 500, json!({})).await;
+    let server = Server::start_persisting_with_smart_setup(introspecting(&mock.uri())).await;
+
+    let response = put_colours(&server, Some("any-token")).await;
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    let (_, body) = fixture::json(response).await;
+    assert_eq!(body["issue"][0]["code"], "transient");
+}
+
+// SMART App Launch, Conformance: the discovery document comes from the
+// introspecting issuer's metadata as it does from a JWT issuer's.
+#[tokio::test]
+async fn the_discovery_document_names_the_introspecting_issuer() {
+    let mock = introspecting_issuer().await;
+    let base = mock.uri();
+    let server = Server::start_persisting_with_smart_setup(introspecting(&base)).await;
+    let document = configuration(&server, "r4b").await;
+    assert_eq!(document["token_endpoint"], format!("{base}/token"));
+    assert_eq!(
+        document["introspection_endpoint"],
+        format!("{base}/introspect")
+    );
+}
+
+// The introspecting issuer is read at the start, so one whose metadata names
+// no introspection endpoint refuses the start by name.
+#[tokio::test]
+async fn an_issuer_without_an_introspection_endpoint_refuses_the_start() {
+    let key = SigningKey::generate("k1");
+    let mock = issuer_publishing(&key, sparse_discovery).await;
+    let dir = tempfile::tempdir().expect("tempdir");
+    let config = Server::smart_config(dir.path(), introspecting(&mock.uri()));
     let error = Smart::start(&config)
         .await
         .expect_err("the start is refused");
     assert!(
-        matches!(error, StartError::Introspection),
-        "the refusal names the mode: {error:?}"
+        matches!(error, StartError::Introspector { .. }),
+        "the refusal names the introspection endpoint: {error:?}"
     );
 }
 
