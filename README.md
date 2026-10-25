@@ -1,77 +1,110 @@
 <!-- SPDX-FileCopyrightText: Cadasto B.V. -->
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
+<div align="center">
 
-# <img src="https://raw.githubusercontent.com/FerroHEALTH/FerroTERM/main/assets/brand/ferroterm-lockup-auto.svg" alt="FerroTERM" width="284" height="64">
+<img src="assets/brand/ferroterm-lockup-auto.svg" alt="FerroTERM" width="290">
 
+**The FHIR terminology server for SNOMED CT, LOINC, ICD and every other code system, in one binary.**
 
-[![CI](https://github.com/FerroHEALTH/FerroTERM/actions/workflows/ci.yml/badge.svg)](https://github.com/FerroHEALTH/FerroTERM/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/FerroHEALTH/FerroTERM/actions/workflows/codeql.yml/badge.svg)](https://github.com/FerroHEALTH/FerroTERM/actions/workflows/codeql.yml)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/FerroHEALTH/FerroTERM/badge)](https://scorecard.dev/viewer/?uri=github.com/FerroHEALTH/FerroTERM)
-[![SLSA Build Level 3](https://slsa.dev/images/gh-badge-level3.svg)](https://ferroterm.eu/docs/operate/verifying-releases.html)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=FerroHEALTH_FerroTERM&metric=alert_status)](https://sonarcloud.io/summary/overall?id=FerroHEALTH_FerroTERM)
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=FerroHEALTH_FerroTERM&metric=coverage)](https://sonarcloud.io/summary/new_code?id=FerroHEALTH_FerroTERM)
-[![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)
-[![GitHub Release](https://img.shields.io/github/release/FerroHEALTH/FerroTERM.svg?logo=github)](https://github.com/FerroHEALTH/FerroTERM/releases/latest)
+[Documentation](https://ferroterm.eu/docs/) ·
+[Quick start](#quick-start) ·
+[What ships today](#what-ships-today) ·
+[Licensing](https://ferroterm.eu/docs/evaluate/licensing.html)
+
+**Project**<br>
+[![Release](https://img.shields.io/github/v/release/FerroHEALTH/FerroTERM?sort=semver&logo=github&label=release)](https://github.com/FerroHEALTH/FerroTERM/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/FerroHEALTH/FerroTERM/ci.yml?branch=main&logo=githubactions&logoColor=white&label=CI)](https://github.com/FerroHEALTH/FerroTERM/actions/workflows/ci.yml)
+[![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue)](LICENSE)
+[![Docs](https://img.shields.io/badge/docs-ferroterm.eu-blue?logo=mdbook)](https://ferroterm.eu/docs/)
+[![GHCR](https://img.shields.io/badge/ghcr.io-ferroterm-2496ED?logo=docker&logoColor=white)](https://github.com/FerroHEALTH/FerroTERM/pkgs/container/ferroterm)
 [![Image pulls](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fghcr-badge.elias.eu.org%2Fapi%2FFerroHEALTH%2FFerroTERM%2Fferroterm&query=downloadCount&label=image%20pulls&logo=github)](https://github.com/FerroHEALTH/FerroTERM/pkgs/container/ferroterm)
 
+**Quality and security**<br>
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/FerroHEALTH/FerroTERM/badge)](https://scorecard.dev/viewer/?uri=github.com/FerroHEALTH/FerroTERM)
+[![Quality gate](https://img.shields.io/sonar/quality_gate/FerroHEALTH_FerroTERM?server=https%3A%2F%2Fsonarcloud.io&logo=sonarqubecloud&label=quality%20gate)](https://sonarcloud.io/summary/overall?id=FerroHEALTH_FerroTERM)
+[![Coverage](https://img.shields.io/sonar/coverage/FerroHEALTH_FerroTERM?server=https%3A%2F%2Fsonarcloud.io&logo=sonarqubecloud&label=coverage)](https://sonarcloud.io/summary/new_code?id=FerroHEALTH_FerroTERM)
+[![CodeQL](https://img.shields.io/github/actions/workflow/status/FerroHEALTH/FerroTERM/codeql.yml?branch=main&logo=github&label=CodeQL)](https://github.com/FerroHEALTH/FerroTERM/actions/workflows/codeql.yml)
+[![Signed releases](https://img.shields.io/badge/releases-signed-brightgreen?logo=github)](https://ferroterm.eu/docs/operate/verifying-releases.html)
+[![SLSA Build Level 3](https://slsa.dev/images/gh-badge-level3.svg)](https://ferroterm.eu/docs/operate/verifying-releases.html)
+
+**Conformance and compliance**<br>
 [![tx-ecosystem R4](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fr4.json)](https://ferroterm.eu/docs/evaluate/conformance.html)
 [![tx-ecosystem R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fr4b.json)](https://ferroterm.eu/docs/evaluate/conformance.html)
 [![tx-ecosystem R5](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fr5.json)](https://ferroterm.eu/docs/evaluate/conformance.html)
+<br>
+[![CRA](https://img.shields.io/badge/CRA-risk%20assessment-blue?logo=europeanunion)](https://ferroterm.eu/docs/evaluate/cra-risk-assessment.html)
 
-A pure-Rust FHIR terminology server for SNOMED CT, LOINC, ICD-10, ICD-11,
-RxNorm, UCUM, and any FHIR `CodeSystem`, served from one binary over an index
-built once per release and read at startup. No JVM, no Elasticsearch, no
-database to run.
+</div>
 
-[Five minutes to a running server](#five-minutes-to-a-running-server) ·
-[What it serves](#what-it-serves) · [The console](#the-console) ·
-[The API](#the-api) ·
-[Do you need a commercial licence?](#do-you-need-a-commercial-licence)
+## What FerroTERM does
 
-## Five minutes to a running server
+Health records are full of codes. A diagnosis is a SNOMED CT or ICD code, a
+lab result a LOINC code, a medicine a code from a national drug database.
+These code systems (the shared lists of medical terms) are what let two
+systems agree that they mean the same thing. Every application that records
+or exchanges clinical data needs to look codes up, check them and search
+them.
 
-The image serves UCUM, BCP 47, BCP 13, and ISO 3166-1 with no configuration,
+FerroTERM answers those questions for every application at once. It loads
+the code systems you are licensed for and serves them over FHIR, the
+standard interface health software uses for terminology: look up a code,
+check that a code belongs to a list, find every narrower term, translate a
+code from one system to another. It runs as one program, with no database
+or search engine to operate beside it.
+
+### Who it is for
+
+- **Hospitals and national eHealth programmes** that need one terminology
+  service for all their applications.
+- **Software vendors and integrators** that need SNOMED CT, LOINC or ICD
+  in their products without running a heavy terminology stack.
+- **Terminology teams** that edit and publish value sets (curated lists of
+  codes) in the console.
+
+### Why you can trust what it claims
+
+Every release is signed and comes with a software bill of materials (the
+list of every component inside) and SLSA build provenance, so you can check
+that what you install is what was built here. The source is public, and
+every feature is in this repository: there is no paid edition with extra
+functions. The conformance badges come from the HL7 terminology test suite,
+run against every change, with a committed pass list per FHIR version, so
+you can check a result against the standard yourself.
+
+## Part of FerroHEALTH
+
+FerroTERM is one of five [FerroHEALTH](https://ferrohealth.eu) servers.
+Each does one job and reaches the others only over published standards:
+FerroEHR stores the record, FerroBRIDGE translates it to FHIR and the OMOP
+research model, FerroFED connects records across organisations and borders,
+FerroPIX matches patient identities, and FerroTERM serves the code systems.
+Any FHIR client can use FerroTERM, not only the FerroHEALTH products. Sign-in,
+the audit trail and the web consoles come from three shared libraries:
+FerroAUTH, FerroAUDIT and FerroUI.
+
+<img src="website/book/src/operate/img/console/dashboard.png" alt="The FerroTERM console dashboard">
+
+## Quick start
+
+The image serves UCUM, BCP 47, BCP 13 and ISO 3166-1 with no configuration,
 so the first call needs nothing beyond Docker:
 
-```console
-$ docker run --rm -p 8080:8080 ghcr.io/ferrohealth/ferroterm:0.3.0
-$ curl 'http://localhost:8080/r4b/CodeSystem/$lookup?system=http://unitsofmeasure.org&code=mg/dL'
+```sh
+docker run --rm -p 8080:8080 ghcr.io/ferrohealth/ferroterm:0.3.0
 ```
 
-```json
-{
-  "resourceType": "Parameters",
-  "parameter": [
-    { "name": "name", "valueString": "Unified Code for Units of Measure (UCUM)" },
-    { "name": "version", "valueString": "2.2" },
-    { "name": "display", "valueString": "mg/dL" },
-    { "name": "property", "part": [
-      { "name": "code", "valueCode": "canonical" },
-      { "name": "value", "valueCode": "m-3.g" } ] }
-  ]
-}
+In a second terminal, look up a unit of measure:
+
+```sh
+curl 'http://localhost:8080/r4b/CodeSystem/$lookup?system=http://unitsofmeasure.org&code=mg/dL'
 ```
 
-A clinical code system is a release you hold a licence for, built once into an
-index by `ferroterm-build` (in the same image and every release tarball) and
-served read-only. With the release `compose.yaml` and a SNOMED CT release zip
-in `./releases` (any other code system builds the same way, with its own
-`ferroterm-build` flag, and SNOMED CT is optional):
-
-```console
-$ curl -LO https://github.com/FerroHEALTH/FerroTERM/releases/latest/download/compose.yaml
-$ mkdir -p index
-$ docker compose run --rm build --rf2 /releases/SnomedCT_Release.zip
-$ docker compose up
-$ curl 'http://localhost:8080/r4b/CodeSystem/$lookup?system=http://snomed.info/sct&code=404684003&displayLanguage=nl'
-```
-
-What each code system costs to build and serve, and how fast each operation
-answers, is in the [speed and footprint table](#speed-and-footprint) below,
-rendered from the benchmark records. The book's
+A clinical code system such as SNOMED CT is a release you hold a licence
+for. `ferroterm-build`, in the same image, turns it into an index once, and
+the server reads that index at startup.
 [Install and run](https://ferroterm.eu/docs/operate/install.html) and
-[Loading code systems](https://ferroterm.eu/docs/operate/loading-snomed.html)
-pages cover every system and the binary distribution.
+[loading code systems](https://ferroterm.eu/docs/operate/loading-snomed.html)
+continue from here.
 
 ## What it serves
 
@@ -85,24 +118,32 @@ systems load this way).
 <!-- code-systems:end -->
 
 The [code systems page](https://ferroterm.eu/docs/evaluate/code-systems.html)
-of the book is the one list: per system the canonical URI, the versions and
-editions handled, the build command, and the licence position. You bring the
-release you are licensed for; UCUM and the registries are vendored into the
-binary and need nothing. Every system reaches the operations through one
-provider seam, so nothing in an operation is a special case for one system.
+lists, per system, the versions handled, the build command and the licence
+position. You bring the release you are licensed for; UCUM and the
+registries are built in.
 
-## Speed and footprint
+## What ships today
 
-Measured by the benchmark harness on one machine, one record per
-code system, warm p50 per operation; nothing here is typed by hand, and CI fails
-when the table drifts from the records under `bench/records/`.
+### Terminology
 
-The set below was taken on 2026-09-22 with the 0.1.4 release binaries, natively
-on an Apple M2 with nothing else running: a record taken on a busy machine
-measures the operating system rather than the server. The resident and
-peak-build figures are the server's and the build tool's own, and the set's
-[README](bench/records/2026-09-23-apple-m2/README.md) states the machine's
-condition and the instrument behind each figure.
+- [The FHIR terminology API](https://ferroterm.eu/docs/integrate/fhir-api.html): `$lookup`, `$validate-code`, `$subsumes`, `$expand`, `$translate` and `$closure`
+- [FHIR R4, R4B, R5 and the R6 ballot](https://ferroterm.eu/docs/integrate/fhir-versions.html), each in its own version's shapes, in JSON and XML
+- [Value sets, implicit value sets and ECL](https://ferroterm.eu/docs/integrate/ecl-value-sets.html), the SNOMED CT expression language
+- [Stored value sets, code systems and concept maps](https://ferroterm.eu/docs/integrate/fhir-api.html#persisted-resources) with history, when you name a database
+
+### Operations
+
+- [The console](https://ferroterm.eu/docs/operate/console.html): browse, look up, expand and translate, and compose value sets
+- [Syncing from a national terminology service](https://ferroterm.eu/docs/operate/sync.html), one way into a running server
+- [Health, metrics and request identifiers](https://ferroterm.eu/docs/operate/observability.html), and [hardware sizing](https://ferroterm.eu/docs/operate/hardware-sizing.html)
+- [Verifiable releases](https://ferroterm.eu/docs/operate/verifying-releases.html): images for amd64 and arm64 and release binaries, signed, with a software bill of materials
+
+### Libraries
+
+- The SNOMED CT, LOINC, ICD, RxNorm and Dutch release readers and the terminology engine, published as Rust crates (listed below)
+
+<details>
+<summary><b>Speed and footprint</b>, measured per code system</summary>
 
 <!-- bench-table:begin -->
 | Code system | Release | Concepts | Build | Peak build memory | Index on disk | Resident | `$lookup` | `$validate-code` | `$subsumes` | `$expand` (small) | `$expand` (large) | Search | Snowstorm |
@@ -118,185 +159,43 @@ condition and the instrument behind each figure.
 Warm p50 over 200 HTTP round trips on one machine (Apple M2, 17.18 GB, macos/aarch64), FerroTERM 0.1.4 serving FHIR R4B, taken 2026-09-22. The records are under `bench/records/`; the [benchmarks page](https://ferroterm.eu/benchmarks.html) has the method, the cold and tail latencies, and how to reproduce a record.
 <!-- bench-table:end -->
 
-## The console
+</details>
 
-The FerroTERM Console is the browser interface, its own image beside the
-server. Start it with the quickstart's `console` profile and open
-`http://localhost:3000`:
+<details>
+<summary><b>Published crates</b> (14)</summary>
 
-```console
-docker compose --profile console up
-```
+| Crate | What it does | Version | Docs | Downloads |
+|---|---|---|---|---|
+| [`rf2`](https://crates.io/crates/rf2) | The SNOMED CT RF2 release loader and typed component model (Apache-2.0) | [![crates.io](https://img.shields.io/crates/v/rf2?logo=rust&label=crates.io)](https://crates.io/crates/rf2) | [![docs.rs](https://img.shields.io/docsrs/rf2?logo=docsdotrs&label=docs.rs)](https://docs.rs/rf2) | [![downloads](https://img.shields.io/crates/d/rf2?logo=rust&label=downloads)](https://crates.io/crates/rf2) |
+| [`concept-graph`](https://crates.io/crates/concept-graph) | The SNOMED CT ontology as CSR adjacency and roaring transitive-closure bitmaps | [![crates.io](https://img.shields.io/crates/v/concept-graph?logo=rust&label=crates.io)](https://crates.io/crates/concept-graph) | [![docs.rs](https://img.shields.io/docsrs/concept-graph?logo=docsdotrs&label=docs.rs)](https://docs.rs/concept-graph) | [![downloads](https://img.shields.io/crates/d/concept-graph?logo=rust&label=downloads)](https://crates.io/crates/concept-graph) |
+| [`concept-store`](https://crates.io/crates/concept-store) | The disk-backed columnar concept and description store | [![crates.io](https://img.shields.io/crates/v/concept-store?logo=rust&label=crates.io)](https://crates.io/crates/concept-store) | [![docs.rs](https://img.shields.io/docsrs/concept-store?logo=docsdotrs&label=docs.rs)](https://docs.rs/concept-store) | [![downloads](https://img.shields.io/crates/d/concept-store?logo=rust&label=downloads)](https://crates.io/crates/concept-store) |
+| [`designation-index`](https://crates.io/crates/designation-index) | The fst and roaring description search index | [![crates.io](https://img.shields.io/crates/v/designation-index?logo=rust&label=crates.io)](https://crates.io/crates/designation-index) | [![docs.rs](https://img.shields.io/docsrs/designation-index?logo=docsdotrs&label=docs.rs)](https://docs.rs/designation-index) | [![downloads](https://img.shields.io/crates/d/designation-index?logo=rust&label=downloads)](https://crates.io/crates/designation-index) |
+| [`sct-ecl`](https://crates.io/crates/sct-ecl) | The SNOMED CT Expression Constraint Language lexer, parser and evaluator | [![crates.io](https://img.shields.io/crates/v/sct-ecl?logo=rust&label=crates.io)](https://crates.io/crates/sct-ecl) | [![docs.rs](https://img.shields.io/docsrs/sct-ecl?logo=docsdotrs&label=docs.rs)](https://docs.rs/sct-ecl) | [![downloads](https://img.shields.io/crates/d/sct-ecl?logo=rust&label=downloads)](https://crates.io/crates/sct-ecl) |
+| [`sct-scg`](https://crates.io/crates/sct-scg) | The SNOMED CT Compositional Grammar lexer, parser and printer | [![crates.io](https://img.shields.io/crates/v/sct-scg?logo=rust&label=crates.io)](https://crates.io/crates/sct-scg) | [![docs.rs](https://img.shields.io/docsrs/sct-scg?logo=docsdotrs&label=docs.rs)](https://docs.rs/sct-scg) | [![downloads](https://img.shields.io/crates/d/sct-scg?logo=rust&label=downloads)](https://crates.io/crates/sct-scg) |
+| [`loinc`](https://crates.io/crates/loinc) | The LOINC release loader and typed row model | [![crates.io](https://img.shields.io/crates/v/loinc?logo=rust&label=crates.io)](https://crates.io/crates/loinc) | [![docs.rs](https://img.shields.io/docsrs/loinc?logo=docsdotrs&label=docs.rs)](https://docs.rs/loinc) | [![downloads](https://img.shields.io/crates/d/loinc?logo=rust&label=downloads)](https://crates.io/crates/loinc) |
+| [`classification`](https://crates.io/crates/classification) | The ClaML and ICD-10-CM tabular readers into one classification model | [![crates.io](https://img.shields.io/crates/v/classification?logo=rust&label=crates.io)](https://crates.io/crates/classification) | [![docs.rs](https://img.shields.io/docsrs/classification?logo=docsdotrs&label=docs.rs)](https://docs.rs/classification) | [![downloads](https://img.shields.io/crates/d/classification?logo=rust&label=downloads)](https://crates.io/crates/classification) |
+| [`dhd-thesaurus`](https://crates.io/crates/dhd-thesaurus) | The DHD Diagnosethesaurus and Verrichtingenthesaurus reader | [![crates.io](https://img.shields.io/crates/v/dhd-thesaurus?logo=rust&label=crates.io)](https://crates.io/crates/dhd-thesaurus) | [![docs.rs](https://img.shields.io/docsrs/dhd-thesaurus?logo=docsdotrs&label=docs.rs)](https://docs.rs/dhd-thesaurus) | [![downloads](https://img.shields.io/crates/d/dhd-thesaurus?logo=rust&label=downloads)](https://crates.io/crates/dhd-thesaurus) |
+| [`gstandaard`](https://crates.io/crates/gstandaard) | The G-Standaard (Z-Index) product ladder reader | [![crates.io](https://img.shields.io/crates/v/gstandaard?logo=rust&label=crates.io)](https://crates.io/crates/gstandaard) | [![docs.rs](https://img.shields.io/docsrs/gstandaard?logo=docsdotrs&label=docs.rs)](https://docs.rs/gstandaard) | [![downloads](https://img.shields.io/crates/d/gstandaard?logo=rust&label=downloads)](https://crates.io/crates/gstandaard) |
+| [`labcodeset`](https://crates.io/crates/labcodeset) | The Nederlandse Labcodeset publication reader | [![crates.io](https://img.shields.io/crates/v/labcodeset?logo=rust&label=crates.io)](https://crates.io/crates/labcodeset) | [![docs.rs](https://img.shields.io/docsrs/labcodeset?logo=docsdotrs&label=docs.rs)](https://docs.rs/labcodeset) | [![downloads](https://img.shields.io/crates/d/labcodeset?logo=rust&label=downloads)](https://crates.io/crates/labcodeset) |
+| [`icd11`](https://crates.io/crates/icd11) | ICD-11 entities from the WHO ICD-API local deployment, cached and read | [![crates.io](https://img.shields.io/crates/v/icd11?logo=rust&label=crates.io)](https://crates.io/crates/icd11) | [![docs.rs](https://img.shields.io/docsrs/icd11?logo=docsdotrs&label=docs.rs)](https://docs.rs/icd11) | [![downloads](https://img.shields.io/crates/d/icd11?logo=rust&label=downloads)](https://crates.io/crates/icd11) |
+| [`rxnorm-rrf`](https://crates.io/crates/rxnorm-rrf) | The RxNorm Rich Release Format reader and typed row model | [![crates.io](https://img.shields.io/crates/v/rxnorm-rrf?logo=rust&label=crates.io)](https://crates.io/crates/rxnorm-rrf) | [![docs.rs](https://img.shields.io/docsrs/rxnorm-rrf?logo=docsdotrs&label=docs.rs)](https://docs.rs/rxnorm-rrf) | [![downloads](https://img.shields.io/crates/d/rxnorm-rrf?logo=rust&label=downloads)](https://crates.io/crates/rxnorm-rrf) |
+| [`fhir-terminology`](https://crates.io/crates/fhir-terminology) | The FHIR terminology operations over the code system provider seam | [![crates.io](https://img.shields.io/crates/v/fhir-terminology?logo=rust&label=crates.io)](https://crates.io/crates/fhir-terminology) | [![docs.rs](https://img.shields.io/docsrs/fhir-terminology?logo=docsdotrs&label=docs.rs)](https://docs.rs/fhir-terminology) | [![downloads](https://img.shields.io/crates/d/fhir-terminology?logo=rust&label=downloads)](https://crates.io/crates/fhir-terminology) |
 
-It renders every page on its own server and reaches FerroTERM over the same
-public FHIR API any client uses, so anything it does, your own client can do.
-It is one of the FerroHEALTH consoles and draws with their shared components.
+</details>
 
-- **The dashboard** counts what the deployment serves, lists the writes it
-  recorded most recently, and leads into each operation.
-- **Code systems, value sets and concept maps** are listings you filter, sort
-  and page, each opening a detail screen with the definition, what the server
-  can do with it, and the resource as JSON.
-- **Look up, check, expand and translate** run `$lookup`, `$validate-code` and
-  `$subsumes`, `$expand`, and `$translate`, offering what the deployment
-  publishes and putting every parameter in the address.
-- **The concept browser** walks a hierarchy with the keyboard and offers only
-  what the served version declares it can do.
-- **Server, Configuration and Your preferences** compare the four FHIR roots,
-  list the settings the console runs with, and keep your theme, density,
-  default version and page size.
+## Learn more
 
-Every page works with scripting off; the browser adds the theme menu, the
-concept tree and the keyboard shortcuts on top.
+- [Documentation](https://ferroterm.eu/docs/) and the [FerroHEALTH book](https://ferrohealth.eu/docs/)
+- [What FerroTERM is](https://ferroterm.eu/docs/evaluate/what-ferroterm-is.html), [architecture at a glance](https://ferroterm.eu/docs/evaluate/architecture.html) and [how it compares](https://ferroterm.eu/docs/evaluate/comparison.html)
+- [Conformance](https://ferroterm.eu/docs/evaluate/conformance.html) and [benchmarks](https://ferroterm.eu/docs/evaluate/benchmarks.html)
+- [Changelog](CHANGELOG.md) and [milestones](https://github.com/FerroHEALTH/FerroTERM/milestones)
+- [Security policy](SECURITY.md)
+- [Contributing](CONTRIBUTING.md), [code of conduct](CODE_OF_CONDUCT.md), [support](SUPPORT.md), [governance](GOVERNANCE.md), [maintainers](MAINTAINERS.md) and the [AI statement](AI_STATEMENT.md)
 
-Reading is open. Signing in, at your OpenID Provider through the console's
-own server, is for editing; the browser never holds a token. The
-[console page](https://ferroterm.eu/docs/operate/console.html) has the screens
-and the configuration.
+## Licence
 
-## The API
-
-FHIR R4 under `/r4`, R4B under `/r4b`, R5 under `/r5`, and the R6 ballot under
-`/r6`, each in its own version's shapes:
-`CodeSystem/$lookup`, `CodeSystem/$validate-code`,
-`CodeSystem/$subsumes`, `ValueSet/$expand` (paging, `filter`, version
-pins, nested `contains`, inline and request-scoped value sets),
-`ValueSet/$validate-code`,
-`ConceptMap/$translate` (loaded, inline, and the SNOMED implicit concept maps),
-`$closure` (on `/r4`, `/r4b`, and `/r5`; the R6 ballot defines none),
-`POST [base]` with a `batch` `Bundle`, `GET ValueSet/{id}` and
-`GET ValueSet?url=`, `$versions`, `$cache-control`, `metadata`, and
-`metadata?mode=terminology`. A deployment that names a database in
-`FERROTERM_RESOURCES` also serves `POST`, `PUT`, `GET`, `DELETE`, `_history`
-reads, and `?url=` search of `CodeSystem`, `ValueSet`, and `ConceptMap`, with
-`ETag` and `If-Match`. Every failure is an `OperationOutcome`, never a bare
-500, and a terminology failure carries a `tx-issue-type` coding.
-
-Conformance is measured rather than claimed. CI runs the HL7 terminology
-ecosystem suite against every pull request and holds a committed pass list per
-served version: **637 of the 670 general cases on R5, 635 on R4, and 628 on
-R4B**. A case that newly passes is added to the list in the change that earned
-it, and a case on the list that stops passing fails the build, so the figure
-only ratchets. What the remaining cases are waiting on is on the tracker,
-cluster by cluster: most are a parameter no published `OperationDefinition`
-declares, or a suite mode that pins an edition no release centre distributes.
-Every route answers FHIR JSON or FHIR XML, by `_format` or `Accept`.
-
-## What is next
-
-v0.3.0 is the current release. The tracker's milestones are the roadmap, and
-the open issues under each are the worklist:
-
-- **[v0.3.1](https://github.com/FerroHEALTH/FerroTERM/milestone/25)**: the
-  benchmark record set retaken after the memory change on the owner's
-  machine, and the work that waits on outside access or an upstream release:
-  the differential check against the Nictiz Nationale Terminologieserver, the
-  NHG tables once Nictiz grants that licence, the suite modes that need an
-  edition this repository cannot hold, and the two unmaintained advisories in
-  the console's dependency tree.
-
-FerroTERM is one product of the FerroHEALTH family, made by Cadasto B.V.
-What holds for every product is written once, in the family book at
-<https://ferrohealth.eu/docs/>:
-[the manufacturer](https://ferrohealth.eu/docs/manufacturer.html),
-[the security policy](https://ferrohealth.eu/docs/security.html) and
-[post-market support](https://ferrohealth.eu/docs/post-market.html),
-[the Cyber Resilience Act](https://ferrohealth.eu/docs/cra.html),
-[how the products fit together](https://ferrohealth.eu/docs/architecture.html),
-and [licensing and trademarks](https://ferrohealth.eu/docs/licensing.html).
-
-## How it is built
-
-The design, with its citations, is [`docs/architecture.md`](docs/architecture.md).
-The short form:
-
-- **Offline once, online from precomputed structures.** `ferroterm-build`
-  turns a release into a `redb` store with its dense columns (concepts,
-  designations, properties), a CSR is-a adjacency with roaring
-  transitive-closure bitmaps (`hierarchy.bin`), and an `fst` word index
-  (`text.bin`). The server reads
-  them at startup and answers from memory: subsumption is a bitmap test and a
-  descendant set is a bitmap. Nothing is memory-mapped, because mapping a file
-  takes `unsafe` and the workspace forbids it.
-- **FHIR is generated, never hand-written.** The model is the `fhir-types`
-  crate, emitted from the pinned HL7 packages (R4 4.0.1, R4B 4.3.0, R5 5.0.0,
-  R6 ballot 5, HL7 Terminology) so each version's operation surface is right by
-  construction. The FerroBRIDGE repository generates and publishes it; this one
-  consumes it from crates.io at a pinned version.
-- **The engine is code-system-neutral.** Providers own the semantics
-  (`crates/fhir-terminology`); the operations talk to the seam.
-- **Supply chain.** Releases are built in a reusable workflow to SLSA Build
-  Level 3: signed provenance, an SBOM per artifact (CycloneDX for the
-  binaries, SPDX for the image), `cargo auditable` binaries, a distroless
-  image for `linux/amd64` and `linux/arm64`, verifiable with
-  `gh attestation verify`.
-
-## Do you need a commercial licence?
-
-Production use is free for Non-Commercial Purposes and needs a commercial
-licence otherwise. `LICENSE` is the authority; this table is the same boundary
-in the order people ask about it.
-
-| What you are doing | What you need | Why |
-|---|---|---|
-| Reading, building, modifying, or redistributing the source | Free | The licence grants this without a fee and without asking anyone; only production use is restricted. |
-| Development, testing, evaluation, prototyping | Free | None of these is production use, which is the only thing the Additional Use Grant limits. |
-| Personal use | Free | Named in the grant's definition of Non-Commercial Purposes. |
-| Academic or scientific research, or teaching | Free | Named in the grant's definition of Non-Commercial Purposes. |
-| Production use by a non-profit or public body that is not in the course of a business, does not deliver a service for payment, and is not for commercial advantage | Free | The grant's definition of Non-Commercial Purposes, in the licence's own words. |
-| Treating patients, or delivering any other service for payment | Commercial licence | The grant ends with "any other production use, including the delivery of health care or any other service for payment, requires a commercial license from the Licensor". |
-| Any production use by a vendor or integrator | Commercial licence | A business's production use is not a Non-Commercial Purpose, so the same closing sentence of the grant applies. |
-| Offering FerroTERM, or a work derived from it, to third parties as a hosted, managed, or embedded terminology service | Commercial licence | Carve-out (a) of the grant, which the licence defines as a service through which anyone other than you and your affiliates stores, manages, or queries terminology, code system content, or health data. |
-| Selling, sublicensing, or otherwise distributing it for a fee, on its own or inside another product | Commercial licence | Carve-out (b) of the grant. |
-
-The last two rows hold whoever you are: hosting it for third parties and
-distributing it for a fee need a commercial licence in every case, including
-for an organisation the free rows above would otherwise cover.
-
-**Each version becomes Apache License 2.0 four years after that version is
-published.** A commercial licence is arranged with Cadasto B.V., the Licensor,
-which handles the business side of FerroTERM: write to
-[info@cadasto.com](mailto:info@cadasto.com) or use
-<https://www.cadasto.com/contact/>. Technical questions go to the maintainer
-named in [MAINTAINERS.md](MAINTAINERS.md).
-
-## Licensing
-
-The software is source-available under the Business Source License 1.1
-([`LICENSE`](LICENSE), [`NOTICE`](NOTICE)), with no open-core tier: the
-engine, the server, and the tools are in this repository under the one
-licence, and nothing is held back to be sold back to you.
-
-The licence lets you read, build, modify, and redistribute the source without
-a fee and without asking anyone, and it covers every non-production use:
-development, testing, evaluation, and prototyping. Production use is free for
-Non-Commercial Purposes, which the licence defines as personal use, academic or
-scientific research, teaching, and use by a non-profit organisation or public
-body that is not in the course of a business, does not deliver a service for
-payment, and is not for commercial advantage. Any other production use needs a
-commercial licence from the Licensor: a hospital, clinic, or care provider
-running FerroTERM for its patients needs one, and so does a vendor, integrator,
-or any company running it in production. Offering FerroTERM, or a work derived
-from it, to third parties as a hosted, managed, or embedded terminology
-service, and selling, sublicensing, or otherwise distributing it for a fee on
-its own or inside another product, need a commercial licence in every case.
-Each version becomes Apache License 2.0 four years after that version is
-published. One crate is outside all of this: `rf2` (the SNOMED CT release file
-reader) is Apache 2.0 on crates.io, so any Rust project can use it without a
-licence conversation. A commercial licence is arranged with Cadasto B.V., the
-Licensor, which handles the business side of FerroTERM: write to
-[info@cadasto.com](mailto:info@cadasto.com) or use
-<https://www.cadasto.com/contact/>. Technical questions go to the maintainer
-named in [MAINTAINERS.md](MAINTAINERS.md).
-
-The code systems are licensed separately: SNOMED CT by SNOMED International,
-LOINC by Regenstrief, ICD by WHO, RxNorm by NLM, and the repository ships none
-of their content. You bring the release you are licensed for; UCUM and the IANA
-and Unicode registries are vendored under their own licences, recorded beside
-the data.
-
-## Contributing
-
-[`CONTRIBUTING.md`](CONTRIBUTING.md) has the rules; the open issues are the
-worklist. Every change ships with tests, and conformance-facing behaviour cites
-the FHIR or SNOMED specification it implements.
+Business Source License 1.1 ([LICENSE](LICENSE)), with Apache License 2.0 as
+the Change License four years after each version; the `rf2` crate is
+Apache-2.0 today. The code systems keep their own licences, and the
+[licensing page](https://ferroterm.eu/docs/evaluate/licensing.html) says
+when you need a commercial licence from Cadasto B.V.
