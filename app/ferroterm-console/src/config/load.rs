@@ -5,10 +5,11 @@
 //! `FERROTERM_CONSOLE__` environment override applied over it. No
 //! specification governs the configuration: our own design.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use crate::config::error::{Error, ParseFault, Stage};
+use crate::config::origin::{Origins, leaves};
 use crate::config::{CONFIG_PATH_ENV, Config, ENV_PREFIX};
 
 impl Config {
@@ -58,11 +59,16 @@ impl Config {
                 fault: ParseFault::from_toml(&error, Some(text), Stage::File),
             })?,
         };
+        let mut from_file = BTreeSet::new();
+        leaves(&table, "", &mut from_file);
+        let mut from_environment = BTreeSet::new();
         for (name, raw) in environment {
-            apply_override(&mut table, name, raw)?;
+            if let Some(key) = apply_override(&mut table, name, raw)? {
+                from_environment.insert(key);
+            }
         }
         let merged = toml::to_string(&table).map_err(|source| Error::Assemble { source })?;
-        toml::from_str(&merged).map_err(|error| {
+        let mut config: Self = toml::from_str(&merged).map_err(|error| {
             // NOTE: no specification governs this: our own design; a fault the
             // file itself carries is reported at its line, which the merged tree has not.
             let file = text.and_then(|text| {
@@ -73,14 +79,17 @@ impl Config {
             Error::Parse {
                 fault: file.unwrap_or_else(|| ParseFault::from_toml(&error, None, Stage::Merged)),
             }
-        })
+        })?;
+        config.origins = Origins::new(from_file, from_environment);
+        Ok(config)
     }
 }
 
-/// Applies one environment override onto `table`.
-fn apply_override(table: &mut toml::Table, name: &str, raw: &str) -> Result<(), Error> {
+/// Applies one environment override onto `table`, returning the dotted key
+/// it set, or `None` for a variable that is no override.
+fn apply_override(table: &mut toml::Table, name: &str, raw: &str) -> Result<Option<String>, Error> {
     let Some(path) = name.strip_prefix(ENV_PREFIX) else {
-        return Ok(());
+        return Ok(None);
     };
     let segments: Vec<String> = path.split("__").map(str::to_ascii_lowercase).collect();
     let Some((key, parents)) = segments.split_last() else {
@@ -106,7 +115,7 @@ fn apply_override(table: &mut toml::Table, name: &str, raw: &str) -> Result<(), 
         cursor = next;
     }
     cursor.insert(key.clone(), env_value(raw));
-    Ok(())
+    Ok(Some(segments.join(".")))
 }
 
 /// Reads `raw` as a TOML value, or as the string it is.
@@ -121,8 +130,31 @@ fn env_value(raw: &str) -> toml::Value {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use super::{apply_override, env_value};
+    use crate::config::Config;
     use crate::config::error::Error;
+    use crate::config::origin::Origin;
+
+    #[test]
+    fn the_configuration_knows_where_each_key_came_from() {
+        let environment = BTreeMap::from([(
+            String::from("FERROTERM_CONSOLE__SESSION__SECURE_COOKIE"),
+            String::from("false"),
+        )]);
+        let config = Config::from_sources(
+            Some("[ferroterm]\nbase_url = \"http://ferroterm:8080/\"\n"),
+            &environment,
+        )
+        .expect("the sources read");
+        assert_eq!(Origin::File, config.origins.of("ferroterm.base_url"));
+        assert_eq!(
+            Origin::Environment,
+            config.origins.of("session.secure_cookie")
+        );
+        assert_eq!(Origin::Default, config.origins.of("ferroterm.timeout_ms"));
+    }
 
     #[test]
     fn an_environment_value_reads_as_toml_syntax_or_as_the_string_it_is() {
