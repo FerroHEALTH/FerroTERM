@@ -1,6 +1,6 @@
 ---
 name: architecture-decisions
-description: FerroTERM's locked, evidence-backed architecture (the OWL-EL two-problem split, the index-materialized graph store, the code-system-neutral provider seam with SNOMED CT first, machine-generated FHIR, and the pure-Rust stack)
+description: FerroTERM's locked, evidence-backed architecture (the OWL-EL two-problem split, the index-materialized graph store, the code-system-neutral provider seam with SNOMED CT first, the generated FHIR model consumed as fhir-types from FerroBRIDGE, and the pure-Rust stack)
 metadata:
   type: project
 ---
@@ -42,17 +42,15 @@ streams, 2026-09-02).
   inferred Relationship file** (SNOMED ships NO transitive-closure file for the
   International edition, only a script); consume a shipped TC file only where an
   edition includes one. A reasoner (ELK-style) is a later capability.
-- **FHIR is machine-generated** from the vendored official FHIR packages
-  (StructureDefinition + OperationDefinition), a bespoke FerroEHR-style
-  generator, per-version modules for **R4 + R4B + R5 + R6 (ballot)**, runtime
-  version wrapper. Never hand-write FHIR types; never edit `// @generated`.
-  **Start with R4B first** (owner call: current stable R4-family release,
-  near-superset of R4, an R4B-first build serves the R4 surface); then R5, R4,
-  R6. Codegen SCOPE = a declared terminology root-set closure (CodeSystem,
-  ValueSet, ConceptMap, Parameters, OperationOutcome, CapabilityStatement,
-  TerminologyCapabilities, Bundle + the terminology OperationDefinitions + their
-  datatype/primitive closure), NOT all ~150 FHIR resources. ECL parser = `winnow`
-  (not the pre-1.0 chumsky).
+- **FHIR is machine-generated, and not here.** The model is the
+  `fhir-types` crate, emitted from the official FHIR packages with
+  per-version modules for **R4 + R4B + R5 + R6 (ballot)**. Its generator was
+  first built here (R4B first, a terminology root-set closure); on
+  2026-09-12 (#300) the crate and its generator moved to FerroBRIDGE, which
+  owns and publishes it ([[family-architecture]]). FerroTERM consumes it
+  from crates.io: never hand-write FHIR types, never edit `// @generated`,
+  and request a missing shape on the FerroBRIDGE tracker. ECL parser =
+  `winnow` (not the pre-1.0 chumsky).
 - **Pure Rust, single binary, no JVM / no Elasticsearch.** SNOMED CT content is
   licence-gated and NEVER committed (bring-your-own RF2); fixtures are
   shaped/synthetic.
@@ -64,8 +62,8 @@ Crate plan (see `docs/architecture.md`): `rf2`, `concept-graph`,
 generator moved to the FerroBRIDGE repository, which vendors the HL7 packages
 and publishes the crate; nothing is generated here any more.
 
-Build sequence: (1) FHIR codegen → `fhir-types`, R4B first then R5/R4/R6;
-(2) RF2 + offline build →
+Build sequence as first planned: (1) FHIR codegen → `fhir-types`, R4B
+first then R5/R4/R6 (FerroBRIDGE's since #300); (2) RF2 + offline build →
 redb artifacts; (3) read-only serving core ($lookup/$subsumes/$validate-code);
 (4) ECL + $expand + $translate; (5) hardening + packaging. Reference oracles:
 Snowstorm + Hermes; the ECL ANTLR grammar. See [[owner-work-style]].
