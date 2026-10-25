@@ -13,7 +13,9 @@ use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use base64::Engine as _;
-use ferrohealth_smart::config::{AuthSection, BasicSection, BasicUser};
+use ferrohealth_smart::config::{
+    AuthMode, AuthSection, BasicSection, BasicUser, IntrospectionSection, IssuerKey, OauthSection,
+};
 use ferroterm_sync::auth::{AdminAuth, AuthError, SYNC_SCOPE};
 use secrecy::SecretString;
 use tower::ServiceExt as _;
@@ -171,6 +173,32 @@ async fn a_section_admitting_no_credential_refuses_the_start() {
     assert!(
         matches!(refused, Err(AuthError::Config { .. })),
         "an enabled [auth] with no issuer and no Basic user fails closed: {refused:?}"
+    );
+}
+
+// The admin listener checks tokens as JWTs only (#881), so `mode =
+// "introspection"` refuses the start by name rather than starting a gate that
+// admits no token.
+#[tokio::test]
+async fn introspection_mode_refuses_the_start() {
+    let introspecting = AuthSection {
+        issuer: IssuerKey::Flat(String::from("https://auth.example.org/realms/tx")),
+        audience: vec![String::from("ferroterm-sync")],
+        mode: AuthMode::Introspection,
+        introspection: Some(IntrospectionSection {
+            client: Some(OauthSection {
+                client_id: String::from("ferroterm-sync"),
+                client_secret: Some(SecretString::from("synthetic-secret")),
+                ..OauthSection::default()
+            }),
+            ..IntrospectionSection::default()
+        }),
+        ..AuthSection::default()
+    };
+    let refused = AdminAuth::start(&introspecting).await;
+    assert!(
+        matches!(refused, Err(AuthError::Introspection)),
+        "the refusal names the mode: {refused:?}"
     );
 }
 
