@@ -278,7 +278,9 @@ The service binds `listen` and serves six routes:
 Every route but `GET /health` requires a credential carrying the product
 scope, `__ferroterm.sync` unless `[auth] product_scope` names another. The
 `[auth]` table is the one the server reads ([Configuration](configuration.md#authentication)):
-an `issuer` and an `audience` for the access tokens it accepts, Basic users
+an `issuer` and an `audience` for the access tokens it accepts (checked as
+JWTs, or at the issuer's introspection endpoint under `mode =
+"introspection"`), Basic users
 under `[[auth.basic.users]]`, or both. A refused request answers `401` with a
 challenge naming the realm `ferroterm-sync` (or `[auth] realm`), or `403` for a
 credential without the scope, with a JSON `error` body.

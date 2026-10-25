@@ -5,7 +5,9 @@
 //!
 //! The service validates a presented credential and issues none: the crate
 //! reads each `[auth]` issuer's metadata and key set, checks every access
-//! token under RFC 9068 and every `[[auth.basic.users]]` credential, answers
+//! token under RFC 9068 (or, under `mode = "introspection"`, at the issuer's
+//! introspection endpoint, RFC 7662) and every `[[auth.basic.users]]`
+//! credential, answers
 //! the status and challenge of a refusal (RFC 6750 §3.1) and writes the audit
 //! line. Every route but `GET /health` requires the product scope, which
 //! `[auth] product_scope` names and which defaults to [`SYNC_SCOPE`]. A
@@ -26,6 +28,7 @@ use ferrohealth_smart::config::{AuthSection, ConfigError};
 use ferrohealth_smart::extract::HeaderOnly;
 use ferrohealth_smart::guard::{AuthLayer, Gate, Render, Requirement, Target};
 use ferrohealth_smart::refusal::Refusal;
+use ferrohealth_smart::resource::introspection::{IntrospectionError, Introspector};
 use ferrohealth_smart::resource::{IssuerSet, ResourceError, ResourceServer};
 
 /// The product scope of a deployment whose `[auth] product_scope` names none.
@@ -55,12 +58,17 @@ pub enum AuthError {
         #[source]
         source: Box<ConfigError>,
     },
-    /// `[auth] mode = "introspection"` is set, which the admin listener does
-    /// not serve yet.
-    #[error(
-        "[auth] mode = \"introspection\" is not supported; check tokens as JWTs with mode = \"jwt\""
-    )]
-    Introspection,
+    /// The introspecting issuer's metadata could not be read, names no
+    /// introspection endpoint, or the `[auth.introspection]` settings break a
+    /// rule.
+    #[error("the introspection endpoint of {issuer} could not be set up")]
+    Introspector {
+        /// The issuer identifier.
+        issuer: String,
+        /// What the introspection check reported.
+        #[source]
+        source: Box<IntrospectionError>,
+    },
     /// An issuer's metadata or key set could not be read, or breaks a rule.
     #[error("the authorization server {issuer} could not be read")]
     Issuer {
@@ -94,7 +102,8 @@ impl AdminAuth {
     ///
     /// Returns [`AuthError::Config`] for a section that breaks a rule, an
     /// enabled one admitting no credential among them,
-    /// [`AuthError::Introspection`] for `mode = "introspection"`, and
+    /// [`AuthError::Introspector`] for an introspecting issuer that cannot be
+    /// set up, and
     /// [`AuthError::Issuer`] for an issuer whose metadata or key set could
     /// not be read.
     pub async fn start(section: &AuthSection) -> Result<Option<Self>, AuthError> {
@@ -104,10 +113,6 @@ impl AdminAuth {
         let resolved = section.resolve().map_err(|source| AuthError::Config {
             source: Box::new(source),
         })?;
-        // TODO(#881): serve introspection through the crate's `Introspector`.
-        if resolved.introspection.is_some() {
-            return Err(AuthError::Introspection);
-        }
         let realm = resolved.realm.unwrap_or_else(|| String::from(REALM));
         let mut gate = Gate::open().with_realm(realm.clone());
         if !resolved.issuers.is_empty() {
@@ -123,6 +128,16 @@ impl AdminAuth {
                 issuers = issuers.with(Arc::new(server));
             }
             gate = gate.with_bearer(Arc::new(issuers));
+        }
+        if let Some(settings) = resolved.introspection {
+            let issuer = settings.issuer.clone();
+            let checker = Introspector::discover(settings).await.map_err(|source| {
+                AuthError::Introspector {
+                    issuer,
+                    source: Box::new(source),
+                }
+            })?;
+            gate = gate.with_bearer(Arc::new(checker));
         }
         if let Some(store) = resolved.basic {
             gate = gate.with_basic(Arc::new(store));
