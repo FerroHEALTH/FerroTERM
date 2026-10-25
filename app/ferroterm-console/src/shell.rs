@@ -21,7 +21,7 @@ use std::borrow::Cow;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::button::{Variant, label};
-use ferrohealth_ui::view::search::{SearchAnswer, SearchBox, search_box};
+use ferrohealth_ui::view::search::{SearchBox, search_box};
 use ferrohealth_ui::view::shell::{Footer, Shell, TopBar, brand_mark, lockup, shell, topbar};
 use ferrohealth_ui::view::status::{Reach, StatusPill, banner, status_pill};
 use ferrohealth_ui::widget::menu::{ThemeChoice, UserMenu, user_menu};
@@ -162,7 +162,7 @@ fn chrome(request: &Request, probe: Probe, open: bool, content: AnyView) -> AnyV
             tr(Msg::ShellConsole),
         )
         .into_any(),
-        search: Some(search(request, None)),
+        search: Some(search(request)),
         end: end(request, probe, open),
     });
     let page = shell(Shell {
@@ -304,26 +304,25 @@ fn navigation(sync: bool) -> Vec<Group> {
     ]
 }
 
-/// The top bar's search, with `answer` under it when the page has one.
+/// The top bar's search, whose panel asks the find's answer route as you
+/// type ([`crate::pages::find::find_answer`]).
 #[must_use]
-pub(crate) fn search(request: &Request, answer: Option<SearchAnswer>) -> AnyView {
+pub(crate) fn search(request: &Request) -> AnyView {
     let value = if request.path == routes::ui_path(routes::FIND_PATH) {
         request.text(crate::find::QUERY_PARAM)
     } else {
         String::new()
     };
-    search_box(
-        SearchBox {
-            id: String::from(SEARCH_ID),
-            name: String::from(crate::find::QUERY_PARAM),
-            label: tr(Msg::ShellSearchLabel),
-            placeholder: tr(Msg::ShellSearchPlaceholder),
-            action: routes::ui_path(routes::FIND_PATH),
-            value,
-            ..SearchBox::default()
-        },
-        answer,
-    )
+    search_box(SearchBox {
+        id: String::from(SEARCH_ID),
+        name: String::from(crate::find::QUERY_PARAM),
+        label: tr(Msg::ShellSearchLabel),
+        placeholder: tr(Msg::ShellSearchPlaceholder),
+        action: routes::ui_path(routes::FIND_PATH),
+        value,
+        suggest: Some(String::from(crate::pages::find::ANSWER_ROUTE)),
+        ..SearchBox::default()
+    })
 }
 
 /// The FHIR version select of `request`: each root a link to the same page

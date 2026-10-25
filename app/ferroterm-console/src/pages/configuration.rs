@@ -111,6 +111,7 @@ fn row(label: Msg, description: Msg, value: AnyView, key: &str) -> Setting {
         value,
         keys: vec![key.to_owned()],
         next_start: false,
+        source: None,
     }
 }
 
@@ -369,6 +370,7 @@ pub(crate) fn ConfigurationPage() -> impl IntoView {
             value: ().into_any(),
             keys: vec![String::from("oidc")],
             next_start: false,
+            source: None,
         });
     }
     let page = settings_page(SettingsPage {

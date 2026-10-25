@@ -327,7 +327,9 @@ async fn the_search_reads_what_was_typed_and_offers_addresses_for_it() {
                 .await;
             journey
                 .press(
-                    By::XPath("//main//a[normalize-space()='Look up ca-leaf']"),
+                    By::XPath(
+                        "//main//a[span[contains(@class, 'fui-hit-name')][normalize-space()='Look up ca-leaf']]",
+                    ),
                     "the look up offer",
                 )
                 .await?;
@@ -340,6 +342,83 @@ async fn the_search_reads_what_was_typed_and_offers_addresses_for_it() {
                     "the code in its field",
                 )
                 .await;
+            journey.no_console_errors().await;
+            Ok::<(), WebDriverError>(())
+        })
+        .await;
+    outcome.expect("the journey ran and the browser session ended cleanly");
+}
+
+/// The panel under the top bar's search answers as you type: the taxonomy's
+/// canonical words open it on the code system first, Down makes that the
+/// active option with the focus kept in the field, Enter opens it, and
+/// Escape closes the panel with the words kept.
+#[tokio::test]
+async fn the_search_panel_answers_as_you_type_and_follows_the_keys() {
+    let Some(base) = server() else {
+        return;
+    };
+    let outcome = session()
+        .await
+        .run_and_quit(|driver| async move {
+            let journey = Journey::open(driver, &base, "/?fhir=r4").await;
+            journey
+                .press(By::Css(FIND_FIELD), "the search field")
+                .await?;
+            journey.type_here("e2e-taxonomy").await?;
+            journey
+                .visible(By::Css("#find-panel #find-hit-1"), "the panel's first hit")
+                .await;
+            journey
+                .element(
+                    By::Css("#find[role='combobox'][aria-expanded='true']"),
+                    "the field naming its open panel",
+                )
+                .await;
+            journey
+                .type_here(&TypingData::from(Key::Down).to_string())
+                .await?;
+            journey
+                .element(
+                    By::Css("#find[aria-activedescendant='find-hit-1']"),
+                    "the first hit active",
+                )
+                .await;
+            assert_eq!(
+                "find",
+                journey
+                    .evaluate("return document.activeElement.id;")
+                    .await?,
+                "the focus stays in the field while the arrows walk the hits"
+            );
+            journey
+                .type_here(&TypingData::from(Key::Enter).to_string())
+                .await?;
+            journey
+                .address_carrying("/systems/", "the code system the hit names")
+                .await;
+
+            journey.reopen(&format!("{base}/?fhir=r4")).await;
+            journey
+                .press(By::Css(FIND_FIELD), "the search field")
+                .await?;
+            journey.type_here("e2e-taxonomy").await?;
+            journey
+                .visible(By::Css("#find-panel #find-hit-1"), "the panel's first hit")
+                .await;
+            journey
+                .type_here(&TypingData::from(Key::Escape).to_string())
+                .await?;
+            journey
+                .element(By::Css("#find-panel[hidden]"), "the panel closed")
+                .await;
+            assert_eq!(
+                "e2e-taxonomy",
+                journey
+                    .evaluate("return document.getElementById('find').value;")
+                    .await?,
+                "Escape on an open panel keeps the words"
+            );
             journey.no_console_errors().await;
             Ok::<(), WebDriverError>(())
         })

@@ -9,13 +9,14 @@
 //! (<https://hl7.org/fhir/R5/capabilitystatement.html>), so an operation it
 //! does not declare is left out rather than offered and refused.
 
-use ferrohealth_ui::table::view::{Body, Column, DataTable, Role, Sorting, data_table, title_cell};
+use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::notice::{Announce, notice};
-use ferrohealth_ui::view::surface::{SectionHead, panel_section, panel_sections_card, stack};
-use ferrohealth_ui::view::template::list::HeadingCount;
+use ferrohealth_ui::view::search::{Hit, HitGroup, Mark, SearchAnswer, find_results};
+use ferrohealth_ui::view::surface::stack;
 use leptos::prelude::*;
+use leptos::server_fn::codec::{GetUrl, Json};
 
 use crate::fhir::capability::CapabilityStatement;
 use crate::fhir::named::Listed;
@@ -28,8 +29,9 @@ use crate::pages::parts::{failure, heading, loaded};
 use crate::request::{Request, request};
 use crate::routes::{CONCEPT_MAPS_PATH, VALUE_SETS_PATH, resource_link, system_link};
 
-/// The most matches one kind lists.
-const MATCHES: usize = 10;
+/// The address the panel under the top bar's search asks as you type
+/// ([`find_answer`]).
+pub(crate) const ANSWER_ROUTE: &str = "/find/answer";
 
 /// What the root declares, as the offers read it.
 fn declared_by(statement: &CapabilityStatement) -> Declared {
@@ -55,6 +57,172 @@ fn declared_by(statement: &CapabilityStatement) -> Declared {
 fn matches(resource: &Listed, typed: &str) -> bool {
     let typed = typed.to_lowercase();
     resource.label.to_lowercase().contains(&typed) || resource.url.to_lowercase().contains(&typed)
+}
+
+/// What the root holds under what was typed: the resources of each kind
+/// whose name or canonical holds it, and the screens that take it.
+#[derive(Debug, Clone)]
+struct Found {
+    /// The resources that match, by resource type, each with its kind's
+    /// heading, a kind with none left out.
+    groups: Vec<(&'static str, String, Vec<Listed>)>,
+    /// The screens that take what was typed, as the root's
+    /// `CapabilityStatement` gates them.
+    offered: Vec<Offer>,
+    /// The resource types whose read failed: the kinds of resource left out
+    /// of [`Found::groups`], and `CapabilityStatement` when the offers are.
+    failed: Vec<&'static str>,
+}
+
+/// The glyph each kind of resource carries in the navigation, which its
+/// hits carry too.
+fn glyph_of(resource_type: &str) -> Glyph {
+    match resource_type {
+        CODE_SYSTEM => Glyph::BOOK_OPEN,
+        VALUE_SET => Glyph::LAYERS,
+        _ => Glyph::ARROW_LEFT_RIGHT,
+    }
+}
+
+/// Reads what the root holds under `subject` through `request`, offering
+/// the screens `declared` gates, or none when the root's
+/// `CapabilityStatement` did not answer.
+async fn find(request: &Request, subject: &Subject, declared: Option<&Declared>) -> Found {
+    let mut failed = Vec::new();
+    let offered = if let Some(declared) = declared {
+        offers(subject, declared, request.version)
+    } else {
+        failed.push("CapabilityStatement");
+        Vec::new()
+    };
+    let mut groups = Vec::new();
+    for (resource_type, kind) in [
+        (CODE_SYSTEM, Msg::ShellCodeSystems),
+        (VALUE_SET, Msg::ShellValueSets),
+        (CONCEPT_MAP, Msg::ShellConceptMaps),
+    ] {
+        match request
+            .client
+            .published_names(request.version, resource_type)
+            .await
+        {
+            Ok(named) => {
+                let found: Vec<Listed> = named
+                    .listed()
+                    .into_iter()
+                    .filter(|resource| matches(resource, subject.typed()))
+                    .collect();
+                if !found.is_empty() {
+                    groups.push((resource_type, tr(kind), found));
+                }
+            }
+            Err(error) => {
+                tracing::warn!(%error, resource_type, "the find read no names");
+                failed.push(resource_type);
+            }
+        }
+    }
+    Found {
+        groups,
+        offered,
+        failed,
+    }
+}
+
+impl Found {
+    /// The answer the panel under the search box and the find page draw:
+    /// every match grouped by kind, then the screens that take what was
+    /// typed.
+    fn answer(&self, request: &Request, subject: &Subject) -> SearchAnswer {
+        let mut groups: Vec<HitGroup> = self
+            .groups
+            .iter()
+            .map(|(resource_type, kind, found)| HitGroup {
+                kind: kind.clone(),
+                hits: found
+                    .iter()
+                    .map(|resource| Hit {
+                        href: href_of(request, resource_type, resource),
+                        name: resource.label.clone(),
+                        line: resource.url.clone(),
+                        mark: Some(Mark::Glyph(glyph_of(resource_type))),
+                        tag: None,
+                    })
+                    .collect(),
+            })
+            .collect();
+        if !self.offered.is_empty() {
+            groups.push(HitGroup {
+                kind: tr(Msg::WhereItGoes),
+                hits: self
+                    .offered
+                    .iter()
+                    .map(|offer| Hit {
+                        href: offer.href.clone(),
+                        name: offer.label.clone(),
+                        line: offer.detail.clone(),
+                        mark: Some(Mark::Glyph(Glyph::ARROW_RIGHT)),
+                        tag: None,
+                    })
+                    .collect(),
+            });
+        }
+        SearchAnswer {
+            query: subject.typed().to_owned(),
+            head: None,
+            groups,
+            none: Some((
+                tr_with(Msg::FindNothing, &[("typed", subject.typed().into())]),
+                tr(Msg::RootDeclaresNoneOperationsWouldApply),
+            )),
+            unfinished: (!self.failed.is_empty()).then(|| {
+                tr_with(
+                    Msg::FindUnfinished,
+                    &[("reads", self.failed.join(", ").into())],
+                )
+            }),
+            more: None,
+        }
+    }
+}
+
+/// The address of `resource`, a resource of `resource_type`.
+fn href_of(request: &Request, resource_type: &str, resource: &Listed) -> String {
+    match resource_type {
+        CODE_SYSTEM => system_link(&resource.url, request.version),
+        VALUE_SET => resource_link(VALUE_SETS_PATH, &resource.id, request.version),
+        _ => resource_link(CONCEPT_MAPS_PATH, &resource.id, request.version),
+    }
+}
+
+/// Answers the panel under the top bar's search: what the root holds under
+/// the words `q`, as JSON.
+///
+/// # Errors
+/// Never: a read the server refuses is named in the answer's `unfinished`.
+#[server(prefix = "/find", endpoint = "answer", input = GetUrl, output = Json)]
+pub(crate) async fn find_answer(
+    /// The words typed.
+    q: String,
+) -> Result<SearchAnswer, ServerFnError> {
+    let request = request();
+    let Some(subject) = Subject::of(&q) else {
+        return Ok(SearchAnswer {
+            query: String::new(),
+            none: Some((tr(Msg::NothingWasTyped), String::new())),
+            ..SearchAnswer::default()
+        });
+    };
+    let declared = match request.client.capability_statement(request.version).await {
+        Ok(statement) => Some(declared_by(&statement)),
+        Err(error) => {
+            tracing::warn!(%error, "the find read no capability statement");
+            None
+        }
+    };
+    Ok(find(&request, &subject, declared.as_ref())
+        .await
+        .answer(&request, &subject))
 }
 
 /// The Find page.
@@ -90,28 +258,8 @@ pub(crate) fn FindPage() -> impl IntoView {
                 .into_any();
             }
         };
-        let mut groups = Vec::new();
-        for (resource_type, kind) in [
-            (CODE_SYSTEM, Msg::ShellCodeSystems),
-            (VALUE_SET, Msg::ShellValueSets),
-            (CONCEPT_MAP, Msg::ShellConceptMaps),
-        ] {
-            let listed = request
-                .client
-                .published_names(request.version, resource_type)
-                .await
-                .map(|named| named.listed())
-                .unwrap_or_default();
-            let found: Vec<Listed> = listed
-                .into_iter()
-                .filter(|resource| matches(resource, subject.typed()))
-                .take(MATCHES)
-                .collect();
-            if !found.is_empty() {
-                groups.push((resource_type, tr(kind), found));
-            }
-        }
-        let read = if groups.is_empty() {
+        let found = find(&request, &subject, Some(&declared_by(&statement))).await;
+        let read_as = found.groups.is_empty().then(|| {
             notice(
                 Tone::Info,
                 Announce::Status,
@@ -128,99 +276,19 @@ pub(crate) fn FindPage() -> impl IntoView {
                     )}
                 },
             )
-            .into_any()
-        } else {
-            found_card(&request, &groups)
-        };
-        let offered = offers(&subject, &declared_by(&statement), request.version);
+        });
+        let results = find_results(found.answer(&request, &subject));
         view! {
             {head}
             {stack(
                 view! {
-                    {read}
-                    {offers_card(&offered)}
+                    {read_as}
+                    {results}
                 },
             )}
         }
         .into_any()
     })
-}
-
-/// The resources whose name or canonical holds what was typed, by kind.
-fn found_card(request: &Request, groups: &[(&str, String, Vec<Listed>)]) -> AnyView {
-    let sections = groups
-        .iter()
-        .map(|(resource_type, kind, found)| {
-            let columns = [Column::text("resource", kind.clone()).role(Role::Title)];
-            let rows = found
-                .iter()
-                .map(|resource| {
-                    let href = match *resource_type {
-                        CODE_SYSTEM => system_link(&resource.url, request.version),
-                        VALUE_SET => resource_link(VALUE_SETS_PATH, &resource.id, request.version),
-                        _ => resource_link(CONCEPT_MAPS_PATH, &resource.id, request.version),
-                    };
-                    let sub = view! { <code>{resource.url.clone()}</code> }.into_any();
-                    view! { <tr>{title_cell(Some(&href), resource.label.clone(), Some(sub))}</tr> }
-                })
-                .collect_view()
-                .into_any();
-            panel_section(
-                Some(SectionHead {
-                    title: kind.clone(),
-                    count: Some(HeadingCount::All(
-                        u64::try_from(found.len()).unwrap_or(u64::MAX),
-                    )),
-                    actions: None,
-                }),
-                data_table(DataTable {
-                    caption: kind,
-                    columns: &columns,
-                    sorting: Sorting::default(),
-                    body: Body::Rows(rows),
-                }),
-            )
-        })
-        .collect_view();
-    panel_sections_card(tr(Msg::FindMatches), sections)
-}
-
-/// Where what was typed can go: one link per screen that takes it.
-fn offers_card(offered: &[Offer]) -> AnyView {
-    let title = tr(Msg::WhereItGoes);
-    let columns = [Column::text("screen", title.clone()).role(Role::Title)];
-    let body = if offered.is_empty() {
-        Body::Empty(view! { <p>{tr(Msg::RootDeclaresNoneOperationsWouldApply)}</p> }.into_any())
-    } else {
-        Body::Rows(
-            offered
-                .iter()
-                .map(|offer| {
-                    let sub = view! { {offer.detail.clone()} }.into_any();
-                    view! { <tr>{title_cell(Some(&offer.href), offer.label.clone(), Some(sub))}</tr> }
-                })
-                .collect_view()
-                .into_any(),
-        )
-    };
-    panel_sections_card(
-        title.clone(),
-        panel_section(
-            Some(SectionHead {
-                title: title.clone(),
-                count: Some(HeadingCount::All(
-                    u64::try_from(offered.len()).unwrap_or(u64::MAX),
-                )),
-                actions: None,
-            }),
-            data_table(DataTable {
-                caption: &title,
-                columns: &columns,
-                sorting: Sorting::default(),
-                body,
-            }),
-        ),
-    )
 }
 
 #[cfg(test)]

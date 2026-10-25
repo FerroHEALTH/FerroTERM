@@ -769,7 +769,8 @@ browse-read-from = · read from version { $version }
 
 find-subtitle = What you typed, read by its shape, and the screens that take it.
 find-read-as = reads as { $subject } from its shape alone. No code system, value set or concept map on FHIR { $version } has it as a name or a canonical.
-find-matches = Resources that match
+find-nothing = Nothing on this root matches { $typed }.
+find-unfinished = The server did not answer every read ({ $reads }), so the matches may be short.
 find-look-up = Look up { $code }
 find-look-up-detail = Opens Look up with the code filled in. Name the system it belongs to.
 find-check = Check { $code }
