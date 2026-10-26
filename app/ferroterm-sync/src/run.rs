@@ -38,6 +38,9 @@ use crate::source::ConfiguredSource;
 use crate::state::{Lane, Staged, State};
 use crate::webhook::Webhook;
 use crate::{naming, reason};
+use ferrohealth_health::lifecycle::Lifecycle;
+use ferrohealth_health::registry::Registry;
+use ferrohealth_server::health::Health;
 
 /// A service that cannot be built.
 #[derive(Debug, thiserror::Error)]
@@ -80,6 +83,7 @@ pub struct Service {
     sources: Vec<ConfiguredSource>,
     clock: Arc<dyn Clock>,
     metrics: Metrics,
+    health: Health,
     records: RecordStore,
     admin: AdminClient,
     webhook: Option<Webhook>,
@@ -130,6 +134,10 @@ impl Service {
             .as_deref()
             .map(|url| Webhook::new(client.clone(), url));
         let records = RecordStore::new(config.records.clone());
+        // The configuration and the state file are read, so the service
+        // serves from here.
+        let lifecycle = Lifecycle::default();
+        lifecycle.booted();
         Ok(Self {
             config,
             client,
@@ -137,6 +145,7 @@ impl Service {
             sources,
             clock,
             metrics: Metrics::new(),
+            health: Health::new(Registry::default(), lifecycle),
             records,
             admin,
             webhook,
@@ -156,6 +165,19 @@ impl Service {
     #[must_use]
     pub const fn metrics(&self) -> &Metrics {
         &self.metrics
+    }
+
+    /// The indicators and the phase the health routes read; the phase is
+    /// serving from construction and draining once a stop is requested.
+    #[must_use]
+    pub const fn health(&self) -> &Health {
+        &self.health
+    }
+
+    /// The phase of the service.
+    #[must_use]
+    pub fn lifecycle(&self) -> &Lifecycle {
+        self.health.lifecycle()
     }
 
     /// The run records an operator reads.

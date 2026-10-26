@@ -3,11 +3,12 @@
 
 //! The service's own admin listener.
 //!
-//! Six routes and nothing else: `POST /run` and `POST /activate` are the
-//! manual triggers, `GET /runs` and `GET /runs/{id}` are the run records,
-//! `GET /metrics` is the Prometheus exposition, and `GET /health` says the
-//! process is up. [`crate::auth`] puts every route but `GET /health` behind
-//! a credential carrying the product scope.
+//! `POST /run` and `POST /activate` are the manual triggers, `GET /runs` and
+//! `GET /runs/{id}` are the run records, `GET /metrics` is the Prometheus
+//! exposition, and `GET /health`, `GET /health/liveness` and
+//! `GET /health/readiness` are the family's health routes. [`crate::auth`]
+//! puts every route but the health routes behind a credential carrying the
+//! product scope.
 //!
 //! A `POST /run` answers when the run has finished, which is how an operator
 //! reads the outcome of the run they asked for. A run that builds an edition
@@ -29,15 +30,16 @@ use crate::run::Service;
 /// The admin application over `service`.
 #[must_use = "the router is the application the listener serves"]
 pub fn router(service: Arc<Service>) -> Router {
+    let health = ferrohealth_server::health::routes(service.health().clone());
     Router::new()
         .route("/run", post(run))
         .route("/activate", post(activate))
         .route("/runs", get(runs))
         .route("/runs/{id}", get(one_run))
         .route("/metrics", get(metrics))
-        .route("/health", get(health))
-        .fallback(unknown)
         .with_state(service)
+        .merge(health)
+        .fallback(unknown)
 }
 
 /// `POST /run`: one run now, answered when it has finished.
@@ -100,16 +102,11 @@ async fn metrics(State(service): State<Arc<Service>>) -> Response {
     }
 }
 
-/// `GET /health`: the process is up.
-async fn health() -> StatusCode {
-    StatusCode::OK
-}
-
 /// Anything else on the admin listener.
 async fn unknown() -> Response {
     (
         StatusCode::NOT_FOUND,
-        "ferroterm-sync admin: POST /run, POST /activate, GET /runs, GET /runs/{id}, GET /metrics, GET /health\n",
+        "ferroterm-sync admin: POST /run, POST /activate, GET /runs, GET /runs/{id}, GET /metrics, GET /health, GET /health/liveness, GET /health/readiness\n",
     )
         .into_response()
 }

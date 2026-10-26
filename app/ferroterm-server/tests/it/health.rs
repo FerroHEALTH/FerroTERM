@@ -16,6 +16,58 @@ async fn health_answers_ok() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// The status and the JSON body `path` answers on `server`.
+async fn health_of(server: &Server, path: &str) -> (StatusCode, serde_json::Value) {
+    let request = Request::get(path).body(Body::empty()).expect("a request");
+    let response = server.router().oneshot(request).await.expect("an answer");
+    let status = response.status();
+    let body = axum::body::to_bytes(response.into_body(), 4096)
+        .await
+        .expect("the body");
+    (status, serde_json::from_slice(&body).expect("a JSON body"))
+}
+
+#[tokio::test]
+async fn the_three_health_routes_answer_a_serving_server() {
+    let server = Server::start();
+    assert_eq!(
+        health_of(&server, "/health").await,
+        (StatusCode::OK, serde_json::json!({ "state": "up" }))
+    );
+    assert_eq!(
+        health_of(&server, "/health/liveness").await,
+        (StatusCode::OK, serde_json::json!({ "state": "up" }))
+    );
+    assert_eq!(
+        health_of(&server, "/health/readiness").await,
+        (
+            StatusCode::OK,
+            serde_json::json!({ "state": "up", "phase": "serving", "indicators": [] })
+        )
+    );
+}
+
+#[tokio::test]
+async fn readiness_is_withdrawn_once_the_server_drains() {
+    let server = Server::start();
+    server.serving.lifecycle().drain();
+    assert_eq!(
+        health_of(&server, "/health").await,
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            serde_json::json!({ "state": "down" })
+        )
+    );
+    let (status, body) = health_of(&server, "/health/readiness").await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(body["phase"], "draining");
+    assert_eq!(
+        health_of(&server, "/health/liveness").await,
+        (StatusCode::OK, serde_json::json!({ "state": "up" })),
+        "a draining process is still alive"
+    );
+}
+
 #[tokio::test]
 async fn unknown_route_is_an_operation_outcome() {
     let server = Server::start();

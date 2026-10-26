@@ -9,6 +9,9 @@
 //! the old state answers from it to the end. The triggers are `SIGHUP` and
 //! `POST /reload` on the admin listener.
 
+use ferrohealth_health::lifecycle::Lifecycle;
+use ferrohealth_health::registry::Registry;
+use ferrohealth_server::health::Health;
 use std::sync::{Arc, Mutex, PoisonError, RwLock};
 
 use axum::Router;
@@ -45,6 +48,8 @@ struct Inner {
     /// The usage report window the request middleware records into; it
     /// outlives every swap of the served set.
     usage: Arc<crate::usage_report::window::Window>,
+    /// The indicators and the phase the health routes read.
+    health: Health,
 }
 
 /// One code system version the served set carries.
@@ -82,6 +87,10 @@ impl Serving {
         state: Arc<AppState>,
         smart: Option<Arc<crate::smart::Smart>>,
     ) -> Self {
+        // A served set exists only once its artifacts are open, so the
+        // process serves from here.
+        let lifecycle = Lifecycle::default();
+        lifecycle.booted();
         Self {
             inner: Arc::new(Inner {
                 current: RwLock::new(state),
@@ -89,8 +98,22 @@ impl Serving {
                 rebuilding: Mutex::new(()),
                 smart,
                 usage: Arc::default(),
+                health: Health::new(Registry::default(), lifecycle),
             }),
         }
+    }
+
+    /// The indicators and the phase the health routes read; the phase is
+    /// serving from construction and draining once a stop is requested.
+    #[must_use]
+    pub fn health(&self) -> &Health {
+        &self.inner.health
+    }
+
+    /// The phase of the process.
+    #[must_use]
+    pub fn lifecycle(&self) -> &Lifecycle {
+        self.inner.health.lifecycle()
     }
 
     /// The resource server, when the deployment authenticates its callers.

@@ -56,6 +56,8 @@ console_error_panic_hook.workspace = true
 web-sys = { workspace = true, features = ["Document", "Element", "HtmlElement", "HtmlFormElement", "KeyboardEvent", "Location", "Window"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+ferrohealth-health.workspace = true
+ferrohealth-server.workspace = true
 # The per-request script nonce of the Content-Security-Policy rides `nonce`.
 leptos = { workspace = true, features = ["ssr", "nonce"] }
 leptos_axum.workspace = true

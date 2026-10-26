@@ -273,9 +273,9 @@ The service binds `listen` and serves six routes:
 | `GET /runs` | the runs this service performed, newest first |
 | `GET /runs/{id}` | one whole run record |
 | `GET /metrics` | the Prometheus exposition |
-| `GET /health` | `200` while the process is up |
+| `GET /health`, `GET /health/liveness`, `GET /health/readiness` | the FerroHEALTH health routes ([Health](observability.md#health)) |
 
-Every route but `GET /health` requires a credential carrying the product
+Every route but the three health routes requires a credential carrying the product
 scope, `__ferroterm.sync` unless `[auth] product_scope` names another. The
 `[auth]` table is the one the server reads ([Configuration](configuration.md#authentication)):
 an `issuer` and an `audience` for the access tokens it accepts (checked as

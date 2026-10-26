@@ -3,19 +3,29 @@
 
 # Health, metrics, and request identifiers
 
-FerroTERM answers a health probe at `GET /health`, a Prometheus scrape at
+FerroTERM answers the FerroHEALTH health routes under `/health`, a Prometheus scrape at
 `GET /metrics`, and names every request with an `X-Request-Id`. None of these
 is a FHIR interaction: the routes live off the FHIR base path, so a probe or a
 scrape is never mistaken for a terminology request.
 
 ## Health
 
-`GET /health` answers `200 OK` with an empty body. The server binds its
-listener only after every index and `CodeSystem` directory it was configured
-with is open, and refuses to start on a missing or damaged one, so an answer
-at all means the deployment serves what it was told to serve. There is no
-degraded state to report: a probe that gets a `200` may send terminology
-requests.
+The server, the synchronisation service and the console answer the same
+three routes, the ones every FerroHEALTH product serves:
+
+| Route | Answers |
+|---|---|
+| `GET /health/liveness` | `200` with `{"state":"up"}` while the process runs. It checks nothing. |
+| `GET /health/readiness` | `200` while the process is ready and `503` otherwise, with the readiness document: `state` (`up`, `degraded` or `down`), `phase` (`booting`, `serving` or `draining`) and `indicators`, each named with its state and never its detail. |
+| `GET /health` | The status of `/health/readiness` with `{"state":…}` alone. |
+
+The server binds its listener only after every index and `CodeSystem`
+directory it was configured with is open, and refuses to start on a missing
+or damaged one, so a ready answer means the deployment serves what it was told
+to serve. On `SIGTERM` or `SIGINT` the process moves to `draining`:
+`/health` and `/health/readiness` answer `503` while the requests in flight
+finish, so a load balancer stops sending new ones, and `/health/liveness`
+keeps answering `200`.
 
 The container image has no shell and no HTTP client, so the probe is a
 subcommand of the binary:
@@ -33,8 +43,8 @@ on every interface, which is what the image sets. The image declares it as its
 `HEALTHCHECK` (every ten seconds, a five-second limit, a sixty-second start
 period for reading an edition), and the shipped `compose.yaml` states the same
 block, so `docker compose up --wait` and `condition: service_healthy` work.
-Kubernetes ignores the image's instruction and takes `GET /health` in its own
-probes.
+Kubernetes ignores the image's instruction: point its liveness probe at
+`GET /health/liveness` and its readiness probe at `GET /health/readiness`.
 
 ## Scraping
 

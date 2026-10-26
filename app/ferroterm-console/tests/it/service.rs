@@ -58,7 +58,16 @@ async fn the_liveness_route_answers_up() {
     let state = console(None, "");
     let response = send(&state, get("/health", &[])).await;
     assert_eq!(StatusCode::OK, response.status());
-    assert_eq!(r#"{"status":"up"}"#, text(response).await);
+    assert_eq!(r#"{"state":"up"}"#, text(response).await);
+}
+
+#[tokio::test]
+async fn the_health_route_withdraws_readiness_once_the_console_drains() {
+    let state = console(None, "");
+    state.lifecycle().drain();
+    let response = send(&state, get("/health", &[])).await;
+    assert_eq!(StatusCode::SERVICE_UNAVAILABLE, response.status());
+    assert_eq!(r#"{"state":"down"}"#, text(response).await);
 }
 
 #[tokio::test]

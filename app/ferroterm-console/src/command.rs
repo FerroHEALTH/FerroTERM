@@ -163,7 +163,12 @@ async fn serve(settings: Settings) -> ExitCode {
         }
     };
     tracing::info!(%listen, "the operator console is listening");
-    match crate::server::serve(listener, crate::server::router(state), shutdown_signal()).await {
+    let lifecycle = state.lifecycle().clone();
+    let draining = async move {
+        shutdown_signal().await;
+        lifecycle.drain();
+    };
+    match crate::server::serve(listener, crate::server::router(state), draining).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             tracing::error!(%error, "the listener failed");
