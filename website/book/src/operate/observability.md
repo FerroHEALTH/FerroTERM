@@ -52,21 +52,26 @@ Kubernetes ignores the image's instruction: point its liveness probe at
 curl -s http://127.0.0.1:8080/metrics
 ```
 
-The exposition is the text format Prometheus reads, with every metric under the
-`ferroterm` prefix:
+The exposition is the Prometheus text format (`text/plain; version=0.0.4`).
+The request histogram follows the OpenTelemetry HTTP semantic conventions, the
+metric every FerroHEALTH product exports, and the two product metrics carry
+the `ferroterm` prefix:
 
 | Metric | Type | Labels | What it says |
 |---|---|---|---|
-| `ferroterm_http_requests_total` | counter | `method`, `route`, `status` | the requests answered |
-| `ferroterm_http_request_duration_seconds` | histogram | `method`, `route`, `status` | how long each took |
+| `http_server_request_duration_seconds` | histogram | `http_request_method`, `http_route`, `http_response_status_code`, `network_protocol_version`, `url_scheme`, and `error_type` on a `5xx` | how long each request took; its `_count` is the requests answered |
 | `ferroterm_code_system_loaded` | gauge | `system`, `version` | one per code system version loaded |
 | `ferroterm_reloads_total` | counter | `outcome` (`ok`, `failed`) | the reloads of the served set |
 
-`route` is the matched route, `/r4b/CodeSystem/$lookup`, never the URI, so the
-series count stays bounded no matter how many codes clients ask about. The
-duration buckets start at half a millisecond and double, which brackets the
-bars the engine is held to: a point read under a millisecond, a page of an
-expansion under ten.
+`http_route` is the matched route, `/r4b/CodeSystem/$lookup`, never the URI, so
+the series count stays bounded no matter how many codes clients ask about. A
+method outside the HTTP standard set is counted as `_OTHER`. The duration
+buckets are the ones the semantic conventions advise, from 5 milliseconds to
+10 seconds.
+
+With a `[telemetry.otlp]` table the same metrics are also pushed to an
+OpenTelemetry collector over OTLP/gRPC, beside the server's spans
+(see [Configuration](configuration.md#telemetry)).
 
 `ferroterm_code_system_loaded` describes the set the server answers from now:
 a [reload](configuration.md#reloading-the-served-set) that drops a version
@@ -93,22 +98,25 @@ server (see [Configuration](configuration.md)).
 
 ## Request identifiers
 
-Every response carries `X-Request-Id`. A client that sends the header gets its
-own value back, so a trace started at the caller stays one trace; a client that
-sends none gets a UUID the server makes. An id that is empty, longer than 128
-characters, or not printable ASCII is replaced rather than echoed, so a header
-cannot smuggle a line break into a log.
+Every response carries `X-Request-Id`, and every request's log line carries
+the server's own id, a UUID it makes for that request. A client that sends
+the header gets its own value back, so a trace started at the caller stays one
+trace, but its value never reaches the log: it is free text that may name a
+patient. An id that is empty, longer than 128 characters, or not printable
+ASCII is not echoed, and the response carries the server's id instead.
 
-The same id is a field of the request's log line:
+The log line says whether the client sent an id of its own:
 
 ```json
 {"timestamp":"2026-09-05T09:21:04.113Z","level":"INFO","message":"request",
  "method":"GET","route":"/r4b/CodeSystem/$lookup","status":200,
- "latency_ms":0.42,"named":"system=http://snomed.info/sct code=73211009",
- "request_id":"0f0f6c1e-9d0e-4a5f-8c1a-1f6b0f1f6b0f"}
+ "latency_ms":0.42,"request_id":"0f0f6c1e-9d0e-4a5f-8c1a-1f6b0f1f6b0f",
+ "client_named":false,"system":"http://snomed.info/sct","code":"73211009"}
 ```
 
-So a client that reports a slow or refused call gives you the id, and the log
-line, the status, and the latency follow from it. Bodies are never logged, and
-the `named` field carries only the system, url, version, and code parameters a
-request stated.
+So a client that reports a slow or refused call gives you the time and the
+route, and the response's `X-Request-Id` when it sent none of its own, and the
+log line, the status, and the latency follow from it. Bodies are never logged.
+Of the query, the line carries only the `system`, `url`, `version`, `code`,
+`codeA` and `codeB` parameters a request stated, as the fields `system`,
+`url`, `version`, `code`, `code_a` and `code_b`, each cut at 64 characters.

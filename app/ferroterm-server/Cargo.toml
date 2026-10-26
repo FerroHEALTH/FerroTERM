@@ -27,7 +27,7 @@ ferrohealth-config.workspace = true
 ferrohealth-health.workspace = true
 ferrohealth-server.workspace = true
 ferrohealth-smart.workspace = true
-prometheus-client.workspace = true
+ferrohealth-telemetry = { workspace = true, features = ["axum", "prometheus", "otlp"] }
 fhir-types.workspace = true
 fhir-terminology.workspace = true
 concept-graph.workspace = true
@@ -35,6 +35,7 @@ http.workspace = true
 hyper-rustls.workspace = true
 hyper-util.workspace = true
 jiff.workspace = true
+opentelemetry.workspace = true
 redb.workspace = true
 serde.workspace = true
 serde_json.workspace = true

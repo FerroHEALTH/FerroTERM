@@ -41,6 +41,7 @@ use crate::{naming, reason};
 use ferrohealth_health::lifecycle::Lifecycle;
 use ferrohealth_health::registry::Registry;
 use ferrohealth_server::health::Health;
+use ferrohealth_telemetry::telemetry::Telemetry;
 
 /// A service that cannot be built.
 #[derive(Debug, thiserror::Error)]
@@ -82,6 +83,7 @@ pub struct Service {
     plan: Plan,
     sources: Vec<ConfiguredSource>,
     clock: Arc<dyn Clock>,
+    telemetry: Arc<Telemetry>,
     metrics: Metrics,
     health: Health,
     records: RecordStore,
@@ -93,7 +95,8 @@ pub struct Service {
 }
 
 impl Service {
-    /// The service `config` describes, reading `sources` on `clock`.
+    /// The service `config` describes, reading `sources` on `clock`,
+    /// measured on `telemetry`.
     ///
     /// # Errors
     ///
@@ -106,6 +109,7 @@ impl Service {
         config: Config,
         sources: Vec<ConfiguredSource>,
         clock: Arc<dyn Clock>,
+        telemetry: Arc<Telemetry>,
     ) -> Result<Self, ServiceError> {
         let plan = config.plan()?;
         let state = State::read(&config.state_file())?;
@@ -144,7 +148,8 @@ impl Service {
             plan,
             sources,
             clock,
-            metrics: Metrics::new(),
+            metrics: Metrics::new(&telemetry.meter(crate::metrics::SCOPE)),
+            telemetry,
             health: Health::new(Registry::default(), lifecycle),
             records,
             admin,
@@ -161,10 +166,16 @@ impl Service {
         &self.config
     }
 
-    /// The metrics a scrape reads.
+    /// The service's own instruments.
     #[must_use]
     pub const fn metrics(&self) -> &Metrics {
         &self.metrics
+    }
+
+    /// The process's OpenTelemetry provider, which `GET /metrics` renders.
+    #[must_use]
+    pub const fn telemetry(&self) -> &Arc<Telemetry> {
+        &self.telemetry
     }
 
     /// The indicators and the phase the health routes read; the phase is

@@ -11,6 +11,7 @@ use std::process::ExitCode;
 use clap::Parser;
 
 use ferrohealth_server::cli::ConfigCommand;
+use ferrohealth_telemetry::telemetry::{Console, Service, Telemetry};
 
 use crate::cli::{Cli, Command};
 use crate::config::Config;
@@ -141,16 +142,20 @@ async fn healthcheck(settings: &Settings) -> ExitCode {
     reason = "a refusal before the subscriber starts has no other place to go"
 )]
 async fn serve(settings: Settings) -> ExitCode {
-    let subscriber = tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_unset| tracing_subscriber::EnvFilter::new("info")),
-        )
-        .try_init();
-    if let Err(error) = subscriber {
+    let service = Service::new("ferroterm-console", env!("CARGO_PKG_VERSION"))
+        .export_crate("ferroterm_console");
+    let telemetry = match Telemetry::new(&settings.telemetry, service) {
+        Ok(telemetry) => telemetry,
+        Err(error) => {
+            eprintln!("ferroterm-console: cannot start the log: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    if let Err(error) = telemetry.install(&settings.telemetry, &Console::detect()) {
         eprintln!("ferroterm-console: cannot start the log: {error}");
         return ExitCode::FAILURE;
     }
+    ferrohealth_telemetry::panic::install_hook();
     let listen = settings.listen;
     let state = match ConsoleState::new(settings) {
         Ok(state) => state,
@@ -172,13 +177,17 @@ async fn serve(settings: Settings) -> ExitCode {
         shutdown_signal().await;
         lifecycle.drain();
     };
-    match crate::server::serve(listener, crate::server::router(state), draining).await {
+    let code = match crate::server::serve(listener, crate::server::router(state), draining).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             tracing::error!(%error, "the listener failed");
             ExitCode::FAILURE
         }
+    };
+    if let Err(error) = telemetry.shutdown() {
+        tracing::warn!(%error, "the telemetry did not flush");
     }
+    code
 }
 
 /// Completes when the process receives `SIGTERM` or `SIGINT`.

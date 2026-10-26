@@ -1,128 +1,105 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The Prometheus metrics the service exposes at `/metrics`.
+//! The service's own instruments, on the meter of `ferrohealth-telemetry`,
+//! which `GET /metrics` exposes for Prometheus.
 //!
 //! No FHIR or SNOMED CT specification governs this: our own design. The
-//! exposition follows the `OpenMetrics` text format the Prometheus client
-//! writes (<https://prometheus.io/docs/instrumenting/exposition_formats/>).
+//! names read as `ferroterm_sync_runs_total`,
+//! `ferroterm_sync_last_run_timestamp_seconds`,
+//! `ferroterm_sync_entries_taken_total`, `ferroterm_sync_bytes_staged_total`,
+//! `ferroterm_sync_index_bytes` and `ferroterm_sync_revalidation_findings`.
 
-use prometheus_client::encoding::text::encode;
-use prometheus_client::encoding::{EncodeLabelSet, EncodeLabelValue, LabelValueEncoder};
-use prometheus_client::metrics::counter::Counter;
-use prometheus_client::metrics::family::Family;
-use prometheus_client::metrics::gauge::Gauge;
-use prometheus_client::registry::{Registry, Unit};
+use std::collections::BTreeMap;
+use std::sync::{Arc, Mutex, PoisonError};
+
+use opentelemetry::KeyValue;
+use opentelemetry::metrics::{Counter, Gauge, Meter, ObservableGauge};
 
 use crate::record::{Outcome, RunRecord};
 
-/// The labels of one finished run.
-#[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
-pub struct Run {
-    /// How the run ended.
-    pub outcome: Outcome,
-}
+/// The scope of the service's instruments on the shared meter provider.
+pub const SCOPE: &str = "ferroterm-sync";
 
-impl EncodeLabelValue for Outcome {
-    fn encode(&self, encoder: &mut LabelValueEncoder<'_>) -> Result<(), std::fmt::Error> {
-        EncodeLabelValue::encode(&self.as_str(), encoder)
-    }
-}
-
-/// The labels of one locally authored resource that was revalidated.
-#[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
-pub struct Local {
-    /// The resource, as its run record names it.
-    pub resource: String,
-}
-
-/// The metrics of one running service.
+/// The instruments of one running service.
 #[derive(Debug)]
 pub struct Metrics {
-    registry: Registry,
-    runs: Family<Run, Counter>,
-    last_run: Gauge,
-    entries_taken: Counter,
-    bytes_staged: Counter,
-    index_bytes: Gauge,
-    revalidation: Family<Local, Gauge>,
-}
-
-impl Default for Metrics {
-    fn default() -> Self {
-        Self::new()
-    }
+    runs: Counter<u64>,
+    last_run: Gauge<i64>,
+    entries_taken: Counter<u64>,
+    bytes_staged: Counter<u64>,
+    index_bytes: Gauge<u64>,
+    findings: Arc<Mutex<BTreeMap<String, u64>>>,
+    // NOTE: the gauge reports through its callback; the handle is held so the
+    // instrument lives as long as the service (<https://docs.rs/opentelemetry/0.33.1/opentelemetry/metrics/struct.ObservableGauge.html>).
+    _revalidation: ObservableGauge<u64>,
 }
 
 impl Metrics {
-    /// The registry with every metric this service exposes, empty of samples.
+    /// The instruments on `meter`, empty of samples but the two run outcomes.
     #[must_use]
-    pub fn new() -> Self {
-        let mut registry = <Registry>::with_prefix("ferroterm_sync");
-        let runs = Family::<Run, Counter>::default();
-        registry.register("runs", "The runs that finished, by outcome", runs.clone());
-        let last_run = Gauge::default();
-        registry.register_with_unit(
-            "last_run_timestamp",
-            "When the last run finished",
-            Unit::Seconds,
-            last_run.clone(),
-        );
-        let entries_taken = Counter::default();
-        registry.register(
-            "entries_taken",
-            "The feed entries the service fetched",
-            entries_taken.clone(),
-        );
-        let bytes_staged = Counter::default();
-        registry.register(
-            "bytes_staged",
-            "The bytes the service downloaded into staging",
-            bytes_staged.clone(),
-        );
-        let index_bytes = Gauge::default();
-        registry.register(
-            "index_bytes",
-            "The bytes the index root holds after the last run",
-            index_bytes.clone(),
-        );
+    pub fn new(meter: &Meter) -> Self {
+        let runs = meter
+            .u64_counter("ferroterm_sync.runs")
+            .with_description("The runs that finished, by outcome")
+            .build();
+        let last_run = meter
+            .i64_gauge("ferroterm_sync.last_run_timestamp")
+            .with_description("When the last run finished")
+            .with_unit("s")
+            .build();
+        let entries_taken = meter
+            .u64_counter("ferroterm_sync.entries_taken")
+            .with_description("The feed entries the service fetched")
+            .build();
+        let bytes_staged = meter
+            .u64_counter("ferroterm_sync.bytes_staged")
+            .with_description("The bytes the service downloaded into staging")
+            .build();
+        let index_bytes = meter
+            .u64_gauge("ferroterm_sync.index_bytes")
+            .with_description("The bytes the index root holds after the last run")
+            .build();
         // Both series start at zero, so a dashboard reads a rate from the first
         // scrape instead of waiting for a run to create the series
         // (<https://prometheus.io/docs/practices/instrumentation/#avoid-missing-metrics>).
         for outcome in [Outcome::Ok, Outcome::Failed] {
-            let series = runs.get_or_create(&Run { outcome });
-            drop(series);
+            runs.add(0, &[KeyValue::new("outcome", outcome.as_str())]);
         }
-        let revalidation = Family::<Local, Gauge>::default();
-        registry.register(
-            "revalidation_findings",
-            "The local codes the last run's release changed, per locally authored resource",
-            revalidation.clone(),
-        );
+        let findings: Arc<Mutex<BTreeMap<String, u64>>> = Arc::default();
+        let read = Arc::clone(&findings);
+        let revalidation = meter
+            .u64_observable_gauge("ferroterm_sync.revalidation_findings")
+            .with_description(
+                "The local codes the last run's release changed, per locally authored resource",
+            )
+            .with_callback(move |observer| {
+                let findings = read.lock().unwrap_or_else(PoisonError::into_inner);
+                for (resource, count) in findings.iter() {
+                    observer.observe(*count, &[KeyValue::new("resource", resource.clone())]);
+                }
+            })
+            .build();
         Self {
-            registry,
             runs,
             last_run,
             entries_taken,
             bytes_staged,
             index_bytes,
-            revalidation,
+            findings,
+            _revalidation: revalidation,
         }
     }
 
     /// Records one finished run.
     pub fn recorded(&self, record: &RunRecord) {
         self.runs
-            .get_or_create(&Run {
-                outcome: record.outcome,
-            })
-            .inc();
-        self.last_run.set(record.finished.as_second());
+            .add(1, &[KeyValue::new("outcome", record.outcome.as_str())]);
+        self.last_run.record(record.finished.as_second(), &[]);
         self.entries_taken
-            .inc_by(u64::try_from(record.entries_taken).unwrap_or(u64::MAX));
-        self.bytes_staged.inc_by(record.bytes_staged);
-        self.index_bytes
-            .set(i64::try_from(record.bytes_used).unwrap_or(i64::MAX));
+            .add(u64::try_from(record.entries_taken).unwrap_or(u64::MAX), &[]);
+        self.bytes_staged.add(record.bytes_staged, &[]);
+        self.index_bytes.record(record.bytes_used, &[]);
         self.revalidated(record);
     }
 
@@ -135,50 +112,53 @@ impl Metrics {
         if record.revalidation.resources == 0 {
             return;
         }
-        self.revalidation.clear();
-        for resource in &record.revalidation.checked_resources {
-            let findings = record
-                .revalidation
-                .findings
-                .iter()
-                .filter(|finding| &finding.resource == resource)
-                .count();
-            self.revalidation
-                .get_or_create(&Local {
-                    resource: resource.clone(),
-                })
-                .set(i64::try_from(findings).unwrap_or(i64::MAX));
-        }
-    }
-
-    /// The exposition text a scrape reads.
-    ///
-    /// # Errors
-    ///
-    /// Returns the formatting error when the registry cannot be written, which
-    /// means a metric name or label is not encodable.
-    pub fn exposition(&self) -> Result<String, std::fmt::Error> {
-        let mut out = String::new();
-        encode(&mut out, &self.registry)?;
-        Ok(out)
+        let next = record
+            .revalidation
+            .checked_resources
+            .iter()
+            .map(|resource| {
+                let findings = record
+                    .revalidation
+                    .findings
+                    .iter()
+                    .filter(|finding| &finding.resource == resource)
+                    .count();
+                (
+                    resource.clone(),
+                    u64::try_from(findings).unwrap_or(u64::MAX),
+                )
+            })
+            .collect();
+        *self.findings.lock().unwrap_or_else(PoisonError::into_inner) = next;
     }
 }
 
 #[cfg(test)]
 #[expect(clippy::panic_in_result_fn, reason = "test assertions")]
 mod tests {
-    use super::Metrics;
+    use ferrohealth_telemetry::section::TelemetrySection;
+    use ferrohealth_telemetry::telemetry::{Service, Telemetry};
+
+    use super::{Metrics, SCOPE};
     use crate::record::{Outcome, RunRecord, Trigger};
+
+    fn telemetry() -> Result<Telemetry, Box<dyn core::error::Error>> {
+        Ok(Telemetry::new(
+            &TelemetrySection::default(),
+            Service::new("ferroterm-sync", "test"),
+        )?)
+    }
 
     #[test]
     fn the_exposition_carries_every_series() -> Result<(), Box<dyn core::error::Error>> {
-        let metrics = Metrics::new();
+        let telemetry = telemetry()?;
+        let metrics = Metrics::new(&telemetry.meter(SCOPE));
         let started: jiff::Timestamp = "2026-09-22T03:00:00Z".parse()?;
         let mut record = RunRecord::new(String::from("r"), Trigger::Schedule, started);
         record.bytes_used = 42;
         record.close("2026-09-22T03:00:01Z".parse()?);
         metrics.recorded(&record);
-        let text = metrics.exposition()?;
+        let text = telemetry.render_prometheus()?;
         assert!(
             text.contains("ferroterm_sync_runs_total{outcome=\"ok\"} 1"),
             "a finished run counts under its outcome: {text}"
@@ -200,14 +180,15 @@ mod tests {
 
     #[test]
     fn a_failed_run_counts_as_failed() -> Result<(), Box<dyn core::error::Error>> {
-        let metrics = Metrics::new();
+        let telemetry = telemetry()?;
+        let metrics = Metrics::new(&telemetry.meter(SCOPE));
         let started: jiff::Timestamp = "2026-09-22T03:00:00Z".parse()?;
         let mut record = RunRecord::new(String::from("r"), Trigger::Manual, started);
         record.fail(String::from("the build did not finish"));
         record.close(started);
         metrics.recorded(&record);
         assert_eq!(record.outcome, Outcome::Failed, "the run failed");
-        let text = metrics.exposition()?;
+        let text = telemetry.render_prometheus()?;
         assert!(
             text.contains("ferroterm_sync_runs_total{outcome=\"failed\"} 1"),
             "the failure is counted: {text}"

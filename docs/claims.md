@@ -356,7 +356,7 @@ Per system, the loader flag, the provider, and the test that exercises it:
 | `fhir.security_services` admits only the `restful-security-service` codes | `app/ferroterm-server/src/config.rs::a_security_service_list_admits_only_the_codes_the_value_set_defines` |
 | `FERROTERM__FHIR__BASE_URL` becomes `implementation.url` per version | `app/ferroterm-server/src/config.rs::a_base_url_loses_its_trailing_slashes_and_an_empty_one_is_unset`; `app/ferroterm-server/src/version/metadata.rs` |
 | The write routes accept every served version's FHIR base under `FERROTERM__FHIR__BASE_URL` as a token audience, beside `[auth] audience`, and the admin listener accepts `[auth] audience` alone | `app/ferroterm-server/src/smart/mod.rs::version_bases`; `app/ferroterm-server/src/smart/mod.rs::Smart::start`; `app/ferroterm-server/tests/it/smart.rs::a_token_for_one_version_base_writes_on_every_served_version`, `::an_audience_naming_another_server_is_refused`, `::the_admin_listener_does_not_take_a_version_base_as_its_audience` |
-| The log fields, and that bodies and free text are never logged | `app/ferroterm-server/src/request_log.rs` |
+| The log fields, and that bodies and free text are never logged | the `ferrohealth-telemetry` request log; `app/ferroterm-server/src/request_fields.rs::only_system_and_code_parameters_are_logged`; `app/ferroterm-server/tests/it/telemetry.rs::the_json_and_pretty_formats_carry_what_each_promises` |
 | The server binary carries no HTTP client outside `ferrohealth-smart`, and makes no outbound connection to an authorization server unless `[auth]` names one | `scripts/checks/no-client-in-server.sh`, the `no-client-in-server` CI job; the ICD-API walker sits behind the `icd11` crate's `api` feature, which only `tools/ferroterm-build` enables. With an issuer configured the server reads that issuer's metadata and key set through `ferrohealth-smart` (`app/ferroterm-server/src/smart/mod.rs::Smart::start`) |
 | `compose.yaml` carries a `proxied` profile with Caddy | `compose.yaml` |
 | `FERROTERM_BIND_HOST` and `FERROTERM_PORT` | Compose variables (`compose.yaml:40`), not read by the server. The install page names them inside its Compose section, which is correct |
@@ -366,11 +366,12 @@ Per system, the loader flag, the provider, and the test that exercises it:
 | Claim | Evidence |
 |---|---|
 | `GET /metrics` answers a Prometheus scrape | `app/ferroterm-server/src/lib.rs::router`; `app/ferroterm-server/tests/it/metrics.rs::the_scrape_carries_the_loaded_systems_and_the_answered_requests` |
-| The four metrics and their labels | `app/ferroterm-server/src/metrics.rs::the_exposition_carries_the_recorded_series` |
-| `route` is the matched route, never the URI | `app/ferroterm-server/src/request_log.rs`; `app/ferroterm-server/tests/it/metrics.rs::a_refusal_is_counted_under_its_own_status` |
-| The duration buckets start at half a millisecond and double | `app/ferroterm-server/src/metrics.rs::new` (`exponential_buckets(0.000_5, 2.0, 12)`) |
-| Every response carries `X-Request-Id`, echoed from the client | `app/ferroterm-server/tests/it/metrics.rs::every_response_carries_a_request_id_and_echoes_the_client_s` |
-| An id that is empty, over 128 characters, or not printable ASCII is replaced | `app/ferroterm-server/src/request_log.rs::request_id`. Only the over-128 case is tested (`::an_unusable_request_id_is_replaced_rather_than_echoed`) |
+| The two product metrics and their labels | `app/ferroterm-server/src/metrics.rs::the_exposition_carries_the_recorded_series` |
+| The request histogram `http_server_request_duration_seconds` and its OpenTelemetry labels | the `ferrohealth-telemetry` request log; `app/ferroterm-server/tests/it/metrics.rs::the_scrape_carries_the_loaded_systems_and_the_answered_requests` |
+| `http_route` is the matched route, never the URI | `app/ferroterm-server/tests/it/metrics.rs::a_refusal_is_counted_under_its_own_status` |
+| The duration buckets are the ones the semantic conventions advise, 5 ms to 10 s | `ferrohealth_telemetry::request_log::DURATION_BUCKETS` |
+| Every response carries `X-Request-Id`, echoed from the client, and the log carries the server's own id | `app/ferroterm-server/tests/it/metrics.rs::every_response_carries_a_request_id_and_echoes_the_client_s` |
+| An id that is empty, over 128 characters, or not printable ASCII is not echoed | `ferrohealth_server::request_id::is_legal`; `app/ferroterm-server/tests/it/metrics.rs::an_unusable_request_id_is_replaced_rather_than_echoed` tests the over-128 case |
 | The scrape carries no code system content and no request bodies, and is not authenticated | `app/ferroterm-server/src/metrics.rs`; `/metrics` is outside the SMART gate, which covers the write routes and the admin listener only |
 
 ### Verifying releases
@@ -472,7 +473,7 @@ persisted resources (`app/ferroterm-server/tests/it/persisted.rs`), batch
 
 `README.md` carries the same defect in its "What is next" section, which lists
 "metrics and request identifiers" under v0.1.0. Both are built and tested
-(`app/ferroterm-server/src/metrics.rs`, `request_log.rs`;
+(`app/ferroterm-server/src/metrics.rs`, `request_fields.rs`;
 `app/ferroterm-server/tests/it/metrics.rs`).
 
 The literal phrase "are v0.1.0" in these lists reads as a version-guard

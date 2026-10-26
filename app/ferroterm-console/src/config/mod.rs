@@ -13,7 +13,8 @@
 //! [`Config::resolve`](crate::config::Config::resolve) turns it into the
 //! checked [`settings::Settings`] the server runs on. An override names its
 //! key by path, `FERROTERM_CONSOLE__FERROTERM__BASE_URL` for `[ferroterm]
-//! base_url`. No specification governs the configuration: our own design.
+//! base_url`. `RUST_LOG` is the alias of `telemetry.filter`. No
+//! specification governs the configuration: our own design.
 //!
 //! ```toml
 //! [server]
@@ -49,6 +50,7 @@ use std::path::{Path, PathBuf};
 
 use ferrohealth_config::loader::{Loaded, Loader};
 use ferrohealth_secret::secret::Secret;
+use ferrohealth_telemetry::section::TelemetrySection;
 use serde::Deserialize;
 
 use crate::config::error::Error;
@@ -56,6 +58,19 @@ use crate::config::error::Error;
 /// The environment prefix: `FERROTERM_CONSOLE__SERVER__LISTEN` sets
 /// `[server] listen`, and `FERROTERM_CONSOLE_CONFIG` names the file.
 pub const PREFIX: &str = "FERROTERM_CONSOLE";
+
+/// The variable that names the `tracing` filter, the alias of
+/// `telemetry.filter`.
+pub const FILTER_ENV: &str = "RUST_LOG";
+
+/// The loader of the console's tree.
+///
+/// # Errors
+/// Returns the loader's error when the prefix is refused, which it never is
+/// for [`PREFIX`].
+pub fn loader() -> Result<Loader, ferrohealth_config::error::ConfigError> {
+    Ok(Loader::new(PREFIX)?.alias(FILTER_ENV, "telemetry.filter"))
+}
 
 /// The configuration tree as written.
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -70,6 +85,8 @@ pub struct Config {
     /// `[oidc]`: the OpenID Provider operators sign in with; without it the
     /// console offers no sign-in.
     pub oidc: Option<Oidc>,
+    /// `[telemetry]`: the console log; `RUST_LOG` sets its filter too.
+    pub telemetry: TelemetrySection,
 }
 
 impl Config {
@@ -81,7 +98,7 @@ impl Config {
     /// Returns [`Error::Load`] when the file cannot be read, a key or
     /// variable is unknown, or a value does not read as its key.
     pub fn load(path: Option<&Path>, sets: &[(String, String)]) -> Result<Loaded<Self>, Error> {
-        Ok(Loader::new(PREFIX)?.load_with(path, sets)?)
+        Ok(loader()?.load_with(path, sets)?)
     }
 
     /// Reads `text` as TOML and applies `environment` over it.
@@ -97,7 +114,7 @@ impl Config {
         text: Option<&str>,
         environment: &BTreeMap<String, String>,
     ) -> Result<Self, Error> {
-        let loaded: Loaded<Self> = Loader::new(PREFIX)?.load_sources(text, None, environment)?;
+        let loaded: Loaded<Self> = loader()?.load_sources(text, None, environment)?;
         Ok(loaded.into_parts().0)
     }
 }

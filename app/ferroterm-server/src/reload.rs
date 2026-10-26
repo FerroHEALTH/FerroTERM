@@ -12,6 +12,7 @@
 use ferrohealth_health::lifecycle::Lifecycle;
 use ferrohealth_health::registry::Registry;
 use ferrohealth_server::health::Health;
+use ferrohealth_telemetry::telemetry::Telemetry;
 use std::sync::{Arc, Mutex, PoisonError, RwLock};
 
 use axum::Router;
@@ -21,7 +22,7 @@ use axum::routing::post;
 use http::StatusCode;
 
 use crate::config::Config;
-use crate::metrics::Outcome;
+use crate::metrics::{Metrics, Outcome};
 use crate::state::{AppState, LoadError};
 
 /// The state every request resolves, and the configuration a reload reads
@@ -50,6 +51,11 @@ struct Inner {
     usage: Arc<crate::usage_report::window::Window>,
     /// The indicators and the phase the health routes read.
     health: Health,
+    /// The process's OpenTelemetry provider: the request histogram, the
+    /// server's own instruments and the Prometheus route read it.
+    telemetry: Arc<Telemetry>,
+    /// The server's own instruments; they outlive every swap of the served set.
+    metrics: Metrics,
 }
 
 /// One code system version the served set carries.
@@ -73,24 +79,27 @@ pub enum ReloadError {
 
 impl Serving {
     /// The set `state`, reloaded from `config` on request, authenticating no
-    /// caller.
+    /// caller, measured on `telemetry`.
     #[must_use]
-    pub fn new(config: Config, state: Arc<AppState>) -> Self {
-        Self::with_smart(config, state, None)
+    pub fn new(config: Config, state: Arc<AppState>, telemetry: Arc<Telemetry>) -> Self {
+        Self::with_smart(config, state, None, telemetry)
     }
 
     /// The set `state`, guarded by `smart` when the deployment authenticates
-    /// its callers.
+    /// its callers, measured on `telemetry`.
     #[must_use]
     pub fn with_smart(
         config: Config,
         state: Arc<AppState>,
         smart: Option<Arc<crate::smart::Smart>>,
+        telemetry: Arc<Telemetry>,
     ) -> Self {
         // A served set exists only once its artifacts are open, so the
         // process serves from here.
         let lifecycle = Lifecycle::default();
         lifecycle.booted();
+        let metrics = Metrics::new(&telemetry.meter(crate::metrics::SCOPE));
+        metrics.serving(state.instances().map(|(_, url, version)| (url, version)));
         Self {
             inner: Arc::new(Inner {
                 current: RwLock::new(state),
@@ -99,8 +108,16 @@ impl Serving {
                 smart,
                 usage: Arc::default(),
                 health: Health::new(Registry::default(), lifecycle),
+                telemetry,
+                metrics,
             }),
         }
+    }
+
+    /// The process's OpenTelemetry provider.
+    #[must_use]
+    pub fn telemetry(&self) -> &Arc<Telemetry> {
+        &self.inner.telemetry
     }
 
     /// The indicators and the phase the health routes read; the phase is
@@ -171,7 +188,7 @@ impl Serving {
         let next = match outcome {
             Ok(next) => Arc::new(next),
             Err(error) => {
-                current.metrics().reloaded(Outcome::Failed);
+                self.inner.metrics.reloaded(Outcome::Failed);
                 tracing::error!(error = reason(&error), "the served set was not reloaded");
                 drop(rebuilding);
                 return Err(ReloadError::Load(error));
@@ -189,8 +206,11 @@ impl Serving {
             .inner
             .current
             .write()
-            .unwrap_or_else(PoisonError::into_inner) = next;
-        current.metrics().reloaded(Outcome::Ok);
+            .unwrap_or_else(PoisonError::into_inner) = Arc::clone(&next);
+        self.inner
+            .metrics
+            .serving(next.instances().map(|(_, url, version)| (url, version)));
+        self.inner.metrics.reloaded(Outcome::Ok);
         tracing::info!(code_systems = served.len(), "the served set was reloaded");
         drop(rebuilding);
         Ok(served)

@@ -458,8 +458,6 @@ pub struct AppState {
     /// The base URL clients reach this server at, when the deployment named
     /// one; the capability statements state it per version.
     base_url: Option<String>,
-    /// The metrics a scrape reads, seeded with what this state loaded.
-    metrics: Arc<crate::metrics::Metrics>,
 }
 
 /// The persisted client resources and the layer they form over the loaded
@@ -544,16 +542,13 @@ struct Loaded {
 
 /// What a rebuilt state takes over from the state it replaces.
 ///
-/// The write store, the metrics, and the `$cache-control` caches outlive one
-/// served set: reopening the store would meet `redb`'s own file lock, and a
-/// counter or a cache handle that restarted with the set would lie to a
-/// scrape and to a client holding an id.
+/// The write store and the `$cache-control` caches outlive one served set:
+/// reopening the store would meet `redb`'s own file lock, and a cache handle
+/// that restarted with the set would lie to a client holding an id.
 #[derive(Debug, Default)]
 struct Carried {
     /// The live write store, when the state being replaced opened one.
     store: Option<Arc<ResourceStore>>,
-    /// The metrics registry a scrape reads.
-    metrics: Option<Arc<crate::metrics::Metrics>>,
     /// The caches `$cache-control` started.
     caches: Option<Arc<Caches>>,
 }
@@ -572,7 +567,7 @@ impl AppState {
     }
 
     /// The same configuration read again into a fresh state, carrying this
-    /// state's write store, metrics, and caches.
+    /// state's write store and caches.
     ///
     /// The caller swaps the result in; this state keeps answering until it
     /// does, and until the last request holding it finishes.
@@ -586,7 +581,6 @@ impl AppState {
             config,
             Carried {
                 store: self.store.clone(),
-                metrics: Some(Arc::clone(&self.metrics)),
                 caches: Some(Arc::clone(&self.caches)),
             },
         )
@@ -664,9 +658,6 @@ impl AppState {
             registry.register_supplement(target.clone(), supplement_of(model));
         }
         let mut state = Self::from_registry(registry);
-        if let Some(metrics) = carried.metrics {
-            state.metrics = metrics;
-        }
         if let Some(caches) = carried.caches {
             state.caches = caches;
         }
@@ -695,7 +686,6 @@ impl AppState {
         };
         state.reload_persisted().map_err(LoadError::Persisted)?;
         state.check_persisted_ids()?;
-        state.seed_metrics();
         Ok(state)
     }
 
@@ -899,7 +889,6 @@ impl AppState {
             software_version: env!("CARGO_PKG_VERSION"),
             security_services: Vec::new(),
             base_url: None,
-            metrics: Arc::new(crate::metrics::Metrics::new()),
         }
     }
 
@@ -914,20 +903,6 @@ impl AppState {
         self.core = core_terminology()?;
         self.reload_persisted().map_err(LoadError::Persisted)?;
         Ok(self)
-    }
-
-    /// Declares every loaded code system version to the metrics registry,
-    /// dropping the versions a previous set declared.
-    fn seed_metrics(&self) {
-        self.metrics
-            .serving(self.instances().map(|(_, url, version)| (url, version)));
-    }
-
-    /// The metrics of this server, for the scrape endpoint and the request
-    /// middleware.
-    #[must_use]
-    pub fn metrics(&self) -> &crate::metrics::Metrics {
-        &self.metrics
     }
 
     /// What is loaded, one entry per code system version, sorted by id.

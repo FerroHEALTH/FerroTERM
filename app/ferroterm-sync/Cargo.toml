@@ -32,8 +32,9 @@ ferrohealth-health.workspace = true
 ferrohealth-server.workspace = true
 ferrohealth-secret.workspace = true
 ferrohealth-smart.workspace = true
+ferrohealth-telemetry = { workspace = true, features = ["axum", "prometheus", "otlp"] }
 jiff = { workspace = true, features = ["serde"] }
-prometheus-client.workspace = true
+opentelemetry.workspace = true
 # `query` carries the operation parameters: the revalidation reads the FHIR
 # API with `$validate-code` and `$expand` as GET requests.
 reqwest = { workspace = true, features = ["query"] }
@@ -44,7 +45,6 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["fs", "io-util", "process", "sync", "time"] }
 toml.workspace = true
 tracing.workspace = true
-tracing-subscriber.workspace = true
 
 [dev-dependencies]
 # The Argon2id hashes of the Basic users the admin guard tests configure, and

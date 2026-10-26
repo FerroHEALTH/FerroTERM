@@ -8,6 +8,7 @@
 //! variable, then every `--set key=value`. Every key is optional: a
 //! deployment writes what it changes and inherits the rest from
 //! [`Config::default`], which describes the layout the container image uses.
+//! `RUST_LOG` is the alias of `telemetry.filter`.
 //! An unknown key or variable is refused rather than ignored, so a typo in a
 //! directory name is a start-up failure and not a run that writes somewhere
 //! nobody looks.
@@ -22,10 +23,15 @@ use ferrohealth_config::loader::{Loaded, Loader};
 use ferrohealth_secret::file::{SecretError, read_secret};
 use ferrohealth_secret::secret::Secret;
 use ferrohealth_smart::config::{AuthSection, CredentialsSection};
+use ferrohealth_telemetry::section::TelemetrySection;
 
 /// The environment prefix: `FERROTERM_SYNC__SCHEDULE__EVERY` sets
 /// `[schedule] every`, and `FERROTERM_SYNC_CONFIG` names the file.
 pub const PREFIX: &str = "FERROTERM_SYNC";
+
+/// The variable that names the `tracing` filter, the alias of
+/// `telemetry.filter`.
+pub const FILTER_ENV: &str = "RUST_LOG";
 
 /// How a staged release reaches the served set.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
@@ -185,6 +191,8 @@ pub struct Config {
     pub nts: NtsSection,
     /// The sources a run reads, in the order they are configured.
     pub source: Vec<SourceConfig>,
+    /// `[telemetry]`: the console log and the metrics export.
+    pub telemetry: TelemetrySection,
 }
 
 impl Default for Config {
@@ -208,6 +216,7 @@ impl Default for Config {
             nts: NtsSection::default(),
             server_admin_credentials: CredentialsSection::default(),
             auth: AuthSection::default(),
+            telemetry: TelemetrySection::default(),
         }
     }
 }
@@ -235,7 +244,7 @@ pub enum ConfigError {
 /// Returns the loader's error when the prefix is refused, which it never is
 /// for [`PREFIX`].
 pub fn loader() -> Result<Loader, ConfigError> {
-    Ok(Loader::new(PREFIX)?)
+    Ok(Loader::new(PREFIX)?.alias(FILTER_ENV, "telemetry.filter"))
 }
 
 impl Config {

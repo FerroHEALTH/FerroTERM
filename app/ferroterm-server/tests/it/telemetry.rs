@@ -1,17 +1,22 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The JSON log format carries the startup and request fields a pipeline reads.
+//! The JSON log format of `ferrohealth-telemetry` carries the startup and
+//! request fields a pipeline reads, the system and code among them.
 
 use std::io::Write;
 use std::sync::{Arc, Mutex};
 
 use axum::body::Body;
-use ferroterm_server::telemetry::{ResolvedFormat, subscriber};
+use ferrohealth_telemetry::console;
+use ferrohealth_telemetry::section::Rendering;
 use http::Request;
 use serde_json::Value;
 use tower::ServiceExt;
+use tracing::Subscriber;
+use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::MakeWriter;
+use tracing_subscriber::layer::SubscriberExt;
 
 use crate::fixture::Server;
 
@@ -51,6 +56,22 @@ impl Capture {
     }
 }
 
+/// The console of `ferrohealth-telemetry` in `rendering` with `filter`,
+/// writing through `writer`, the subscriber the binary installs.
+pub(crate) fn subscriber<W>(
+    rendering: Rendering,
+    filter: &str,
+    ansi: bool,
+    writer: W,
+) -> impl Subscriber + Send + Sync
+where
+    W: for<'w> MakeWriter<'w> + Send + Sync + 'static,
+{
+    tracing_subscriber::registry()
+        .with(EnvFilter::new(filter))
+        .with(console::layer(rendering, ansi, writer))
+}
+
 /// Keeps the process-global maximum level permissive for the whole test binary.
 ///
 /// `tracing::subscriber::set_default` installs a subscriber for one thread, but
@@ -79,12 +100,7 @@ pub(crate) fn admit_every_level() {
 async fn the_json_and_pretty_formats_carry_what_each_promises() {
     admit_every_level();
     let capture = Capture::default();
-    let json = subscriber(
-        ResolvedFormat::Json,
-        "info,hyper=warn",
-        false,
-        capture.clone(),
-    );
+    let json = subscriber(Rendering::Json, "info,hyper=warn", false, capture.clone());
     let guard = tracing::subscriber::set_default(json);
 
     tracing::info!(
@@ -118,9 +134,14 @@ async fn the_json_and_pretty_formats_carry_what_each_promises() {
     assert_eq!(request_line["route"], "/r4b/CodeSystem/$lookup");
     assert_eq!(request_line["status"], 400);
     assert!(request_line["latency_ms"].as_f64().is_some());
-    assert_eq!(
-        request_line["named"],
-        "system=http://snomed.info/sct code=1"
+    assert_eq!(request_line["system"], "http://snomed.info/sct");
+    assert_eq!(request_line["code"], "1");
+    assert_eq!(request_line["client_named"], false);
+    assert!(
+        request_line["request_id"]
+            .as_str()
+            .is_some_and(|id| id.len() == 36),
+        "the server's own id: {request_line}"
     );
     assert!(
         request_line.get("display").is_none(),
@@ -131,7 +152,7 @@ async fn the_json_and_pretty_formats_carry_what_each_promises() {
     // The pretty format keeps one event on one line, so a line-oriented
     // collector reads it as one record.
     let capture = Capture::default();
-    let pretty = subscriber(ResolvedFormat::Pretty, "info", false, capture.clone());
+    let pretty = subscriber(Rendering::Pretty, "info", false, capture.clone());
     let guard = tracing::subscriber::set_default(pretty);
     tracing::info!(value = "two\nlines", "one event");
     let bytes = capture.0.lock().expect("lock").clone();

@@ -19,6 +19,7 @@ use crate::config::{Config, ConfigError};
 use crate::record::{RunRecord, Trigger};
 use crate::run::{Service, ServiceError};
 use crate::source::RegistryError;
+use ferrohealth_telemetry::telemetry::Telemetry;
 
 /// The `ferroterm-sync` command line.
 #[derive(Debug, Parser)]
@@ -101,18 +102,19 @@ pub fn load(args: &ConfigArgs) -> Result<ferrohealth_config::loader::Loaded<Conf
     Ok(Config::load(args.config.as_deref(), &args.sets)?)
 }
 
-/// Builds the service `config` describes.
+/// Builds the service `config` describes, measured on `telemetry`.
 ///
 /// # Errors
 ///
 /// Returns [`StartError::Registry`] when a source cannot be built, and
 /// [`StartError::Service`] when the service cannot be built.
-pub fn service(config: Config) -> Result<Arc<Service>, StartError> {
+pub fn service(config: Config, telemetry: Arc<Telemetry>) -> Result<Arc<Service>, StartError> {
     let sources = crate::source::configure(&config.source, &config.nts)?;
     Ok(Arc::new(Service::new(
         config,
         sources,
         Arc::new(SystemClock),
+        telemetry,
     )?))
 }
 
@@ -124,8 +126,8 @@ pub fn service(config: Config) -> Result<Arc<Service>, StartError> {
 /// listener, [`StartError::Bind`] when the listener does not bind and
 /// [`StartError::Serve`] when it stops with an error; the start-up errors of
 /// [`service`] reach the caller unchanged.
-pub async fn serve(config: Config) -> Result<(), StartError> {
-    let service = service(config)?;
+pub async fn serve(config: Config, telemetry: Arc<Telemetry>) -> Result<(), StartError> {
+    let service = service(config, telemetry)?;
     let guard = crate::auth::AdminAuth::start(&service.config().auth).await?;
     let unguarded = crate::admin::router(Arc::clone(&service));
     let admin = if let Some(guard) = &guard {
@@ -170,8 +172,8 @@ pub async fn serve(config: Config) -> Result<(), StartError> {
 ///
 /// Returns the start-up errors of [`service`]; a run that fails is a record
 /// with a failed outcome, never an error here.
-pub async fn run_once(config: Config) -> Result<RunRecord, StartError> {
-    let service = service(config)?;
+pub async fn run_once(config: Config, telemetry: Arc<Telemetry>) -> Result<RunRecord, StartError> {
+    let service = service(config, telemetry)?;
     Ok(service.run(Trigger::RunOnce).await)
 }
 
@@ -179,26 +181,6 @@ pub async fn run_once(config: Config) -> Result<RunRecord, StartError> {
 #[must_use]
 pub fn health_url(config: &Config, url: Option<String>) -> String {
     url.unwrap_or_else(|| crate::healthcheck::url_for(config.listen))
-}
-
-/// Installs the log subscriber.
-///
-/// `RUST_LOG` is the filter; without it the service logs at `info` and leaves
-/// the HTTP stack at `warn`.
-///
-/// # Errors
-///
-/// Returns the reason when a subscriber is already installed.
-pub fn init_logging() -> Result<(), tracing_subscriber::util::TryInitError> {
-    use tracing_subscriber::layer::SubscriberExt;
-    use tracing_subscriber::util::SubscriberInitExt;
-
-    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info,hyper=warn,tower=warn"));
-    tracing_subscriber::registry()
-        .with(filter)
-        .with(tracing_subscriber::fmt::layer())
-        .try_init()
 }
 
 /// Completes on `SIGTERM` or `SIGINT`, which is how a container stops.

@@ -247,7 +247,7 @@ systems, and report on possible unauthorised access"
   [validating tokens in the server](../operate/reverse-proxy.md#validating-tokens-in-the-server);
   `app/ferroterm-console/src/oidc/`.
 - **Status:** met for writes and the admin listener. Reporting is the request
-  log and `ferroterm_http_requests_total` by status; there is no separate
+  log and `http_server_request_duration_seconds` by status code; there is no separate
   security event record.
 
 ### (e) Confidentiality of stored, transmitted and processed data

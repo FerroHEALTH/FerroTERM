@@ -8,6 +8,8 @@ use std::sync::Arc;
 use axum::Router;
 use axum::body::Body;
 use ferrohealth_smart::config::{AuthSection, IssuerKey};
+use ferrohealth_telemetry::section::TelemetrySection;
+use ferrohealth_telemetry::telemetry::{Service, Telemetry};
 use ferroterm_server::config::{AdminSection, Config, FhirSection, TerminologySection};
 use ferroterm_server::reload::Serving;
 use ferroterm_server::state::AppState;
@@ -57,6 +59,18 @@ pub(crate) fn base_of(segment: &str) -> String {
 }
 
 /// The edition in a temporary directory, loaded the way the binary loads it.
+/// A telemetry of its own for one test server, so its scrape counts only
+/// its own requests.
+pub(crate) fn telemetry() -> Arc<Telemetry> {
+    Arc::new(
+        Telemetry::new(
+            &TelemetrySection::default(),
+            Service::new("ferroterm", "test"),
+        )
+        .expect("the default telemetry builds"),
+    )
+}
+
 pub(crate) struct Server {
     _dir: Arc<tempfile::TempDir>,
     config: Config,
@@ -79,7 +93,7 @@ impl Server {
             ..server.config.clone()
         };
         let state = Arc::new(AppState::load(&config).expect("loads"));
-        server.serving = Serving::new(config.clone(), state);
+        server.serving = Serving::new(config.clone(), state, telemetry());
         server.config = config;
         server
     }
@@ -147,7 +161,7 @@ impl Server {
         let state = Arc::new(AppState::load(&config).expect("loads"));
         Self {
             _dir: dir,
-            serving: Serving::new(config.clone(), state),
+            serving: Serving::new(config.clone(), state, telemetry()),
             config,
         }
     }
@@ -285,7 +299,7 @@ impl Server {
         let state = Arc::new(AppState::load(&config).expect("loads"));
         Self {
             _dir: Arc::new(dir),
-            serving: Serving::with_smart(config.clone(), state, smart),
+            serving: Serving::with_smart(config.clone(), state, smart, telemetry()),
             config,
         }
     }

@@ -14,8 +14,9 @@
   TOML array in the file or comma-separated in a variable, where
   `FERROTERM_INDEX` and `FERROTERM_CODESYSTEMS` took the platform's path
   separator, and `usage_report.enabled` takes `true` or `false`, where
-  `FERROTERM_USAGE_REPORT` took `on` or `off`. Upgrade: rename each variable,
-  or move the values into a file.
+  `FERROTERM_USAGE_REPORT` took `on` or `off`. An old name is not read and
+  does not refuse the start, so the server runs on the default. Upgrade:
+  rename each variable, or move the values into a file.
 - Breaking: `FERROTERM_AUTH_FILE` and its `FERROTERM_AUTH__<KEY>` overrides are
   gone. The `[auth]` table is a section of the server's configuration file, and
   one key is set as `FERROTERM__AUTH__<KEY>`. Upgrade: move the table into the

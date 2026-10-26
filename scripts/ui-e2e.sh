@@ -250,15 +250,9 @@ pids+=("$!")
 await "http://127.0.0.1:18090/health" "$work/sync.log"
 
 serve() {
-  local port="$1" log="$2" name
-  local unset=()
+  local port="$1" log="$2"
   shift 2
-  # The server refuses every FERROTERM_ variable that is not its own, so the
-  # journeys' FERROTERM_UI_E2E_ settings stay out of its environment.
-  for name in $(compgen -e); do
-    [[ "$name" == FERROTERM_* && "$name" != FERROTERM__* ]] && unset+=(-u "$name")
-  done
-  env "${unset[@]}" FERROTERM__USAGE_REPORT__ENABLED=false FERROTERM__SERVER__LISTEN="127.0.0.1:$port" \
+  env FERROTERM__USAGE_REPORT__ENABLED=false FERROTERM__SERVER__LISTEN="127.0.0.1:$port" \
     FERROTERM__TERMINOLOGY__CODE_SYSTEMS=e2e/fixtures/codesystems "$@" \
     target/debug/ferroterm > "$log" 2>&1 &
   pids+=("$!")
