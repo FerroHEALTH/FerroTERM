@@ -340,7 +340,7 @@ largest thing a client sends).
 Health and metrics stay off the public route:
 
 ```
-handle /health /metrics {
+handle /health /health/* /metrics {
     respond 404
 }
 ```

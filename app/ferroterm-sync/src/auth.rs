@@ -42,8 +42,12 @@ pub const SYNC_SCOPE: &str = "__ferroterm.sync";
 /// The realm of a deployment that names no `[auth] realm`.
 const REALM: &str = "ferroterm-sync";
 
-/// The one route that stays open: a probe holds no credential.
-const HEALTH: &str = "/health";
+/// The routes that stay open: a probe holds no credential.
+const HEALTH: [&str; 3] = [
+    ferrohealth_server::health::SUMMARY,
+    ferrohealth_server::health::LIVENESS,
+    ferrohealth_server::health::READINESS,
+];
 
 /// An `[auth]` section the service cannot start with.
 #[derive(Debug, thiserror::Error)]
@@ -157,13 +161,13 @@ impl AdminAuth {
         &self.scope
     }
 
-    /// `router` with every route but `GET /health` behind the gate.
+    /// `router` with every route but the health routes behind the gate.
     #[must_use = "the guarded router is what the listener serves"]
     pub fn guard(&self, router: Router) -> Router {
         let requirement = Requirement::Scope(self.scope.clone());
         let classify = move |_: &Method, uri: &Uri, _: &Extensions| {
             let path = uri.path();
-            if path == HEALTH {
+            if HEALTH.contains(&path) {
                 return None;
             }
             let interaction = match path {

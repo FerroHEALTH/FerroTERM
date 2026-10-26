@@ -27,6 +27,8 @@ anyhow.workspace = true
 axum.workspace = true
 clap.workspace = true
 # The credential of the reload call: HTTP Basic or a client credentials token.
+ferrohealth-health.workspace = true
+ferrohealth-server.workspace = true
 ferrohealth-smart.workspace = true
 jiff = { workspace = true, features = ["serde"] }
 prometheus-client.workspace = true

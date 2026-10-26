@@ -344,7 +344,7 @@ Per system, the loader flag, the provider, and the test that exercises it:
 | Claim | Evidence |
 |---|---|
 | Four registry systems served with no configuration | `app/ferroterm-server/src/state.rs::build` |
-| `GET /health` | `app/ferroterm-server/src/lib.rs::router`; `app/ferroterm-server/tests/it/health.rs::health_answers_ok` |
+| `GET /health`, `GET /health/liveness`, `GET /health/readiness` | `app/ferroterm-server/src/lib.rs::router` over `ferrohealth_server::health::routes`; `app/ferroterm-server/tests/it/health.rs::the_three_health_routes_answer_a_serving_server` and `readiness_is_withdrawn_once_the_server_drains` |
 | The image runs as numeric user `65532` on a distroless base, with `FERROTERM_LISTEN=0.0.0.0:8080` | `docker/Dockerfile:14,28,33` |
 | Tags are `<version>`, `<major.minor>`, and `latest` | `.github/workflows/release-image.yml:124-126`; `latest` comes from `docker/metadata-action`'s default flavour |
 | The image carries a `HEALTHCHECK` running `ferroterm healthcheck`, which exits 0 against a serving instance and 1 against a stopped one | `docker/Dockerfile:36-45`; `app/ferroterm-server/src/healthcheck.rs`; `app/ferroterm-server/tests/it/healthcheck.rs` |

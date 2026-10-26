@@ -136,7 +136,12 @@ pub async fn serve(path: &std::path::Path) -> Result<(), StartError> {
         guarded = guard.is_some(),
         "ferroterm-sync started"
     );
-    let admin = axum::serve(listener, admin).with_graceful_shutdown(shutdown_signal());
+    let lifecycle = service.lifecycle().clone();
+    let draining = async move {
+        shutdown_signal().await;
+        lifecycle.drain();
+    };
+    let admin = axum::serve(listener, admin).with_graceful_shutdown(draining);
     let schedule = Arc::clone(&service).serve_schedule(shutdown_signal());
     let served = tokio::join!(admin, schedule);
     let (admin, ()) = served;

@@ -111,6 +111,18 @@ async fn the_health_probe_needs_no_credential() {
 }
 
 #[tokio::test]
+async fn the_liveness_and_readiness_probes_need_no_credential() {
+    let router = guarded().await;
+    for path in ["/health/liveness", "/health/readiness"] {
+        assert_eq!(
+            status(&router, "GET", path, None).await.0,
+            StatusCode::OK,
+            "{path}"
+        );
+    }
+}
+
+#[tokio::test]
 async fn every_other_route_refuses_a_request_without_a_credential() {
     let router = guarded().await;
     for (method, path) in [

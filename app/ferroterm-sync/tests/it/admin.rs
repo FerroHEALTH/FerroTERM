@@ -263,6 +263,41 @@ async fn health_answers_and_an_unknown_route_does_not() {
 }
 
 #[tokio::test]
+async fn health_withdraws_readiness_once_the_service_drains() {
+    let harness = Harness::new().await;
+    let service = harness.service(
+        vec![harness.source()],
+        TestClock::new("2026-10-01T03:00:00Z", 0),
+    );
+    let router = ferroterm_sync::admin::router(std::sync::Arc::clone(&service));
+
+    let (status, body) = json(
+        &router,
+        Request::get("/health")
+            .body(Body::empty())
+            .expect("a request"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "a serving service is ready");
+    assert_eq!(body, serde_json::json!({ "state": "up" }));
+
+    service.lifecycle().drain();
+    let (status, body) = json(
+        &router,
+        Request::get("/health")
+            .body(Body::empty())
+            .expect("a request"),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::SERVICE_UNAVAILABLE,
+        "a draining service is not"
+    );
+    assert_eq!(body, serde_json::json!({ "state": "down" }));
+}
+
+#[tokio::test]
 async fn a_run_identifier_that_is_a_path_is_refused() {
     let harness = Harness::new().await;
     let service = harness.service(

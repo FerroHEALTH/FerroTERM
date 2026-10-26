@@ -46,6 +46,7 @@ use std::sync::Arc;
 
 use axum::Router;
 use axum::routing::get;
+use ferrohealth_health::lifecycle::Lifecycle;
 use http::StatusCode;
 use tokio::net::TcpListener;
 
@@ -58,8 +59,9 @@ pub const FHIR_BASES: [&str; 4] = ["/r4", "/r4b", "/r5", "/r6"];
 
 /// Builds the HTTP application over `serving`.
 ///
-/// `GET /health` answers `200 OK` while the process is up ([`healthcheck`] is
-/// the probe the container runs against it); every FHIR route lives under its
+/// `GET /health`, `GET /health/liveness` and `GET /health/readiness` are the
+/// family's health routes over [`Serving::health`] ([`healthcheck`] is the
+/// probe the container runs against `/health`); every FHIR route lives under its
 /// version prefix. Any other path is an `OperationOutcome` `not-found`, and
 /// that includes `/reload`, which only the admin listener serves.
 pub fn router(serving: Serving) -> Router {
@@ -71,19 +73,20 @@ pub fn router(serving: Serving) -> Router {
         None => router,
     };
     let [r4, r4b, r5, r6] = FHIR_BASES;
+    let health = ferrohealth_server::health::routes(serving.health().clone());
     Router::new()
-        .route("/health", get(health))
         .nest(r4, gated(r4::router(), r4))
         .nest(r4b, gated(r4b::router(), r4b))
         .nest(r5, gated(r5::router(), r5))
         .nest(r6, gated(r6::router(), r6))
         .route("/metrics", get(metrics_scrape))
+        .with_state(serving.clone())
+        .merge(health)
         .fallback(outcome::not_found)
         .layer(axum::middleware::from_fn_with_state(
-            serving.clone(),
+            serving,
             request_log::log,
         ))
-        .with_state(serving)
 }
 
 /// Serves [`router`] on an already-bound listener until the process receives
@@ -114,8 +117,9 @@ pub async fn serve_until<F>(
 where
     F: Future<Output = ()> + Send + 'static,
 {
+    let lifecycle = serving.lifecycle().clone();
     axum::serve(listener, router(serving))
-        .with_graceful_shutdown(shutdown)
+        .with_graceful_shutdown(draining(lifecycle, shutdown))
         .await
 }
 
@@ -137,9 +141,20 @@ pub async fn serve_admin_until<F>(
 where
     F: Future<Output = ()> + Send + 'static,
 {
+    let lifecycle = serving.lifecycle().clone();
     axum::serve(listener, reload::router(serving))
-        .with_graceful_shutdown(shutdown)
+        .with_graceful_shutdown(draining(lifecycle, shutdown))
         .await
+}
+
+/// Completes with `shutdown`, after marking `lifecycle` draining so the
+/// health route withdraws readiness while the requests in flight finish.
+async fn draining<F>(lifecycle: Lifecycle, shutdown: F)
+where
+    F: Future<Output = ()> + Send + 'static,
+{
+    shutdown.await;
+    lifecycle.drain();
 }
 
 /// Completes when the process receives `SIGTERM` or `SIGINT`.
@@ -169,10 +184,6 @@ pub async fn shutdown_signal() {
         () = interrupt => tracing::info!("SIGINT received, shutting down"),
         () = terminate => tracing::info!("SIGTERM received, shutting down"),
     }
-}
-
-async fn health() -> StatusCode {
-    StatusCode::OK
 }
 
 /// `GET /metrics`: the Prometheus exposition of this server.

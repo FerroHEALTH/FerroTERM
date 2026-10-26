@@ -212,7 +212,8 @@ The image carries a `HEALTHCHECK` that runs `ferroterm healthcheck`: the
 binary probes `GET /health` on its own listen address, since there is no shell
 or `curl` to do it, so `docker inspect` reports the container's health and
 Compose can wait on it. Kubernetes ignores the image's `HEALTHCHECK`: point the
-readiness and liveness probes at `GET /health`, set `runAsNonRoot: true`,
+liveness probe at `GET /health/liveness` and the readiness probe at
+`GET /health/readiness`, set `runAsNonRoot: true`,
 `readOnlyRootFilesystem: true`, drop every capability, and mount the index
 root (not a single artifact) read-only at the path `FERROTERM_INDEX` names. The server stops
 cleanly on `SIGTERM`.

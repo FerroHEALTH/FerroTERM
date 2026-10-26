@@ -20,6 +20,9 @@ use axum::extract::Request;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
+use ferrohealth_health::lifecycle::Lifecycle;
+use ferrohealth_health::registry::Registry;
+use ferrohealth_server::health::Health;
 use http::header::{
     CACHE_CONTROL, CONTENT_SECURITY_POLICY, REFERRER_POLICY, X_CONTENT_TYPE_OPTIONS,
     X_FRAME_OPTIONS,
@@ -28,7 +31,6 @@ use http::{HeaderValue, StatusCode};
 use leptos::config::LeptosOptions;
 use leptos::nonce::Nonce;
 use leptos_axum::LeptosRoutes as _;
-use serde::Serialize;
 use tower_http::compression::CompressionLayer;
 use tower_http::compression::predicate::{And, Predicate as _, SizeAbove};
 use tower_http::services::ServeDir;
@@ -37,8 +39,8 @@ use tower_http::set_header::SetResponseHeaderLayer;
 use crate::config::settings::{OidcSettings, Settings};
 use crate::session::Sessions;
 
-/// The path of the console's own liveness route.
-pub const HEALTH: &str = "/health";
+/// The path of the console's health summary route.
+pub const HEALTH: &str = ferrohealth_server::health::SUMMARY;
 
 /// The name cargo-leptos gives the site bundle's files under `pkg/`.
 pub const OUTPUT_NAME: &str = "ferroterm-console";
@@ -72,6 +74,7 @@ pub struct ConsoleState {
     sessions: Sessions,
     upstream: reqwest::Client,
     provider: reqwest::Client,
+    health: Health,
 }
 
 impl ConsoleState {
@@ -95,12 +98,30 @@ impl ConsoleState {
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|source| ClientError { source })?;
+        // The settings are resolved and both clients built, so the console
+        // serves from here.
+        let lifecycle = Lifecycle::default();
+        lifecycle.booted();
         Ok(Self {
             sessions: Sessions::new(settings.session),
             settings: Arc::new(settings),
             upstream,
             provider,
+            health: Health::new(Registry::default(), lifecycle),
         })
+    }
+
+    /// The indicators and the phase the health routes read; the phase is
+    /// serving from construction and draining once a stop is requested.
+    #[must_use]
+    pub fn health(&self) -> &Health {
+        &self.health
+    }
+
+    /// The phase of the console.
+    #[must_use]
+    pub fn lifecycle(&self) -> &Lifecycle {
+        self.health.lifecycle()
     }
 
     /// The resolved configuration.
@@ -153,8 +174,11 @@ pub fn router(state: ConsoleState) -> axum::Router {
             provide_request_nonce();
         }
     };
+    let health = ferrohealth_server::health::routes(state.health().clone());
     let pages = axum::Router::new()
-        .route(HEALTH, get(health))
+        .route_service(HEALTH, health.clone())
+        .route_service(ferrohealth_server::health::LIVENESS, health.clone())
+        .route_service(ferrohealth_server::health::READINESS, health)
         .route(COMPONENTS_CSS, get(components_css))
         .route(THEME_CSS, get(theme_css))
         .route(crate::routes::LOGIN_ROUTE, get(crate::oidc::login))
@@ -350,18 +374,6 @@ fn stylesheet(text: &'static str) -> Response {
         text,
     )
         .into_response()
-}
-
-/// The body of the liveness route.
-#[derive(Debug, Serialize)]
-struct Health {
-    /// Always `up`: the route answers while the process serves.
-    status: &'static str,
-}
-
-/// Serves `GET /health`: `200` while the process serves.
-async fn health() -> Response {
-    (StatusCode::OK, axum::Json(Health { status: "up" })).into_response()
 }
 
 /// The media types of the site bundle: the WebAssembly, its JavaScript glue
