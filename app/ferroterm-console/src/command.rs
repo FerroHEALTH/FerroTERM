@@ -144,17 +144,18 @@ async fn healthcheck(settings: &Settings) -> ExitCode {
 async fn serve(settings: Settings) -> ExitCode {
     let service = Service::new("ferroterm-console", env!("CARGO_PKG_VERSION"))
         .export_crate("ferroterm_console");
-    let telemetry = match Telemetry::new(&settings.telemetry, service) {
+    let installed = Telemetry::new(&settings.telemetry, service).and_then(|telemetry| {
+        telemetry
+            .install(&settings.telemetry, &Console::detect())
+            .map(|_filter| telemetry)
+    });
+    let telemetry = match installed {
         Ok(telemetry) => telemetry,
         Err(error) => {
             eprintln!("ferroterm-console: cannot start the log: {error}");
             return ExitCode::FAILURE;
         }
     };
-    if let Err(error) = telemetry.install(&settings.telemetry, &Console::detect()) {
-        eprintln!("ferroterm-console: cannot start the log: {error}");
-        return ExitCode::FAILURE;
-    }
     ferrohealth_telemetry::panic::install_hook();
     let listen = settings.listen;
     let state = match ConsoleState::new(settings) {

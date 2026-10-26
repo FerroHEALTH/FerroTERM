@@ -52,7 +52,7 @@ Kubernetes ignores the image's instruction: point its liveness probe at
 curl -s http://127.0.0.1:8080/metrics
 ```
 
-The exposition is the Prometheus text format (`text/plain; version=0.0.4`).
+The exposition is the Prometheus text format, served as `text/plain`.
 The request histogram follows the OpenTelemetry HTTP semantic conventions, the
 metric every FerroHEALTH product exports, and the two product metrics carry
 the `ferroterm` prefix:
