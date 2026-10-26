@@ -76,6 +76,9 @@ exceptions = [
   # the sync service authenticate with, the same Licensor's crate under the
   # same licence.
   { allow = ["BUSL-1.1"], crate = "ferrohealth-smart" },
+  # The FerroHEALTH secrets and redaction crate ferrohealth-smart renders
+  # every secret through, the same Licensor's crate under the same licence.
+  { allow = ["BUSL-1.1"], crate = "ferrohealth-secret" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-build" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-bench" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-testkit" },
