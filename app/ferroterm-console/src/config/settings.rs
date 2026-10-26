@@ -12,6 +12,7 @@ use ferrohealth_config::loader::Loaded;
 use ferrohealth_config::provenance::{Provenance, Source};
 use ferrohealth_secret::file::read_secret;
 use ferrohealth_secret::secret::Secret;
+use ferrohealth_telemetry::section::TelemetrySection;
 use ferrohealth_ui::i18n::Locale;
 use secrecy::SecretString;
 use url::Url;
@@ -38,6 +39,8 @@ pub struct Settings {
     /// Where each key took its value from, and the configuration file the
     /// settings were read from, which the Configuration page names.
     pub provenance: Provenance,
+    /// The console log.
+    pub telemetry: TelemetrySection,
 }
 
 impl Settings {
@@ -241,6 +244,7 @@ impl Config {
             session,
             oidc,
             provenance: Provenance::default(),
+            telemetry: self.telemetry.clone(),
         })
     }
 }
@@ -525,12 +529,12 @@ mod tests {
         let error = Config::from_sources(None, &environment)
             .expect_err("a key the tree does not have is refused");
         assert!(matches!(error, Error::Load(_)), "{error:?}");
-        let unknown =
-            BTreeMap::from([(String::from("FERROTERM_CONSOLE_LISTEN"), String::from("x"))]);
-        assert!(matches!(
-            Config::from_sources(None, &unknown),
-            Err(Error::Load(_))
-        ));
+    }
+
+    #[test]
+    fn a_name_under_the_prefix_that_is_no_override_is_left_alone() {
+        let other = BTreeMap::from([(String::from("FERROTERM_CONSOLE_LISTEN"), String::from("x"))]);
+        Config::from_sources(None, &other).expect("only an override is checked against the tree");
     }
 
     #[test]

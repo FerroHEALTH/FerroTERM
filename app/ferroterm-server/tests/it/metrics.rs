@@ -3,7 +3,10 @@
 
 //! The scrape endpoint and the request id
 //! (<https://prometheus.io/docs/instrumenting/exposition_formats/>; no FHIR
-//! specification governs either, so both are our own design, #122).
+//! specification governs either, so both are our own design, #122). The
+//! request histogram is `http.server.request.duration` of the OpenTelemetry
+//! semantic conventions, which Prometheus reads as
+//! `http_server_request_duration_seconds`.
 
 use axum::body::Body;
 use http::{Request, StatusCode};
@@ -40,13 +43,17 @@ async fn the_scrape_carries_the_loaded_systems_and_the_answered_requests() {
     assert_eq!(status, StatusCode::OK);
     let (_, after) = text(&server, "/metrics").await;
     assert!(
-        after.contains(
-            "ferroterm_http_requests_total{method=\"Get\",route=\"/r4b/CodeSystem/$lookup\",status=\"200\"} 1"
-        ),
+        after.lines().any(|line| {
+            line.starts_with("http_server_request_duration_seconds_count{")
+                && line.contains("http_request_method=\"GET\"")
+                && line.contains("http_route=\"/r4b/CodeSystem/$lookup\"")
+                && line.contains("http_response_status_code=\"200\"")
+                && line.ends_with(" 1")
+        }),
         "the operation is counted by its route, not its URI: {after}"
     );
     assert!(
-        after.contains("ferroterm_http_request_duration_seconds_sum{"),
+        after.contains("http_server_request_duration_seconds_sum{"),
         "the duration histogram is exposed: {after}"
     );
 }
@@ -58,7 +65,7 @@ async fn a_refusal_is_counted_under_its_own_status() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
     let (_, scrape) = text(&server, "/metrics").await;
     assert!(
-        scrape.contains("status=\"400\""),
+        scrape.contains("http_response_status_code=\"400\""),
         "a client error keeps its own series: {scrape}"
     );
 }

@@ -85,13 +85,6 @@ cleanup() {
 trap cleanup EXIT
 
 echo "== starting the server on 127.0.0.1:8080 (admin 127.0.0.1:8081) over the empty root"
-# The server refuses every FERROTERM_ variable that is not its own, so the
-# sync service's account stays out of its environment.
-unset_sync=()
-for name in $(compgen -e); do
-  [[ "$name" == FERROTERM_SYNC_* ]] && unset_sync+=(-u "$name")
-done
-env "${unset_sync[@]}" \
 FERROTERM__USAGE_REPORT__ENABLED=false \
 FERROTERM__TERMINOLOGY__INDEX="$work/index" \
 FERROTERM__TERMINOLOGY__CODE_SYSTEMS="$work/codesystems" \

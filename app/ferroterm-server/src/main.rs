@@ -4,7 +4,7 @@
 //! The `ferroterm` binary: configuration in, [`ferroterm_server::serve`] out.
 //!
 //! The order is the one that makes the console right: read the configuration,
-//! print the banner when a person is reading, install the log subscriber, load
+//! print the banner when a person is reading, install the telemetry, load
 //! the artifacts (their summary is the first thing logged), bind, serve.
 #![expect(
     clippy::print_stdout,
@@ -18,13 +18,14 @@ use std::sync::Arc;
 
 use clap::Parser;
 use ferrohealth_server::cli::ConfigCommand;
+use ferrohealth_telemetry::section::Rendering;
+use ferrohealth_telemetry::telemetry::{Console, Service, Telemetry};
 use ferroterm_server::cli::{Cli, Command};
 use ferroterm_server::config::Config;
 use ferroterm_server::reload::Serving;
 use ferroterm_server::smart::Smart;
 use ferroterm_server::state::AppState;
-use ferroterm_server::telemetry::ResolvedFormat;
-use ferroterm_server::{banner, healthcheck, reload, telemetry, usage_report};
+use ferroterm_server::{banner, healthcheck, reload, usage_report};
 use tokio::net::TcpListener;
 
 #[tokio::main]
@@ -62,25 +63,38 @@ async fn main() -> ExitCode {
     let (config, _provenance) = loaded.into_parts();
     let mut config = config;
     config.usage_report = config.usage_report.with_ci(|name| std::env::var(name).ok());
-    let stdout_is_terminal = std::io::stdout().is_terminal();
-    if config.telemetry.format.resolve(stdout_is_terminal) == ResolvedFormat::Pretty {
+    if config
+        .telemetry
+        .format
+        .resolve(std::io::stdout().is_terminal())
+        == Rendering::Pretty
+    {
         banner::print();
     }
-    if let Err(error) = telemetry::init(
-        config.telemetry.format,
-        &config.telemetry.filter,
-        stdout_is_terminal,
-    ) {
+    let service = Service::new("ferroterm", env!("CARGO_PKG_VERSION"));
+    let telemetry = match Telemetry::new(&config.telemetry, service) {
+        Ok(telemetry) => Arc::new(telemetry),
+        Err(error) => {
+            eprintln!("ferroterm: cannot start: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    if let Err(error) = telemetry.install(&config.telemetry, &Console::detect()) {
         eprintln!("ferroterm: cannot start: {error}");
         return ExitCode::FAILURE;
     }
-    match run(config, started).await {
+    ferrohealth_telemetry::panic::install_hook();
+    let outcome = match run(config, Arc::clone(&telemetry), started).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             tracing::error!(error = format!("{error:#}"), "cannot start");
             ExitCode::FAILURE
         }
+    };
+    if let Err(error) = telemetry.shutdown() {
+        tracing::warn!(%error, "the telemetry did not flush");
     }
+    outcome
 }
 
 /// `ferroterm healthcheck`: silent on `200 OK`, the reason on stderr otherwise.
@@ -95,7 +109,11 @@ async fn healthcheck_main(url: &str) -> ExitCode {
     }
 }
 
-async fn run(config: Config, started: std::time::Instant) -> anyhow::Result<()> {
+async fn run(
+    config: Config,
+    telemetry: Arc<Telemetry>,
+    started: std::time::Instant,
+) -> anyhow::Result<()> {
     use anyhow::Context;
 
     let state = AppState::load(&config).context("loading the artifacts terminology.index names")?;
@@ -171,7 +189,7 @@ async fn run(config: Config, started: std::time::Instant) -> anyhow::Result<()> 
         }
         None => None,
     };
-    let serving = Serving::with_smart(config, Arc::new(state), smart);
+    let serving = Serving::with_smart(config, Arc::new(state), smart, telemetry);
     // NOTE: dropping the handle detaches the task, which then runs until the
     // process ends (<https://docs.rs/tokio/latest/tokio/task/struct.JoinHandle.html>).
     let _hangup = tokio::spawn(reload::on_hangup(serving.clone()));

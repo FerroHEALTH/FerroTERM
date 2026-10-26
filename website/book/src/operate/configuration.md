@@ -15,9 +15,12 @@ the one before it:
 
 A container sets the variables or mounts the file; a host does either in the
 service unit. The load is strict: an unknown key in the file, a `FERROTERM__`
-variable that names no key, any other variable that starts with `FERROTERM_`,
-and a value of the wrong type each refuse the start, naming the key or the
-variable and the closest known name, never the value. A list key reads a TOML
+variable that names no key, and a value of the wrong type each refuse the
+start, naming the key or the variable and the closest known name, never the
+value. Any other variable that starts with `FERROTERM_` is left alone, so the
+console's `FERROTERM_CONSOLE__` and the synchronisation service's
+`FERROTERM_SYNC__` variables can share the server's environment; a flat name
+of an earlier release, such as `FERROTERM_LISTEN`, is not read. A list key reads a TOML
 array from the file and a comma-separated list from a variable
 (`FERROTERM__TERMINOLOGY__INDEX=/srv/a,/srv/b`).
 
@@ -75,6 +78,39 @@ audience = ["https://tx.example.org"]
 | `usage_report.deployment` (`FERROTERM__USAGE_REPORT__DEPLOYMENT`) | How the server was deployed, as the usage report states it: `helm`, `compose`, `binary`, or `unknown`. The compose file sets `compose`. | `unknown` |
 | `telemetry.format` (`FERROTERM__TELEMETRY__FORMAT`) | `auto`, `json`, or `pretty`. `json` writes one object per line (`timestamp`, `level`, `message`, and the fields) for a log pipeline; `pretty` writes aligned human lines with colour; `auto` picks `pretty` when stdout is a terminal and `json` otherwise. The startup banner prints only with `pretty`. | `auto` |
 | `telemetry.filter` (`FERROTERM__TELEMETRY__FILTER`, or `RUST_LOG`) | The `tracing` filter. `RUST_LOG` wins over the file and over `FERROTERM__TELEMETRY__FILTER`. | `info,hyper=warn,tower=warn,h2=warn` |
+| `telemetry.logged_query_parameters` (`FERROTERM__TELEMETRY__LOGGED_QUERY_PARAMETERS`) | Further query parameters whose values the request line carries in its `query` field, beside the system and code fields the server always logs (see [Request identifiers](observability.md#request-identifiers)). Name only parameters that hold no free text. | none |
+| `telemetry.environment` (`FERROTERM__TELEMETRY__ENVIRONMENT`) | The deployment environment the exported spans and metrics name, such as `production` (`deployment.environment.name`). | none |
+| `[telemetry.otlp]` (`FERROTERM__TELEMETRY__OTLP__<KEY>`) | The OpenTelemetry collector the spans and metrics are pushed to (see [Telemetry](#telemetry)). | none (nothing is exported) |
+
+## Telemetry
+
+The console log, the request log and the `/metrics` scrape need no
+configuration. A `[telemetry.otlp]` table also exports the server's spans and
+metrics to an OpenTelemetry collector over OTLP/gRPC:
+
+```toml
+[telemetry]
+environment = "production"
+
+[telemetry.otlp]
+endpoint = "https://collector.example.org:4317"
+traces = true
+metrics = true
+sample_ratio = 0.1
+trust_roots_file = "/etc/ferroterm/collector-ca.pem"
+```
+
+| Key | Meaning | Default |
+|---|---|---|
+| `endpoint` | The collector's OTLP/gRPC endpoint; `https://` speaks TLS. It may carry a credential, so `config check` shows it masked. | none |
+| `traces` | Whether the spans are exported. | `true` |
+| `metrics` | Whether the metrics are pushed. | `true` |
+| `sample_ratio` | The share of the traces that are sampled, from `0` to `1`. | `1` |
+| `trust_roots_file` | A PEM file of trust roots the collector's certificate may chain to, beside the platform's. | none |
+| `client_identity_file` | A PEM file holding a client certificate chain and its key, for mutual TLS with the collector. | none |
+
+The synchronisation service and the console read the same `[telemetry]`
+section from their own files.
 
 ## Authentication
 
@@ -172,9 +208,11 @@ systems, one `serving code system` line per loaded version (`id`, `system`,
 address and the base path of every served version (`bases`), and one `usage
 report ON` or `usage report OFF` line (see [Usage report](usage-report.md)).
 Per request: one
-`request` line with `method`, `route`, `status`, `latency_ms`, and the
-`system`, `url`, `version`, `code`, `codeA`, `codeB` query parameters the
-request named (`named`); bodies and free-text parameters are never logged. A
+`request` line with `method`, `route`, `status`, `latency_ms`, the server's
+`request_id`, `client_named`, and the `system`, `url`, `version`, `code`,
+`codeA` and `codeB` query parameters the request named, as the fields
+`system`, `url`, `version`, `code`, `code_a` and `code_b`; bodies and
+free-text parameters are never logged. A
 client error logs at `warn`, a server error at `error`. On `SIGTERM` or
 `SIGINT`: the signal, then `ferroterm stopped`. A refused start is one
 `cannot start` line with the reason. On a reload: `the served set was

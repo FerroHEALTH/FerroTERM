@@ -52,7 +52,11 @@ fn requests(c: &mut Criterion) {
 
     // The router is built once, as the binary builds it, and cloned per
     // request because `oneshot` consumes the service.
-    let built = ferroterm_server::router(Serving::new(config.clone(), Arc::clone(&state)));
+    let built = ferroterm_server::router(Serving::new(
+        config.clone(),
+        Arc::clone(&state),
+        telemetry(),
+    ));
     let answer = |uri: &str| {
         let router = built.clone();
         let request = Request::get(uri).body(Body::empty()).expect("request");
@@ -110,7 +114,11 @@ fn fixed(c: &mut Criterion) {
         .build()
         .expect("runtime");
     let bare = axum::Router::new().route("/health", axum::routing::get(async || "ok"));
-    let served = ferroterm_server::router(Serving::new(config.clone(), Arc::clone(&state)));
+    let served = ferroterm_server::router(Serving::new(
+        config.clone(),
+        Arc::clone(&state),
+        telemetry(),
+    ));
     let call = |router: axum::Router, uri: &str| {
         let request = Request::get(uri).body(Body::empty()).expect("request");
         runtime.block_on(async {
@@ -168,7 +176,11 @@ fn local(c: &mut Criterion) {
         .enable_all()
         .build()
         .expect("runtime");
-    let router = ferroterm_server::router(Serving::new(config.clone(), Arc::clone(&state)));
+    let router = ferroterm_server::router(Serving::new(
+        config.clone(),
+        Arc::clone(&state),
+        telemetry(),
+    ));
     let answer = |uri: &str| {
         let router = router.clone();
         let request = Request::get(uri).body(Body::empty()).expect("request");
@@ -250,3 +262,14 @@ fn local(c: &mut Criterion) {
 
 criterion_group!(benches, requests, fixed, local);
 criterion_main!(benches);
+
+/// A telemetry of its own for the measured router.
+fn telemetry() -> Arc<ferrohealth_telemetry::telemetry::Telemetry> {
+    Arc::new(
+        ferrohealth_telemetry::telemetry::Telemetry::new(
+            &ferrohealth_telemetry::section::TelemetrySection::default(),
+            ferrohealth_telemetry::telemetry::Service::new("ferroterm", "bench"),
+        )
+        .expect("the default telemetry builds"),
+    )
+}

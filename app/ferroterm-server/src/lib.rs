@@ -32,26 +32,22 @@ pub mod reload;
 // linking the library it builds, so the module is compiled here for its tests.
 #[cfg(test)]
 mod release_date;
-pub mod request_log;
+pub mod request_fields;
 pub mod scope;
 pub mod smart;
 pub mod state;
-pub mod telemetry;
 pub mod usage_report;
 pub mod version;
 pub mod wire;
 
 use std::future::Future;
-use std::sync::Arc;
 
 use axum::Router;
-use axum::routing::get;
 use ferrohealth_health::lifecycle::Lifecycle;
-use http::StatusCode;
+use ferrohealth_telemetry::request_log::{self, RequestLog};
 use tokio::net::TcpListener;
 
 use crate::reload::Serving;
-use crate::state::AppState;
 
 /// The base path of every served FHIR version; the router mounts each and the
 /// boot lines name them.
@@ -61,9 +57,13 @@ pub const FHIR_BASES: [&str; 4] = ["/r4", "/r4b", "/r5", "/r6"];
 ///
 /// `GET /health`, `GET /health/liveness` and `GET /health/readiness` are the
 /// family's health routes over [`Serving::health`] ([`healthcheck`] is the
-/// probe the container runs against `/health`); every FHIR route lives under its
-/// version prefix. Any other path is an `OperationOutcome` `not-found`, and
-/// that includes `/reload`, which only the admin listener serves.
+/// probe the container runs against `/health`), and `GET /metrics` is the
+/// Prometheus exposition of [`Serving::telemetry`]; every FHIR route lives
+/// under its version prefix. Any other path is an `OperationOutcome`
+/// `not-found`, and that includes `/reload`, which only the admin listener
+/// serves. Every request gets the server's request id and one line of the
+/// request log of `ferrohealth-telemetry`, with the fields
+/// [`request_fields`] adds.
 pub fn router(serving: Serving) -> Router {
     // The gate sits inside each version's router, so the path it reads is the
     // one under the version prefix that `nest` leaves.
@@ -74,18 +74,31 @@ pub fn router(serving: Serving) -> Router {
     };
     let [r4, r4b, r5, r6] = FHIR_BASES;
     let health = ferrohealth_server::health::routes(serving.health().clone());
+    let telemetry = std::sync::Arc::clone(serving.telemetry());
+    let log = RequestLog::new(&serving.config().telemetry.logged_query_parameters)
+        .with_metrics(&telemetry.meter(metrics::SCOPE));
     Router::new()
         .nest(r4, gated(r4::router(), r4))
         .nest(r4b, gated(r4b::router(), r4b))
         .nest(r5, gated(r5::router(), r5))
         .nest(r6, gated(r6::router(), r6))
-        .route("/metrics", get(metrics_scrape))
+        .route(
+            "/metrics",
+            ferrohealth_telemetry::telemetry::prometheus_route(telemetry),
+        )
         .with_state(serving.clone())
         .merge(health)
         .fallback(outcome::not_found)
         .layer(axum::middleware::from_fn_with_state(
             serving,
-            request_log::log,
+            request_fields::record,
+        ))
+        .layer(axum::middleware::from_fn_with_state(
+            log,
+            request_log::middleware,
+        ))
+        .layer(axum::middleware::from_fn(
+            ferrohealth_server::request_id::assign,
         ))
 }
 
@@ -183,32 +196,5 @@ pub async fn shutdown_signal() {
     tokio::select! {
         () = interrupt => tracing::info!("SIGINT received, shutting down"),
         () = terminate => tracing::info!("SIGTERM received, shutting down"),
-    }
-}
-
-/// `GET /metrics`: the Prometheus exposition of this server.
-///
-/// The endpoint is off the FHIR base path, so a scrape is never a terminology
-/// request and no FHIR content negotiation applies. It answers the text
-/// exposition format Prometheus reads
-/// (<https://prometheus.io/docs/instrumenting/exposition_formats/>).
-async fn metrics_scrape(
-    axum::extract::State(state): axum::extract::State<Arc<AppState>>,
-) -> axum::response::Response {
-    use axum::response::IntoResponse;
-    match state.metrics().exposition() {
-        Ok(text) => (
-            StatusCode::OK,
-            [(
-                http::header::CONTENT_TYPE,
-                "application/openmetrics-text; version=1.0.0; charset=utf-8",
-            )],
-            text,
-        )
-            .into_response(),
-        Err(error) => {
-            tracing::error!(%error, "the metrics registry cannot be written");
-            StatusCode::INTERNAL_SERVER_ERROR.into_response()
-        }
     }
 }

@@ -10,9 +10,11 @@
 )]
 
 use std::process::ExitCode;
+use std::sync::Arc;
 
 use clap::Parser;
 use ferrohealth_server::cli::ConfigCommand;
+use ferrohealth_telemetry::telemetry::{Console, Service, Telemetry};
 use ferroterm_sync::cli::{Cli, Command};
 use ferroterm_sync::config::Config;
 use ferroterm_sync::record::Outcome;
@@ -42,18 +44,53 @@ async fn main() -> ExitCode {
             }
         },
         Some(Command::Healthcheck { url }) => healthcheck(loaded.settings(), url).await,
-        Some(Command::RunOnce) => logged(run_once(loaded.into_parts().0)).await,
-        None => Box::pin(logged(serve(loaded.into_parts().0))).await,
+        Some(Command::RunOnce) => {
+            let config = loaded.into_parts().0;
+            match telemetry(&config) {
+                Ok(telemetry) => {
+                    finished(run_once(config, Arc::clone(&telemetry)).await, &telemetry)
+                }
+                Err(code) => code,
+            }
+        }
+        None => {
+            let config = loaded.into_parts().0;
+            match telemetry(&config) {
+                Ok(telemetry) => finished(
+                    Box::pin(serve(config, Arc::clone(&telemetry))).await,
+                    &telemetry,
+                ),
+                Err(code) => code,
+            }
+        }
     }
 }
 
-/// Installs the log subscriber and then runs `command`.
-async fn logged(command: impl Future<Output = ExitCode>) -> ExitCode {
-    if let Err(error) = ferroterm_sync::cli::init_logging() {
+/// Builds and installs the telemetry `[telemetry]` describes, with the
+/// family's panic line.
+fn telemetry(config: &Config) -> Result<Arc<Telemetry>, ExitCode> {
+    let service = Service::new("ferroterm-sync", env!("CARGO_PKG_VERSION"));
+    let telemetry = match Telemetry::new(&config.telemetry, service) {
+        Ok(telemetry) => Arc::new(telemetry),
+        Err(error) => {
+            eprintln!("ferroterm-sync: cannot start: {error}");
+            return Err(ExitCode::FAILURE);
+        }
+    };
+    if let Err(error) = telemetry.install(&config.telemetry, &Console::detect()) {
         eprintln!("ferroterm-sync: cannot start: {error}");
-        return ExitCode::FAILURE;
+        return Err(ExitCode::FAILURE);
     }
-    command.await
+    ferrohealth_telemetry::panic::install_hook();
+    Ok(telemetry)
+}
+
+/// Flushes the telemetry before the process exits with `code`.
+fn finished(code: ExitCode, telemetry: &Telemetry) -> ExitCode {
+    if let Err(error) = telemetry.shutdown() {
+        tracing::warn!(%error, "the telemetry did not flush");
+    }
+    code
 }
 
 /// `ferroterm-sync healthcheck`: silent on `200 OK`, the reason otherwise.
@@ -70,8 +107,8 @@ async fn healthcheck(config: &Config, url: Option<String>) -> ExitCode {
 }
 
 /// Serves until the process is stopped.
-async fn serve(config: Config) -> ExitCode {
-    match ferroterm_sync::cli::serve(config).await {
+async fn serve(config: Config, telemetry: Arc<Telemetry>) -> ExitCode {
+    match ferroterm_sync::cli::serve(config, telemetry).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             let error = anyhow::Error::from(error);
@@ -82,8 +119,8 @@ async fn serve(config: Config) -> ExitCode {
 }
 
 /// Performs one run, reports it, and exits non-zero when the run failed.
-async fn run_once(config: Config) -> ExitCode {
-    match ferroterm_sync::cli::run_once(config).await {
+async fn run_once(config: Config, telemetry: Arc<Telemetry>) -> ExitCode {
+    match ferroterm_sync::cli::run_once(config, telemetry).await {
         Ok(record) => {
             println!(
                 "{}: {} in {} ms, {} entries taken, {} activated",

@@ -37,7 +37,6 @@ petgraph = "0.8.3"
 unicode-normalization = "0.1.25"
 # HTTP and async.
 axum = "0.8.9"
-prometheus-client = "0.25.1"
 tower = "0.5.3"
 hyper = "1.11.1"
 hyper-util = { version = "0.1.20", default-features = false, features = ["client-legacy", "http1", "tokio"] }
@@ -83,18 +82,22 @@ ferrohealth-smart = { version = "=0.7.5", features = ["axum"] }
 # The FerroHEALTH health family: the readiness document, the indicator
 # registry and the process lifecycle, and the HTTP plumbing whose `health`
 # module serves `/health`, `/health/liveness` and `/health/readiness` over
-# them. ferrohealth-server 0.3.0 pins ferrohealth-health =0.1.1. Pinned
-# exactly. Verified against crates.io on 2026-10-26.
+# them. Pinned exactly. Verified against crates.io on 2026-10-26.
 ferrohealth-health = { version = "=0.1.1", features = ["registry"] }
-ferrohealth-server = { version = "=0.3.0" }
+ferrohealth-server = { version = "=0.3.2" }
 # The FerroHEALTH configuration loader and its secrets: one TOML tree per
 # binary under `--config` or `<PREFIX>_CONFIG`, `<PREFIX>__SECTION__KEY`
 # overrides, `--set`, strict refusals and provenance, and the `<key>_file`
-# rule with the redacting `Secret`. ferrohealth-server 0.3.0 and
-# ferrohealth-config 0.2.2 pin ferrohealth-secret =0.2.0. Pinned exactly.
-# Verified against crates.io on 2026-10-26.
-ferrohealth-config = { version = "=0.2.2" }
+# rule with the redacting `Secret`. Pinned exactly. Verified against
+# crates.io on 2026-10-26.
+ferrohealth-config = { version = "=0.2.5" }
 ferrohealth-secret = { version = "=0.2.0" }
+# The FerroHEALTH telemetry: the `[telemetry]` section, the console, the
+# panic line, the request log with its product fields, and the one
+# OpenTelemetry provider read by Prometheus and pushed over OTLP. Each member
+# names the features it uses. Pinned exactly. Verified against crates.io on
+# 2026-10-26.
+ferrohealth-telemetry = { version = "=0.2.1" }
 # The Argon2id hashes of the Basic users the SMART tests configure, the
 # version and features ferrohealth-smart verifies them with. Verified against
 # crates.io on 2026-10-20.
@@ -151,7 +154,10 @@ url = "2.5.8"
 # Only the console's site bundle is compressed, brotli or gzip as the request
 # asks; the security headers are set per response. Verified 2026-10-18.
 tower-http = { version = "0.7.1", default-features = false, features = ["set-header", "compression-br", "compression-gzip", "fs"] }
-# Observability.
+# Observability. `opentelemetry` is the API the product instruments are made
+# with on the meter of ferrohealth-telemetry, at the version that crate
+# builds on. Verified against crates.io on 2026-10-26.
+opentelemetry = { version = "0.33.1", default-features = false, features = ["metrics"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 # Command-line parsing for the tools and the server binary.

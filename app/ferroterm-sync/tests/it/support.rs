@@ -432,7 +432,8 @@ impl Harness {
         clock: Arc<TestClock>,
     ) -> Arc<Service> {
         Arc::new(
-            Service::new(self.config.clone(), sources, clock).expect("the service is configured"),
+            Service::new(self.config.clone(), sources, clock, telemetry())
+                .expect("the service is configured"),
         )
     }
 
@@ -525,4 +526,16 @@ fn executable(path: &Path) {
     use std::os::unix::fs::PermissionsExt as _;
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))
         .expect("the build binary is executable");
+}
+
+/// A telemetry of its own for one service, so its scrape counts only its
+/// own runs.
+fn telemetry() -> Arc<ferrohealth_telemetry::telemetry::Telemetry> {
+    Arc::new(
+        ferrohealth_telemetry::telemetry::Telemetry::new(
+            &ferrohealth_telemetry::section::TelemetrySection::default(),
+            ferrohealth_telemetry::telemetry::Service::new("ferroterm-sync", "test"),
+        )
+        .expect("the default telemetry builds"),
+    )
 }

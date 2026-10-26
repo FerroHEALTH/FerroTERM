@@ -23,7 +23,7 @@ use crate::fixture::json;
 /// A serving over `config`, loaded the way the binary loads it.
 fn serving(config: Config) -> Serving {
     let state = Arc::new(AppState::load(&config).expect("loads"));
-    Serving::new(config, state)
+    Serving::new(config, state, crate::fixture::telemetry())
 }
 
 async fn get(router: &Router, uri: &str) -> (StatusCode, Value) {

@@ -112,8 +112,10 @@ location / {
 The server does not read these headers: it takes its public URL from
 `FERROTERM__FHIR__BASE_URL` rather than from a header a client could forge, which is
 the same reason a proxy should strip an inbound `X-Forwarded-*` it did not set.
-It does read `X-Request-Id`, and echoes it, so a proxy that generates one (as
-nginx does above) gets the same id in the server's log line. See
+It does read `X-Request-Id` and echoes it, so a proxy that generates one (as
+nginx does above) gets its id back on the response; the server's log line
+carries the server's own id and `client_named: true`, never the proxy's value.
+See
 [Metrics and request identifiers](observability.md).
 
 ## Authentication

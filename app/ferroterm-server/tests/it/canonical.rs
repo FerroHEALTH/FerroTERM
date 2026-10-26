@@ -448,8 +448,8 @@ async fn a_stored_core_canonical_is_not_served_and_is_logged_at_startup() {
     drop(store);
 
     let capture = crate::telemetry::Capture::default();
-    let guard = tracing::subscriber::set_default(ferroterm_server::telemetry::subscriber(
-        ferroterm_server::telemetry::ResolvedFormat::Json,
+    let guard = tracing::subscriber::set_default(crate::telemetry::subscriber(
+        ferrohealth_telemetry::section::Rendering::Json,
         "warn",
         false,
         capture.clone(),

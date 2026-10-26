@@ -36,7 +36,10 @@ pub fn router(service: Arc<Service>) -> Router {
         .route("/activate", post(activate))
         .route("/runs", get(runs))
         .route("/runs/{id}", get(one_run))
-        .route("/metrics", get(metrics))
+        .route(
+            "/metrics",
+            ferrohealth_telemetry::telemetry::prometheus_route(Arc::clone(service.telemetry())),
+        )
         .with_state(service)
         .merge(health)
         .fallback(unknown)
@@ -80,25 +83,6 @@ async fn one_run(State(service): State<Arc<Service>>, Path(id): Path<String>) ->
                 .into_response()
         }
         Err(error) => failed(&error),
-    }
-}
-
-/// `GET /metrics`: the Prometheus exposition of this service.
-async fn metrics(State(service): State<Arc<Service>>) -> Response {
-    match service.metrics().exposition() {
-        Ok(text) => (
-            StatusCode::OK,
-            [(
-                axum::http::header::CONTENT_TYPE,
-                "application/openmetrics-text; version=1.0.0; charset=utf-8",
-            )],
-            text,
-        )
-            .into_response(),
-        Err(error) => {
-            tracing::error!(%error, "the metrics registry cannot be written");
-            StatusCode::INTERNAL_SERVER_ERROR.into_response()
-        }
     }
 }
 

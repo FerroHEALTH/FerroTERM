@@ -97,8 +97,8 @@ container image sets `/etc/ferroterm/sync.toml`). A variable
 `FERROTERM_SYNC__<SECTION>__<KEY>` sets one key over the file
 (`FERROTERM_SYNC__RETENTION=4`, `FERROTERM_SYNC__SCHEDULE__AT=03:00`), and
 `--set key=value` sets one over both. Every key is optional and falls back to
-the value below; a key or a `FERROTERM_SYNC_` variable the service does not
-know is refused at start-up rather than ignored. `ferroterm-sync config check`
+the value below; a key, or a `FERROTERM_SYNC__` variable, that the service
+does not know is refused at start-up rather than ignored. `ferroterm-sync config check`
 prints every key with where it came from, every secret as `***`.
 
 | Key | Default | What it names |
@@ -119,6 +119,7 @@ prints every key with where it came from, every secret as `***`.
 | `[server_admin_credentials]` | none | the credential of the reload call (see [below](#the-credential-of-the-reload-call)) |
 | `[auth]` | on, no issuer | the credentials the admin listener admits (see [The admin listener](#the-admin-listener)) |
 | `[nts]` | no account | the account the NTS add-on authenticates with (see [Credentials](#credentials)) |
+| `[telemetry]` | `auto` format, no export | the console log's `format` and `filter` (`RUST_LOG` sets the filter too), and the OTLP export of the service's metrics, the same section the server reads (see [Telemetry](configuration.md#telemetry)) |
 
 A `[[source]]` entry names the add-on that reads a service and carries that
 add-on's own block:

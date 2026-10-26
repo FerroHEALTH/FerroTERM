@@ -42,9 +42,9 @@ use std::path::{Path, PathBuf};
 
 use ferrohealth_config::loader::{Loaded, Loader};
 use ferrohealth_smart::config::AuthSection;
+use ferrohealth_telemetry::section::TelemetrySection;
 use serde::{Deserialize, Serialize};
 
-use crate::telemetry::LogFormat;
 use crate::usage_report::config::UsageReportConfig;
 
 /// The environment prefix: `FERROTERM__SERVER__LISTEN` sets `[server]
@@ -101,7 +101,7 @@ pub struct Config {
     pub terminology: TerminologySection,
     /// `[fhir]`: what the capability statements declare.
     pub fhir: FhirSection,
-    /// `[telemetry]`: the console log.
+    /// `[telemetry]`: the console log, the request log and the metrics export.
     pub telemetry: TelemetrySection,
     /// `[auth]`: who may write and reach the admin listener.
     pub auth: AuthSection,
@@ -193,25 +193,6 @@ pub struct FhirSection {
     /// `Basic`, `Certificates`, `Kerberos`, `NTLM`); empty when the
     /// deployment declares none.
     pub security_services: Vec<String>,
-}
-
-/// `[telemetry]`.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct TelemetrySection {
-    /// The console log format.
-    pub format: LogFormat,
-    /// The `tracing` filter; `RUST_LOG` sets it too.
-    pub filter: String,
-}
-
-impl Default for TelemetrySection {
-    fn default() -> Self {
-        Self {
-            format: LogFormat::Auto,
-            filter: String::from(crate::telemetry::DEFAULT_FILTER),
-        }
-    }
 }
 
 /// A configuration the server refuses to start on.
@@ -357,9 +338,9 @@ mod tests {
     use std::collections::BTreeMap;
 
     use ferrohealth_smart::config::IssuerKey;
+    use ferrohealth_telemetry::section::Format;
 
     use super::{Config, ConfigError, base_url_of};
-    use crate::telemetry::LogFormat;
 
     fn environment(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
         pairs
@@ -472,8 +453,12 @@ mod tests {
         let users = auth.basic.as_ref().expect("the Basic table").users.len();
         assert_eq!(users, 1);
         assert!(auth.enabled, "authentication is on unless it is turned off");
-        assert_eq!(config.telemetry.format, LogFormat::Json);
-        assert_eq!(config.telemetry.filter, "debug", "RUST_LOG sets the filter");
+        assert_eq!(config.telemetry.format, Format::Json);
+        assert_eq!(
+            config.telemetry.filter.as_str(),
+            "debug",
+            "RUST_LOG sets the filter"
+        );
     }
 
     #[test]
@@ -507,20 +492,28 @@ mod tests {
             Config::from_sources(None, &environment(&[("FERROTERM__", "x")])),
             Err(ConfigError::Load(_))
         ));
-        // The flat names of earlier releases are refused, never read.
-        for removed in [
+    }
+
+    #[test]
+    fn a_sibling_binary_s_variable_or_a_flat_name_is_left_alone() {
+        // The console's and the sync service's overrides share the server's
+        // environment, and the flat names of earlier releases are never read.
+        for foreign in [
+            "FERROTERM_CONSOLE__SERVER__LISTEN",
+            "FERROTERM_CONSOLE_CONFIG",
+            "FERROTERM_SYNC__RETENTION",
             "FERROTERM_LISTEN",
             "FERROTERM_INDEX",
             "FERROTERM_AUTH_FILE",
             "FERROTERM_AUTH__ISSUER",
             "FERROTERM_USAGE_REPORT",
         ] {
+            let config = Config::from_sources(None, &environment(&[(foreign, "x")]))
+                .unwrap_or_else(|error| panic!("{foreign}: {error}"));
+            assert_eq!(config.server.listen, "127.0.0.1:8080", "{foreign}");
             assert!(
-                matches!(
-                    Config::from_sources(None, &environment(&[(removed, "x")])),
-                    Err(ConfigError::Load(_))
-                ),
-                "{removed}"
+                matches!(&config.auth.issuer, IssuerKey::Flat(issuer) if issuer.is_empty()),
+                "{foreign}"
             );
         }
     }

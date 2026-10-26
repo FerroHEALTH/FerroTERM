@@ -39,7 +39,10 @@ The configuration is a TOML file, named by `--config` or
 `FERROTERM_CONSOLE__FERROTERM__BASE_URL`, `--set key=value` sets one over
 both, and every secret also reads from a file through its `_file` sibling,
 whose trailing line ending is dropped. An unknown key, or a
-`FERROTERM_CONSOLE_` variable that names none, is refused at start.
+`FERROTERM_CONSOLE__` variable that names none, is refused at start.
+The `[telemetry]` section is the one the server reads
+([Telemetry](configuration.md#telemetry)): `format` and `filter` set the
+console log, and `RUST_LOG` sets the filter too.
 
 ```toml
 [server]

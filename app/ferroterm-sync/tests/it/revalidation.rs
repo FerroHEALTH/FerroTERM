@@ -152,7 +152,10 @@ async fn an_inactive_code_is_reported_with_the_release_that_changed_it() {
         1,
         "the webhook summary carries the finding count"
     );
-    let text = service.metrics().exposition().expect("the metrics encode");
+    let text = service
+        .telemetry()
+        .render_prometheus()
+        .expect("the metrics encode");
     assert!(
         text.contains(
             "ferroterm_sync_revalidation_findings{resource=\"ValueSet https://example.invalid/ValueSet/local\"} 1"
