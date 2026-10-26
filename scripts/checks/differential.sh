@@ -79,7 +79,7 @@ if [[ -z "$server" ]]; then
     exit 2
   fi
   mkdir -p "$(dirname "$out")"
-  FERROTERM_USAGE_REPORT=off FERROTERM_INDEX="$index" FERROTERM_LISTEN=127.0.0.1:8099 FERROTERM_LOG_FORMAT=json \
+  FERROTERM__USAGE_REPORT__ENABLED=false FERROTERM__TERMINOLOGY__INDEX="$index" FERROTERM__SERVER__LISTEN=127.0.0.1:8099 FERROTERM__TELEMETRY__FORMAT=json \
     target/release/ferroterm > "$out.server.log" 2>&1 &
   started=$!
   trap 'kill "$started" 2>/dev/null || true' EXIT

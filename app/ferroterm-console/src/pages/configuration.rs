@@ -26,11 +26,11 @@ use leptos::prelude::*;
 use leptos_meta::Title;
 use leptos_router::hooks::use_params_map;
 
-use crate::config::origin::Origin;
 use crate::config::settings::Settings;
 use crate::locale::{Msg, tr, tr_with};
 use crate::routes::{CONFIGURATION_PATH, ui_path};
 use crate::server::ConsoleState;
+use ferrohealth_config::provenance::Source as KeySource;
 
 /// The id of the dialog that says how configuration works.
 const HOW_DIALOG: &str = "config-how";
@@ -172,7 +172,7 @@ fn settings_of(tab: ConfigTab, settings: &Settings) -> Vec<Setting> {
             source: row
                 .keys
                 .first()
-                .and_then(|key| marker(settings.origins.of(key))),
+                .and_then(|key| marker(settings.source_of(key))),
             ..row
         })
         .collect()
@@ -180,11 +180,12 @@ fn settings_of(tab: ConfigTab, settings: &Settings) -> Vec<Setting> {
 
 /// How a value that does not come from the file is marked: the file is the
 /// page's own source, so it carries no mark.
-fn marker(origin: Origin) -> Option<ValueSource> {
-    match origin {
-        Origin::File => None,
-        Origin::Environment => Some(ValueSource::Environment),
-        Origin::Default => Some(ValueSource::Default),
+fn marker(source: KeySource) -> Option<ValueSource> {
+    match source {
+        KeySource::File => None,
+        // A `--set` pair wins over the file the way an environment override does.
+        KeySource::Environment | KeySource::Set => Some(ValueSource::Environment),
+        KeySource::Default => Some(ValueSource::Default),
     }
 }
 
@@ -376,8 +377,8 @@ pub(crate) fn ConfigurationPage() -> impl IntoView {
     };
     let settings = state.settings();
     let shown_file = settings
-        .file
-        .as_ref()
+        .provenance
+        .file()
         .and_then(|path| path.file_name())
         .map_or_else(
             || String::from(DEFAULT_FILE),
@@ -406,7 +407,7 @@ pub(crate) fn ConfigurationPage() -> impl IntoView {
             mono: false,
             badge: None,
         },
-        actions: more(settings.file.as_deref()),
+        actions: more(settings.provenance.file()),
         source: Source::File {
             file: shown_file.clone(),
             how: How::Dialog(HOW_DIALOG.into()),

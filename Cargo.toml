@@ -87,6 +87,14 @@ ferrohealth-smart = { version = "=0.7.5", features = ["axum"] }
 # exactly. Verified against crates.io on 2026-10-26.
 ferrohealth-health = { version = "=0.1.1", features = ["registry"] }
 ferrohealth-server = { version = "=0.3.0" }
+# The FerroHEALTH configuration loader and its secrets: one TOML tree per
+# binary under `--config` or `<PREFIX>_CONFIG`, `<PREFIX>__SECTION__KEY`
+# overrides, `--set`, strict refusals and provenance, and the `<key>_file`
+# rule with the redacting `Secret`. ferrohealth-server 0.3.0 and
+# ferrohealth-config 0.2.2 pin ferrohealth-secret =0.2.0. Pinned exactly.
+# Verified against crates.io on 2026-10-26.
+ferrohealth-config = { version = "=0.2.2" }
+ferrohealth-secret = { version = "=0.2.0" }
 # The Argon2id hashes of the Basic users the SMART tests configure, the
 # version and features ferrohealth-smart verifies them with. Verified against
 # crates.io on 2026-10-20.

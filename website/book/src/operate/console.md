@@ -36,8 +36,10 @@ $ ferroterm-console healthcheck
 The configuration is a TOML file, named by `--config` or
 `FERROTERM_CONSOLE_CONFIG`. Every key can be set from the environment as
 `FERROTERM_CONSOLE__<SECTION>__<KEY>`, for example
-`FERROTERM_CONSOLE__FERROTERM__BASE_URL`, and every secret also reads from a
-file through its `_file` sibling. An unknown key is refused at start.
+`FERROTERM_CONSOLE__FERROTERM__BASE_URL`, `--set key=value` sets one over
+both, and every secret also reads from a file through its `_file` sibling,
+whose trailing line ending is dropped. An unknown key, or a
+`FERROTERM_CONSOLE_` variable that names none, is refused at start.
 
 ```toml
 [server]
@@ -87,11 +89,11 @@ session on its own server, behind one cookie the browser cannot read; the
 browser never holds a token. Register the console as a client at the provider
 with the redirect address `https://your-console/auth/callback` and the scopes
 above, and point the terminology server at the same issuer with
-`FERROTERM_AUTH__ISSUER` and the audience the provider puts in the console's
-tokens with `FERROTERM_AUTH__AUDIENCE`
+`FERROTERM__AUTH__ISSUER` and the audience the provider puts in the console's
+tokens with `FERROTERM__AUTH__AUDIENCE`
 ([Configuration](configuration.md#authentication)), so it accepts the tokens
 the console presents. A provider that types its access tokens `JWT` rather
-than `at+jwt` (RFC 9068) needs `FERROTERM_AUTH__TOKEN_PROFILE=jwt`. A role that
+than `at+jwt` (RFC 9068) needs `FERROTERM__AUTH__TOKEN_PROFILE=jwt`. A role that
 gets none of the three `user/` scopes reads the server and changes nothing;
 the menu under your name says what you may edit.
 

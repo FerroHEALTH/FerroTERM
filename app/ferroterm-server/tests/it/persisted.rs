@@ -292,8 +292,8 @@ async fn a_write_is_refused_where_the_deployment_persists_nothing() {
     assert!(
         body["issue"][0]["diagnostics"]
             .as_str()
-            .is_some_and(|text| text.contains("FERROTERM_RESOURCES")),
-        "the refusal names the variable that turns persistence on: {body}"
+            .is_some_and(|text| text.contains("terminology.resources")),
+        "the refusal names the key that turns persistence on: {body}"
     );
 }
 

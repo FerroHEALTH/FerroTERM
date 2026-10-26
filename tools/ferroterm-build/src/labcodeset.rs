@@ -4,7 +4,7 @@
 //! The Nederlandse Labcodeset as FHIR resources over the LOINC, SNOMED CT, and
 //! UCUM providers.
 //!
-//! A publication becomes a `FERROTERM_CODESYSTEMS` directory of FHIR R4B
+//! A publication becomes a `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` directory of FHIR R4B
 //! resources: the value set of the active concepts over LOINC with their Dutch
 //! displays, a LOINC supplement carrying the Dutch names and the publication's
 //! properties (materials, units, outcome lists, statuses), and one value set

@@ -7,8 +7,8 @@
 #   scripts/checks/served-artifacts.sh --server URL --index DIRS
 #
 # --server is a versioned FHIR root (http://127.0.0.1:8098/r4b). --index is the
-# FERROTERM_INDEX the server was given: artifact directories separated by the
-# platform's path separator.
+# FERROTERM__TERMINOLOGY__INDEX the server was given: artifact directories
+# separated by commas.
 #
 # The server refuses an artifact it cannot read, logs the reason, and carries
 # on serving the rest. That is the right contract for an operator with nine
@@ -84,7 +84,7 @@ while IFS= read -r directory || [[ -n "$directory" ]]; do
 # The final entry carries no newline of its own, so the read that returns it
 # also reports end of input; without the second test the last artifact named
 # would never be checked.
-done < <(printf '%s\n' "$index" | tr ':' '\n')
+done < <(printf '%s\n' "$index" | tr ',' '\n')
 
 if [[ "$missing" -ne 0 ]]; then
   exit 1

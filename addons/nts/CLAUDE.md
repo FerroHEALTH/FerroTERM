@@ -29,9 +29,9 @@ SMART App Launch for where the token endpoint is discovered, and the FHIR
 
 ## The rules this add-on holds
 
-- **A credential never enters the configuration body.** `CredentialSource`
-  names a file or the environment, and `Credentials` renders only which grants
-  are configured. Any new field holding a secret gets the same treatment, and
+- **A credential never enters the configuration body.** The sync service
+  hands `Credentials` over, its secrets in `ferrohealth-secret`'s `Secret`,
+  and it renders only which grants are configured. Any new field holding a secret gets the same treatment, and
   the test asserting that no rendering carries a secret covers it.
 - **A token is renewed before it expires, never after.** The refresh runs
   inside the margin; a refused refresh logs in again from the stored

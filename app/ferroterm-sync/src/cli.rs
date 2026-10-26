@@ -5,12 +5,13 @@
 //!
 //! With no subcommand the process serves: it binds the admin listener and runs
 //! the schedule until it is stopped. `run-once` performs one run and exits,
-//! which is what a cron-style deployment or a first manual run uses.
+//! which is what a cron-style deployment or a first manual run uses, and
+//! `config check` prints the running configuration.
 
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
+use ferrohealth_server::cli::{ConfigArgs, ConfigCommand};
 use tokio::net::TcpListener;
 
 use crate::clock::SystemClock;
@@ -27,9 +28,9 @@ use crate::source::RegistryError;
     about = "The FerroTERM synchronisation service"
 )]
 pub struct Cli {
-    /// The configuration file to read.
-    #[arg(long, value_name = "FILE", default_value = "/etc/ferroterm/sync.toml")]
-    pub config: PathBuf,
+    /// `--config` and `--set`, which every subcommand takes.
+    #[command(flatten)]
+    pub config: ConfigArgs,
     /// The subcommand, or `None` to serve.
     #[command(subcommand)]
     pub command: Option<Command>,
@@ -40,6 +41,12 @@ pub struct Cli {
 pub enum Command {
     /// Performs one run and exits.
     RunOnce,
+    /// Works on the configuration.
+    Config {
+        /// The job to run.
+        #[command(subcommand)]
+        command: ConfigCommand,
+    },
     /// Asks the running service for `GET /health` and exits 0 on `200 OK`.
     ///
     /// The image has no shell and no HTTP client, so this is its HEALTHCHECK
@@ -55,7 +62,7 @@ pub enum Command {
 /// A service that could not start.
 #[derive(Debug, thiserror::Error)]
 pub enum StartError {
-    /// The configuration file does not read.
+    /// The configuration does not read.
     #[error("the configuration does not read")]
     Config(#[from] ConfigError),
     /// A configured source cannot be built.
@@ -85,16 +92,23 @@ pub enum StartError {
     },
 }
 
-/// Builds the service the configuration at `path` describes.
+/// Reads the configuration `args` names.
 ///
 /// # Errors
 ///
-/// Returns [`StartError::Config`] when the file does not read,
-/// [`StartError::Registry`] when a source cannot be built, and
+/// Returns [`StartError::Config`] when the configuration does not read.
+pub fn load(args: &ConfigArgs) -> Result<ferrohealth_config::loader::Loaded<Config>, StartError> {
+    Ok(Config::load(args.config.as_deref(), &args.sets)?)
+}
+
+/// Builds the service `config` describes.
+///
+/// # Errors
+///
+/// Returns [`StartError::Registry`] when a source cannot be built, and
 /// [`StartError::Service`] when the service cannot be built.
-pub fn service(path: &std::path::Path) -> Result<Arc<Service>, StartError> {
-    let config = Config::load(path)?;
-    let sources = crate::source::configure(&config.source)?;
+pub fn service(config: Config) -> Result<Arc<Service>, StartError> {
+    let sources = crate::source::configure(&config.source, &config.nts)?;
     Ok(Arc::new(Service::new(
         config,
         sources,
@@ -110,8 +124,8 @@ pub fn service(path: &std::path::Path) -> Result<Arc<Service>, StartError> {
 /// listener, [`StartError::Bind`] when the listener does not bind and
 /// [`StartError::Serve`] when it stops with an error; the start-up errors of
 /// [`service`] reach the caller unchanged.
-pub async fn serve(path: &std::path::Path) -> Result<(), StartError> {
-    let service = service(path)?;
+pub async fn serve(config: Config) -> Result<(), StartError> {
+    let service = service(config)?;
     let guard = crate::auth::AdminAuth::start(&service.config().auth).await?;
     let unguarded = crate::admin::router(Arc::clone(&service));
     let admin = if let Some(guard) = &guard {
@@ -156,22 +170,15 @@ pub async fn serve(path: &std::path::Path) -> Result<(), StartError> {
 ///
 /// Returns the start-up errors of [`service`]; a run that fails is a record
 /// with a failed outcome, never an error here.
-pub async fn run_once(path: &std::path::Path) -> Result<RunRecord, StartError> {
-    let service = service(path)?;
+pub async fn run_once(config: Config) -> Result<RunRecord, StartError> {
+    let service = service(config)?;
     Ok(service.run(Trigger::RunOnce).await)
 }
 
 /// The address the health probe reads, from `url` or the configuration.
-///
-/// # Errors
-///
-/// Returns [`StartError::Config`] when no address was given and the
-/// configuration does not read.
-pub fn health_url(path: &std::path::Path, url: Option<String>) -> Result<String, StartError> {
-    match url {
-        Some(url) => Ok(url),
-        None => Ok(crate::healthcheck::url_for(Config::load(path)?.listen)),
-    }
+#[must_use]
+pub fn health_url(config: &Config, url: Option<String>) -> String {
+    url.unwrap_or_else(|| crate::healthcheck::url_for(config.listen))
 }
 
 /// Installs the log subscriber.
@@ -222,6 +229,8 @@ async fn shutdown_signal() {
 mod tests {
     use clap::Parser;
 
+    use ferrohealth_server::cli::ConfigCommand;
+
     use super::{Cli, Command};
 
     #[test]
@@ -240,10 +249,24 @@ mod tests {
             "one run and exit is its own command"
         );
         assert_eq!(
-            cli.config,
-            std::path::PathBuf::from("/tmp/s.toml"),
+            cli.config.config,
+            Some(std::path::PathBuf::from("/tmp/s.toml")),
             "the configuration file is named on the command line"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn config_check_is_a_subcommand() -> Result<(), clap::Error> {
+        let cli =
+            Cli::try_parse_from(["ferroterm-sync", "config", "check", "--set", "retention=3"])?;
+        assert_eq!(
+            cli.command,
+            Some(Command::Config {
+                command: ConfigCommand::Check,
+            })
+        );
+        assert_eq!(cli.config.sets.len(), 1, "--set follows the subcommand");
         Ok(())
     }
 }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The usage report's state on disk: the instance id and the time of the last
-//! start report, under `FERROTERM_STATE_DIR`.
+//! start report, under `usage_report.state_dir`.
 //!
 //! No FHIR or SNOMED CT specification governs this: our own design. Without a
 //! stable instance id every restart would count as a new installation, so a

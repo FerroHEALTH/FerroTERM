@@ -95,15 +95,16 @@ pub struct NtsSource {
 }
 
 impl NtsSource {
-    /// The add-on configured from `config`, with the credentials it names.
+    /// The add-on configured from `config`, authenticating with
+    /// `credentials`.
     ///
     /// # Errors
     ///
-    /// Returns [`NtsError::Credentials`] when the credentials cannot be read
-    /// or configure no usable grant, and [`NtsError::Client`] when the HTTP
-    /// client cannot be built.
-    pub fn new(config: &NtsConfig) -> Result<Self, NtsError> {
-        let credentials = Credentials::load(&config.credentials)?;
+    /// Returns [`NtsError::Credentials`] when the credentials configure no
+    /// usable grant, and [`NtsError::Client`] when the HTTP client cannot be
+    /// built.
+    pub fn new(config: &NtsConfig, credentials: Credentials) -> Result<Self, NtsError> {
+        let credentials = credentials.usable()?;
         let client = reqwest::Client::builder()
             .build()
             .map_err(|source| NtsError::Client { source })?;

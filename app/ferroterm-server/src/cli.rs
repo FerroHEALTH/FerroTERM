@@ -1,9 +1,11 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The command line: no subcommand serves, `healthcheck` probes a server.
+//! The command line: no subcommand serves, `config check` prints the running
+//! configuration, `healthcheck` probes a server.
 
 use clap::{Parser, Subcommand};
+use ferrohealth_server::cli::{ConfigArgs, ConfigCommand};
 
 /// The `ferroterm` command line.
 ///
@@ -16,6 +18,9 @@ use clap::{Parser, Subcommand};
     about = "The FerroTERM FHIR terminology server"
 )]
 pub struct Cli {
+    /// `--config` and `--set`, which every subcommand takes.
+    #[command(flatten)]
+    pub config: ConfigArgs,
     /// The subcommand, or `None` to serve.
     #[command(subcommand)]
     pub command: Option<Command>,
@@ -24,13 +29,19 @@ pub struct Cli {
 /// What the binary does besides serving.
 #[derive(Debug, Subcommand, PartialEq, Eq)]
 pub enum Command {
+    /// Works on the configuration.
+    Config {
+        /// The job to run.
+        #[command(subcommand)]
+        command: ConfigCommand,
+    },
     /// Asks a running server for `GET /health` and exits 0 on `200 OK`.
     ///
     /// The image has no shell and no HTTP client, so this is its HEALTHCHECK
-    /// command. Without `--url` the probe follows `FERROTERM_LISTEN`, on the
+    /// command. Without `--url` the probe follows `server.listen`, on the
     /// loopback when the server listens on every interface.
     Healthcheck {
-        /// The URL to probe instead of the one `FERROTERM_LISTEN` implies.
+        /// The URL to probe instead of the one `server.listen` implies.
         #[arg(long, value_name = "URL")]
         url: Option<String>,
     },
@@ -39,6 +50,8 @@ pub enum Command {
 #[cfg(test)]
 mod tests {
     use clap::Parser;
+
+    use ferrohealth_server::cli::ConfigCommand;
 
     use super::{Cli, Command};
 
@@ -61,6 +74,31 @@ mod tests {
                 url: Some(String::from("http://h:1/health")),
             })
         );
+    }
+
+    #[test]
+    fn config_check_takes_the_file_and_the_sets() {
+        let cli = Cli::try_parse_from([
+            "ferroterm",
+            "config",
+            "check",
+            "--config",
+            "/etc/ferroterm.toml",
+            "--set",
+            "server.listen=0.0.0.0:8080",
+        ])
+        .expect("parses");
+        assert_eq!(
+            cli.command,
+            Some(Command::Config {
+                command: ConfigCommand::Check,
+            })
+        );
+        assert_eq!(
+            cli.config.config.as_deref(),
+            Some(std::path::Path::new("/etc/ferroterm.toml"))
+        );
+        assert_eq!(cli.config.sets.len(), 1);
     }
 
     #[test]

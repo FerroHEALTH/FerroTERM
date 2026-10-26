@@ -30,10 +30,10 @@
 # so the server refuses to start until you name the authorization server that
 # issues it, or say the compose network is trusted:
 #
-#   FERROTERM_AUTH__ISSUER=https://auth.example.org/realms/tx
-#   FERROTERM_AUTH__AUDIENCE='["https://tx.example.org"]'
+#   FERROTERM__AUTH__ISSUER=https://auth.example.org/realms/tx
+#   FERROTERM__AUTH__AUDIENCE='["https://tx.example.org"]'
 #   # or, on a network only trusted callers reach:
-#   FERROTERM_AUTH__ENABLED=false
+#   FERROTERM__AUTH__ENABLED=false
 #
 # With an issuer, give the sync the credential it reloads with in its own
 # configuration file, under [server_admin_credentials] (HTTP Basic or the OAuth
@@ -51,14 +51,14 @@ services:
       # The listener that serves POST /reload, which is what the sync calls.
       # It is reachable as `ferroterm:8081` inside the compose network and is
       # published nowhere.
-      FERROTERM_ADMIN_LISTEN: 0.0.0.0:8081
+      FERROTERM__ADMIN__LISTEN: 0.0.0.0:8081
       # Inbound authentication (the [auth] table), passed through when set; the
       # admin scope is `__ferroterm.admin` unless PRODUCT_SCOPE names another.
-      FERROTERM_AUTH__ENABLED:
-      FERROTERM_AUTH__ISSUER:
-      FERROTERM_AUTH__AUDIENCE:
-      FERROTERM_AUTH__PRODUCT_SCOPE:
-      FERROTERM_CODESYSTEMS: /data/codesystems
+      FERROTERM__AUTH__ENABLED:
+      FERROTERM__AUTH__ISSUER:
+      FERROTERM__AUTH__AUDIENCE:
+      FERROTERM__AUTH__PRODUCT_SCOPE:
+      FERROTERM__TERMINOLOGY__CODE_SYSTEMS: /data/codesystems
     volumes:
       - type: bind
         source: ${FERROTERM_SYNC_DATA:-./data}/index
@@ -79,13 +79,16 @@ services:
     restart: unless-stopped
     environment:
       RUST_LOG: ${RUST_LOG:-info}
-      # The credentials a source add-on reads. Put them in a file the
-      # deployment mounts, or set them here from your own secret store; the
-      # configuration file never carries a secret.
-      FERROTERM_NTS_USERNAME: ${FERROTERM_NTS_USERNAME:-}
-      FERROTERM_NTS_PASSWORD: ${FERROTERM_NTS_PASSWORD:-}
-      FERROTERM_NTS_CLIENT_ID: ${FERROTERM_NTS_CLIENT_ID:-}
-      FERROTERM_NTS_CLIENT_SECRET: ${FERROTERM_NTS_CLIENT_SECRET:-}
+      # The configuration file the service reads, the mount below.
+      FERROTERM_SYNC_CONFIG: /etc/ferroterm/sync.toml
+      # The NTS account, the [nts] keys, passed through from your shell when
+      # set. A secret can be a mounted file instead: set
+      # FERROTERM_SYNC__NTS__PASSWORD_FILE (or ..._CLIENT_SECRET_FILE) to its
+      # path, never both the value and the file.
+      FERROTERM_SYNC__NTS__USERNAME:
+      FERROTERM_SYNC__NTS__PASSWORD:
+      FERROTERM_SYNC__NTS__CLIENT_ID:
+      FERROTERM_SYNC__NTS__CLIENT_SECRET:
     volumes:
       - type: bind
         source: ${FERROTERM_SYNC_DATA:-./data}

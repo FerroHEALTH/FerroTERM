@@ -38,13 +38,13 @@ correction its files need.
 
 ## Credentials
 
-The account is the deployment's, and it never enters a configuration body. Set
-`credentials` to `{"from": "environment"}` and export
-`FERROTERM_NTS_USERNAME` and `FERROTERM_NTS_PASSWORD` (plus
-`FERROTERM_NTS_CLIENT_ID` or `FERROTERM_NTS_CLIENT_SECRET` where they differ
-from the defaults), or to `{"from": "file", "path": "…"}` and mount a JSON file
-with the same field names. No rendering of the configuration, the credentials,
-or the source prints a secret.
+The account is the deployment's, and it never enters the add-on's
+configuration block. The synchronisation service reads it from its own
+`[nts]` section (`FERROTERM_SYNC__NTS__USERNAME`, `FERROTERM_SYNC__NTS__PASSWORD`,
+`FERROTERM_SYNC__NTS__CLIENT_ID`, `FERROTERM_SYNC__NTS__CLIENT_SECRET`, each
+secret also as a mounted `_file`) and hands it to `NtsSource::new`. The
+secrets are held in `ferrohealth-secret`'s `Secret`, so no rendering of the
+configuration, the credentials, or the source prints one.
 
 ## Another service on the same software
 

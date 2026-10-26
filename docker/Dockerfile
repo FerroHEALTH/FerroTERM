@@ -31,14 +31,14 @@ COPY --chmod=0555 dist/${TARGETOS}/${TARGETARCH}/ferroterm-build /usr/local/bin/
 # report's instance id), owned by the runtime user so a named volume mounted
 # here starts with that ownership. The base has no shell to `mkdir`, so the
 # directory is copied in from the context. The image declares no volume and
-# sets no FERROTERM_STATE_DIR: a throwaway container must not mint an instance
+# sets no FERROTERM__USAGE_REPORT__STATE_DIR: a throwaway container must not mint an instance
 # id, so the report stays off until a deployment mounts a volume and names it,
 # as the compose file does.
 COPY --chown=65532:65532 docker/state/ /data/state/
 
 # The binary's default listen address is loopback, which no container can
 # publish; the image default is every interface on the documented port.
-ENV FERROTERM_LISTEN=0.0.0.0:8080
+ENV FERROTERM__SERVER__LISTEN=0.0.0.0:8080
 EXPOSE 8080/tcp
 
 # Numeric on purpose: the kubelet cannot resolve a user name against an image
@@ -46,7 +46,7 @@ EXPOSE 8080/tcp
 USER 65532:65532
 
 # The base has no shell and no HTTP client, so the probe is the binary itself:
-# one GET /health on the loopback (FERROTERM_LISTEN says where), exit 0 on
+# one GET /health on the loopback (FERROTERM__SERVER__LISTEN says where), exit 0 on
 # 200. The server binds only after every artifact is open, so healthy means it
 # answers terminology requests. The start period covers reading an edition
 # (the longest start in the committed records is 23 s); a slower disk or a

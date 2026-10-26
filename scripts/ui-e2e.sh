@@ -250,10 +250,16 @@ pids+=("$!")
 await "http://127.0.0.1:18090/health" "$work/sync.log"
 
 serve() {
-  local port="$1" log="$2"
+  local port="$1" log="$2" name
+  local unset=()
   shift 2
-  env FERROTERM_USAGE_REPORT=off FERROTERM_LISTEN="127.0.0.1:$port" \
-    FERROTERM_CODESYSTEMS=e2e/fixtures/codesystems "$@" \
+  # The server refuses every FERROTERM_ variable that is not its own, so the
+  # journeys' FERROTERM_UI_E2E_ settings stay out of its environment.
+  for name in $(compgen -e); do
+    [[ "$name" == FERROTERM_* && "$name" != FERROTERM__* ]] && unset+=(-u "$name")
+  done
+  env "${unset[@]}" FERROTERM__USAGE_REPORT__ENABLED=false FERROTERM__SERVER__LISTEN="127.0.0.1:$port" \
+    FERROTERM__TERMINOLOGY__CODE_SYSTEMS=e2e/fixtures/codesystems "$@" \
     target/debug/ferroterm > "$log" 2>&1 &
   pids+=("$!")
   await "http://127.0.0.1:$port/health" "$log"
@@ -261,10 +267,10 @@ serve() {
 # The anonymous console writes through a server with [auth] off; the signed-in
 # one through a server that trusts the stub issuer, whose access tokens name
 # the audience `ferroterm` when the request names none.
-serve 18080 "$work/server.log" FERROTERM_RESOURCES="$work/resources.redb" \
-  FERROTERM_AUTH__ENABLED=false
-serve 18081 "$work/server-smart.log" FERROTERM_RESOURCES="$work/resources-smart.redb" \
-  FERROTERM_AUTH__ISSUER="$issuer" FERROTERM_AUTH__AUDIENCE='["ferroterm"]'
+serve 18080 "$work/server.log" FERROTERM__TERMINOLOGY__RESOURCES="$work/resources.redb" \
+  FERROTERM__AUTH__ENABLED=false
+serve 18081 "$work/server-smart.log" FERROTERM__TERMINOLOGY__RESOURCES="$work/resources-smart.redb" \
+  FERROTERM__AUTH__ISSUER="$issuer" FERROTERM__AUTH__AUDIENCE='["ferroterm"]'
 
 console() {
   local port="$1" upstream="$2" log="$3"

@@ -75,7 +75,7 @@ const REALM: &str = "FerroTERM";
 pub enum StartError {
     /// A guarded surface runs and `[auth]` names no issuer and is not off.
     #[error(
-        "{} need [auth]: set FERROTERM_AUTH__ISSUER and FERROTERM_AUTH__AUDIENCE (or the file FERROTERM_AUTH_FILE), or FERROTERM_AUTH__ENABLED=false on a network only trusted callers reach",
+        "{} need [auth]: set auth.issuer and auth.audience (FERROTERM__AUTH__ISSUER and FERROTERM__AUTH__AUDIENCE), or auth.enabled = false on a network only trusted callers reach",
         surfaces.join(" and ")
     )]
     Unconfigured {
@@ -179,8 +179,8 @@ impl Smart {
         let resolved = auth.resolve().map_err(|source| StartError::Auth {
             source: Box::new(source),
         })?;
-        let bases = version_bases(config.base_url.as_deref());
-        let admin_listens = config.admin_listen.is_some();
+        let bases = version_bases(config.base_url().as_deref());
+        let admin_listens = config.admin_listen().is_some();
         let (primary, fhir, admin): (Primary, Arc<dyn Verifier>, Arc<dyn Verifier>) =
             if let Some(settings) = resolved.introspection {
                 let mut widened = settings.clone();
@@ -231,7 +231,7 @@ impl Smart {
         })?;
         let realm = resolved
             .realm
-            .or_else(|| config.base_url.clone())
+            .or_else(|| config.base_url())
             .unwrap_or_else(|| String::from(REALM));
         let basic = resolved.basic.map(Arc::new);
         let fhir = gate_of(fhir, basic.as_ref(), &realm);
@@ -417,11 +417,11 @@ fn gate_of(verifier: Arc<dyn Verifier>, basic: Option<&Arc<PasswordStore>>, real
 /// The guarded surfaces `config` turns on, each named with its variable.
 fn guarded_surfaces(config: &Config) -> Vec<&'static str> {
     let mut surfaces = Vec::new();
-    if config.resources.is_some() {
-        surfaces.push("the write routes (FERROTERM_RESOURCES)");
+    if config.terminology.resources.is_some() {
+        surfaces.push("the write routes (terminology.resources)");
     }
-    if config.admin_listen.is_some() {
-        surfaces.push("the admin listener (FERROTERM_ADMIN_LISTEN)");
+    if config.admin_listen().is_some() {
+        surfaces.push("the admin listener (admin.listen)");
     }
     surfaces
 }
@@ -558,7 +558,7 @@ pub async fn configuration(
 #[cfg(test)]
 mod tests {
     use super::{guarded_surfaces, version_bases};
-    use crate::config::Config;
+    use crate::config::{AdminSection, Config, TerminologySection};
 
     // The `aud` a client sends is the FHIR base it is talking to
     // (<https://hl7.org/fhir/smart-app-launch/app-launch.html>), and this
@@ -593,8 +593,13 @@ mod tests {
     fn the_writes_and_the_admin_listener_are_the_guarded_surfaces() {
         assert_eq!(guarded_surfaces(&Config::default()), Vec::<&str>::new());
         let both = Config {
-            resources: Some(std::path::PathBuf::from("resources.redb")),
-            admin_listen: Some(String::from("127.0.0.1:8081")),
+            terminology: TerminologySection {
+                resources: Some(std::path::PathBuf::from("resources.redb")),
+                ..TerminologySection::default()
+            },
+            admin: AdminSection {
+                listen: Some(String::from("127.0.0.1:8081")),
+            },
             ..Config::default()
         };
         assert_eq!(guarded_surfaces(&both).len(), 2);

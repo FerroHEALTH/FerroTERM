@@ -1,16 +1,13 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The environment the usage report reads.
+//! The `[usage_report]` section of the configuration.
 //!
 //! No FHIR or SNOMED CT specification governs this: our own design.
 
 use std::path::PathBuf;
 
-use crate::config::{
-    CI_ENVS, ConfigError, DEPLOYMENT_ENV, STATE_DIR_ENV, USAGE_REPORT_ENDPOINT_ENV,
-    USAGE_REPORT_ENV, switch_of,
-};
+use crate::config::CI_ENVS;
 
 /// The collector every report goes to unless the deployment names another.
 pub const ENDPOINT: &str = "https://report.ferropulse.eu/v1/report";
@@ -19,7 +16,7 @@ pub const ENDPOINT: &str = "https://report.ferropulse.eu/v1/report";
 ///
 /// The deployment artifact sets it: the compose files say `compose`, and a
 /// Helm chart says `helm`. It is never detected.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Deployment {
     /// A Helm chart.
@@ -33,24 +30,11 @@ pub enum Deployment {
     Unknown,
 }
 
-impl Deployment {
-    /// Returns the deployment `value` names, or `None` when it names none.
-    #[must_use]
-    pub fn parse(value: &str) -> Option<Self> {
-        match value.trim().to_ascii_lowercase().as_str() {
-            "helm" => Some(Self::Helm),
-            "compose" => Some(Self::Compose),
-            "binary" => Some(Self::Binary),
-            "unknown" => Some(Self::Unknown),
-            _ => None,
-        }
-    }
-}
-
-/// The usage report configuration of one process.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// The usage report configuration of one process, `[usage_report]`.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct UsageReportConfig {
-    /// Whether the deployment left the report on (`FERROTERM_USAGE_REPORT`).
+    /// Whether the deployment left the report on (`usage_report.enabled`).
     pub enabled: bool,
     /// The collector endpoint: `https`, or `http` to a loopback host.
     pub endpoint: String,
@@ -60,7 +44,9 @@ pub struct UsageReportConfig {
     /// How the server was deployed.
     pub deployment: Deployment,
     /// The CI variable that is set to `true` or `1`, when one is; the report
-    /// is then off whatever `enabled` says.
+    /// is then off whatever `enabled` says. Read from the process, never from
+    /// the file.
+    #[serde(skip)]
     pub ci: Option<&'static str>,
 }
 
@@ -77,50 +63,12 @@ impl Default for UsageReportConfig {
 }
 
 impl UsageReportConfig {
-    /// Reads the configuration through `lookup`, which answers the value of an
-    /// environment variable; an unset variable keeps the default.
-    ///
-    /// Reading through a function is what lets a test supply the environment:
-    /// setting a variable needs `std::env::set_var`, which is unsafe in
-    /// edition 2024, and this workspace forbids unsafe.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ConfigError::UsageReport`] for a switch that names neither
-    /// state, [`ConfigError::UsageReportEndpoint`] for an endpoint that is not
-    /// `https` (or `http` to a loopback host) or carries credentials, and
-    /// [`ConfigError::Deployment`] for an unknown deployment kind.
-    pub fn from_lookup(lookup: impl Fn(&str) -> Option<String>) -> Result<Self, ConfigError> {
-        let defaults = Self::default();
-        let enabled = match lookup(USAGE_REPORT_ENV) {
-            Some(value) => switch_of(&value).ok_or(ConfigError::UsageReport(value))?,
-            None => defaults.enabled,
-        };
-        let endpoint = match lookup(USAGE_REPORT_ENDPOINT_ENV) {
-            Some(value) if !value.trim().is_empty() => {
-                let value = value.trim().to_owned();
-                if !endpoint_admitted(&value) {
-                    return Err(ConfigError::UsageReportEndpoint(value));
-                }
-                value
-            }
-            _ => defaults.endpoint,
-        };
-        let deployment = match lookup(DEPLOYMENT_ENV) {
-            Some(value) if !value.trim().is_empty() => {
-                Deployment::parse(&value).ok_or(ConfigError::Deployment(value))?
-            }
-            _ => defaults.deployment,
-        };
-        Ok(Self {
-            enabled,
-            endpoint,
-            state_dir: lookup(STATE_DIR_ENV)
-                .filter(|dir| !dir.trim().is_empty())
-                .map(PathBuf::from),
-            deployment,
-            ci: ci_of(&lookup),
-        })
+    /// The section with the CI detection read through `lookup`, which
+    /// answers the value of an environment variable.
+    #[must_use]
+    pub fn with_ci(mut self, lookup: impl Fn(&str) -> Option<String>) -> Self {
+        self.ci = ci_of(lookup);
+        self
     }
 }
 
@@ -140,7 +88,7 @@ pub fn ci_of(lookup: impl Fn(&str) -> Option<String>) -> Option<&'static str> {
 
 /// Whether the report may be posted to `url`: `https`, or plain `http` to a
 /// loopback host, and no credentials in the authority.
-fn endpoint_admitted(url: &str) -> bool {
+pub(crate) fn endpoint_admitted(url: &str) -> bool {
     let authority = url.split_once("://").map_or("", |(_, rest)| {
         rest.split(['/', '?', '#']).next().unwrap_or(rest)
     });
@@ -173,8 +121,8 @@ pub(crate) fn secure(url: &str) -> bool {
 mod tests {
     use std::collections::BTreeMap;
 
-    use super::{Deployment, ENDPOINT, UsageReportConfig, ci_of};
-    use crate::config::ConfigError;
+    use super::{Deployment, ENDPOINT, UsageReportConfig, ci_of, endpoint_admitted};
+    use crate::config::{Config, ConfigError};
 
     fn lookup(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
         let map: BTreeMap<String, String> = pairs
@@ -184,9 +132,17 @@ mod tests {
         move |name| map.get(name).cloned()
     }
 
+    fn read(pairs: &[(&str, &str)]) -> Result<UsageReportConfig, ConfigError> {
+        let environment = pairs
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect();
+        Config::from_sources(None, &environment).map(|config| config.usage_report)
+    }
+
     #[test]
     fn the_default_is_on_without_a_state_directory() {
-        let config = UsageReportConfig::from_lookup(lookup(&[])).expect("reads");
+        let config = read(&[]).expect("reads");
         assert_eq!(config, UsageReportConfig::default());
         assert!(config.enabled);
         assert_eq!(config.endpoint, ENDPOINT);
@@ -195,16 +151,16 @@ mod tests {
     }
 
     #[test]
-    fn every_variable_is_read() {
-        let config = UsageReportConfig::from_lookup(lookup(&[
-            ("FERROTERM_USAGE_REPORT", "off"),
+    fn every_key_is_read() {
+        let config = read(&[
+            ("FERROTERM__USAGE_REPORT__ENABLED", "false"),
             (
-                "FERROTERM_USAGE_REPORT_ENDPOINT",
+                "FERROTERM__USAGE_REPORT__ENDPOINT",
                 "http://127.0.0.1:9/v1/report",
             ),
-            ("FERROTERM_STATE_DIR", "/data/state"),
-            ("FERROTERM_DEPLOYMENT", "compose"),
-        ]))
+            ("FERROTERM__USAGE_REPORT__STATE_DIR", "/data/state"),
+            ("FERROTERM__USAGE_REPORT__DEPLOYMENT", "compose"),
+        ])
         .expect("reads");
         assert!(!config.enabled);
         assert_eq!(config.endpoint, "http://127.0.0.1:9/v1/report");
@@ -218,8 +174,8 @@ mod tests {
     #[test]
     fn a_bad_switch_endpoint_or_deployment_refuses_to_start() {
         assert!(matches!(
-            UsageReportConfig::from_lookup(lookup(&[("FERROTERM_USAGE_REPORT", "maybe")])),
-            Err(ConfigError::UsageReport(value)) if value == "maybe"
+            read(&[("FERROTERM__USAGE_REPORT__ENABLED", "maybe")]),
+            Err(ConfigError::Load(_))
         ));
         for endpoint in [
             "http://report.example/v1",
@@ -227,20 +183,18 @@ mod tests {
             "ftp://report.example/",
             "not a url",
         ] {
+            assert!(!endpoint_admitted(endpoint), "{endpoint}");
             assert!(
                 matches!(
-                    UsageReportConfig::from_lookup(lookup(&[(
-                        "FERROTERM_USAGE_REPORT_ENDPOINT",
-                        endpoint
-                    )])),
+                    read(&[("FERROTERM__USAGE_REPORT__ENDPOINT", endpoint)]),
                     Err(ConfigError::UsageReportEndpoint(_))
                 ),
                 "{endpoint}"
             );
         }
         assert!(matches!(
-            UsageReportConfig::from_lookup(lookup(&[("FERROTERM_DEPLOYMENT", "k8s")])),
-            Err(ConfigError::Deployment(value)) if value == "k8s"
+            read(&[("FERROTERM__USAGE_REPORT__DEPLOYMENT", "k8s")]),
+            Err(ConfigError::Load(_))
         ));
     }
 
@@ -273,11 +227,9 @@ mod tests {
 
     #[test]
     fn an_explicit_on_keeps_the_ci_flag() {
-        let config = UsageReportConfig::from_lookup(lookup(&[
-            ("FERROTERM_USAGE_REPORT", "on"),
-            ("GITHUB_ACTIONS", "true"),
-        ]))
-        .expect("reads");
+        let config = read(&[("FERROTERM__USAGE_REPORT__ENABLED", "true")])
+            .expect("reads")
+            .with_ci(lookup(&[("GITHUB_ACTIONS", "true")]));
         assert!(config.enabled);
         assert_eq!(config.ci, Some("GITHUB_ACTIONS"));
     }

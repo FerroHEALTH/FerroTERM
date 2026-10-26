@@ -34,7 +34,7 @@ The server exposes the FHIR terminology API on R4B:
   was sent, each one independent of the rest.
 - `POST`, `PUT`, `GET`, `DELETE`, `_history` reads, and `?url=` search of
   `CodeSystem`, `ValueSet`, and `ConceptMap`, with `ETag` and `If-Match`, where
-  the deployment names a database in `FERROTERM_RESOURCES`. The closure tables
+  the deployment names a database in `FERROTERM__TERMINOLOGY__RESOURCES`. The closure tables
   live in the same database.
 - `metadata` and `metadata?mode=terminology`: what this deployment serves.
 

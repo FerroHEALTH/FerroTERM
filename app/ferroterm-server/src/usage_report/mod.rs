@@ -13,8 +13,8 @@
 //! carries no code, no system or value set URL, no request path, and no host
 //! name: the payload types have no field that could hold one, and [`window`]
 //! classifies a request by its matched route template alone. It is on by
-//! default; `FERROTERM_USAGE_REPORT=off` stops it, a CI environment stops it,
-//! and so does the lack of a writable `FERROTERM_STATE_DIR`. One boot line says
+//! default; `usage_report.enabled = false` stops it, a CI environment stops it,
+//! and so does the lack of a writable `usage_report.state_dir`. One boot line says
 //! which ([`reporter::announce`]).
 //!
 //! - [`config`]: the environment the report reads.

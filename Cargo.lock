@@ -6,6 +6,7 @@ version = 4
 name = "addon-nts"
 version = "0.3.0"
 dependencies = [
+ "ferrohealth-secret",
  "jiff",
  "reqwest",
  "serde",
@@ -1234,6 +1235,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 
 [[package]]
+name = "ferrohealth-config"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8cbeb07c4187dc552627b39a4eeda20a02be352d794467635e0f06136a5360f2"
+dependencies = [
+ "ferrohealth-secret",
+ "percent-encoding",
+ "serde",
+ "thiserror 2.0.21",
+ "toml",
+ "tracing",
+]
+
+[[package]]
 name = "ferrohealth-health"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1396,7 +1411,9 @@ dependencies = [
  "clap",
  "console_error_panic_hook",
  "cookie",
+ "ferrohealth-config",
  "ferrohealth-health",
+ "ferrohealth-secret",
  "ferrohealth-server",
  "ferrohealth-ui",
  "fluent-templates",
@@ -1437,6 +1454,7 @@ dependencies = [
  "clap",
  "concept-graph",
  "criterion",
+ "ferrohealth-config",
  "ferrohealth-health",
  "ferrohealth-server",
  "ferrohealth-smart",
@@ -1458,7 +1476,6 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "tokio",
- "toml",
  "tower",
  "tracing",
  "tracing-subscriber",
@@ -1476,7 +1493,9 @@ dependencies = [
  "axum",
  "base64 0.23.1",
  "clap",
+ "ferrohealth-config",
  "ferrohealth-health",
+ "ferrohealth-secret",
  "ferrohealth-server",
  "ferrohealth-smart",
  "jiff",

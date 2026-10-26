@@ -31,17 +31,17 @@ There are two kinds of report, and both are one HTTPS `POST` to
   covers the requests since the previous daily report of the same process, or
   since boot.
 
-The report needs a state directory, `FERROTERM_STATE_DIR`, where the server
+The report needs a state directory, `FERROTERM__USAGE_REPORT__STATE_DIR`, where the server
 keeps the instance id. Without one, or with one it cannot write, the server
 sends nothing: without a stable id each restart would count as a new
 installation. The compose file is the one deployment that turns it on: it
 mounts the named volume `ferroterm-state` at `/data/state` and sets
-`FERROTERM_STATE_DIR=/data/state`. The container image sets no state
+`FERROTERM__USAGE_REPORT__STATE_DIR=/data/state`. The container image sets no state
 directory, so a plain `docker run` or a Kubernetes pod sends nothing until
-you mount a writable volume and set `FERROTERM_STATE_DIR` to it:
+you mount a writable volume and set `FERROTERM__USAGE_REPORT__STATE_DIR` to it:
 
 ```shell
-docker run -v ferroterm-state:/data/state -e FERROTERM_STATE_DIR=/data/state \
+docker run -v ferroterm-state:/data/state -e FERROTERM__USAGE_REPORT__STATE_DIR=/data/state \
   ghcr.io/ferrohealth/ferroterm:<version>
 ```
 
@@ -52,16 +52,16 @@ volume mounted there is writable. A bind mount needs a host directory that uid
 The boot line, with the report on, reads:
 
 ```text
-usage report ON: instance id, version, licence type, deployment, uptime, host size, loaded code system families and coarse operation latency, at each start and once a day; no codes, URLs or request paths. Off: FERROTERM_USAGE_REPORT=off. Details: https://ferroterm.eu/docs/operate/usage-report.html
+usage report ON: instance id, version, licence type, deployment, uptime, host size, loaded code system families and coarse operation latency, at each start and once a day; no codes, URLs or request paths. Off: FERROTERM__USAGE_REPORT__ENABLED=false. Details: https://ferroterm.eu/docs/operate/usage-report.html
 ```
 
 It carries the configured endpoint as the structured field `endpoint`. With the
 report off, the line says why, for example:
 
 ```text
-usage report OFF: switched off (FERROTERM_USAGE_REPORT=off); nothing is sent. Details: https://ferroterm.eu/docs/operate/usage-report.html
+usage report OFF: switched off (FERROTERM__USAGE_REPORT__ENABLED=false); nothing is sent. Details: https://ferroterm.eu/docs/operate/usage-report.html
 usage report OFF: CI detected (GITHUB_ACTIONS); nothing is sent. Details: https://ferroterm.eu/docs/operate/usage-report.html
-usage report OFF: no state directory (FERROTERM_STATE_DIR is unset), and without a stable instance id each restart would count as a new installation; nothing is sent. On: mount a writable volume and set FERROTERM_STATE_DIR to it. Details: https://ferroterm.eu/docs/operate/usage-report.html
+usage report OFF: no state directory (FERROTERM__USAGE_REPORT__STATE_DIR is unset), and without a stable instance id each restart would count as a new installation; nothing is sent. On: mount a writable volume and set FERROTERM__USAGE_REPORT__STATE_DIR to it. Details: https://ferroterm.eu/docs/operate/usage-report.html
 ```
 
 ## What a report contains
@@ -74,11 +74,11 @@ Every report carries these fields:
 | `event` | both | `start` or `daily`. |
 | `first_start` | `start` | `true` when this start created the instance id, which marks a new installation; `false` on every later start. |
 | `product` | both | Always `ferroterm`. |
-| `instance_id` | both | A random UUID (version 4), created at the first start and stored in `<FERROTERM_STATE_DIR>/instance-id`. It is not derived from the host or anything else about the deployment. |
+| `instance_id` | both | A random UUID (version 4), created at the first start and stored in `<FERROTERM__USAGE_REPORT__STATE_DIR>/instance-id`. It is not derived from the host or anything else about the deployment. |
 | `version` | both | The server version, for example `0.1.8`. |
 | `git_sha` | both | The commit the binary was built from, 7 to 40 hex digits. A build that recorded no commit, such as a local `cargo build`, sends `0000000`. |
 | `licence` | both | The licence grant type, `non-commercial` (what the Business Source License grants everyone). |
-| `deployment` | both | How the server was deployed: `helm`, `compose`, `binary` or `unknown`. It comes from `FERROTERM_DEPLOYMENT`, which the compose file sets to `compose`. |
+| `deployment` | both | How the server was deployed: `helm`, `compose`, `binary` or `unknown`. It comes from `FERROTERM__USAGE_REPORT__DEPLOYMENT`, which the compose file sets to `compose`. |
 | `uptime_s` | both | Seconds since this process started. |
 | `cpu_bucket` | both | The CPUs available to the process, as a range: `1-2`, `3-4`, `5-8`, `9-16` or `17+`. |
 | `memory_bucket` | both | The memory available to the process in GiB, the smaller of the host's memory and the container limit, as a range: `<4`, `4-8`, `8-16`, `16-32` or `32+`. Off Linux the server cannot read it and sends `<4`. |
@@ -90,8 +90,8 @@ The `status` object:
 | Member | What it is |
 |---|---|
 | `index_ok` | Whether at least one code system the deployment loaded is serving. |
-| `code_systems` | The families of the loaded code systems, sorted: `dhd`, `fhir`, `gstandaard`, `icd10`, `icd10cm`, `icd11`, `labcodeset`, `loinc`, `other`, `rxnorm`, `snomed`. `fhir` is a `CodeSystem` resource from `FERROTERM_CODESYSTEMS` that no other family names, and `other` is an artifact none names. Never an edition, a module id, a version or a URL. |
-| `persistence` | Whether a resources database (`FERROTERM_RESOURCES`) is configured. |
+| `code_systems` | The families of the loaded code systems, sorted: `dhd`, `fhir`, `gstandaard`, `icd10`, `icd10cm`, `icd11`, `labcodeset`, `loinc`, `other`, `rxnorm`, `snomed`. `fhir` is a `CodeSystem` resource from `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` that no other family names, and `other` is an artifact none names. Never an edition, a module id, a version or a URL. |
+| `persistence` | Whether a resources database (`FERROTERM__TERMINOLOGY__RESOURCES`) is configured. |
 
 A start report, formatted here for reading (the server sends it on one line):
 
@@ -173,15 +173,15 @@ The collector does record the IP address the report arrives from. See
 ## Switch it off
 
 ```shell
-FERROTERM_USAGE_REPORT=off
+FERROTERM__USAGE_REPORT__ENABLED=false
 ```
 
 The compose file forwards this variable from your shell, so
-`FERROTERM_USAGE_REPORT=off docker compose up` switches the report off there
+`FERROTERM__USAGE_REPORT__ENABLED=false docker compose up` switches the report off there
 too. In a CI job the report is off by itself: when `GITHUB_ACTIONS` or `CI` is
-`true` or `1`, the server sends nothing, and `FERROTERM_USAGE_REPORT=on` does
+`true` or `1`, the server sends nothing, and `FERROTERM__USAGE_REPORT__ENABLED=true` does
 not change that. A container does not inherit the runner's environment, so a
-test lane that starts the image passes `--env FERROTERM_USAGE_REPORT=off`.
+test lane that starts the image passes `--env FERROTERM__USAGE_REPORT__ENABLED=false`.
 
 With the report off, the server sends nothing to FerroPULSE and writes nothing
 to the state directory for the report, and the boot line says `usage report
@@ -192,7 +192,7 @@ ends, unless you ask for them to be erased.
 ## Network
 
 - **Destination:** outbound HTTPS to `report.ferropulse.eu`, port 443.
-  `FERROTERM_USAGE_REPORT_ENDPOINT` moves it; the server refuses to start on an
+  `FERROTERM__USAGE_REPORT__ENDPOINT` moves it; the server refuses to start on an
   endpoint that is plain HTTP (except to a loopback host) or that carries
   credentials.
 - **One direction only:** the server reads the status code of the answer and
@@ -285,7 +285,7 @@ backup for at most 14 days more.
 >
 > **To have the reports already stored erased**, write to
 > [info@cadasto.com](mailto:info@cadasto.com) with the instance id, which
-> the server keeps in `<FERROTERM_STATE_DIR>/instance-id`. Under the compose
+> the server keeps in `<FERROTERM__USAGE_REPORT__STATE_DIR>/instance-id`. Under the compose
 > file it sits on the `ferroterm-state` volume:
 > `docker run --rm -v <project>_ferroterm-state:/s busybox cat /s/instance-id`
 > prints it. Cadasto then

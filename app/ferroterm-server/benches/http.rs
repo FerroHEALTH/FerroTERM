@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use criterion::{Criterion, criterion_group, criterion_main};
-use ferroterm_server::config::Config;
+use ferroterm_server::config::{Config, TerminologySection};
 use ferroterm_server::reload::Serving;
 use ferroterm_server::state::AppState;
 use http::Request;
@@ -35,7 +35,10 @@ fn requests(c: &mut Criterion) {
     let dir = tempfile::tempdir().expect("tempdir");
     ferroterm_testkit::scaled::write(dir.path(), CONCEPTS).expect("writes the edition");
     let config = Config {
-        index: vec![dir.path().to_path_buf()],
+        terminology: TerminologySection {
+            index: vec![dir.path().to_path_buf()],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     };
     let state = Arc::new(AppState::load(&config).expect("loads"));
@@ -95,7 +98,10 @@ fn fixed(c: &mut Criterion) {
     let dir = tempfile::tempdir().expect("tempdir");
     ferroterm_testkit::scaled::write(dir.path(), CONCEPTS).expect("writes the edition");
     let config = Config {
-        index: vec![dir.path().to_path_buf()],
+        terminology: TerminologySection {
+            index: vec![dir.path().to_path_buf()],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     };
     let state = Arc::new(AppState::load(&config).expect("loads"));
@@ -143,7 +149,10 @@ fn local(c: &mut Criterion) {
         return;
     }
     let config = Config {
-        index: built,
+        terminology: TerminologySection {
+            index: built,
+            ..TerminologySection::default()
+        },
         ..Config::default()
     };
     // An artifact of an older layout is as absent as a missing one, as far as

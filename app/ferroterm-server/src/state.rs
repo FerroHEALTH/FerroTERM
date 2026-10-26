@@ -233,10 +233,10 @@ pub struct InstanceSummary {
 /// Where a code system the deployment loaded came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Origin {
-    /// An artifact directory named by `FERROTERM_INDEX`.
+    /// An artifact directory named by `FERROTERM__TERMINOLOGY__INDEX`.
     Index,
     /// A `CodeSystem` resource from a directory named by
-    /// `FERROTERM_CODESYSTEMS`, a supplement included.
+    /// `FERROTERM__TERMINOLOGY__CODE_SYSTEMS`, a supplement included.
     CodeSystems,
 }
 
@@ -479,10 +479,7 @@ struct Persisted {
 #[derive(Debug, thiserror::Error)]
 pub enum PersistError {
     /// The deployment configured no resource database.
-    #[error(
-        "this server persists no resources: set {}",
-        crate::config::RESOURCES_ENV
-    )]
+    #[error("this server persists no resources: set terminology.resources")]
     NotConfigured,
     /// The store cannot be read or written.
     #[error(transparent)]
@@ -598,7 +595,7 @@ impl AppState {
     /// The state `config` names, built over what `carried` hands on.
     fn build(config: &Config, carried: Carried) -> Result<Self, LoadError> {
         let mut loaded = Vec::new();
-        for path in artifact_paths(&config.index)? {
+        for path in artifact_paths(&config.terminology.index)? {
             let provider = open_artifact(&path, config)?;
             loaded.push(Loaded { path, provider });
         }
@@ -629,7 +626,7 @@ impl AppState {
         let mut supplements = Vec::new();
         let mut value_sets = ValueSetStore::new();
         let mut concept_maps = ConceptMapStore::new();
-        for path in &config.code_systems {
+        for path in &config.terminology.code_systems {
             load_code_systems(
                 path,
                 &mut loaded,
@@ -677,8 +674,8 @@ impl AppState {
         state.origins = origins;
         state
             .security_services
-            .clone_from(&config.security_services);
-        state.base_url.clone_from(&config.base_url);
+            .clone_from(&config.fhir.security_services);
+        state.base_url = config.base_url();
         state.register_supplements(supplements)?;
         state.register_instances(&value_sets, &concept_maps)?;
         state.base.value_sets = value_sets;
@@ -686,7 +683,7 @@ impl AppState {
         state.core = core_terminology()?;
         state.store = match carried.store {
             Some(store) => Some(store),
-            None => match &config.resources {
+            None => match &config.terminology.resources {
                 Some(path) => Some(Arc::new(ResourceStore::open(path).map_err(|source| {
                     LoadError::Resources {
                         path: path.clone(),
@@ -2044,7 +2041,7 @@ fn open_artifact(path: &Path, config: &Config) -> Result<Arc<dyn CodeSystemProvi
     })?;
     Ok(match described.system.as_str() {
         snomed::SYSTEM => Arc::new(
-            SnomedProvider::open(path, &config.default_language).map_err(|source| {
+            SnomedProvider::open(path, &config.terminology.default_language).map_err(|source| {
                 LoadError::Open {
                     path: path.to_path_buf(),
                     source: Box::new(source),

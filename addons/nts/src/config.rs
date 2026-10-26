@@ -3,12 +3,11 @@
 
 //! Where the service is, and which of its content a run takes.
 //!
-//! The configuration carries no secret. It names where the credentials are
-//! read from ([`CredentialSource`]) and nothing more, so a configuration file
-//! can be committed, logged, and shown in a run record whole.
+//! The configuration carries no secret: the synchronisation service hands the
+//! credentials over ([`crate::credentials::Credentials`]), so a configuration
+//! block can be committed, logged, and shown in a run record whole.
 
 use std::collections::BTreeSet;
-use std::path::PathBuf;
 
 use terminology_syndication::model::CategoryTerm;
 use terminology_syndication::select::Subscription;
@@ -92,23 +91,6 @@ pub mod canonical {
 // FHIR API on 2026-09-25 (issue #602); its syndication feed listed SNOMED CT
 // only, so none of them is a feed identifier yet.
 
-/// Where the add-on reads its credentials.
-///
-/// A credential never appears in the configuration body, so a deployment
-/// points at a file it mounts or at the process environment.
-#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Deserialize)]
-#[serde(tag = "from", rename_all = "kebab-case", deny_unknown_fields)]
-pub enum CredentialSource {
-    /// The `FERROTERM_NTS_*` environment variables.
-    #[default]
-    Environment,
-    /// A JSON file holding the credential fields.
-    File {
-        /// The file to read.
-        path: PathBuf,
-    },
-}
-
 /// The add-on's configuration.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -124,8 +106,6 @@ pub struct NtsConfig {
     pub fhir_api_url: Option<String>,
     /// Whether a run lists the FHIR endpoint beside the feed.
     pub fhir_api: bool,
-    /// Where the credentials are read from.
-    pub credentials: CredentialSource,
     /// The canonical identifiers the run takes.
     pub systems: BTreeSet<String>,
     /// The category terms the run takes, as the feed writes them.
@@ -140,7 +120,6 @@ impl Default for NtsConfig {
             feed_url: None,
             fhir_api_url: None,
             fhir_api: true,
-            credentials: CredentialSource::Environment,
             systems: canonical::DEFAULT
                 .iter()
                 .map(|&s| String::from(s))
@@ -210,7 +189,7 @@ impl NtsConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::{CredentialSource, NtsConfig, canonical};
+    use super::{NtsConfig, canonical};
     use terminology_syndication::model::CategoryTerm;
 
     #[test]
@@ -300,20 +279,17 @@ mod tests {
 
     #[test]
     fn the_configuration_body_carries_no_secret() {
-        let config: NtsConfig = serde_json::from_str(
-            r#"{"name":"nts","credentials":{"from":"file","path":"/run/secrets/nts.json"}}"#,
-        )
-        .expect("the configuration reads");
-        assert_eq!(
-            config.credentials,
-            CredentialSource::File {
-                path: std::path::PathBuf::from("/run/secrets/nts.json")
-            }
-        );
-        let rejected = serde_json::from_str::<NtsConfig>(r#"{"password":"secret"}"#);
-        assert!(
-            rejected.is_err(),
-            "a credential field in the configuration body is refused"
-        );
+        let config: NtsConfig =
+            serde_json::from_str(r#"{"name":"nts"}"#).expect("the configuration reads");
+        assert_eq!(config.name, "nts");
+        for refused in [
+            r#"{"password":"secret"}"#,
+            r#"{"credentials":{"from":"environment"}}"#,
+        ] {
+            assert!(
+                serde_json::from_str::<NtsConfig>(refused).is_err(),
+                "a credential field in the configuration body is refused: {refused}"
+            );
+        }
     }
 }

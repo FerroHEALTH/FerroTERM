@@ -17,7 +17,7 @@ those credentials
 | The server | The proxy |
 |---|---|
 | answers FHIR terminology requests | terminates TLS |
-| reads its indexes, writes only what `FERROTERM_RESOURCES` names | authenticates readers, if you want them authenticated; the server checks the writers and the admin callers itself |
+| reads its indexes, writes only what `FERROTERM__TERMINOLOGY__RESOURCES` names | authenticates readers, if you want them authenticated; the server checks the writers and the admin callers itself |
 | logs a line per request with no bodies and no free text | rate-limits and sheds load |
 | states its endpoint and its declared security in the capability statement | forwards the client's `X-Request-Id` |
 
@@ -58,7 +58,7 @@ compose network only.
 
 ```bash
 FERROTERM_DOMAIN=tx.example.org \
-FERROTERM_BASE_URL=https://tx.example.org \
+FERROTERM__FHIR__BASE_URL=https://tx.example.org \
 docker compose --profile proxied up
 ```
 
@@ -71,11 +71,11 @@ reaches it as `ferroterm:8080` inside the network.
 
 A server behind a proxy answers on an address it never sees: the proxy
 terminates TLS and forwards a plain request, so the socket the process bound is
-not the URL a client used. `FERROTERM_BASE_URL` is that URL, without a version
+not the URL a client used. `FERROTERM__FHIR__BASE_URL` is that URL, without a version
 prefix and without a trailing slash:
 
 ```
-FERROTERM_BASE_URL=https://tx.example.org
+FERROTERM__FHIR__BASE_URL=https://tx.example.org
 ```
 
 Each version's capability statement then states its own endpoint, so a client
@@ -110,7 +110,7 @@ location / {
 ```
 
 The server does not read these headers: it takes its public URL from
-`FERROTERM_BASE_URL` rather than from a header a client could forge, which is
+`FERROTERM__FHIR__BASE_URL` rather than from a header a client could forge, which is
 the same reason a proxy should strip an inbound `X-Forwarded-*` it did not set.
 It does read `X-Request-Id`, and echoes it, so a proxy that generates one (as
 nginx does above) gets the same id in the server's log line. See
@@ -125,7 +125,7 @@ what that is (<https://hl7.org/fhir/R4B/security.html>). Authenticate at the
 proxy, and tell clients what you did:
 
 ```
-FERROTERM_SECURITY_SERVICE=SMART-on-FHIR
+FERROTERM__FHIR__SECURITY_SERVICES=SMART-on-FHIR
 ```
 
 The value is codes of the FHIR `restful-security-service` value set
@@ -137,13 +137,13 @@ authentication of its own; a deployment puts its own in front of it."
 If your gateway speaks SMART on FHIR, the scopes worth granting are read-only:
 the terminology surface reads, and the only routes that change content are the
 resource endpoints and `$closure`, which a deployment enables by naming
-`FERROTERM_RESOURCES` and can leave unset.
+`FERROTERM__TERMINOLOGY__RESOURCES` and can leave unset.
 
 ## Validating tokens in the server
 
 Take the gateway route when one gateway already fronts every service you run
 and no client writes to FerroTERM. Take the server route when writes matter:
-`FERROTERM_RESOURCES` is set, clients or an editor persist `CodeSystem`,
+`FERROTERM__TERMINOLOGY__RESOURCES` is set, clients or an editor persist `CodeSystem`,
 `ValueSet`, and `ConceptMap` resources, and you want the server itself to know
 which caller may change what. A gateway can protect a path; it cannot tell a
 terminologist's token from a reporting client's without repeating the scope
@@ -153,14 +153,14 @@ The server takes the SMART App Launch resource-server role
 (<https://hl7.org/fhir/smart-app-launch/conformance.html>) through the
 FerroHEALTH crate `ferrohealth-smart`. It issues no tokens of its own: your
 authorization server does that, and FerroTERM only reads its public metadata.
-A server that names `FERROTERM_RESOURCES` or `FERROTERM_ADMIN_LISTEN` refuses to
+A server that names `FERROTERM__TERMINOLOGY__RESOURCES` or `FERROTERM__ADMIN__LISTEN` refuses to
 start until `[auth]` names the issuer and an audience, or turns authentication
 off ([Configuration](configuration.md#authentication)).
 
 ```
-FERROTERM_BASE_URL=https://tx.example.org
-FERROTERM_AUTH__ISSUER=https://auth.example.org/realms/tx
-FERROTERM_AUTH__AUDIENCE='["https://tx.example.org"]'
+FERROTERM__FHIR__BASE_URL=https://tx.example.org
+FERROTERM__AUTH__ISSUER=https://auth.example.org/realms/tx
+FERROTERM__AUTH__AUDIENCE='["https://tx.example.org"]'
 ```
 
 At start the server reads the issuer's metadata, at
@@ -239,9 +239,9 @@ signs in on `/r4b` therefore get tokens with different audiences from an issuer
 that mints the claim from that request. Both are this server.
 
 The write routes accept every served version's base derived from
-`FERROTERM_BASE_URL`, with and without a trailing slash, plus every
+`FERROTERM__FHIR__BASE_URL`, with and without a trailing slash, plus every
 `[auth] audience`. With
-`FERROTERM_BASE_URL=https://tx.example.org` the server accepts
+`FERROTERM__FHIR__BASE_URL=https://tx.example.org` the server accepts
 `https://tx.example.org/r4`, `/r4b`, `/r5`, and `/r6` under that host. A token
 passes when its `aud` holds any of them, which RFC 7519 §4.1.3 asks of a
 recipient identifying itself, and the claim may be a string or an array. A
@@ -252,7 +252,7 @@ A token minted for one version's base is spent on every other. One process
 serves the four bases and a reader moves between them in one session, so the
 audience says which server, not which version.
 
-Set `FERROTERM_BASE_URL` to the exact address readers' browsers use, down to
+Set `FERROTERM__FHIR__BASE_URL` to the exact address readers' browsers use, down to
 the scheme, the host, and the port. An audience is compared as a string, so
 `https://tx.example.org` and `https://tx.example.org:443` are two audiences,
 and a value that differs from the one the console sends refuses every write
@@ -266,7 +266,7 @@ for it: it accepts `[auth] audience` alone.
 
 `[auth] audience` is required with an issuer, so every token is checked for an
 audience of this server (RFC 9068 §4); a server that names an issuer and no
-audience refuses to start. Set `FERROTERM_BASE_URL` in any deployment behind a
+audience refuses to start. Set `FERROTERM__FHIR__BASE_URL` in any deployment behind a
 proxy as well: it is what the capability statements publish.
 
 A server-to-server client obtains its token through SMART Backend Services,
@@ -317,7 +317,7 @@ with it.
 
 ## The admin listener stays behind the proxy
 
-`FERROTERM_ADMIN_LISTEN` binds a second listener that serves `POST /reload`
+`FERROTERM__ADMIN__LISTEN` binds a second listener that serves `POST /reload`
 and nothing else. Every route on it requires the admin scope, and the server
 refuses to start with it until `[auth]` names an issuer or turns
 authentication off

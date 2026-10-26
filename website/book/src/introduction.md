@@ -25,7 +25,7 @@ per version.
 
 Hierarchical expansion, persisted client resources, `Bundle` batch, `$closure`,
 and the SNOMED implicit concept maps are served. The persisted resources and the
-closure tables need a deployment that names a database in `FERROTERM_RESOURCES`,
+closure tables need a deployment that names a database in `FERROTERM__TERMINOLOGY__RESOURCES`,
 and `$closure` answers on `/r4`, `/r4b`, and `/r5`, since the R6 ballot defines
 no such operation. Where a mature terminology server does more, such as
 authoring SNOMED content and MRCM validation of post-coordinated expressions,

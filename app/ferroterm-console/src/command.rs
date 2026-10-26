@@ -10,7 +10,9 @@ use std::process::ExitCode;
 
 use clap::Parser;
 
-use crate::cli::{Cli, Command, ConfigCommand};
+use ferrohealth_server::cli::ConfigCommand;
+
+use crate::cli::{Cli, Command};
 use crate::config::Config;
 use crate::config::settings::Settings;
 use crate::server::ConsoleState;
@@ -44,7 +46,9 @@ where
             return u8::try_from(code).map_or(ExitCode::FAILURE, ExitCode::from);
         }
     };
-    let settings = match Config::load(cli.config.as_deref()).and_then(|config| config.resolve()) {
+    let settings = match Config::load(cli.config.config.as_deref(), &cli.config.sets)
+        .and_then(Settings::from_loaded)
+    {
         Ok(settings) => settings,
         Err(error) if cli.command == Command::Healthcheck => {
             eprintln!("ferroterm-console: not up: {}", chain(&error));

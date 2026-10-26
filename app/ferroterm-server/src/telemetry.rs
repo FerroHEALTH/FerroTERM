@@ -7,7 +7,7 @@
 //! console is a terminal, aligned fields) and `json` for a log pipeline (one
 //! object per line). `auto`, the default, picks `pretty` on a terminal and
 //! `json` otherwise, so a container gets machine lines without configuration.
-//! `RUST_LOG` is the filter; the HTTP stack's own crates default to `warn`.
+//! `telemetry.filter` (or `RUST_LOG`) is the filter; the HTTP stack's own crates default to `warn`.
 //! No spec governs the console: our own design.
 
 use std::io::{self, Write};
@@ -19,15 +19,12 @@ use tracing_subscriber::fmt::MakeWriter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
-/// The environment variable choosing the log format.
-pub const FORMAT_ENV: &str = "FERROTERM_LOG_FORMAT";
-/// The environment variable carrying the `tracing` filter.
-pub const FILTER_ENV: &str = "RUST_LOG";
-/// The filter used when `RUST_LOG` is unset.
+/// The filter used when `telemetry.filter` and `RUST_LOG` are unset.
 pub const DEFAULT_FILTER: &str = "info,hyper=warn,tower=warn,h2=warn";
 
 /// The requested format.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum LogFormat {
     /// `pretty` on a terminal, `json` otherwise.
     #[default]

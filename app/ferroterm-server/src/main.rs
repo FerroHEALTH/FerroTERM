@@ -7,8 +7,9 @@
 //! print the banner when a person is reading, install the log subscriber, load
 //! the artifacts (their summary is the first thing logged), bind, serve.
 #![expect(
+    clippy::print_stdout,
     clippy::print_stderr,
-    reason = "a refused configuration and a failed health probe are reported before any log subscriber exists"
+    reason = "a refused configuration and a failed health probe are reported before any log subscriber exists, and `config check` prints the running tree for a person"
 )]
 
 use std::io::IsTerminal;
@@ -16,8 +17,9 @@ use std::process::ExitCode;
 use std::sync::Arc;
 
 use clap::Parser;
+use ferrohealth_server::cli::ConfigCommand;
 use ferroterm_server::cli::{Cli, Command};
-use ferroterm_server::config::{ADMIN_LISTEN_ENV, Config, INDEX_ENV, LISTEN_ENV};
+use ferroterm_server::config::Config;
 use ferroterm_server::reload::Serving;
 use ferroterm_server::smart::Smart;
 use ferroterm_server::state::AppState;
@@ -29,21 +31,46 @@ use tokio::net::TcpListener;
 async fn main() -> ExitCode {
     let started = std::time::Instant::now();
     let cli = Cli::parse();
-    if let Some(Command::Healthcheck { url }) = cli.command {
-        return healthcheck_main(url).await;
-    }
-    let config = match Config::from_env() {
-        Ok(config) => config,
+    let loaded = match Config::load(cli.config.config.as_deref(), &cli.config.sets) {
+        Ok(loaded) => loaded,
         Err(error) => {
             eprintln!("ferroterm: cannot start: {error}");
             return ExitCode::FAILURE;
         }
     };
+    match cli.command {
+        Some(Command::Healthcheck { url }) => {
+            let url = url.unwrap_or_else(|| healthcheck::url_of(&loaded.settings().server.listen));
+            return healthcheck_main(&url).await;
+        }
+        Some(Command::Config {
+            command: ConfigCommand::Check,
+        }) => {
+            return match ferrohealth_config::report::check_report(&loaded) {
+                Ok(report) => {
+                    println!("{report}");
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("ferroterm config check: {error}");
+                    ExitCode::FAILURE
+                }
+            };
+        }
+        None => {}
+    }
+    let (config, _provenance) = loaded.into_parts();
+    let mut config = config;
+    config.usage_report = config.usage_report.with_ci(|name| std::env::var(name).ok());
     let stdout_is_terminal = std::io::stdout().is_terminal();
-    if config.log_format.resolve(stdout_is_terminal) == ResolvedFormat::Pretty {
+    if config.telemetry.format.resolve(stdout_is_terminal) == ResolvedFormat::Pretty {
         banner::print();
     }
-    if let Err(error) = telemetry::init(config.log_format, &config.log_filter, stdout_is_terminal) {
+    if let Err(error) = telemetry::init(
+        config.telemetry.format,
+        &config.telemetry.filter,
+        stdout_is_terminal,
+    ) {
         eprintln!("ferroterm: cannot start: {error}");
         return ExitCode::FAILURE;
     }
@@ -57,9 +84,8 @@ async fn main() -> ExitCode {
 }
 
 /// `ferroterm healthcheck`: silent on `200 OK`, the reason on stderr otherwise.
-async fn healthcheck_main(url: Option<String>) -> ExitCode {
-    let url = url.unwrap_or_else(healthcheck::url_from_env);
-    match healthcheck::probe(&url).await {
+async fn healthcheck_main(url: &str) -> ExitCode {
+    match healthcheck::probe(url).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             let error = anyhow::Error::from(error);
@@ -72,8 +98,7 @@ async fn healthcheck_main(url: Option<String>) -> ExitCode {
 async fn run(config: Config, started: std::time::Instant) -> anyhow::Result<()> {
     use anyhow::Context;
 
-    let state = AppState::load(&config)
-        .with_context(|| format!("loading the artifacts named by {INDEX_ENV}"))?;
+    let state = AppState::load(&config).context("loading the artifacts terminology.index names")?;
     let summaries = state
         .summaries()
         .context("summarising the loaded code systems")?;
@@ -87,7 +112,7 @@ async fn run(config: Config, started: std::time::Instant) -> anyhow::Result<()> 
     );
     if summaries.is_empty() {
         tracing::warn!(
-            "no code systems loaded: set {INDEX_ENV} to one or more artifact directories"
+            "no code systems loaded: set terminology.index to one or more artifact directories"
         );
     }
     for summary in &summaries {
@@ -115,7 +140,7 @@ async fn run(config: Config, started: std::time::Instant) -> anyhow::Result<()> 
             "requiring a credential on the write routes and the admin listener"
         ),
         None if !config.auth.enabled
-            && (config.resources.is_some() || config.admin_listen.is_some()) =>
+            && (config.terminology.resources.is_some() || config.admin_listen().is_some()) =>
         {
             tracing::warn!(
                 "[auth] is off: the write routes and the admin listener authenticate no caller"
@@ -123,20 +148,23 @@ async fn run(config: Config, started: std::time::Instant) -> anyhow::Result<()> 
         }
         None => {}
     }
-    let listener = TcpListener::bind(&config.listen)
+    let listener = TcpListener::bind(&config.server.listen)
         .await
-        .with_context(|| format!("binding {} (set {LISTEN_ENV} to change it)", config.listen))?;
+        .with_context(|| {
+            format!(
+                "binding {} (set server.listen to change it)",
+                config.server.listen
+            )
+        })?;
     tracing::info!(
-        listen = %config.listen,
+        listen = %config.server.listen,
         bases = ferroterm_server::FHIR_BASES.join(","),
         "listening"
     );
-    let admin = match &config.admin_listen {
+    let admin = match config.admin_listen() {
         Some(address) => {
             let bound = TcpListener::bind(address).await.with_context(|| {
-                format!(
-                    "binding the admin listener on {address} (set {ADMIN_LISTEN_ENV} to change it)"
-                )
+                format!("binding the admin listener on {address} (set admin.listen to change it)")
             })?;
             tracing::info!(listen = %address, route = "/reload", "listening for admin requests");
             Some(bound)

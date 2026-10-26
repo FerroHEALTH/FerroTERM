@@ -627,11 +627,11 @@ impl Server {
             .try_clone()
             .with_context(|| format!("cannot write {}", log.display()))?;
         let child = Command::new(binary)
-            .env("FERROTERM_INDEX", artifact)
-            .env("FERROTERM_LISTEN", format!("127.0.0.1:{port}"))
-            .env("FERROTERM_LOG_FORMAT", "json")
+            .env("FERROTERM__TERMINOLOGY__INDEX", artifact)
+            .env("FERROTERM__SERVER__LISTEN", format!("127.0.0.1:{port}"))
+            .env("FERROTERM__TELEMETRY__FORMAT", "json")
             // A benchmark run is no installation, so it sends no usage report.
-            .env("FERROTERM_USAGE_REPORT", "off")
+            .env("FERROTERM__USAGE_REPORT__ENABLED", "false")
             .stdout(Stdio::from(also))
             .stderr(Stdio::from(sink))
             .spawn()

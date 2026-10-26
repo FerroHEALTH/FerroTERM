@@ -178,7 +178,7 @@ impl RequestsBucket {
 pub enum Family {
     /// The Dutch DHD thesauri.
     Dhd,
-    /// FHIR `CodeSystem` resources loaded from `FERROTERM_CODESYSTEMS` that
+    /// FHIR `CodeSystem` resources loaded from `terminology.code_systems` that
     /// no other family names.
     Fhir,
     /// The Dutch G-Standaard product ladder.

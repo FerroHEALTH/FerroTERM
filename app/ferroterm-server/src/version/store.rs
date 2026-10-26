@@ -790,7 +790,7 @@ pub(crate) fn loaded_supplements(
 /// (<https://hl7.org/fhir/R4B/bundle-definitions.html#Bundle.entry.fullUrl>),
 /// so a searchset needs the base the client used: the one the deployment
 /// declares, else the authority the request itself names. A deployment behind
-/// TLS or a path prefix declares `FERROTERM_BASE_URL`, because the request
+/// TLS or a path prefix declares `fhir.base_url`, because the request
 /// carries no scheme and no `Forwarded` header is read here: no FHIR
 /// specification governs reverse-proxy trust, and this is our own design.
 pub(crate) fn base_of(

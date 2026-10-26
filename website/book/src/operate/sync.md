@@ -39,7 +39,7 @@ at the `id` it carries, so a delivery whose `id` another loaded or persisted
 resource of the same type already answers on is one of the reloads the server
 refuses (see
 [What a code system version is served as](configuration.md#what-a-code-system-version-is-served-as)). Nothing is deleted except by
-retention, and the server's own write store (`FERROTERM_RESOURCES`) is never
+retention, and the server's own write store (`FERROTERM__TERMINOLOGY__RESOURCES`) is never
 touched.
 
 ## Running it
@@ -80,7 +80,7 @@ then renames it into the index root, and a rename works only inside one
 filesystem. The server mounts `index/` and `codesystems/` read-only; the sync
 mounts the whole tree and writes to it as uid 65532.
 
-The overlay also sets `FERROTERM_ADMIN_LISTEN` on the server, because
+The overlay also sets `FERROTERM__ADMIN__LISTEN` on the server, because
 `POST /reload` on that listener is how the sync asks for the new release to be
 served. That listener is a guarded surface, so the server starts only once
 `[auth]` names an issuer, with `[server_admin_credentials]` in the sync
@@ -92,9 +92,14 @@ first run and a cron-style deployment use.
 
 ## Configuration
 
-One TOML file, `/etc/ferroterm/sync.toml` unless `--config` says otherwise.
-Every key is optional and falls back to the value below; a key the service does
-not know is refused at start-up rather than ignored.
+One TOML file, named by `--config <path>` or by `FERROTERM_SYNC_CONFIG` (the
+container image sets `/etc/ferroterm/sync.toml`). A variable
+`FERROTERM_SYNC__<SECTION>__<KEY>` sets one key over the file
+(`FERROTERM_SYNC__RETENTION=4`, `FERROTERM_SYNC__SCHEDULE__AT=03:00`), and
+`--set key=value` sets one over both. Every key is optional and falls back to
+the value below; a key or a `FERROTERM_SYNC_` variable the service does not
+know is refused at start-up rather than ignored. `ferroterm-sync config check`
+prints every key with where it came from, every secret as `***`.
 
 | Key | Default | What it names |
 |---|---|---|
@@ -113,6 +118,7 @@ not know is refused at start-up rather than ignored.
 | `build_command` | `ferroterm-build` | the offline build, on `PATH` or by path |
 | `[server_admin_credentials]` | none | the credential of the reload call (see [below](#the-credential-of-the-reload-call)) |
 | `[auth]` | on, no issuer | the credentials the admin listener admits (see [The admin listener](#the-admin-listener)) |
+| `[nts]` | no account | the account the NTS add-on authenticates with (see [Credentials](#credentials)) |
 
 A `[[source]]` entry names the add-on that reads a service and carries that
 add-on's own block:
@@ -143,10 +149,10 @@ An add-on whose service keeps resources behind its FHIR API lists that API by
 default; the NTS block takes `fhir_api = false` to keep a run to the feed and
 `fhir_api_url` to point at another endpoint.
 
-The file carries no secret in clear. A source add-on reads its credentials from
-a file or from the environment, and the reload call reads its own from the
-files `[server_admin_credentials]` names, so this file is safe to commit and
-safe to show.
+The file needs no secret in clear. The NTS account's secrets can each be a
+mounted file (`password_file`, `client_secret_file`) or a variable, and the
+reload call reads its own from the files `[server_admin_credentials]` names,
+so the file can stay safe to commit and safe to show.
 
 ### The credential of the reload call
 
@@ -388,19 +394,24 @@ for.
 
 ### Credentials
 
-The add-on reads its credentials from a file or from the environment, never
-from the configuration body, so a configuration file is safe to commit and to
-show in a run record.
+The service hands the add-on the account its `[nts]` section names. Each
+secret is set inline or through its `_file` sibling, which names a mounted
+file whose trailing line ending is dropped; setting both refuses the start.
+Keep the secrets out of the file you commit: set them as variables or mount
+them.
 
-| Variable | What it holds |
+| Key (variable) | What it holds |
 |---|---|
-| `FERROTERM_NTS_CLIENT_ID` | The OAuth 2 client, `cli_client` by default |
-| `FERROTERM_NTS_CLIENT_SECRET` | A client secret, when your deployment has one |
-| `FERROTERM_NTS_USERNAME` | Your account name |
-| `FERROTERM_NTS_PASSWORD` | Your account password |
+| `nts.client_id` (`FERROTERM_SYNC__NTS__CLIENT_ID`) | The OAuth 2 client, `cli_client` by default |
+| `nts.client_secret` (`FERROTERM_SYNC__NTS__CLIENT_SECRET`), or `nts.client_secret_file` | A client secret, when your deployment has one |
+| `nts.username` (`FERROTERM_SYNC__NTS__USERNAME`) | Your account name |
+| `nts.password` (`FERROTERM_SYNC__NTS__PASSWORD`), or `nts.password_file` | Your account password |
 
-The file form takes the same four field names in a JSON object, and the
-configuration points at it with `{"from": "file", "path": "/run/secrets/nts.json"}`.
+```toml
+[nts]
+username = "your-account"
+password_file = "/run/secrets/nts-password"
+```
 
 The add-on reads the token endpoint from
 `https://terminologieserver.nl/fhir/.well-known/smart-configuration`, which
@@ -424,7 +435,7 @@ per system, whether the service publishes it as an RF2 archive, as FHIR
 resources, or only as Ontoserver's binary index; `scripts/live/sync-e2e.sh`
 builds the binaries from the checkout, starts the server on an empty index
 root, runs the sync once, and shows the run record and what the server serves
-afterwards. Both take the `FERROTERM_NTS_*` variables and print no secret.
+afterwards. Both take the `FERROTERM_SYNC__NTS__*` variables and print no secret.
 The FerroEHR hop follows: point its quickstart overlay at the server the
 second script started and commit a composition whose binding names a code the
 run made available.
@@ -432,8 +443,8 @@ run made available.
 1. Get the account, accept the terms, and confirm which systems your licences
    unlock. Run `scripts/live/nts-feed.sh` to see the feed as your account sees
    it.
-2. Put the credentials where the add-on reads them, and keep them out of the
-   configuration file.
+2. Put the credentials in the `[nts]` keys as variables or mounted files, and
+   keep them out of the configuration file you commit.
 3. Subscribe by canonical identifier. The defaults are the SNOMED CT
    Netherlands edition (`http://snomed.info/sct/11000146104`), LOINC
    (`http://loinc.org`), UCUM (`http://unitsofmeasure.org`), and ICD-10

@@ -10,8 +10,9 @@
 #
 # Local only, by design. It needs a personal licensed account, so it refuses to
 # run under CI and no workflow calls it. Credentials come from the environment
-# the add-on reads (FERROTERM_NTS_USERNAME and FERROTERM_NTS_PASSWORD, or
-# FERROTERM_NTS_CLIENT_ID and FERROTERM_NTS_CLIENT_SECRET) and are never
+# the sync service reads (FERROTERM_SYNC__NTS__USERNAME and
+# FERROTERM_SYNC__NTS__PASSWORD, or FERROTERM_SYNC__NTS__CLIENT_ID and
+# FERROTERM_SYNC__NTS__CLIENT_SECRET) and are never
 # printed. The listing is written to a temporary file that is removed on exit
 # unless --keep names a path; a kept listing is licensed content, so it stays
 # out of the repository.
@@ -53,12 +54,12 @@ if [[ -n "$saved" ]]; then
   listing="$saved"
   echo "== listing: $saved ($(wc -c <"$listing" | tr -d ' ') bytes, saved)"
 else
-user="${FERROTERM_NTS_USERNAME:-}"
-pass="${FERROTERM_NTS_PASSWORD:-}"
-client_id="${FERROTERM_NTS_CLIENT_ID:-}"
-client_secret="${FERROTERM_NTS_CLIENT_SECRET:-}"
+user="${FERROTERM_SYNC__NTS__USERNAME:-}"
+pass="${FERROTERM_SYNC__NTS__PASSWORD:-}"
+client_id="${FERROTERM_SYNC__NTS__CLIENT_ID:-}"
+client_secret="${FERROTERM_SYNC__NTS__CLIENT_SECRET:-}"
 if [[ -z "$client_secret" ]] && { [[ -z "$user" ]] || [[ -z "$pass" ]]; }; then
-  echo "nts-feed: set FERROTERM_NTS_USERNAME and FERROTERM_NTS_PASSWORD (or FERROTERM_NTS_CLIENT_ID and FERROTERM_NTS_CLIENT_SECRET)" >&2
+  echo "nts-feed: set FERROTERM_SYNC__NTS__USERNAME and FERROTERM_SYNC__NTS__PASSWORD (or FERROTERM_SYNC__NTS__CLIENT_ID and FERROTERM_SYNC__NTS__CLIENT_SECRET)" >&2
   exit 2
 fi
 

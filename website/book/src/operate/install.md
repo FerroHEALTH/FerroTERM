@@ -144,9 +144,9 @@ Diagnosethesaurus and the Verrichtingenthesaurus as `--out
 fallback child is `claml` when `--system` ends in no plain name (an `urn:oid`).
 
 The Labcodeset resources and the DHD concept maps are FHIR resources, read
-through `FERROTERM_CODESYSTEMS`. They already sit on the index mount, so add
+through `FERROTERM__TERMINOLOGY__CODE_SYSTEMS`. They already sit on the index mount, so add
 the variable to the `ferroterm` service's `environment` in `compose.yaml`, with
-the paths separated by `:`, for example `FERROTERM_CODESYSTEMS:
+the paths separated by `:`, for example `FERROTERM__TERMINOLOGY__CODE_SYSTEMS:
 /data/index/labcodeset:/data/index/dhd/conceptmaps`. The release mount is
 read-only, so filling an ICD-11 cache with `--icd11-api` (which writes into
 the cache) runs with the binary; a build from a filled cache in `./releases`
@@ -170,8 +170,8 @@ $ FERROTERM_INDEX_DIR=/srv/ferroterm/index docker compose up
 The file pulls the image of the release it shipped with, mounts the index
 read-only at `/data/index`, publishes port 8080 on the loopback interface, and
 runs the container with every capability dropped and a read-only root
-filesystem. `FERROTERM_BIND_HOST`, `FERROTERM_PORT`, `FERROTERM_LOG_FORMAT`,
-`FERROTERM_DEFAULT_LANGUAGE`, and `RUST_LOG` are variables you set on the
+filesystem. `FERROTERM_BIND_HOST`, `FERROTERM_PORT`, `FERROTERM__TELEMETRY__FORMAT`,
+`FERROTERM__TERMINOLOGY__DEFAULT_LANGUAGE`, and `RUST_LOG` are variables you set on the
 command line.
 
 The `ferroterm` service declares a health check, so `docker compose up --wait`
@@ -192,7 +192,7 @@ a numeric non-root user (`65532`), and the listen address preset to
 ```console
 $ docker run --rm -p 8080:8080 \
     -v /srv/ferroterm/index:/data/index:ro \
-    -e FERROTERM_INDEX=/data/index \
+    -e FERROTERM__TERMINOLOGY__INDEX=/data/index \
     ghcr.io/ferrohealth/ferroterm:0.3.0
 ```
 
@@ -215,7 +215,7 @@ Compose can wait on it. Kubernetes ignores the image's `HEALTHCHECK`: point the
 liveness probe at `GET /health/liveness` and the readiness probe at
 `GET /health/readiness`, set `runAsNonRoot: true`,
 `readOnlyRootFilesystem: true`, drop every capability, and mount the index
-root (not a single artifact) read-only at the path `FERROTERM_INDEX` names. The server stops
+root (not a single artifact) read-only at the path `FERROTERM__TERMINOLOGY__INDEX` names. The server stops
 cleanly on `SIGTERM`.
 
 ## Run the binary
@@ -229,7 +229,7 @@ $ gh release download v0.3.0 -R FerroHEALTH/FerroTERM -p 'ferroterm-v0.3.0-x86_6
 $ gh attestation verify ferroterm-v0.3.0-x86_64-unknown-linux-musl.tar.gz -R FerroHEALTH/FerroTERM \
     --signer-workflow FerroHEALTH/FerroTERM/.github/workflows/release-build.yml
 $ tar xzf ferroterm-v0.3.0-x86_64-unknown-linux-musl.tar.gz
-$ FERROTERM_INDEX=/srv/ferroterm/index ./ferroterm
+$ FERROTERM__TERMINOLOGY__INDEX=/srv/ferroterm/index ./ferroterm
 ```
 
 The server opens each index read-only, refuses to start on a missing or

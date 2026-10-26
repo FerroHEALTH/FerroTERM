@@ -70,7 +70,7 @@ both come from the ecosystem overlay and are marked as such in the
 
 A value set reaches `$expand` and `ValueSet/$validate-code` in five ways:
 
-- **Loaded**: a `ValueSet` JSON under `FERROTERM_CODESYSTEMS`, named by `url`
+- **Loaded**: a `ValueSet` JSON under `FERROTERM__TERMINOLOGY__CODE_SYSTEMS`, named by `url`
   (and `version`; without one the greatest version answers). Loaded value sets
   are readable at `GET ValueSet/{id}` and `GET ValueSet?url=…&version=…`, where
   `{id}` is the `id` the resource carries, or one the server mints when it
@@ -154,7 +154,7 @@ describes and the server prints at startup. A system the server holds behind an 
 definition and `content = not-present`: the codes come from `$lookup`,
 `$validate-code`, and `$expand`, never from the resource
 (<https://hl7.org/fhir/R4B/codesystem-content-mode.html>). A system loaded as a
-`CodeSystem` resource under `FERROTERM_CODESYSTEMS` answers with the `content`
+`CodeSystem` resource under `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` answers with the `content`
 it declared, so a `complete` one carries its concepts. A supplement is applied
 to the system it supplements and is read and searched like any other
 `CodeSystem` this server holds, with `content = supplement` and the
@@ -293,7 +293,7 @@ it used. Designations carry their BCP 47 language and their use.
 
 ## Persisted resources
 
-A deployment that names a database in `FERROTERM_RESOURCES` accepts
+A deployment that names a database in `FERROTERM__TERMINOLOGY__RESOURCES` accepts
 `CodeSystem`, `ValueSet`, and `ConceptMap` resources over the REST API and
 keeps them across restarts. The interactions are the ones the FHIR RESTful API
 defines (<https://hl7.org/fhir/R4B/http.html>), under every version prefix:
@@ -347,7 +347,7 @@ those five is a `400`.
 
 Each `entry.fullUrl` is the absolute URL of the resource
 (<https://hl7.org/fhir/R4B/bundle.html#bundle-unique>): the base URL of
-`FERROTERM_BASE_URL` plus the version's own root, or, where a deployment
+`FERROTERM__FHIR__BASE_URL` plus the version's own root, or, where a deployment
 declares no base URL, the authority the request names. Declare the base URL
 behind TLS or a path prefix, because a request carries no scheme. The bundle
 also carries its `self` link, the URL the search was made at, which R5 and the
@@ -382,7 +382,7 @@ identity depending on the version of FHIR in use"
 there.
 
 Every operation sees a persisted resource exactly as it sees one loaded from
-`FERROTERM_CODESYSTEMS`, on every served version.
+`FERROTERM__TERMINOLOGY__CODE_SYSTEMS`, on every served version.
 
 A deployment that names no database refuses every write with a `422` and
 declares no write interaction in its capability statement.
@@ -573,4 +573,4 @@ move is to initialise and replay its codes.
 
 The R6 ballot ships no `ConceptMap-closure` definition, so `/r6` offers no
 `$closure` and its capability statement declares none. The tables live in the
-database `FERROTERM_RESOURCES` names, so they outlive a restart.
+database `FERROTERM__TERMINOLOGY__RESOURCES` names, so they outlive a restart.

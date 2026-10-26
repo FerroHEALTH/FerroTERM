@@ -35,6 +35,10 @@ COPY --chmod=0555 dist/${TARGETOS}/${TARGETARCH}/ferroterm-build /usr/local/bin/
 # same.
 EXPOSE 8181/tcp
 
+# The configuration file the deployment mounts; FERROTERM_SYNC__SECTION__KEY
+# variables override its keys.
+ENV FERROTERM_SYNC_CONFIG=/etc/ferroterm/sync.toml
+
 # Numeric on purpose: the kubelet cannot resolve a user name against an image
 # it does not read, so `runAsNonRoot: true` refuses a named USER. The volumes
 # the service writes (the staging, records, and state directories) must be

@@ -119,7 +119,7 @@ engine. Each row is a tracker issue under the program issue.
   `versionNeeded`, `compositional` honoured; supplements add designations and
   properties only. This provider alone passes the tx-ecosystem `general` mode
   (<https://build.fhir.org/ig/HL7/fhir-tx-ecosystem-ig/testcases.html>).
-- **Loading.** `FERROTERM_CODESYSTEMS` names the directories; every
+- **Loading.** `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` names the directories; every
   `CodeSystem` in them is served, the version from the package manifest,
   and a supplement is layered over the system it names.
 
@@ -158,7 +158,7 @@ and it does so **without reading an openEHR artefact**.
   directories do name one canonical at one version, the load refuses rather
   than picking a winner, so a collision is reported and never silently
   resolved.
-- **Loading.** `FERROTERM_CODESYSTEMS`, the same directories as any other
+- **Loading.** `FERROTERM__TERMINOLOGY__CODE_SYSTEMS`, the same directories as any other
   supplied resource. Nothing about the request shape is openEHR-specific: the
   ordinary `$lookup`, `$expand`, `$validate-code`, and `$translate` answer over
   them (`app/ferroterm-server/tests/it/openehr.rs`).
@@ -216,7 +216,7 @@ and it does so **without reading an openEHR artefact**.
   provider answers `copyright`, `parent`, and `ancestor`, the three implicit
   value set forms, and `LONG_COMMON_NAME` as the display (a translation when
   the language asks for one); `STATUS = DEPRECATED` is inactive. The server
-  opens a LOINC artifact from `FERROTERM_INDEX` like an edition; the manifest
+  opens a LOINC artifact from `FERROTERM__TERMINOLOGY__INDEX` like an edition; the manifest
   says which system a directory serves.
 - **Size.** 108,248 terms in 2.81 (96,241 active).
 
@@ -488,7 +488,7 @@ each has a clear provider shape.
   the ICD-10, DBC, and ZA derivations, the roles, the code mappings,
   replacements, splits, and umbrella terms as properties. The build also
   writes `conceptmaps/dhd-to-snomed.json` and `dhd-to-icd10.json` (FHIR R4B
-  `ConceptMap`, `equivalent` and `wider`) for `FERROTERM_CODESYSTEMS`, so
+  `ConceptMap`, `equivalent` and `wider`) for `FERROTERM__TERMINOLOGY__CODE_SYSTEMS`, so
   `$translate` answers the links. The refset `31000147101` rides on the SNOMED
   provider as `?fhir_vs=refset/31000147101`.
 - **G-Standaard (Z-Index).** The Dutch medication database: about 80
