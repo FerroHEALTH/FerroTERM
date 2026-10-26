@@ -13,7 +13,7 @@ use std::process::ExitCode;
 use std::sync::Arc;
 
 use clap::Parser;
-use ferrohealth_server::cli::ConfigCommand;
+use ferrohealth_server::cli::{Common, ConfigCommand};
 use ferrohealth_telemetry::telemetry::{Console, Service, Telemetry};
 use ferroterm_sync::cli::{Cli, Command};
 use ferroterm_sync::config::Config;
@@ -31,9 +31,9 @@ async fn main() -> ExitCode {
         }
     };
     match cli.command {
-        Some(Command::Config {
+        Some(Command::Common(Common::Config {
             command: ConfigCommand::Check,
-        }) => match ferrohealth_config::report::check_report(&loaded) {
+        })) => match ferrohealth_config::report::check_report(&loaded) {
             Ok(report) => {
                 println!("{report}");
                 ExitCode::SUCCESS
@@ -43,7 +43,7 @@ async fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
-        Some(Command::Healthcheck { url }) => healthcheck(loaded.settings(), url).await,
+        Some(Command::Common(Common::Healthcheck)) => healthcheck(loaded.settings()).await,
         Some(Command::RunOnce) => {
             let config = loaded.into_parts().0;
             match telemetry(&config) {
@@ -53,7 +53,7 @@ async fn main() -> ExitCode {
                 Err(code) => code,
             }
         }
-        None => {
+        Some(Command::Common(Common::Serve)) | None => {
             let config = loaded.into_parts().0;
             match telemetry(&config) {
                 Ok(telemetry) => finished(
@@ -93,17 +93,14 @@ fn finished(code: ExitCode, telemetry: &Telemetry) -> ExitCode {
     code
 }
 
-/// `ferroterm-sync healthcheck`: silent on `200 OK`, the reason otherwise.
-async fn healthcheck(config: &Config, url: Option<String>) -> ExitCode {
-    let url = ferroterm_sync::cli::health_url(config, url);
-    match ferroterm_sync::healthcheck::probe(&url).await {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(error) => {
-            let error = anyhow::Error::from(error);
-            eprintln!("ferroterm-sync healthcheck: {error:#}");
-            ExitCode::FAILURE
-        }
+/// `ferroterm-sync healthcheck`: silent when ready, the reason otherwise.
+async fn healthcheck(config: &Config) -> ExitCode {
+    let outcome = ferroterm_sync::cli::healthcheck(config).await;
+    if outcome.exit_code() == 0 {
+        return ExitCode::SUCCESS;
     }
+    eprintln!("ferroterm-sync healthcheck: {outcome}");
+    ExitCode::FAILURE
 }
 
 /// Serves until the process is stopped.

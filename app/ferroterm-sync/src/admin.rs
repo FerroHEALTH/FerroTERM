@@ -4,11 +4,12 @@
 //! The service's own admin listener.
 //!
 //! `POST /run` and `POST /activate` are the manual triggers, `GET /runs` and
-//! `GET /runs/{id}` are the run records, `GET /metrics` is the Prometheus
-//! exposition, and `GET /health`, `GET /health/liveness` and
-//! `GET /health/readiness` are the family's health routes. [`crate::auth`]
-//! puts every route but the health routes behind a credential carrying the
-//! product scope.
+//! `GET /runs/{id}` are the run records, and `GET /metrics` is the Prometheus
+//! exposition ([`routes`]). [`app`] wraps them in the stack of
+//! `ferrohealth-server`, which adds `GET /health`, `GET /health/liveness` and
+//! `GET /health/readiness`, the request log, the request timeout, the body
+//! limit and the panic catch. [`crate::auth`] puts every route but the health
+//! routes behind a credential carrying the product scope.
 //!
 //! A `POST /run` answers when the run has finished, which is how an operator
 //! reads the outcome of the run they asked for. A run that builds an edition
@@ -23,14 +24,40 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
+use ferrohealth_server::section::ServerSection;
+use ferrohealth_server::stack::{self, StackPolicy};
+use ferrohealth_telemetry::request_log::RequestLog;
 
 use crate::record::RecordError;
 use crate::run::Service;
 
-/// The admin application over `service`.
+/// The admin application over `service`: [`routes`] under the stack, with no
+/// credential required.
 #[must_use = "the router is the application the listener serves"]
 pub fn router(service: Arc<Service>) -> Router {
-    let health = ferrohealth_server::health::routes(service.health().clone());
+    let held = Arc::clone(&service);
+    app(&held, routes(service))
+}
+
+/// `routes`, which [`crate::auth`] may have guarded, under the stack of
+/// `ferrohealth-server` with the health routes of `service`.
+#[must_use = "the router is the application the listener serves"]
+pub fn app(service: &Service, routes: Router) -> Router {
+    let section = ServerSection {
+        listen: service.config().listen,
+        ..ServerSection::default()
+    };
+    let policy = StackPolicy {
+        request_log: RequestLog::new(&service.config().telemetry.logged_query_parameters)
+            .with_metrics(&service.telemetry().meter(crate::metrics::SCOPE)),
+        ..StackPolicy::default()
+    };
+    stack::app(routes, service.health().clone(), &section, policy)
+}
+
+/// The admin routes over `service`, without the health routes and the stack.
+#[must_use = "the router is the application the listener serves"]
+pub fn routes(service: Arc<Service>) -> Router {
     Router::new()
         .route("/run", post(run))
         .route("/activate", post(activate))
@@ -41,7 +68,6 @@ pub fn router(service: Arc<Service>) -> Router {
             ferrohealth_telemetry::telemetry::prometheus_route(Arc::clone(service.telemetry())),
         )
         .with_state(service)
-        .merge(health)
         .fallback(unknown)
 }
 

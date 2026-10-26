@@ -103,7 +103,7 @@ services:
       ferroterm:
         condition: service_healthy
     # The image declares the same probe (`ferroterm-sync healthcheck`: one GET
-    # /health on the admin listener, exit 0 on 200).
+    # /health/readiness on the admin listener, exit 0 on 200).
     healthcheck:
       test: ["CMD", "/usr/local/bin/ferroterm-sync", "healthcheck"]
       interval: 30s

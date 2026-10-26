@@ -33,7 +33,6 @@ pub mod build;
 pub mod cli;
 pub mod clock;
 pub mod config;
-pub mod healthcheck;
 pub mod holdings;
 pub mod metrics;
 pub mod naming;

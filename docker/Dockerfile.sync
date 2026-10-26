@@ -46,7 +46,8 @@ ENV FERROTERM_SYNC_CONFIG=/etc/ferroterm/sync.toml
 USER 65532:65532
 
 # The base has no shell and no HTTP client, so the probe is the binary itself:
-# one GET /health on the admin listener the configuration names, exit 0 on 200.
+# one GET /health/readiness on the admin listener the configuration names, exit
+# 0 on 200.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD ["/usr/local/bin/ferroterm-sync", "healthcheck"]
 
