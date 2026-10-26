@@ -46,9 +46,9 @@ struct Inner {
     rebuilding: Mutex<()>,
     /// The resource server, when the deployment authenticates its callers.
     smart: Option<Arc<crate::smart::Smart>>,
-    /// The usage report window the request middleware records into; it
-    /// outlives every swap of the served set.
-    usage: Arc<crate::usage_report::window::Window>,
+    /// The usage report window the request log records into; it outlives
+    /// every swap of the served set.
+    usage: Arc<ferrohealth_usage_report::window::Window>,
     /// The indicators and the phase the health routes read.
     health: Health,
     /// The process's OpenTelemetry provider: the request histogram, the
@@ -106,7 +106,7 @@ impl Serving {
                 config,
                 rebuilding: Mutex::new(()),
                 smart,
-                usage: Arc::default(),
+                usage: Arc::new(crate::usage_report::window()),
                 health: Health::new(Registry::default(), lifecycle),
                 telemetry,
                 metrics,
@@ -141,7 +141,7 @@ impl Serving {
 
     /// The usage report window of this process.
     #[must_use]
-    pub fn usage_window(&self) -> Arc<crate::usage_report::window::Window> {
+    pub fn usage_window(&self) -> Arc<ferrohealth_usage_report::window::Window> {
         Arc::clone(&self.inner.usage)
     }
 
@@ -223,7 +223,7 @@ impl FromRef<Serving> for Arc<AppState> {
     }
 }
 
-impl FromRef<Serving> for Arc<crate::usage_report::window::Window> {
+impl FromRef<Serving> for Arc<ferrohealth_usage_report::window::Window> {
     fn from_ref(serving: &Serving) -> Self {
         serving.usage_window()
     }

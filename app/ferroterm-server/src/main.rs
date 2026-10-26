@@ -61,8 +61,6 @@ async fn main() -> ExitCode {
         None => {}
     }
     let (config, _provenance) = loaded.into_parts();
-    let mut config = config;
-    config.usage_report = config.usage_report.with_ci(|name| std::env::var(name).ok());
     if config
         .telemetry
         .format
@@ -194,8 +192,8 @@ async fn run(
     // process ends (<https://docs.rs/tokio/latest/tokio/task/struct.JoinHandle.html>).
     let _hangup = tokio::spawn(reload::on_hangup(serving.clone()));
     // The report never blocks boot: the task it starts is detached the same way.
-    let _usage =
-        usage_report::reporter::start(&serving.config().usage_report, &serving, started).await;
+    let ci = ferrohealth_usage_report::section::ci_of(|name| std::env::var(name).ok());
+    let _usage = usage_report::start(&serving.config().usage_report, &serving, started, ci).await;
     match admin {
         Some(admin) => {
             let fhir = ferroterm_server::serve(listener, serving.clone());

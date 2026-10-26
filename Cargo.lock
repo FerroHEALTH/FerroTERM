@@ -1355,6 +1355,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "ferrohealth-usage-report"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f28aa456d9065b32993b0997e7b5b1819344b4c8e62ea9aa45f3ee8f880d0605"
+dependencies = [
+ "ferrohealth-telemetry",
+ "http",
+ "jiff",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+ "url",
+ "uuid",
+]
+
+[[package]]
 name = "ferroterm-bench"
 version = "0.3.0"
 dependencies = [
@@ -1457,11 +1476,11 @@ dependencies = [
  "ferrohealth-server",
  "ferrohealth-smart",
  "ferrohealth-telemetry",
+ "ferrohealth-usage-report",
  "ferroterm-testkit",
  "fhir-terminology",
  "fhir-types",
  "http",
- "hyper-rustls",
  "hyper-util",
  "jiff",
  "jsonschema",
@@ -2068,9 +2087,7 @@ dependencies = [
  "http",
  "hyper",
  "hyper-util",
- "log",
  "rustls",
- "rustls-native-certs",
  "tokio",
  "tokio-rustls",
  "tower-service",
@@ -5268,7 +5285,6 @@ checksum = "4a0e2d11620c50695fe12bbbfde96b3477fe606e7284c22d505c12ce51214514"
 dependencies = [
  "getrandom 0.4.3",
  "js-sys",
- "serde_core",
  "wasm-bindgen",
 ]
 

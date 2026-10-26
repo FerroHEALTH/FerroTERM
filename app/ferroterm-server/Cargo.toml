@@ -28,11 +28,11 @@ ferrohealth-health.workspace = true
 ferrohealth-server.workspace = true
 ferrohealth-smart.workspace = true
 ferrohealth-telemetry = { workspace = true, features = ["axum", "prometheus", "otlp"] }
+ferrohealth-usage-report = { workspace = true, features = ["telemetry"] }
 fhir-types.workspace = true
 fhir-terminology.workspace = true
 concept-graph.workspace = true
 http.workspace = true
-hyper-rustls.workspace = true
 hyper-util.workspace = true
 jiff.workspace = true
 opentelemetry.workspace = true
@@ -44,8 +44,7 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["time"] }
 tracing.workspace = true
 tracing-subscriber.workspace = true
-# The usage report serializes its instance id.
-uuid = { workspace = true, features = ["serde"] }
+uuid.workspace = true
 
 [dev-dependencies]
 argon2.workspace = true

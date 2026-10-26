@@ -88,6 +88,8 @@ exceptions = [
   # The FerroHEALTH configuration loader, the same Licensor's crate under the
   # same licence.
   { allow = ["BUSL-1.1"], crate = "ferrohealth-config" },
+  # The FerroHEALTH usage report to FerroPULSE, the same licensor and licence.
+  { allow = ["BUSL-1.1"], crate = "ferrohealth-usage-report" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-build" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-bench" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-testkit" },

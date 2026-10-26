@@ -8,31 +8,47 @@
 //! held to `FerroPULSE`'s report envelope v2. The tests pin the exact JSON
 //! shape the contract names.
 
+use std::sync::Arc;
 use std::time::Instant;
 
 use serde_json::{Value, json};
 use wiremock::matchers::{header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-use ferroterm_server::usage_report::config::{Deployment, UsageReportConfig};
-use ferroterm_server::usage_report::reporter::{Prepared, Reporter, StartOutcome, prepare};
-use ferroterm_server::usage_report::state::LAST_START_FILE;
+use ferrohealth_usage_report::reporter::{Prepared, Reporter, StartOutcome, prepare};
+use ferrohealth_usage_report::section::{Deployment, Endpoint, UsageReportSection};
+use ferrohealth_usage_report::state::LAST_START_FILE;
+use ferroterm_server::reload::Serving;
+use ferroterm_server::usage_report::identity;
 use ferroterm_testkit::snomed::{CAT, item, sctid};
 
 use crate::fixture::Server;
 
 /// A report configuration over `state` posting to `endpoint`.
-fn config(state: &std::path::Path, endpoint: &str) -> UsageReportConfig {
-    UsageReportConfig {
-        endpoint: endpoint.to_owned(),
+fn config(state: &std::path::Path, endpoint: &str) -> UsageReportSection {
+    UsageReportSection {
+        endpoint: Endpoint::new(endpoint).expect("an admitted endpoint"),
         state_dir: Some(state.to_path_buf()),
         deployment: Deployment::Compose,
-        ..UsageReportConfig::default()
+        ..UsageReportSection::default()
     }
 }
 
-fn prepared(config: &UsageReportConfig) -> Prepared {
-    prepare(config).unwrap_or_else(|off| panic!("the report runs: {off:?}"))
+fn prepared(config: &UsageReportSection) -> Prepared {
+    prepare(config, None).unwrap_or_else(|off| panic!("the report runs: {off:?}"))
+}
+
+/// The reporter of `serving` to `config`'s collector.
+fn reporter_of(config: &UsageReportSection, serving: &Serving) -> Reporter<Serving> {
+    Reporter::new(
+        config,
+        identity(),
+        prepared(config),
+        Arc::new(serving.clone()),
+        serving.usage_window(),
+        Instant::now(),
+    )
+    .expect("builds")
 }
 
 /// The vendored `FerroPULSE` fixtures, `scripts/vendor/ferropulse-schemas.sh`.
@@ -136,19 +152,13 @@ fn stable(mut report: Value) -> Value {
     report
 }
 
-#[test]
-fn the_start_report_is_exactly_the_v2_envelope() {
+#[tokio::test]
+async fn the_start_report_is_exactly_the_v2_envelope() {
     let server = Server::start_with_every_loader();
     let dir = tempfile::tempdir().expect("tempdir");
     let config = config(dir.path(), "https://report.ferropulse.eu/v1/report");
-    let reporter = Reporter::new(
-        &config,
-        prepared(&config),
-        server.serving.clone(),
-        Instant::now(),
-    )
-    .expect("builds");
-    let report = serde_json::to_value(reporter.start_report()).expect("serializes");
+    let reporter = reporter_of(&config, &server.serving);
+    let report = serde_json::to_value(reporter.start_report().await).expect("serializes");
     assert_eq!(
         stable(report),
         json!({
@@ -237,13 +247,7 @@ async fn the_daily_report_carries_the_window_the_router_recorded() {
         .await;
     let dir = tempfile::tempdir().expect("tempdir");
     let config = config(dir.path(), &format!("{}/v1/report", collector.uri()));
-    let reporter = Reporter::new(
-        &config,
-        prepared(&config),
-        server.serving.clone(),
-        Instant::now(),
-    )
-    .expect("builds");
+    let reporter = reporter_of(&config, &server.serving);
     let status = reporter.send_daily().await.expect("sends");
     assert_eq!(status, http::StatusCode::NO_CONTENT);
     let requests = collector.received_requests().await.expect("recorded");
@@ -276,7 +280,7 @@ async fn the_daily_report_carries_the_window_the_router_recorded() {
                 "window_24h": {
                     "requests_bucket": "1-100",
                     "groups": groups,
-                    "counters": { "fhir_r4": 1, "fhir_r4b": 3, "fhir_r5": 1, "fhir_r6": 0 }
+                    "counters": { "fhir_r4": 1, "fhir_r4b": 3, "fhir_r5": 1, "responses_4xx": 1 }
                 }
             }
         })
@@ -291,7 +295,7 @@ async fn the_daily_report_carries_the_window_the_router_recorded() {
         json!({
             "requests_bucket": "0",
             "groups": {},
-            "counters": { "fhir_r4": 0, "fhir_r4b": 0, "fhir_r5": 0, "fhir_r6": 0 }
+            "counters": {}
         }),
         "a sent window is not sent again"
     );
@@ -307,13 +311,7 @@ async fn a_daily_report_that_does_not_reach_the_collector_keeps_its_window() {
     let address = closed.local_addr().expect("an address");
     drop(closed);
     let unreachable = config(dir.path(), &format!("http://{address}/v1/report"));
-    let reporter = Reporter::new(
-        &unreachable,
-        prepared(&unreachable),
-        server.serving.clone(),
-        Instant::now(),
-    )
-    .expect("builds");
+    let reporter = reporter_of(&unreachable, &server.serving);
     assert!(reporter.send_daily().await.is_err());
     let collector = MockServer::start().await;
     Mock::given(method("POST"))
@@ -321,13 +319,7 @@ async fn a_daily_report_that_does_not_reach_the_collector_keeps_its_window() {
         .mount(&collector)
         .await;
     let reachable = config(dir.path(), &format!("{}/v1/report", collector.uri()));
-    let reporter = Reporter::new(
-        &reachable,
-        prepared(&reachable),
-        server.serving.clone(),
-        Instant::now(),
-    )
-    .expect("builds");
+    let reporter = reporter_of(&reachable, &server.serving);
     assert_eq!(
         reporter.send_daily().await.expect("answered"),
         http::StatusCode::BAD_REQUEST
@@ -359,13 +351,7 @@ async fn a_start_report_is_sent_first_true_then_false_and_skipped_within_ten_min
     let state = dir.path().join("state");
     let config = config(&state, &format!("{}/v1/report", collector.uri()));
 
-    let first = Reporter::new(
-        &config,
-        prepared(&config),
-        server.serving.clone(),
-        Instant::now(),
-    )
-    .expect("builds");
+    let first = reporter_of(&config, &server.serving);
     assert_eq!(
         first.send_start().await.expect("sends"),
         StartOutcome::Sent(http::StatusCode::NO_CONTENT)
@@ -373,26 +359,14 @@ async fn a_start_report_is_sent_first_true_then_false_and_skipped_within_ten_min
 
     // A second start more than ten minutes later.
     std::fs::write(state.join(LAST_START_FILE), "2000-01-01T00:00:00Z\n").expect("writes");
-    let second = Reporter::new(
-        &config,
-        prepared(&config),
-        server.serving.clone(),
-        Instant::now(),
-    )
-    .expect("builds");
+    let second = reporter_of(&config, &server.serving);
     assert_eq!(
         second.send_start().await.expect("sends"),
         StartOutcome::Sent(http::StatusCode::NO_CONTENT)
     );
 
     // A third start at once: inside the ten minutes, nothing is sent.
-    let third = Reporter::new(
-        &config,
-        prepared(&config),
-        server.serving.clone(),
-        Instant::now(),
-    )
-    .expect("builds");
+    let third = reporter_of(&config, &server.serving);
     assert_eq!(
         third.send_start().await.expect("decides"),
         StartOutcome::RateLimited
@@ -415,18 +389,13 @@ async fn a_start_report_is_sent_first_true_then_false_and_skipped_within_ten_min
 
 #[test]
 fn a_plain_http_collector_off_loopback_is_refused() {
-    let server = Server::start();
-    let dir = tempfile::tempdir().expect("tempdir");
-    let config = config(dir.path(), "http://report.example/v1/report");
-    assert!(
-        Reporter::new(
-            &config,
-            prepared(&config),
-            server.serving.clone(),
-            Instant::now()
-        )
-        .is_err()
-    );
+    assert!(Endpoint::new("http://report.example/v1/report").is_err());
+    let environment = [(
+        "FERROTERM__USAGE_REPORT__ENDPOINT".to_owned(),
+        "http://report.example/v1/report".to_owned(),
+    )]
+    .into();
+    assert!(ferroterm_server::config::Config::from_sources(None, &environment).is_err());
 }
 
 #[test]
@@ -469,24 +438,12 @@ async fn every_rendered_report_has_the_shape_of_the_contract_examples() {
         .await;
     let dir = tempfile::tempdir().expect("tempdir");
     let config = config(dir.path(), &format!("{}/v1/report", collector.uri()));
-    let first = Reporter::new(
-        &config,
-        prepared(&config),
-        server.serving.clone(),
-        Instant::now(),
-    )
-    .expect("builds");
+    let first = reporter_of(&config, &server.serving);
     first.send_start().await.expect("sends");
     first.send_daily().await.expect("sends");
     first.send_daily().await.expect("sends");
     std::fs::write(dir.path().join(LAST_START_FILE), "2000-01-01T00:00:00Z\n").expect("writes");
-    let second = Reporter::new(
-        &config,
-        prepared(&config),
-        server.serving.clone(),
-        Instant::now(),
-    )
-    .expect("builds");
+    let second = reporter_of(&config, &server.serving);
     second.send_start().await.expect("sends");
     let sent: Vec<Value> = collector
         .received_requests()
@@ -516,15 +473,21 @@ async fn every_rendered_report_has_the_shape_of_the_contract_examples() {
         if window.is_object() {
             let mine = &ours["metrics"]["window_24h"];
             assert_eq!(keys(mine), keys(window), "{name}");
-            assert_eq!(keys(&mine["counters"]), keys(&window["counters"]), "{name}");
+            // A counter is sent once it counted something, so ours name a
+            // subset of the example's version counters.
+            let named = keys(&window["counters"]);
+            for counter in keys(&mine["counters"]) {
+                assert!(named.contains(&counter), "{name}: {counter}");
+            }
             for group in mine["groups"].as_object().expect("an object").values() {
                 assert_eq!(keys(group), group_members, "{name}");
             }
         }
     }
+    let mut expected = example("ferroterm-daily-idle.json")["metrics"].clone();
+    expected["window_24h"]["counters"] = json!({});
     assert_eq!(
-        idle["metrics"],
-        example("ferroterm-daily-idle.json")["metrics"],
-        "an idle window renders as the contract's idle example"
+        idle["metrics"], expected,
+        "an idle window renders as the contract's idle example, without zero counters"
     );
 }
