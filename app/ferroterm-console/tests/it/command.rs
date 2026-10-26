@@ -107,10 +107,12 @@ fn a_healthcheck_of_a_serving_console_succeeds() {
         .expect("a free port");
     let address = listener.local_addr().expect("an address");
     let state = crate::provider::console(None, "");
+    let lifecycle = state.lifecycle().clone();
     let router = ferroterm_console::server::router(state);
     runtime.spawn(ferroterm_console::server::serve(
         listener,
         router,
+        lifecycle,
         std::future::pending(),
     ));
     let dir = tempfile::tempdir().expect("a directory");

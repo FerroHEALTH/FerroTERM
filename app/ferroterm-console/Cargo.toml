@@ -60,7 +60,7 @@ web-sys = { workspace = true, features = ["Document", "Element", "HtmlElement", 
 ferrohealth-config.workspace = true
 ferrohealth-health.workspace = true
 ferrohealth-secret.workspace = true
-ferrohealth-server.workspace = true
+ferrohealth-server = { workspace = true, features = ["console"] }
 # The console log and the panic line; `otlp` exports the console's spans
 # when `[telemetry.otlp]` names a collector.
 ferrohealth-telemetry = { workspace = true, features = ["otlp"] }

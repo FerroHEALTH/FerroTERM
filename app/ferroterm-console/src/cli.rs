@@ -9,8 +9,8 @@
 //! HTTP client of its own. No specification governs the command line: our own
 //! design.
 
-use clap::{Parser, Subcommand};
-use ferrohealth_server::cli::{ConfigArgs, ConfigCommand};
+use clap::Parser;
+use ferrohealth_server::cli::{Common, ConfigArgs};
 
 /// The `ferroterm-console` command line.
 #[derive(Debug, Parser, PartialEq, Eq)]
@@ -19,32 +19,19 @@ pub struct Cli {
     /// `--config`, overriding `FERROTERM_CONSOLE_CONFIG`, and `--set`.
     #[command(flatten)]
     pub config: ConfigArgs,
-    /// The job to run.
+    /// The job to run: the family's `serve`, `config check` and
+    /// `healthcheck`.
     #[command(subcommand)]
-    pub command: Command,
-}
-
-/// What the binary does.
-#[derive(Debug, Subcommand, PartialEq, Eq)]
-pub enum Command {
-    /// Serves the console until the process is asked to stop.
-    Serve,
-    /// Works on the configuration.
-    Config {
-        /// The job to run.
-        #[command(subcommand)]
-        command: ConfigCommand,
-    },
-    /// Asks the console running on this host whether it answers, and exits
-    /// `0` only when its health route answers `200`.
-    Healthcheck,
+    pub command: Common,
 }
 
 #[cfg(test)]
 mod tests {
-    use ferrohealth_server::cli::ConfigCommand;
+    use ferrohealth_server::cli::{Common, ConfigCommand};
+    use ferrohealth_server::healthcheck::target;
+    use std::net::SocketAddr;
 
-    use super::{Cli, Command};
+    use super::Cli;
     use clap::{CommandFactory, Parser};
 
     #[test]
@@ -55,16 +42,16 @@ mod tests {
     #[test]
     fn every_job_parses_with_and_without_a_configuration_file() {
         for (args, command) in [
-            (vec!["ferroterm-console", "serve"], Command::Serve),
+            (vec!["ferroterm-console", "serve"], Common::Serve),
             (
                 vec!["ferroterm-console", "config", "check"],
-                Command::Config {
+                Common::Config {
                     command: ConfigCommand::Check,
                 },
             ),
             (
                 vec!["ferroterm-console", "healthcheck"],
-                Command::Healthcheck,
+                Common::Healthcheck,
             ),
         ] {
             let parsed = Cli::try_parse_from(&args).expect("the job parses");
@@ -74,5 +61,18 @@ mod tests {
         let parsed = Cli::try_parse_from(["ferroterm-console", "serve", "--config", "viewer.toml"])
             .expect("the job parses");
         assert_eq!(Some("viewer.toml".into()), parsed.config.config);
+    }
+
+    #[test]
+    fn a_wildcard_listen_address_is_asked_on_loopback_and_any_other_as_it_is() {
+        for (listen, asked) in [
+            ("0.0.0.0:3000", "127.0.0.1:3000"),
+            ("[::]:3000", "[::1]:3000"),
+            ("10.0.0.7:3000", "10.0.0.7:3000"),
+        ] {
+            let listen: SocketAddr = listen.parse().expect("a socket address");
+            let asked: SocketAddr = asked.parse().expect("a socket address");
+            assert_eq!(asked, target(listen), "{listen}");
+        }
     }
 }

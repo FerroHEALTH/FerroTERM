@@ -33,7 +33,7 @@ Three properties decide most questions in this crate:
 |---|---|
 | `src/lib.rs`, `src/main.rs` | the two halves, chosen by target; `hydrate()` hydrates the islands |
 | `src/server.rs`, `src/upstream.rs` | the HTTP service and its security headers; the client of the FHIR server |
-| `src/config/`, `src/session/`, `src/oidc/`, `src/cli.rs`, `src/command.rs`, `src/healthcheck.rs` | the configuration, the sign-in and the binary |
+| `src/config/`, `src/session/`, `src/oidc/`, `src/cli.rs`, `src/command.rs` | the configuration, the sign-in and the binary |
 | `src/app.rs`, `src/shell.rs`, `src/pages/` | the page tree, the chrome and the screens |
 | `src/request.rs`, `src/prefs.rs`, `src/post.rs`, `src/posted.rs` | what a page reads of its request, the preferences, the console's form routes, a posted form |
 | `src/islands.rs` | the console's one island: its keyboard shortcuts |

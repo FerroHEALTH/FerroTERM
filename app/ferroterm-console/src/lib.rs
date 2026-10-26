@@ -13,9 +13,8 @@
 //! [`app`] is the page tree, drawn with the components of `ferrohealth-ui`;
 //! [`server`] serves it with the health, sign-in and form routes under the
 //! browser security headers, [`config`] reads the TOML configuration, [`cli`]
-//! and [`command`] run the binary, and [`healthcheck`] is the job a container
-//! runtime runs beside it. No specification governs the console: our own
-//! design.
+//! and [`command`] run the binary, `healthcheck` among its jobs. No
+//! specification governs the console: our own design.
 //!
 //! The pages are drawn on the server alone, so every module above compiles
 //! for the host. The browser half is the WebAssembly the island script
@@ -45,7 +44,6 @@ pub mod fhir;
 #[cfg(not(target_arch = "wasm32"))]
 mod find;
 #[cfg(not(target_arch = "wasm32"))]
-pub mod healthcheck;
 pub mod islands;
 #[cfg(not(target_arch = "wasm32"))]
 mod locale;
