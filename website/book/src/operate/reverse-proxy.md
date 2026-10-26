@@ -43,8 +43,9 @@ its key set at start, again when the key set is older than
 `jwks_max_age_seconds`, and again when a token names a key it has not read (see [Validating tokens in the server](#validating-tokens-in-the-server)).
 That is the whole of its outbound traffic, apart from the opt-out usage
 report; name no issuer and it makes none. Those reads go through the
-FerroHEALTH resource-server crate `ferrohealth-smart`, whose HTTP client is the
-one the server links.
+FerroHEALTH resource-server crate `ferrohealth-smart` and the report through
+the FerroHEALTH crate `ferrohealth-usage-report`; their HTTP client is the one
+the server links.
 
 `scripts/checks/no-client-in-server.sh` is the evidence. The
 `no-client-in-server` job in `.github/workflows/ci.yml` runs it on every pull

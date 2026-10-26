@@ -52,7 +52,7 @@ volume mounted there is writable. A bind mount needs a host directory that uid
 The boot line, with the report on, reads:
 
 ```text
-usage report ON: instance id, version, licence type, deployment, uptime, host size, loaded code system families and coarse operation latency, at each start and once a day; no codes, URLs or request paths. Off: FERROTERM__USAGE_REPORT__ENABLED=false. Details: https://ferroterm.eu/docs/operate/usage-report.html
+usage report ON: instance id, version, licence type, deployment, uptime, host size, loaded code system families and coarse operation latency, at each start and once a day; no clinical content, identifiers, URLs or request paths. Off: FERROTERM__USAGE_REPORT__ENABLED=false. Details: https://ferroterm.eu/docs/operate/usage-report.html
 ```
 
 It carries the configured endpoint as the structured field `endpoint`. With the
@@ -133,7 +133,7 @@ daily report:
         "histogram": [1200, 800, 300, 90, 20, 6, 2, 1, 0, 0, 0]
       }
     },
-    "counters": { "fhir_r4": 120, "fhir_r4b": 2300, "fhir_r5": 0, "fhir_r6": 3 }
+    "counters": { "fhir_r4": 120, "fhir_r4b": 2300, "fhir_r6": 3, "responses_4xx": 14 }
   }
 }
 ```
@@ -148,14 +148,18 @@ daily report:
   never by the path or the parameters the client sent: `lookup`,
   `validate_code`, `expand`, `subsumes`, `translate` and `closure` for the
   operations, `metadata`, `read` (a resource, its history, or a version),
-  `search`, `write` (create, update, delete), and `other` for everything else.
+  `search`, `write` (create, update, delete), and `other` for everything else,
+  a request under a FHIR base that no route matched included.
 - **`p50_ms`, `p95_ms`, `p99_ms`:** the median, 95th and 99th percentile
   latency of the group in milliseconds, estimated from its histogram.
 - **`errors_5xx`:** the responses with a 5xx status.
 - **`histogram`:** 11 request counts, one per latency bucket. The bucket upper
   bounds in milliseconds are 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000,
   and no bound for the last.
-- **`counters`:** the requests per served FHIR version.
+- **`counters`:** the requests per served FHIR version (`fhir_r4`,
+  `fhir_r4b`, `fhir_r5`, `fhir_r6`) and the `4xx` answers to them
+  (`responses_4xx`). A counter that counted nothing in the window is left
+  out.
 
 ## What a report never contains
 

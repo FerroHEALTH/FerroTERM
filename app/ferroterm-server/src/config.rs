@@ -45,7 +45,7 @@ use ferrohealth_smart::config::AuthSection;
 use ferrohealth_telemetry::section::TelemetrySection;
 use serde::{Deserialize, Serialize};
 
-use crate::usage_report::config::UsageReportConfig;
+use ferrohealth_usage_report::section::UsageReportSection;
 
 /// The environment prefix: `FERROTERM__SERVER__LISTEN` sets `[server]
 /// listen`, and `FERROTERM_CONFIG` names the file.
@@ -66,12 +66,6 @@ pub const GIT_SHA_ENV: &str = "FERROTERM_GIT_SHA";
 /// (`CapabilityStatement.software.releaseDate`); the build reads it, the
 /// configuration never does.
 pub const RELEASE_DATE_ENV: &str = "FERROTERM_RELEASE_DATE";
-
-/// The environment variables a CI runner sets, in the order they are read.
-///
-/// Either one set to `true` or `1`, in any case, switches the usage report
-/// off for the process.
-pub const CI_ENVS: [&str; 2] = ["GITHUB_ACTIONS", "CI"];
 
 /// The codes of the FHIR `restful-security-service` value set
 /// (<http://hl7.org/fhir/ValueSet/restful-security-service>), each with its
@@ -106,7 +100,7 @@ pub struct Config {
     /// `[auth]`: who may write and reach the admin listener.
     pub auth: AuthSection,
     /// `[usage_report]`: the usage report to `FerroPULSE`.
-    pub usage_report: UsageReportConfig,
+    pub usage_report: UsageReportSection,
 }
 
 /// `[server]`.
@@ -207,12 +201,6 @@ pub enum ConfigError {
         "fhir.security_services: `{0}` is not a code of http://hl7.org/fhir/ValueSet/restful-security-service"
     )]
     SecurityService(String),
-    /// `usage_report.endpoint` is not an `https` URL without credentials, or
-    /// plain `http` to a loopback host.
-    #[error(
-        "usage_report.endpoint: `{0}` is not an https URL without credentials (plain http is accepted for a loopback host only)"
-    )]
-    UsageReportEndpoint(String),
 }
 
 /// The loader of the server's tree.
@@ -232,9 +220,6 @@ impl Config {
     /// Reads the configuration of the running process: the file `path`
     /// names, or the one `FERROTERM_CONFIG` names, the environment, and the
     /// `--set` pairs `sets`, with the product's own checks applied.
-    ///
-    /// The CI detection of the usage report is read from the process
-    /// environment here too.
     ///
     /// # Errors
     ///
@@ -270,21 +255,14 @@ impl Config {
     }
 
     /// Checks what the tree's types cannot: every security service is a
-    /// code of its value set, and the usage report endpoint may be posted to.
+    /// code of its value set.
     ///
     /// # Errors
     ///
     /// Returns [`ConfigError::SecurityService`] for a code the value set does
-    /// not define, and [`ConfigError::UsageReportEndpoint`] for an endpoint
-    /// that is not `https` (or `http` to a loopback host) or carries
-    /// credentials.
+    /// not define.
     pub fn check(&self) -> Result<(), ConfigError> {
         services_of(&self.fhir.security_services)?;
-        if !crate::usage_report::config::endpoint_admitted(&self.usage_report.endpoint) {
-            return Err(ConfigError::UsageReportEndpoint(
-                self.usage_report.endpoint.clone(),
-            ));
-        }
         Ok(())
     }
 
@@ -530,11 +508,11 @@ mod tests {
         read("http://127.0.0.1:9/v1/report").expect("loopback http");
         assert!(matches!(
             read("http://collector.example.org/v1/report"),
-            Err(ConfigError::UsageReportEndpoint(_))
+            Err(ConfigError::Load(_))
         ));
         assert!(matches!(
             read("https://user:pw@collector.example.org/v1/report"),
-            Err(ConfigError::UsageReportEndpoint(_))
+            Err(ConfigError::Load(_))
         ));
     }
 }

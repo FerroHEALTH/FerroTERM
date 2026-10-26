@@ -63,7 +63,8 @@ pub const FHIR_BASES: [&str; 4] = ["/r4", "/r4b", "/r5", "/r6"];
 /// `not-found`, and that includes `/reload`, which only the admin listener
 /// serves. Every request gets the server's request id and one line of the
 /// request log of `ferrohealth-telemetry`, with the fields
-/// [`request_fields`] adds.
+/// [`request_fields`] adds; the log feeds the usage report window, naming a
+/// request under a FHIR base that no route matched by its base.
 pub fn router(serving: Serving) -> Router {
     // The gate sits inside each version's router, so the path it reads is the
     // one under the version prefix that `nest` leaves.
@@ -76,7 +77,9 @@ pub fn router(serving: Serving) -> Router {
     let health = ferrohealth_server::health::routes(serving.health().clone());
     let telemetry = std::sync::Arc::clone(serving.telemetry());
     let log = RequestLog::new(&serving.config().telemetry.logged_query_parameters)
-        .with_metrics(&telemetry.meter(metrics::SCOPE));
+        .with_metrics(&telemetry.meter(metrics::SCOPE))
+        .with_recorder(serving.usage_window())
+        .with_route_namer(std::sync::Arc::new(usage_report::FhirBaseNamer));
     Router::new()
         .nest(r4, gated(r4::router(), r4))
         .nest(r4b, gated(r4b::router(), r4b))

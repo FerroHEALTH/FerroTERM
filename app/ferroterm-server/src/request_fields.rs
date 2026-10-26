@@ -4,19 +4,18 @@
 //! What the server adds to the request line of `ferrohealth-telemetry`: the
 //! system and code a request named, as the crate's product fields.
 //!
-//! The same pass feeds the usage report window, by matched route template.
-//! Only parameters that name a system or a code reach the line; free text
+//! The same pass counts the request under its FHIR version in the usage
+//! report window; the request log records its latency there. Only parameters that name a system or a code reach the line; free text
 //! never does. No specification governs the line: our own design.
 
 use std::sync::Arc;
-use std::time::Instant;
 
-use axum::extract::{MatchedPath, Request, State};
+use axum::extract::{Request, State};
 use axum::middleware::Next;
 use axum::response::Response;
 use ferrohealth_telemetry::request_log::fields::{LineFields, Token};
 
-use crate::usage_report::window::Window;
+use ferrohealth_usage_report::window::Window;
 
 /// The query parameters that reach the line, and the field each becomes.
 const LOGGED: [(&str, &str); 6] = [
@@ -31,25 +30,12 @@ const LOGGED: [(&str, &str); 6] = [
 /// The longest value a field carries, in characters.
 const MAX_VALUE: usize = 64;
 
-/// Adds the named system and code to the response's line fields, and records
-/// the request in the usage window.
+/// Adds the named system and code to the response's line fields, and counts
+/// the request under its FHIR version in the usage window.
 pub async fn record(State(usage): State<Arc<Window>>, request: Request, next: Next) -> Response {
-    let method = request.method().clone();
-    let matched = request
-        .extensions()
-        .get::<MatchedPath>()
-        .map(|m| m.as_str().to_owned());
-    let path = request.uri().path().to_owned();
+    crate::usage_report::count_version(&usage, request.uri().path());
     let fields = named_fields(request.uri().query().unwrap_or(""));
-    let started = Instant::now();
     let mut response = next.run(request).await;
-    usage.record(
-        &method,
-        matched.as_deref(),
-        &path,
-        started.elapsed(),
-        response.status(),
-    );
     if !fields.is_empty() {
         response.extensions_mut().insert(fields);
     }
