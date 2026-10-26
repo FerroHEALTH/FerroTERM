@@ -11,7 +11,7 @@
 //! keeps the id it was authored with, so a client that knows the id reads it
 //! there; a resource that carries none keeps the id the server mints.
 
-use ferroterm_server::config::Config;
+use ferroterm_server::config::{Config, TerminologySection};
 use ferroterm_server::state::{AppState, LoadError, instance_id};
 use http::StatusCode;
 use serde_json::Value;
@@ -137,7 +137,10 @@ fn a_resource_without_an_id_keeps_the_one_the_server_mints() {
     let dir = tempfile::tempdir().expect("tempdir");
     write_value_set(dir.path(), "anonymous.json", None, "https://a.example/vs");
     let state = AppState::load(&Config {
-        code_systems: vec![dir.path().to_path_buf()],
+        terminology: TerminologySection {
+            code_systems: vec![dir.path().to_path_buf()],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     })
     .expect("loads");
@@ -165,7 +168,10 @@ fn two_loaded_resources_with_one_id_refuse_the_load() {
         "https://a.example/second",
     );
     let loaded = AppState::load(&Config {
-        code_systems: vec![dir.path().to_path_buf()],
+        terminology: TerminologySection {
+            code_systems: vec![dir.path().to_path_buf()],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     });
     let Err(error) = loaded else {
@@ -194,7 +200,10 @@ fn an_id_outside_the_fhir_id_alphabet_refuses_the_load() {
         );
         assert!(
             AppState::load(&Config {
-                code_systems: vec![dir.path().to_path_buf()],
+                terminology: TerminologySection {
+                    code_systems: vec![dir.path().to_path_buf()],
+                    ..TerminologySection::default()
+                },
                 ..Config::default()
             })
             .is_err(),
@@ -285,8 +294,11 @@ async fn an_authored_id_keeps_the_address_a_minted_id_would_have_taken() {
     let server = Server::start_with_config(
         dir,
         Config {
-            index: vec![edition],
-            code_systems: vec![resources],
+            terminology: TerminologySection {
+                index: vec![edition],
+                code_systems: vec![resources],
+                ..TerminologySection::default()
+            },
             ..Config::default()
         },
     );
@@ -319,8 +331,11 @@ async fn a_write_onto_a_loaded_id_is_refused() {
     let server = Server::start_with_config(
         dir,
         Config {
-            code_systems: vec![resources.clone()],
-            resources: Some(resources.join("resources.redb")),
+            terminology: TerminologySection {
+                code_systems: vec![resources.clone()],
+                resources: Some(resources.join("resources.redb")),
+                ..TerminologySection::default()
+            },
             ..Config::default()
         },
     );
@@ -355,8 +370,11 @@ fn a_loaded_id_a_persisted_record_holds_refuses_the_load() {
         "https://a.example/vs",
     );
     let config = Config {
-        code_systems: vec![dir.path().to_path_buf()],
-        resources: Some(dir.path().join("resources.redb")),
+        terminology: TerminologySection {
+            code_systems: vec![dir.path().to_path_buf()],
+            resources: Some(dir.path().join("resources.redb")),
+            ..TerminologySection::default()
+        },
         ..Config::default()
     };
     let state = AppState::load(&config).expect("loads");
@@ -401,7 +419,10 @@ fn a_loaded_id_a_persisted_record_holds_refuses_the_load() {
 /// A configuration that loads the resources in `dir` and nothing else.
 fn loading(dir: &std::path::Path) -> Config {
     Config {
-        code_systems: vec![dir.to_path_buf()],
+        terminology: TerminologySection {
+            code_systems: vec![dir.to_path_buf()],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     }
 }

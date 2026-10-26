@@ -48,7 +48,7 @@ FerroTERM is younger. Hierarchical expansion, persisted client resources,
 `Bundle` batch, `$closure`, the SNOMED implicit value sets and implicit concept
 maps, ECL, the R4, R4B, R5, and R6 endpoints, and XML are served; the persisted
 resources and the closure tables need a deployment that names a database in
-`FERROTERM_RESOURCES`. FerroTERM serves an index built from a finished release,
+`FERROTERM__TERMINOLOGY__RESOURCES`. FerroTERM serves an index built from a finished release,
 so it authors no SNOMED content and has no syndication client to download one,
 and MRCM validation of postcoordinated expressions is unscheduled. What
 it serves, it serves from one binary with signed provenance, over more code

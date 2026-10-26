@@ -16,7 +16,7 @@ use core::fmt;
 use terminology_syndication::select::{Holdings, Selection, Subscription};
 use terminology_syndication::source::Source;
 
-use crate::config::SourceConfig;
+use crate::config::{NtsSection, SourceConfig};
 
 /// A FHIR resource file a service publishes with a correction it needs.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -133,6 +133,15 @@ pub enum RegistryError {
         #[source]
         source: toml::de::Error,
     },
+    /// A secret of the account the add-on authenticates with does not read.
+    #[error("the account of the `{kind}` source does not read")]
+    Credentials {
+        /// The kind whose account did not read.
+        kind: String,
+        /// Why it did not read.
+        #[source]
+        source: ferrohealth_secret::file::SecretError,
+    },
     /// The add-on could not be built from its configuration.
     #[error("the `{kind}` source could not be built")]
     Build {
@@ -153,13 +162,17 @@ pub const KINDS: [&str; 1] = ["nts"];
 ///
 /// Returns [`RegistryError::UnknownKind`] when no add-on reads that kind,
 /// [`RegistryError::Config`] when the add-on's own block does not read, and
-/// [`RegistryError::Build`] when the add-on cannot be built, which is what
-/// missing credentials look like.
-pub fn configure(sources: &[SourceConfig]) -> Result<Vec<ConfiguredSource>, RegistryError> {
+/// [`RegistryError::Credentials`] when a secret of the account `nts` names
+/// does not read, and [`RegistryError::Build`] when the add-on cannot be
+/// built, which is what missing credentials look like.
+pub fn configure(
+    sources: &[SourceConfig],
+    nts: &NtsSection,
+) -> Result<Vec<ConfiguredSource>, RegistryError> {
     let mut out = Vec::with_capacity(sources.len());
     for source in sources {
         out.push(match source.kind.as_str() {
-            "nts" => nts(source)?,
+            "nts" => nts_source(source, nts)?,
             other => {
                 return Err(RegistryError::UnknownKind {
                     kind: other.to_owned(),
@@ -171,8 +184,12 @@ pub fn configure(sources: &[SourceConfig]) -> Result<Vec<ConfiguredSource>, Regi
     Ok(out)
 }
 
-/// The Nationale Terminologie Server add-on, configured from its own block.
-fn nts(source: &SourceConfig) -> Result<ConfiguredSource, RegistryError> {
+/// The Nationale Terminologie Server add-on, configured from its own block
+/// and authenticating with the account `account` names.
+fn nts_source(
+    source: &SourceConfig,
+    account: &NtsSection,
+) -> Result<ConfiguredSource, RegistryError> {
     let config: addon_nts::config::NtsConfig =
         source
             .config
@@ -182,11 +199,18 @@ fn nts(source: &SourceConfig) -> Result<ConfiguredSource, RegistryError> {
                 kind: String::from("nts"),
                 source,
             })?;
-    let built =
-        addon_nts::source::NtsSource::new(&config).map_err(|error| RegistryError::Build {
+    let credentials = account
+        .credentials()
+        .map_err(|source| RegistryError::Credentials {
+            kind: String::from("nts"),
+            source,
+        })?;
+    let built = addon_nts::source::NtsSource::new(&config, credentials).map_err(|error| {
+        RegistryError::Build {
             kind: String::from("nts"),
             source: Box::new(error),
-        })?;
+        }
+    })?;
     let subscription = built.subscription().clone();
     Ok(ConfiguredSource::new(Box::new(built), subscription).with_fixups(Box::new(NtsFixups)))
 }
@@ -214,14 +238,17 @@ impl Fixups for NtsFixups {
 #[expect(clippy::panic_in_result_fn, reason = "test assertions")]
 mod tests {
     use super::{Fixups, NtsFixups, configure};
-    use crate::config::SourceConfig;
+    use crate::config::{NtsSection, SourceConfig};
 
     #[test]
     fn an_unknown_kind_names_the_kinds_this_build_reads() {
-        let configured = configure(&[SourceConfig {
-            kind: String::from("mlds"),
-            config: toml::Table::new(),
-        }]);
+        let configured = configure(
+            &[SourceConfig {
+                kind: String::from("mlds"),
+                config: toml::Table::new(),
+            }],
+            &NtsSection::default(),
+        );
         match configured {
             Ok(_) => panic!("a service this build cannot read is refused at start-up"),
             Err(error) => assert!(

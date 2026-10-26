@@ -19,8 +19,6 @@ use hyper_util::client::legacy::Client;
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::TokioExecutor;
 
-use crate::config::{Config, LISTEN_ENV};
-
 /// The route the probe asks for.
 pub const PATH: &str = "/health";
 
@@ -92,14 +90,6 @@ pub fn url_of(listen: &str) -> String {
         Err(_not_a_socket_address) => listen.to_owned(),
     };
     format!("http://{authority}{PATH}")
-}
-
-/// The URL the environment implies: `FERROTERM_LISTEN`, or the binary's
-/// default listen address when it is unset.
-#[must_use]
-pub fn url_from_env() -> String {
-    let listen = std::env::var(LISTEN_ENV).unwrap_or_else(|_unset| Config::default().listen);
-    url_of(&listen)
 }
 
 /// Asks `url` once and returns when it answered `200 OK`.

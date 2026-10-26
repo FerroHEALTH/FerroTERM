@@ -10,7 +10,8 @@
 # Without --server the script starts target/release/ferroterm on the first free
 # port at or above 8098, or the one --port names
 # (build it first: cargo build --release -p ferroterm-server), serving the
-# artifact directories --index names (the FERROTERM_INDEX form). --mode picks
+# comma-separated artifact directories --index names (the
+# FERROTERM__TERMINOLOGY__INDEX form). --mode picks
 # the suite mode (general by default; icd-11 needs the three ICD-11 artifacts)
 # and its pass list conformance/tx-ecosystem/passing[-<fhir>][-<mode>].txt; --fhir
 # picks the served FHIR version (r4b by default; the runner reads the version
@@ -115,9 +116,9 @@ if [[ -z "$server" ]]; then
   fi
   server=http://127.0.0.1:$port/$fhir
   if [[ -n "$index" ]]; then
-    export FERROTERM_INDEX="$index"
+    export FERROTERM__TERMINOLOGY__INDEX="$index"
   fi
-  FERROTERM_USAGE_REPORT=off FERROTERM_LISTEN=127.0.0.1:"$port" FERROTERM_LOG_FORMAT=json target/release/ferroterm > "$work/server.log" 2>&1 &
+  FERROTERM__USAGE_REPORT__ENABLED=false FERROTERM__SERVER__LISTEN=127.0.0.1:"$port" FERROTERM__TELEMETRY__FORMAT=json target/release/ferroterm > "$work/server.log" 2>&1 &
   started=$!
   trap 'kill "$started" 2>/dev/null || true; wait "$started" 2>/dev/null || true' EXIT
   ready=""

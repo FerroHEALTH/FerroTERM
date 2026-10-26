@@ -222,7 +222,10 @@ async fn two_directories_minting_one_canonical_refuse_to_load() {
             .expect("writes the archetype's terminology");
     }
     let config = ferroterm_server::config::Config {
-        code_systems: vec![first, second],
+        terminology: ferroterm_server::config::TerminologySection {
+            code_systems: vec![first, second],
+            ..ferroterm_server::config::TerminologySection::default()
+        },
         ..ferroterm_server::config::Config::default()
     };
     let Err(error) = ferroterm_server::state::AppState::load(&config) else {

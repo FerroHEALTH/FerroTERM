@@ -7,7 +7,6 @@ use std::net::SocketAddr;
 use std::process::{Command, Output};
 use std::time::Duration;
 
-use ferroterm_server::config::LISTEN_ENV;
 use ferroterm_server::healthcheck::{self, HealthcheckError};
 use http::StatusCode;
 use tokio::net::TcpListener;
@@ -15,6 +14,9 @@ use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 
 use crate::fixture::Server;
+
+/// The override of `server.listen`, which the probe follows without `--url`.
+const LISTEN_ENV: &str = "FERROTERM__SERVER__LISTEN";
 
 /// The fixture edition served on an ephemeral loopback port, until `stop`.
 struct Served {
@@ -126,7 +128,7 @@ async fn the_subcommand_exits_zero_against_a_serving_instance_and_non_zero_again
     );
     assert!(explicit.stdout.is_empty(), "a passing probe prints nothing");
 
-    // Without `--url`: the probe follows FERROTERM_LISTEN, the way the image
+    // Without `--url`: the probe follows server.listen, the way the image
     // runs it.
     let from_env = ferroterm(&["healthcheck"], &[(LISTEN_ENV, &address)]).await?;
     assert!(

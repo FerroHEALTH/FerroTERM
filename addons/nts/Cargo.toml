@@ -15,6 +15,8 @@ authors.workspace = true
 publish = false
 
 [dependencies]
+# The redacting type the account's secrets are held in.
+ferrohealth-secret.workspace = true
 jiff.workspace = true
 # `form` carries the token request: OAuth 2 sends its parameters as
 # `application/x-www-form-urlencoded` (RFC 6749 §4.3.2).

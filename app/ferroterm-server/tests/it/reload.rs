@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use axum::Router;
 use axum::body::Body;
-use ferroterm_server::config::Config;
+use ferroterm_server::config::{Config, TerminologySection};
 use ferroterm_server::reload::Serving;
 use ferroterm_server::state::AppState;
 use ferroterm_testkit::fhir::{ANIMALS, SKETCH};
@@ -80,7 +80,10 @@ async fn a_resource_written_after_the_start_is_served_after_a_reload() {
     let resources = dir.path().join("resources");
     std::fs::create_dir_all(&resources).expect("creates");
     let serving = serving(Config {
-        code_systems: vec![resources.clone()],
+        terminology: TerminologySection {
+            code_systems: vec![resources.clone()],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     });
     // The router is built once, as the binary builds it, so what it answers
@@ -125,7 +128,10 @@ async fn a_removed_resource_leaves_the_served_set_after_a_reload() {
     std::fs::create_dir_all(&resources).expect("creates");
     ferroterm_testkit::fhir::write_code_systems(&resources).expect("writes the resources");
     let serving = serving(Config {
-        code_systems: vec![resources.clone()],
+        terminology: TerminologySection {
+            code_systems: vec![resources.clone()],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     });
     let router = ferroterm_server::router(serving.clone());
@@ -170,7 +176,10 @@ async fn an_artifact_swapped_into_the_configured_path_is_served_after_a_reload()
     std::fs::create_dir_all(&index).expect("creates");
     ferroterm_testkit::snomed::write(&index).expect("writes the edition");
     let serving = serving(Config {
-        index: vec![index.clone()],
+        terminology: TerminologySection {
+            index: vec![index.clone()],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     });
     let router = ferroterm_server::router(serving.clone());
@@ -214,7 +223,10 @@ async fn a_broken_artifact_refuses_the_reload_and_the_old_set_still_answers() {
     std::fs::create_dir_all(&index).expect("creates");
     ferroterm_testkit::snomed::write(&index).expect("writes the edition");
     let serving = serving(Config {
-        index: vec![index.clone()],
+        terminology: TerminologySection {
+            index: vec![index.clone()],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     });
     let router = ferroterm_server::router(serving.clone());
@@ -258,8 +270,11 @@ async fn a_request_in_flight_during_a_swap_answers_from_the_set_it_started_on() 
     std::fs::create_dir_all(&resources).expect("creates");
     ferroterm_testkit::snomed::write(&index).expect("writes the edition");
     let serving = serving(Config {
-        index: vec![index],
-        code_systems: vec![resources.clone()],
+        terminology: TerminologySection {
+            index: vec![index],
+            code_systems: vec![resources.clone()],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     });
     let router = ferroterm_server::router(serving.clone());
@@ -305,7 +320,10 @@ async fn the_admin_listener_serves_reload_and_the_fhir_surface_does_not() {
     std::fs::create_dir_all(&index).expect("creates");
     ferroterm_testkit::snomed::write(&index).expect("writes the edition");
     let serving = serving(Config {
-        index: vec![index],
+        terminology: TerminologySection {
+            index: vec![index],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     });
     let admin_router = ferroterm_server::reload::router(serving.clone());
@@ -349,7 +367,10 @@ async fn a_refused_reload_answers_the_admin_request_with_the_reason() {
     std::fs::create_dir_all(&index).expect("creates");
     ferroterm_testkit::snomed::write(&index).expect("writes the edition");
     let serving = serving(Config {
-        index: vec![index.clone()],
+        terminology: TerminologySection {
+            index: vec![index.clone()],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     });
     let admin_router = ferroterm_server::reload::router(serving);
@@ -371,17 +392,16 @@ async fn a_refused_reload_answers_the_admin_request_with_the_reason() {
 
 #[test]
 fn an_unset_address_configures_no_admin_listener() {
-    // Nothing in this process sets the variable: `std::env::set_var` is unsafe
-    // in edition 2024 and this workspace forbids unsafe
+    // The process environment is not read: `std::env::set_var` is unsafe in
+    // edition 2024 and this workspace forbids unsafe
     // (<https://doc.rust-lang.org/edition-guide/rust-2024/newly-unsafe-functions.html>).
-    assert_eq!(Config::default().admin_listen, None);
+    assert_eq!(Config::default().admin_listen(), None);
     assert_eq!(
-        Config::from_env()
-            .expect("the environment parses")
-            .admin_listen,
+        Config::from_sources(None, &std::collections::BTreeMap::new())
+            .expect("the defaults load")
+            .admin_listen(),
         None,
-        "an unset {} means no admin listener",
-        ferroterm_server::config::ADMIN_LISTEN_ENV
+        "an unset admin.listen means no admin listener"
     );
 }
 /// The SNOMED CT system every index-root case below serves.
@@ -450,7 +470,10 @@ async fn an_index_root_serves_every_child_directory_that_holds_a_manifest() {
     std::fs::write(root.join("RETENTION"), b"two releases\n").expect("writes");
 
     let serving = serving(Config {
-        index: vec![root],
+        terminology: TerminologySection {
+            index: vec![root],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     });
     let router = ferroterm_server::router(serving);
@@ -473,7 +496,10 @@ async fn a_child_added_under_a_root_is_served_after_a_reload() {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = root_with_first_release(dir.path());
     let serving = serving(Config {
-        index: vec![root.clone()],
+        terminology: TerminologySection {
+            index: vec![root.clone()],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     });
     let router = ferroterm_server::router(serving.clone());
@@ -513,7 +539,10 @@ async fn a_child_removed_from_a_root_leaves_the_served_set_after_a_reload() {
     let root = root_with_first_release(dir.path());
     let later = later_release_under(&root);
     let serving = serving(Config {
-        index: vec![root],
+        terminology: TerminologySection {
+            index: vec![root],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     });
     let router = ferroterm_server::router(serving.clone());
@@ -545,7 +574,10 @@ async fn a_child_without_a_manifest_is_ignored_until_the_manifest_lands() {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = root_with_first_release(dir.path());
     let serving = serving(Config {
-        index: vec![root.clone()],
+        terminology: TerminologySection {
+            index: vec![root.clone()],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     });
     let router = ferroterm_server::router(serving.clone());
@@ -584,7 +616,10 @@ async fn a_broken_child_under_a_root_refuses_the_reload_and_the_old_set_still_an
     let root = root_with_first_release(dir.path());
     let later = later_release_under(&root);
     let serving = serving(Config {
-        index: vec![root],
+        terminology: TerminologySection {
+            index: vec![root],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     });
     let router = ferroterm_server::router(serving.clone());

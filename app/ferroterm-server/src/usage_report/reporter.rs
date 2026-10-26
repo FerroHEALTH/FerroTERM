@@ -22,7 +22,6 @@ use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::TokioExecutor;
 use tokio::task::JoinHandle;
 
-use crate::config::{STATE_DIR_ENV, USAGE_REPORT_ENV};
 use crate::reload::Serving;
 use crate::usage_report::config::{Deployment, UsageReportConfig};
 use crate::usage_report::payload::{
@@ -57,7 +56,7 @@ const GIT_SHA: &str = env!("FERROTERM_GIT_SHA");
 /// Why the report is off for this process.
 #[derive(Debug)]
 pub enum Off {
-    /// `FERROTERM_USAGE_REPORT=off`.
+    /// `usage_report.enabled = false`.
     Switch,
     /// A CI variable is set; it names which.
     Ci(&'static str),
@@ -118,27 +117,27 @@ pub fn announce(config: &UsageReportConfig, decision: &Result<Prepared, Off>) {
             endpoint = %config.endpoint,
             "usage report ON: instance id, version, licence type, deployment, uptime, host size, \
              loaded code system families and coarse operation latency, at each start and once a \
-             day; no codes, URLs or request paths. Off: {USAGE_REPORT_ENV}=off. Details: \
+             day; no codes, URLs or request paths. Off: FERROTERM__USAGE_REPORT__ENABLED=false. Details: \
              {NOTICE_URL}"
         ),
         Err(Off::Switch) => tracing::info!(
-            "usage report OFF: switched off ({USAGE_REPORT_ENV}=off); nothing is sent. Details: \
+            "usage report OFF: switched off (usage_report.enabled = false); nothing is sent. Details: \
              {NOTICE_URL}"
         ),
         Err(Off::Ci(variable)) => tracing::info!(
             "usage report OFF: CI detected ({variable}); nothing is sent. Details: {NOTICE_URL}"
         ),
         Err(Off::NoStateDir) => tracing::info!(
-            "usage report OFF: no state directory ({STATE_DIR_ENV} is unset), and without a \
+            "usage report OFF: no state directory (usage_report.state_dir is unset), and without a \
              stable instance id each restart would count as a new installation; nothing is sent. \
-             On: mount a writable volume and set {STATE_DIR_ENV} to it. Details: {NOTICE_URL}"
+             On: mount a writable volume and set usage_report.state_dir to it. Details: {NOTICE_URL}"
         ),
         Err(Off::StateDir { path, error }) => tracing::info!(
             path = %path.display(),
             error = %error_chain(error),
-            "usage report OFF: the state directory ({STATE_DIR_ENV}) cannot be written, and \
+            "usage report OFF: the state directory (usage_report.state_dir) cannot be written, and \
              without a stable instance id each restart would count as a new installation; \
-             nothing is sent. On: mount a writable volume and set {STATE_DIR_ENV} to it. \
+             nothing is sent. On: mount a writable volume and set usage_report.state_dir to it. \
              Details: {NOTICE_URL}"
         ),
     }

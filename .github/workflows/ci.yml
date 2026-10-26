@@ -38,7 +38,7 @@ permissions: {}
 # A server a lane starts is no installation, so it sends no usage report
 # (scripts/checks/usage-report-off.sh holds every launcher to this).
 env:
-  FERROTERM_USAGE_REPORT: "off"
+  FERROTERM__USAGE_REPORT__ENABLED: "false"
 
 jobs:
   # ── Tier 1: the workflow + shell checks (always run) ────────────────────────

@@ -85,6 +85,9 @@ exceptions = [
   { allow = ["BUSL-1.1"], crate = "ferrohealth-health" },
   { allow = ["BUSL-1.1"], crate = "ferrohealth-server" },
   { allow = ["BUSL-1.1"], crate = "ferrohealth-telemetry" },
+  # The FerroHEALTH configuration loader, the same Licensor's crate under the
+  # same licence.
+  { allow = ["BUSL-1.1"], crate = "ferrohealth-config" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-build" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-bench" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-testkit" },

@@ -42,29 +42,29 @@ services:
     ports:
       - "${FERROTERM_BIND_HOST:-127.0.0.1}:${FERROTERM_PORT:-8080}:8080"
     environment:
-      FERROTERM_INDEX: /data/index
+      FERROTERM__TERMINOLOGY__INDEX: /data/index
       # FHIR CodeSystem resources (a package's `package/` directory or JSON
-      # files) are served from a second mount: add `FERROTERM_CODESYSTEMS:
+      # files) are served from a second mount: add `FERROTERM__TERMINOLOGY__CODE_SYSTEMS:
       # /data/codesystems` here and a read-only bind volume below.
       # `pretty` for a person watching `docker compose up`; a log pipeline
       # sets `json` (one object per line). `RUST_LOG` filters.
-      FERROTERM_LOG_FORMAT: ${FERROTERM_LOG_FORMAT:-pretty}
-      FERROTERM_DEFAULT_LANGUAGE: ${FERROTERM_DEFAULT_LANGUAGE:-en}
+      FERROTERM__TELEMETRY__FORMAT: ${FERROTERM__TELEMETRY__FORMAT:-pretty}
+      FERROTERM__TERMINOLOGY__DEFAULT_LANGUAGE: ${FERROTERM__TERMINOLOGY__DEFAULT_LANGUAGE:-en}
       # The URL clients reach this server at, when a proxy sits in front: it
       # becomes `CapabilityStatement.implementation.url`, per version, and it
       # is what the SMART gate accepts as a token audience.
-      FERROTERM_BASE_URL: ${FERROTERM_BASE_URL:-}
+      FERROTERM__FHIR__BASE_URL:
       # The authentication the proxy enforces, declared in the capability
       # statement (`OAuth`, `SMART-on-FHIR`, `Basic`, `Certificates`, ...).
-      FERROTERM_SECURITY_SERVICE: ${FERROTERM_SECURITY_SERVICE:-}
+      FERROTERM__FHIR__SECURITY_SERVICES:
       RUST_LOG: ${RUST_LOG:-info}
-      # The usage report to FerroPULSE: on by default, `FERROTERM_USAGE_REPORT=off`
+      # The usage report to FerroPULSE: on by default, `FERROTERM__USAGE_REPORT__ENABLED=false`
       # stops it. What it sends and when:
       # https://ferroterm.eu/docs/operate/usage-report.html
-      FERROTERM_USAGE_REPORT: ${FERROTERM_USAGE_REPORT:-on}
-      FERROTERM_DEPLOYMENT: compose
+      FERROTERM__USAGE_REPORT__ENABLED: ${FERROTERM__USAGE_REPORT__ENABLED:-true}
+      FERROTERM__USAGE_REPORT__DEPLOYMENT: compose
       # The instance id lives here, on the one writable volume.
-      FERROTERM_STATE_DIR: /data/state
+      FERROTERM__USAGE_REPORT__STATE_DIR: /data/state
     volumes:
       - type: bind
         source: ${FERROTERM_INDEX_DIR:-./index}
@@ -149,14 +149,14 @@ services:
   # default domain, `localhost`, Caddy issues from its own internal CA, so the
   # quickstart works offline; name a real domain and it uses Let's Encrypt.
   #
-  # FERROTERM_BASE_URL is what makes `CapabilityStatement.implementation.url`
+  # FERROTERM__FHIR__BASE_URL is what makes `CapabilityStatement.implementation.url`
   # correct: the server answers on an address it never sees, so it states the
   # one clients use. Set it to the same scheme and host as the proxy. With a
   # SMART issuer configured it is also the token audience the write routes
   # accept, one FHIR base per served version.
   #
   # The proxy is the place for authentication and rate limiting: the server has
-  # neither, and `FERROTERM_SECURITY_SERVICE` only declares what you put in
+  # neither, and `FERROTERM__FHIR__SECURITY_SERVICES` only declares what you put in
   # front (`OAuth`, `SMART-on-FHIR`, ...). See the book,
   # https://ferroterm.eu/book/operate/reverse-proxy.html.
   proxy:

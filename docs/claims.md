@@ -157,7 +157,7 @@ claim, not a test that merely touches the area.
 | ECL 2.2 from a parser written to the official ANTLR `ECL.g4`, vendored with its example corpus | `crates/sct-ecl/vendor/PROVENANCE.md` (tag 2.2, commit `e0b83c15`), `crates/sct-ecl/vendor/syntax/ECL.g4`, `crates/sct-ecl/vendor/examples/` (121 files); `crates/sct-ecl/tests/it/corpus.rs::every_example_of_the_corpus_parses_and_round_trips` |
 | Malformed ECL comes back as an `OperationOutcome` | `app/ferroterm-server/tests/it/value_set.rs::expand_and_validate_code_answer_an_ecl_implicit_value_set` |
 | The five SNOMED implicit value sets and `?fhir_cm=` | `crates/fhir-terminology/tests/it/snomed.rs::the_implicit_value_sets_follow_the_snomed_ct_page`, `::ecl_arrives_as_the_constraint_filter_and_the_ecl_implicit_value_set`; `crates/fhir-terminology/tests/it/snomed_concept_map.rs` (10 tests) |
-| No SNOMED authoring, browser, or history; read-only over an index built offline | The server writes only what `FERROTERM_RESOURCES` names; no authoring route in `app/ferroterm-server/src/version/mod.rs` |
+| No SNOMED authoring, browser, or history; read-only over an index built offline | The server writes only what `FERROTERM__TERMINOLOGY__RESOURCES` names; no authoring route in `app/ferroterm-server/src/version/mod.rs` |
 | No JVM, no Elasticsearch, no database | As under [What it is](#what-it-is) |
 | Releases carry signed SLSA Build Level 3 provenance and SBOMs | The release workflows above |
 | No syndication client | No HTTP fetch of a release in `tools/ferroterm-build`; the ICD-11 build reads a local WHO ICD-API deployment |
@@ -243,7 +243,7 @@ Per system, the loader flag, the provider, and the test that exercises it:
 | G-Standaard, `--gstandaard` | `crates/gstandaard/src/lib.rs::GPK_SYSTEM` (and `PRK_SYSTEM`, `HPK_SYSTEM`); `tools/ferroterm-build/tests/it/gstandaard.rs::the_release_builds_the_four_rungs_under_the_output_directory` |
 | Nederlandse Labcodeset, `--labcodeset` | `crates/fhir-terminology/tests/it/labcodeset.rs::the_built_resources_load_as_a_supplement_and_value_sets`; `tools/ferroterm-build/tests/it/labcodeset.rs::the_publication_builds_from_a_document_a_directory_or_a_zip` |
 | NHG ICPC-1 to SNOMED CT map | **NO EVIDENCE.** See [E5](#e5) |
-| FHIR `CodeSystem`, `ValueSet`, `ConceptMap` through `FERROTERM_CODESYSTEMS`, supplements included | `app/ferroterm-server/tests/it/config.rs::code_system_directories_load_and_supplements_apply`; `crates/fhir-terminology/tests/it/supplement.rs::a_supplement_layers_designations_and_properties_over_the_system` |
+| FHIR `CodeSystem`, `ValueSet`, `ConceptMap` through `FERROTERM__TERMINOLOGY__CODE_SYSTEMS`, supplements included | `app/ferroterm-server/tests/it/config.rs::code_system_directories_load_and_supplements_apply`; `crates/fhir-terminology/tests/it/supplement.rs::a_supplement_layers_designations_and_properties_over_the_system` |
 | "HL7 Terminology's 900+ systems load this way" | `crates/fhir-terminology/src/fhir_codesystem/load.rs::load_dir` loads a package directory; `crates/fhir-terminology/tests/it/fhir_core.rs::every_version_bundle_loads` asserts more than 200 systems per version build into providers. The 928-resource HL7 Terminology corpus that carried the 900+ figure left with the vendored packages (#300), so that figure has no test behind it here |
 | The repository ships no code system content | `git ls-files data` returns 10 `.gitkeep` files |
 
@@ -345,17 +345,17 @@ Per system, the loader flag, the provider, and the test that exercises it:
 |---|---|
 | Four registry systems served with no configuration | `app/ferroterm-server/src/state.rs::build` |
 | `GET /health`, `GET /health/liveness`, `GET /health/readiness` | `app/ferroterm-server/src/lib.rs::router` over `ferrohealth_server::health::routes`; `app/ferroterm-server/tests/it/health.rs::the_three_health_routes_answer_a_serving_server` and `readiness_is_withdrawn_once_the_server_drains` |
-| The image runs as numeric user `65532` on a distroless base, with `FERROTERM_LISTEN=0.0.0.0:8080` | `docker/Dockerfile:14,28,33` |
+| The image runs as numeric user `65532` on a distroless base, with `FERROTERM__SERVER__LISTEN=0.0.0.0:8080` | `docker/Dockerfile:14,28,33` |
 | Tags are `<version>`, `<major.minor>`, and `latest` | `.github/workflows/release-image.yml:124-126`; `latest` comes from `docker/metadata-action`'s default flavour |
 | The image carries a `HEALTHCHECK` running `ferroterm healthcheck`, which exits 0 against a serving instance and 1 against a stopped one | `docker/Dockerfile:36-45`; `app/ferroterm-server/src/healthcheck.rs`; `app/ferroterm-server/tests/it/healthcheck.rs` |
 | The server stops cleanly on `SIGTERM` | `app/ferroterm-server/src/main.rs` |
 | The server opens each index read-only, refuses to start on a missing or damaged one, and listens on `127.0.0.1:8080` | `app/ferroterm-server/src/config.rs::Default`; `app/ferroterm-server/tests/it/config.rs` |
-| The ten environment variables and their defaults | the `*_ENV` constants of `app/ferroterm-server/src/config.rs::LISTEN_ENV` and `app/ferroterm-server/src/telemetry.rs::FORMAT_ENV`; `app/ferroterm-server/tests/it/config.rs::the_environment_fills_the_config` |
+| The configuration keys, their variables and their defaults | `app/ferroterm-server/src/config.rs::PREFIX` and the section structs of `app/ferroterm-server/src/config.rs`; `app/ferroterm-server/src/config.rs::the_file_holds_the_tree_and_the_environment_goes_over_it`; `app/ferroterm-server/tests/it/config.rs::the_environment_fills_the_config` |
 | A supplement whose system is not loaded refuses the start | `app/ferroterm-server/tests/it/config.rs::a_supplement_without_its_system_refuses_to_start` |
 | The `CodeSystem` id shapes (`snomed.info-sct-<module>-version-<date>`, and the system-and-version form), and that the id addresses the instance | `app/ferroterm-server/src/state.rs`; `app/ferroterm-server/tests/it/metadata.rs`; `app/ferroterm-server/tests/it/code_system.rs::every_loaded_code_system_reads_at_the_id_the_server_names_it_by` |
-| `FERROTERM_SECURITY_SERVICE` admits only the `restful-security-service` codes | `app/ferroterm-server/src/config.rs::a_security_service_list_admits_only_the_codes_the_value_set_defines` |
-| `FERROTERM_BASE_URL` becomes `implementation.url` per version | `app/ferroterm-server/src/config.rs::a_base_url_loses_its_trailing_slashes_and_an_empty_one_is_unset`; `app/ferroterm-server/src/version/metadata.rs` |
-| The write routes accept every served version's FHIR base under `FERROTERM_BASE_URL` as a token audience, beside `[auth] audience`, and the admin listener accepts `[auth] audience` alone | `app/ferroterm-server/src/smart/mod.rs::version_bases`; `app/ferroterm-server/src/smart/mod.rs::Smart::start`; `app/ferroterm-server/tests/it/smart.rs::a_token_for_one_version_base_writes_on_every_served_version`, `::an_audience_naming_another_server_is_refused`, `::the_admin_listener_does_not_take_a_version_base_as_its_audience` |
+| `fhir.security_services` admits only the `restful-security-service` codes | `app/ferroterm-server/src/config.rs::a_security_service_list_admits_only_the_codes_the_value_set_defines` |
+| `FERROTERM__FHIR__BASE_URL` becomes `implementation.url` per version | `app/ferroterm-server/src/config.rs::a_base_url_loses_its_trailing_slashes_and_an_empty_one_is_unset`; `app/ferroterm-server/src/version/metadata.rs` |
+| The write routes accept every served version's FHIR base under `FERROTERM__FHIR__BASE_URL` as a token audience, beside `[auth] audience`, and the admin listener accepts `[auth] audience` alone | `app/ferroterm-server/src/smart/mod.rs::version_bases`; `app/ferroterm-server/src/smart/mod.rs::Smart::start`; `app/ferroterm-server/tests/it/smart.rs::a_token_for_one_version_base_writes_on_every_served_version`, `::an_audience_naming_another_server_is_refused`, `::the_admin_listener_does_not_take_a_version_base_as_its_audience` |
 | The log fields, and that bodies and free text are never logged | `app/ferroterm-server/src/request_log.rs` |
 | The server binary carries no HTTP client outside `ferrohealth-smart`, and makes no outbound connection to an authorization server unless `[auth]` names one | `scripts/checks/no-client-in-server.sh`, the `no-client-in-server` CI job; the ICD-API walker sits behind the `icd11` crate's `api` feature, which only `tools/ferroterm-build` enables. With an issuer configured the server reads that issuer's metadata and key set through `ferrohealth-smart` (`app/ferroterm-server/src/smart/mod.rs::Smart::start`) |
 | `compose.yaml` carries a `proxied` profile with Caddy | `compose.yaml` |
@@ -441,7 +441,7 @@ list.
 and **"FerroTERM reads what its artifacts carry and takes a resource inline in
 the request"** (`website/landing/comparison.html`, the client-authored
 resources row and the "Where the Snowstorm servers are ahead" section). A
-deployment that names `FERROTERM_RESOURCES` serves `POST`, `PUT`, `GET`,
+deployment that names `FERROTERM__TERMINOLOGY__RESOURCES` serves `POST`, `PUT`, `GET`,
 `DELETE`, `_history` reads, and `?url=` search of `CodeSystem`, `ValueSet`, and
 `ConceptMap`, with `ETag`, `If-Match`, `412`, and `410`
 (`app/ferroterm-server/src/version/store.rs`;

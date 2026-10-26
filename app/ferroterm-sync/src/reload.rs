@@ -4,7 +4,7 @@
 //! Asking the server to reload the set it serves.
 //!
 //! The server re-scans its index root and its resource directory on
-//! `POST /reload`, served by the admin listener its `FERROTERM_ADMIN_LISTEN`
+//! `POST /reload`, served by the admin listener its `FERROTERM__ADMIN__LISTEN`
 //! binds, and answers with the systems it now serves. A reload it refuses
 //! leaves the old set answering, which is what makes a failed run harmless.
 //!

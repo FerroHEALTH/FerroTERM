@@ -9,7 +9,7 @@
 //! pair another resource of the type already carries is refused with 409 and
 //! a `duplicate` issue (<https://hl7.org/fhir/R4B/valueset-issue-type.html>).
 
-use ferroterm_server::config::Config;
+use ferroterm_server::config::{Config, TerminologySection};
 use ferroterm_server::persistence::{Record, ResourceStore};
 use http::StatusCode;
 use serde_json::{Value, json};
@@ -184,8 +184,11 @@ async fn a_write_onto_a_loaded_canonical_is_refused() {
     let server = Server::start_with_config(
         dir,
         Config {
-            code_systems: vec![resources.clone()],
-            resources: Some(resources.join("resources.redb")),
+            terminology: TerminologySection {
+                code_systems: vec![resources.clone()],
+                resources: Some(resources.join("resources.redb")),
+                ..TerminologySection::default()
+            },
             ..Config::default()
         },
     );
@@ -262,7 +265,10 @@ async fn a_stored_duplicate_answers_from_the_most_recent_write() {
     let server = Server::start_with_config(
         dir,
         Config {
-            resources: Some(database),
+            terminology: TerminologySection {
+                resources: Some(database),
+                ..TerminologySection::default()
+            },
             ..Config::default()
         },
     );
@@ -451,7 +457,10 @@ async fn a_stored_core_canonical_is_not_served_and_is_logged_at_startup() {
     let server = Server::start_with_config(
         dir,
         Config {
-            resources: Some(database),
+            terminology: TerminologySection {
+                resources: Some(database),
+                ..TerminologySection::default()
+            },
             ..Config::default()
         },
     );

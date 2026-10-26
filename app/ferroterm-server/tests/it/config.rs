@@ -3,7 +3,7 @@
 
 //! Loading the artifacts named by the configuration.
 
-use ferroterm_server::config::Config;
+use ferroterm_server::config::{Config, TerminologySection};
 use ferroterm_server::state::{AppState, LoadError, instance_id};
 use ferroterm_testkit::snomed::VERSION;
 
@@ -12,7 +12,10 @@ fn the_state_loads_every_named_artifact_and_names_its_instances() {
     let dir = tempfile::tempdir().expect("tempdir");
     ferroterm_testkit::snomed::write(dir.path()).expect("writes");
     let config = Config {
-        index: vec![dir.path().to_path_buf()],
+        terminology: TerminologySection {
+            index: vec![dir.path().to_path_buf()],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     };
     let state = AppState::load(&config).expect("loads");
@@ -62,7 +65,10 @@ fn the_state_loads_every_named_artifact_and_names_its_instances() {
 #[test]
 fn a_missing_or_duplicate_artifact_refuses_to_start() {
     let missing = Config {
-        index: vec![std::path::PathBuf::from("/nonexistent/ferroterm")],
+        terminology: TerminologySection {
+            index: vec![std::path::PathBuf::from("/nonexistent/ferroterm")],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     };
     assert!(matches!(
@@ -72,7 +78,10 @@ fn a_missing_or_duplicate_artifact_refuses_to_start() {
     let dir = tempfile::tempdir().expect("tempdir");
     ferroterm_testkit::snomed::write(dir.path()).expect("writes");
     let twice = Config {
-        index: vec![dir.path().to_path_buf(), dir.path().to_path_buf()],
+        terminology: TerminologySection {
+            index: vec![dir.path().to_path_buf(), dir.path().to_path_buf()],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     };
     assert!(matches!(
@@ -91,9 +100,9 @@ fn a_missing_or_duplicate_artifact_refuses_to_start() {
 #[test]
 fn the_environment_fills_the_config() {
     let config = Config::default();
-    assert_eq!(config.listen, "127.0.0.1:8080");
-    assert_eq!(config.default_language, "en");
-    assert_eq!(config.index, Vec::<std::path::PathBuf>::new());
+    assert_eq!(config.server.listen, "127.0.0.1:8080");
+    assert_eq!(config.terminology.default_language, "en");
+    assert_eq!(config.terminology.index, Vec::<std::path::PathBuf>::new());
 }
 
 #[test]
@@ -103,7 +112,10 @@ fn code_system_directories_load_and_supplements_apply() {
     let dir = tempfile::tempdir().expect("tempdir");
     ferroterm_testkit::fhir::write_code_systems(dir.path()).expect("writes");
     let config = Config {
-        code_systems: vec![dir.path().to_path_buf()],
+        terminology: TerminologySection {
+            code_systems: vec![dir.path().to_path_buf()],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     };
     let state = AppState::load(&config).expect("loads");
@@ -168,7 +180,10 @@ fn a_supplement_without_its_system_refuses_to_start() {
     )
     .expect("writes");
     let config = Config {
-        code_systems: vec![dir.path().to_path_buf()],
+        terminology: TerminologySection {
+            code_systems: vec![dir.path().to_path_buf()],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     };
     assert!(matches!(
@@ -184,7 +199,10 @@ fn a_loinc_artifact_is_served_beside_the_edition() {
     let loinc = tempfile::tempdir().expect("tempdir");
     ferroterm_testkit::loinc::write_artifact(loinc.path()).expect("builds");
     let config = Config {
-        index: vec![snomed.path().to_path_buf(), loinc.path().to_path_buf()],
+        terminology: TerminologySection {
+            index: vec![snomed.path().to_path_buf(), loinc.path().to_path_buf()],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     };
     let state = AppState::load(&config).expect("loads");
@@ -205,7 +223,10 @@ fn a_loinc_artifact_is_served_beside_the_edition() {
     .expect("writes");
     assert!(matches!(
         AppState::load(&Config {
-            index: vec![empty.path().to_path_buf()],
+            terminology: TerminologySection {
+                index: vec![empty.path().to_path_buf()],
+                ..TerminologySection::default()
+            },
             ..Config::default()
         }),
         Err(LoadError::UnknownArtifact { .. })
@@ -219,7 +240,10 @@ fn a_classification_artifact_is_served_by_its_manifest_kind() {
     let cm = tempfile::tempdir().expect("tempdir");
     ferroterm_testkit::classification::write_icd10cm_artifact(cm.path()).expect("builds");
     let config = Config {
-        index: vec![claml.path().to_path_buf(), cm.path().to_path_buf()],
+        terminology: TerminologySection {
+            index: vec![claml.path().to_path_buf(), cm.path().to_path_buf()],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     };
     let state = AppState::load(&config).expect("loads");
@@ -246,7 +270,10 @@ fn an_rxnorm_artifact_is_served_beside_the_others() {
     let rxnorm = tempfile::tempdir().expect("tempdir");
     ferroterm_testkit::rxnorm::write_artifact(rxnorm.path()).expect("builds");
     let config = Config {
-        index: vec![rxnorm.path().to_path_buf()],
+        terminology: TerminologySection {
+            index: vec![rxnorm.path().to_path_buf()],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     };
     let state = AppState::load(&config).expect("loads");
@@ -265,11 +292,14 @@ fn the_three_icd11_artifacts_are_served_by_their_manifest_kind() {
     let out = tempfile::tempdir().expect("tempdir");
     ferroterm_testkit::icd11::write_artifacts(out.path()).expect("builds");
     let config = Config {
-        index: vec![
-            out.path().join("mms"),
-            out.path().join("icf"),
-            out.path().join("entity"),
-        ],
+        terminology: TerminologySection {
+            index: vec![
+                out.path().join("mms"),
+                out.path().join("icf"),
+                out.path().join("entity"),
+            ],
+            ..TerminologySection::default()
+        },
         ..Config::default()
     };
     let state = AppState::load(&config).expect("loads");

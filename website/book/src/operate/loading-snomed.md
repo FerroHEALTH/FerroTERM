@@ -41,7 +41,7 @@ graph LR
 ```
 
 Every source builds into the same layout, and the manifest names the system,
-so `FERROTERM_INDEX` takes any mix of them. When a new release arrives, rebuild
+so `FERROTERM__TERMINOLOGY__INDEX` takes any mix of them. When a new release arrives, rebuild
 its index and restart the server against it.
 
 Each command below names its output directory with `--out`. Give
@@ -89,7 +89,7 @@ $ ferroterm-build --loinc /path/to/Loinc_2.82.zip --out /path/to/loinc-index
 The zip's term table, parts, hierarchy, answer lists, and linguistic variants
 are unpacked to a temporary directory; the part-link tables are not read. The
 version is taken from the release name (`Loinc_2.82`), else pass
-`--loinc-version`. Point `FERROTERM_INDEX` at the directory beside your SNOMED
+`--loinc-version`. Point `FERROTERM__TERMINOLOGY__INDEX` at the directory beside your SNOMED
 CT index; the server opens each by the system its manifest names.
 
 ## Loading ICD-10 and ICD-10-CM
@@ -120,7 +120,7 @@ $ ferroterm-build --icd10cm 2026-code-descriptions-tabular-order.zip \
 
 Codes come out with the period (`A00.0`, `S02.0XXA`); chapters are named by
 their range (`A00-B99`); the order file's header flag is the `valid`
-property. Point `FERROTERM_INDEX` at each directory as for LOINC.
+property. Point `FERROTERM__TERMINOLOGY__INDEX` at each directory as for LOINC.
 
 ## Loading ATC
 
@@ -160,7 +160,7 @@ designations, and the SNOMED CT identifier, the ICD-10, DBC, and ZA
 derivations, the roles, and the umbrella terms are properties. Concepts ended
 before the delivery date are served inactive. The build also writes two
 `ConceptMap` resources under `conceptmaps/` in the output directory (the
-thesaurus to SNOMED CT and to ICD-10); point `FERROTERM_CODESYSTEMS` at that
+thesaurus to SNOMED CT and to ICD-10); point `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` at that
 directory to serve them with `$translate`. Pass `--dhd-version` when the zip
 name does not carry the version.
 
@@ -175,7 +175,7 @@ $ ferroterm-build --gstandaard /path/to/g-standaard/202609 --gstandaard-version 
 ```
 
 Four artifact directories appear under the output (`gpk`, `prk`, `hpk`,
-`artikel`), one `urn:oid` system each; list them all in `FERROTERM_INDEX`.
+`artikel`), one `urn:oid` system each; list them all in `FERROTERM__TERMINOLOGY__INDEX`.
 Each is a flat table: the full name from the names file is the display, the
 short and label names are designations, and the rungs above a concept (`gpk`,
 `prk`, `hpk`), the ATC code, form, route, brand, and firm are properties.
@@ -195,8 +195,8 @@ output directory: the value set of the active concepts over LOINC
 designations), a LOINC supplement carrying the Dutch names and the
 publication's facts as properties (materials, units, outcome lists, statuses,
 replacements), and one value set per ordinal outcome list under its OID
-(`urn:oid:…`). Point `FERROTERM_CODESYSTEMS` at that directory beside a LOINC
-artifact in `FERROTERM_INDEX`; the SNOMED CT materials and outcome refsets
+(`urn:oid:…`). Point `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` at that directory beside a LOINC
+artifact in `FERROTERM__TERMINOLOGY__INDEX`; the SNOMED CT materials and outcome refsets
 resolve when a SNOMED CT edition is loaded too. Retired concepts stay in the
 supplement, marked `labcodeset-status = retired`, and leave the value set.
 
@@ -204,7 +204,7 @@ supplement, marked `labcodeset-status = retired`, and leave the value set.
 
 Nictiz and the NHG distribute the ICPC-1 (NHG table 24) to SNOMED CT mapping
 as a FHIR R4 `ConceptMap`. Put the file in a directory with a `package.json`
-naming its FHIR version, and point `FERROTERM_CODESYSTEMS` at it:
+naming its FHIR version, and point `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` at it:
 
 ```json
 {"name": "nl.nictiz.nhg-icpc-snomed", "version": "2026-03-31", "fhirVersions": ["4.0.1"]}
@@ -231,7 +231,7 @@ pass `--rxnorm-version` when the release has none. The build keeps the names
 of the unrestricted sources (`RXNORM`, `MTHSPL`). A full release carries
 sources the UMLS licence restricts by category; name the ones your licence
 covers with `--rxnorm-sources MSH,VANDF` to serve their names too. Point
-`FERROTERM_INDEX` at the directory as for LOINC.
+`FERROTERM__TERMINOLOGY__INDEX` at the directory as for LOINC.
 
 ## Loading ICD-11
 
@@ -251,7 +251,7 @@ The cache holds one JSON file per entity and language (about 110,000 files
 for the MMS, the ICF, and the Foundation) and is reused by later builds, so
 the API is only needed once per release. The build writes
 `icd11-index/mms`, `icd11-index/icf`, and `icd11-index/entity`; point
-`FERROTERM_INDEX` at each of the three. Languages beyond English need the
+`FERROTERM__TERMINOLOGY__INDEX` at each of the three. Languages beyond English need the
 deployment to include them (`include=2026-01_fr`); the build records every
 language the cache holds.
 

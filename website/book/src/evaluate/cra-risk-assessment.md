@@ -100,7 +100,7 @@ listener and the console's sign-in use
 | Case | What FerroTERM does | What remains |
 |---|---|---|
 | The FHIR listener published to the internet without a proxy | the server speaks plain HTTP and serves its read surface to anyone who reaches it; the book says to put TLS and reader authentication in the proxy | the deployment decides; a licence that limits who may read the content is the deployment's to keep |
-| Writes switched on without authentication | a server that names `FERROTERM_RESOURCES` or `FERROTERM_ADMIN_LISTEN` refuses to start until `[auth]` names an issuer or says `enabled = false` | `enabled = false` is accepted, for a network only trusted callers reach |
+| Writes switched on without authentication | a server that names `FERROTERM__TERMINOLOGY__RESOURCES` or `FERROTERM__ADMIN__LISTEN` refuses to start until `[auth]` names an issuer or says `enabled = false` | `enabled = false` is accepted, for a network only trusted callers reach |
 | The admin listener published beside the FHIR surface | every route on it requires the admin scope, and the book says to bind it to loopback or an internal address | a deployment that turns authentication off and publishes it lets anyone make the server re-read its disks |
 | A damaged or half-written index served | an artifact that does not open refuses the start, and a reload that meets one keeps the previous set ([a refused artifact stops the start](../operate/configuration.md#a-refused-artifact-stops-the-start)) | none |
 | Patient data sent as a search term | the request log never carries a body or a free-text parameter | a proxy's own access log may; the book says to keep it to the same standard |
@@ -180,18 +180,18 @@ reset the product to its original state"
 - **Applies:** yes. The tailor-made carve-out does not: a public release is
   not a tailor-made product.
 - **How:** the server binds `127.0.0.1:8080` unless told otherwise, persists
-  nothing and accepts no write until `FERROTERM_RESOURCES` names a database,
-  binds no admin listener until `FERROTERM_ADMIN_LISTEN` names one, and refuses
+  nothing and accepts no write until `FERROTERM__TERMINOLOGY__RESOURCES` names a database,
+  binds no admin listener until `FERROTERM__ADMIN__LISTEN` names one, and refuses
   to start with either until `[auth]` names an issuer and an audience or turns
   authentication off. `[auth]` refuses an HMAC algorithm and a plain `http`
-  issuer outside loopback, and an unknown `FERROTERM_AUTH__` key stops the
+  issuer outside loopback, and an unknown `FERROTERM__AUTH__` key stops the
   start. The console offers no sign-in or editing without an `[oidc]` section,
   and its session cookie is `Secure` by default. The images run as uid 65532
   on distroless static, with no shell; the quickstart adds a read-only root
   filesystem, all capabilities dropped and `no-new-privileges`.
 - **Reset:** FerroTERM keeps its state in files the deployment names: the
-  index directories, the `FERROTERM_RESOURCES` database and the
-  `FERROTERM_STATE_DIR` directory. Deleting the database and the state
+  index directories, the `FERROTERM__TERMINOLOGY__RESOURCES` database and the
+  `FERROTERM__USAGE_REPORT__STATE_DIR` directory. Deleting the database and the state
   directory and restarting returns a server to its original state over the
   same indexes ([CRA information for users, 8(d)](cra-user-information.md#8d-secure-decommissioning-and-removing-user-data)).
 - **Evidence:** `app/ferroterm-server/src/config.rs`;
@@ -283,7 +283,7 @@ corruptions"
   release by atomic rename; a write through the REST API takes `If-Match`.
   Programs: SLSA Build Level 3 provenance, Sigstore-signed SBOM attestations,
   checksums, and a base image pinned by digest. Configuration: a
-  `FERROTERM_AUTH__` variable that names no key of `[auth]` stops the start.
+  `FERROTERM__AUTH__` variable that names no key of `[auth]` stops the start.
 - **Evidence:** [a refused artifact stops the start](../operate/configuration.md#a-refused-artifact-stops-the-start);
   [verifying releases](../operate/verifying-releases.md);
   `.github/workflows/release-build.yml`.
@@ -439,7 +439,7 @@ and why.
 
 | Flow | Default | Carries | Purpose |
 |---|---|---|---|
-| Usage report to `report.ferropulse.eu` | on, when `FERROTERM_STATE_DIR` names a writable directory | instance id, version, licence type, deployment, uptime, host size, loaded code system families and coarse operation latency ([fields](../operate/usage-report.md#what-a-report-contains)) | the manufacturer's view of which versions and deployment sizes run; no code, URL or request path; `FERROTERM_USAGE_REPORT=off` turns it off |
+| Usage report to `report.ferropulse.eu` | on, when `FERROTERM__USAGE_REPORT__STATE_DIR` names a writable directory | instance id, version, licence type, deployment, uptime, host size, loaded code system families and coarse operation latency ([fields](../operate/usage-report.md#what-a-report-contains)) | the manufacturer's view of which versions and deployment sizes run; no code, URL or request path; `FERROTERM__USAGE_REPORT__ENABLED=false` turns it off |
 | Metadata and key set of the `[auth]` issuer | when an issuer is configured | the issuer's well-known URLs; no request data | verifying the tokens the write routes and the admin listener accept |
 | The console to the terminology server | always | the FHIR requests a screen makes, with the signed-in user's token on a write | the console's purpose |
 | The console to the OpenID Provider | when `[oidc]` is configured | the authorization code exchange, refresh and revocation | signing a user in |

@@ -8,6 +8,10 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use ferrohealth_config::loader::Loaded;
+use ferrohealth_config::provenance::{Provenance, Source};
+use ferrohealth_secret::file::read_secret;
+use ferrohealth_secret::secret::Secret;
 use ferrohealth_ui::i18n::Locale;
 use secrecy::SecretString;
 use url::Url;
@@ -31,11 +35,39 @@ pub struct Settings {
     pub session: SessionSettings,
     /// The OpenID Provider operators sign in with, when one is configured.
     pub oidc: Option<OidcSettings>,
-    /// Where each key took its value from.
-    pub origins: crate::config::origin::Origins,
-    /// The configuration file the settings were read from, when one was
-    /// named, which the Configuration page names.
-    pub file: Option<PathBuf>,
+    /// Where each key took its value from, and the configuration file the
+    /// settings were read from, which the Configuration page names.
+    pub provenance: Provenance,
+}
+
+impl Settings {
+    /// Resolves the loaded configuration `loaded`, keeping where each key
+    /// came from.
+    ///
+    /// # Errors
+    /// Returns every error of [`Config::resolve`].
+    pub fn from_loaded(loaded: Loaded<Config>) -> Result<Self, Error> {
+        let (config, provenance) = loaded.into_parts();
+        let mut settings = config.resolve()?;
+        settings.provenance = provenance;
+        Ok(settings)
+    }
+
+    /// Where `key` took its value from. A secret set through its `_file`
+    /// key counts as set, either way round.
+    #[must_use]
+    pub fn source_of(&self, key: &str) -> Source {
+        let names = [
+            key.to_owned(),
+            format!("{key}_file"),
+            key.strip_suffix("_file").unwrap_or(key).to_owned(),
+        ];
+        names
+            .iter()
+            .map(|name| self.provenance.source(name))
+            .max()
+            .unwrap_or(Source::Default)
+    }
 }
 
 /// The resolved `[ferroterm]`.
@@ -208,8 +240,7 @@ impl Config {
             },
             session,
             oidc,
-            origins: self.origins.clone(),
-            file: self.file.clone(),
+            provenance: Provenance::default(),
         })
     }
 }
@@ -272,11 +303,7 @@ fn resolve_oidc(oidc: &Oidc) -> Result<OidcSettings, Error> {
         .as_deref()
         .map(|text| provider_url("oidc.revocation_endpoint", text))
         .transpose()?;
-    let client_secret = crate::config::secret::resolve(
-        "oidc.client_secret",
-        oidc.client_secret.as_ref(),
-        oidc.client_secret_file.as_deref(),
-    )?;
+    let client_secret = client_secret(oidc)?;
     Ok(OidcSettings {
         issuer: oidc.issuer.clone(),
         authorization_endpoint,
@@ -377,6 +404,17 @@ fn base_url(key: &str, text: &str) -> Result<Url, Error> {
     Ok(url)
 }
 
+/// The client secret `[oidc]` sets inline or through `client_secret_file`.
+fn client_secret(oidc: &Oidc) -> Result<Option<SecretString>, Error> {
+    Ok(read_secret(
+        "oidc.client_secret",
+        oidc.client_secret.clone(),
+        oidc.client_secret_file.as_deref(),
+    )?
+    .as_ref()
+    .map(Secret::to_secret_string))
+}
+
 /// Whether `url` names a loopback host: `localhost`, `127.0.0.0/8` or `::1`.
 fn is_loopback(url: &Url) -> bool {
     match url.host() {
@@ -390,9 +428,210 @@ fn is_loopback(url: &Url) -> bool {
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
+    use std::path::Path;
 
-    use crate::config::Config;
+    use ferrohealth_config::loader::Loader;
+    use ferrohealth_config::provenance::Source;
+    use ferrohealth_secret::file::SecretError;
+    use ferrohealth_secret::secret::Secret;
+    use secrecy::ExposeSecret;
+
+    use super::{Settings, client_secret};
     use crate::config::error::Error;
+    use crate::config::{Config, Oidc, PREFIX};
+
+    /// A secret file holding `text` in a fresh directory.
+    fn secret_file(text: &str) -> (tempfile::TempDir, std::path::PathBuf) {
+        let dir = tempfile::tempdir().expect("a directory");
+        let path = dir.path().join("client_secret");
+        std::fs::write(&path, text).expect("the file is written");
+        (dir, path)
+    }
+
+    fn oidc(inline: Option<&str>, file: Option<&Path>) -> Oidc {
+        Oidc {
+            client_secret: inline.map(Secret::new),
+            client_secret_file: file.map(Path::to_path_buf),
+            ..Oidc::default()
+        }
+    }
+
+    fn exposed(secret: Option<secrecy::SecretString>) -> Option<String> {
+        secret.map(|secret| secret.expose_secret().to_owned())
+    }
+
+    #[test]
+    fn the_settings_name_the_file_they_were_read_from() {
+        let path = std::env::temp_dir().join(format!(
+            "ferroterm-console-{}-named.toml",
+            std::process::id()
+        ));
+        std::fs::write(
+            &path,
+            "[ferroterm]\nbase_url = \"http://ferroterm:8080/\"\n",
+        )
+        .expect("the file is written");
+        let settings = Config::load(Some(&path), &[])
+            .and_then(Settings::from_loaded)
+            .expect("the file reads");
+        std::fs::remove_file(&path).expect("the file is removed");
+        assert_eq!(Some(path.as_path()), settings.provenance.file());
+        let none = Config::from_sources(None, &BTreeMap::new())
+            .and_then(|config| config.resolve())
+            .expect("the defaults resolve");
+        assert_eq!(None, none.provenance.file(), "no file was read");
+    }
+
+    #[test]
+    fn the_configuration_knows_where_each_key_came_from() {
+        let environment = BTreeMap::from([(
+            String::from("FERROTERM_CONSOLE__SESSION__SECURE_COOKIE"),
+            String::from("false"),
+        )]);
+        let loaded = Loader::new(PREFIX)
+            .expect("the prefix")
+            .load_sources::<Config>(
+                Some("[ferroterm]\nbase_url = \"http://ferroterm:8080/\"\n\n[oidc]\nclient_secret_file = \"/run/secrets/x\"\n"),
+                None,
+                &environment,
+            )
+            .expect("the sources read");
+        let (config, provenance) = loaded.into_parts();
+        let mut settings = Config {
+            oidc: None,
+            ..config
+        }
+        .resolve()
+        .expect("resolves");
+        settings.provenance = provenance;
+        assert_eq!(Source::File, settings.source_of("ferroterm.base_url"));
+        assert_eq!(
+            Source::Environment,
+            settings.source_of("session.secure_cookie")
+        );
+        assert_eq!(Source::Default, settings.source_of("ferroterm.timeout_ms"));
+        assert_eq!(Source::File, settings.source_of("oidc.client_secret_file"));
+        assert_eq!(
+            Source::File,
+            settings.source_of("oidc.client_secret"),
+            "a secret set through its file counts as set"
+        );
+    }
+
+    #[test]
+    fn an_override_name_without_a_known_key_is_refused() {
+        let environment =
+            BTreeMap::from([(String::from("FERROTERM_CONSOLE__LISTEN"), String::from("x"))]);
+        let error = Config::from_sources(None, &environment)
+            .expect_err("a key the tree does not have is refused");
+        assert!(matches!(error, Error::Load(_)), "{error:?}");
+        let unknown =
+            BTreeMap::from([(String::from("FERROTERM_CONSOLE_LISTEN"), String::from("x"))]);
+        assert!(matches!(
+            Config::from_sources(None, &unknown),
+            Err(Error::Load(_))
+        ));
+    }
+
+    #[test]
+    fn an_override_into_a_value_that_is_no_table_is_refused() {
+        let environment = BTreeMap::from([(
+            String::from("FERROTERM_CONSOLE__SERVER__LISTEN__PORT"),
+            String::from("x"),
+        )]);
+        let error = Config::from_sources(
+            Some("[server]\nlisten = \"127.0.0.1:3000\"\n"),
+            &environment,
+        )
+        .expect_err("a key under a value is refused");
+        assert!(matches!(error, Error::Load(_)), "{error:?}");
+    }
+
+    #[test]
+    fn an_environment_value_reads_as_the_key_wants() {
+        let environment = BTreeMap::from([
+            (
+                String::from("FERROTERM_CONSOLE__FERROTERM__TIMEOUT_MS"),
+                String::from("5"),
+            ),
+            (
+                String::from("FERROTERM_CONSOLE__SESSION__SECURE_COOKIE"),
+                String::from("false"),
+            ),
+            (
+                String::from("FERROTERM_CONSOLE__SERVER__LISTEN"),
+                String::from("0.0.0.0:3000"),
+            ),
+        ]);
+        let config = Config::from_sources(None, &environment).expect("reads");
+        assert_eq!(5, config.ferroterm.timeout_ms);
+        assert!(!config.session.secure_cookie);
+        assert_eq!("0.0.0.0:3000", config.server.listen);
+    }
+
+    #[test]
+    fn an_inline_secret_is_taken_as_it_stands() {
+        let resolved = client_secret(&oidc(Some("inline-secret"), None)).expect("resolved");
+        assert_eq!(Some(String::from("inline-secret")), exposed(resolved));
+    }
+
+    #[test]
+    fn a_secret_file_is_read_without_its_trailing_line_ending() {
+        let (_dir, path) = secret_file("file-secret\n");
+        let resolved = client_secret(&oidc(None, Some(&path))).expect("resolved");
+        assert_eq!(Some(String::from("file-secret")), exposed(resolved));
+    }
+
+    #[test]
+    fn no_secret_at_all_is_none() {
+        assert!(
+            client_secret(&oidc(None, None))
+                .expect("resolved")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn a_secret_set_both_inline_and_in_a_file_is_refused_by_its_key() {
+        let (_dir, path) = secret_file("file-secret");
+        let error =
+            client_secret(&oidc(Some("inline-secret"), Some(&path))).expect_err("both are refused");
+        assert!(
+            matches!(&error, Error::Secret(SecretError::Both { key }) if key == "oidc.client_secret"),
+            "{error:?}"
+        );
+    }
+
+    #[test]
+    fn a_secret_file_that_cannot_be_read_is_refused_by_its_key() {
+        let missing = Path::new("/nonexistent/ferroterm-console/client_secret");
+        let error = client_secret(&oidc(None, Some(missing))).expect_err("refused");
+        assert!(
+            matches!(&error, Error::Secret(SecretError::Read { key, path, .. })
+                if key == "oidc.client_secret" && path == missing),
+            "{error:?}"
+        );
+    }
+
+    #[test]
+    fn an_empty_secret_file_is_refused() {
+        let (_dir, path) = secret_file("\n");
+        let error = client_secret(&oidc(None, Some(&path))).expect_err("refused");
+        assert!(
+            matches!(&error, Error::Secret(SecretError::Empty { key, .. }) if key == "oidc.client_secret"),
+            "{error:?}"
+        );
+    }
+
+    #[test]
+    fn a_refusal_never_shows_the_secret() {
+        let (_dir, path) = secret_file("file-secret");
+        let error =
+            client_secret(&oidc(Some("inline-secret"), Some(&path))).expect_err("both are refused");
+        let shown = format!("{error} {error:?}");
+        assert!(!shown.contains("inline-secret"), "{shown}");
+        assert!(!shown.contains("file-secret"), "{shown}");
+    }
 
     #[test]
     fn the_locale_is_english_unless_configured_and_a_bad_tag_is_refused_by_key() {

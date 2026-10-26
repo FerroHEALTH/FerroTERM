@@ -20,9 +20,9 @@
 #   --systems ...  the canonicals to subscribe to; default the NL edition of
 #                  SNOMED CT, LOINC, UCUM, and ICD-10
 #   --keep         keep the work directory when it was a temporary one
-# Credentials: FERROTERM_NTS_USERNAME and FERROTERM_NTS_PASSWORD, or
-# FERROTERM_NTS_CLIENT_ID and FERROTERM_NTS_CLIENT_SECRET, as the add-on reads
-# them. Requires: cargo, curl, jq, python3, and a free port 8080 and 8081.
+# Credentials: FERROTERM_SYNC__NTS__USERNAME and FERROTERM_SYNC__NTS__PASSWORD,
+# or FERROTERM_SYNC__NTS__CLIENT_ID and FERROTERM_SYNC__NTS__CLIENT_SECRET, the
+# sync service's [nts] keys. Requires: cargo, curl, jq, python3, and a free port 8080 and 8081.
 #
 # The FerroEHR hop comes after this: point its quickstart overlay
 # (docker-compose.terminology.yml, [terminology.external]) at
@@ -52,8 +52,8 @@ done
 for tool in cargo curl jq python3; do
   command -v "$tool" >/dev/null 2>&1 || { echo "sync-e2e: missing required tool: $tool" >&2; exit 2; }
 done
-if [[ -z "${FERROTERM_NTS_CLIENT_SECRET:-}" ]] && { [[ -z "${FERROTERM_NTS_USERNAME:-}" ]] || [[ -z "${FERROTERM_NTS_PASSWORD:-}" ]]; }; then
-  echo "sync-e2e: set FERROTERM_NTS_USERNAME and FERROTERM_NTS_PASSWORD (or FERROTERM_NTS_CLIENT_ID and FERROTERM_NTS_CLIENT_SECRET)" >&2
+if [[ -z "${FERROTERM_SYNC__NTS__CLIENT_SECRET:-}" ]] && { [[ -z "${FERROTERM_SYNC__NTS__USERNAME:-}" ]] || [[ -z "${FERROTERM_SYNC__NTS__PASSWORD:-}" ]]; }; then
+  echo "sync-e2e: set FERROTERM_SYNC__NTS__USERNAME and FERROTERM_SYNC__NTS__PASSWORD (or FERROTERM_SYNC__NTS__CLIENT_ID and FERROTERM_SYNC__NTS__CLIENT_SECRET)" >&2
   exit 2
 fi
 
@@ -85,13 +85,20 @@ cleanup() {
 trap cleanup EXIT
 
 echo "== starting the server on 127.0.0.1:8080 (admin 127.0.0.1:8081) over the empty root"
-FERROTERM_USAGE_REPORT=off \
-FERROTERM_INDEX="$work/index" \
-FERROTERM_CODESYSTEMS="$work/codesystems" \
-FERROTERM_LISTEN=127.0.0.1:8080 \
-FERROTERM_ADMIN_LISTEN=127.0.0.1:8081 \
-FERROTERM_AUTH__ENABLED=false \
-FERROTERM_LOG_FORMAT=json \
+# The server refuses every FERROTERM_ variable that is not its own, so the
+# sync service's account stays out of its environment.
+unset_sync=()
+for name in $(compgen -e); do
+  [[ "$name" == FERROTERM_SYNC_* ]] && unset_sync+=(-u "$name")
+done
+env "${unset_sync[@]}" \
+FERROTERM__USAGE_REPORT__ENABLED=false \
+FERROTERM__TERMINOLOGY__INDEX="$work/index" \
+FERROTERM__TERMINOLOGY__CODE_SYSTEMS="$work/codesystems" \
+FERROTERM__SERVER__LISTEN=127.0.0.1:8080 \
+FERROTERM__ADMIN__LISTEN=127.0.0.1:8081 \
+FERROTERM__AUTH__ENABLED=false \
+FERROTERM__TELEMETRY__FORMAT=json \
   "$bin/ferroterm" >"$work/server.log" 2>&1 &
 server_pid=$!
 for _ in $(seq 1 60); do
@@ -100,8 +107,8 @@ for _ in $(seq 1 60); do
 done
 curl -sf http://127.0.0.1:8080/health >/dev/null || { tail -20 "$work/server.log" >&2; echo "sync-e2e: the server did not come up" >&2; exit 1; }
 
-# The configuration carries no credential; the add-on reads them from the
-# environment this script inherited.
+# The file carries no credential; the sync service reads its [nts] account
+# from the FERROTERM_SYNC__NTS__ variables this script inherited.
 list="$(printf '%s' "$systems" | python3 -c 'import sys; print(", ".join(f"\"{s.strip()}\"" for s in sys.stdin.read().split(",") if s.strip()))')"
 cat >"$work/sync.toml" <<TOML
 listen = "127.0.0.1:8181"

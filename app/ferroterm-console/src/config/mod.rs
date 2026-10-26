@@ -1,12 +1,15 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The console's configuration: a TOML file, `FERROTERM_CONSOLE__`
-//! environment overrides over it, and every secret reachable through a
-//! `<key>_file` sibling read at start.
+//! The console's configuration, read by `ferrohealth-config`.
+//!
+//! The tree's defaults, the TOML file `--config` or
+//! `FERROTERM_CONSOLE_CONFIG` names, every `FERROTERM_CONSOLE__SECTION__KEY`
+//! override and every `--set key=value`, with every secret reachable through
+//! a `<key>_file` sibling read at start.
 //!
 //! [`Config`] is the tree as written, every default in its struct's
-//! `Default` impl; [`Config::load`](crate::config::Config::load) reads it and
+//! `Default` impl; [`Config::load`] reads it and
 //! [`Config::resolve`](crate::config::Config::resolve) turns it into the
 //! checked [`settings::Settings`] the server runs on. An override names its
 //! key by path, `FERROTERM_CONSOLE__FERROTERM__BASE_URL` for `[ferroterm]
@@ -39,22 +42,20 @@
 //! ```
 
 pub mod error;
-pub mod load;
-pub mod origin;
-pub mod secret;
 pub mod settings;
 
-use std::path::PathBuf;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 
-use secrecy::SecretString;
+use ferrohealth_config::loader::{Loaded, Loader};
+use ferrohealth_secret::secret::Secret;
 use serde::Deserialize;
 
-/// The environment variable that names the configuration file when
-/// `--config` does not.
-pub const CONFIG_PATH_ENV: &str = "FERROTERM_CONSOLE_CONFIG";
+use crate::config::error::Error;
 
-/// The prefix of every environment override.
-pub const ENV_PREFIX: &str = "FERROTERM_CONSOLE__";
+/// The environment prefix: `FERROTERM_CONSOLE__SERVER__LISTEN` sets
+/// `[server] listen`, and `FERROTERM_CONSOLE_CONFIG` names the file.
+pub const PREFIX: &str = "FERROTERM_CONSOLE";
 
 /// The configuration tree as written.
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -69,12 +70,36 @@ pub struct Config {
     /// `[oidc]`: the OpenID Provider operators sign in with; without it the
     /// console offers no sign-in.
     pub oidc: Option<Oidc>,
-    /// Where each key took its value from, which no file writes.
-    #[serde(skip)]
-    pub origins: origin::Origins,
-    /// The configuration file the tree was read from, when one was.
-    #[serde(skip)]
-    pub file: Option<PathBuf>,
+}
+
+impl Config {
+    /// Reads the configuration of the running process: the file `path`
+    /// names, or the one `FERROTERM_CONSOLE_CONFIG` names, the environment
+    /// and the `--set` pairs `sets`.
+    ///
+    /// # Errors
+    /// Returns [`Error::Load`] when the file cannot be read, a key or
+    /// variable is unknown, or a value does not read as its key.
+    pub fn load(path: Option<&Path>, sets: &[(String, String)]) -> Result<Loaded<Self>, Error> {
+        Ok(Loader::new(PREFIX)?.load_with(path, sets)?)
+    }
+
+    /// Reads `text` as TOML and applies `environment` over it.
+    ///
+    /// Reading the sources and reading the process environment are separate
+    /// so a test can state both: setting an environment variable is `unsafe`
+    /// in edition 2024 and this workspace forbids `unsafe`.
+    ///
+    /// # Errors
+    /// Returns [`Error::Load`] for TOML that does not read as this tree and
+    /// for an override that names no key.
+    pub fn from_sources(
+        text: Option<&str>,
+        environment: &BTreeMap<String, String>,
+    ) -> Result<Self, Error> {
+        let loaded: Loaded<Self> = Loader::new(PREFIX)?.load_sources(text, None, environment)?;
+        Ok(loaded.into_parts().0)
+    }
 }
 
 /// `[server]`.
@@ -192,7 +217,7 @@ pub struct Oidc {
     /// The console's client identifier at the provider (RFC 6749 §2.2).
     pub client_id: String,
     /// The console's client secret, inline, for a confidential client.
-    pub client_secret: Option<SecretString>,
+    pub client_secret: Option<Secret>,
     /// A file holding the console's client secret.
     pub client_secret_file: Option<PathBuf>,
     /// The redirection endpoint the provider sends the operator back to

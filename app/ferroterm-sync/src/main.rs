@@ -12,16 +12,38 @@
 use std::process::ExitCode;
 
 use clap::Parser;
+use ferrohealth_server::cli::ConfigCommand;
 use ferroterm_sync::cli::{Cli, Command};
+use ferroterm_sync::config::Config;
 use ferroterm_sync::record::Outcome;
 
 #[tokio::main]
 async fn main() -> ExitCode {
     let cli = Cli::parse();
-    match &cli.command {
-        Some(Command::Healthcheck { url }) => healthcheck(&cli, url.clone()).await,
-        Some(Command::RunOnce) => logged(run_once(&cli)).await,
-        None => logged(serve(&cli)).await,
+    let loaded = match ferroterm_sync::cli::load(&cli.config) {
+        Ok(loaded) => loaded,
+        Err(error) => {
+            let error = anyhow::Error::from(error);
+            eprintln!("ferroterm-sync: cannot start: {error:#}");
+            return ExitCode::FAILURE;
+        }
+    };
+    match cli.command {
+        Some(Command::Config {
+            command: ConfigCommand::Check,
+        }) => match ferrohealth_config::report::check_report(&loaded) {
+            Ok(report) => {
+                println!("{report}");
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("ferroterm-sync config check: {error}");
+                ExitCode::FAILURE
+            }
+        },
+        Some(Command::Healthcheck { url }) => healthcheck(loaded.settings(), url).await,
+        Some(Command::RunOnce) => logged(run_once(loaded.into_parts().0)).await,
+        None => Box::pin(logged(serve(loaded.into_parts().0))).await,
     }
 }
 
@@ -35,15 +57,8 @@ async fn logged(command: impl Future<Output = ExitCode>) -> ExitCode {
 }
 
 /// `ferroterm-sync healthcheck`: silent on `200 OK`, the reason otherwise.
-async fn healthcheck(cli: &Cli, url: Option<String>) -> ExitCode {
-    let url = match ferroterm_sync::cli::health_url(&cli.config, url) {
-        Ok(url) => url,
-        Err(error) => {
-            let error = anyhow::Error::from(error);
-            eprintln!("ferroterm-sync healthcheck: {error:#}");
-            return ExitCode::FAILURE;
-        }
-    };
+async fn healthcheck(config: &Config, url: Option<String>) -> ExitCode {
+    let url = ferroterm_sync::cli::health_url(config, url);
     match ferroterm_sync::healthcheck::probe(&url).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
@@ -55,8 +70,8 @@ async fn healthcheck(cli: &Cli, url: Option<String>) -> ExitCode {
 }
 
 /// Serves until the process is stopped.
-async fn serve(cli: &Cli) -> ExitCode {
-    match ferroterm_sync::cli::serve(&cli.config).await {
+async fn serve(config: Config) -> ExitCode {
+    match ferroterm_sync::cli::serve(config).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             let error = anyhow::Error::from(error);
@@ -67,8 +82,8 @@ async fn serve(cli: &Cli) -> ExitCode {
 }
 
 /// Performs one run, reports it, and exits non-zero when the run failed.
-async fn run_once(cli: &Cli) -> ExitCode {
-    match ferroterm_sync::cli::run_once(&cli.config).await {
+async fn run_once(config: Config) -> ExitCode {
+    match ferroterm_sync::cli::run_once(config).await {
         Ok(record) => {
             println!(
                 "{}: {} in {} ms, {} entries taken, {} activated",

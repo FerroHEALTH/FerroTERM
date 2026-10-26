@@ -185,14 +185,14 @@ lifetime of the product with digital elements to ensure its secure use;"
 "how changes to the product with digital elements can affect the security of
 data;"
 
-- **Configuration.** Naming `FERROTERM_RESOURCES` turns on writes and
-  `FERROTERM_ADMIN_LISTEN` the reload; both demand `[auth]`. Setting
+- **Configuration.** Naming `FERROTERM__TERMINOLOGY__RESOURCES` turns on writes and
+  `FERROTERM__ADMIN__LISTEN` the reload; both demand `[auth]`. Setting
   `[auth] enabled = false` removes the credential check from both. Binding the
   admin listener to a public address exposes the reload. Adding a user to
   `[[auth.basic.users]]` or a subject to `scopeless_subjects` grants writes.
 - **Outbound data.** The usage report sends what
   [the usage report](../operate/usage-report.md#what-a-report-contains) lists,
-  and `FERROTERM_USAGE_REPORT=off` stops it.
+  and `FERROTERM__USAGE_REPORT__ENABLED=false` stops it.
 - **Upgrades.** An upgrade replaces the binaries or the image; the indexes,
   the resource database and the configuration stay where they are, and the
   release notes say when an index needs rebuilding.
@@ -221,13 +221,13 @@ FerroTERM keeps everything it holds in files and directories you name. To take
 a deployment out of service and remove its data, stop the server and the
 console, then delete:
 
-- every directory `FERROTERM_INDEX` names, which hold the licensed content the
+- every directory `FERROTERM__TERMINOLOGY__INDEX` names, which hold the licensed content the
   build wrote, and the release files you built them from;
-- the database file `FERROTERM_RESOURCES` names, which holds the resources
+- the database file `terminology.resources` names, which holds the resources
   your clients wrote and the closure tables;
-- the directory `FERROTERM_STATE_DIR` names, which holds the usage report's
+- the directory `usage_report.state_dir` names, which holds the usage report's
   instance id;
-- the file `FERROTERM_AUTH_FILE` names, the Basic users' password hash files,
+- the server's configuration file, the Basic users' password hash files,
   and the console's configuration and client secret.
 
 The console keeps its sessions in memory, so stopping it ends them. Remove

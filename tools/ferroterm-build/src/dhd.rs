@@ -5,7 +5,7 @@
 //!
 //! The thesaurus links to SNOMED CT (the fully specified names' identifiers)
 //! and to ICD-10 (the derivations) are written as FHIR R4B `ConceptMap`
-//! resources beside the artifact, so a `FERROTERM_CODESYSTEMS` directory can
+//! resources beside the artifact, so a `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` directory can
 //! serve them with `$translate` (<https://hl7.org/fhir/R4B/conceptmap.html>).
 
 use std::io;

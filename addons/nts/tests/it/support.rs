@@ -12,9 +12,10 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use addon_nts::auth::Clock;
-use addon_nts::config::{CredentialSource, NtsConfig};
+use addon_nts::config::NtsConfig;
 use addon_nts::credentials::Credentials;
 use addon_nts::source::NtsSource;
+use ferrohealth_secret::secret::Secret;
 use sha2::Digest as _;
 use wiremock::matchers::{body_string_contains, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -78,14 +79,14 @@ pub(crate) fn password_account() -> Credentials {
         client_id: String::from("cli_client"),
         client_secret: None,
         username: Some(String::from("an-account")),
-        password: Some(String::from("a-password")),
+        password: Some(Secret::new("a-password")),
     }
 }
 
 /// The credentials of a deployment that also holds a client secret.
 pub(crate) fn confidential_account() -> Credentials {
     Credentials {
-        client_secret: Some(String::from("a-client-secret")),
+        client_secret: Some(Secret::new("a-client-secret")),
         ..password_account()
     }
 }
@@ -94,7 +95,6 @@ pub(crate) fn confidential_account() -> Credentials {
 pub(crate) fn config(server: &MockServer) -> NtsConfig {
     NtsConfig {
         base_url: server.uri(),
-        credentials: CredentialSource::Environment,
         ..NtsConfig::default()
     }
 }

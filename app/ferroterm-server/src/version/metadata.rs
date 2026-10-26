@@ -53,7 +53,7 @@ macro_rules! metadata {
             /// the terminology ecosystem requires a server to populate
             /// (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>, Metadata).
             ///
-            /// The deployment declares it (`FERROTERM_SECURITY_SERVICE`), and a deployment
+            /// The deployment declares it (`fhir.security_services`), and a deployment
             /// that configured a SMART issuer adds `SMART-on-FHIR` and the `oauth-uris`
             /// extension; the binding is extensible, so a deployment that declares none
             /// and configured no issuer says so in text.

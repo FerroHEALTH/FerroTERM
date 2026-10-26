@@ -9,17 +9,16 @@
 //! HTTP client of its own. No specification governs the command line: our own
 //! design.
 
-use std::path::PathBuf;
-
 use clap::{Parser, Subcommand};
+use ferrohealth_server::cli::{ConfigArgs, ConfigCommand};
 
 /// The `ferroterm-console` command line.
 #[derive(Debug, Parser, PartialEq, Eq)]
 #[command(name = "ferroterm-console", version, about = "The FerroTERM Console")]
 pub struct Cli {
-    /// The configuration file to read, overriding `FERROTERM_CONSOLE_CONFIG`.
-    #[arg(long, value_name = "PATH", global = true)]
-    pub config: Option<PathBuf>,
+    /// `--config`, overriding `FERROTERM_CONSOLE_CONFIG`, and `--set`.
+    #[command(flatten)]
+    pub config: ConfigArgs,
     /// The job to run.
     #[command(subcommand)]
     pub command: Command,
@@ -41,17 +40,11 @@ pub enum Command {
     Healthcheck,
 }
 
-/// The `config` jobs.
-#[derive(Debug, Subcommand, PartialEq, Eq)]
-pub enum ConfigCommand {
-    /// Reads and resolves the configuration, secrets included, and reports
-    /// whether the console would start on it.
-    Check,
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{Cli, Command, ConfigCommand};
+    use ferrohealth_server::cli::ConfigCommand;
+
+    use super::{Cli, Command};
     use clap::{CommandFactory, Parser};
 
     #[test]
@@ -76,10 +69,10 @@ mod tests {
         ] {
             let parsed = Cli::try_parse_from(&args).expect("the job parses");
             assert_eq!(command, parsed.command, "{args:?}");
-            assert_eq!(None, parsed.config, "{args:?}");
+            assert_eq!(None, parsed.config.config, "{args:?}");
         }
         let parsed = Cli::try_parse_from(["ferroterm-console", "serve", "--config", "viewer.toml"])
             .expect("the job parses");
-        assert_eq!(Some("viewer.toml".into()), parsed.config);
+        assert_eq!(Some("viewer.toml".into()), parsed.config.config);
     }
 }

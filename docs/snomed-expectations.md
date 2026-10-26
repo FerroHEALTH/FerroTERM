@@ -13,7 +13,7 @@ at `68e66c767` on `main`, release 0.1.0, bound to `127.0.0.1:8211`, serving
 `/r4b`. It was run three times over the artifacts the owner's licensed
 releases build into:
 
-| Run | `FERROTERM_INDEX` | Edition served | Concepts | Reference sets | Languages |
+| Run | `FERROTERM__TERMINOLOGY__INDEX` | Edition served | Concepts | Reference sets | Languages |
 |---|---|---|---|---|---|
 | NL | `artifacts/nl` | `http://snomed.info/sct/11000146104/version/20260630` | 548,949 | 75 | en, nl |
 | INT | `artifacts/int` | `http://snomed.info/sct/900000000000207008/version/20260901` | 535,502 | 25 | en |
@@ -770,7 +770,7 @@ $lookup code=74400008&property=nonesuch
 
 ## An incidental finding
 
-A code system loaded from `FERROTERM_INDEX` is not readable as a
+A code system loaded from `FERROTERM__TERMINOLOGY__INDEX` is not readable as a
 `CodeSystem` instance, though the server prints an id for it at start, the
 capability statement declares `read` and `search-type`, and
 `website/book/src/operate/configuration.md` documents both the id and an

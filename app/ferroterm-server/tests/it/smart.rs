@@ -20,7 +20,7 @@ use base64::Engine;
 use ferrohealth_smart::config::{
     AuthMode, BasicSection, BasicUser, IntrospectionSection, OauthSection,
 };
-use ferroterm_server::config::Config;
+use ferroterm_server::config::{AdminSection, Config, TerminologySection};
 use ferroterm_server::smart::{Smart, StartError};
 use http::header::{AUTHORIZATION, WWW_AUTHENTICATE};
 use http::{Request, StatusCode};
@@ -1104,12 +1104,17 @@ async fn a_cleartext_issuer_outside_the_loopback_refuses_the_start() {
 #[tokio::test]
 async fn a_guarded_surface_without_an_issuer_refuses_the_start() {
     for (resources, admin, named) in [
-        (true, false, "FERROTERM_RESOURCES"),
-        (false, true, "FERROTERM_ADMIN_LISTEN"),
+        (true, false, "terminology.resources"),
+        (false, true, "admin.listen"),
     ] {
         let config = Config {
-            resources: resources.then(|| std::path::PathBuf::from("resources.redb")),
-            admin_listen: admin.then(|| String::from("127.0.0.1:0")),
+            terminology: TerminologySection {
+                resources: resources.then(|| std::path::PathBuf::from("resources.redb")),
+                ..TerminologySection::default()
+            },
+            admin: AdminSection {
+                listen: admin.then(|| String::from("127.0.0.1:0")),
+            },
             ..Config::default()
         };
         let error = Smart::start(&config)
@@ -1117,7 +1122,7 @@ async fn a_guarded_surface_without_an_issuer_refuses_the_start() {
             .expect_err("the start is refused");
         let reason = error.to_string();
         assert!(reason.contains(named), "{reason}");
-        assert!(reason.contains("FERROTERM_AUTH__ISSUER"), "{reason}");
+        assert!(reason.contains("FERROTERM__AUTH__ISSUER"), "{reason}");
     }
 }
 
@@ -1268,8 +1273,13 @@ async fn a_read_only_server_or_auth_off_starts_without_an_issuer() {
         .expect("a read-only server needs no issuer");
     assert!(read_only.is_none());
     let mut off = Config {
-        resources: Some(std::path::PathBuf::from("resources.redb")),
-        admin_listen: Some(String::from("127.0.0.1:0")),
+        terminology: TerminologySection {
+            resources: Some(std::path::PathBuf::from("resources.redb")),
+            ..TerminologySection::default()
+        },
+        admin: AdminSection {
+            listen: Some(String::from("127.0.0.1:0")),
+        },
         ..Config::default()
     };
     off.auth.enabled = false;

@@ -8,7 +8,7 @@ use std::sync::Arc;
 use axum::Router;
 use axum::body::Body;
 use ferrohealth_smart::config::{AuthSection, IssuerKey};
-use ferroterm_server::config::Config;
+use ferroterm_server::config::{AdminSection, Config, FhirSection, TerminologySection};
 use ferroterm_server::reload::Serving;
 use ferroterm_server::state::AppState;
 use http::{Request, Response, StatusCode};
@@ -28,7 +28,7 @@ pub(crate) const AUDIENCE: &str = "ferroterm";
 pub(crate) struct SmartSetup {
     /// The `[auth]` table.
     pub(crate) auth: AuthSection,
-    /// `FERROTERM_BASE_URL`, the address clients reach this server at.
+    /// `FERROTERM__FHIR__BASE_URL`, the address clients reach this server at.
     pub(crate) base_url: Option<String>,
 }
 
@@ -72,7 +72,10 @@ impl Server {
     pub(crate) fn start_with_base_url(base: &str) -> Self {
         let mut server = Self::start_with(false, false);
         let config = Config {
-            base_url: Some(base.to_owned()),
+            fhir: FhirSection {
+                base_url: Some(base.to_owned()),
+                ..FhirSection::default()
+            },
             ..server.config.clone()
         };
         let state = Arc::new(AppState::load(&config).expect("loads"));
@@ -109,8 +112,11 @@ impl Server {
         ferroterm_testkit::rxnorm::write_artifact(&rxnorm).expect("builds rxnorm");
         ferroterm_testkit::fhir::write_code_systems(&fhir).expect("writes the resources");
         let config = Config {
-            index: vec![snomed, loinc, rxnorm],
-            code_systems: vec![fhir],
+            terminology: TerminologySection {
+                index: vec![snomed, loinc, rxnorm],
+                code_systems: vec![fhir],
+                ..TerminologySection::default()
+            },
             ..Config::default()
         };
         Self::assembled(Arc::new(dir), config)
@@ -121,7 +127,10 @@ impl Server {
     pub(crate) fn start_with_authored_ids() -> Self {
         let dir = tempfile::tempdir().expect("tempdir");
         let config = Config {
-            code_systems: vec![authored_resources()],
+            terminology: TerminologySection {
+                code_systems: vec![authored_resources()],
+                ..TerminologySection::default()
+            },
             ..Config::default()
         };
         Self::assembled(Arc::new(dir), config)
@@ -207,7 +216,10 @@ impl Server {
         ferroterm_testkit::openehr::write_second_deployer(&elsewhere)
             .expect("writes the second deployer's resources");
         let config = Config {
-            code_systems: vec![derived, elsewhere],
+            terminology: TerminologySection {
+                code_systems: vec![derived, elsewhere],
+                ..TerminologySection::default()
+            },
             ..Config::default()
         };
         Self::assembled(Arc::new(dir), config)
@@ -243,12 +255,20 @@ impl Server {
         std::fs::create_dir_all(&fhir).expect("creates");
         ferroterm_testkit::fhir::write_code_systems(&fhir).expect("writes the resources");
         Config {
-            index: vec![dir.to_path_buf()],
-            code_systems: vec![fhir],
-            resources: Some(dir.join("resources.redb")),
-            base_url,
+            terminology: TerminologySection {
+                index: vec![dir.to_path_buf()],
+                code_systems: vec![fhir],
+                resources: Some(dir.join("resources.redb")),
+                ..TerminologySection::default()
+            },
+            fhir: FhirSection {
+                base_url,
+                ..FhirSection::default()
+            },
             // The listener is never bound here; naming it builds the admin gate.
-            admin_listen: Some(String::from("127.0.0.1:0")),
+            admin: AdminSection {
+                listen: Some(String::from("127.0.0.1:0")),
+            },
             auth,
             ..Config::default()
         }
@@ -282,9 +302,12 @@ impl Server {
         std::fs::create_dir_all(&fhir).expect("creates");
         ferroterm_testkit::fhir::write_code_systems(&fhir).expect("writes the resources");
         let config = Config {
-            index: vec![dir.path().to_path_buf()],
-            code_systems: if resources { vec![fhir] } else { Vec::new() },
-            resources: persists.then(|| dir.path().join("resources.redb")),
+            terminology: TerminologySection {
+                index: vec![dir.path().to_path_buf()],
+                code_systems: if resources { vec![fhir] } else { Vec::new() },
+                resources: persists.then(|| dir.path().join("resources.redb")),
+                ..TerminologySection::default()
+            },
             ..Config::default()
         };
         Self::assembled(Arc::new(dir), config)

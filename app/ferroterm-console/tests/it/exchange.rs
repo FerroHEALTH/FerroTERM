@@ -165,7 +165,7 @@ async fn a_confidential_client_authenticates_with_basic_and_names_no_client_id_i
     let provider = Provider::start().await;
     let pending = pending();
     let oidc = Oidc {
-        client_secret: Some(SecretString::from("s3cr:t&+")),
+        client_secret: Some(ferrohealth_secret::secret::Secret::new("s3cr:t&+")),
         ..provider.oidc()
     };
     let id_token = provider.id_token(&provider.claims(pending.nonce()));

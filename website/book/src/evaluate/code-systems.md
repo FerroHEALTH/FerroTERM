@@ -14,7 +14,7 @@ properties, implicit value sets, with their citations) are in
 <!-- code-systems:begin -->
 | Code system | Canonical URI | Versions and editions | How you load it | Licence |
 |---|---|---|---|---|
-| SNOMED CT | `http://snomed.info/sct` | Any RF2 edition; the version is the edition URI (`http://snomed.info/sct/[module]/version/[date]`) | `ferroterm-build --rf2 <release zip or dir>` into `FERROTERM_INDEX` | Licensed by SNOMED International; free in member countries through the national release centre |
+| SNOMED CT | `http://snomed.info/sct` | Any RF2 edition; the version is the edition URI (`http://snomed.info/sct/[module]/version/[date]`) | `ferroterm-build --rf2 <release zip or dir>` into `FERROTERM__TERMINOLOGY__INDEX` | Licensed by SNOMED International; free in member countries through the national release centre |
 | LOINC | `http://loinc.org` | Any release (`2.82` style), with its linguistic variants | `ferroterm-build --loinc <Loinc_x.yy.zip or dir>` | Free under the LOINC licence |
 | UCUM | `http://unitsofmeasure.org` | The `ucum-essence.xml` grammar vendored in the binary | Nothing to load | Free (UCUM licence) |
 | BCP 47 | `urn:ietf:bcp:47` | The IANA Language Subtag Registry vendored in the binary | Nothing to load | Open (IETF) |
@@ -31,9 +31,9 @@ properties, implicit value sets, with their citations) are in
 | RxNorm | `http://www.nlm.nih.gov/research/umls/rxnorm` | Any monthly release, or the licence-free prescribable subset | `ferroterm-build --rxnorm <RRF zip or dir>` | UMLS licence for the full release; the prescribable subset is free |
 | DHD Diagnosethesaurus and Verrichtingenthesaurus | `urn:oid:2.16.840.1.213883.2.4.3.120.5.1` | Any Uitleverformaat 5.0 delivery, with its SNOMED CT and ICD-10 concept maps | `ferroterm-build --dhd <delivery zip or dir>` | Licensed by DHD |
 | G-Standaard | `urn:oid:2.16.840.1.213883.2.4.4.1` (GPK), `.10` (PRK), `.7` (HPK), `.8` (article) | Any monthly release | `ferroterm-build --gstandaard <dir> --gstandaard-version <release>` | Z-Index subscription |
-| Nederlandse Labcodeset | `https://ferroterm.eu/fhir/ValueSet/nl-labcodeset` and the LOINC supplement `https://ferroterm.eu/fhir/CodeSystem/nl-labcodeset-loinc` | Any Nictiz publication, as a value set and supplement over LOINC, SNOMED CT, and UCUM | `ferroterm-build --labcodeset <zip, document, or dir>` into `FERROTERM_CODESYSTEMS` | Licensed by Nictiz |
-| NHG ICPC-1 to SNOMED CT map | `http://terminologie.nictiz.nl/ns/ConceptMap/icpc1nl-snomed` (source `http://hl7.org/fhir/sid/icpc-1-nl`) | Any Nictiz release of the FHIR `ConceptMap` | A directory with the `ConceptMap` and a `package.json`, in `FERROTERM_CODESYSTEMS` | Licensed by the NHG |
-| FHIR `CodeSystem`, `ValueSet`, and `ConceptMap` resources | Each resource's own `url` | HL7 Terminology and any FHIR package or directory of JSON, supplements included | `FERROTERM_CODESYSTEMS` | Per resource; HL7 Terminology is CC0 |
+| Nederlandse Labcodeset | `https://ferroterm.eu/fhir/ValueSet/nl-labcodeset` and the LOINC supplement `https://ferroterm.eu/fhir/CodeSystem/nl-labcodeset-loinc` | Any Nictiz publication, as a value set and supplement over LOINC, SNOMED CT, and UCUM | `ferroterm-build --labcodeset <zip, document, or dir>` into `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` | Licensed by Nictiz |
+| NHG ICPC-1 to SNOMED CT map | `http://terminologie.nictiz.nl/ns/ConceptMap/icpc1nl-snomed` (source `http://hl7.org/fhir/sid/icpc-1-nl`) | Any Nictiz release of the FHIR `ConceptMap` | A directory with the `ConceptMap` and a `package.json`, in `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` | Licensed by the NHG |
+| FHIR `CodeSystem`, `ValueSet`, and `ConceptMap` resources | Each resource's own `url` | HL7 Terminology and any FHIR package or directory of JSON, supplements included | `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` | Per resource; HL7 Terminology is CC0 |
 <!-- code-systems:end -->
 
 Every system reaches the operations through one provider seam, so nothing in

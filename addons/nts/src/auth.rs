@@ -20,6 +20,8 @@
 use core::fmt;
 use std::sync::Arc;
 
+use ferrohealth_secret::secret::Secret;
+
 use crate::credentials::Credentials;
 
 /// How many seconds before an access token expires the add-on renews it.
@@ -376,7 +378,7 @@ impl Authenticator {
         }
         let (Some(username), Some(password)) = (
             self.credentials.username.as_deref(),
-            self.credentials.password.as_deref(),
+            self.credentials.password.as_ref().map(Secret::expose),
         ) else {
             return Err(AuthError::NoUsableGrant {
                 name: self.name.clone(),
@@ -398,7 +400,7 @@ impl Authenticator {
             ("grant_type", grant.as_str()),
             ("client_id", self.credentials.client_id.as_str()),
         ];
-        if let Some(secret) = self.credentials.client_secret.as_deref() {
+        if let Some(secret) = self.credentials.client_secret.as_ref().map(Secret::expose) {
             form.push(("client_secret", secret));
         }
         match exchange {

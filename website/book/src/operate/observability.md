@@ -38,7 +38,7 @@ $ ferroterm healthcheck --url http://127.0.0.1:8080/health
 It sends one `GET /health`, waits at most three seconds, and exits 0 with no
 output on `200 OK`. Otherwise it exits 1 with the reason on stderr: `cannot
 reach`, `answered 404 Not Found`, or `did not answer within 3s`. Without
-`--url` it follows `FERROTERM_LISTEN`, on the loopback when the server listens
+`--url` it follows `FERROTERM__SERVER__LISTEN`, on the loopback when the server listens
 on every interface, which is what the image sets. The image declares it as its
 `HEALTHCHECK` (every ten seconds, a five-second limit, a sixty-second start
 period for reading an edition), and the shipped `compose.yaml` states the same

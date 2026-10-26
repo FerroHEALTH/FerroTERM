@@ -98,7 +98,7 @@ async fn a_confidential_client_authenticates_its_revocation_with_basic() {
     let provider = Provider::start().await;
     revocation_answers(&provider, 200).await;
     let oidc = Oidc {
-        client_secret: Some(SecretString::from("secret")),
+        client_secret: Some(ferrohealth_secret::secret::Secret::new("secret")),
         ..full(&provider)
     };
     let state = console(Some(oidc), "");

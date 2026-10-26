@@ -1,20 +1,31 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The one configuration file the service reads.
+//! The service's configuration tree, read by `ferrohealth-config`.
 //!
-//! The file is TOML and every key is optional: a deployment writes what it
-//! changes and inherits the rest from [`Config::default`], which describes the
-//! layout the container image uses. An unknown key is refused rather than
-//! ignored, so a typo in a directory name is a start-up failure and not a run
-//! that writes somewhere nobody looks.
+//! The tree's defaults, then the TOML file `--config` or
+//! `FERROTERM_SYNC_CONFIG` names, then every `FERROTERM_SYNC__SECTION__KEY`
+//! variable, then every `--set key=value`. Every key is optional: a
+//! deployment writes what it changes and inherits the rest from
+//! [`Config::default`], which describes the layout the container image uses.
+//! An unknown key or variable is refused rather than ignored, so a typo in a
+//! directory name is a start-up failure and not a run that writes somewhere
+//! nobody looks.
 //!
-//! No FHIR or SNOMED CT specification governs the file: our own design.
+//! No FHIR or SNOMED CT specification governs the tree: our own design.
 
+use std::collections::BTreeMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
 
+use ferrohealth_config::loader::{Loaded, Loader};
+use ferrohealth_secret::file::{SecretError, read_secret};
+use ferrohealth_secret::secret::Secret;
 use ferrohealth_smart::config::{AuthSection, CredentialsSection};
+
+/// The environment prefix: `FERROTERM_SYNC__SCHEDULE__EVERY` sets
+/// `[schedule] every`, and `FERROTERM_SYNC_CONFIG` names the file.
+pub const PREFIX: &str = "FERROTERM_SYNC";
 
 /// How a staged release reaches the served set.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
@@ -44,7 +55,7 @@ impl Activation {
 ///
 /// Both shapes may be configured at once, in which case the earlier of the two
 /// due times wins. With neither, the service runs only when it is asked to.
-#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ScheduleConfig {
     /// An interval measured from the end of the last run, such as `24h`.
@@ -54,7 +65,7 @@ pub struct ScheduleConfig {
 }
 
 /// One configured source: which add-on speaks to it, and its own settings.
-#[derive(Debug, Clone, PartialEq, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SourceConfig {
     /// The add-on that reads this service, such as `nts`.
@@ -64,8 +75,69 @@ pub struct SourceConfig {
     pub config: toml::Table,
 }
 
+/// `[nts]`: the account the Nationale Terminologie Server add-on
+/// authenticates with.
+///
+/// Each secret is set inline or through its `<key>_file` sibling, which names
+/// a mounted file, never both.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct NtsSection {
+    /// The OAuth 2 client identifier.
+    pub client_id: String,
+    /// The client secret, when the deployment has one.
+    pub client_secret: Option<Secret>,
+    /// A file holding the client secret.
+    pub client_secret_file: Option<PathBuf>,
+    /// The account name for the password grant.
+    pub username: Option<String>,
+    /// The account password for the password grant.
+    pub password: Option<Secret>,
+    /// A file holding the account password.
+    pub password_file: Option<PathBuf>,
+}
+
+impl Default for NtsSection {
+    fn default() -> Self {
+        Self {
+            client_id: String::from(addon_nts::credentials::DEFAULT_CLIENT_ID),
+            client_secret: None,
+            client_secret_file: None,
+            username: None,
+            password: None,
+            password_file: None,
+        }
+    }
+}
+
+impl NtsSection {
+    /// The account this section names, every secret read inline or from its
+    /// file.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SecretError`] when a secret is set both inline and through
+    /// its file, or its file cannot be read or is empty.
+    pub fn credentials(&self) -> Result<addon_nts::credentials::Credentials, SecretError> {
+        Ok(addon_nts::credentials::Credentials {
+            client_id: self.client_id.clone(),
+            client_secret: read_secret(
+                "nts.client_secret",
+                self.client_secret.clone(),
+                self.client_secret_file.as_deref(),
+            )?,
+            username: self.username.clone(),
+            password: read_secret(
+                "nts.password",
+                self.password.clone(),
+                self.password_file.as_deref(),
+            )?,
+        })
+    }
+}
+
 /// The whole configuration of one running service.
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
     /// The address the service's own admin listener binds.
@@ -108,6 +180,9 @@ pub struct Config {
     /// tokens it accepts, the Basic users, and the product scope every route
     /// but `GET /health` requires ([`crate::auth`]).
     pub auth: AuthSection,
+    /// The account the Nationale Terminologie Server add-on authenticates
+    /// with.
+    pub nts: NtsSection,
     /// The sources a run reads, in the order they are configured.
     pub source: Vec<SourceConfig>,
 }
@@ -130,6 +205,7 @@ impl Default for Config {
             build_command: PathBuf::from("ferroterm-build"),
             schedule: ScheduleConfig::default(),
             source: Vec::new(),
+            nts: NtsSection::default(),
             server_admin_credentials: CredentialsSection::default(),
             auth: AuthSection::default(),
         }
@@ -139,56 +215,69 @@ impl Default for Config {
 /// A configuration that could not be read.
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
-    /// The file does not read.
-    #[error("cannot read {path}")]
-    Io {
-        /// The file the service tried to read.
-        path: PathBuf,
-        /// Why it did not read.
-        #[source]
-        source: std::io::Error,
-    },
-    /// The file is not the TOML this service reads.
-    #[error("{path} is not a ferroterm-sync configuration")]
-    Parse {
-        /// The file that did not parse.
-        path: PathBuf,
-        /// What TOML found wrong with it.
-        #[source]
-        source: toml::de::Error,
-    },
-    /// The schedule the file describes does not read.
-    #[error("the schedule in {path} does not read")]
+    /// The tree does not load: a file that does not read, an unknown key or
+    /// variable, or a value of the wrong type.
+    #[error(transparent)]
+    Load(#[from] ferrohealth_config::error::ConfigError),
+    /// The schedule the tree describes does not read.
+    #[error("the schedule does not read")]
     Schedule {
-        /// The file the schedule came from.
-        path: PathBuf,
         /// Why the schedule does not read.
         #[source]
         source: crate::schedule::ScheduleError,
     },
 }
 
+/// The loader of the service's tree.
+///
+/// # Errors
+///
+/// Returns the loader's error when the prefix is refused, which it never is
+/// for [`PREFIX`].
+pub fn loader() -> Result<Loader, ConfigError> {
+    Ok(Loader::new(PREFIX)?)
+}
+
 impl Config {
-    /// Reads the configuration at `path`, with its schedule checked.
+    /// Reads the configuration of the running process: the file `path`
+    /// names, or the one `FERROTERM_SYNC_CONFIG` names, the environment and
+    /// the `--set` pairs `sets`, with its schedule checked.
     ///
     /// # Errors
     ///
-    /// Returns [`ConfigError::Io`] when the file does not read,
-    /// [`ConfigError::Parse`] when it is not the TOML this service reads, and
+    /// Returns [`ConfigError::Load`] when the tree does not load, and
     /// [`ConfigError::Schedule`] when the schedule it describes does not.
-    pub fn load(path: &Path) -> Result<Self, ConfigError> {
-        let text = std::fs::read_to_string(path).map_err(|source| ConfigError::Io {
-            path: path.to_path_buf(),
-            source,
-        })?;
-        let config: Self = toml::from_str(&text).map_err(|source| ConfigError::Parse {
-            path: path.to_path_buf(),
-            source,
-        })?;
-        config.plan().map_err(|source| ConfigError::Schedule {
-            path: path.to_path_buf(),
-            source,
-        })?;
+    pub fn load(
+        path: Option<&Path>,
+        sets: &[(String, String)],
+    ) -> Result<Loaded<Self>, ConfigError> {
+        let loaded = loader()?.load_with::<Self>(path, sets)?;
+        loaded
+            .settings()
+            .plan()
+            .map_err(|source| ConfigError::Schedule { source })?;
+        Ok(loaded)
+    }
+
+    /// Reads `text` as the file and applies `environment` over it, with its
+    /// schedule checked.
+    ///
+    /// Reading the sources and reading the process are separate so a test
+    /// states both: setting a variable is `unsafe` in edition 2024.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Config::load`].
+    pub fn from_sources(
+        text: Option<&str>,
+        environment: &BTreeMap<String, String>,
+    ) -> Result<Self, ConfigError> {
+        let (config, _provenance) = loader()?
+            .load_sources::<Self>(text, None, environment)?
+            .into_parts();
+        config
+            .plan()
+            .map_err(|source| ConfigError::Schedule { source })?;
         Ok(config)
     }
 
@@ -231,11 +320,20 @@ impl Config {
 #[cfg(test)]
 #[expect(clippy::panic_in_result_fn, reason = "test assertions")]
 mod tests {
-    use super::{Activation, Config};
+    use std::collections::BTreeMap;
+
+    use super::{Activation, Config, ConfigError, Secret};
+
+    fn environment(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
+        pairs
+            .iter()
+            .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
+            .collect()
+    }
 
     #[test]
-    fn an_empty_file_is_the_default_deployment() -> Result<(), toml::de::Error> {
-        let config: Config = toml::from_str("")?;
+    fn an_empty_file_is_the_default_deployment() -> Result<(), ConfigError> {
+        let config = Config::from_sources(Some(""), &BTreeMap::new())?;
         // The credentials table holds secrets and so compares by its `Debug`
         // rendering, which redacts them.
         assert_eq!(
@@ -249,8 +347,9 @@ mod tests {
     #[test]
     fn a_file_names_the_directories_the_schedule_and_the_sources()
     -> Result<(), Box<dyn core::error::Error>> {
-        let config: Config = toml::from_str(
-            r#"
+        let config = Config::from_sources(
+            Some(
+                r#"
 listen = "0.0.0.0:9000"
 server_admin_url = "http://server:8081"
 index_root = "/srv/index"
@@ -269,6 +368,8 @@ kind = "nts"
 [source.config]
 base_url = "https://example.invalid"
 "#,
+            ),
+            &BTreeMap::new(),
         )?;
         assert_eq!(
             config.activation,
@@ -297,17 +398,61 @@ base_url = "https://example.invalid"
 
     #[test]
     fn an_unknown_key_is_refused() {
-        let parsed = toml::from_str::<Config>("retetion = 4\n");
+        let parsed = Config::from_sources(Some("retetion = 4\n"), &BTreeMap::new());
         assert!(
-            parsed.is_err(),
+            matches!(parsed, Err(ConfigError::Load(_))),
             "a misspelled key is a start-up failure, never a silent default"
+        );
+        let variable =
+            Config::from_sources(None, &environment(&[("FERROTERM_SYNC__RETETION", "4")]));
+        assert!(
+            matches!(variable, Err(ConfigError::Load(_))),
+            "a misspelled override is refused too"
         );
     }
 
     #[test]
     fn an_unknown_key_inside_the_schedule_is_refused() {
-        let parsed = toml::from_str::<Config>("[schedule]\ncron = \"0 3 * * *\"\n");
+        let parsed =
+            Config::from_sources(Some("[schedule]\ncron = \"0 3 * * *\"\n"), &BTreeMap::new());
         assert!(parsed.is_err(), "the service takes no cron expression");
+    }
+
+    #[test]
+    fn the_nts_account_reads_inline_or_from_a_file_never_both()
+    -> Result<(), Box<dyn core::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("password");
+        std::fs::write(&path, "a-password\n")?;
+        let config = Config::from_sources(
+            Some("[nts]\nusername = \"an-account\"\n"),
+            &environment(&[(
+                "FERROTERM_SYNC__NTS__PASSWORD_FILE",
+                path.to_str().ok_or("a UTF-8 path")?,
+            )]),
+        )?;
+        let credentials = config.nts.credentials()?;
+        assert_eq!(credentials.client_id, "cli_client");
+        assert_eq!(
+            credentials.password.as_ref().map(Secret::expose),
+            Some("a-password"),
+            "the trailing line ending of the file is not part of the secret"
+        );
+        assert!(credentials.has_password_grant());
+        let both = Config::from_sources(
+            Some("[nts]\npassword = \"inline\"\n"),
+            &environment(&[(
+                "FERROTERM_SYNC__NTS__PASSWORD_FILE",
+                path.to_str().ok_or("a UTF-8 path")?,
+            )]),
+        )?;
+        assert!(
+            both.nts.credentials().is_err(),
+            "a secret set inline and through its file is refused"
+        );
+        let rendered = format!("{:?}", config.nts);
+        assert!(!rendered.contains("a-password"), "{rendered}");
+        Ok(())
     }
 
     #[test]
