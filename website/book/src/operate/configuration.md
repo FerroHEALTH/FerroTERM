@@ -69,6 +69,7 @@ The keys of `[auth]`, in the file `FERROTERM_AUTH_FILE` names or as
 | `jwks_max_age_seconds` | How long a key set is used before it is read again. | `600` |
 | `jwks_refresh_interval_seconds` | The shortest time between two reads of the key set, so an unknown `kid` reads it at most once per interval. | `60` |
 | `jwks_file` | A key set file handed over out of band, read in place of the issuer's `jwks_uri`. | none |
+| `ca_file` | A PEM file of trust roots added to the platform's for every issuer's discovery document and key set, for an issuer behind a private certificate authority. A file that cannot be read or holds no certificate refuses the start. | none (the platform's roots) |
 | `timeout_ms` | How long one call to the authorization server may take. | `10000` |
 | `mode` | How a bearer token is checked: `jwt`, as an RFC 9068 JWT against the issuer's key set, or `introspection`, by posting it to the issuer's introspection endpoint (RFC 7662), for an authorization server that issues tokens the server cannot read. `introspection` takes one flat `issuer` and no `jwks_file`. | `jwt` |
 | `[auth.introspection]` | The introspection check under `mode = "introspection"`: `endpoint` (the issuer metadata's `introspection_endpoint` when empty), `cache_max_age_seconds` (how long an active response is used, at most until its `exp`; `60`), `cache_capacity` (`10000`), and exactly one of `client` (the client authentication of the call, with the keys of a client credentials grant: `client_id`, `client_auth`, `client_secret` or `client_secret_file`, `private_key_file`) and `bearer` (a client credentials grant whose token authorizes the call). | none |
@@ -77,6 +78,7 @@ The keys of `[auth]`, in the file `FERROTERM_AUTH_FILE` names or as
 | `capabilities` | SMART capabilities the discovery document adds to the ones it derives. | none |
 | `scopeless_subjects` | The exact `sub` values granted every write without a scope. | none |
 | `[[auth.basic.users]]` | HTTP Basic users (RFC 7617) for machine callers: `user`, `password_hash` or `password_hash_file` (an Argon2id PHC string), and `scopes`, which decide what the user reaches as a token's scopes would. | none (no Basic) |
+| `[auth.basic] cache_ttl_seconds` | How long a Basic credential that verified is kept, so a repeat request skips the Argon2id key derivation. `0` verifies every request. | `300` |
 
 A machine caller authenticates with HTTP Basic as one of those users or with an
 access token it obtained with the OAuth 2.0 client credentials grant; the

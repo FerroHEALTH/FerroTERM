@@ -77,9 +77,9 @@ toml = { version = "1.1.6", default-features = false, features = ["std", "parse"
 # The FerroHEALTH SMART and OAuth 2.0 resource-server crate: the token check,
 # the SMART scopes, the Basic users and the client credentials token of the
 # server and the sync service. Pinned exactly, as every family crate is.
-# 0.7.1 masks a credential in an OAuth section's URL in every rendering
-# (GHSA-vphj-3f8c-5hpx). Verified against crates.io on 2026-10-26.
-ferrohealth-smart = { version = "=0.7.1", features = ["axum"] }
+# 0.7.5 masks every secret and URL through ferrohealth-secret and caches a
+# verified Basic credential. Verified against crates.io on 2026-10-26.
+ferrohealth-smart = { version = "=0.7.5", features = ["axum"] }
 # The Argon2id hashes of the Basic users the SMART tests configure, the
 # version and features ferrohealth-smart verifies them with. Verified against
 # crates.io on 2026-10-20.
