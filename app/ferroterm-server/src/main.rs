@@ -17,15 +17,14 @@ use std::process::ExitCode;
 use std::sync::Arc;
 
 use clap::Parser;
-use ferrohealth_server::cli::ConfigCommand;
-use ferrohealth_telemetry::section::Rendering;
+use ferrohealth_server::cli::{Common, ConfigCommand};
 use ferrohealth_telemetry::telemetry::{Console, Service, Telemetry};
 use ferroterm_server::cli::{Cli, Command};
 use ferroterm_server::config::Config;
 use ferroterm_server::reload::Serving;
 use ferroterm_server::smart::Smart;
 use ferroterm_server::state::AppState;
-use ferroterm_server::{banner, healthcheck, reload, usage_report};
+use ferroterm_server::{banner, reload, usage_report};
 use tokio::net::TcpListener;
 
 #[tokio::main]
@@ -40,13 +39,12 @@ async fn main() -> ExitCode {
         }
     };
     match cli.command {
-        Some(Command::Healthcheck { url }) => {
-            let url = url.unwrap_or_else(|| healthcheck::url_of(&loaded.settings().server.listen));
-            return healthcheck_main(&url).await;
+        Some(Command::Common(Common::Healthcheck)) => {
+            return healthcheck(&loaded.settings().server).await;
         }
-        Some(Command::Config {
+        Some(Command::Common(Common::Config {
             command: ConfigCommand::Check,
-        }) => {
+        })) => {
             return match ferrohealth_config::report::check_report(&loaded) {
                 Ok(report) => {
                     println!("{report}");
@@ -58,17 +56,15 @@ async fn main() -> ExitCode {
                 }
             };
         }
-        None => {}
+        Some(Command::Common(Common::Serve)) | None => {}
     }
     let (config, _provenance) = loaded.into_parts();
-    if config
-        .telemetry
-        .format
-        .resolve(std::io::stdout().is_terminal())
-        == Rendering::Pretty
-    {
-        banner::print();
-    }
+    banner::print(
+        config
+            .telemetry
+            .format
+            .resolve(std::io::stdout().is_terminal()),
+    );
     let service = Service::new("ferroterm", env!("CARGO_PKG_VERSION"));
     let telemetry = match Telemetry::new(&config.telemetry, service) {
         Ok(telemetry) => Arc::new(telemetry),
@@ -95,16 +91,15 @@ async fn main() -> ExitCode {
     outcome
 }
 
-/// `ferroterm healthcheck`: silent on `200 OK`, the reason on stderr otherwise.
-async fn healthcheck_main(url: &str) -> ExitCode {
-    match healthcheck::probe(url).await {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(error) => {
-            let error = anyhow::Error::from(error);
-            eprintln!("ferroterm healthcheck: {error:#}");
-            ExitCode::FAILURE
-        }
+/// `ferroterm healthcheck`: silent when the server is ready, the reason on
+/// stderr otherwise.
+async fn healthcheck(section: &ferrohealth_server::section::ServerSection) -> ExitCode {
+    let outcome = ferroterm_server::healthcheck(section).await;
+    if outcome.exit_code() == 0 {
+        return ExitCode::SUCCESS;
     }
+    eprintln!("ferroterm healthcheck: {outcome}");
+    ExitCode::FAILURE
 }
 
 async fn run(
@@ -194,20 +189,9 @@ async fn run(
     // The report never blocks boot: the task it starts is detached the same way.
     let ci = ferrohealth_usage_report::section::ci_of(|name| std::env::var(name).ok());
     let _usage = usage_report::start(&serving.config().usage_report, &serving, started, ci).await;
-    match admin {
-        Some(admin) => {
-            let fhir = ferroterm_server::serve(listener, serving.clone());
-            let admin = ferroterm_server::serve_admin_until(
-                admin,
-                serving,
-                ferroterm_server::shutdown_signal(),
-            );
-            let ((), ()) = tokio::try_join!(fhir, admin).context("serving HTTP")?;
-        }
-        None => ferroterm_server::serve(listener, serving)
-            .await
-            .context("serving HTTP")?,
-    }
-    tracing::info!("ferroterm stopped");
+    let drained = ferroterm_server::serve(listener, admin, serving)
+        .await
+        .context("serving HTTP")?;
+    tracing::info!(?drained, "ferroterm stopped");
     Ok(())
 }

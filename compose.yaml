@@ -74,7 +74,7 @@ services:
         source: ferroterm-state
         target: /data/state
     # The image declares the same probe (`ferroterm healthcheck`: one GET
-    # /health, exit 0 on 200). Stating it here is what lets another service
+    # /health/readiness, exit 0 on 200). Stating it here is what lets another service
     # wait on it with `condition: service_healthy`, as the proxy below does,
     # and what `docker compose up --wait` waits for. A large edition on a slow
     # disk raises start_period.

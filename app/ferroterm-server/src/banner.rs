@@ -1,12 +1,18 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The boot banner: the wordmark and what this process is, printed before
-//! the log subscriber exists and only when the console is for a person.
+//! What FerroTERM puts into the family's boot banner.
+//!
+//! `ferrohealth_server::build_info::banner` draws its wordmark, its build and
+//! the facts under them, printed before the log subscriber exists and only
+//! when the console renders for a person.
+
+use ferrohealth_server::build_info::{self, BuildInfo};
+use ferrohealth_telemetry::section::Rendering;
 
 /// The wordmark in the `FIGlet` `standard` face, kept as text so the banner
 /// needs no font asset and no dependency.
-const WORDMARK: &str = r"
+pub const WORDMARK: &str = r"
  _____                   _____ _____ ____  __  __
 |  ___|__ _ __ _ __ ___ |_   _| ____|  _ \|  \/  |
 | |_ / _ \ '__| '__/ _ \  | | |  _| | |_) | |\/| |
@@ -14,39 +20,70 @@ const WORDMARK: &str = r"
 |_|  \___|_|  |_|  \___/  |_| |_____|_| \_\_|  |_|
 ";
 
-/// The project site printed under the wordmark.
+/// The project site the banner names.
 pub const SITE: &str = "https://ferroterm.eu";
-/// The maintainer named under the wordmark (`MAINTAINERS.md`).
+/// The maintainer the banner names (`MAINTAINERS.md`).
 pub const MAINTAINER: &str = "Ruben Talstra";
 
-/// Renders the banner for `version`.
+/// The commit the build stamped, empty when it named none.
+const COMMIT: &str = env!("FERROTERM_GIT_SHA");
+
+/// This build: the version and, when the build named one, the commit.
+pub const BUILD: BuildInfo = {
+    let info = BuildInfo::new("ferroterm", env!("CARGO_PKG_VERSION"));
+    if COMMIT.is_empty() {
+        info
+    } else {
+        info.with_commit(COMMIT)
+    }
+};
+
+/// The banner of `info`, or `None` unless the console renders `pretty`.
 #[must_use]
-pub fn render(version: &str) -> String {
-    let wordmark = WORDMARK.trim_start_matches('\n');
-    format!(
-        "{wordmark}\n  FHIR terminology server for SNOMED CT and other code systems · v{version}\n  Maintained by {MAINTAINER} · {SITE}\n"
+pub fn render(info: &BuildInfo, rendering: Rendering) -> Option<String> {
+    let versions = crate::FHIR_BASES
+        .map(|base| base.trim_start_matches('/').to_uppercase())
+        .join(", ");
+    build_info::banner(
+        info,
+        WORDMARK.trim_start_matches('\n'),
+        &[
+            ("FHIR", versions),
+            ("site", SITE.to_owned()),
+            ("maintainer", MAINTAINER.to_owned()),
+        ],
+        rendering,
     )
 }
 
-/// Prints the banner for this build.
+/// Prints the banner of this build when the console renders `pretty`.
 #[expect(
     clippy::print_stdout,
     reason = "the banner is console output and prints before any log subscriber exists"
 )]
-pub fn print() {
-    print!("{}", render(env!("CARGO_PKG_VERSION")));
+pub fn print(rendering: Rendering) {
+    if let Some(banner) = render(&BUILD, rendering) {
+        print!("{banner}");
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use ferrohealth_server::build_info::BuildInfo;
+    use ferrohealth_telemetry::section::Rendering;
+
     use super::render;
 
     #[test]
     fn the_banner_names_the_version_and_fits_a_terminal() {
-        let banner = render("1.2.3");
-        assert!(banner.contains("v1.2.3"));
-        assert!(banner.contains("Maintained by Ruben Talstra · https://ferroterm.eu"));
+        let info = BuildInfo::new("ferroterm", "1.2.3").with_commit("1a2b3c4d5e6f");
+        let banner = render(&info, Rendering::Pretty).expect("pretty prints the banner");
+        assert!(banner.contains("ferroterm 1.2.3 (1a2b3c4)"), "{banner}");
+        assert!(banner.contains("R4, R4B, R5, R6"), "{banner}");
+        assert!(banner.contains("Ruben Talstra"), "{banner}");
+        assert!(banner.contains("https://ferroterm.eu"), "{banner}");
         assert!(banner.lines().all(|line| line.chars().count() <= 100));
-        assert_eq!(banner.lines().count(), 8);
+        assert_eq!(banner.lines().count(), 9);
+        assert!(render(&info, Rendering::Json).is_none(), "json prints none");
     }
 }

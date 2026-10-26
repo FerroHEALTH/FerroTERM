@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use axum::Router;
 use axum::body::Body;
+use ferrohealth_server::section::ServerSection;
 use ferrohealth_smart::config::{AuthSection, IssuerKey};
 use ferrohealth_telemetry::section::TelemetrySection;
 use ferrohealth_telemetry::telemetry::{Service, Telemetry};
@@ -96,6 +97,19 @@ impl Server {
         server.serving = Serving::new(config.clone(), state, telemetry());
         server.config = config;
         server
+    }
+
+    /// The edition served with `server` as its `[server]` section.
+    pub(crate) fn start_with_server(server: ServerSection) -> Self {
+        let mut started = Self::start_with(false, false);
+        let config = Config {
+            server,
+            ..started.config.clone()
+        };
+        let state = Arc::new(AppState::load(&config).expect("loads"));
+        started.serving = Serving::new(config.clone(), state, telemetry());
+        started.config = config;
+        started
     }
 
     /// The edition plus the testkit's `CodeSystem` and `ValueSet` resources.
@@ -306,7 +320,7 @@ impl Server {
 
     /// The admin application, which the second listener serves.
     pub(crate) fn admin_router(&self) -> Router {
-        ferroterm_server::reload::router(self.serving.clone())
+        ferroterm_server::admin_router(self.serving.clone())
     }
 
     fn start_with(resources: bool, persists: bool) -> Self {

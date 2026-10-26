@@ -67,7 +67,8 @@ audience = ["https://tx.example.org"]
 | `terminology.code_systems` (`FERROTERM__TERMINOLOGY__CODE_SYSTEMS`) | Directories of FHIR `CodeSystem` resources to serve: a FHIR package's `package/` directory (HL7 Terminology, for example) or a directory of `CodeSystem` JSON files. Files are read in the FHIR version the directory's `package.json` declares, or as R4B when there is none. A resource with `content = supplement` is applied to the system it `supplements` and is read and searched as a `CodeSystem` of its own; the server refuses to start when that system is not loaded. `ValueSet` resources in the same directories are served by `url` and `version` for `ValueSet/$expand` and `ValueSet/$validate-code` (without a version, the greatest version answers). | none |
 | `terminology.resources` (`FERROTERM__TERMINOLOGY__RESOURCES`) | The database file holding the `CodeSystem`, `ValueSet`, and `ConceptMap` resources clients write through the REST API, and the closure tables `$closure` maintains. The server creates the file when it does not exist, serves every resource in it exactly as it serves one from `terminology.code_systems`, and loads them again after a restart. A deployment that names no file refuses every write with a `422` and declares no write interaction in its capability statement. With a file named, the server refuses to start until `[auth]` names an issuer or turns authentication off (see [Authentication](#authentication)). | none (the server persists nothing) |
 | `terminology.default_language` (`FERROTERM__TERMINOLOGY__DEFAULT_LANGUAGE`) | The BCP 47 language used for `display` when a request names none. | `en` |
-| `server.listen` (`FERROTERM__SERVER__LISTEN`) | The socket address to bind. | `127.0.0.1:8080` (the container image sets `0.0.0.0:8080`) |
+| `server.listen` (`FERROTERM__SERVER__LISTEN`) | The socket address to bind, an IP address and a port; a host name is refused. | `127.0.0.1:8080` (the container image sets `0.0.0.0:8080`) |
+| `[server]` (`FERROTERM__SERVER__<KEY>`) | The request timeout, the body limit, the drain, the overload bound, the trusted proxies, compression and TLS of both listeners (see [The HTTP server](#the-http-server)). | see [The HTTP server](#the-http-server) |
 | `admin.listen` (`FERROTERM__ADMIN__LISTEN`) | The socket address of the admin listener, which serves `POST /reload` and nothing else (see [Reloading the served set](#reloading-the-served-set)). Every route on it requires the admin scope (see [Authentication](#authentication)), and the server refuses to start with it until `[auth]` names an issuer or turns authentication off. Unset or empty, the server binds no second listener and `SIGHUP` is the only reload trigger. | none (no admin listener) |
 | `fhir.base_url` (`FERROTERM__FHIR__BASE_URL`) | The URL clients reach this server at, without a version prefix (`https://tx.example.org`); a trailing slash is dropped. Each version states it as `implementation.url` in its capability statements, so a client behind a reverse proxy learns the address it should use rather than the socket the process bound. Setting it also adds every served version's base under this URL to the audiences the write routes accept, beside `[auth] audience` (see [Behind a reverse proxy](reverse-proxy.md#the-audience-a-token-carries)). A deployment that names none states no URL. | none |
 | `fhir.security_services` (`FERROTERM__FHIR__SECURITY_SERVICES`) | The authentication in front of the server, as codes of the FHIR `restful-security-service` value set (`OAuth`, `SMART-on-FHIR`, `Basic`, `Certificates`, `Kerberos`, `NTLM`). The codes declare what a proxy enforces, in `CapabilityStatement.rest.security.service`; with an `[auth]` issuer, `SMART-on-FHIR` is added to whatever you declare here. Any other code refuses the start. | none |
@@ -81,6 +82,77 @@ audience = ["https://tx.example.org"]
 | `telemetry.logged_query_parameters` (`FERROTERM__TELEMETRY__LOGGED_QUERY_PARAMETERS`) | Further query parameters whose values the request line carries in its `query` field, beside the system and code fields the server always logs (see [Request identifiers](observability.md#request-identifiers)). Name only parameters that hold no free text. | none |
 | `telemetry.environment` (`FERROTERM__TELEMETRY__ENVIRONMENT`) | The deployment environment the exported spans and metrics name, such as `production` (`deployment.environment.name`). | none |
 | `[telemetry.otlp]` (`FERROTERM__TELEMETRY__OTLP__<KEY>`) | The OpenTelemetry collector the spans and metrics are pushed to (see [Telemetry](#telemetry)). | none (nothing is exported) |
+
+## The HTTP server
+
+The FHIR listener and the admin listener run the HTTP stack every FerroHEALTH
+server runs. Each request gets the server's request id and one line of the
+request log, and the stack answers these refusals itself, under a FHIR base as
+an `OperationOutcome`:
+
+- a request still running after `request_timeout_ms` is answered `408`
+  (`timeout`);
+- a body larger than `body_limit_bytes` is answered `413` (`too-long`);
+- past `max_concurrent_requests`, a request is answered `503` (`throttled`)
+  with `Retry-After`, and the health routes are never refused;
+- a handler that fails unexpectedly is answered `500` (`exception`) with the
+  request id, and the log line names the id and nothing of the failure.
+
+On `SIGTERM` or `SIGINT`, readiness turns `503` at once, both listeners keep
+accepting for `drain_delay_ms` so a load balancer stops sending requests,
+then close, and the requests in flight get `shutdown_timeout_ms` to finish. A
+connection still open then is dropped, and the server exits.
+
+```toml
+[server]
+listen = "0.0.0.0:8080"
+request_timeout_ms = 30000
+body_limit_bytes = 1048576
+drain_delay_ms = 5000
+shutdown_timeout_ms = 10000
+max_concurrent_requests = 512
+trusted_proxies = ["10.0.0.0/8"]
+
+[server.tls]
+certificate_file = "/etc/ferroterm/tls/server.pem"
+key_file = "/etc/ferroterm/tls/server.key"
+```
+
+| Key | Meaning | Default |
+|---|---|---|
+| `listen` | The socket address of the FHIR listener. | `127.0.0.1:8080` |
+| `base_path` | A path every route of both listeners is served under, such as `/terminology`: empty, or `/` followed by segments with no trailing `/`. The FHIR bases become `/terminology/r4` and the others, and the health probe follows. | empty |
+| `request_timeout_ms` | How long one request may take before it is answered `408`. | `30000` |
+| `header_read_timeout_ms` | How long a client may take to send a request head; a client still sending one then is disconnected. | `30000` |
+| `body_limit_bytes` | The largest request body read before the request is answered `413`. | `1048576` (1 MiB) |
+| `drain_delay_ms` | How long readiness stays withdrawn on `SIGTERM` before the listeners close. | `0` |
+| `shutdown_timeout_ms` | How long the requests in flight may take once the listeners closed. Keep `drain_delay_ms` plus this below the grace period of the container runtime, so the server exits before it is killed. | `10000` |
+| `max_concurrent_requests` | How many requests are served at once; past it a request is answered `503`. Unset, there is no bound. | none |
+| `retry_after_s` | The seconds a `503` past the bound tells the client to wait (`Retry-After`). | `1` |
+| `trusted_proxies` | The reverse proxies, each an address or a CIDR block, whose forwarded client address the request log believes. Empty, every request is named by the connection's peer. | none |
+| `forwarded_header` | The header a trusted proxy names the client in: `forwarded` (RFC 7239) or `x-forwarded-for`. | `forwarded` |
+| `compression` | Whether a response is compressed with gzip or Brotli when the client accepts one. | `true` |
+| `compression_min_bytes` | The smallest response body that is compressed. | `1024` |
+| `[server.tls]` | TLS on both listeners (see below). Unset, they speak plain HTTP behind a proxy that terminates TLS. | none |
+
+`[server.caller_rate]` is refused: FerroTERM applies no per-caller rate limit.
+Bound the server with `max_concurrent_requests`, or limit callers at the
+reverse proxy.
+
+The `[server.tls]` table:
+
+| Key | Meaning | Default |
+|---|---|---|
+| `certificate_file` | The certificate chain in PEM, the leaf first. | required |
+| `key_file` | The private key of the leaf in PEM. | required |
+| `min_version` | The oldest TLS version spoken, `"1.3"` or `"1.2"`. | `"1.3"` |
+| `client_auth` | Whether a client certificate is asked: `none`, `optional` or `required`. | `none` |
+| `client_ca_file` | The CA bundle a client certificate must chain to; required unless `client_auth` is `none`. | none |
+| `reload_interval_s` | How often the files are read again. `SIGHUP` always reads them again. | none |
+| `healthcheck_identity_file` | The client certificate chain and key, in one PEM, that `ferroterm healthcheck` presents to a listener that asks one. | none |
+
+`ferroterm healthcheck` asks `GET /health/readiness` over the same TLS and
+accepts only the certificate `certificate_file` holds.
 
 ## Telemetry
 

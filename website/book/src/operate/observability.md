@@ -23,27 +23,31 @@ The server binds its listener only after every index and `CodeSystem`
 directory it was configured with is open, and refuses to start on a missing
 or damaged one, so a ready answer means the deployment serves what it was told
 to serve. On `SIGTERM` or `SIGINT` the process moves to `draining`:
-`/health` and `/health/readiness` answer `503` while the requests in flight
-finish, so a load balancer stops sending new ones, and `/health/liveness`
-keeps answering `200`.
+`/health` and `/health/readiness` answer `503` at once, the listeners keep
+accepting for `server.drain_delay_ms` so a load balancer stops sending new
+requests, and the requests in flight then get `server.shutdown_timeout_ms` to
+finish before the server exits (see
+[The HTTP server](configuration.md#the-http-server)). `/health/liveness` keeps
+answering `200` throughout. The admin listener answers the same three routes.
 
 The container image has no shell and no HTTP client, so the probe is a
 subcommand of the binary:
 
 ```console
 $ ferroterm healthcheck
-$ ferroterm healthcheck --url http://127.0.0.1:8080/health
 ```
 
-It sends one `GET /health`, waits at most three seconds, and exits 0 with no
-output on `200 OK`. Otherwise it exits 1 with the reason on stderr: `cannot
-reach`, `answered 404 Not Found`, or `did not answer within 3s`. Without
-`--url` it follows `FERROTERM__SERVER__LISTEN`, on the loopback when the server listens
-on every interface, which is what the image sets. The image declares it as its
-`HEALTHCHECK` (every ten seconds, a five-second limit, a sixty-second start
-period for reading an edition), and the shipped `compose.yaml` states the same
-block, so `docker compose up --wait` and `condition: service_healthy` work.
-Kubernetes ignores the image's instruction: point its liveness probe at
+It sends one `GET /health/readiness` to `server.listen`, on the loopback when
+the server listens on every interface, under `server.base_path`, and over the
+TLS `[server.tls]` configures, accepting only the certificate the server's own
+file holds. It waits at most three seconds and exits 0 with no output on
+`200`. Otherwise it exits 1 with the reason on stderr: `unhealthy: readiness
+answered 503`, `unhealthy: cannot connect to …`, or `unhealthy: readiness did
+not answer in time`. The image declares it as its `HEALTHCHECK` (every ten
+seconds, a five-second limit, a sixty-second start period for reading an
+edition), and the shipped `compose.yaml` states the same block, so
+`docker compose up --wait` and `condition: service_healthy` work. Kubernetes
+ignores the image's instruction: point its liveness probe at
 `GET /health/liveness` and its readiness probe at `GET /health/readiness`.
 
 ## Scraping
