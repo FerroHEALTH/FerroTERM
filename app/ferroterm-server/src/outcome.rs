@@ -12,8 +12,12 @@
 //! issue carries `severity`, `code` from the issue-type value set, and
 //! `diagnostics`; the status is the one the operation layer chose.
 
+use std::sync::Arc;
+
 use axum::body::Body;
 use axum::response::{IntoResponse, Response};
+use ferrohealth_server::panic::PanicBody;
+use ferrohealth_server::refusal::RefusalBody;
 use fhir_terminology::compose::Side;
 use fhir_terminology::operations::value_set_validate_code::TX_ISSUE_TYPE;
 use fhir_terminology::operations::{OperationError, Refused, RefusedInput};
@@ -333,9 +337,60 @@ pub async fn not_found(headers: http::HeaderMap) -> Response {
     .respond(wire)
 }
 
+/// The body of a request whose handler panicked.
+///
+/// It is an `OperationOutcome` with the `exception` issue type naming the
+/// server's request id, and never the panic message
+/// (<https://hl7.org/fhir/R4B/valueset-issue-type.html>).
+#[must_use]
+pub fn panic_body() -> PanicBody {
+    Arc::new(|_uri, request_id| {
+        Failure::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            format!("the server could not answer this request (request id {request_id})"),
+        )
+        .into_response()
+    })
+}
+
+/// The body of a refusal the stack of `ferrohealth-server` writes itself.
+///
+/// A `408`, `413`, `429` or `503` is an `OperationOutcome` carrying the
+/// reason, so every error of the FHIR listener has one shape (FHIR R4B
+/// `http.html`).
+#[must_use]
+pub fn refusal_body() -> RefusalBody {
+    Arc::new(|_uri, _request_id, status, reason| {
+        Failure::new(status, refusal_code(status), reason).into_response()
+    })
+}
+
+/// The issue type of a refusal of `status`
+/// (<https://hl7.org/fhir/R4B/valueset-issue-type.html>).
+fn refusal_code(status: StatusCode) -> &'static str {
+    match status {
+        StatusCode::REQUEST_TIMEOUT => "timeout",
+        StatusCode::PAYLOAD_TOO_LARGE => "too-long",
+        StatusCode::TOO_MANY_REQUESTS | StatusCode::SERVICE_UNAVAILABLE => "throttled",
+        _ => "exception",
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::query_value;
+    use http::StatusCode;
+
+    use super::{query_value, refusal_code};
+
+    #[test]
+    fn each_refusal_of_the_stack_has_its_issue_type() {
+        assert_eq!(refusal_code(StatusCode::REQUEST_TIMEOUT), "timeout");
+        assert_eq!(refusal_code(StatusCode::PAYLOAD_TOO_LARGE), "too-long");
+        assert_eq!(refusal_code(StatusCode::TOO_MANY_REQUESTS), "throttled");
+        assert_eq!(refusal_code(StatusCode::SERVICE_UNAVAILABLE), "throttled");
+        assert_eq!(refusal_code(StatusCode::BAD_GATEWAY), "exception");
+    }
 
     #[test]
     fn a_query_value_is_found_by_its_decoded_name_and_kept_as_sent() {

@@ -100,7 +100,7 @@ fn a_missing_or_duplicate_artifact_refuses_to_start() {
 #[test]
 fn the_environment_fills_the_config() {
     let config = Config::default();
-    assert_eq!(config.server.listen, "127.0.0.1:8080");
+    assert_eq!(config.server.listen.to_string(), "127.0.0.1:8080");
     assert_eq!(config.terminology.default_language, "en");
     assert_eq!(config.terminology.index, Vec::<std::path::PathBuf>::new());
 }

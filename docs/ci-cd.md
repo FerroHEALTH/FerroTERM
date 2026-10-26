@@ -132,7 +132,7 @@ ca-certificates for about 2 MiB and is itself keyless-signed; there is no shell
 and no package manager. The user is the numeric `65532:65532` (the kubelet
 refuses `runAsNonRoot` on a named user), the entrypoint is exec-form so the
 binary is PID 1 and receives `SIGTERM` itself, and the `HEALTHCHECK` is the
-binary probing its own `GET /health` (`ferroterm healthcheck`), since the base
+binary probing its own `GET /health/readiness` (`ferroterm healthcheck`), since the base
 has no shell or HTTP client and Kubernetes ignores the instruction anyway. The
 root `.dockerignore`
 denies everything but the staged `dist/` tree, so no source, vendored package,

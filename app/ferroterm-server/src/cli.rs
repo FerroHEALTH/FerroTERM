@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The command line: no subcommand serves, `config check` prints the running
-//! configuration, `healthcheck` probes a server.
+//! The command line: no subcommand serves, and the family's `serve`,
+//! `config check` and `healthcheck` are the subcommands.
 
 use clap::{Parser, Subcommand};
-use ferrohealth_server::cli::{ConfigArgs, ConfigCommand};
+use ferrohealth_server::cli::{Common, ConfigArgs};
 
 /// The `ferroterm` command line.
 ///
@@ -26,32 +26,19 @@ pub struct Cli {
     pub command: Option<Command>,
 }
 
-/// What the binary does besides serving.
+/// What the binary does: the family's commands.
 #[derive(Debug, Subcommand, PartialEq, Eq)]
 pub enum Command {
-    /// Works on the configuration.
-    Config {
-        /// The job to run.
-        #[command(subcommand)]
-        command: ConfigCommand,
-    },
-    /// Asks a running server for `GET /health` and exits 0 on `200 OK`.
-    ///
-    /// The image has no shell and no HTTP client, so this is its HEALTHCHECK
-    /// command. Without `--url` the probe follows `server.listen`, on the
-    /// loopback when the server listens on every interface.
-    Healthcheck {
-        /// The URL to probe instead of the one `server.listen` implies.
-        #[arg(long, value_name = "URL")]
-        url: Option<String>,
-    },
+    /// `serve`, `config check` and `healthcheck`.
+    #[command(flatten)]
+    Common(Common),
 }
 
 #[cfg(test)]
 mod tests {
     use clap::Parser;
 
-    use ferrohealth_server::cli::ConfigCommand;
+    use ferrohealth_server::cli::{Common, ConfigCommand};
 
     use super::{Cli, Command};
 
@@ -59,21 +46,14 @@ mod tests {
     fn no_arguments_means_serve() {
         let cli = Cli::try_parse_from(["ferroterm"]).expect("parses");
         assert_eq!(cli.command, None);
+        let serve = Cli::try_parse_from(["ferroterm", "serve"]).expect("parses");
+        assert_eq!(serve.command, Some(Command::Common(Common::Serve)));
     }
 
     #[test]
-    fn healthcheck_takes_an_optional_url() {
-        let defaulted = Cli::try_parse_from(["ferroterm", "healthcheck"]).expect("parses");
-        assert_eq!(defaulted.command, Some(Command::Healthcheck { url: None }));
-        let explicit =
-            Cli::try_parse_from(["ferroterm", "healthcheck", "--url", "http://h:1/health"])
-                .expect("parses");
-        assert_eq!(
-            explicit.command,
-            Some(Command::Healthcheck {
-                url: Some(String::from("http://h:1/health")),
-            })
-        );
+    fn healthcheck_is_a_subcommand() {
+        let probe = Cli::try_parse_from(["ferroterm", "healthcheck"]).expect("parses");
+        assert_eq!(probe.command, Some(Command::Common(Common::Healthcheck)));
     }
 
     #[test]
@@ -90,9 +70,9 @@ mod tests {
         .expect("parses");
         assert_eq!(
             cli.command,
-            Some(Command::Config {
+            Some(Command::Common(Common::Config {
                 command: ConfigCommand::Check,
-            })
+            }))
         );
         assert_eq!(
             cli.config.config.as_deref(),
@@ -104,7 +84,7 @@ mod tests {
     #[test]
     fn an_unknown_subcommand_is_refused() {
         assert!(
-            Cli::try_parse_from(["ferroterm", "serve"]).is_err(),
+            Cli::try_parse_from(["ferroterm", "frobnicate"]).is_err(),
             "an unknown word must not fall through to serving"
         );
     }

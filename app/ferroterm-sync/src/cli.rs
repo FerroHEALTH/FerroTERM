@@ -3,15 +3,18 @@
 
 //! The command line, and what each command does.
 //!
-//! With no subcommand the process serves: it binds the admin listener and runs
-//! the schedule until it is stopped. `run-once` performs one run and exits,
-//! which is what a cron-style deployment or a first manual run uses, and
-//! `config check` prints the running configuration.
+//! With no subcommand, or with `serve`, the process serves: it binds the admin
+//! listener and runs the schedule until it is stopped. `run-once` performs one
+//! run and exits, which is what a cron-style deployment or a first manual run
+//! uses; `config check` and `healthcheck` are the family's shared commands.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use clap::{Parser, Subcommand};
-use ferrohealth_server::cli::{ConfigArgs, ConfigCommand};
+use ferrohealth_server::cli::{Common, ConfigArgs};
+use ferrohealth_server::healthcheck::Outcome;
+use ferrohealth_server::section::ServerSection;
 use tokio::net::TcpListener;
 
 use crate::clock::SystemClock;
@@ -37,28 +40,18 @@ pub struct Cli {
     pub command: Option<Command>,
 }
 
-/// What the binary does besides serving.
+/// What the binary does: the family's commands and its own.
 #[derive(Debug, Subcommand, PartialEq, Eq)]
 pub enum Command {
+    /// `serve`, `config check` and `healthcheck`.
+    #[command(flatten)]
+    Common(Common),
     /// Performs one run and exits.
     RunOnce,
-    /// Works on the configuration.
-    Config {
-        /// The job to run.
-        #[command(subcommand)]
-        command: ConfigCommand,
-    },
-    /// Asks the running service for `GET /health` and exits 0 on `200 OK`.
-    ///
-    /// The image has no shell and no HTTP client, so this is its HEALTHCHECK
-    /// command. Without `--url` the probe follows the configured listen
-    /// address, on the loopback when the service listens on every interface.
-    Healthcheck {
-        /// The URL to probe instead of the one the configuration implies.
-        #[arg(long, value_name = "URL")]
-        url: Option<String>,
-    },
 }
+
+/// How long the health probe waits for the readiness answer.
+pub const HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(3);
 
 /// A service that could not start.
 #[derive(Debug, thiserror::Error)]
@@ -86,11 +79,7 @@ pub enum StartError {
     },
     /// The admin listener stopped with an error.
     #[error("the admin listener stopped")]
-    Serve {
-        /// Why it stopped.
-        #[source]
-        source: std::io::Error,
-    },
+    Serve(#[from] ferrohealth_server::serve::ServeError),
 }
 
 /// Reads the configuration `args` names.
@@ -129,8 +118,8 @@ pub fn service(config: Config, telemetry: Arc<Telemetry>) -> Result<Arc<Service>
 pub async fn serve(config: Config, telemetry: Arc<Telemetry>) -> Result<(), StartError> {
     let service = service(config, telemetry)?;
     let guard = crate::auth::AdminAuth::start(&service.config().auth).await?;
-    let unguarded = crate::admin::router(Arc::clone(&service));
-    let admin = if let Some(guard) = &guard {
+    let unguarded = crate::admin::routes(Arc::clone(&service));
+    let routes = if let Some(guard) = &guard {
         guard.guard(unguarded)
     } else {
         tracing::warn!(
@@ -138,6 +127,7 @@ pub async fn serve(config: Config, telemetry: Arc<Telemetry>) -> Result<(), Star
         );
         unguarded
     };
+    let admin = crate::admin::app(&service, routes);
     let address = service.config().listen;
     let listener = TcpListener::bind(address)
         .await
@@ -152,16 +142,21 @@ pub async fn serve(config: Config, telemetry: Arc<Telemetry>) -> Result<(), Star
         guarded = guard.is_some(),
         "ferroterm-sync started"
     );
-    let lifecycle = service.lifecycle().clone();
-    let draining = async move {
-        shutdown_signal().await;
-        lifecycle.drain();
+    let section = ServerSection {
+        listen: address,
+        ..ServerSection::default()
     };
-    let admin = axum::serve(listener, admin).with_graceful_shutdown(draining);
-    let schedule = Arc::clone(&service).serve_schedule(shutdown_signal());
-    let served = tokio::join!(admin, schedule);
-    let (admin, ()) = served;
-    admin.map_err(|source| StartError::Serve { source })?;
+    let admin = ferrohealth_server::serve::run(
+        listener,
+        admin,
+        &section,
+        service.lifecycle().clone(),
+        ferrohealth_server::serve::shutdown_signal(),
+    );
+    let schedule =
+        Arc::clone(&service).serve_schedule(ferrohealth_server::serve::shutdown_signal());
+    let (admin, ()) = tokio::join!(admin, schedule);
+    admin?;
     tracing::info!("ferroterm-sync stopped");
     Ok(())
 }
@@ -177,33 +172,11 @@ pub async fn run_once(config: Config, telemetry: Arc<Telemetry>) -> Result<RunRe
     Ok(service.run(Trigger::RunOnce).await)
 }
 
-/// The address the health probe reads, from `url` or the configuration.
-#[must_use]
-pub fn health_url(config: &Config, url: Option<String>) -> String {
-    url.unwrap_or_else(|| crate::healthcheck::url_for(config.listen))
-}
-
-/// Completes on `SIGTERM` or `SIGINT`, which is how a container stops.
-async fn shutdown_signal() {
-    let interrupt = async {
-        if let Err(error) = tokio::signal::ctrl_c().await {
-            tracing::error!(%error, "cannot listen for SIGINT");
-        }
-    };
-    let terminate = async {
-        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
-            Ok(mut signal) => {
-                if signal.recv().await.is_none() {
-                    tracing::debug!("the SIGTERM stream ended");
-                }
-            }
-            Err(error) => tracing::error!(%error, "cannot listen for SIGTERM"),
-        }
-    };
-    tokio::select! {
-        () = interrupt => {}
-        () = terminate => {}
-    }
+/// Asks the running service for its readiness over the loopback when it
+/// listens on every interface, as the container probe does.
+pub async fn healthcheck(config: &Config) -> Outcome {
+    let target = ferrohealth_server::healthcheck::target(config.listen);
+    ferrohealth_server::healthcheck::check(target, "", HEALTHCHECK_TIMEOUT).await
 }
 
 #[cfg(test)]
@@ -211,7 +184,8 @@ async fn shutdown_signal() {
 mod tests {
     use clap::Parser;
 
-    use ferrohealth_server::cli::ConfigCommand;
+    use ferrohealth_server::cli::{Common, ConfigCommand};
+    use ferrohealth_server::healthcheck::target;
 
     use super::{Cli, Command};
 
@@ -244,11 +218,38 @@ mod tests {
             Cli::try_parse_from(["ferroterm-sync", "config", "check", "--set", "retention=3"])?;
         assert_eq!(
             cli.command,
-            Some(Command::Config {
+            Some(Command::Common(Common::Config {
                 command: ConfigCommand::Check,
-            })
+            }))
         );
         assert_eq!(cli.config.sets.len(), 1, "--set follows the subcommand");
         Ok(())
+    }
+
+    #[test]
+    fn serve_and_healthcheck_are_the_family_s_subcommands() -> Result<(), clap::Error> {
+        let serve = Cli::try_parse_from(["ferroterm-sync", "serve"])?;
+        assert_eq!(serve.command, Some(Command::Common(Common::Serve)));
+        let probe = Cli::try_parse_from(["ferroterm-sync", "healthcheck"])?;
+        assert_eq!(probe.command, Some(Command::Common(Common::Healthcheck)));
+        Ok(())
+    }
+
+    #[test]
+    fn a_service_on_every_interface_is_probed_on_the_loopback() {
+        assert_eq!(
+            target("0.0.0.0:8181".parse().expect("an address")),
+            "127.0.0.1:8181".parse().expect("an address"),
+            "a container reaches itself on the loopback"
+        );
+    }
+
+    #[test]
+    fn a_named_address_is_probed_as_it_is() {
+        assert_eq!(
+            target("127.0.0.1:9000".parse().expect("an address")),
+            "127.0.0.1:9000".parse().expect("an address"),
+            "the configured address is the one probed"
+        );
     }
 }

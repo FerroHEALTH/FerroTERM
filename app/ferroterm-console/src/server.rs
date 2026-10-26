@@ -5,9 +5,11 @@
 //! form routes, the Leptos pages and the site bundle, under one set of
 //! browser security headers.
 //!
-//! Every response carries a Content-Security-Policy whose script source is a
-//! nonce minted for that response alone, `nosniff`, `DENY` framing and no
-//! referrer, and every document is `no-store`. Only the site bundle is
+//! Every response carries the browser security headers of
+//! `ferrohealth-server`'s `console`: a Content-Security-Policy whose script
+//! source is a nonce minted for that response alone, `nosniff`, `DENY`
+//! framing, no referrer and a same-origin opener, and every document is
+//! `no-store`. Only the site bundle is
 //! compressed. A request that is not a safe method is taken only from the
 //! console's own pages, and a session's access token is refreshed before
 //! the request it arrives with is served. No specification governs the
@@ -22,19 +24,18 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use ferrohealth_health::lifecycle::Lifecycle;
 use ferrohealth_health::registry::Registry;
+use ferrohealth_server::console::{self, ConsoleHeaders, CspNonce};
 use ferrohealth_server::health::Health;
-use http::header::{
-    CACHE_CONTROL, CONTENT_SECURITY_POLICY, REFERRER_POLICY, X_CONTENT_TYPE_OPTIONS,
-    X_FRAME_OPTIONS,
-};
-use http::{HeaderValue, StatusCode};
+use ferrohealth_server::section::ServerSection;
+use ferrohealth_server::serve::Drained;
+use http::StatusCode;
+use http::header::CACHE_CONTROL;
 use leptos::config::LeptosOptions;
 use leptos::nonce::Nonce;
 use leptos_axum::LeptosRoutes as _;
 use tower_http::compression::CompressionLayer;
 use tower_http::compression::predicate::{And, Predicate as _, SizeAbove};
 use tower_http::services::ServeDir;
-use tower_http::set_header::SetResponseHeaderLayer;
 
 use crate::config::settings::{OidcSettings, Settings};
 use crate::session::Sessions;
@@ -208,7 +209,12 @@ pub fn router(state: ConsoleState) -> axum::Router {
             let options = options.clone();
             move || crate::app::document(options.clone())
         })
-        .nest_service(BUNDLE, bundle(&options))
+        .nest(
+            BUNDLE,
+            axum::Router::new()
+                .fallback_service(bundle(&options))
+                .layer(axum::middleware::map_response(miss_is_not_kept)),
+        )
         .fallback(leptos_axum::file_and_error_handler_with_context(
             context,
             crate::app::document,
@@ -218,7 +224,13 @@ pub fn router(state: ConsoleState) -> axum::Router {
         ))
         .layer(axum::middleware::from_fn(same_origin_only))
         .layer(Extension(state));
-    with_security_headers(pages.layer(bundle_compression()), form_action).with_state(options)
+    let headers = ConsoleHeaders::new(form_action).with_bundle(BUNDLE);
+    pages
+        .layer(bundle_compression())
+        .layer(axum::middleware::from_fn(move |request, next| {
+            console::headers(headers.clone(), request, next)
+        }))
+        .with_state(options)
 }
 
 /// Serves the site bundle under [`BUNDLE`] from the site root, its br and
@@ -233,6 +245,18 @@ fn bundle(options: &LeptosOptions) -> ServeDir {
     ServeDir::new(directory)
         .precompressed_br()
         .precompressed_gzip()
+}
+
+/// Marks a bundle answer that is not a success `no-store`, so a miss is never
+/// kept; a file found keeps the bundle's `no-cache` (RFC 9111 §5.2.2.5).
+// TODO(#903): delete this layer once `ferrohealth-server` 0.3.3 marks the miss itself.
+async fn miss_is_not_kept(mut response: Response) -> Response {
+    if !response.status().is_success() {
+        response
+            .headers_mut()
+            .insert(CACHE_CONTROL, http::HeaderValue::from_static("no-store"));
+    }
+    response
 }
 
 /// Draws the page a form was posted to, the posted fields in its context
@@ -366,11 +390,15 @@ async fn theme_css() -> Response {
     stylesheet(THEME)
 }
 
-/// A stylesheet answer of `text`, revalidated so a new release is fetched.
+/// A stylesheet answer of `text`, revalidated so a new release is fetched
+/// (RFC 9111 §5.2.2.4).
 fn stylesheet(text: &'static str) -> Response {
     (
         StatusCode::OK,
-        [(http::header::CONTENT_TYPE, "text/css; charset=utf-8")],
+        [
+            (http::header::CONTENT_TYPE, "text/css; charset=utf-8"),
+            (CACHE_CONTROL, "no-cache"),
+        ],
         text,
     )
         .into_response()
@@ -417,145 +445,41 @@ fn bundle_compression() -> CompressionLayer<And<SizeAbove, ResponsePredicate>> {
         .compress_when(SizeAbove::new(256).and(bundle))
 }
 
-/// Wraps `router` in the browser security headers every response carries,
-/// with `form_action` as the policy's `form-action` sources.
-fn with_security_headers(
-    router: axum::Router<LeptosOptions>,
-    form_action: String,
-) -> axum::Router<LeptosOptions> {
-    let form_action: Arc<str> = Arc::from(form_action);
-    router
-        .layer(axum::middleware::from_fn(
-            move |request: Request, next: Next| {
-                content_security_policy(Arc::clone(&form_action), request, next)
-            },
-        ))
-        .layer(axum::middleware::from_fn(cache_control))
-        .layer(SetResponseHeaderLayer::overriding(
-            X_CONTENT_TYPE_OPTIONS,
-            HeaderValue::from_static("nosniff"),
-        ))
-        .layer(SetResponseHeaderLayer::overriding(
-            X_FRAME_OPTIONS,
-            HeaderValue::from_static("DENY"),
-        ))
-        .layer(SetResponseHeaderLayer::overriding(
-            REFERRER_POLICY,
-            HeaderValue::from_static("no-referrer"),
-        ))
-}
-
-/// Mints this response's script nonce, hands it to the renderer through the
-/// request, and answers with the policy that names it and `form_action`.
-async fn content_security_policy(
-    form_action: Arc<str>,
-    mut request: Request,
-    next: Next,
-) -> Response {
-    let nonce = Nonce::new();
-    let policy = HeaderValue::from_str(&policy(&nonce, &form_action));
-    request.extensions_mut().insert(nonce);
-    let mut response = next.run(request).await;
-    match policy {
-        Ok(policy) => {
-            response
-                .headers_mut()
-                .insert(CONTENT_SECURITY_POLICY, policy);
-            response
-        }
-        Err(_invalid) => {
-            tracing::error!("the Content-Security-Policy could not be written as a header");
-            StatusCode::INTERNAL_SERVER_ERROR.into_response()
-        }
-    }
-}
-
 /// Re-provides the request's nonce into the render, so the bootstrap script
 /// carries the nonce the response header authorizes.
 ///
 /// `leptos_axum` provides a nonce of its own before this runs, and the
-/// request parts it provides carry the one [`content_security_policy`]
+/// request parts it provides carry the one `ferrohealth_server::console`
 /// minted, which replaces it.
 fn provide_request_nonce() {
     let Some(parts) = leptos::context::use_context::<http::request::Parts>() else {
         return;
     };
-    if let Some(nonce) = parts.extensions.get::<Nonce>() {
-        leptos::context::provide_context(nonce.clone());
+    if let Some(nonce) = parts.extensions.get::<CspNonce>() {
+        leptos::context::provide_context(Nonce::from_value(nonce.as_str()));
     }
 }
 
-/// The Content-Security-Policy of one response, naming its script nonce and
-/// the `form-action` sources [`form_action`] returns.
-///
-/// The WebAssembly bundle needs `'wasm-unsafe-eval'` to be compiled, which
-/// admits no JavaScript `eval` (Content Security Policy Level 3). Scripts run
-/// by nonce alone, and nothing admits `'unsafe-inline'`.
-#[must_use]
-pub fn policy(nonce: &Nonce, form_action: &str) -> String {
-    format!(
-        "default-src 'self'; \
-         script-src 'self' 'wasm-unsafe-eval' 'nonce-{nonce}'; \
-         style-src 'self'; \
-         img-src 'self' data:; \
-         connect-src 'self'; \
-         object-src 'none'; \
-         base-uri 'self'; \
-         form-action {form_action}; \
-         frame-ancestors 'none'"
-    )
-}
-
-/// Marks every document `no-store`, and the site bundle `no-cache`, so a
-/// rebuilt bundle is fetched again (RFC 9111 §5.2.2).
-async fn cache_control(request: Request, next: Next) -> Response {
-    let path = request.uri().path();
-    let bundle = path.starts_with("/pkg/") || path == COMPONENTS_CSS || path == THEME_CSS;
-    let mut response = next.run(request).await;
-    let value = if bundle && response.status().is_success() {
-        "no-cache"
-    } else {
-        "no-store"
-    };
-    response
-        .headers_mut()
-        .insert(CACHE_CONTROL, HeaderValue::from_static(value));
-    response
-}
-
-/// Serves `router` on `listener` until `shutdown` resolves.
+/// Serves `router` on `listener` until `shutdown` resolves, then drains as
+/// `ferrohealth-server` does: `lifecycle` turns draining, and the requests in
+/// flight get the family's default shutdown bound.
 ///
 /// # Errors
 /// Returns the I/O error of a listener that fails.
 pub async fn serve(
     listener: tokio::net::TcpListener,
     router: axum::Router,
+    lifecycle: Lifecycle,
     shutdown: impl Future<Output = ()> + Send + 'static,
-) -> std::io::Result<()> {
-    axum::serve(listener, router)
-        .with_graceful_shutdown(shutdown)
-        .await
-}
-
-#[cfg(test)]
-mod tests {
-    use super::policy;
-    use leptos::nonce::Nonce;
-
-    #[test]
-    fn the_policy_allows_scripts_only_by_nonce_and_never_eval() {
-        let nonce = Nonce::new();
-        let policy = policy(&nonce, "'self'");
-        let script = policy
-            .split(';')
-            .map(str::trim)
-            .find(|directive| directive.starts_with("script-src"))
-            .expect("a script-src directive");
-        assert_eq!(
-            format!("script-src 'self' 'wasm-unsafe-eval' 'nonce-{nonce}'"),
-            script
-        );
-        assert!(!policy.contains("'unsafe-eval'"), "{policy}");
-        assert!(!policy.contains("'unsafe-inline'"), "{policy}");
-    }
+) -> std::io::Result<Drained> {
+    let section = ServerSection::default();
+    ferrohealth_server::serve::serve(
+        listener,
+        router,
+        lifecycle,
+        shutdown,
+        section.drain_delay(),
+        section.shutdown_timeout(),
+    )
+    .await
 }

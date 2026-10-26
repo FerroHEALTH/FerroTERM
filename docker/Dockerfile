@@ -46,8 +46,8 @@ EXPOSE 8080/tcp
 USER 65532:65532
 
 # The base has no shell and no HTTP client, so the probe is the binary itself:
-# one GET /health on the loopback (FERROTERM__SERVER__LISTEN says where), exit 0 on
-# 200. The server binds only after every artifact is open, so healthy means it
+# one GET /health/readiness on the loopback (FERROTERM__SERVER__LISTEN says
+# where), exit 0 on 200. The server binds only after every artifact is open, so healthy means it
 # answers terminology requests. The start period covers reading an edition
 # (the longest start in the committed records is 23 s); a slower disk or a
 # larger deployment raises it in the compose file. Kubernetes ignores this

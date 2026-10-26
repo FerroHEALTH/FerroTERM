@@ -47,7 +47,7 @@ fn release_date_env() {
 }
 
 /// Records the commit being built into `FERROTERM_GIT_SHA`, for the usage
-/// report.
+/// report and the boot banner.
 ///
 /// The release lane builds on a GitHub runner, which names the commit in
 /// `GITHUB_SHA`; `FERROTERM_GIT_SHA` overrides it. A build that names none

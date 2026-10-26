@@ -344,11 +344,12 @@ Per system, the loader flag, the provider, and the test that exercises it:
 | Claim | Evidence |
 |---|---|
 | Four registry systems served with no configuration | `app/ferroterm-server/src/state.rs::build` |
-| `GET /health`, `GET /health/liveness`, `GET /health/readiness` | `app/ferroterm-server/src/lib.rs::router` over `ferrohealth_server::health::routes`; `app/ferroterm-server/tests/it/health.rs::the_three_health_routes_answer_a_serving_server` and `readiness_is_withdrawn_once_the_server_drains` |
-| The image runs as numeric user `65532` on a distroless base, with `FERROTERM__SERVER__LISTEN=0.0.0.0:8080` | `docker/Dockerfile:14,28,33` |
+| `GET /health`, `GET /health/liveness`, `GET /health/readiness` | `app/ferroterm-server/src/lib.rs::router` over `ferrohealth_server::stack::app`; `app/ferroterm-server/tests/it/health.rs::the_three_health_routes_answer_a_serving_server` and `readiness_is_withdrawn_once_the_server_drains` |
+| The image runs as numeric user `65532` on a distroless base, with `FERROTERM__SERVER__LISTEN=0.0.0.0:8080` | `docker/Dockerfile:18,41,46` |
 | Tags are `<version>`, `<major.minor>`, and `latest` | `.github/workflows/release-image.yml:124-126`; `latest` comes from `docker/metadata-action`'s default flavour |
-| The image carries a `HEALTHCHECK` running `ferroterm healthcheck`, which exits 0 against a serving instance and 1 against a stopped one | `docker/Dockerfile:36-45`; `app/ferroterm-server/src/healthcheck.rs`; `app/ferroterm-server/tests/it/healthcheck.rs` |
-| The server stops cleanly on `SIGTERM` | `app/ferroterm-server/src/main.rs` |
+| The image carries a `HEALTHCHECK` running `ferroterm healthcheck`, which asks `GET /health/readiness` and exits 0 against a serving instance and 1 against a draining or stopped one | `docker/Dockerfile:48-56`; `app/ferroterm-server/src/lib.rs::healthcheck`; `app/ferroterm-server/tests/it/healthcheck.rs` |
+| The server stops cleanly on `SIGTERM`: readiness turns `503`, the listeners close after `server.drain_delay_ms`, and the server returns once the requests in flight finish or `server.shutdown_timeout_ms` passes | `app/ferroterm-server/src/lib.rs::serve_until` over `ferrohealth_server::serve::run_all`; `app/ferroterm-server/tests/it/shutdown.rs` |
+| A request past `server.request_timeout_ms` is answered `408`, a body past `server.body_limit_bytes` `413`, and a handler panic `500`, each as an `OperationOutcome`, with the panic message in neither the body nor the log | `app/ferroterm-server/src/outcome.rs::panic_body` and `refusal_body`; `app/ferroterm-server/tests/it/stack.rs` |
 | The server opens each index read-only, refuses to start on a missing or damaged one, and listens on `127.0.0.1:8080` | `app/ferroterm-server/src/config.rs::Default`; `app/ferroterm-server/tests/it/config.rs` |
 | The configuration keys, their variables and their defaults | `app/ferroterm-server/src/config.rs::PREFIX` and the section structs of `app/ferroterm-server/src/config.rs`; `app/ferroterm-server/src/config.rs::the_file_holds_the_tree_and_the_environment_goes_over_it`; `app/ferroterm-server/tests/it/config.rs::the_environment_fills_the_config` |
 | A supplement whose system is not loaded refuses the start | `app/ferroterm-server/tests/it/config.rs::a_supplement_without_its_system_refuses_to_start` |

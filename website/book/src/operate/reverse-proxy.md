@@ -32,7 +32,7 @@ bodies, and response bodies are never logged, so a proxy log is the only place a
 By default, nothing. The server binary carries no general HTTP client, so a
 deployment can refuse it every outbound route and it still answers every
 request. The indexes are files it opens read-only, and the one socket it opens
-itself is the health probe: a `GET /health` to its own listener over loopback,
+itself is the health probe: a `GET /health/readiness` to its own listener over loopback,
 because the image has no shell to run a probe with. Fetching a release from a
 terminology service happens outside the server, on a machine of your choosing,
 and the server reads the artifacts that run writes.

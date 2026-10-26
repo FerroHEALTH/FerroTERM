@@ -41,6 +41,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use ferrohealth_config::loader::{Loaded, Loader};
+use ferrohealth_server::section::ServerSection;
 use ferrohealth_smart::config::AuthSection;
 use ferrohealth_telemetry::section::TelemetrySection;
 use serde::{Deserialize, Serialize};
@@ -87,7 +88,8 @@ pub const SECURITY_SERVICE_SYSTEM: &str =
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
-    /// `[server]`: the FHIR listener.
+    /// `[server]`: the FHIR listener and the stack of `ferrohealth-server`
+    /// around it (timeouts, body limit, drain, TLS).
     pub server: ServerSection,
     /// `[admin]`: the admin listener.
     pub admin: AdminSection,
@@ -101,22 +103,6 @@ pub struct Config {
     pub auth: AuthSection,
     /// `[usage_report]`: the usage report to `FerroPULSE`.
     pub usage_report: UsageReportSection,
-}
-
-/// `[server]`.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct ServerSection {
-    /// The socket address the FHIR listener binds.
-    pub listen: String,
-}
-
-impl Default for ServerSection {
-    fn default() -> Self {
-        Self {
-            listen: String::from("127.0.0.1:8080"),
-        }
-    }
 }
 
 /// `[admin]`.
@@ -201,6 +187,12 @@ pub enum ConfigError {
         "fhir.security_services: `{0}` is not a code of http://hl7.org/fhir/ValueSet/restful-security-service"
     )]
     SecurityService(String),
+    /// `[server.caller_rate]` is set, and the server limits no caller's
+    /// rate, so the limit would be read and never applied.
+    #[error(
+        "server.caller_rate: FerroTERM applies no per-caller rate limit; remove the table, or bound the server with server.max_concurrent_requests"
+    )]
+    CallerRate,
 }
 
 /// The loader of the server's tree.
@@ -255,14 +247,19 @@ impl Config {
     }
 
     /// Checks what the tree's types cannot: every security service is a
-    /// code of its value set.
+    /// code of its value set, and no key of `[server]` is set that the server
+    /// would not apply.
     ///
     /// # Errors
     ///
     /// Returns [`ConfigError::SecurityService`] for a code the value set does
-    /// not define.
+    /// not define, and [`ConfigError::CallerRate`] when `[server.caller_rate]`
+    /// is set.
     pub fn check(&self) -> Result<(), ConfigError> {
         services_of(&self.fhir.security_services)?;
+        if self.server.caller_rate.is_some() {
+            return Err(ConfigError::CallerRate);
+        }
         Ok(())
     }
 
@@ -385,6 +382,36 @@ mod tests {
     }
 
     #[test]
+    fn the_server_section_takes_the_family_keys_and_refuses_a_caller_rate() {
+        let config = Config::from_sources(
+            Some("[server]\nlisten = \"0.0.0.0:9090\"\nrequest_timeout_ms = 5000\nbody_limit_bytes = 4096\nshutdown_timeout_ms = 2000\n"),
+            &BTreeMap::new(),
+        )
+        .expect("reads");
+        assert_eq!(config.server.listen.to_string(), "0.0.0.0:9090");
+        assert_eq!(config.server.request_timeout_ms, 5_000);
+        assert_eq!(config.server.body_limit_bytes, 4_096);
+        assert_eq!(config.server.shutdown_timeout_ms, 2_000);
+        assert!(
+            matches!(
+                Config::from_sources(
+                    Some("[server]\nlisten = \"localhost:8080\"\n"),
+                    &BTreeMap::new()
+                ),
+                Err(ConfigError::Load(_))
+            ),
+            "a host name is no socket address"
+        );
+        assert!(matches!(
+            Config::from_sources(
+                Some("[server.caller_rate]\nrequests_per_second = 5\nburst = 10\n"),
+                &BTreeMap::new()
+            ),
+            Err(ConfigError::CallerRate)
+        ));
+    }
+
+    #[test]
     fn an_empty_admin_address_is_no_admin_listener() {
         assert_eq!(Config::default().admin_listen(), None);
         let empty = Config::from_sources(None, &environment(&[("FERROTERM__ADMIN__LISTEN", "")]))
@@ -444,7 +471,7 @@ mod tests {
         let config = Config::from_sources(None, &BTreeMap::new()).expect("reads");
         assert!(config.auth.enabled, "the default fails closed");
         assert!(matches!(&config.auth.issuer, IssuerKey::Flat(issuer) if issuer.is_empty()));
-        assert_eq!(config.server.listen, "127.0.0.1:8080");
+        assert_eq!(config.server.listen.to_string(), "127.0.0.1:8080");
         assert_eq!(config.terminology.default_language, "en");
         let off =
             Config::from_sources(None, &environment(&[("FERROTERM__AUTH__ENABLED", "false")]))
@@ -488,7 +515,11 @@ mod tests {
         ] {
             let config = Config::from_sources(None, &environment(&[(foreign, "x")]))
                 .unwrap_or_else(|error| panic!("{foreign}: {error}"));
-            assert_eq!(config.server.listen, "127.0.0.1:8080", "{foreign}");
+            assert_eq!(
+                config.server.listen.to_string(),
+                "127.0.0.1:8080",
+                "{foreign}"
+            );
             assert!(
                 matches!(&config.auth.issuer, IssuerKey::Flat(issuer) if issuer.is_empty()),
                 "{foreign}"

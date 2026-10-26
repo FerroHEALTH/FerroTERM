@@ -44,6 +44,7 @@ mod scope;
 mod shutdown;
 mod smart;
 mod snomed_expression;
+mod stack;
 mod telemetry;
 mod translate;
 mod usage_report;

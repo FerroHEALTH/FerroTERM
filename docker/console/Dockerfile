@@ -43,7 +43,7 @@ EXPOSE 3000/tcp
 USER 65532:65532
 
 # The base has no shell and no HTTP client, so the probe is the binary's own
-# `healthcheck` subcommand: it asks GET /health on the configured listen port
+# `healthcheck` subcommand: it asks GET /health/readiness on the configured listen port
 # over loopback and exits 0 on 200, 1 otherwise. Kubernetes ignores the
 # instruction and keeps its own probes.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \

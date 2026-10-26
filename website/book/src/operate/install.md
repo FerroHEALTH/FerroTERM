@@ -209,14 +209,14 @@ $ gh attestation verify oci://ghcr.io/ferrohealth/ferroterm:0.3.0 \
 ```
 
 The image carries a `HEALTHCHECK` that runs `ferroterm healthcheck`: the
-binary probes `GET /health` on its own listen address, since there is no shell
+binary probes `GET /health/readiness` on its own listen address, since there is no shell
 or `curl` to do it, so `docker inspect` reports the container's health and
 Compose can wait on it. Kubernetes ignores the image's `HEALTHCHECK`: point the
 liveness probe at `GET /health/liveness` and the readiness probe at
 `GET /health/readiness`, set `runAsNonRoot: true`,
 `readOnlyRootFilesystem: true`, drop every capability, and mount the index
 root (not a single artifact) read-only at the path `FERROTERM__TERMINOLOGY__INDEX` names. The server stops
-cleanly on `SIGTERM`.
+cleanly on `SIGTERM`, within the bound `server.shutdown_timeout_ms` sets.
 
 ## Run the binary
 
