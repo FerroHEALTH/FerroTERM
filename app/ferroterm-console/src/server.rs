@@ -211,9 +211,7 @@ pub fn router(state: ConsoleState) -> axum::Router {
         })
         .nest(
             BUNDLE,
-            axum::Router::new()
-                .fallback_service(bundle(&options))
-                .layer(axum::middleware::map_response(miss_is_not_kept)),
+            axum::Router::new().fallback_service(bundle(&options)),
         )
         .fallback(leptos_axum::file_and_error_handler_with_context(
             context,
@@ -245,18 +243,6 @@ fn bundle(options: &LeptosOptions) -> ServeDir {
     ServeDir::new(directory)
         .precompressed_br()
         .precompressed_gzip()
-}
-
-/// Marks a bundle answer that is not a success `no-store`, so a miss is never
-/// kept; a file found keeps the bundle's `no-cache` (RFC 9111 §5.2.2.5).
-// TODO(#903): delete this layer once `ferrohealth-server` 0.3.3 marks the miss itself.
-async fn miss_is_not_kept(mut response: Response) -> Response {
-    if !response.status().is_success() {
-        response
-            .headers_mut()
-            .insert(CACHE_CONTROL, http::HeaderValue::from_static("no-store"));
-    }
-    response
 }
 
 /// Draws the page a form was posted to, the posted fields in its context

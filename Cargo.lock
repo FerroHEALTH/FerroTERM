@@ -1266,9 +1266,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-server"
-version = "0.3.2"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "062f4a74610690764d0757719297dd5388e195a394228f853ef554555a95e74e"
+checksum = "e737126f295e5a5327550ec3d86979841a6d5176505ecde95e77e5e92161d7e0"
 dependencies = [
  "axum",
  "clap",
@@ -1278,6 +1278,7 @@ dependencies = [
  "http",
  "hyper-util",
  "ipnet",
+ "pin-project-lite",
  "rustls",
  "secrecy",
  "serde",
@@ -1294,9 +1295,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-smart"
-version = "0.7.5"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "153bc745cdbf6d0a9b8ec9570a52f7af455c69bb6f5ee6049f26a3893067c123"
+checksum = "92b53c30e33da34e0d2c8e1ed57986bf741a5eaf070a470202f672cc418ae3f3"
 dependencies = [
  "argon2",
  "aws-lc-rs",
@@ -1319,9 +1320,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-telemetry"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a2f28c60ec0d7f865d0e5af7acea704c0107204e8adcd77d87dc4d807735780"
+checksum = "b2520fcd3daaf7053226ae5fc5107471d277f4dac94907eea9536c7583805a2c"
 dependencies = [
  "axum",
  "ferrohealth-secret",
@@ -1330,11 +1331,13 @@ dependencies = [
  "opentelemetry-otlp",
  "opentelemetry-prometheus",
  "opentelemetry_sdk",
+ "pin-project-lite",
  "prometheus",
  "rustls",
  "secrecy",
  "serde",
  "thiserror 2.0.21",
+ "tower",
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
@@ -1357,9 +1360,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-usage-report"
-version = "0.1.2"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f28aa456d9065b32993b0997e7b5b1819344b4c8e62ea9aa45f3ee8f880d0605"
+checksum = "244de83090953a4d780a29304837cc250980e834bf98fcfa98598ce8f7cd2859"
 dependencies = [
  "ferrohealth-telemetry",
  "http",
@@ -5285,6 +5288,7 @@ checksum = "4a0e2d11620c50695fe12bbbfde96b3477fe606e7284c22d505c12ce51214514"
 dependencies = [
  "getrandom 0.4.3",
  "js-sys",
+ "rand 0.10.3",
  "wasm-bindgen",
 ]
 
