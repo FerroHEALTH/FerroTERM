@@ -74,13 +74,13 @@ toml = { version = "1.1.6", default-features = false, features = ["std", "parse"
 # server and the sync service. Pinned exactly, as every family crate is.
 # 0.7.5 masks every secret and URL through ferrohealth-secret and caches a
 # verified Basic credential. Verified against crates.io on 2026-10-26.
-ferrohealth-smart = { version = "=0.7.5", features = ["axum"] }
+ferrohealth-smart = { version = "=0.8.1", features = ["axum"] }
 # The FerroHEALTH health family: the readiness document, the indicator
 # registry and the process lifecycle, and the HTTP plumbing whose `health`
 # module serves `/health`, `/health/liveness` and `/health/readiness` over
 # them. Pinned exactly. Verified against crates.io on 2026-10-26.
 ferrohealth-health = { version = "=0.1.1", features = ["registry"] }
-ferrohealth-server = { version = "=0.3.2" }
+ferrohealth-server = { version = "=0.3.4" }
 # The FerroHEALTH configuration loader and its secrets: one TOML tree per
 # binary under `--config` or `<PREFIX>_CONFIG`, `<PREFIX>__SECTION__KEY`
 # overrides, `--set`, strict refusals and provenance, and the `<key>_file`
@@ -93,12 +93,12 @@ ferrohealth-secret = { version = "=0.2.0" }
 # OpenTelemetry provider read by Prometheus and pushed over OTLP. Each member
 # names the features it uses. Pinned exactly. Verified against crates.io on
 # 2026-10-26.
-ferrohealth-telemetry = { version = "=0.2.1" }
+ferrohealth-telemetry = { version = "=0.2.2" }
 # The FerroHEALTH usage report to FerroPULSE: envelope v2, the reporter, the
 # instance id and start claim, CI detection and the latency window, which
 # with `telemetry` records what the request log sees. Pinned exactly.
 # Verified against crates.io on 2026-10-26.
-ferrohealth-usage-report = { version = "=0.1.2" }
+ferrohealth-usage-report = { version = "=0.2.0" }
 # The Argon2id hashes of the Basic users the SMART tests configure, the
 # version and features ferrohealth-smart verifies them with. Verified against
 # crates.io on 2026-10-20.

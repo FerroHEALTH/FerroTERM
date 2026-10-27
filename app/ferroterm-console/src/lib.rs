@@ -43,7 +43,6 @@ mod evidence;
 pub mod fhir;
 #[cfg(not(target_arch = "wasm32"))]
 mod find;
-#[cfg(not(target_arch = "wasm32"))]
 pub mod islands;
 #[cfg(not(target_arch = "wasm32"))]
 mod locale;
