@@ -128,6 +128,7 @@ The checks, in the order the plan job runs them:
 | The tag equals the workspace version | `plan.sh` |
 | The changelog has only Keep a Changelog types, each once per section | `scripts/checks/changelog-structure.sh` |
 | The section being cut opens its `### Security` with the reason when it mixes security and functional changes, and every Security entry names a GHSA id or a `security/vex/` path | `scripts/checks/changelog-security.sh --section X.Y.Z` |
+| No fragment other than `changelog.d/README.md` is left for the cut to have assembled, each leftover named | `plan.sh` |
 | The changelog section becomes the notes, with the support period and the CRA user-information link | `plan.sh notes`, `scripts/checks/release-notes.sh` |
 
 The support period's end month is five years from the date on the section's
