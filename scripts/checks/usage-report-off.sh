@@ -170,13 +170,14 @@ readonly FAMILY_IMAGE="ghcr\\.io/ferrohealth/($FAMILY)[:@]"
 # KEY set to false, or to an interpolation of OWN_KEY, which every Compose
 # launcher exports as false. A service that merges an `x-` anchor
 # (`<<: *name`) runs the anchor's image; one whose `entrypoint` names another
-# binary of the image starts no server.
+# binary of the image, or whose `command` names a subcommand other than
+# `serve`, starts no server.
 compose_findings() {
   awk -v own="$OWN_KEY" -v img="$FAMILY_IMAGE" -v file="$1" -v sq="'" '
     function close_block() {
       if (kind == "anchor" && product != "") anchor_image[name] = product
-      if (kind == "service") { svc[++n] = name; svc_image[name] = product; svc_merge[name] = merge; svc_entry[name] = entry }
-      kind = ""; name = ""; product = ""; merge = ""; entry = ""
+      if (kind == "service") { svc[++n] = name; svc_image[name] = product; svc_merge[name] = merge; svc_entry[name] = entry; svc_cmd[name] = cmd }
+      kind = ""; name = ""; product = ""; merge = ""; entry = ""; cmd = ""
     }
     /^[[:space:]]*#/ { next }
     /^[^[:space:]]/ {
@@ -190,6 +191,7 @@ compose_findings() {
     kind == "" { next }
     /^[[:space:]]+image:/ && match($0, img) { product = toupper(substr($0, RSTART + 20, RLENGTH - 21)) }
     /^[[:space:]]+entrypoint:/ { entry = $0 }
+    /^[[:space:]]+command:/ { cmd = $0; sub(/^[[:space:]]+command:[[:space:]]*\[?[[:space:]]*["\047]?/, "", cmd); sub(/[^-A-Za-z0-9_].*/, "", cmd) }
     match($0, /<<:[[:space:]]*\*[A-Za-z0-9_-]+/) { merge = substr($0, RSTART, RLENGTH); sub(/.*\*/, "", merge) }
     match($0, /[A-Z]+__USAGE_REPORT__ENABLED[[:space:]]*[:=]/) {
       key = substr($0, RSTART, RLENGTH); sub(/[[:space:]]*[:=]$/, "", key)
@@ -203,6 +205,8 @@ compose_findings() {
         if (p == "" && svc_merge[s] != "") p = anchor_image[svc_merge[s]]
         # An entrypoint naming another binary of the image (an index build) serves nothing.
         if (p != "" && svc_entry[s] != "" && svc_entry[s] !~ ("/" tolower(p) "([^-a-z]|$)")) continue
+        # So does a `command` naming a subcommand other than serve (`cdm init`).
+        if (p != "" && svc_cmd[s] != "" && svc_cmd[s] !~ /^-/ && svc_cmd[s] != "serve") continue
         if (p != "" && !((s, p "__USAGE_REPORT__ENABLED") in ok))
           printf "%s: %s (%s__USAGE_REPORT__ENABLED)\n", file, s, p
       }
@@ -313,7 +317,7 @@ self_test() {
   # Sibling servers: Compose services, a docker run and a Rust harness.
   mkdir -p "$tmp/scripts" "$tmp/tools/bare/src" "$tmp/tools/held/src"
   # shellcheck disable=SC2016 # the fixture is literal Compose text, never expanded here
-  printf 'x-node: &node\n  image: ghcr.io/ferrohealth/ferroehr:1.0.0\nservices:\n  ferroterm:\n    image: ghcr.io/ferrohealth/ferroterm:1.0.0\n    environment:\n      FERROTERM__USAGE_REPORT__ENABLED: ${FERROTERM__USAGE_REPORT__ENABLED:-true}\n  ferroehr:\n    image: ghcr.io/ferrohealth/ferroehr:1.0.0\n    environment:\n      FERROEHR__USAGE_REPORT__ENABLED: ${FERROTERM__USAGE_REPORT__ENABLED:-true}\n  ferropix:\n    image: ghcr.io/ferrohealth/ferropix:1.0.0@sha256:0\n    environment:\n      - X=1\n  ferropix-off:\n    image: ghcr.io/ferrohealth/ferropix:1.0.0\n    environment:\n      FERROPIX__USAGE_REPORT__ENABLED: "false"\n  node-a:\n    <<: *node\n    environment:\n      X: "1"\n  ferroehr-postgres:\n    image: ghcr.io/ferrohealth/ferroehr-postgres:1.0.0\n  ferropix-build:\n    image: ghcr.io/ferrohealth/ferropix:1.0.0\n    entrypoint: ["/usr/local/bin/ferropix-build"]\n  ferroehr-serve:\n    image: ghcr.io/ferrohealth/ferroehr:1.0.0\n    entrypoint: ["/usr/local/bin/ferroehr", "serve"]\n' > "$tmp/compose.sib.yaml"
+  printf 'x-node: &node\n  image: ghcr.io/ferrohealth/ferroehr:1.0.0\nservices:\n  ferroterm:\n    image: ghcr.io/ferrohealth/ferroterm:1.0.0\n    environment:\n      FERROTERM__USAGE_REPORT__ENABLED: ${FERROTERM__USAGE_REPORT__ENABLED:-true}\n  ferroehr:\n    image: ghcr.io/ferrohealth/ferroehr:1.0.0\n    environment:\n      FERROEHR__USAGE_REPORT__ENABLED: ${FERROTERM__USAGE_REPORT__ENABLED:-true}\n  ferropix:\n    image: ghcr.io/ferrohealth/ferropix:1.0.0@sha256:0\n    environment:\n      - X=1\n  ferropix-off:\n    image: ghcr.io/ferrohealth/ferropix:1.0.0\n    environment:\n      FERROPIX__USAGE_REPORT__ENABLED: "false"\n  node-a:\n    <<: *node\n    environment:\n      X: "1"\n  ferroehr-postgres:\n    image: ghcr.io/ferrohealth/ferroehr-postgres:1.0.0\n  ferropix-build:\n    image: ghcr.io/ferrohealth/ferropix:1.0.0\n    entrypoint: ["/usr/local/bin/ferropix-build"]\n  ferroehr-serve:\n    image: ghcr.io/ferrohealth/ferroehr:1.0.0\n    entrypoint: ["/usr/local/bin/ferroehr", "serve"]\n  ferroehr-job:\n    image: ghcr.io/ferrohealth/ferroehr:1.0.0\n    command: ["db", "migrate"]\n  ferropix-serve:\n    image: ghcr.io/ferrohealth/ferropix:1.0.0\n    command: ["serve"]\n' > "$tmp/compose.sib.yaml"
   printf '#!/usr/bin/env bash\nexport FERROTERM__USAGE_REPORT__ENABLED=false\ndocker run -d ghcr.io/ferrohealth/ferroehr:1.0.0\n' > "$tmp/scripts/sib-run-on.sh"
   printf '#!/usr/bin/env bash\ndocker run -d \\\n  -e FERROEHR__USAGE_REPORT__ENABLED=false ghcr.io/ferrohealth/ferroehr:1.0.0\n' > "$tmp/scripts/sib-run-off.sh"
   printf '#!/usr/bin/env bash\ndocker run --rm ghcr.io/ferrohealth/ferroehr:1.0.0 healthcheck\n' > "$tmp/scripts/sib-run-job.sh"
@@ -322,14 +326,14 @@ self_test() {
   printf 'fn f(i: I) -> I {\n    i.with_env_var("FERROPIX__USAGE_REPORT__ENABLED", "false")\n}\n' > "$tmp/tools/held/src/start.rs"
 
   found="$(cd "$tmp" && findings tracked_fixtures)"
-  for name in "compose.sib.yaml: ferropix (FERROPIX__USAGE_REPORT__ENABLED)" "compose.sib.yaml: ferroehr-serve (FERROEHR__USAGE_REPORT__ENABLED)" "compose.sib.yaml: node-a (FERROEHR__USAGE_REPORT__ENABLED)" \
+  for name in "compose.sib.yaml: ferropix (FERROPIX__USAGE_REPORT__ENABLED)" "compose.sib.yaml: ferroehr-serve (FERROEHR__USAGE_REPORT__ENABLED)" "compose.sib.yaml: ferropix-serve (FERROPIX__USAGE_REPORT__ENABLED)" "compose.sib.yaml: node-a (FERROEHR__USAGE_REPORT__ENABLED)" \
     "scripts/sib-run-on.sh (FERROEHR__USAGE_REPORT__ENABLED)" "tools/bare (FERROPIX__USAGE_REPORT__ENABLED)"; do
     grep -qxF "$name" <<< "$found" || {
       echo "self-test: $name was not caught" >&2
       failures=1
     }
   done
-  if grep -E 'compose\.sib\.yaml: (ferroterm|ferroehr|ferropix-off|ferroehr-postgres|ferropix-build) |sib-run-off|sib-run-job|tools/held' <<< "$found"; then
+  if grep -E 'compose\.sib\.yaml: (ferroterm|ferroehr|ferropix-off|ferroehr-postgres|ferropix-build|ferroehr-job) |sib-run-off|sib-run-job|tools/held' <<< "$found"; then
     echo "self-test: a switched sibling, a one-shot job or a non-server image was wrongly caught" >&2
     failures=1
   fi
@@ -351,7 +355,7 @@ self_test() {
     fi
   done
   [[ "$failures" -eq 0 ]] || return 1
-  echo "usage-report-off: self-test OK (twelve unswitched launchers and five unswitched sibling servers caught, sixteen clean or exempt files and seven sibling cases allowed)."
+  echo "usage-report-off: self-test OK (twelve unswitched launchers and six unswitched sibling servers caught, sixteen clean or exempt files and eight sibling cases allowed)."
 }
 
 report() {
