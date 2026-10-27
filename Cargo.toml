@@ -175,6 +175,10 @@ jsonschema = { version = "0.58.6", default-features = false }
 # The test issuer generates its own signing key and publishes it as a JWK, so
 # no private key is committed. Checked against crates.io on 2026-09-22.
 ring = "0.17.14"
+# The TLS tests generate the listener's certificate and key, so no private
+# key is committed; the backend is the aws-lc-rs that rustls resolves to.
+# Checked against crates.io on 2026-10-27.
+rcgen = { version = "0.14.10", default-features = false, features = ["aws_lc_rs", "pem"] }
 base64 = "0.23.1"
 criterion = "0.8.2"
 divan = "0.1.21"

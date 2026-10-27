@@ -46,6 +46,7 @@ mod smart;
 mod snomed_expression;
 mod stack;
 mod telemetry;
+mod tls;
 mod translate;
 mod usage_report;
 mod value_set;
