@@ -24,7 +24,8 @@
 #   plan.sh support-end <YYYY-MM-DD>
 #       Prints the month the support period of a release of that date ends.
 #   plan.sh --self-test
-#       Proves prev-tag's ordering and support-end's arithmetic offline.
+#       Proves prev-tag's ordering, support-end's arithmetic and the leftover
+#       fragment check offline.
 #
 # The milestone check reads the tracker through gh (GH_TOKEN in CI, the
 # logged-in gh locally). Exit 2 on a usage error.
@@ -169,6 +170,29 @@ check_changelog_security() {
   bash scripts/checks/changelog-security.sh --section "$VERSION"
 }
 
+# The cut assembles every fragment under changelog.d/ into the section it
+# writes and deletes them (scripts/release/changelog.sh --assemble), so an entry
+# left at the tagged commit misses these release notes and lands in the next.
+check_changelog_fragments() {
+  local dir="${1:-changelog.d}" path
+  local -a left=()
+  if [[ ! -d "$dir" ]]; then
+    echo "::error::$dir/ is missing." >&2
+    return 1
+  fi
+  for path in "$dir"/* "$dir"/.[!.]*; do
+    [[ -e "$path" ]] || continue
+    [[ "${path#"$dir"/}" != README.md ]] || continue
+    left+=("$path")
+  done
+  if [[ "${#left[@]}" -gt 0 ]]; then
+    echo "::error::$dir/ still holds ${#left[@]} fragment(s) the cut did not assemble; run scripts/release/changelog.sh --assemble ${VERSION:-<version>} <date> on the release branch:" >&2
+    printf '  %s\n' "${left[@]}" >&2
+    return 1
+  fi
+  echo "no fragment is left under $dir/"
+}
+
 check_notes() {
   notes "$TAG" "$NOTES"
   echo "Release notes for $VERSION:"
@@ -191,6 +215,7 @@ check_milestone The milestone titled as the tag holds no open item
 check_version The tag matches the workspace version
 check_changelog_structure Changelog structure (no duplicate subsections, canonical types)
 check_changelog_security The Security section of the cut names its advisories and its reason
+check_changelog_fragments No changelog fragment is left unassembled
 check_notes The changelog section for this tag becomes the release notes
 check_notes_content The release notes carry the CRA user information and the support period
 EOF
@@ -257,6 +282,20 @@ self_test() {
   expect "an empty date" "$(support_end "" || echo "$refused")" "$refused"
   expect "a month out of range" "$(support_end 2026-13-01 || echo "$refused")" "$refused"
   expect "a day out of range" "$(support_end 2026-04-31 || echo "$refused")" "$refused"
+  local tree err
+  tree="$(mktemp -d)"
+  mkdir "$tree/changelog.d"
+  touch "$tree/changelog.d/README.md"
+  expect "only the README is left" "$(check_changelog_fragments "$tree/changelog.d" 2>/dev/null || echo "$refused")" \
+    "no fragment is left under $tree/changelog.d/"
+  touch "$tree/changelog.d/904-left-behind.fixed.md" "$tree/changelog.d/.hidden"
+  expect "a leftover fragment" "$(check_changelog_fragments "$tree/changelog.d" 2>/dev/null || echo "$refused")" "$refused"
+  err="$(check_changelog_fragments "$tree/changelog.d" 2>&1 >/dev/null || true)"
+  expect "the refusal names the fragment" "$(grep -c -F "$tree/changelog.d/904-left-behind.fixed.md" <<<"$err")" "1"
+  expect "the refusal names a hidden file" "$(grep -c -F "$tree/changelog.d/.hidden" <<<"$err")" "1"
+  expect "the refusal spares the README" "$(grep -c -F README.md <<<"$err" || true)" "0"
+  expect "a missing directory" "$(check_changelog_fragments "$tree/absent" 2>/dev/null || echo "$refused")" "$refused"
+  rm -rf -- "$tree"
   if [[ "$fails" -gt 0 ]]; then
     echo "plan.sh self-test FAILED ($fails case(s))" >&2
     exit 1
