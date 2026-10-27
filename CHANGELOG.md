@@ -17,6 +17,244 @@ fragments here under the version and its date.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-27
+
+### Added
+
+- `[auth] mode = "introspection"` checks an opaque access token at the
+  issuer's introspection endpoint (RFC 7662), on the server's write routes
+  and admin listener and on the synchronisation service's admin listener.
+  The endpoint is the one the issuer's metadata names, or
+  `[auth.introspection] endpoint`; the call authenticates with
+  `[auth.introspection.client]` or a `[auth.introspection.bearer]` client
+  credentials token. An inactive token answers `401`, an endpoint that
+  cannot answer `503`, and an issuer that names no endpoint refuses the
+  start. The discovery document and the capability statement name the
+  introspecting issuer's endpoints (#881).
+- The server, the synchronisation service and the console read their
+  configuration through the FerroHEALTH loader, `ferrohealth-config`: the
+  defaults, a TOML file named by `--config` or by `FERROTERM_CONFIG`,
+  `FERROTERM_SYNC_CONFIG` or `FERROTERM_CONSOLE_CONFIG`, one variable per key
+  (`FERROTERM__SECTION__KEY`, `FERROTERM_SYNC__SECTION__KEY`,
+  `FERROTERM_CONSOLE__SECTION__KEY`), and `--set key=value` last. `ferroterm
+  config check` and `ferroterm-sync config check` print every key with where it
+  came from and every secret as `***` (#895).
+- The server, the synchronisation service and the console serve the
+  FerroHEALTH health routes from `ferrohealth-health` 0.1.1 and
+  `ferrohealth-server` 0.3.0: `GET /health/liveness` answers `200` while the
+  process runs, and `GET /health/readiness` answers the readiness document
+  (state, phase and each indicator's state), `200` while ready and `503`
+  otherwise. On the sync service both stay open without a credential, as
+  `GET /health` does. Point a Kubernetes liveness probe at
+  `/health/liveness` and its readiness probe at `/health/readiness` (#895).
+- The server's `[server]` section takes the keys of the FerroHEALTH HTTP
+  stack, for the FHIR listener and the admin listener alike:
+  `request_timeout_ms`, `header_read_timeout_ms`, `body_limit_bytes`,
+  `drain_delay_ms`, `shutdown_timeout_ms`, `max_concurrent_requests` with
+  `retry_after_s` (past the bound a request is answered `503` with
+  `Retry-After`, and the health routes are never refused), `trusted_proxies`
+  with `forwarded_header`, `compression` with `compression_min_bytes`, and
+  `base_path`, a path every route is served under. A `[server.tls]` table
+  (`certificate_file`, `key_file`, `min_version`, `client_auth`,
+  `client_ca_file`, `reload_interval_s`, `healthcheck_identity_file`) serves
+  both listeners over TLS, reads the files again on `SIGHUP`, and
+  `ferroterm healthcheck` then probes over TLS, accepting only the server's
+  own certificate. `[server.caller_rate]` is refused, since the server limits
+  no caller's rate (#895).
+- `ferroterm serve` and `ferroterm-sync serve` name the default command, as
+  `ferroterm-console serve` does (#895).
+- The server, the synchronisation service and the console read the
+  FerroHEALTH `[telemetry]` section: `format` and `filter` as before (with
+  `RUST_LOG` setting the filter in all three), `logged_query_parameters` for
+  further query parameters the request line may carry, `environment`, and a
+  `[telemetry.otlp]` table that pushes the spans and the metrics to an
+  OpenTelemetry collector over OTLP/gRPC (`endpoint`, `traces`, `metrics`,
+  `sample_ratio`, `trust_roots_file`, `client_identity_file`). A panic is
+  logged as one line before the process ends (#895).
+
+### Changed
+
+- The console's command bar answers under the field as you type: from the
+  second character a panel asks `GET /find/answer?q=` and shows the code
+  systems, value sets and concept maps whose name or canonical holds the
+  words, five of a kind, then the screens that take what was typed; the
+  arrow keys walk them, Enter opens one and Escape closes the panel. Find
+  lists every match in the page, with no cap of ten, and a read the server
+  refuses is said on the page and in the panel, where it was shown as no
+  match before. The console moves to FerroUI 0.4.0 (#876).
+- The server and the synchronisation service take `ferrohealth-smart`
+  0.6.0, the release every FerroHEALTH product runs. The default
+  `[auth] mode = "jwt"` checks tokens exactly as before (#880).
+- The console's Configuration screen marks a value an environment override
+  sets with From the environment and one nothing sets with Default, through
+  FerroUI's setting source; a value the configuration file sets carries no
+  mark. The configuration loader records which keys the file and the
+  environment set (#886).
+- Breaking: an override variable that names no key refuses the start, naming
+  the variable and the closest key it knows (`FERROTERM__…` for the server,
+  `FERROTERM_SYNC__…` and `FERROTERM_CONSOLE__…` for the other two), as each
+  binary refuses an unknown key in its file. Any other variable under the
+  prefix is left alone, so the three binaries can share one environment.
+  Upgrade: correct a misspelt override (#895).
+- Breaking: a secret file the console reads through a `_file` key loses only
+  its trailing line ending, the FerroHEALTH rule, where the console trimmed
+  every surrounding space; a file that holds only whitespace other than line
+  endings is now a secret, not a refusal. Upgrade: write the secret file with
+  the secret alone (#895).
+- Breaking: `GET /health` on the server, the synchronisation service and the
+  console answers the family's summary, `{"state":"up"}`, where the server
+  and the sync service answered an empty body and the console
+  `{"status":"up"}`. It answers `503` with `{"state":"down"}` from the moment
+  the process receives `SIGTERM` or `SIGINT` until it exits, so a load
+  balancer stops sending requests while the ones in flight finish. Upgrade: a
+  probe that reads only the status needs no change; one that parses the
+  console's body reads `state` in place of `status` (#895).
+- Breaking: `ferroterm healthcheck`, `ferroterm-sync healthcheck` and
+  `ferroterm-console healthcheck` ask `GET /health/readiness` and exit 1 while
+  the process drains, where they asked `GET /health`. The reason on stderr
+  reads `unhealthy: readiness answered 503`, `unhealthy: cannot connect to
+  <address>: …` or `unhealthy: readiness did not answer in time`, and the
+  console prints `healthy` on success. Upgrade: a script that matched the old
+  reasons (`cannot reach`, `answered`, `did not answer within`) matches the
+  new ones (#895).
+- Breaking: the server refuses a request body larger than 1 MiB with `413`,
+  the default of `server.body_limit_bytes`, where the limit of 2 MB applied.
+  Upgrade: a deployment that writes larger resources raises
+  `server.body_limit_bytes` (#895).
+- Breaking: `server.listen` takes an IP address and a port, and a host name
+  such as `localhost:8080` refuses the start. Upgrade: write the address,
+  such as `127.0.0.1:8080` (#895).
+- The boot banner names the build as `ferroterm <version> (<commit>)` and
+  lists the served FHIR versions, the site and the maintainer, the banner
+  every FerroHEALTH product prints (#895).
+- The synchronisation service's admin listener runs the FerroHEALTH HTTP
+  stack: a request id on every request, a request timeout of 30 seconds, a
+  body limit of 1 MiB and a panic answered `500`. The console sends the
+  FerroHEALTH console headers, which add
+  `Cross-Origin-Opener-Policy: same-origin`, and marks its stylesheets
+  `no-cache` so a new release is fetched (#895).
+- The server and the synchronisation service take `ferrohealth-smart`
+  0.7.5. A secret or a masked URL in a rendered `[auth]` table now reads
+  `***` in place of `[redacted]`, and a URL's query is masked beside its
+  userinfo. `[auth] ca_file` names a PEM file of trust roots for an issuer
+  behind a private certificate authority, and `[auth.basic]
+  cache_ttl_seconds` keeps a verified Basic credential for 300 seconds by
+  default, so a repeat request skips the Argon2id derivation; set it to `0`
+  to verify every request (#895).
+- Breaking: the server's request metrics follow the OpenTelemetry HTTP
+  semantic conventions, the metric every FerroHEALTH product exports through
+  `ferrohealth-telemetry`. `ferroterm_http_requests_total` and
+  `ferroterm_http_request_duration_seconds` are gone with no alias; one
+  histogram, `http_server_request_duration_seconds`, takes their place, with
+  the labels `http_request_method`, `http_route`, `http_response_status_code`,
+  `network_protocol_version`, `url_scheme` and, on a `5xx`, `error_type`, and
+  the buckets the conventions advise (5 ms to 10 s) where the old ones started
+  at half a millisecond. Upgrade: count requests with
+  `http_server_request_duration_seconds_count`, and rename `method`, `route`
+  and `status` in every query and alert (#895).
+- Breaking: `GET /metrics` on the server and on the synchronisation service
+  answers in the Prometheus text format (`text/plain; version=0.0.4`), where it
+  answered in OpenMetrics. The `ferroterm_code_system_loaded`,
+  `ferroterm_reloads_total` and `ferroterm_sync_*` series keep their names and
+  labels. Upgrade: a scraper that asked for OpenMetrics only reads the text
+  format (#895).
+- Breaking: the request log carries the server's own id, a UUID it makes for
+  every request, in `request_id`, and `client_named` says whether the client
+  sent an `X-Request-Id`; the client's value is still echoed on the response
+  and never logged, the FerroHEALTH request-id rule, where the log carried the
+  client's value. The system and code a request named are fields of their own
+  (`system`, `url`, `version`, `code`, `code_a`, `code_b`), where they were
+  one `named` field. Upgrade: correlate a client report by its time and route,
+  or by the response's `X-Request-Id` when the client sent none, and read the
+  new fields in a log pipeline (#895).
+- The usage report runs on `ferrohealth-usage-report`, the reporter every
+  FerroHEALTH product sends with; the `[usage_report]` keys and the report's
+  contents stay as they were. The boot line says "no clinical content,
+  identifiers, URLs or request paths", the family's wording (#895).
+- Breaking: the daily report's `counters` carry only what counted something
+  in the window, where the four per-version counters were always sent, and
+  add `responses_4xx`, the `4xx` answers under a FHIR base. Upgrade: read a
+  missing version counter as zero (#895).
+- Breaking: the request log and the `http_route` label of
+  `http_server_request_duration_seconds` name a request under a FHIR base that
+  no route matched `/r4/{*unmatched}`, `/r4b/{*unmatched}`, `/r5/{*unmatched}`
+  or `/r6/{*unmatched}`, where it was `<unmatched>`; any other unmatched
+  request stays `<unmatched>`. Upgrade: match those four routes where a query
+  or alert matched `<unmatched>` under a FHIR base (#895).
+
+### Removed
+
+- Breaking: the server's flat variables are gone with no alias. Each is now a
+  key of the configuration tree: `FERROTERM_LISTEN` is `server.listen`
+  (`FERROTERM__SERVER__LISTEN`), `FERROTERM_ADMIN_LISTEN` is `admin.listen`,
+  `FERROTERM_INDEX`, `FERROTERM_CODESYSTEMS`, `FERROTERM_RESOURCES` and
+  `FERROTERM_DEFAULT_LANGUAGE` are `terminology.index`,
+  `terminology.code_systems`, `terminology.resources` and
+  `terminology.default_language`, `FERROTERM_BASE_URL` and
+  `FERROTERM_SECURITY_SERVICE` are `fhir.base_url` and
+  `fhir.security_services`, `FERROTERM_LOG_FORMAT` is `telemetry.format`, and
+  `FERROTERM_USAGE_REPORT`, `FERROTERM_USAGE_REPORT_ENDPOINT`,
+  `FERROTERM_STATE_DIR` and `FERROTERM_DEPLOYMENT` are
+  `usage_report.enabled`, `usage_report.endpoint`, `usage_report.state_dir`
+  and `usage_report.deployment`. `RUST_LOG` still sets the filter. A list is a
+  TOML array in the file or comma-separated in a variable, where
+  `FERROTERM_INDEX` and `FERROTERM_CODESYSTEMS` took the platform's path
+  separator, and `usage_report.enabled` takes `true` or `false`, where
+  `FERROTERM_USAGE_REPORT` took `on` or `off`. An old name is not read and
+  does not refuse the start, so the server runs on the default. Upgrade:
+  rename each variable, or move the values into a file (#895).
+- Breaking: `FERROTERM_AUTH_FILE` and its `FERROTERM_AUTH__<KEY>` overrides are
+  gone. The `[auth]` table is a section of the server's configuration file, and
+  one key is set as `FERROTERM__AUTH__<KEY>`. Upgrade: move the table into the
+  file `FERROTERM_CONFIG` names, and rename each `FERROTERM_AUTH__` variable to
+  `FERROTERM__AUTH__` (#895).
+- Breaking: the NTS add-on reads its account from the synchronisation
+  service's `[nts]` section. `FERROTERM_NTS_USERNAME`, `FERROTERM_NTS_PASSWORD`,
+  `FERROTERM_NTS_CLIENT_ID` and `FERROTERM_NTS_CLIENT_SECRET` are
+  `FERROTERM_SYNC__NTS__USERNAME` and the other three, the JSON credential
+  file and the `credentials` key of the `[source.config]` block are gone, and
+  each secret takes a mounted file through `nts.password_file` or
+  `nts.client_secret_file`. Upgrade: rename the variables, and point the
+  `_file` key at a file that holds the secret alone (#895).
+- Breaking: `ferroterm-sync` reads no file unless `--config` or
+  `FERROTERM_SYNC_CONFIG` names one, where it read `/etc/ferroterm/sync.toml`
+  by default; the container image sets `FERROTERM_SYNC_CONFIG` to that path (#895).
+- Breaking: `ferroterm healthcheck --url` and `ferroterm-sync healthcheck
+  --url` are gone with no alias. The probe follows the configured listen
+  address, on the loopback when the process listens on every interface.
+  Upgrade: set `server.listen` (or the sync service's `listen`) to the
+  address to probe, or probe the URL with an HTTP client of your own (#895).
+
+### Fixed
+
+- The console's settings name the configuration file they were read from
+  wherever they are resolved: `Config::load` keeps the path it read and
+  `Config::resolve` carries it, where only the command line's own start
+  filled it in before (#888).
+- The server, the synchronisation service and the console bound the drain on
+  `SIGTERM` or `SIGINT`: readiness turns `503` at once, the listeners keep
+  accepting for `server.drain_delay_ms`, then close, and the requests in
+  flight get `server.shutdown_timeout_ms` (10 seconds by default) to finish
+  before the process exits, where a connection held open by a slow client
+  kept the process up until the container runtime killed it. The server's
+  admin listener drains with the FHIR listener under the same bound (#890).
+- The server answers a request that runs past `server.request_timeout_ms`
+  with `408`, a body larger than `server.body_limit_bytes` with `413`, and a
+  handler that panics with `500`, each as an `OperationOutcome` (`timeout`,
+  `too-long`, `exception`), where a panic dropped the connection with no
+  answer and a slow request had no deadline. The `500` names the request id,
+  and the panic message reaches neither the body nor the log (#891).
+
+### Security
+
+Shipped with functional changes because: the fix is a dependency release that reached main beside the unreleased work of the next version, and a patch of the last release alone would ship the same pin.
+
+- `ferrohealth-smart` 0.7.1 masks the userinfo of an OAuth section's
+  `issuer` and `token_endpoint` in every rendering, a URL that does not parse
+  included; before it a credential written into such a URL could reach a
+  log through the section's `Debug` or serialized form (CWE-532,
+  GHSA-vphj-3f8c-5hpx). FerroTERM moves to it from 0.6.0 (#893).
+
 ## [0.3.0] - 2026-10-24
 
 ### Added
@@ -1905,7 +2143,8 @@ binary answers `GET /health` only.
 - No existing Rust terminology or FHIR crate is a dependency; the README
   records the evaluation and the reasons.
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.10...v0.2.0
 [0.1.10]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.8...v0.1.10

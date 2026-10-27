@@ -74,7 +74,7 @@ services:
     # the same provenance and SBOM attestations. For a commit no release
     # carries, build it from docker/Dockerfile.sync under this tag, as the
     # book's sync page shows, and Compose runs the local image.
-    image: ghcr.io/ferrohealth/ferroterm-sync:${FERROTERM_VERSION:-0.3.0}
+    image: ghcr.io/ferrohealth/ferroterm-sync:${FERROTERM_VERSION:-0.3.1}
     container_name: ferroterm-sync
     restart: unless-stopped
     environment:
