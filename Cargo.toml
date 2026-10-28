@@ -72,9 +72,9 @@ toml = { version = "1.1.6", default-features = false, features = ["std", "parse"
 # The FerroHEALTH SMART and OAuth 2.0 resource-server crate: the token check,
 # the SMART scopes, the Basic users and the client credentials token of the
 # server and the sync service. Pinned exactly, as every family crate is.
-# 0.7.5 masks every secret and URL through ferrohealth-secret and caches a
-# verified Basic credential. Verified against crates.io on 2026-10-26.
-ferrohealth-smart = { version = "=0.8.1", features = ["axum"] }
+# 0.8.6 trusts `[auth] ca_file` under `mode = "introspection"` as well.
+# Verified against crates.io on 2026-10-28.
+ferrohealth-smart = { version = "=0.8.6", features = ["axum"] }
 # The FerroHEALTH health family: the readiness document, the indicator
 # registry and the process lifecycle, and the HTTP plumbing whose `health`
 # module serves `/health`, `/health/liveness` and `/health/readiness` over
@@ -85,8 +85,8 @@ ferrohealth-server = { version = "=0.3.7" }
 # binary under `--config` or `<PREFIX>_CONFIG`, `<PREFIX>__SECTION__KEY`
 # overrides, `--set`, strict refusals and provenance, and the `<key>_file`
 # rule with the redacting `Secret`. Pinned exactly. Verified against
-# crates.io on 2026-10-26.
-ferrohealth-config = { version = "=0.2.5" }
+# crates.io on 2026-10-28.
+ferrohealth-config = { version = "=0.2.6" }
 ferrohealth-secret = { version = "=0.2.0" }
 # The FerroHEALTH telemetry: the `[telemetry]` section, the console, the
 # panic line, the request log with its product fields, and the one
