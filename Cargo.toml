@@ -171,7 +171,7 @@ wiremock = "0.6.5"
 # The usage report tests validate every report against FerroPULSE's vendored
 # JSON Schema; no network or file resolution, so no default features. Checked
 # against crates.io on 2026-10-16.
-jsonschema = { version = "0.58.6", default-features = false }
+jsonschema = { version = "0.59.0", default-features = false }
 # The test issuer generates its own signing key and publishes it as a JWK, so
 # no private key is committed. Checked against crates.io on 2026-09-22.
 ring = "0.17.14"
