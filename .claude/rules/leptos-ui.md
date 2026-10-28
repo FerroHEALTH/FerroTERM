@@ -107,6 +107,12 @@ for a Leptos question FerroUI does not settle is the official Leptos book
   decide whether an edit control is drawn. The terminology server checks the
   token on every write. A sign-in's outcomes are the states of the sign-in
   page (`/auth/sign-in?state=…`).
+- **A signed-in page watches its session** (FerroUI `docs/consoles.md`, "The
+  session's end"): the shell draws `island::SessionWatch` from what the
+  session had left as the server drew the page, the sign-in page of an ended
+  session draws `island::SessionEnded`, and `session::watch` answers the
+  session route `/auth/session`, where `GET` extends nothing and `POST`, the
+  reader's own activity, starts the idle timeout again.
 - **Reading is open.** A visitor reads every screen, as the server's read
   surface asks for no token; the sign-in is for editing, and a console with
   no `[oidc]` offers none.

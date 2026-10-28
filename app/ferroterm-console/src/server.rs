@@ -194,6 +194,10 @@ pub fn router(state: ConsoleState) -> axum::Router {
             post(crate::oidc::logout::logout),
         )
         .route(
+            crate::routes::SESSION_ROUTE,
+            get(crate::session::watch::status).post(crate::session::watch::status),
+        )
+        .route(
             crate::routes::PREFERENCE_ROUTE,
             post(crate::post::preference),
         )

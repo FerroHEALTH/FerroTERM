@@ -10,6 +10,7 @@
 //! (`crate::oidc`); the reader returns to the page they came from.
 
 use ferrohealth_ui::icon::Glyph;
+use ferrohealth_ui::island::SessionEnded;
 use ferrohealth_ui::view::shell::{brand_mark, centred, lockup_plain};
 use ferrohealth_ui::view::sign_in::{Notice, Provider, Retry, SignIn, State, sign_in};
 use leptos::prelude::*;
@@ -67,6 +68,7 @@ pub(crate) async fn page(request: Request) -> AnyView {
     let issuer = request.issuer.clone();
     let back = request
         .param(BACK_PARAM)
+        .or_else(|| request.param(ferrohealth_ui::widget::session::RETURN))
         .and_then(|back| crate::routes::return_path(&back).map(str::to_owned))
         .unwrap_or_else(|| ui_path(""));
     let login = format!(
@@ -82,6 +84,13 @@ pub(crate) async fn page(request: Request) -> AnyView {
         None => state_of(Some(SignInState::Unavailable), &login),
         Some(_) => state_of(named, &login),
     };
+    // NOTE: FerroUI `docs/consoles.md`, "The session's end": the page a session that
+    // ended lands on tells every other tab of the console, which then leaves too.
+    let ended = matches!(
+        named,
+        Some(SignInState::SignedOut | SignInState::Expired | SignInState::ExpiredAbsolute)
+    )
+    .then(|| view! { <SessionEnded /> });
     let rejected = matches!(state, State::Rejected(_));
     let unavailable = matches!(state, State::Unavailable(_));
     let provider = issuer
@@ -141,6 +150,7 @@ pub(crate) async fn page(request: Request) -> AnyView {
     view! {
         <Title text=title />
         {centred(card, footer())}
+        {ended}
     }
     .into_any()
 }

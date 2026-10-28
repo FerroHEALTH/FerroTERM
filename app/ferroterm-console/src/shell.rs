@@ -25,7 +25,7 @@
 use std::borrow::Cow;
 
 use ferrohealth_ui::icon::Glyph;
-use ferrohealth_ui::island::ShortcutLegend;
+use ferrohealth_ui::island::{SessionWatch, ShortcutLegend};
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::button::{Variant, label};
 use ferrohealth_ui::view::search::{SearchBox, search_box};
@@ -33,6 +33,7 @@ use ferrohealth_ui::view::shell::{Footer, Shell, TopBar, brand_mark, lockup, she
 use ferrohealth_ui::view::status::{Reach, StatusPill, banner, status_pill};
 use ferrohealth_ui::widget::menu::{ThemeChoice, UserMenu, user_menu};
 use ferrohealth_ui::widget::nav::{Entry, Group, Rail, Sidebar, sidebar};
+use ferrohealth_ui::widget::session::{Left, Watch};
 use ferrohealth_ui::widget::shortcuts::LegendWords;
 use ferrohealth_ui::widget::version::{VersionRoot, VersionSelect, version_select};
 #[cfg(not(target_arch = "wasm32"))]
@@ -201,12 +202,39 @@ pub(crate) fn console_shell(content: AnyView) -> AnyView {
         dock: None,
         footer: footer(),
     });
+    // NOTE: FerroUI `docs/consoles.md`, "The session's end": the watch starts from what
+    // the session had left as the server drew the page, carried to the browser.
+    let left = *SharedValue::new(session_left);
+    let watch = left.map(|left| {
+        let watch = Watch::new(
+            routes::SESSION_ROUTE,
+            routes::SIGN_IN_PAGE,
+            routes::SIGN_OUT_ROUTE,
+            left,
+        );
+        view! { <SessionWatch watch /> }
+    });
     view! {
         {page}
+        {watch}
         <Shortcuts goto=crate::pages::shortcuts::goto() />
         <ShortcutLegend groups=crate::pages::shortcuts::groups() words=LegendWords::of_page() />
     }
     .into_any()
+}
+
+/// What the reader's session had left as the server drew the page; none for
+/// a visitor, and in the browser, which reads the value the server
+/// serialized.
+fn session_left() -> Option<Left> {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        crate::session::request::left()
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        None
+    }
 }
 
 /// The navigation of `request`, its rail as the reader left it.
