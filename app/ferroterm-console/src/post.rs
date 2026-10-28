@@ -21,30 +21,8 @@ use crate::fhir::version::FhirVersion;
 use crate::locale::{Msg, tr};
 use crate::prefs::{PREFIX, SIDEBAR};
 use crate::routes::BACK_PARAM;
+use crate::routes::{SESSION_FHIR, return_path};
 use crate::server::ConsoleState;
-
-/// The cookie key of the FHIR version the top bar chose for the browser's
-/// session.
-pub(crate) const SESSION_FHIR: &str = "session-fhir";
-
-/// The page `path` names when it is one of the console's own pages, and
-/// `None` for anything else, so a post never redirects off the console.
-///
-/// A page is an absolute path of visible ASCII with a query of its own,
-/// never `//`, a backslash, a fragment or a dot segment.
-#[must_use]
-pub(crate) fn return_path(path: &str) -> Option<&str> {
-    let (route, _query) = path.split_once('?').unwrap_or((path, ""));
-    let plain = route.starts_with('/')
-        && !route.starts_with("//")
-        && path
-            .chars()
-            .all(|c| c.is_ascii_graphic() && c != '\\' && c != '#')
-        && !route
-            .split('/')
-            .any(|segment| segment == "." || segment == "..");
-    plain.then_some(path)
-}
 
 /// The redirect to `back`, when it is one of the console's own pages, else
 /// to the dashboard, setting each of `cookies`.

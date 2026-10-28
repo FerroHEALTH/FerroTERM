@@ -38,9 +38,9 @@ use crate::pages::editor::{
     heading, icon_submit, name, opened_line, percent, refused, rows, text_field,
 };
 use crate::pages::operations::choices;
-use crate::pages::parts::{failure, loaded, name_of};
-use crate::posted::{Posted, posted};
-use crate::request::{Request, request};
+use crate::pages::parts::{failure, name_of, redirect};
+use crate::posted::Posted;
+use crate::request::Request;
 use crate::routes::{
     COMPOSE_ROUTE, COMPOSER_ID_PARAM, VALUE_SETS_PATH, resource_link, sign_in_link, ui_link,
 };
@@ -79,14 +79,8 @@ const OPERATORS: [&str; 10] = [
 ];
 
 /// The value set composer.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn ComposerPage() -> impl IntoView {
-    let request = request();
-    let posted = posted();
+pub(crate) async fn page(request: Request) -> AnyView {
+    let posted = request.posted.clone();
     let letter = if request.text(COMPOSER_ID_PARAM).is_empty() {
         Letter::Create
     } else {
@@ -94,7 +88,7 @@ pub(crate) fn ComposerPage() -> impl IntoView {
     };
     if !request.can(VALUE_SET, letter) {
         if request.session.who().is_none() && request.sign_in {
-            leptos_axum::redirect(&sign_in_link(&request.back()));
+            redirect(&sign_in_link(&request.back()));
         }
         return crate::pages::errors::forbidden_page(
             Msg::EditorForbiddenValueSet,
@@ -105,7 +99,7 @@ pub(crate) fn ComposerPage() -> impl IntoView {
             ),
         );
     }
-    loaded(async move { page(&request, posted.as_ref()).await })
+    edited(&request, posted.as_ref()).await
 }
 
 /// The composer's address: the value set it edits, on the reader's version.
@@ -119,11 +113,11 @@ fn address(request: &Request, id: &str) -> String {
 }
 
 /// The page, after whatever the reader `posted`.
-async fn page(request: &Request, posted: Option<&Posted>) -> AnyView {
+async fn edited(request: &Request, posted: Option<&Posted>) -> AnyView {
     let id = request.text(COMPOSER_ID_PARAM);
     let here = address(request, &id);
     if posted.is_some_and(|form| form.intent() == DISCARD) {
-        leptos_axum::redirect(&here);
+        redirect(&here);
         return ().into_any();
     }
     let opened = match open(request, &id).await {
@@ -252,7 +246,7 @@ async fn save(
                 .and_then(|resource| resource.id.clone())
                 .unwrap_or_else(|| draft.id.clone());
             let version = written.version_id().unwrap_or_default().to_owned();
-            leptos_axum::redirect(&format!(
+            redirect(&format!(
                 "{}&{SAVED_PARAM}={}",
                 address(request, &saved_id),
                 percent(&version)

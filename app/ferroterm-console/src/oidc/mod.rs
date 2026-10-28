@@ -24,6 +24,7 @@ use http::{HeaderMap, HeaderValue, StatusCode};
 use serde::Deserialize;
 use url::Url;
 
+use crate::auth::SignInState;
 use crate::config::settings::{OFFLINE_ACCESS, OidcSettings};
 use crate::server::ConsoleState;
 use crate::session::{COOKIE, PendingSignIn, SIGN_IN_COOKIE, SessionError, challenge};
@@ -38,62 +39,6 @@ pub const LOGIN: &str = crate::routes::LOGIN_ROUTE;
 /// The path of the redirection endpoint the provider sends the operator back
 /// to.
 pub const CALLBACK: &str = "/auth/callback";
-
-/// Why the sign-in page is shown, as its `state` parameter names it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SignInState {
-    /// The reader signed out of the console.
-    SignedOut,
-    /// The session ended after its idle timeout.
-    Expired,
-    /// The session ended at its absolute timeout.
-    ExpiredAbsolute,
-    /// The console holds as many sessions as it may.
-    Full,
-    /// The provider refused the sign-in.
-    Refused,
-    /// The provider's answer failed the console's checks.
-    Rejected,
-    /// The console could not reach the provider.
-    Unreachable,
-    /// The console offers no sign-in.
-    Unavailable,
-}
-
-impl SignInState {
-    /// Every state, in the order the page knows them.
-    pub const ALL: [Self; 8] = [
-        Self::SignedOut,
-        Self::Expired,
-        Self::ExpiredAbsolute,
-        Self::Full,
-        Self::Refused,
-        Self::Rejected,
-        Self::Unreachable,
-        Self::Unavailable,
-    ];
-
-    /// The `state` parameter that names it.
-    #[must_use]
-    pub const fn key(self) -> &'static str {
-        match self {
-            Self::SignedOut => "signed-out",
-            Self::Expired => "expired",
-            Self::ExpiredAbsolute => "expired-absolute",
-            Self::Full => "full",
-            Self::Refused => "refused",
-            Self::Rejected => "rejected",
-            Self::Unreachable => "unreachable",
-            Self::Unavailable => "unavailable",
-        }
-    }
-
-    /// The state `key` names, or `None` for one the page does not know.
-    #[must_use]
-    pub fn parse(key: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|state| state.key() == key)
-    }
-}
 
 /// The redirect to the sign-in page saying `state`.
 #[must_use]
@@ -161,7 +106,7 @@ pub async fn login(
     let back = query
         .back
         .as_deref()
-        .and_then(crate::post::return_path)
+        .and_then(crate::routes::return_path)
         .map(str::to_owned);
     let pending = match PendingSignIn::mint() {
         Ok(pending) => pending.returning_to(back),

@@ -2,23 +2,30 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The chrome around every screen: the top bar, the navigation, the banner
-//! and the footer, drawn on the server from FerroUI's shell.
+//! and the footer, drawn once from FerroUI's shell around the routes.
 //!
 //! The top bar carries what is true of every screen at once: the search, the
 //! FHIR version the reader is reading through (M3), the server's state as
 //! the status pill (F12), Sign in for a visitor, and the user menu (F13),
 //! which holds the theme, since the top bar carries no theme control
-//! (FerroUI's family rule 5). The navigation folds to its rail by a plain
-//! form post the console keeps in a cookie. No specification governs the
-//! chrome: our own design.
-#![expect(
-    clippy::same_name_method,
-    reason = "leptos::component derives a TypedBuilder whose `builder` shadows a trait method"
+//! (FerroUI's family rule 5). The navigation folds to its rail by a form
+//! post the console keeps in a cookie. The shell is drawn once and follows
+//! the router (FerroUI `docs/consoles.md`, "How a console builds", step
+//! 10): the navigation marks the page in view by itself, the version select
+//! follows the address, and the parts that read the visit draw again when
+//! it changes. No specification governs the chrome: our own design.
+#![cfg_attr(
+    target_arch = "wasm32",
+    allow(
+        clippy::unused_async_trait_impl,
+        reason = "the server function macro writes the browser half's call as an async trait method; only that target has it"
+    )
 )]
 
 use std::borrow::Cow;
 
 use ferrohealth_ui::icon::Glyph;
+use ferrohealth_ui::island::ShortcutLegend;
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::button::{Variant, label};
 use ferrohealth_ui::view::search::{SearchBox, search_box};
@@ -28,15 +35,18 @@ use ferrohealth_ui::widget::menu::{ThemeChoice, UserMenu, user_menu};
 use ferrohealth_ui::widget::nav::{Entry, Group, Rail, Sidebar, sidebar};
 use ferrohealth_ui::widget::shortcuts::LegendWords;
 use ferrohealth_ui::widget::version::{VersionRoot, VersionSelect, version_select};
+#[cfg(not(target_arch = "wasm32"))]
 use http::StatusCode;
 use leptos::prelude::*;
-use leptos_router::components::Outlet;
+use leptos_router::hooks::use_location;
+use serde::{Deserialize, Serialize};
 
 use crate::fhir::version::FhirVersion;
-use crate::islands::Shortcuts;
 use crate::locale::{Msg, tr, tr_with};
-use crate::request::{Request, request};
+use crate::request::Request;
 use crate::routes;
+use crate::shortcuts::Shortcuts;
+use crate::visit::Visits;
 
 /// The product name as a reader reads it, the same in every language.
 pub(crate) const PRODUCT: &str = "FerroTERM Console";
@@ -67,7 +77,7 @@ const MARK_LIGHT: &str = "/mark-light.svg";
 const MARK_DARK: &str = "/mark-dark.svg";
 
 /// How the terminology server answered the console's probe.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum Probe {
     /// It answered `200`.
     Up,
@@ -80,6 +90,7 @@ pub(crate) enum Probe {
 }
 
 impl Probe {
+    #[cfg(not(target_arch = "wasm32"))]
     /// The state `status` names, or [`Probe::Unreachable`] for none.
     #[must_use]
     pub(crate) fn of(status: Option<StatusCode>) -> Self {
@@ -102,58 +113,124 @@ impl Probe {
     }
 }
 
-/// The console's chrome around the page the route draws.
-///
-/// It asks the server for its health once per page, for the status pill,
-/// and, on a console with no sign-in, whether the server itself asks for
-/// one, for the development banner.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn ConsoleShell() -> impl IntoView {
-    framed(|| view! { <Outlet /> }.into_any())
+/// How the terminology server answered the console, read once for the
+/// shell.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct Reached {
+    /// How it answered the probe of its health.
+    probe: Probe,
+    /// Whether it serves writes with no sign-in on a console that offers
+    /// none, which the development banner says.
+    open: bool,
 }
 
-/// The console's chrome around the page `content` draws, for a page the
-/// router reaches outside the shell's routes, such as an address that names
-/// no screen.
-pub(crate) fn framed(content: fn() -> AnyView) -> AnyView {
-    let request = request();
-    view! {
+/// Asks the server for its health, for the status pill, and, on a console
+/// with no sign-in, whether the server itself asks for one, for the
+/// development banner.
+///
+/// # Errors
+///
+/// When the server function cannot be reached or answered.
+#[server(endpoint = "reached")]
+pub(crate) async fn server_reached() -> Result<Reached, ServerFnError> {
+    let request = Request::read();
+    let health = request.client.probe().await;
+    let open = if request.sign_in {
+        false
+    } else {
+        request.client.serves_without_sign_in(request.version).await
+    };
+    Ok(Reached {
+        probe: Probe::of(health),
+        open,
+    })
+}
+
+/// The request of the address in view, as the visit the shell knows read
+/// it.
+fn in_view(visits: Option<Visits>, path: String, query: String) -> Request {
+    let visit = visits.map_or_else(crate::visit::server_visit, |visits| visits.0.get());
+    Request::of(&visit, path, query)
+}
+
+/// The console's chrome around `content`, the routes: drawn once, each part
+/// following the router or the visit as it changes.
+pub(crate) fn console_shell(content: AnyView) -> AnyView {
+    ferrohealth_ui::widget::nav::follow_path();
+    let location = use_location();
+    let visits = use_context::<Visits>();
+    let path = location.pathname.get_untracked();
+    let query = location
+        .search
+        .get_untracked()
+        .trim_start_matches('?')
+        .to_owned();
+    let reached = OnceResource::new(server_reached());
+    let drawn_at = (path.clone(), query.clone());
+    let bar = view! {
+        <Suspense>
+            {move || {
+                let request = in_view(visits, drawn_at.0.clone(), drawn_at.1.clone());
+                Suspend::new(async move {
+                    let reached = reached.await.ok();
+                    top_bar(&request, reached)
+                })
+            }}
+        </Suspense>
+    }
+    .into_any();
+    let drawn_at = (path.clone(), query.clone());
+    let nav = (move || {
+        let request = in_view(visits, drawn_at.0.clone(), drawn_at.1.clone());
+        navigation_of(&request)
+    })
+    .into_any();
+    let banner = view! {
         <Suspense>
             {Suspend::new(async move {
-                let health = request.client.probe().await;
-                let open = if request.sign_in {
-                    false
-                } else {
-                    request.client.serves_without_sign_in(request.version).await
-                };
-                chrome(&request, Probe::of(health), open, content())
+                reached.await.ok().filter(|reached| reached.open).map(|_| development_banner())
             })}
         </Suspense>
+    }
+    .into_any();
+    let page = shell(Shell {
+        topbar: bar,
+        banner: Some(banner),
+        sidebar: nav,
+        content,
+        dock: None,
+        footer: footer(),
+    });
+    view! {
+        {page}
+        <Shortcuts goto=crate::pages::shortcuts::goto() />
+        <ShortcutLegend groups=crate::pages::shortcuts::groups() words=LegendWords::of_page() />
     }
     .into_any()
 }
 
-/// The chrome of `request`, the server `probe`d as it answered, with the
-/// development banner when `open` (no sign-in on either side).
-fn chrome(request: &Request, probe: Probe, open: bool, content: AnyView) -> AnyView {
+/// The navigation of `request`, its rail as the reader left it.
+fn navigation_of(request: &Request) -> AnyView {
     let rail = Rail {
         collapsed: request.prefs.rail,
         action: String::from(routes::SIDEBAR_ROUTE),
         back: request.back(),
     };
-    let nav = sidebar(Sidebar {
+    sidebar(Sidebar {
         id: NAV_ID,
         label: tr(Msg::ShellNavigation),
         groups: navigation(request.reads_sync()),
         current: request.path.clone(),
         rail: Some(rail),
         nest: None,
-    });
-    let bar = topbar(TopBar {
+    })
+}
+
+/// The top bar of `request`, the server as it was `reached`.
+fn top_bar(request: &Request, reached: Option<Reached>) -> AnyView {
+    let probe = reached.map_or(Probe::Unreachable, |reached| reached.probe);
+    let open = reached.is_some_and(|reached| reached.open);
+    topbar(TopBar {
         sidebar: NAV_ID,
         lockup: lockup(
             routes::ui_link("", request.version),
@@ -164,26 +241,7 @@ fn chrome(request: &Request, probe: Probe, open: bool, content: AnyView) -> AnyV
         .into_any(),
         search: Some(search(request)),
         end: end(request, probe, open),
-    });
-    let page = shell(Shell {
-        topbar: bar,
-        banner: open.then(development_banner),
-        sidebar: nav,
-        content,
-        dock: None,
-        footer: footer(),
-    });
-    let legend = request.path == routes::ui_path(routes::SHORTCUTS_PATH);
-    view! {
-        {page}
-        <Shortcuts
-            groups=crate::pages::shortcuts::groups()
-            words=LegendWords::of_page()
-            goto=crate::pages::shortcuts::goto()
-            open=legend
-        />
-    }
-    .into_any()
+    })
 }
 
 /// The footer every page carries.
@@ -308,12 +366,18 @@ fn navigation(sync: bool) -> Vec<Group> {
 /// type ([`crate::pages::find::find_answer`]).
 #[must_use]
 pub(crate) fn search(request: &Request) -> AnyView {
+    search_box(search_of(request))
+}
+
+/// The top bar's search box of `request`, holding the words of the find
+/// page it is on.
+fn search_of(request: &Request) -> SearchBox {
     let value = if request.path == routes::ui_path(routes::FIND_PATH) {
         request.text(crate::find::QUERY_PARAM)
     } else {
         String::new()
     };
-    search_box(SearchBox {
+    SearchBox {
         id: String::from(SEARCH_ID),
         name: String::from(crate::find::QUERY_PARAM),
         label: tr(Msg::ShellSearchLabel),
@@ -322,7 +386,7 @@ pub(crate) fn search(request: &Request) -> AnyView {
         value,
         suggest: Some(String::from(crate::pages::find::ANSWER_ROUTE)),
         ..SearchBox::default()
-    })
+    }
 }
 
 /// The FHIR version select of `request`: each root a link to the same page
@@ -346,10 +410,19 @@ fn versions(request: &Request) -> VersionSelect {
 }
 
 /// The end of the top bar: the version select, the status pill, Sign in for
-/// a visitor, and the user menu.
+/// a visitor, and the user menu, each part that names the page in view
+/// following the router.
 fn end(request: &Request, probe: Probe, open: bool) -> AnyView {
-    let select = versions(request);
-    let choices = vec![select.choices()];
+    let location = use_location();
+    let at = {
+        let request = request.clone();
+        move || {
+            request.at(
+                location.pathname.get(),
+                location.search.get().trim_start_matches('?').to_owned(),
+            )
+        }
+    };
     let (reach, words) = probe.pill();
     let pill = status_pill(StatusPill {
         reach,
@@ -359,21 +432,41 @@ fn end(request: &Request, probe: Probe, open: bool) -> AnyView {
             &[("root", request.root.clone().into())],
         )),
     });
+    let select = {
+        let at = at.clone();
+        move || version_select(versions(&at()))
+    };
+    let signed_in = request.session.signed_in();
+    let sign_in = (!signed_in && request.sign_in).then(|| {
+        let at = at.clone();
+        (move || {
+            view! {
+                <a href=routes::sign_in_link(&at().back()) class=Variant::Secondary.small()>
+                    {label(Some(Glyph::LOG_IN), tr(Msg::ShellSignIn))}
+                </a>
+            }
+        })
+        .into_any()
+    });
+    let menu = move || user_menu(menu_of(&at(), open));
+    view! {
+        {select}
+        {pill}
+        {sign_in}
+        {menu}
+    }
+    .into_any()
+}
+
+/// The user menu of `request`, saying the server is `open` to a visitor.
+fn menu_of(request: &Request, open: bool) -> UserMenu {
+    let choices = vec![versions(request).choices()];
     let theme = ThemeChoice {
         current: request.prefs.family.theme,
         action: String::from(routes::PREFERENCE_ROUTE),
         back: request.back(),
     };
-    let signed_in = request.session.signed_in();
-    let sign_in = (!signed_in && request.sign_in).then(|| {
-        view! {
-            <a href=routes::sign_in_link(&request.back()) class=Variant::Secondary.small()>
-                {label(Some(Glyph::LOG_IN), tr(Msg::ShellSignIn))}
-            </a>
-        }
-        .into_any()
-    });
-    let menu = if signed_in {
+    if request.session.signed_in() {
         let who = request
             .session
             .who()
@@ -410,12 +503,23 @@ fn end(request: &Request, probe: Probe, open: bool) -> AnyView {
             sign_out: None,
             links: Vec::new(),
         }
-    };
-    view! {
-        {version_select(select)}
-        {pill}
-        {sign_in}
-        {user_menu(menu)}
     }
-    .into_any()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::search_of;
+    use crate::request::Request;
+    use crate::visit::Visit;
+
+    #[test]
+    fn the_search_asks_the_find_answer_route_and_keeps_the_find_page_s_words() {
+        let visit = Visit::default();
+        let find = Request::of(&visit, String::from("/find"), String::from("q=respir"));
+        let search = search_of(&find);
+        assert_eq!(Some(String::from("/find/answer")), search.suggest);
+        assert_eq!("respir", search.value);
+        let other = Request::of(&visit, String::from("/systems"), String::from("q=respir"));
+        assert_eq!("", search_of(&other).value, "only the find page fills it");
+    }
 }

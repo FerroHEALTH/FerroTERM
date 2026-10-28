@@ -106,7 +106,7 @@ fn messages_source() -> String {
         .filter(|id| !id.starts_with("number-"))
         .collect();
     let mut out = String::from(
-        "/// A message of the console's catalog, by its id.\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub(crate) enum Msg {\n",
+        "/// A message of the console's catalog, by its id.\n#[cfg_attr(\n    target_arch = \"wasm32\",\n    expect(\n        dead_code,\n        reason = \"the words of the server's own routes, its sign-in and its form posts, are drawn on the server alone\"\n    )\n)]\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub(crate) enum Msg {\n",
     );
     for id in &ids {
         line(

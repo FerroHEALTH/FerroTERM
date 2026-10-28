@@ -167,7 +167,12 @@ pub fn leptos_options(settings: &Settings) -> LeptosOptions {
 pub fn router(state: ConsoleState) -> axum::Router {
     let options = leptos_options(state.settings());
     let form_action = form_action(state.settings());
-    let routes = leptos_axum::generate_route_list(crate::app::App);
+    // NOTE: no specification governs this: our own design; the router draws the
+    // route only to load it from here, so the server answers it with its handler.
+    let routes = leptos_axum::generate_route_list_with_exclusions(
+        crate::app::App,
+        Some(vec![String::from(crate::routes::FHIR_VERSION_ROUTE)]),
+    );
     let context = {
         let state = state.clone();
         move || {

@@ -36,15 +36,14 @@ use ferrohealth_ui::view::template::list::HeadingCount;
 use ferrohealth_ui::view::time::timestamp;
 use ferrohealth_ui::widget::action_menu::{Act, Action, Item, Menu};
 use leptos::prelude::*;
-use leptos_router::hooks::use_params_map;
 
 use crate::fhir::error::FhirError;
 use crate::fhir::searchset::SearchFilter;
 use crate::fhir::sync::{Finding, RunOutcome, RunRecord, RunSummary, Subject};
 use crate::locale::{Msg, tr, tr_with};
-use crate::pages::parts::{failure, headed, heading, loaded};
-use crate::posted::{INTENT, posted};
-use crate::request::{Request, request};
+use crate::pages::parts::{failure, headed, heading, redirect};
+use crate::posted::INTENT;
+use crate::request::Request;
 use crate::routes::{SYNC_PATH, SYNC_ROUTE, screen_link, ui_path};
 
 /// The intent of the Run now form.
@@ -142,61 +141,56 @@ fn posted_failure(error: Option<&FhirError>) -> Option<AnyView> {
 }
 
 /// Synchronisation: the runs, newest first, with Run now and Activate.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn SyncPage() -> impl IntoView {
-    let request = request();
+pub(crate) async fn page(request: Request) -> AnyView {
     if !request.reads_sync() {
         return hidden();
     }
-    let form = posted().filter(|form| matches!(form.intent(), RUN | ACTIVATE));
-    loaded(async move {
-        let refused = match form {
-            Some(form) => {
-                let answered = if form.intent() == RUN {
-                    request.client.run_now().await
-                } else {
-                    request.client.activate().await
-                };
-                match answered {
-                    Ok(summary) => {
-                        let outcome = match summary.outcome {
-                            RunOutcome::Ok => "ok",
-                            RunOutcome::Failed | RunOutcome::Other => "failed",
-                        };
-                        leptos_axum::redirect(&format!(
-                            "{SYNC_ROUTE}?{RAN_PARAM}={}&{OUTCOME_PARAM}={outcome}",
-                            percent(&summary.id)
-                        ));
-                        return ().into_any();
-                    }
-                    Err(error) => Some(error),
+    let form = request
+        .posted
+        .clone()
+        .filter(|form| matches!(form.intent(), RUN | ACTIVATE));
+    let refused = match form {
+        Some(form) => {
+            let answered = if form.intent() == RUN {
+                request.client.run_now().await
+            } else {
+                request.client.activate().await
+            };
+            match answered {
+                Ok(summary) => {
+                    let outcome = match summary.outcome {
+                        RunOutcome::Ok => "ok",
+                        RunOutcome::Failed | RunOutcome::Other => "failed",
+                    };
+                    redirect(&format!(
+                        "{SYNC_ROUTE}?{RAN_PARAM}={}&{OUTCOME_PARAM}={outcome}",
+                        percent(&summary.id)
+                    ));
+                    return ().into_any();
                 }
+                Err(error) => Some(error),
             }
-            None => None,
-        };
-        let header = heading(
-            tr(Msg::ShellSynchronisation),
-            Some(tr(Msg::SyncSubtitle)),
-            Vec::new(),
-            actions(),
-        );
-        let body = match request.client.runs().await {
-            Ok(runs) => runs_section(&runs),
-            Err(error) => failure(&error),
-        };
-        view! {
-            {header}
-            {confirmations()}
-            {posted_failure(refused.as_ref())}
-            {ran_notice(&request)}
-            {panel_sections(body)}
         }
-        .into_any()
-    })
+        None => None,
+    };
+    let header = heading(
+        tr(Msg::ShellSynchronisation),
+        Some(tr(Msg::SyncSubtitle)),
+        Vec::new(),
+        actions(),
+    );
+    let body = match request.client.runs().await {
+        Ok(runs) => runs_section(&runs),
+        Err(error) => failure(&error),
+    };
+    view! {
+        {header}
+        {confirmations()}
+        {posted_failure(refused.as_ref())}
+        {ran_notice(&request)}
+        {panel_sections(body)}
+    }
+    .into_any()
 }
 
 /// The title row's actions: Run now, and Activate in More, each opening its
@@ -339,58 +333,49 @@ fn runs_section(runs: &[RunSummary]) -> AnyView {
 }
 
 /// One run's screen: its Summary or its Findings.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn RunPage() -> impl IntoView {
-    let request = request();
+pub(crate) async fn run_page(request: Request) -> AnyView {
     if !request.reads_sync() {
         return hidden();
     }
-    let params = use_params_map();
-    let (id, tab) = params.with_untracked(|params| (params.get("id"), params.get("tab")));
+    let (id, tab) = (request.segment(1), request.segment(2));
     let id = id.unwrap_or_default();
     let findings = match tab.as_deref() {
         None => false,
         Some("findings") => true,
         Some(_) => return hidden(),
     };
-    loaded(async move {
-        match request.client.run_record(&id).await {
-            Ok(record) => {
-                let ids = if findings {
-                    resolve(&request, &record.revalidation.findings).await
-                } else {
-                    BTreeMap::new()
-                };
-                run_page(&request, &record, findings, &ids)
-            }
-            Err(error) => {
-                let not_found = error.status() == Some(http::StatusCode::NOT_FOUND);
-                view! {
-                    {heading(
-                        tr_with(Msg::SyncRunTitle, &[("when", id.clone().into())]),
-                        None,
-                        vec![crumb()],
-                        ActionGroup::none(),
-                    )}
-                    {not_found
-                        .then(|| {
-                            notice(
-                                Tone::Bad,
-                                Announce::Alert,
-                                None,
-                                tr_with(Msg::SyncNotFound, &[("id", id.clone().into())]),
-                            )
-                        })}
-                    {(!not_found).then(|| failure(&error))}
-                }
-                .into_any()
-            }
+    match request.client.run_record(&id).await {
+        Ok(record) => {
+            let ids = if findings {
+                resolve(&request, &record.revalidation.findings).await
+            } else {
+                BTreeMap::new()
+            };
+            run_screen(&request, &record, findings, &ids)
         }
-    })
+        Err(error) => {
+            let not_found = error.status() == Some(http::StatusCode::NOT_FOUND);
+            view! {
+                {heading(
+                    tr_with(Msg::SyncRunTitle, &[("when", id.clone().into())]),
+                    None,
+                    vec![crumb()],
+                    ActionGroup::none(),
+                )}
+                {not_found
+                    .then(|| {
+                        notice(
+                            Tone::Bad,
+                            Announce::Alert,
+                            None,
+                            tr_with(Msg::SyncNotFound, &[("id", id.clone().into())]),
+                        )
+                    })}
+                {(!not_found).then(|| failure(&error))}
+            }
+            .into_any()
+        }
+    }
 }
 
 /// The trail's step back to the runs.
@@ -399,7 +384,7 @@ fn crumb() -> Crumb {
 }
 
 /// The page of `record`, on its Findings tab when `findings`.
-fn run_page(
+fn run_screen(
     request: &Request,
     record: &RunRecord,
     findings: bool,

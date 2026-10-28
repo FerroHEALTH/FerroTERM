@@ -26,7 +26,6 @@ use ferrohealth_ui::view::surface::{
 use ferrohealth_ui::view::template::list::HeadingCount;
 use ferrohealth_ui::widget::action_menu::{Act, Action, Item, Menu};
 use leptos::prelude::*;
-use leptos_router::hooks::use_params_map;
 
 use crate::auth::scopes::Letter;
 use crate::fhir::concept_map::{MappingRow, PublishedConceptMap};
@@ -34,40 +33,29 @@ use crate::fhir::version::FhirVersion;
 use crate::fhir::{CONCEPT_MAP, Document, resources_text};
 use crate::locale::{Msg, tr, tr_with};
 use crate::pages::detail::{Head, Kind, Links, PANE_PARAM, Pane, header, line, tabbed};
-use crate::pages::parts::{Source, failure, heading, loaded, system_names};
-use crate::request::{Request, request};
+use crate::pages::parts::{Source, failure, heading, system_names};
+use crate::request::Request;
 use crate::routes::{
     CONCEPT_MAPS_PATH, TRANSLATE_PATH, editing_link, resource_link, system_link, ui_link,
 };
 
 /// One concept map, on the tab the address names.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn ConceptMapPage() -> impl IntoView {
-    let request = request();
-    let params = use_params_map();
-    let id = params
-        .with_untracked(|params| params.get("id"))
-        .unwrap_or_default();
+pub(crate) async fn page(request: Request) -> AnyView {
+    let id = request.segment(1).unwrap_or_default();
     let Some(pane) = Pane::of(Kind::ConceptMap, request.param(PANE_PARAM).as_deref()) else {
         return crate::pages::errors::not_found_page();
     };
-    loaded(async move {
-        match request.client.concept_map_read(request.version, &id).await {
-            Ok(document) => {
-                let names = system_names(&request.client, request.version).await;
-                page(&request, &id, &document, &names, pane)
-            }
-            Err(error) => view! {
-                {heading(id.clone(), None, Vec::new(), ActionGroup::none())}
-                {failure(&error)}
-            }
-            .into_any(),
+    match request.client.concept_map_read(request.version, &id).await {
+        Ok(document) => {
+            let names = system_names(&request.client, request.version).await;
+            screen(&request, &id, &document, &names, pane)
         }
-    })
+        Err(error) => view! {
+            {heading(id.clone(), None, Vec::new(), ActionGroup::none())}
+            {failure(&error)}
+        }
+        .into_any(),
+    }
 }
 
 /// A value percent-encoded as one query component.
@@ -121,7 +109,7 @@ fn actions(
 }
 
 /// The page of `document` on `pane`.
-fn page(
+fn screen(
     request: &Request,
     id: &str,
     document: &Document<PublishedConceptMap>,

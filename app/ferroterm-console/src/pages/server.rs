@@ -28,7 +28,6 @@ use ferrohealth_ui::view::tabs::{Tab, binder};
 use ferrohealth_ui::view::template::list::HeadingCount;
 use ferrohealth_ui::widget::action_menu::{Act, Action, Item, Menu};
 use leptos::prelude::*;
-use leptos_router::hooks::use_params_map;
 
 use crate::comparison::{Cell, Comparison, RootAnswer, Row, compare, notes, state_sentence};
 use crate::evidence::{Conformance, Latency, embedded};
@@ -37,9 +36,9 @@ use crate::fhir::sync::Reloaded;
 use crate::fhir::version::FhirVersion;
 use crate::locale::{Msg, tr, tr_with};
 use crate::pages::dashboard::host;
-use crate::pages::parts::{failure, heading, loaded};
-use crate::posted::{INTENT, posted};
-use crate::request::{Request, request};
+use crate::pages::parts::{failure, heading, redirect};
+use crate::posted::INTENT;
+use crate::request::Request;
 use crate::routes::{SERVER_PATH, SERVER_ROUTE, ui_path};
 
 /// The intent of the Reload the served set form.
@@ -106,16 +105,8 @@ fn tabbed(current: ServerTab, panel: AnyView) -> AnyView {
 }
 
 /// Server, on the tab the route names.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn ServerPage() -> impl IntoView {
-    let request = request();
-    let params = use_params_map();
-    let segment = params.with_untracked(|params| params.get("tab"));
-    let Some(tab) = ServerTab::of(segment.as_deref()) else {
+pub(crate) async fn page(request: Request) -> AnyView {
+    let Some(tab) = ServerTab::of(request.segment(1).as_deref()) else {
         return crate::pages::errors::not_found_page();
     };
     let reloads = request.reloads();
@@ -132,24 +123,26 @@ pub(crate) fn ServerPage() -> impl IntoView {
             ActionGroup::none()
         },
     );
-    let form = posted().filter(|form| reloads && form.intent() == RELOAD);
-    let reload = (reloads || form.is_some()).then(|| {
-        let request = request.clone();
-        loaded(async move {
-            let answered = match form {
-                Some(_) => Some(request.client.reload().await),
-                None => None,
-            };
-            reload_outcome(&request, answered)
-        })
-    });
+    let form = request
+        .posted
+        .clone()
+        .filter(|form| reloads && form.intent() == RELOAD);
+    let reload = if reloads || form.is_some() {
+        let answered = match form {
+            Some(_) => Some(request.client.reload().await),
+            None => None,
+        };
+        Some(reload_outcome(&request, answered))
+    } else {
+        None
+    };
     let body = match tab {
         ServerTab::Evidence => tabbed(tab, evidence()),
-        ServerTab::Versions | ServerTab::Operations => loaded(async move {
+        ServerTab::Versions | ServerTab::Operations => {
             let answers = read_roots(&request).await;
             let counts = system_counts(&request, &answers).await;
             tabbed(tab, roots_panel(&request, tab, &answers, &counts))
-        }),
+        }
     };
     view! {
         {header}
@@ -204,7 +197,7 @@ fn reload_dialog() -> AnyView {
 fn reload_outcome(request: &Request, answered: Option<Result<Reloaded, FhirError>>) -> AnyView {
     match answered {
         Some(Ok(reloaded)) if reloaded.status.is_success() => {
-            leptos_axum::redirect(&format!(
+            redirect(&format!(
                 "{SERVER_ROUTE}?{RELOADED_PARAM}={}",
                 reloaded.status.as_u16()
             ));

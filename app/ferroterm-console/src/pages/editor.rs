@@ -311,7 +311,7 @@ pub(crate) fn refused(request: &Request, error: &FhirError, reload: &str) -> (An
                 Action::new(
                     Some(Glyph::REFRESH_CW),
                     tr(Msg::EditorReload),
-                    Act::Link(reload.to_owned()),
+                    Act::Link(reloaded(reload)),
                 ),
                 Variant::Primary,
             );
@@ -422,9 +422,17 @@ pub(crate) fn percent(value: &str) -> String {
     url::form_urlencoded::byte_serialize(value.as_bytes()).collect()
 }
 
+/// The editor's address `reload` asked for again, marked so the router
+/// reads it afresh even from the page the refused post drew at the same
+/// address; the editor reads no such parameter.
+fn reloaded(reload: &str) -> String {
+    let separator = if reload.contains('?') { '&' } else { '?' };
+    format!("{reload}{separator}reload=current")
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{field, rows};
+    use super::{field, reloaded, rows};
     use crate::posted::Posted;
 
     #[test]
@@ -435,5 +443,14 @@ mod tests {
         assert_eq!(vec!["k2", "k1", "new-1"], keys);
         assert_eq!("Bee", field(&read[0].1, "display"));
         assert_eq!("", field(&read[1].1, "display"));
+    }
+
+    #[test]
+    fn the_reload_after_a_conflict_is_marked_apart_from_the_page_it_is_on() {
+        assert_eq!(
+            "/codesystem?fhir=r4b&system=x&reload=current",
+            reloaded("/codesystem?fhir=r4b&system=x")
+        );
+        assert_eq!("/compose?reload=current", reloaded("/compose"));
     }
 }

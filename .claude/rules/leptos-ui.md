@@ -15,23 +15,23 @@ before any console change:
 - the consumer guide, [`docs/consoles.md`](https://github.com/FerroHEALTH/FerroUI/blob/main/docs/consoles.md):
   how a console takes the library, what it keeps local, how it moves to a
   new release;
-- the component rules, [`.claude/rules/leptos-ui.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.3.6/.claude/rules/leptos-ui.md):
+- the component rules, [`.claude/rules/leptos-ui.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.5.6/.claude/rules/leptos-ui.md):
   the mandates (§0: Rust only, no inline style, no server function in the
   library, no browser storage, no patient identifier in a URL), the
   four-layer interaction contract (§1), reactivity, views, forms, tables and
   paging, accessibility, tokens and themes, icons, the bundle, the catalogs,
-  the book's rules and the island rules;
-- the crate discipline, [`crates/ferrohealth-ui/CLAUDE.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.3.6/crates/ferrohealth-ui/CLAUDE.md):
-  the interaction contract, islands mode and the list of ready islands;
-- the reviewed design, [`design/README.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.3.6/design/README.md),
-  [`design/COMPONENTS.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.3.6/design/COMPONENTS.md)
+  the book's rules and whole-page hydration (§15);
+- the crate discipline, [`crates/ferrohealth-ui/CLAUDE.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.5.6/crates/ferrohealth-ui/CLAUDE.md):
+  the interaction contract and the list of ready components;
+- the reviewed design, [`design/README.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.5.6/design/README.md),
+  [`design/COMPONENTS.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.5.6/design/COMPONENTS.md)
   (the component IDs such as R9, F13 and M1 to M6, the family rules, the
   page templates) and the console's mockup under
-  [`design/consoles/ferroterm/`](https://github.com/FerroHEALTH/FerroUI/tree/v0.3.6/design/consoles/ferroterm).
+  [`design/consoles/ferroterm/`](https://github.com/FerroHEALTH/FerroUI/tree/v0.5.6/design/consoles/ferroterm).
 
 **The pin decides the version you read.** The console pins `ferrohealth-ui
-= "=0.3.6"` (root `Cargo.toml`), so every FerroUI document above is read at
-the tag `v0.3.6`. FerroUI's `design/` is the only design source: a design
+= "=0.5.6"` (root `Cargo.toml`), so every FerroUI document above is read at
+the tag `v0.5.6`. FerroUI's `design/` is the only design source: a design
 folder anywhere else is stale and never synced from.
 
 **Nothing FerroUI has or should have is built here.** A missing component,
@@ -46,22 +46,20 @@ for a Leptos question FerroUI does not settle is the official Leptos book
 
 ## 1. What the console is
 
-- **A backend-for-frontend binary in Leptos islands mode.**
-  `ferroterm-console` (`serve`, `config check`, `healthcheck`) draws every
-  page on the server and sends it whole; the browser hydrates the islands in
-  it and nothing else (the Leptos book, "Guide: Islands"). The halves are
-  chosen by compilation target, never by a Cargo feature: the host half
-  links `leptos` with `islands`, `ssr` and `nonce`, the wasm32 half with
-  `islands` and `hydrate`. cargo-leptos 0.3.11 builds it
-  (`scripts/release/console-site.sh`) with `--split`, and the workspace turns
-  on `ferrohealth-ui`'s `split` feature to match, so FerroUI's lazy islands
-  (the tree, the date pickers) load as chunks of their own
-  (FerroHEALTH/FerroUI#331). Every lane builds the site through that script. The terminology server serves no UI file.
-- **The browser half carries islands only:** FerroUI's (the theme menu, the
-  copy buttons, the tree, the toasts, the repeat rows) and the console's own
-  keyboard shortcuts (`crate::islands`). Every page module compiles for the
-  host alone, so the WebAssembly holds no page, no catalog and no FHIR
-  client.
+- **A backend-for-frontend binary whose page the browser hydrates whole.**
+  `ferroterm-console` (`serve`, `config check`, `healthcheck`) draws the
+  first page on the server; the browser hydrates it and draws every page
+  after it, so no link or `GET` form reloads the document (FerroUI
+  `docs/consoles.md`, "How a console builds"). The halves are chosen by
+  compilation target, never by a Cargo feature: the host half links `leptos`
+  with `ssr` and `nonce`, the wasm32 half with `hydrate`, and neither turns
+  on `islands`. The pages sit in five lazy route groups (`crate::groups`),
+  each loaded as chunks of its own, which cargo-leptos 0.3.11 builds with
+  `--split` (`scripts/release/console-site.sh`). Every lane builds the site
+  through that script. The terminology server serves no UI file.
+- **Every page, the FHIR client and the catalog compile for both halves.**
+  Only the configuration, the sign-in, the sessions, the form routes and the
+  forwarding to the server (`crate::upstream`) are the host's alone.
 - **A FHIR client and nothing else.** Every request is an ordinary request to
   the server's public FHIR API, built in `crate::fhir` and sent from the
   console's server (`crate::upstream`). The console depends on **no**
@@ -75,18 +73,33 @@ for a Leptos question FerroUI does not settle is the official Leptos book
 
 ## 2. Requests, forms and the session
 
+- **A page is read on the server, once.** Each screen is one async function
+  from its `Request` to the page. The `read_page` server function
+  (`crate::groups`) reads the visit (`crate::visit`) and runs the screen with
+  a recording client (`crate::fhir::tape`); whichever half shows the page
+  runs the screen again from that recording, so the browser hydrates what
+  the server drew and draws a page after a navigation from one round trip.
+  An exchange the recording does not hold goes through the `forward` server
+  function (`crate::fhir::exchange`), which forwards only the paths
+  `crate::upstream` allows.
+- **What the server read of the request reaches the browser** as the visit:
+  the preference cookies (never the session cookie), who is signed in and
+  the scopes, the console's own settings a page names, the locale, and a
+  posted form. The shell asks for it again after each navigation
+  (`visit::FollowVisit`).
 - **Every page works with no WebAssembly** (FerroUI's four layers). A read is
   a link or a `GET` form whose parameters live in the address (the
   operation runners, the listings, the concept browser, the history
-  comparison). A write is a plain `POST` form to the page's own address
-  (`crate::posted`): the server draws the page again with the posted fields
-  in its context, sends the write, and redirects to what it wrote or draws
-  the refusal over the draft the reader keeps (`pages::editor`). A
-  preference, the navigation rail and the session's FHIR version are form
-  posts or links to the console's routes (`crate::post`).
+  comparison). A write is a plain `POST` form to the page's own address: the
+  server draws the page again with the posted fields in the visit, sends the
+  write, and redirects to what it wrote or draws the refusal over the draft
+  the reader keeps (`pages::editor`). A preference, the navigation rail and
+  the session's FHIR version are form posts or links to the console's routes
+  (`crate::post`); FerroUI's preference and rail forms post in the
+  background and the router draws the page they return to.
 - **A request that is not a safe method is taken only from the console's own
-  pages** (`server::same_origin_only`, fetch metadata first); the console has
-  no server function.
+  pages** (`server::same_origin_only`, fetch metadata first), the server
+  functions' posts among them.
 - **The reader's sign-in lives on the console's server** (`crate::session`,
   `crate::oidc`): authorization code with PKCE at the configured OpenID
   Provider, the session in memory behind one opaque `HttpOnly` cookie. The
@@ -107,12 +120,16 @@ for a Leptos question FerroUI does not settle is the official Leptos book
 
 ## 3. Rendering
 
-- **A route renders whole on the server** (`SsrMode::Async`): a screen reads
-  what it shows in one plain future under `<Suspense>`
-  (`pages::parts::loaded`), so the page arrives drawn and no loading state
-  is ever sent.
-- **What a page reads stays on the server.** An island takes the words it
-  draws as props, so nothing a screen read reaches the browser but as HTML.
+- **A route renders whole on the server** (`SsrMode::Async`), so the first
+  page arrives drawn and no loading state is ever sent.
+- **The shell is drawn once** (`shell::console_shell`) and follows the
+  router: the navigation marks the page in view, the version select and
+  the user menu follow the address, and the parts that read the visit draw
+  again when it changes.
+- **A view closure the server would render once per pass is drawn once on
+  the server, outside the closure**, as the page group and the layout do,
+  so a page reads the server once and its recording keeps the id the
+  browser hydrates it from.
 - A resource page's tab, a runner's run, a listing's page, sort and filter,
   and the concept browser's open levels are query parameters, never
   fragments or client state.
@@ -151,6 +168,9 @@ are `no-store`, and only the site bundle is compressed (`server.rs`).
   --all-targets -- -D warnings` on the host and `cargo clippy -p
   ferroterm-console --lib --target wasm32-unknown-unknown -- -D warnings`;
   `cargo nextest run -p ferroterm-console`.
+- The journeys wait for FerroUI's `data-ferroui-hydrated` mark before they
+  act, and a press waits for either a new document or a page the router
+  drew in place of the one it left (`e2e/tests/it/harness.rs`).
 - **The journeys are a merge gate, Rust only**: `scripts/ui-e2e.sh` builds
   the server, the console and the stub issuer, starts them on loopback with
   chromedriver, and runs `e2e/` (thirtyfour). Every journey fails on a
@@ -160,9 +180,11 @@ are `no-store`, and only the site bundle is compressed (`server.rs`).
 
 ## 7. Bundle
 
-`scripts/checks/console-bundle.sh` fails when the brotli-compressed
+`scripts/checks/console-bundle.sh` fails when the brotli-compressed entry
 WebAssembly of the release site bundle is over the number below, which it
-reads from this table.
+reads from this table. It reports the route groups' chunks beside it and
+does not gate them: a page loads the entry and its own group's chunks, and
+another group's only when the reader goes there.
 
 | Measure | Budget |
 |---|---|
@@ -171,12 +193,11 @@ reads from this table.
 The budget is 1.1 MiB, set with the console's first measured release
 bundle: 1071380 bytes on ferrohealth-ui 0.1.4 (2026-10-19, cargo-leptos
 0.3.11, wasm-bindgen 0.2.129, Rust 1.98.0) when the console was a whole
-app hydrated in the browser. In islands mode on ferrohealth-ui 0.3.2 the
-bundle carries the islands alone: 319426 bytes (2026-10-23, the same
-tools, Rust 1.99.1) for the entry and 182948 for the chunks of the
-lazy islands, 502374 in all, 43% of the budget. A change that needs more raises the
-budget here, in its own pull request, with the measured size and the
-reason.
+app hydrated in the browser. Hydrated whole again on ferrohealth-ui 0.5.6,
+with its pages in five route groups, the entry is 590475 bytes (2026-10-28,
+the same tools, Rust 1.99.1), 51% of the budget, and the groups' 25 chunks
+967442 more. A change that needs more raises the budget here, in its own
+pull request, with the measured size and the reason.
 
 ## 8. Strings and locales
 

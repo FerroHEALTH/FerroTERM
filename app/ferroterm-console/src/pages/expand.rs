@@ -28,9 +28,9 @@ use crate::locale::{Msg, message, tr, tr_with};
 use crate::pages::operations::{
     Op, before, choices, frame, options, run, select, sent, text, verdict,
 };
-use crate::pages::parts::{failure, loaded, name_of};
+use crate::pages::parts::{failure, name_of};
 use crate::prefs::MAX_COUNT;
-use crate::request::{Request, request};
+use crate::request::Request;
 use crate::routes::ui_link;
 
 /// The address parameter carrying the value set's canonical.
@@ -117,106 +117,98 @@ impl Asked {
 }
 
 /// The Expand tab.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn ExpandPage() -> impl IntoView {
-    let request = request();
-    loaded(async move {
-        let sets_named = request
-            .client
-            .published_names(request.version, VALUE_SET)
-            .await
-            .ok();
-        let sets = choices(sets_named.as_ref());
-        let set_names = sets_named
-            .as_ref()
-            .map(crate::fhir::named::NamedSearch::names)
-            .unwrap_or_default();
-        let asked = Asked::read(&request);
-        let picked = if asked.url.is_empty() {
-            sets.first()
-                .map(|(value, _)| value.clone())
-                .unwrap_or_default()
-        } else {
-            asked.url.clone()
-        };
-        let count = asked.count.to_string();
-        let fields = view! {
-            {select("expand-url", URL_PARAM, tr(Msg::CheckValueSet), &sets, &picked, None)}
-            {text(
-                "expand-filter",
-                FILTER_PARAM,
-                tr(Msg::ExpandFilter),
-                &asked.filter,
-                tr(Msg::ExpandFilterHint),
+pub(crate) async fn page(request: Request) -> AnyView {
+    let sets_named = request
+        .client
+        .published_names(request.version, VALUE_SET)
+        .await
+        .ok();
+    let sets = choices(sets_named.as_ref());
+    let set_names = sets_named
+        .as_ref()
+        .map(crate::fhir::named::NamedSearch::names)
+        .unwrap_or_default();
+    let asked = Asked::read(&request);
+    let picked = if asked.url.is_empty() {
+        sets.first()
+            .map(|(value, _)| value.clone())
+            .unwrap_or_default()
+    } else {
+        asked.url.clone()
+    };
+    let count = asked.count.to_string();
+    let fields = view! {
+        {select("expand-url", URL_PARAM, tr(Msg::CheckValueSet), &sets, &picked, None)}
+        {text(
+            "expand-filter",
+            FILTER_PARAM,
+            tr(Msg::ExpandFilter),
+            &asked.filter,
+            tr(Msg::ExpandFilterHint),
+        )}
+        {Field::new("expand-count", tr(Msg::ExpandPageSize))
+            .view(
+                view! {
+                    <input
+                        id="expand-count"
+                        name=COUNT_PARAM
+                        type="number"
+                        min="1"
+                        max=MAX_COUNT.to_string()
+                        class=format!("{INPUT} {NARROW}")
+                        value=count
+                    />
+                },
             )}
-            {Field::new("expand-count", tr(Msg::ExpandPageSize))
-                .view(
+        {field_checks(
+            view! {
+                {check(
+                    "expand-active",
+                    tr(Msg::ExpandActiveOnly),
                     view! {
                         <input
-                            id="expand-count"
-                            name=COUNT_PARAM
-                            type="number"
-                            min="1"
-                            max=MAX_COUNT.to_string()
-                            class=format!("{INPUT} {NARROW}")
-                            value=count
+                            type="checkbox"
+                            id="expand-active"
+                            name=ACTIVE_PARAM
+                            value="true"
+                            checked=asked.active
                         />
                     },
                 )}
-            {field_checks(
-                view! {
-                    {check(
-                        "expand-active",
-                        tr(Msg::ExpandActiveOnly),
-                        view! {
-                            <input
-                                type="checkbox"
-                                id="expand-active"
-                                name=ACTIVE_PARAM
-                                value="true"
-                                checked=asked.active
-                            />
-                        },
-                    )}
-                    {check(
-                        "expand-designations",
-                        tr(Msg::ExpandDesignations),
-                        view! {
-                            <input
-                                type="checkbox"
-                                id="expand-designations"
-                                name=DESIGNATIONS_PARAM
-                                value="true"
-                                checked=asked.designations
-                            />
-                        },
-                    )}
-                },
-            )}
-        }
-        .into_any();
-        let form = options(
-            &request,
-            &[],
-            fields,
-            run(
-                "expand-run",
-                tr(Msg::OpsExpand),
-                Glyph::LIST_TREE,
-                "$expand",
-            ),
-        );
-        let answer = if asked.url.is_empty() {
-            before(tr(Msg::ExpandBefore))
-        } else {
-            answer(&request, &asked, &name_of(&set_names, &asked.url)).await
-        };
-        frame(&request, Op::Expand, form, answer)
-    })
+                {check(
+                    "expand-designations",
+                    tr(Msg::ExpandDesignations),
+                    view! {
+                        <input
+                            type="checkbox"
+                            id="expand-designations"
+                            name=DESIGNATIONS_PARAM
+                            value="true"
+                            checked=asked.designations
+                        />
+                    },
+                )}
+            },
+        )}
+    }
+    .into_any();
+    let form = options(
+        &request,
+        &[],
+        fields,
+        run(
+            "expand-run",
+            tr(Msg::OpsExpand),
+            Glyph::LIST_TREE,
+            "$expand",
+        ),
+    );
+    let answer = if asked.url.is_empty() {
+        before(tr(Msg::ExpandBefore))
+    } else {
+        answer(&request, &asked, &name_of(&set_names, &asked.url)).await
+    };
+    frame(&request, Op::Expand, form, answer)
 }
 
 /// The answer to `asked`, the value set named `set`.

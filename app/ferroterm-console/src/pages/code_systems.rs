@@ -26,8 +26,8 @@ use crate::fhir::named::{Listed, NamedSearch};
 use crate::fhir::terminology::SystemCard;
 use crate::locale::{Msg, message, tr, tr_with};
 use crate::pages::listing::{Frame, ListState, NAME_COLUMN, counted};
-use crate::pages::parts::{Source, failure, heading, loaded, versions_word};
-use crate::request::{Request, request};
+use crate::pages::parts::{Source, failure, heading, versions_word};
+use crate::request::Request;
 use crate::routes::{CODE_SYSTEM_EDITOR_PATH, SYSTEMS_PATH, system_link, ui_link, ui_path};
 
 /// One served code system as the listing draws it.
@@ -91,33 +91,25 @@ pub(crate) fn hierarchy_word(card: &SystemCard) -> String {
 }
 
 /// Code systems.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn CodeSystemsPage() -> impl IntoView {
-    let request = request();
-    loaded(async move {
-        let capabilities = request
-            .client
-            .terminology_capabilities(request.version)
-            .await;
-        let listed = request
-            .client
-            .published_names(request.version, CODE_SYSTEM)
-            .await
-            .map(|named| NamedSearch::listed(&named))
-            .unwrap_or_default();
-        match capabilities {
-            Ok(capabilities) => listing(&request, rows(capabilities.cards(), &listed)),
-            Err(error) => view! {
-                {heading(tr(Msg::ShellCodeSystems), None, Vec::new(), ActionGroup::none())}
-                {failure(&error)}
-            }
-            .into_any(),
+pub(crate) async fn page(request: Request) -> AnyView {
+    let capabilities = request
+        .client
+        .terminology_capabilities(request.version)
+        .await;
+    let listed = request
+        .client
+        .published_names(request.version, CODE_SYSTEM)
+        .await
+        .map(|named| NamedSearch::listed(&named))
+        .unwrap_or_default();
+    match capabilities {
+        Ok(capabilities) => listing(&request, rows(capabilities.cards(), &listed)),
+        Err(error) => view! {
+            {heading(tr(Msg::ShellCodeSystems), None, Vec::new(), ActionGroup::none())}
+            {failure(&error)}
         }
-    })
+        .into_any(),
+    }
 }
 
 /// The listing of `all` the root serves, as the address filters it.

@@ -18,12 +18,15 @@ and editors for the resources a deployment writes.
 ## 1. The shape
 
 **The console is its own binary and its own image, a backend-for-frontend in
-front of the server.** `ferroterm-console` draws every page on the server in
-Leptos islands mode (Leptos 0.8, the book's "Guide: Islands"): the page
-arrives whole, works with no WebAssembly, and the browser hydrates only the
-islands in it, FerroUI's and the console's keyboard shortcuts. It reaches
-the terminology server over the server's public FHIR API, server to server,
-and the terminology server serves no user interface of its own.
+front of the server.** `ferroterm-console` draws the first page on the
+server: it arrives whole and works with no WebAssembly. The browser then
+hydrates the whole page and draws every page after it, each group of pages
+loaded as chunks of its own, so no link or `GET` form reloads the document
+(FerroUI's consumer guide, "How a console builds"). The console's server
+reads each page once, recording what it asks the terminology server, and
+the browser draws the page from that recording. It reaches the terminology
+server over the server's public FHIR API, server to server, and the
+terminology server serves no user interface of its own.
 
 The console is one of four FerroHEALTH consoles (FerroEHR, FerroFED, FerroTERM
 and FerroBRIDGE) that share one component library, `ferrohealth-ui`, one
@@ -55,9 +58,9 @@ shape, and one operator experience. That is the reason for the shape:
 | Concern | Choice |
 |---|---|
 | Framework | Leptos 0.8, `leptos_axum`, `leptos_router`, `leptos_meta` |
-| Halves | chosen by compilation target, never by a Cargo feature: the host half links `leptos` with `islands` and `ssr`, the `wasm32-unknown-unknown` half with `islands` and `hydrate` |
-| Rendering | every route `SsrMode::Async`: the server waits for the reads a screen exists to show, so no content waits on a script; reads are links and `GET` forms, writes plain `POST` forms to the page's own address |
-| Components | `ferrohealth-ui` `=0.3.6` (crates.io), its stylesheet served at `/ferrohealth-ui.css` and the FerroTERM brand at `/theme.css`; the console has no stylesheet of its own |
+| Halves | chosen by compilation target, never by a Cargo feature: the host half links `leptos` with `ssr`, the `wasm32-unknown-unknown` half with `hydrate`; every page compiles for both |
+| Rendering | every route `SsrMode::Async`: the server waits for the reads a screen exists to show, so no content waits on a script; the browser hydrates the whole page and draws every page after it from the recording of the server's read; reads are links and `GET` forms, writes plain `POST` forms to the page's own address |
+| Components | `ferrohealth-ui` `=0.5.6` (crates.io), its stylesheet served at `/ferrohealth-ui.css` and the FerroTERM brand at `/theme.css`; the console has no stylesheet of its own |
 | Build | cargo-leptos (`scripts/release/console-site.sh`), `wasm-opt` pinned and checked by SHA-256 (`scripts/release/console-tools.sh`); no Node |
 | Image | `docker/console/Dockerfile`, distroless static, the binary and the site bundle the release lane stages |
 

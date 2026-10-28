@@ -21,8 +21,8 @@ use crate::fhir::concept_map::PublishedConceptMap;
 use crate::fhir::searchset::SearchFilter;
 use crate::locale::{Msg, message, tr, tr_with};
 use crate::pages::listing::{Frame, ListState, NAME_COLUMN, counted, status_state};
-use crate::pages::parts::{Source, failure, heading, loaded, name_of, system_names};
-use crate::request::{Request, request};
+use crate::pages::parts::{Source, failure, heading, name_of, system_names};
+use crate::request::Request;
 use crate::routes::{CONCEPT_MAP_EDITOR_PATH, CONCEPT_MAPS_PATH, resource_link, ui_link, ui_path};
 
 /// The name a reader reads a concept map by.
@@ -58,32 +58,24 @@ pub(crate) fn from_to(
 }
 
 /// Concept maps.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn ConceptMapsPage() -> impl IntoView {
-    let request = request();
-    loaded(async move {
-        let found = request
-            .client
-            .concept_map_search(request.version, &SearchFilter::default())
-            .await;
-        let names = system_names(&request.client, request.version).await;
-        match found {
-            Ok(found) => listing(
-                &request,
-                found.found().into_iter().cloned().collect(),
-                &names,
-            ),
-            Err(error) => view! {
-                {heading(tr(Msg::ShellConceptMaps), None, Vec::new(), ActionGroup::none())}
-                {failure(&error)}
-            }
-            .into_any(),
+pub(crate) async fn page(request: Request) -> AnyView {
+    let found = request
+        .client
+        .concept_map_search(request.version, &SearchFilter::default())
+        .await;
+    let names = system_names(&request.client, request.version).await;
+    match found {
+        Ok(found) => listing(
+            &request,
+            found.found().into_iter().cloned().collect(),
+            &names,
+        ),
+        Err(error) => view! {
+            {heading(tr(Msg::ShellConceptMaps), None, Vec::new(), ActionGroup::none())}
+            {failure(&error)}
         }
-    })
+        .into_any(),
+    }
 }
 
 /// Where a listed map comes from: stored on the server, or loaded at start.

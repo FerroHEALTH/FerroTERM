@@ -121,7 +121,7 @@ async fn the_top_bar_search_asks_the_answer_route() {
     let state = console(None, &reaching(&server));
     let page = text(send(&state, get("/find?q=respir", &[])).await).await;
     assert!(
-        page.contains("/find/answer"),
-        "the search names its answer route: {page}"
+        page.contains("id=\"find-panel\""),
+        "the search draws the typeahead panel its answer route fills: {page}"
     );
 }

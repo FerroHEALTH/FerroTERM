@@ -10,8 +10,7 @@
 //! the draft the reader keeps. No specification governs this: our own
 //! design.
 
-use leptos::prelude::*;
-
+#[cfg(not(target_arch = "wasm32"))]
 /// The most bytes a posted form may carry: a code system's draft with every
 /// concept fits well under it.
 pub(crate) const LIMIT: usize = 4 * 1024 * 1024;
@@ -20,10 +19,11 @@ pub(crate) const LIMIT: usize = 4 * 1024 * 1024;
 pub(crate) const INTENT: &str = "intent";
 
 /// The fields of a posted form, in the order the browser sent them.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Posted(Vec<(String, String)>);
 
 impl Posted {
+    #[cfg(not(target_arch = "wasm32"))]
     /// The fields of the `application/x-www-form-urlencoded` body `body`.
     #[must_use]
     pub(crate) fn parse(body: &[u8]) -> Self {
@@ -60,12 +60,6 @@ impl Posted {
     pub(crate) fn intent(&self) -> &str {
         self.get(INTENT).unwrap_or_default()
     }
-}
-
-/// The form posted to the page being drawn, if one was.
-#[must_use]
-pub(crate) fn posted() -> Option<Posted> {
-    use_context::<Posted>()
 }
 
 #[cfg(test)]

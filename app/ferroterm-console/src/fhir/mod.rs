@@ -24,6 +24,7 @@ pub(crate) mod named;
 pub(crate) mod outcome;
 pub(crate) mod searchset;
 pub(crate) mod sync;
+pub(crate) mod tape;
 pub(crate) mod terminology;
 pub(crate) mod translate;
 pub(crate) mod validation;
@@ -54,6 +55,7 @@ use crate::fhir::named::NamedSearch;
 use crate::fhir::outcome::OperationOutcome;
 use crate::fhir::searchset::SearchFilter;
 use crate::fhir::searchset::SearchSet;
+use crate::fhir::tape::Tape;
 use crate::fhir::terminology::TerminologyCapabilities;
 use crate::fhir::translate::TranslateAnswer;
 use crate::fhir::translate::TranslateRequest;
@@ -74,6 +76,7 @@ use crate::url::RequestUrl;
 /// (<https://hl7.org/fhir/R4B/http.html#mime-type>).
 const FHIR_JSON: &str = "application/fhir+json";
 
+#[cfg(not(target_arch = "wasm32"))]
 /// The media type of everything the console reads that is not FHIR: the
 /// health route and the sync service's admin listener answer ordinary JSON.
 const PLAIN_JSON: &str = "application/json";
@@ -95,16 +98,32 @@ pub(crate) const CONCEPT_MAP: &str = "ConceptMap";
 /// `root` is the address the server's readers reach it at, which every
 /// request address a screen discloses starts with; the console's server
 /// decides where a request actually goes.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct FhirClient {
     root: String,
+    tape: Tape,
 }
 
 impl FhirClient {
     /// A client whose disclosed addresses start with `root`, the server's
     /// public root without a final `/`.
     pub(crate) fn new(root: String) -> Self {
-        Self { root }
+        Self {
+            root,
+            tape: Tape::Live,
+        }
+    }
+
+    /// The same client sending its exchanges through `tape`.
+    #[must_use]
+    pub(crate) fn with_tape(self, tape: Tape) -> Self {
+        Self { tape, ..self }
+    }
+
+    /// The tape the client sends its exchanges through.
+    #[must_use]
+    pub(crate) const fn tape(&self) -> &Tape {
+        &self.tape
     }
 
     /// The FHIR base of one served version, as a reader would type it.
@@ -114,6 +133,7 @@ impl FhirClient {
             .render(&self.root)
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     /// Probes `GET /health` and returns the status the server answered.
     ///
     /// `/health` sits outside the FHIR base, so no content negotiation applies
@@ -134,6 +154,7 @@ impl FhirClient {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     /// The status `GET /health` answers, or `None` when the server did not
     /// answer at all.
     pub(crate) async fn probe(&self) -> Option<StatusCode> {
@@ -143,6 +164,7 @@ impl FhirClient {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     /// Whether the root of `version` serves with no sign-in: it answers its
     /// SMART discovery document `404`, as a deployment with authentication
     /// switched off does
@@ -798,7 +820,9 @@ impl FhirClient {
 
     /// Sends one write and reads what the server committed.
     async fn write(&self, exchange: Exchange, url: &str) -> Result<Written, FhirError> {
-        let answer = exchange::send(exchange)
+        let answer = self
+            .tape
+            .send(exchange)
             .await
             .map_err(|error| transport(url, &error))?;
         let status = status_of(&answer, url)?;
@@ -982,7 +1006,8 @@ impl FhirClient {
     /// Sends a request of `method` to `url` with no body, asking for
     /// `accept`, and answers what came back.
     async fn send(&self, method: Method, url: &str, accept: &str) -> Result<Answer, FhirError> {
-        exchange::send(Exchange::new(method, self.path_of(url)?, accept))
+        self.tape
+            .send(Exchange::new(method, self.path_of(url)?, accept))
             .await
             .map_err(|error| transport(url, &error))
     }
@@ -1008,7 +1033,9 @@ impl FhirClient {
     async fn post_json<T: DeserializeOwned>(&self, url: &str, body: &str) -> Result<T, FhirError> {
         let exchange = Exchange::new(Method::Post, self.path_of(url)?, FHIR_JSON)
             .with_body(FHIR_JSON, body.to_owned());
-        let answer = exchange::send(exchange)
+        let answer = self
+            .tape
+            .send(exchange)
             .await
             .map_err(|error| transport(url, &error))?;
         read_json(&answer, url)
@@ -1091,9 +1118,7 @@ mod tests {
 
     #[test]
     fn a_version_base_is_the_root_plus_the_version_segment() {
-        let client = FhirClient {
-            root: "https://tx.example.org".to_owned(),
-        };
+        let client = FhirClient::new("https://tx.example.org".to_owned());
         assert_eq!(
             client.version_base(FhirVersion::R4B),
             "https://tx.example.org/r4b"
@@ -1102,9 +1127,7 @@ mod tests {
 
     #[test]
     fn the_metadata_addresses_are_the_ones_a_reader_would_type() {
-        let client = FhirClient {
-            root: "https://tx.example.org".to_owned(),
-        };
+        let client = FhirClient::new("https://tx.example.org".to_owned());
         assert_eq!(
             client.metadata_url(FhirVersion::R5),
             "https://tx.example.org/r5/metadata"
@@ -1117,9 +1140,7 @@ mod tests {
 
     #[test]
     fn a_code_system_search_encodes_the_canonical_it_asks_about() {
-        let client = FhirClient {
-            root: "https://tx.example.org".to_owned(),
-        };
+        let client = FhirClient::new("https://tx.example.org".to_owned());
         assert_eq!(
             client.code_system_search_url(
                 FhirVersion::R4B,
@@ -1132,9 +1153,7 @@ mod tests {
 
     #[test]
     fn an_expansion_address_carries_an_implicit_canonical_whole() {
-        let client = FhirClient {
-            root: "https://tx.example.org".to_owned(),
-        };
+        let client = FhirClient::new("https://tx.example.org".to_owned());
         let request = ExpandRequest {
             // An implicit value set canonical carries its own query string,
             // and an unencoded one would truncate the request around it.
@@ -1153,9 +1172,7 @@ mod tests {
 
     #[test]
     fn a_lookup_address_is_the_one_a_reader_would_type() {
-        let client = FhirClient {
-            root: "https://tx.example.org".to_owned(),
-        };
+        let client = FhirClient::new("https://tx.example.org".to_owned());
         let request = LookupRequest {
             system: "http://snomed.info/sct".to_owned(),
             code: "404684003".to_owned(),
@@ -1171,9 +1188,7 @@ mod tests {
 
     #[test]
     fn an_inline_expansion_addresses_the_operation_and_carries_its_body() {
-        let client = FhirClient {
-            root: "https://tx.example.org".to_owned(),
-        };
+        let client = FhirClient::new("https://tx.example.org".to_owned());
         assert_eq!(
             client.expand_post_url(FhirVersion::R4B),
             "https://tx.example.org/r4b/ValueSet/$expand",
@@ -1183,9 +1198,7 @@ mod tests {
 
     #[test]
     fn a_search_sends_only_the_parameters_the_reader_named() {
-        let client = FhirClient {
-            root: "https://tx.example.org".to_owned(),
-        };
+        let client = FhirClient::new("https://tx.example.org".to_owned());
         assert_eq!(
             client.search_url(FhirVersion::R4B, VALUE_SET, &SearchFilter::default()),
             "https://tx.example.org/r4b/ValueSet",
@@ -1208,9 +1221,7 @@ mod tests {
 
     #[test]
     fn a_resource_read_escapes_the_id_into_its_own_segment() {
-        let client = FhirClient {
-            root: "https://tx.example.org".to_owned(),
-        };
+        let client = FhirClient::new("https://tx.example.org".to_owned());
         assert_eq!(
             client.resource_url(FhirVersion::R6, VALUE_SET, "a/b"),
             "https://tx.example.org/r6/ValueSet/a%2Fb",
@@ -1220,9 +1231,7 @@ mod tests {
 
     #[test]
     fn a_translation_sends_the_names_the_target_version_declares() {
-        let client = FhirClient {
-            root: "https://tx.example.org".to_owned(),
-        };
+        let client = FhirClient::new("https://tx.example.org".to_owned());
         let request = TranslateRequest {
             system: "http://snomed.info/sct".to_owned(),
             code: "404684003".to_owned(),
@@ -1243,9 +1252,7 @@ mod tests {
 
     #[test]
     fn a_validation_addresses_the_resource_type_it_is_invoked_on() {
-        let client = FhirClient {
-            root: "https://tx.example.org".to_owned(),
-        };
+        let client = FhirClient::new("https://tx.example.org".to_owned());
         let request = ValidateRequest {
             url: "https://terminology.example/x?edition=2031".to_owned(),
             code: "cat".to_owned(),
@@ -1273,9 +1280,7 @@ mod tests {
 
     #[test]
     fn a_subsumption_addresses_the_code_system_and_carries_both_codes() {
-        let client = FhirClient {
-            root: "https://tx.example.org".to_owned(),
-        };
+        let client = FhirClient::new("https://tx.example.org".to_owned());
         let request = SubsumesRequest {
             system: "http://snomed.info/sct".to_owned(),
             code_a: "404684003".to_owned(),
@@ -1303,9 +1308,7 @@ mod tests {
 
     #[test]
     fn a_create_addresses_the_resource_type_and_a_history_the_instance() {
-        let client = FhirClient {
-            root: "https://tx.example.org".to_owned(),
-        };
+        let client = FhirClient::new("https://tx.example.org".to_owned());
         assert_eq!(
             client.create_url(FhirVersion::R5, CODE_SYSTEM),
             "https://tx.example.org/r5/CodeSystem",

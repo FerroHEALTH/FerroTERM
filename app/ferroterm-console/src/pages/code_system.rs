@@ -24,7 +24,6 @@ use ferrohealth_ui::view::surface::{
 use ferrohealth_ui::view::template::list::HeadingCount;
 use ferrohealth_ui::widget::action_menu::{Act, Action, Item, Menu};
 use leptos::prelude::*;
-use leptos_router::hooks::use_params_map;
 
 use crate::auth::scopes::Letter;
 use crate::fhir::code_system::{CodeSystemSearch, PublishedCodeSystem};
@@ -34,8 +33,8 @@ use crate::fhir::{CODE_SYSTEM, Document, resources_text};
 use crate::locale::{Msg, tr, tr_with};
 use crate::pages::code_systems::content_word;
 use crate::pages::detail::{Head, Kind, Links, PANE_PARAM, Pane, header, line, tabbed};
-use crate::pages::parts::{Source, failure, heading, loaded};
-use crate::request::{Request, request};
+use crate::pages::parts::{Source, failure, heading};
+use crate::request::Request;
 use crate::routes::{
     BROWSE_PATH, EXPAND_PATH, LOOKUP_PATH, VALIDATE_PATH, editing_link, system_link,
     system_tool_link,
@@ -54,73 +53,62 @@ struct Read {
 }
 
 /// One code system, on the tab the address names.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn CodeSystemPage() -> impl IntoView {
-    let request = request();
-    let params = use_params_map();
-    let system = params
-        .with_untracked(|params| params.get("system"))
-        .unwrap_or_default();
+pub(crate) async fn page(request: Request) -> AnyView {
+    let system = request.segment(1).unwrap_or_default();
     let Some(pane) = Pane::of(Kind::CodeSystem, request.param(PANE_PARAM).as_deref()) else {
         return crate::pages::errors::not_found_page();
     };
-    loaded(async move {
-        let capabilities = match request
+    let capabilities = match request
+        .client
+        .terminology_capabilities(request.version)
+        .await
+    {
+        Ok(capabilities) => capabilities,
+        Err(error) => return refused(&system, &error),
+    };
+    let Some(card) = capabilities.card(&system) else {
+        return undeclared(&request, &system);
+    };
+    let index = card
+        .versions
+        .iter()
+        .any(|version| version.artifact.is_some());
+    let search: Result<Document<CodeSystemSearch>, _> = if index {
+        request
             .client
-            .terminology_capabilities(request.version)
+            .code_system_summary(request.version, &system)
             .await
-        {
-            Ok(capabilities) => capabilities,
-            Err(error) => return refused(&system, &error),
-        };
-        let Some(card) = capabilities.card(&system) else {
-            return undeclared(&request, &system);
-        };
-        let index = card
-            .versions
-            .iter()
-            .any(|version| version.artifact.is_some());
-        let search: Result<Document<CodeSystemSearch>, _> = if index {
-            request
-                .client
-                .code_system_summary(request.version, &system)
-                .await
-        } else {
-            request
-                .client
-                .code_system_search(request.version, &system)
-                .await
-        };
-        let (published, text) = match search {
-            Ok(document) => (
-                document.value.published().into_iter().next(),
-                Some(resources_text(&document.text)),
-            ),
-            Err(_refused) => (None, None),
-        };
-        let source = if index {
-            Source::Index
-        } else if published
-            .as_ref()
-            .and_then(PublishedCodeSystem::stored)
-            .is_some()
-        {
-            Source::Stored
-        } else {
-            Source::Loaded
-        };
-        let read = Read {
-            card,
-            published,
-            text,
-            source,
-        };
-        page(&request, &read, pane)
-    })
+    } else {
+        request
+            .client
+            .code_system_search(request.version, &system)
+            .await
+    };
+    let (published, text) = match search {
+        Ok(document) => (
+            document.value.published().into_iter().next(),
+            Some(resources_text(&document.text)),
+        ),
+        Err(_refused) => (None, None),
+    };
+    let source = if index {
+        Source::Index
+    } else if published
+        .as_ref()
+        .and_then(PublishedCodeSystem::stored)
+        .is_some()
+    {
+        Source::Stored
+    } else {
+        Source::Loaded
+    };
+    let read = Read {
+        card,
+        published,
+        text,
+        source,
+    };
+    screen(&request, &read, pane)
 }
 
 /// The page of a read that was refused.
@@ -230,7 +218,7 @@ fn actions(request: &Request, read: &Read, title: &str) -> ActionGroup {
 }
 
 /// The page of `read` on `pane`.
-fn page(request: &Request, read: &Read, pane: Pane) -> AnyView {
+fn screen(request: &Request, read: &Read, pane: Pane) -> AnyView {
     let title = read
         .published
         .as_ref()

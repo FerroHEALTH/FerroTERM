@@ -19,12 +19,11 @@ use ferrohealth_ui::view::preferences::{
 };
 use leptos::prelude::*;
 use leptos_meta::Title;
-use leptos_router::hooks::use_params_map;
 
 use crate::fhir::version::FhirVersion;
 use crate::locale::{Msg, tr};
 use crate::prefs::{DISPLAY_LANGUAGE, FHIR, PAGE_SIZE};
-use crate::request::{Request, request};
+use crate::request::Request;
 use crate::routes::{PREFERENCE_ROUTE, RESET_ROUTE, SHORTCUTS_PATH, ui_path};
 
 /// The route segment of Language and region, as the console names it.
@@ -141,16 +140,8 @@ fn own_rows(request: &Request, post: &Post, saved: Option<&str>) -> Vec<AnyView>
 }
 
 /// Your preferences, on the tab the route names.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn PreferencesPage() -> impl IntoView {
-    let request = request();
-    let params = use_params_map();
-    let segment = params.with_untracked(|params| params.get("section"));
-    let Some(section) = section(segment.as_deref()) else {
+pub(crate) async fn page(request: Request) -> AnyView {
+    let Some(section) = section(request.segment(1).as_deref()) else {
         return crate::pages::errors::not_found_page();
     };
     let routes = routes();
@@ -172,7 +163,7 @@ pub(crate) fn PreferencesPage() -> impl IntoView {
         saved,
         accent: tr(Msg::PreferencesAccent),
         languages: crate::locale::languages(),
-        browser: crate::locale::requested(),
+        browser: request.browser.clone(),
         week_from_language: Weekday::Monday,
         shortcuts: Some(ui_path(SHORTCUTS_PATH)),
         reset: String::from(RESET_ROUTE),

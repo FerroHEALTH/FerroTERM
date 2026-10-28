@@ -24,8 +24,8 @@ use crate::pages::lookup::CODE_PARAM;
 use crate::pages::operations::{
     Op, before, choices, frame, options, run, select, sent, text, verdict,
 };
-use crate::pages::parts::{failure, loaded, name_of};
-use crate::request::{Request, request};
+use crate::pages::parts::{failure, name_of};
+use crate::request::Request;
 use crate::routes::{SYSTEM_PARAM, ui_link};
 
 /// The address parameter naming what to check.
@@ -44,34 +44,26 @@ const CODE_A_PARAM: &str = "codeA";
 const CODE_B_PARAM: &str = "codeB";
 
 /// The Check tab.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn ValidatePage() -> impl IntoView {
-    let request = request();
-    loaded(async move {
-        let relation = request.text(MODE_PARAM) == RELATION;
-        let systems_named = request
-            .client
-            .published_names(request.version, CODE_SYSTEM)
-            .await
-            .ok();
-        let systems = choices(systems_named.as_ref());
-        let system_names = systems_named
-            .as_ref()
-            .map(crate::fhir::named::NamedSearch::names)
-            .unwrap_or_default();
-        let system = request.text(SYSTEM_PARAM);
-        let mode = mode(&request, relation, &system);
-        let (form, answer) = if relation {
-            relation_tab(&request, mode, &systems, system).await
-        } else {
-            membership_tab(&request, mode, &systems, &system_names, system).await
-        };
-        frame(&request, Op::Check, form, answer)
-    })
+pub(crate) async fn page(request: Request) -> AnyView {
+    let relation = request.text(MODE_PARAM) == RELATION;
+    let systems_named = request
+        .client
+        .published_names(request.version, CODE_SYSTEM)
+        .await
+        .ok();
+    let systems = choices(systems_named.as_ref());
+    let system_names = systems_named
+        .as_ref()
+        .map(crate::fhir::named::NamedSearch::names)
+        .unwrap_or_default();
+    let system = request.text(SYSTEM_PARAM);
+    let mode = mode(&request, relation, &system);
+    let (form, answer) = if relation {
+        relation_tab(&request, mode, &systems, system).await
+    } else {
+        membership_tab(&request, mode, &systems, &system_names, system).await
+    };
+    frame(&request, Op::Check, form, answer)
 }
 
 /// The choice of what to check, two links that keep the code system.

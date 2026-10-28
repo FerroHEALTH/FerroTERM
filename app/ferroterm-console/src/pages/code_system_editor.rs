@@ -32,9 +32,9 @@ use crate::pages::editor::{
     DISCARD, OPENED, OPENED_AT, SAVE, SAVED_PARAM, Standing, add_button, dock, field, form,
     heading, name, opened_line, percent, refused, rows, text_field,
 };
-use crate::pages::parts::{failure, loaded};
-use crate::posted::{INTENT, Posted, posted};
-use crate::request::{Request, request};
+use crate::pages::parts::{failure, redirect};
+use crate::posted::{INTENT, Posted};
+use crate::request::Request;
 use crate::routes::{
     CODE_SYSTEM_EDITOR_ROUTE, EDITOR_SYSTEM_PARAM, SYSTEMS_PATH, sign_in_link, system_link, ui_link,
 };
@@ -109,14 +109,8 @@ fn content_words(mode: &str) -> String {
 }
 
 /// The code system editor.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn CodeSystemEditorPage() -> impl IntoView {
-    let request = request();
-    let posted = posted();
+pub(crate) async fn page(request: Request) -> AnyView {
+    let posted = request.posted.clone();
     let letter = if request.text(EDITOR_SYSTEM_PARAM).is_empty() {
         Letter::Create
     } else {
@@ -124,7 +118,7 @@ pub(crate) fn CodeSystemEditorPage() -> impl IntoView {
     };
     if !request.can(CODE_SYSTEM, letter) {
         if request.session.who().is_none() && request.sign_in {
-            leptos_axum::redirect(&sign_in_link(&request.back()));
+            redirect(&sign_in_link(&request.back()));
         }
         return crate::pages::errors::forbidden_page(
             Msg::EditorForbiddenCodeSystem,
@@ -135,7 +129,7 @@ pub(crate) fn CodeSystemEditorPage() -> impl IntoView {
             ),
         );
     }
-    loaded(async move { page(&request, posted.as_ref()).await })
+    edited(&request, posted.as_ref()).await
 }
 
 /// The editor's address: the canonical it edits, on the reader's version.
@@ -152,11 +146,11 @@ fn address(request: &Request, canonical: &str) -> String {
 }
 
 /// The page, after whatever the reader `posted`.
-async fn page(request: &Request, posted: Option<&Posted>) -> AnyView {
+async fn edited(request: &Request, posted: Option<&Posted>) -> AnyView {
     let system = request.text(EDITOR_SYSTEM_PARAM);
     let here = address(request, &system);
     if posted.is_some_and(|form| form.intent() == DISCARD) {
-        leptos_axum::redirect(&here);
+        redirect(&here);
         return ().into_any();
     }
     let stored = if system.is_empty() {
@@ -195,7 +189,7 @@ async fn page(request: &Request, posted: Option<&Posted>) -> AnyView {
             match sent {
                 Ok(written) => {
                     let version = written.version_id().unwrap_or_default().to_owned();
-                    leptos_axum::redirect(&format!(
+                    redirect(&format!(
                         "{}&{SAVED_PARAM}={}",
                         address(request, draft.url.trim()),
                         percent(&version)

@@ -77,22 +77,37 @@ return [on.id || '', on.getAttribute('name') || '', (on.textContent || '').trim(
 const TAG: &str = r#"
 if (window.__journeyPress === undefined) {
   navigation.addEventListener("navigate", (event) => {
-    if (!event.hashChange) { window.__journeyPress.navigating = true; }
+    if (!event.hashChange) {
+      window.__journeyPress.navigating = true;
+      window.__journeyPress.inPlace = event.destination.sameDocument;
+    }
   });
   addEventListener("submit", (event) => { window.__journeyPress.submits.push(event); }, true);
 }
-window.__journeyPress = { navigating: false, submits: [] };
+window.__journeyPress = {
+  navigating: false,
+  inPlace: false,
+  submits: [],
+  page: document.querySelector("main .fui-column > *") ?? document.querySelector("main > *"),
+};
 "#;
 
 /// Where the press [`TAG`] watched has left the browser: `loaded` once the
-/// tagged page is gone, `leaving` while it is still in front of the browser
-/// and another page is on its way, `staying` when the press loads nothing.
+/// tagged document is gone, `drawn` once the router has drawn another page
+/// in place of the tagged one, `leaving` while the tagged page is still in
+/// front of the browser and another is on its way, `staying` when the press
+/// loads nothing.
 const LEFT: &str = r#"
 const press = window.__journeyPress;
 if (press === undefined) { return "loaded"; }
 const posted = press.submits.some((event) => !event.defaultPrevented
   && (event.submitter?.getAttribute("formmethod") ?? event.target.method).toLowerCase() !== "dialog");
-return press.navigating || posted ? "leaving" : "staying";
+if (!press.navigating && !posted) { return "staying"; }
+const now = document.querySelector("main .fui-column > *") ?? document.querySelector("main > *");
+if (press.inPlace && !posted && now !== null && (press.page === null || !press.page.isConnected)) {
+  return "drawn";
+}
+return "leaving";
 "#;
 
 /// How often a wait re-reads the page while it waits.
@@ -134,12 +149,13 @@ const SIGN_IN_CONTROL: &str = "//a[normalize-space()='Sign in']";
 const SHELL_MARK: &str = "header a.fui-lockup";
 
 /// Whether the page in front of the browser has finished loading and, when
-/// it carries the island that marks `<html>` once the page has hydrated, has
-/// been marked. The sign-in page draws the shell's header without the island.
+/// it is the console's, FerroUI has marked it hydrated
+/// (`data-ferroui-hydrated`). A page that is not the console's (the issuer's,
+/// a refusal in plain text) loads no FerroUI stylesheet and is not waited on.
 const HYDRATED: &str = r#"
 return document.readyState === "complete"
-    && (document.documentElement.hasAttribute("data-hydrated")
-        || document.querySelector("leptos-island[data-component^='Shortcuts']") === null);
+    && (document.documentElement.hasAttribute("data-ferroui-hydrated")
+        || document.querySelector("link[href='/ferrohealth-ui.css']") === null);
 "#;
 
 /// Opens the issuer's profile address, which decides what the sign-in grants.
@@ -348,11 +364,11 @@ impl Journey {
     ///
     /// The server sends a whole page, so its controls are on screen before
     /// their handlers are; a key typed in between reaches the field and never
-    /// the form's state. The console marks `<html>` with `data-hydrated` when
-    /// it is done. A page that is not the console's (the issuer's, a refusal
-    /// in plain text) carries no shell, and the sign-in page no island that
-    /// marks it, so neither is waited on. A document still loading is waited
-    /// on, because the island may not be parsed yet.
+    /// the form's state. FerroUI marks `<html>` with `data-ferroui-hydrated`
+    /// once the page and its lazy route have hydrated. A page that is not the
+    /// console's (the issuer's, a refusal in plain text) is not waited on. A
+    /// document still loading is waited on, because its script may not have
+    /// run yet.
     async fn hydrated(&self) {
         // The page is read whole on every poll, so a navigation still settling
         // when the wait starts is judged on the page it lands on, and a script
@@ -371,7 +387,7 @@ impl Journey {
         }
         panic!(
             "{}",
-            self.failure("the page to hydrate", "no data-hydrated mark")
+            self.failure("the page to hydrate", "no data-ferroui-hydrated mark")
                 .await
         );
     }
@@ -516,7 +532,9 @@ impl Journey {
     /// A click can return while the page it leaves is still in front of the
     /// browser, hydrated, and carrying the controls the next step looks for,
     /// so every wait after it would pass on a page about to go away. The tag
-    /// goes with that page, which is how the new one is told apart.
+    /// goes with that document and marks the page drawn in it, which is how
+    /// the next one is told apart: a new document, or a page the router drew
+    /// in place of the marked one.
     async fn acting<F, A>(&self, what: &str, act: F) -> WebDriverResult<()>
     where
         F: FnOnce() -> A,
@@ -536,7 +554,7 @@ impl Journey {
                 .and_then(|answer| answer.convert::<String>().ok());
             match left.as_deref() {
                 Some("staying") => return Ok(()),
-                Some("loaded") => {
+                Some("loaded" | "drawn") => {
                     self.hydrated().await;
                     return Ok(());
                 }

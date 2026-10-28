@@ -1,12 +1,9 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The parts the screens share: reading on the server while the page
-//! renders, the page's title and heading, where a resource comes from, a
-//! relative time, and the refusal of a request the server answered with a
-//! failure.
-
-use std::future::Future;
+//! The parts the screens share: a redirect, the page's title and heading,
+//! where a resource comes from, a relative time, and the refusal of a
+//! request the server answered with a failure.
 
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::refusal::{Issue, Refusal, Severity, refusal};
@@ -21,18 +18,18 @@ use crate::fhir::outcome::OperationOutcome;
 use crate::fhir::terminology::SystemCard;
 use crate::locale::{Msg, tr, tr_with};
 
-/// Draws what `read` resolves to, once the server has read it.
+/// Sends the reader to `to` in place of the page being read.
 ///
-/// The future runs while the server renders the page: every route renders
-/// whole (`SsrMode::Async`), so the page arrives with its content and no
-/// loading state, and in islands mode nothing it read reaches the browser
-/// but as HTML (the Leptos book, "Guide: Islands", reduced data
-/// serialization).
-pub(crate) fn loaded<F>(read: F) -> AnyView
-where
-    F: Future<Output = AnyView> + Send + 'static,
-{
-    view! { <Suspense>{Suspend::new(read)}</Suspense> }.into_any()
+/// The server reads every page ([`crate::groups::read_page`]), so the
+/// redirect is the server's: the document's own answer on a first load or a
+/// post, and the read's on a page the browser draws, which the browser then
+/// follows. The browser drawing the page from that read redirects nowhere
+/// itself.
+pub(crate) fn redirect(to: &str) {
+    #[cfg(not(target_arch = "wasm32"))]
+    leptos_axum::redirect(to);
+    #[cfg(target_arch = "wasm32")]
+    let _: &str = to;
 }
 
 /// The page's title in the browser tab, and its heading with `subtitle`,

@@ -22,7 +22,7 @@ use serde::Deserialize;
 
 use crate::fhir::FhirClient;
 use crate::fhir::error::FhirError;
-use crate::fhir::exchange::{self, Exchange, Method};
+use crate::fhir::exchange::{Exchange, Method};
 use crate::locale::{Msg, tr_with};
 use crate::url::RequestUrl;
 
@@ -294,7 +294,9 @@ impl FhirClient {
             .filter(|path| path.starts_with('/'))
             .unwrap_or(url)
             .to_owned();
-        let answer = exchange::send(Exchange::new(method, path, JSON))
+        let answer = self
+            .tape()
+            .send(Exchange::new(method, path, JSON))
             .await
             .map_err(|error| FhirError::Transport {
                 url: url.to_owned(),
@@ -310,7 +312,7 @@ impl FhirClient {
     /// Returns the [`FhirError`] of a listener that could not be reached,
     /// refused, or answered something that is no run list.
     pub(crate) async fn runs(&self) -> Result<Vec<RunSummary>, FhirError> {
-        let url = self.admin_url(&[crate::upstream::RUNS]);
+        let url = self.admin_url(&[crate::fhir::exchange::RUNS]);
         Ok(self.admin_json(Method::Get, &url).await?.0)
     }
 
@@ -322,7 +324,7 @@ impl FhirClient {
     /// refused (`404` for a run it holds no record of), or answered something
     /// that is no record.
     pub(crate) async fn run_record(&self, id: &str) -> Result<RunRecord, FhirError> {
-        let url = self.admin_url(&[crate::upstream::RUNS, id]);
+        let url = self.admin_url(&[crate::fhir::exchange::RUNS, id]);
         let (mut record, text): (RunRecord, String) = self.admin_json(Method::Get, &url).await?;
         record.text = text;
         Ok(record)
@@ -335,7 +337,7 @@ impl FhirClient {
     /// Returns the [`FhirError`] of a listener that could not be reached or
     /// refused.
     pub(crate) async fn run_now(&self) -> Result<RunSummary, FhirError> {
-        let url = self.admin_url(&[crate::upstream::RUN]);
+        let url = self.admin_url(&[crate::fhir::exchange::RUN]);
         Ok(self.admin_json(Method::Post, &url).await?.0)
     }
 
@@ -346,7 +348,7 @@ impl FhirClient {
     /// Returns the [`FhirError`] of a listener that could not be reached or
     /// refused.
     pub(crate) async fn activate(&self) -> Result<RunSummary, FhirError> {
-        let url = self.admin_url(&[crate::upstream::ACTIVATE]);
+        let url = self.admin_url(&[crate::fhir::exchange::ACTIVATE]);
         Ok(self.admin_json(Method::Post, &url).await?.0)
     }
 
@@ -357,7 +359,7 @@ impl FhirClient {
     ///
     /// Returns [`FhirError::Transport`] when no answer came.
     pub(crate) async fn reload(&self) -> Result<Reloaded, FhirError> {
-        let url = self.admin_url(&[crate::upstream::RELOAD]);
+        let url = self.admin_url(&[crate::fhir::exchange::RELOAD]);
         let (status, body) = self.admin(Method::Post, &url).await?;
         let status = answered(status, &url)?;
         Ok(Reloaded { status, body })

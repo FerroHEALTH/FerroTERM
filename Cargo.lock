@@ -1408,15 +1408,19 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-ui"
-version = "0.4.0"
+version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a52b63a48efb590636fdd163dfa049a6230a0bb757a36bf0e22e7850cdf3440"
+checksum = "1120740ed44fc0de9981bfa3f66520a7c5e826ef2d2c83b584e50583033be378"
 dependencies = [
+ "axum",
  "fluent-templates",
+ "form_urlencoded",
+ "http",
  "intl-memoizer",
  "leptos",
  "leptos_router",
  "serde",
+ "tower",
  "wasm-bindgen-futures",
  "web-sys",
 ]
@@ -2402,10 +2406,12 @@ dependencies = [
  "jiff-core",
  "jiff-static",
  "jiff-tzdb-platform",
+ "js-sys",
  "log",
  "portable-atomic",
  "portable-atomic-util",
  "serde_core",
+ "wasm-bindgen",
  "windows-link",
 ]
 

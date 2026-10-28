@@ -24,13 +24,11 @@ use ferrohealth_ui::view::template::settings::{
 use ferrohealth_ui::widget::action_menu::{Act, Action, Item, Menu};
 use leptos::prelude::*;
 use leptos_meta::Title;
-use leptos_router::hooks::use_params_map;
+use serde::{Deserialize, Serialize};
 
-use crate::config::settings::Settings;
 use crate::locale::{Msg, tr, tr_with};
+use crate::request::Request;
 use crate::routes::{CONFIGURATION_PATH, ui_path};
-use crate::server::ConsoleState;
-use ferrohealth_config::provenance::Source as KeySource;
 
 /// The id of the dialog that says how configuration works.
 const HOW_DIALOG: &str = "config-how";
@@ -107,6 +105,163 @@ impl ConfigTab {
 
 /// A setting row of `label` and `description`, the value `value`, set by
 /// the key `key`.
+/// Where a key took its value from, as the configuration loader reports it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) enum KeySource {
+    /// The configuration file.
+    File,
+    /// An environment variable.
+    Environment,
+    /// A `--set key=value` argument.
+    Set,
+    /// Nothing sets it: the console's default.
+    Default,
+}
+
+/// How the client secret of the sign-in is set.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) enum SecretShown {
+    /// Read from the file at this path.
+    File(String),
+    /// Set inline, never shown.
+    Inline,
+    /// Not set.
+    Unset,
+}
+
+/// The `[oidc]` settings the page shows.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct OidcShown {
+    /// The issuer.
+    issuer: String,
+    /// The client id.
+    client_id: String,
+    /// How the client secret is set.
+    secret: SecretShown,
+    /// The redirect URI.
+    redirect_uri: String,
+    /// The scopes asked for.
+    scopes: Vec<String>,
+    /// Whether an end-session endpoint is set.
+    end_session: bool,
+}
+
+/// What the Configuration page shows of the console's running settings,
+/// read on the server and carried to the page, with no secret in it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct Shown {
+    /// The configuration file the settings were read from, if one was.
+    file: Option<String>,
+    /// The terminology server's root.
+    base: String,
+    /// The root readers reach the server at.
+    public: String,
+    /// The sync service's admin listener.
+    sync: Option<String>,
+    /// The server's admin listener.
+    admin: Option<String>,
+    /// How long one call to the server may take.
+    timeout: Duration,
+    /// The OpenID Provider, when one is configured.
+    oidc: Option<OidcShown>,
+    /// Whether the session cookie is `Secure`.
+    secure_cookie: bool,
+    /// The session's idle timeout.
+    idle_timeout: Duration,
+    /// The session's absolute lifetime.
+    absolute_timeout: Duration,
+    /// How many sessions the console holds at once.
+    max_sessions: u64,
+    /// The listener's address.
+    listen: String,
+    /// The site root.
+    site_root: String,
+    /// Where each key a row names took its value from.
+    sources: Vec<(String, KeySource)>,
+}
+
+impl Shown {
+    /// What the page shows of `settings`.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[must_use]
+    pub(crate) fn of(settings: &crate::config::settings::Settings) -> Self {
+        use ferrohealth_config::provenance::Source;
+        let oidc = settings.oidc.as_ref().map(|oidc| OidcShown {
+            issuer: oidc.issuer.clone(),
+            client_id: oidc.client_id.clone(),
+            secret: match (&oidc.client_secret_file, &oidc.client_secret) {
+                (Some(file), _) => SecretShown::File(file.display().to_string()),
+                (None, Some(_)) => SecretShown::Inline,
+                (None, None) => SecretShown::Unset,
+            },
+            redirect_uri: oidc.redirect_uri.to_string(),
+            scopes: oidc.scopes.clone(),
+            end_session: oidc.end_session_endpoint.is_some(),
+        });
+        let sources = ROW_KEYS
+            .iter()
+            .map(|key| {
+                let source = match settings.source_of(key) {
+                    Source::File => KeySource::File,
+                    Source::Environment => KeySource::Environment,
+                    Source::Set => KeySource::Set,
+                    Source::Default => KeySource::Default,
+                };
+                ((*key).to_owned(), source)
+            })
+            .collect();
+        Self {
+            file: settings
+                .provenance
+                .file()
+                .map(|path| path.display().to_string()),
+            base: settings.ferroterm.base.to_string(),
+            public: settings.ferroterm.public.to_string(),
+            sync: settings.ferroterm.sync.as_ref().map(ToString::to_string),
+            admin: settings.ferroterm.admin.as_ref().map(ToString::to_string),
+            timeout: settings.ferroterm.timeout,
+            oidc,
+            secure_cookie: settings.session.secure_cookie,
+            idle_timeout: settings.session.idle_timeout,
+            absolute_timeout: settings.session.absolute_timeout,
+            max_sessions: u64::try_from(settings.session.max_sessions).unwrap_or(u64::MAX),
+            listen: settings.listen.to_string(),
+            site_root: settings.site_root.display().to_string(),
+            sources,
+        }
+    }
+
+    /// Where `key` took its value from.
+    fn source_of(&self, key: &str) -> KeySource {
+        self.sources
+            .iter()
+            .find(|(each, _)| each == key)
+            .map_or(KeySource::Default, |(_, source)| *source)
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+/// The first key of every row, whose source the row marks.
+const ROW_KEYS: [&str; 17] = [
+    "ferroterm.base_url",
+    "ferroterm.public_url",
+    "ferroterm.sync_url",
+    "ferroterm.admin_url",
+    "ferroterm.timeout_ms",
+    "oidc.issuer",
+    "oidc.client_id",
+    "oidc.client_secret_file",
+    "oidc.redirect_uri",
+    "oidc.scopes",
+    "oidc.end_session_endpoint",
+    "session.secure_cookie",
+    "session.idle_timeout_s",
+    "session.absolute_timeout_s",
+    "session.max_sessions",
+    "server.listen",
+    "server.site_root",
+];
+
 fn row(label: Msg, description: Msg, value: AnyView, key: &str) -> Setting {
     Setting {
         label: tr(label),
@@ -160,7 +315,7 @@ fn on(value: bool) -> AnyView {
 }
 
 /// The settings of `tab` from `settings`.
-fn settings_of(tab: ConfigTab, settings: &Settings) -> Vec<Setting> {
+fn settings_of(tab: ConfigTab, settings: &Shown) -> Vec<Setting> {
     let rows = match tab {
         ConfigTab::Connection => connection(settings),
         ConfigTab::SignIn => sign_in(settings),
@@ -184,18 +339,19 @@ fn marker(source: KeySource) -> Option<ValueSource> {
     match source {
         KeySource::File => None,
         // A `--set` pair wins over the file the way an environment override does.
-        KeySource::Environment | KeySource::Set => Some(ValueSource::Environment),
+        KeySource::Environment => Some(ValueSource::Environment),
+        KeySource::Set => Some(ValueSource::CommandLine),
         KeySource::Default => Some(ValueSource::Default),
     }
 }
 
 /// The settings of the terminology server and the sync service.
-fn connection(settings: &Settings) -> Vec<Setting> {
-    let sync = settings.ferroterm.sync.as_ref().map_or_else(
+fn connection(settings: &Shown) -> Vec<Setting> {
+    let sync = settings.sync.as_ref().map_or_else(
         || view! { <span class="fui-muted">{tr(Msg::ConfigNotSet)}</span> }.into_any(),
         |url| code(url.as_str()),
     );
-    let admin = settings.ferroterm.admin.as_ref().map_or_else(
+    let admin = settings.admin.as_ref().map_or_else(
         || view! { <span class="fui-muted">{tr(Msg::ConfigNotSet)}</span> }.into_any(),
         |url| code(url.as_str()),
     );
@@ -203,13 +359,13 @@ fn connection(settings: &Settings) -> Vec<Setting> {
         row(
             Msg::ConfigServer,
             Msg::ConfigServerLine,
-            code(settings.ferroterm.base.as_str()),
+            code(settings.base.as_str()),
             "ferroterm.base_url",
         ),
         row(
             Msg::ConfigPublic,
             Msg::ConfigPublicLine,
-            code(settings.ferroterm.public.as_str()),
+            code(settings.public.as_str()),
             "ferroterm.public_url",
         ),
         row(
@@ -227,21 +383,21 @@ fn connection(settings: &Settings) -> Vec<Setting> {
         row(
             Msg::ConfigTimeout,
             Msg::ConfigTimeoutLine,
-            duration(settings.ferroterm.timeout).into_any(),
+            duration(settings.timeout).into_any(),
             "ferroterm.timeout_ms",
         ),
     ]
 }
 
 /// The settings of the OpenID Provider.
-fn sign_in(settings: &Settings) -> Vec<Setting> {
+fn sign_in(settings: &Shown) -> Vec<Setting> {
     settings.oidc.as_ref().map_or_else(Vec::new, |oidc| {
-        let secret = match (&oidc.client_secret_file, &oidc.client_secret) {
-            (Some(file), _) => SecretState::Set(file.display().to_string()),
-            (None, Some(_)) => SecretState::Redacted,
-            (None, None) => SecretState::Unset,
+        let secret = match &oidc.secret {
+            SecretShown::File(file) => SecretState::Set(file.clone()),
+            SecretShown::Inline => SecretState::Redacted,
+            SecretShown::Unset => SecretState::Unset,
         };
-        let sign_out = if oidc.end_session_endpoint.is_some() {
+        let sign_out = if oidc.end_session {
             tr(Msg::ConfigSetUp)
         } else {
             tr(Msg::ConfigNotSet)
@@ -268,7 +424,7 @@ fn sign_in(settings: &Settings) -> Vec<Setting> {
             row(
                 Msg::ConfigRedirect,
                 Msg::ConfigRedirectLine,
-                code(oidc.redirect_uri.as_str()),
+                code(oidc.redirect_uri.clone()),
                 "oidc.redirect_uri",
             ),
             row(
@@ -288,51 +444,48 @@ fn sign_in(settings: &Settings) -> Vec<Setting> {
 }
 
 /// The settings of the sessions.
-fn sessions(settings: &Settings) -> Vec<Setting> {
+fn sessions(settings: &Shown) -> Vec<Setting> {
     vec![
         row(
             Msg::ConfigSecureCookie,
             Msg::ConfigSecureCookieLine,
-            on(settings.session.secure_cookie),
+            on(settings.secure_cookie),
             "session.secure_cookie",
         ),
         row(
             Msg::ConfigIdle,
             Msg::ConfigIdleLine,
-            duration(settings.session.idle_timeout).into_any(),
+            duration(settings.idle_timeout).into_any(),
             "session.idle_timeout_s",
         ),
         row(
             Msg::ConfigAbsolute,
             Msg::ConfigAbsoluteLine,
-            duration(settings.session.absolute_timeout).into_any(),
+            duration(settings.absolute_timeout).into_any(),
             "session.absolute_timeout_s",
         ),
         row(
             Msg::ConfigLimit,
             Msg::ConfigLimitLine,
-            ferrohealth_ui::i18n::number::grouped(
-                u64::try_from(settings.session.max_sessions).unwrap_or(u64::MAX),
-            )
-            .into_any(),
+            ferrohealth_ui::i18n::number::grouped(settings.max_sessions).into_any(),
             "session.max_sessions",
         ),
     ]
 }
 
 /// The settings of the listener.
-fn listener(settings: &Settings) -> Vec<Setting> {
+fn listener(settings: &Shown) -> Vec<Setting> {
     vec![
         row(
             Msg::ConfigListen,
             Msg::ConfigListenLine,
-            code(settings.listen.to_string()),
+            code(settings.listen.clone()),
             "server.listen",
         ),
         row(
             Msg::ConfigSiteRoot,
             Msg::ConfigSiteRootLine,
-            code(settings.site_root.display().to_string()),
+            code(settings.site_root.clone()),
             "server.site_root",
         ),
     ]
@@ -360,25 +513,20 @@ fn more(file: Option<&std::path::Path>) -> ActionGroup {
     ))
 }
 
-/// Configuration, on the tab the route names.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn ConfigurationPage() -> impl IntoView {
-    let params = use_params_map();
-    let segment = params.with_untracked(|params| params.get("tab"));
-    let Some(tab) = ConfigTab::of(segment.as_deref()) else {
+/// Configuration, on the tab the route names, from the settings the server
+/// read for it.
+pub(crate) async fn page(request: Request) -> AnyView {
+    let Some(tab) = ConfigTab::of(request.segment(1).as_deref()) else {
         return crate::pages::errors::not_found_page();
     };
-    let Some(state) = use_context::<ConsoleState>() else {
+    let Some(settings) = use_context::<Shown>() else {
         return crate::pages::errors::not_found_page();
     };
-    let settings = state.settings();
+    let settings = &settings;
     let shown_file = settings
-        .provenance
-        .file()
+        .file
+        .as_deref()
+        .map(std::path::Path::new)
         .and_then(|path| path.file_name())
         .map_or_else(
             || String::from(DEFAULT_FILE),
@@ -407,7 +555,7 @@ pub(crate) fn ConfigurationPage() -> impl IntoView {
             mono: false,
             badge: None,
         },
-        actions: more(settings.provenance.file()),
+        actions: more(settings.file.as_deref().map(std::path::Path::new)),
         source: Source::File {
             file: shown_file.clone(),
             how: How::Dialog(HOW_DIALOG.into()),

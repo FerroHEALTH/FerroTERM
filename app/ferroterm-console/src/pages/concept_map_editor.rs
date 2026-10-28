@@ -38,9 +38,9 @@ use crate::pages::editor::{
     heading, icon_submit, name, opened_line, percent, refused, rows, text_field,
 };
 use crate::pages::operations::choices;
-use crate::pages::parts::{failure, loaded, name_of};
-use crate::posted::{Posted, posted};
-use crate::request::{Request, request};
+use crate::pages::parts::{failure, name_of, redirect};
+use crate::posted::Posted;
+use crate::request::Request;
 use crate::routes::{
     CONCEPT_MAP_EDITOR_ROUTE, CONCEPT_MAPS_PATH, MAP_EDITOR_PARAM, resource_link, sign_in_link,
     ui_link,
@@ -102,14 +102,8 @@ fn relationship_choices(version: FhirVersion) -> Vec<(&'static str, String)> {
 }
 
 /// The concept map editor.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn ConceptMapEditorPage() -> impl IntoView {
-    let request = request();
-    let posted = posted();
+pub(crate) async fn page(request: Request) -> AnyView {
+    let posted = request.posted.clone();
     let letter = if request.text(MAP_EDITOR_PARAM).is_empty() {
         Letter::Create
     } else {
@@ -117,7 +111,7 @@ pub(crate) fn ConceptMapEditorPage() -> impl IntoView {
     };
     if !request.can(CONCEPT_MAP, letter) {
         if request.session.who().is_none() && request.sign_in {
-            leptos_axum::redirect(&sign_in_link(&request.back()));
+            redirect(&sign_in_link(&request.back()));
         }
         return crate::pages::errors::forbidden_page(
             Msg::EditorForbiddenConceptMap,
@@ -128,7 +122,7 @@ pub(crate) fn ConceptMapEditorPage() -> impl IntoView {
             ),
         );
     }
-    loaded(async move { page(&request, posted.as_ref()).await })
+    edited(&request, posted.as_ref()).await
 }
 
 /// The editor's address: the canonical it edits, on the reader's version.
@@ -145,11 +139,11 @@ fn address(request: &Request, canonical: &str) -> String {
 }
 
 /// The page, after whatever the reader `posted`.
-async fn page(request: &Request, posted: Option<&Posted>) -> AnyView {
+async fn edited(request: &Request, posted: Option<&Posted>) -> AnyView {
     let canonical = request.text(MAP_EDITOR_PARAM);
     let here = address(request, &canonical);
     if posted.is_some_and(|form| form.intent() == DISCARD) {
-        leptos_axum::redirect(&here);
+        redirect(&here);
         return ().into_any();
     }
     let opened = match open(request, &canonical).await {
@@ -283,7 +277,7 @@ async fn save(
     match crate::pages::editor::send(request, CONCEPT_MAP, &draft.id, &body, opened).await {
         Ok(written) => {
             let version = written.version_id().unwrap_or_default().to_owned();
-            leptos_axum::redirect(&format!(
+            redirect(&format!(
                 "{}&{SAVED_PARAM}={}",
                 address(request, draft.url.trim()),
                 percent(&version)

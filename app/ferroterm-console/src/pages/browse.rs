@@ -43,8 +43,8 @@ use crate::fhir::{CODE_SYSTEM, FhirClient};
 use crate::locale::{Msg, tr, tr_with};
 use crate::pages::lookup::CODE_PARAM;
 use crate::pages::operations::{choices, select};
-use crate::pages::parts::{failure, heading, loaded};
-use crate::request::{Request, request};
+use crate::pages::parts::{failure, heading};
+use crate::request::Request;
 use crate::routes::{
     BROWSE_PATH, LOOKUP_PATH, SYSTEM_PARAM, SYSTEM_VERSION_PARAM, VERSION_PARAM, system_tool_link,
     ui_link,
@@ -167,62 +167,54 @@ fn percent(value: &str) -> String {
 }
 
 /// The concept browser.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn BrowsePage() -> impl IntoView {
-    let request = request();
-    loaded(async move {
-        let state = State::read(&request);
-        let named = request
-            .client
-            .published_names(request.version, CODE_SYSTEM)
-            .await
-            .ok();
-        let systems = choices(named.as_ref());
-        let card = request
-            .client
-            .terminology_capabilities(request.version)
-            .await
-            .ok()
-            .and_then(|capabilities| capabilities.card(&state.system));
-        let row = card
-            .as_ref()
-            .and_then(|card| chosen_version(card, state.pinned().as_deref()));
-        let hierarchy = row.as_ref().map(Hierarchy::of).unwrap_or_default();
-        let languages: Vec<(String, String)> = row
-            .as_ref()
-            .map(|row| {
-                row.languages
-                    .iter()
-                    .map(|tag| (tag.clone(), tag.clone()))
-                    .collect()
-            })
-            .unwrap_or_default();
-        let options = picker(
-            &request,
-            &state,
-            &systems,
-            &versions(card.as_ref()),
-            &languages,
-        );
-        let body = panes(&request, &state, &hierarchy).await;
-        view! {
-            {heading(
-                tr(Msg::BrowseTitle),
-                Some(tr(Msg::BrowseSubtitle)),
-                Vec::new(),
-                ActionGroup::none(),
-            )}
-            <section class="fui-card fui-panel" aria-label=tr(Msg::BrowseTitle)>
-                {options}
-                {body}
-            </section>
-        }
-        .into_any()
-    })
+pub(crate) async fn page(request: Request) -> AnyView {
+    let state = State::read(&request);
+    let named = request
+        .client
+        .published_names(request.version, CODE_SYSTEM)
+        .await
+        .ok();
+    let systems = choices(named.as_ref());
+    let card = request
+        .client
+        .terminology_capabilities(request.version)
+        .await
+        .ok()
+        .and_then(|capabilities| capabilities.card(&state.system));
+    let row = card
+        .as_ref()
+        .and_then(|card| chosen_version(card, state.pinned().as_deref()));
+    let hierarchy = row.as_ref().map(Hierarchy::of).unwrap_or_default();
+    let languages: Vec<(String, String)> = row
+        .as_ref()
+        .map(|row| {
+            row.languages
+                .iter()
+                .map(|tag| (tag.clone(), tag.clone()))
+                .collect()
+        })
+        .unwrap_or_default();
+    let options = picker(
+        &request,
+        &state,
+        &systems,
+        &versions(card.as_ref()),
+        &languages,
+    );
+    let body = panes(&request, &state, &hierarchy).await;
+    view! {
+        {heading(
+            tr(Msg::BrowseTitle),
+            Some(tr(Msg::BrowseSubtitle)),
+            Vec::new(),
+            ActionGroup::none(),
+        )}
+        <section class="fui-card fui-panel" aria-label=tr(Msg::BrowseTitle)>
+            {options}
+            {body}
+        </section>
+    }
+    .into_any()
 }
 
 /// The versions the picker offers, the one an unversioned request resolves
