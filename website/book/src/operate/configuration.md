@@ -123,7 +123,7 @@ key_file = "/etc/ferroterm/tls/server.key"
 | `listen` | The socket address of the FHIR listener. | `127.0.0.1:8080` |
 | `base_path` | A path every route of both listeners is served under, such as `/terminology`: empty, or `/` followed by segments with no trailing `/`. The FHIR bases become `/terminology/r4` and the others, and the health probe follows. | empty |
 | `request_timeout_ms` | How long one request may take before it is answered `408`. | `30000` |
-| `header_read_timeout_ms` | How long a client may take to send a request head; a client still sending one then is disconnected. | `30000` |
+| `header_read_timeout_ms` | How long a client may take to send a request head, counted from accept or from its last response; a client that has not sent one by then, one that sent nothing included, is disconnected. | `30000` |
 | `body_limit_bytes` | The largest request body read before the request is answered `413`. | `1048576` (1 MiB) |
 | `drain_delay_ms` | How long readiness stays withdrawn on `SIGTERM` before the listeners close. | `0` |
 | `shutdown_timeout_ms` | How long the requests in flight may take once the listeners closed. Keep `drain_delay_ms` plus this below the grace period of the container runtime, so the server exits before it is killed. | `10000` |
