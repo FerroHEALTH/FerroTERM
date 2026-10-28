@@ -19,10 +19,6 @@ cut follows, in order.
 2. **The version moves everywhere**, not only in the manifests: the workspace
    `version`, `CITATION.cff`, the README, the landing page, the book.
    `scripts/checks/versions.sh` fails on any file left behind.
-   The console's recorded capability documents carry the software version, so
-   re-record them in the same commit:
-   `FERROTERM_RECORD_VIEWER_FIXTURES=1 cargo nextest run -p ferroterm-server
-   -E 'test(the_viewer_capability_fixtures)'`.
 3. **The changelog names the release.** Every change since the last release
    is a fragment under `changelog.d/` (`changelog.d/README.md`), and entries
    written before the fragments may still sit under `[Unreleased]`. Run
@@ -39,6 +35,13 @@ cut follows, in order.
    refuses a malformed fragment, a version that already has a section, and a
    release with no entry. Commit `CHANGELOG.md` and the removals together, and
    read the section as the release notes before you tag.
+
+   Then re-record the console's capability fixtures in the same commit:
+   `FERROTERM_RECORD_VIEWER_FIXTURES=1 cargo nextest run -p ferroterm-server
+   -E 'test(the_viewer_capability_fixtures)'`. The recorded documents carry
+   the software version and its release date, and the server reads
+   `software.releaseDate` from the changelog's release heading when it is
+   built, so fixtures recorded before the assembly carry no release date.
 
    A release with `### Security` entries beside other sections opens that
    section with the reason line of the `changelog.d/*.security-reason.md`
