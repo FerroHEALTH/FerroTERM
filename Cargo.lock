@@ -1654,9 +1654,9 @@ dependencies = [
 
 [[package]]
 name = "fhir-types"
-version = "0.1.109"
+version = "0.1.128"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffaa6eacd8d0bf84a6e8855848f6c1aef052c54a7d89ec8bb7679c8b75f7e7bf"
+checksum = "eab6cf450919fa8033d479209d0384dfd9dc9a7373aef7a9be66dab6f1db72b3"
 dependencies = [
  "quick-xml",
  "regex",
