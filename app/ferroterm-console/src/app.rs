@@ -133,8 +133,18 @@ fn server_route() -> impl IntoView {
     // NOTE: no specification governs this: our own design; a browser that refuses
     // the load keeps the page it was on, and says so in its console.
     #[cfg(target_arch = "wasm32")]
-    if window().location().reload().is_err() {
-        leptos::logging::warn!("the browser refused to load the route from the server");
+    {
+        let location = use_location();
+        let search = location.search.get_untracked();
+        let search = search.trim_start_matches('?');
+        let href = if search.is_empty() {
+            location.pathname.get_untracked()
+        } else {
+            format!("{}?{search}", location.pathname.get_untracked())
+        };
+        if window().location().set_href(&href).is_err() {
+            leptos::logging::warn!("the browser refused to load the route from the server");
+        }
     }
 }
 
