@@ -1292,9 +1292,9 @@ checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 
 [[package]]
 name = "ferrohealth-config"
-version = "0.2.6"
+version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fb490bb6126a8536e8ee377284d746cc14f7c42423c4d7ec58e6e3d16a3c4c2"
+checksum = "4bd06be76f568419eae594d08b41a18f4262061a43587d073a0e88a135b7bacb"
 dependencies = [
  "ferrohealth-secret",
  "percent-encoding",

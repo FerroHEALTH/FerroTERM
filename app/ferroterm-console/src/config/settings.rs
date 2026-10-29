@@ -57,19 +57,11 @@ impl Settings {
     }
 
     /// Where `key` took its value from. A secret set through its `_file`
-    /// key counts as set, either way round.
+    /// key counts as set, either way round
+    /// (`ferrohealth_config::provenance::Provenance::secret_source`).
     #[must_use]
     pub fn source_of(&self, key: &str) -> Source {
-        let names = [
-            key.to_owned(),
-            format!("{key}_file"),
-            key.strip_suffix("_file").unwrap_or(key).to_owned(),
-        ];
-        names
-            .iter()
-            .map(|name| self.provenance.source(name))
-            .max()
-            .unwrap_or(Source::Default)
+        self.provenance.secret_source(key)
     }
 }
 
