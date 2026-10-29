@@ -147,7 +147,7 @@ The `[server.tls]` table:
 | `key_file` | The private key of the leaf in PEM. | required |
 | `min_version` | The oldest TLS version spoken, `"1.3"` or `"1.2"`. | `"1.3"` |
 | `client_auth` | Whether a client certificate is asked: `none`, `optional` or `required`. | `none` |
-| `client_ca_file` | The CA bundle a client certificate must chain to; required unless `client_auth` is `none`. | none |
+| `client_ca_file` | The CA bundle a client certificate must chain to; required unless `client_auth` is `none`, and refused when `client_auth` is `none`, the default, so a deployment that sets a CA asks for client certificates. | none |
 | `reload_interval_s` | How often the files are read again. `SIGHUP` always reads them again. | none |
 | `healthcheck_identity_file` | The client certificate chain and key, in one PEM, that `ferroterm healthcheck` presents to a listener that asks one. | none |
 
@@ -394,7 +394,7 @@ A reload holds the same bar without the downtime. One artifact that does not
 open refuses the whole swap: the server keeps serving the set it already had,
 logs `the served set was not reloaded` with the reason, counts
 `ferroterm_reloads_total{outcome="failed"}`, and answers the admin request
-with a `500` naming the artifact. A half-applied release never reaches a
+with a `500` [`reload-failed`](problems.md#reload-failed) problem naming the artifact. A half-applied release never reaches a
 client. A child directory under an index root is an artifact like any other
 here: once it holds a manifest the server cannot read, it refuses the reload
 rather than serving the root without it.

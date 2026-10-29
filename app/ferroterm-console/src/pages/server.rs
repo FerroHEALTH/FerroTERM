@@ -33,6 +33,7 @@ use leptos_router::hooks::use_params_map;
 use crate::comparison::{Cell, Comparison, RootAnswer, Row, compare, notes, state_sentence};
 use crate::evidence::{Conformance, Latency, embedded};
 use crate::fhir::error::FhirError;
+use crate::fhir::problem::Problem;
 use crate::fhir::sync::Reloaded;
 use crate::fhir::version::FhirVersion;
 use crate::locale::{Msg, tr, tr_with};
@@ -218,7 +219,13 @@ fn reload_outcome(request: &Request, answered: Option<Result<Reloaded, FhirError
                 Msg::ServerReloadRefused,
                 &[
                     ("status", reloaded.status.as_u16().to_string().into()),
-                    ("body", reloaded.body.into()),
+                    (
+                        "body",
+                        Problem::read(&reloaded.body)
+                            .and_then(|problem| problem.detail.or(problem.title))
+                            .unwrap_or(reloaded.body)
+                            .into(),
+                    ),
                 ],
             ),
         )

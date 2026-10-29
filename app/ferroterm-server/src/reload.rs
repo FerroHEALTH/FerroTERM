@@ -268,18 +268,18 @@ async fn reload(State(serving): State<Serving>) -> Response {
     }
 }
 
-/// The answer to a reload that did not happen: the old set still answers.
+/// The answer to a reload that did not happen: the old set still answers,
+/// and the problem's detail says why, for the operator who asked.
 fn refused(reason: &str) -> Response {
-    (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        axum::Json(serde_json::json!({ "outcome": Outcome::Failed.as_str(), "reason": reason })),
-    )
-        .into_response()
+    crate::problem::respond(crate::problem::Kind::ReloadFailed.problem(reason), None)
 }
 
 /// Anything else on the admin listener.
 async fn unknown() -> Response {
-    (StatusCode::NOT_FOUND, "ferroterm admin: POST /reload\n").into_response()
+    crate::problem::blank(
+        StatusCode::NOT_FOUND,
+        "the admin listener answers POST /reload and the health routes alone",
+    )
 }
 
 /// Reloads the served set on every `SIGHUP`, until the process ends.

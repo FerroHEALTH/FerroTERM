@@ -327,8 +327,9 @@ pub fn fhir_json(status: StatusCode, value: &fhir_types::codec::Value) -> Respon
 
 /// The fallback for a path the server does not define, in the format `Accept`
 /// asks for.
-pub async fn not_found(headers: http::HeaderMap) -> Response {
-    let wire = crate::wire::Wire::negotiate(&[], &headers).unwrap_or_default();
+#[must_use]
+pub fn not_found(headers: &http::HeaderMap) -> Response {
+    let wire = crate::wire::Wire::negotiate(&[], headers).unwrap_or_default();
     Failure::new(
         StatusCode::NOT_FOUND,
         "not-found",

@@ -28,6 +28,7 @@
 - [Hardware sizing](operate/hardware-sizing.md)
 - [Behind a reverse proxy](operate/reverse-proxy.md)
 - [Health, metrics, and request identifiers](operate/observability.md)
+- [Problem types](operate/problems.md)
 - [Usage report](operate/usage-report.md)
 - [Verifying releases](operate/verifying-releases.md)
 

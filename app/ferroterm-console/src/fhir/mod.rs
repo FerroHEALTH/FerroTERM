@@ -22,6 +22,7 @@ pub(crate) mod expansion;
 pub(crate) mod facts;
 pub(crate) mod named;
 pub(crate) mod outcome;
+pub(crate) mod problem;
 pub(crate) mod searchset;
 pub(crate) mod sync;
 pub(crate) mod terminology;

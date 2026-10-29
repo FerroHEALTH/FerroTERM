@@ -28,6 +28,7 @@ use ferrohealth_server::section::ServerSection;
 use ferrohealth_server::stack::{self, StackPolicy};
 use ferrohealth_telemetry::request_log::RequestLog;
 
+use crate::problem::{self, Kind};
 use crate::record::RecordError;
 use crate::run::Service;
 
@@ -48,9 +49,10 @@ pub fn app(service: &Service, routes: Router) -> Router {
         ..ServerSection::default()
     };
     let policy = StackPolicy {
+        panic_body: ferrohealth_server::problem::panic_body(),
+        refusal_body: ferrohealth_server::problem::refusal_body(),
         request_log: RequestLog::new(&service.config().telemetry.logged_query_parameters)
             .with_metrics(&service.telemetry().meter(crate::metrics::SCOPE)),
-        ..StackPolicy::default()
     };
     stack::app(routes, service.health().clone(), &section, policy)
 }
@@ -95,39 +97,42 @@ async fn runs(State(service): State<Arc<Service>>) -> Response {
 async fn one_run(State(service): State<Arc<Service>>, Path(id): Path<String>) -> Response {
     match service.records().read(&id) {
         Ok(record) => (StatusCode::OK, axum::Json(record)).into_response(),
-        Err(RecordError::BadId { id }) => (
-            StatusCode::NOT_FOUND,
-            axum::Json(serde_json::json!({ "error": format!("`{id}` is not a run") })),
-        )
-            .into_response(),
+        Err(RecordError::BadId { id }) => {
+            tracing::debug!(id, "a run id that is no run id");
+            not_a_run()
+        }
         Err(RecordError::Io { path, source }) if source.kind() == std::io::ErrorKind::NotFound => {
             tracing::debug!(path = %path.display(), "no such run record");
-            (
-                StatusCode::NOT_FOUND,
-                axum::Json(serde_json::json!({ "error": "no such run" })),
-            )
-                .into_response()
+            not_a_run()
         }
         Err(error) => failed(&error),
     }
 }
 
-/// Anything else on the admin listener.
-async fn unknown() -> Response {
-    (
-        StatusCode::NOT_FOUND,
-        "ferroterm-sync admin: POST /run, POST /activate, GET /runs, GET /runs/{id}, GET /metrics, GET /health, GET /health/liveness, GET /health/readiness\n",
+/// The answer to a run id the service holds no record of.
+fn not_a_run() -> Response {
+    problem::respond(
+        Kind::RunNotFound.problem("no run of this service has that id; GET /runs lists them"),
+        None,
     )
-        .into_response()
 }
 
-/// The answer to a request the service could not serve.
+/// Anything else on the admin listener.
+async fn unknown() -> Response {
+    problem::blank(
+        StatusCode::NOT_FOUND,
+        "the admin listener answers POST /run, POST /activate, GET /runs, GET /runs/{id}, GET /metrics and the health routes",
+    )
+}
+
+/// The answer to a request the service could not serve; the log names the
+/// cause, and the problem quotes none of it.
 fn failed(error: &dyn core::error::Error) -> Response {
     let reason = crate::reason(error);
     tracing::error!(error = reason, "an admin request could not be served");
-    (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        axum::Json(serde_json::json!({ "error": reason })),
+    problem::respond(
+        Kind::RecordsUnreadable
+            .problem("the run records could not be read; the service log names the cause"),
+        None,
     )
-        .into_response()
 }

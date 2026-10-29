@@ -462,6 +462,24 @@ impl Server {
     }
 }
 
+/// The status and the RFC 9457 problem of an answer outside the FHIR bases.
+pub(crate) async fn problem(response: Response<Body>) -> (StatusCode, Value) {
+    let status = response.status();
+    assert_eq!(
+        response
+            .headers()
+            .get(http::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok()),
+        Some("application/problem+json"),
+        "every error outside the FHIR bases is a problem"
+    );
+    let bytes = axum::body::to_bytes(response.into_body(), 1 << 20)
+        .await
+        .expect("body");
+    let value: Value = serde_json::from_slice(&bytes).expect("json body");
+    (status, value)
+}
+
 pub(crate) async fn json(response: Response<Body>) -> (StatusCode, Value) {
     let status = response.status();
     assert_eq!(
