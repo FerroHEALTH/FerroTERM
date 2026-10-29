@@ -56,3 +56,20 @@ pub fn operator() -> Option<Operator> {
         None
     })
 }
+
+/// What the request's live signed-in session has left, read without
+/// extending it; `None` for a visitor or a session that is gone.
+#[must_use]
+pub fn left() -> Option<ferrohealth_ui::widget::session::Left> {
+    let state = use_context::<ConsoleState>()?;
+    let parts = use_context::<http::request::Parts>()?;
+    let id = state.sessions().cookie_in(&parts.headers, COOKIE)?;
+    state
+        .sessions()
+        .remaining(&id, false)
+        .unwrap_or_else(|error| {
+            tracing::error!(%error, "the session store could not be read");
+            None
+        })
+        .map(crate::session::watch::left)
+}

@@ -230,6 +230,71 @@ async fn signing_out_revokes_the_token_and_drops_it() {
     outcome.expect("the journey ran and the browser session ended cleanly");
 }
 
+/// A signed-in page leaves for the sign-in page once its session ends in
+/// another tab of the console.
+///
+/// The first window keeps a signed-in page open; the second signs out, and
+/// its signed-out page tells every tab of the console that the session ended
+/// (FerroUI's session watch), so the first leaves for the sign-in page with
+/// no press of its own.
+#[tokio::test]
+async fn a_signed_in_page_leaves_for_the_sign_in_once_its_session_ends_elsewhere() {
+    let Some(deployment) = signed_in() else {
+        return;
+    };
+    let outcome = session()
+        .await
+        .run_and_quit(|driver| async move {
+            let journey = Journey::open(driver, &deployment.base, "/").await;
+            choose(&journey, &deployment, "writer", "session-watch").await;
+            let named = sign_in(&journey, &deployment).await;
+            assert!(named.contains(WHO), "the reader is signed in: `{named}`");
+            let first = journey.window().await?;
+            journey
+                .reopen(&format!("{}{TAXONOMY_PAGE}", deployment.base))
+                .await;
+
+            journey.open_window().await?;
+            journey.reopen(&format!("{}/", deployment.base)).await;
+            open_menu(&journey).await;
+            let out = journey
+                .visible(By::XPath(SIGN_OUT), "the sign-out control")
+                .await;
+            journey.press_on(&out, "the sign-out control").await?;
+            journey
+                .text_becoming(
+                    By::Css("body"),
+                    StringMatch::new("You are signed out").partial(),
+                    "the second window's sign-in page",
+                )
+                .await;
+
+            journey.switch_to(&first).await?;
+            journey
+                .count_becoming(
+                    By::XPath("//*[contains(text(), 'Practitioner/')]"),
+                    0,
+                    "the first window to stop naming the reader",
+                )
+                .await;
+            journey
+                .element(
+                    By::Css("a[href^='/auth/login']"),
+                    "the sign-in page's way in",
+                )
+                .await;
+            let at = journey.evaluate("return location.pathname;").await?;
+            assert_eq!(
+                "/auth/sign-in", at,
+                "the first window is on the sign-in page"
+            );
+            journey.no_console_errors().await;
+            Ok::<(), WebDriverError>(())
+        })
+        .await;
+    outcome.expect("the journey ran and the browser session ended cleanly");
+}
+
 /// A visitor reads without signing in, is offered the sign-in, and is
 /// offered no control that writes.
 ///

@@ -37,6 +37,7 @@ use crate::config::settings::SessionSettings;
 mod cookies;
 pub mod refresh;
 pub mod request;
+pub mod watch;
 
 /// The name of the cookie that carries a signed-in session, under the
 /// `__Host-` prefix when the cookie is `Secure`.
@@ -483,6 +484,43 @@ impl Sessions {
             .map(|session| session.scopes.clone()))
     }
 
+    /// What the live signed-in session `id` has left until its idle timeout
+    /// and its absolute lifetime; `None` for a session that is not live.
+    ///
+    /// A read leaves the session as it is; with `extend` the request counts
+    /// as the reader's activity and starts the idle timeout again, which
+    /// never reaches past the absolute lifetime.
+    ///
+    /// # Errors
+    /// Returns [`SessionError::Poisoned`] when the store is unusable.
+    pub fn remaining(
+        &self,
+        id: &SessionId,
+        extend: bool,
+    ) -> Result<Option<Remaining>, SessionError> {
+        let now = Instant::now();
+        let mut store = self.lock()?;
+        let Some(session) = store.sessions.get_mut(id) else {
+            return Ok(None);
+        };
+        if !live(&self.settings, session, now) {
+            return Ok(None);
+        }
+        if extend {
+            session.touched = now;
+        }
+        Ok(Some(Remaining {
+            idle: self
+                .settings
+                .idle_timeout
+                .saturating_sub(now.saturating_duration_since(session.touched)),
+            absolute: self
+                .settings
+                .absolute_timeout
+                .saturating_sub(now.saturating_duration_since(session.created)),
+        }))
+    }
+
     /// How many entries each pool holds.
     ///
     /// # Errors
@@ -517,6 +555,15 @@ impl Sessions {
             .lock()
             .map_err(|_poisoned| SessionError::Poisoned)
     }
+}
+
+/// What a live session has left until each of its timeouts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Remaining {
+    /// Until the idle timeout, unless the reader acts.
+    pub idle: Duration,
+    /// Until the absolute lifetime ends, which nothing extends.
+    pub absolute: Duration,
 }
 
 /// Whether `session` is inside its idle and its absolute timeout at `now`,
@@ -722,6 +769,35 @@ mod tests {
             assert!(sessions.access_token(&id).expect("usable").is_none());
             assert_eq!(0, sessions.occupancy().expect("usable").sessions);
         }
+    }
+
+    #[test]
+    fn a_read_of_what_is_left_extends_nothing_and_an_extension_restarts_the_idle_timeout() {
+        let sessions = Sessions::new(settings());
+        let id = sessions.establish(signed_in()).expect("room");
+        std::thread::sleep(Duration::from_millis(5));
+        let read = sessions
+            .remaining(&id, false)
+            .expect("usable")
+            .expect("live");
+        assert!(read.idle < Duration::from_secs(60), "{read:?}");
+        assert!(read.absolute < Duration::from_secs(600), "{read:?}");
+        let again = sessions
+            .remaining(&id, false)
+            .expect("usable")
+            .expect("live");
+        assert!(again.idle <= read.idle, "a read never extends: {again:?}");
+        let extended = sessions
+            .remaining(&id, true)
+            .expect("usable")
+            .expect("live");
+        assert_eq!(Duration::from_secs(60), extended.idle);
+        assert!(
+            extended.absolute <= read.absolute,
+            "nothing extends the lifetime"
+        );
+        sessions.end(&id).expect("usable");
+        assert_eq!(None, sessions.remaining(&id, true).expect("usable"));
     }
 
     #[test]
