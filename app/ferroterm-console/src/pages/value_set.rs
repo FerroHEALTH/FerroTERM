@@ -28,7 +28,6 @@ use ferrohealth_ui::view::surface::{
 use ferrohealth_ui::view::template::list::HeadingCount;
 use ferrohealth_ui::widget::action_menu::{Act, Action, Item, Menu};
 use leptos::prelude::*;
-use leptos_router::hooks::use_params_map;
 
 use crate::auth::scopes::Letter;
 use crate::fhir::concept::LookupRequest;
@@ -39,10 +38,10 @@ use crate::fhir::version::FhirVersion;
 use crate::fhir::{Document, FhirClient, VALUE_SET, resources_text};
 use crate::locale::{Msg, tr, tr_with};
 use crate::pages::detail::{Head, Kind, Links, PANE_PARAM, Pane, header, line, tabbed};
-use crate::pages::parts::{Source, failure, heading, loaded, name_of, system_names};
+use crate::pages::parts::{Source, failure, heading, name_of, redirect, system_names};
 use crate::pages::value_sets::DELETED_PARAM;
-use crate::posted::{INTENT, posted};
-use crate::request::{Request, request};
+use crate::posted::INTENT;
+use crate::request::Request;
 use crate::routes::{
     VALIDATE_PATH, VALUE_SETS_PATH, editing_link, expansion_link, resource_link, system_link,
     ui_link,
@@ -69,60 +68,52 @@ struct Read {
 }
 
 /// One value set, on the tab the address names.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn ValueSetPage() -> impl IntoView {
-    let request = request();
-    let params = use_params_map();
-    let id = params
-        .with_untracked(|params| params.get("id"))
-        .unwrap_or_default();
+pub(crate) async fn page(request: Request) -> AnyView {
+    let id = request.segment(1).unwrap_or_default();
     let Some(pane) = Pane::of(Kind::ValueSet, request.param(PANE_PARAM).as_deref()) else {
         return crate::pages::errors::not_found_page();
     };
-    let form = posted().filter(|form| form.intent() == DELETE);
-    loaded(async move {
-        let refused = match form {
-            Some(_) => match request.client.delete(request.version, VALUE_SET, &id).await {
-                Ok(()) => {
-                    leptos_axum::redirect(&format!(
-                        "{}&{DELETED_PARAM}={}",
-                        ui_link(VALUE_SETS_PATH, request.version),
-                        percent(&id)
-                    ));
-                    return ().into_any();
-                }
-                Err(error) => Some(error),
-            },
-            None => None,
-        };
-        let document = match request.client.value_set_read(request.version, &id).await {
-            Ok(document) => document,
-            Err(error) => {
-                return view! {
-                    {heading(id.clone(), None, Vec::new(), ActionGroup::none())}
-                    {failure(&error)}
-                }
-                .into_any();
+    let form = request
+        .posted
+        .clone()
+        .filter(|form| form.intent() == DELETE);
+    let refused = match form {
+        Some(_) => match request.client.delete(request.version, VALUE_SET, &id).await {
+            Ok(()) => {
+                redirect(&format!(
+                    "{}&{DELETED_PARAM}={}",
+                    ui_link(VALUE_SETS_PATH, request.version),
+                    percent(&id)
+                ));
+                return ().into_any();
             }
-        };
-        let names = system_names(&request.client, request.version).await;
-        let displays =
-            filter_displays(&request.client, request.version, &document.value.clauses()).await;
-        let expansion = if pane == Pane::Second {
-            Some(expand(&request, &document.value).await)
-        } else {
-            None
-        };
-        view! {
-            {refused.as_ref().map(failure)}
-            {page(&request, &id, &Read { document, names, displays }, pane, expansion)}
+            Err(error) => Some(error),
+        },
+        None => None,
+    };
+    let document = match request.client.value_set_read(request.version, &id).await {
+        Ok(document) => document,
+        Err(error) => {
+            return view! {
+                {heading(id.clone(), None, Vec::new(), ActionGroup::none())}
+                {failure(&error)}
+            }
+            .into_any();
         }
-        .into_any()
-    })
+    };
+    let names = system_names(&request.client, request.version).await;
+    let displays =
+        filter_displays(&request.client, request.version, &document.value.clauses()).await;
+    let expansion = if pane == Pane::Second {
+        Some(expand(&request, &document.value).await)
+    } else {
+        None
+    };
+    view! {
+        {refused.as_ref().map(failure)}
+        {screen(&request, &id, &Read { document, names, displays }, pane, expansion)}
+    }
+    .into_any()
 }
 
 /// The display of each concept a clause's filter names, read with
@@ -286,7 +277,7 @@ fn percent(value: &str) -> String {
 }
 
 /// The page of `read` on `pane`.
-fn page(
+fn screen(
     request: &Request,
     id: &str,
     read: &Read,

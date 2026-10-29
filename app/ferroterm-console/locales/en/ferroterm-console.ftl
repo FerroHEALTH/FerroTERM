@@ -375,6 +375,8 @@ errors-not-found-body = The console has no page at { $path }. The navigation lis
 errors-forbidden-body = You are signed in as { $who }, and this account may not do this: { $what }. You can still read everything and preview what you compose.
 errors-forbidden-scope = Needs the scope
 errors-sign-in-again = Sign in again
+errors-unread-title = The page did not load
+errors-unread-body = The console could not read this page from its server: { $reported }. Load the page again, or go back to the dashboard.
 
 ## The keyboard shortcuts
 

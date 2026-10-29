@@ -87,7 +87,7 @@ pub async fn logout(Extension(state): Extension<ConsoleState>, headers: HeaderMa
             format!(
                 "{}?state={}",
                 crate::routes::SIGN_IN_PAGE,
-                super::SignInState::SignedOut.key()
+                crate::auth::SignInState::SignedOut.key()
             )
         },
         String::from,

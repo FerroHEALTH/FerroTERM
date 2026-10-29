@@ -24,7 +24,7 @@ use leptos::context::use_context;
 use secrecy::ExposeSecret as _;
 use url::Url;
 
-use crate::fhir::exchange::{Answer, Exchange, ExchangeError, Method};
+use crate::fhir::exchange::{ACTIVATE, Answer, Exchange, ExchangeError, Method, RELOAD, RUN, RUNS};
 use crate::server::ConsoleState;
 
 /// The FHIR roots the console forwards to, each a first path segment.
@@ -32,18 +32,6 @@ pub const FHIR_ROOTS: [&str; 4] = ["r4", "r4b", "r5", "r6"];
 
 /// The terminology server's health route.
 pub const HEALTH: &str = "health";
-
-/// The sync service's run list, served by its admin listener.
-pub const RUNS: &str = "runs";
-
-/// The sync service's manual run, on its admin listener.
-pub const RUN: &str = "run";
-
-/// The sync service's activation of what is staged, on its admin listener.
-pub const ACTIVATE: &str = "activate";
-
-/// The terminology server's reload of its served set, on its admin listener.
-pub const RELOAD: &str = "reload";
 
 /// The largest body the console reads from an answer.
 pub const BODY_LIMIT: usize = 32 * 1024 * 1024;

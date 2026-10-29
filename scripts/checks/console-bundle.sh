@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 # Measures the console's release site bundle (app/ferroterm-console)
-# and fails when its brotli-compressed WebAssembly is over its byte budget
+# and fails when its brotli-compressed entry WebAssembly is over its byte budget
 # (no specification governs this: our own design).
 #
 # It reads the bundle scripts/release/console-site.sh --release writes, prints
@@ -77,8 +77,9 @@ br() {
 wasm="$pkg/$name.wasm"
 js="$pkg/$name.js"
 entry_br="$(br "$wasm")"
-# The lazy islands' chunks count too: a page that draws every one of them
-# loads them all beside the entry.
+# The route groups' chunks are reported beside the entry and not gated: a
+# page loads the entry and its own group's chunks, and the other groups as
+# the reader goes to them.
 chunks_br=0
 chunks_raw=0
 for chunk in "$pkg"/chunk_*.wasm "$pkg"/split_*.wasm; do
@@ -86,7 +87,7 @@ for chunk in "$pkg"/chunk_*.wasm "$pkg"/split_*.wasm; do
   chunks_br=$((chunks_br + $(br "$chunk")))
   chunks_raw=$((chunks_raw + $(raw "$chunk")))
 done
-wasm_br=$((entry_br + chunks_br))
+wasm_br="$entry_br"
 percent=$((wasm_br * 100 / budget))
 
 table="$(
@@ -95,10 +96,10 @@ table="$(
   echo "| File | Raw | gzip -9 | brotli -q 11 |"
   echo "|---|---:|---:|---:|"
   echo "| \`$name.wasm\` | $(raw "$wasm") | $(gz "$wasm") | $entry_br |"
-  echo "| the lazy islands' chunks | $chunks_raw | | $chunks_br |"
+  echo "| the route groups' chunks | $chunks_raw | | $chunks_br |"
   echo "| \`$name.js\` | $(raw "$js") | $(gz "$js") | $(br "$js") |"
   echo
-  echo "Sizes in bytes. Budget: $budget bytes of brotli-compressed WebAssembly; this build is $wasm_br bytes with every chunk, $percent% of it."
+  echo "Sizes in bytes. Budget: $budget bytes of brotli-compressed WebAssembly; the entry is $wasm_br bytes, $percent% of it, and the chunks $chunks_br more."
 )"
 
 echo "$table"
@@ -107,7 +108,7 @@ if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
 fi
 
 if [[ "$wasm_br" -gt "$budget" ]]; then
-  echo "::error file=.claude/rules/leptos-ui.md::The brotli-compressed WebAssembly is $wasm_br bytes, over the $budget-byte budget of .claude/rules/leptos-ui.md § Bundle. Shrink the bundle, or raise the budget there with the reason." >&2
+  echo "::error file=.claude/rules/leptos-ui.md::The brotli-compressed entry WebAssembly is $wasm_br bytes, over the $budget-byte budget of .claude/rules/leptos-ui.md § Bundle. Shrink the bundle, or raise the budget there with the reason." >&2
   exit 1
 fi
 echo "console-bundle: $wasm_br of $budget bytes, within the budget"

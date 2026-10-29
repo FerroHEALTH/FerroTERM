@@ -1,18 +1,13 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The routed screens, each drawn on the server alone.
+//! The routed screens.
 //!
-//! A screen reads what it shows on the server while the page renders
-//! ([`parts::loaded`]), so the browser receives the whole page as HTML and
-//! hydrates the islands in it and nothing else.
-
-// The diagnostic lands on macro output rather than on an item written here,
-// so the expectation covers the module tree.
-#![expect(
-    clippy::same_name_method,
-    reason = "leptos::component derives a TypedBuilder whose `builder` shadows a trait method"
-)]
+//! Each screen is one async function from the request to the page: it reads
+//! what it shows from the terminology server and draws it. The server runs
+//! it to record what it reads, and whichever half shows the page runs it
+//! again from that recording (`crate::groups`), so the code of a screen is
+//! the same on both.
 
 pub(crate) mod about;
 pub(crate) mod browse;

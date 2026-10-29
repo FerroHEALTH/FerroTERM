@@ -1,32 +1,24 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
-//! What the server knows of the request it draws a page for, read once at
-//! the root of the page tree and provided to every screen.
+//! What a page reads of its request: the address, the reader's
+//! preferences, who is signed in and the console's own settings.
 //!
-//! The pages are drawn on the server alone (islands mode), so a screen reads
-//! the address, the reader's preferences and the session straight from this
-//! value: nothing crosses to the browser but the islands' props. No
-//! specification governs this: our own design.
+//! A page is drawn from a [`Request`] built from the visit the server read
+//! ([`crate::visit::Visit`]) and the address the router names, so the server
+//! and the browser draw it from the same value. No specification governs
+//! this: our own design.
 
 use ferrohealth_ui::i18n::Locale;
 use leptos::prelude::*;
 
+use crate::auth::Session;
 use crate::auth::scopes::Letter;
-use crate::auth::{Operator, Session};
 use crate::fhir::FhirClient;
 use crate::fhir::version::FhirVersion;
-use crate::prefs::{PREFIX, Prefs};
+use crate::posted::Posted;
+use crate::prefs::Prefs;
 use crate::routes::VERSION_PARAM;
-use crate::server::ConsoleState;
-
-/// The admin listeners the console is configured to reach.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct Listeners {
-    /// The sync service's admin listener.
-    pub(crate) sync: bool,
-    /// The terminology server's admin listener.
-    pub(crate) admin: bool,
-}
+use crate::visit::{Listeners, Visit};
 
 /// The request a page is drawn for.
 #[derive(Clone, Debug)]
@@ -47,6 +39,8 @@ pub(crate) struct Request {
     /// Whether the console offers a sign-in: an OpenID Provider is
     /// configured.
     pub(crate) sign_in: bool,
+    /// The issuer of that provider.
+    pub(crate) issuer: Option<String>,
     /// The admin listeners the console reaches.
     pub(crate) listeners: Listeners,
     /// The client of the terminology server.
@@ -55,33 +49,58 @@ pub(crate) struct Request {
     pub(crate) root: String,
     /// The locale the page is drawn in.
     pub(crate) locale: Locale,
+    /// The locale the browser asks for.
+    pub(crate) browser: Locale,
+    /// The form the request posted, for a page drawn as a post's answer.
+    pub(crate) posted: Option<Posted>,
 }
 
 impl Request {
+    /// The request for the address `path` and `query`, as `visit` read it.
+    #[must_use]
+    pub(crate) fn of(visit: &Visit, path: String, query: String) -> Self {
+        let prefs = Prefs::read(&visit.cookies, &visit.prefix);
+        let named =
+            param_in(&query, VERSION_PARAM).and_then(|text| text.parse::<FhirVersion>().ok());
+        Self {
+            locale: visit.locale(),
+            browser: visit.browser(),
+            version: named.or(prefs.session_fhir).unwrap_or(prefs.fhir),
+            version_named: named.is_some(),
+            prefs,
+            path,
+            query,
+            session: Session::new(visit.operator.clone()),
+            sign_in: visit.issuer.is_some(),
+            issuer: visit.issuer.clone(),
+            listeners: visit.listeners,
+            client: FhirClient::new(visit.root.clone()),
+            root: visit.root.clone(),
+            posted: visit.posted.clone(),
+        }
+    }
+
+    /// The same request for the address `path` and `query`, as a part of the
+    /// shell drawn once reads the page in view.
+    #[must_use]
+    pub(crate) fn at(&self, path: String, query: String) -> Self {
+        let named =
+            param_in(&query, VERSION_PARAM).and_then(|text| text.parse::<FhirVersion>().ok());
+        Self {
+            version: named.or(self.prefs.session_fhir).unwrap_or(self.prefs.fhir),
+            version_named: named.is_some(),
+            path,
+            query,
+            ..self.clone()
+        }
+    }
+
     /// The request the server is drawing, read from its context: the
     /// console's state and the request's parts.
+    #[cfg(not(target_arch = "wasm32"))]
     #[must_use]
     pub(crate) fn read() -> Self {
-        let state = use_context::<ConsoleState>();
-        let parts = use_context::<http::request::Parts>();
-        let cookies = parts
-            .as_ref()
-            .map(|parts| {
-                parts
-                    .headers
-                    .get_all(http::header::COOKIE)
-                    .iter()
-                    .filter_map(|value| value.to_str().ok())
-                    .collect::<Vec<_>>()
-                    .join("; ")
-            })
-            .unwrap_or_default();
-        let prefix = state.as_ref().map_or_else(
-            || String::from(PREFIX),
-            |state| state.sessions().cookie_name(PREFIX),
-        );
-        let prefs = Prefs::read(&cookies, &prefix);
-        let (path, query) = parts.as_ref().map_or_else(
+        let (path, query) = use_context::<http::request::Parts>().map_or_else(
             || (String::from("/"), String::new()),
             |parts| {
                 (
@@ -90,35 +109,22 @@ impl Request {
                 )
             },
         );
-        let named =
-            param_in(&query, VERSION_PARAM).and_then(|text| text.parse::<FhirVersion>().ok());
-        let operator: Option<Operator> = crate::session::request::operator();
-        let root = state
-            .as_ref()
-            .map(|state| state.settings().ferroterm.shown_root())
-            .unwrap_or_default();
-        Self {
-            locale: crate::locale::chosen(&prefs),
-            version: named.or(prefs.session_fhir).unwrap_or(prefs.fhir),
-            version_named: named.is_some(),
-            prefs,
-            path,
-            query,
-            session: Session::new(operator),
-            sign_in: state
-                .as_ref()
-                .is_some_and(|state| state.settings().oidc.is_some()),
-            listeners: Listeners {
-                sync: state
-                    .as_ref()
-                    .is_some_and(|state| state.settings().ferroterm.sync.is_some()),
-                admin: state
-                    .as_ref()
-                    .is_some_and(|state| state.settings().ferroterm.admin.is_some()),
-            },
-            client: FhirClient::new(root.clone()),
-            root,
-        }
+        Self::of(&Visit::requested(), path, query)
+    }
+
+    /// The `index`th segment of the page's path, counted from the first after
+    /// the root, when it has one.
+    #[must_use]
+    pub(crate) fn segment(&self, index: usize) -> Option<String> {
+        self.path
+            .split('/')
+            .filter(|segment| !segment.is_empty())
+            .nth(index)
+            .map(|segment| {
+                percent_encoding::percent_decode_str(segment)
+                    .decode_utf8_lossy()
+                    .into_owned()
+            })
     }
 
     /// The value of the address's parameter `name`, decoded, if it carries
@@ -186,10 +192,25 @@ pub(crate) fn params_in(query: &str, name: &str) -> Vec<String> {
         .collect()
 }
 
-/// The request the page tree provides, read once at its root.
+/// The request the page being drawn was provided with, or the server's own
+/// request outside a page.
 #[must_use]
 pub(crate) fn request() -> Request {
-    use_context::<Request>().unwrap_or_else(Request::read)
+    if let Some(request) = use_context::<Request>() {
+        return request;
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        Request::read()
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        Request::of(
+            &crate::visit::visit_untracked(),
+            String::from("/"),
+            String::new(),
+        )
+    }
 }
 
 #[cfg(test)]

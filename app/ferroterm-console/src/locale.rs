@@ -76,6 +76,7 @@ pub(crate) fn tr_in(catalog: &dyn Loader, locale: &Locale, msg: Msg) -> String {
 /// The locale of the request being served: the best language of its
 /// `Accept-Language` the catalog holds, else the configured one, English
 /// with no configuration in reach.
+#[cfg(not(target_arch = "wasm32"))]
 #[must_use]
 pub(crate) fn requested() -> Locale {
     use leptos::context::use_context;
@@ -96,6 +97,7 @@ pub(crate) fn requested() -> Locale {
 /// The locale the page is drawn in: the language the reader chose in Your
 /// preferences when the console ships a catalog of it, else the language
 /// [`requested`] negotiates.
+#[cfg(not(target_arch = "wasm32"))]
 #[must_use]
 pub(crate) fn chosen(prefs: &crate::prefs::Prefs) -> Locale {
     prefs
@@ -107,6 +109,7 @@ pub(crate) fn chosen(prefs: &crate::prefs::Prefs) -> Locale {
         .unwrap_or_else(requested)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 /// Whether the console ships a catalog of the language `tag`.
 #[must_use]
 pub(crate) fn offered(tag: &str) -> bool {

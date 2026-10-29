@@ -15,11 +15,10 @@ use ferrohealth_ui::view::sign_in::{Notice, Provider, Retry, SignIn, State, sign
 use leptos::prelude::*;
 use leptos_meta::Title;
 
+use crate::auth::SignInState;
 use crate::locale::{Msg, tr};
-use crate::oidc::SignInState;
-use crate::request::request;
+use crate::request::Request;
 use crate::routes::{BACK_PARAM, LOGIN_ROUTE, ui_path};
-use crate::server::ConsoleState;
 use crate::shell::footer;
 
 /// Where the book documents the console.
@@ -64,23 +63,11 @@ fn state_of(state: Option<SignInState>, retry: &str) -> State {
 }
 
 /// The sign-in page.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn SignInPage() -> impl IntoView {
-    let request = request();
-    let issuer = use_context::<ConsoleState>().and_then(|state| {
-        state
-            .settings()
-            .oidc
-            .as_ref()
-            .map(|oidc| oidc.issuer.clone())
-    });
+pub(crate) async fn page(request: Request) -> AnyView {
+    let issuer = request.issuer.clone();
     let back = request
         .param(BACK_PARAM)
-        .and_then(|back| crate::post::return_path(&back).map(str::to_owned))
+        .and_then(|back| crate::routes::return_path(&back).map(str::to_owned))
         .unwrap_or_else(|| ui_path(""));
     let login = format!(
         "{LOGIN_ROUTE}?{}",
@@ -155,4 +142,5 @@ pub(crate) fn SignInPage() -> impl IntoView {
         <Title text=title />
         {centred(card, footer())}
     }
+    .into_any()
 }

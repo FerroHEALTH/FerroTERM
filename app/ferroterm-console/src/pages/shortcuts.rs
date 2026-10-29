@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The keyboard shortcuts: the groups the legend lists, the go-to targets
-//! the console's shortcuts island follows, and the page that lists them
+//! the console's shortcuts follow, and the page that lists them
 //! with no WebAssembly.
 
 use ferrohealth_ui::view::action::ActionGroup;
@@ -12,6 +12,7 @@ use leptos::prelude::*;
 
 use crate::locale::{Msg, tr};
 use crate::pages::parts::heading;
+use crate::request::Request;
 use crate::routes::{
     BROWSE_PATH, CONCEPT_MAPS_PATH, OPERATIONS_PATH, SERVER_PATH, SYSTEMS_PATH, VALUE_SETS_PATH,
     ui_path,
@@ -81,12 +82,7 @@ pub(crate) fn groups() -> Vec<ShortcutGroup> {
 }
 
 /// The keyboard shortcuts, as a page.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn ShortcutsPage() -> impl IntoView {
+pub(crate) async fn page(_request: Request) -> AnyView {
     let or = tr(Msg::KeysOr);
     let cards = groups()
         .into_iter()
@@ -108,4 +104,5 @@ pub(crate) fn ShortcutsPage() -> impl IntoView {
         {heading(tr(Msg::KeysTitle), Some(tr(Msg::KeysIntro)), Vec::new(), ActionGroup::none())}
         {grid_start(cards)}
     }
+    .into_any()
 }

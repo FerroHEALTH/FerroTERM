@@ -37,9 +37,9 @@ use crate::fhir::error::FhirError;
 use crate::fhir::write::Version;
 use crate::locale::{Msg, tr, tr_with};
 use crate::pages::detail::{Head, Kind, Links, Pane, header, line, tabbed};
-use crate::pages::parts::{Source, failure, heading, loaded, refusal_of, relative};
-use crate::posted::{Posted, posted};
-use crate::request::{Request, request};
+use crate::pages::parts::{Source, failure, heading, redirect, refusal_of, relative};
+use crate::posted::Posted;
+use crate::request::Request;
 use crate::routes::{HISTORY_ROUTE, ID_PARAM, TYPE_PARAM, editing_link, history_link, screen_link};
 
 /// The query parameter naming the earlier revision of a comparison.
@@ -80,13 +80,7 @@ enum Restored {
 }
 
 /// The History tab of the resource the address names.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn HistoryPage() -> impl IntoView {
-    let request = request();
+pub(crate) async fn page(request: Request) -> AnyView {
     let subject = Subject {
         resource_type: request.text(TYPE_PARAM),
         id: request.text(ID_PARAM),
@@ -94,21 +88,22 @@ pub(crate) fn HistoryPage() -> impl IntoView {
     let Some(kind) = Kind::of(&subject.resource_type).filter(|_| !subject.id.is_empty()) else {
         return crate::pages::errors::not_found_page();
     };
-    let posted = posted().filter(|form| form.intent() == RESTORE);
-    loaded(async move {
-        let support = match request.client.capability_statement(request.version).await {
-            Ok(statement) => Support::of(&statement, &subject.resource_type),
-            Err(error) => return refused_page(&subject, &error),
-        };
-        let restored = match &posted {
-            Some(form) => send_restore(&request, support, &subject, form).await,
-            None => None,
-        };
-        match open(&request.client, request.version, support, subject.clone()).await {
-            Ok(opened) => page(&request, kind, &opened, restored.as_ref()),
-            Err(error) => refused_page(&subject, &error),
-        }
-    })
+    let posted = request
+        .posted
+        .clone()
+        .filter(|form| form.intent() == RESTORE);
+    let support = match request.client.capability_statement(request.version).await {
+        Ok(statement) => Support::of(&statement, &subject.resource_type),
+        Err(error) => return refused_page(&subject, &error),
+    };
+    let restored = match &posted {
+        Some(form) => send_restore(&request, support, &subject, form).await,
+        None => None,
+    };
+    match open(&request.client, request.version, support, subject.clone()).await {
+        Ok(opened) => screen(&request, kind, &opened, restored.as_ref()),
+        Err(error) => refused_page(&subject, &error),
+    }
 }
 
 /// The page of a resource whose revisions did not read.
@@ -166,7 +161,7 @@ async fn send_restore(
                 percent(&revision),
                 percent(&written)
             );
-            leptos_axum::redirect(&back);
+            redirect(&back);
             Some(Restored::Written { revision, written })
         }
         Err(error) => Some(Restored::Refused(error)),
@@ -187,7 +182,7 @@ fn element<'a>(resource: Option<&'a Value>, name: &str) -> Option<&'a str> {
 }
 
 /// The page of `opened`, after a restore that came to `restored`.
-fn page(request: &Request, kind: Kind, opened: &Opened, restored: Option<&Restored>) -> AnyView {
+fn screen(request: &Request, kind: Kind, opened: &Opened, restored: Option<&Restored>) -> AnyView {
     let current = opened.current.as_ref();
     let subject = &opened.subject;
     let canonical = opened.canonical();

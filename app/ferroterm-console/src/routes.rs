@@ -193,6 +193,7 @@ pub(crate) const RESET_ROUTE: &str = "/preferences/reset";
 /// The route the navigation's Collapse and Expand post to.
 pub(crate) const SIDEBAR_ROUTE: &str = "/sidebar";
 
+#[cfg(not(target_arch = "wasm32"))]
 /// The route the top bar's FHIR version select leads to, which keeps the
 /// version for the browser's session and returns to the page.
 pub(crate) const FHIR_VERSION_ROUTE: &str = "/fhir-version";
@@ -363,6 +364,29 @@ pub(crate) fn version_link(pathname: &str, search: &str, version: FhirVersion) -
     let selected = format!("{VERSION_PARAM}={}", version.segment());
     kept.push(&selected);
     format!("{pathname}?{}", kept.join("&"))
+}
+
+/// The cookie key of the FHIR version the top bar chose for the browser's
+/// session.
+pub(crate) const SESSION_FHIR: &str = "session-fhir";
+
+/// The page `path` names when it is one of the console's own pages, and
+/// `None` for anything else, so a post never redirects off the console.
+///
+/// A page is an absolute path of visible ASCII with a query of its own,
+/// never `//`, a backslash, a fragment or a dot segment.
+#[must_use]
+pub(crate) fn return_path(path: &str) -> Option<&str> {
+    let (route, _query) = path.split_once('?').unwrap_or((path, ""));
+    let plain = route.starts_with('/')
+        && !route.starts_with("//")
+        && path
+            .chars()
+            .all(|c| c.is_ascii_graphic() && c != '\\' && c != '#')
+        && !route
+            .split('/')
+            .any(|segment| segment == "." || segment == "..");
+    plain.then_some(path)
 }
 
 #[cfg(test)]
@@ -615,7 +639,7 @@ mod tests {
         );
         assert_eq!(back_of(&link), back);
         assert_eq!(
-            crate::post::return_path(&back_of(&link)),
+            return_path(&back_of(&link)),
             Some(back),
             "the sign-in returns to a page the console accepts as its own"
         );

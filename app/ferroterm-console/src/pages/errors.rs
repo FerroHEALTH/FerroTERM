@@ -16,9 +16,45 @@ use crate::routes::{VALUE_SETS_PATH, ui_path};
 
 /// Sets the status of the answer the page is drawn into.
 fn status(code: http::StatusCode) {
+    #[cfg(not(target_arch = "wasm32"))]
     if let Some(response) = use_context::<leptos_axum::ResponseOptions>() {
         response.set_status(code);
     }
+    #[cfg(target_arch = "wasm32")]
+    let _: http::StatusCode = code;
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+/// Answers the read of a page with `200 OK` whatever status the page set as
+/// it was read: the page sets it again as it is drawn, as the document's.
+pub(crate) fn answered_ok() {
+    status(http::StatusCode::OK);
+}
+
+/// The page drawn when the console's server did not answer the read of the
+/// page, saying what the transport reported.
+pub(crate) fn unread_page(reported: &str) -> AnyView {
+    let body =
+        view! { {tr_with(Msg::ErrorsUnreadBody, &[("reported", reported.to_owned().into())])} }
+            .into_any();
+    view! {
+        <Title text=tr(Msg::ErrorsUnreadTitle) />
+        {error_page(ErrorPage {
+            status: Status::Fault,
+            title: tr(Msg::ErrorsUnreadTitle),
+            body,
+            hint: None,
+            ways: vec![
+                Way {
+                    label: tr(Msg::ShellDashboard),
+                    href: ui_path(""),
+                    glyph: Some(Glyph::LAYOUT_DASHBOARD),
+                },
+            ],
+            detail: None,
+        })}
+    }
+    .into_any()
 }
 
 /// The page for an address that names no screen: `404`, the address, and

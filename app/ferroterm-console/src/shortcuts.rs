@@ -1,43 +1,36 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The console's own island: its keyboard shortcuts.
+//! The console's own keyboard shortcuts: a go-to pair follows its link,
+//! Ctrl Enter runs the page's run form and Ctrl S saves its save form.
 //!
-//! FerroUI binds no key; a console listens for its own in an island of its
-//! own and opens the library's legend from it (`widget::shortcuts`). Every
+//! FerroUI opens the legend on `?` (`island::ShortcutLegend`, drawn by the
+//! shell) and binds no other key; a console listens for its own. Every
 //! shortcut has a control on the screen that does the same, so the page
 //! loses nothing when its WebAssembly has not loaded. No specification
 //! governs the shortcuts: our own design.
-#![expect(
-    clippy::mem_forget,
-    reason = "the island macro of leptos_macro 0.8 keeps each hydrated island alive by forgetting its view state, in the browser entry it writes"
-)]
-#![expect(
-    clippy::must_use_candidate,
-    reason = "the #[island] macro drops a #[must_use] from the function it writes"
-)]
+
 #![expect(
     clippy::same_name_method,
-    reason = "the #[island] macro derives a TypedBuilder whose `builder` shadows a trait method"
+    reason = "leptos::component derives a TypedBuilder whose `builder` shadows a trait method"
 )]
-#![expect(
-    missing_docs,
-    reason = "the #[island] macro writes an undocumented struct of each island's props as they cross to the browser"
+#![cfg_attr(
+    not(target_arch = "wasm32"),
+    allow(
+        dead_code,
+        reason = "the keys are read in the browser alone; the host builds them for the tests"
+    )
 )]
 
-use ferrohealth_ui::view::kbd::ShortcutGroup;
-use ferrohealth_ui::widget::shortcuts::{LegendWords, shortcut_legend};
 use leptos::prelude::*;
 
 /// What a key does, once the listener has asked whether the reader types.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Press {
+pub(crate) enum Press {
     /// Nothing: the key is no shortcut here.
     Nothing,
     /// The first key of a go-to pair: wait for the second.
     Wait,
-    /// Open the legend.
-    Legend,
     /// Follow the link to this address.
     Go(String),
     /// Submit the form marked with this attribute.
@@ -45,14 +38,14 @@ pub enum Press {
 }
 
 /// The attribute a form that Ctrl Enter runs carries.
-pub const RUN: &str = "data-run";
+pub(crate) const RUN: &str = "data-run";
 
 /// The attribute a form that Ctrl S saves carries.
-pub const SAVE: &str = "data-save";
+pub(crate) const SAVE: &str = "data-save";
 
 /// Where a key is pressed, which decides whether it can be a shortcut.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Context {
+pub(crate) enum Context {
     /// The phone layout, which has no shortcuts.
     Phone,
     /// With Control (or Command) held, inside a field or not.
@@ -67,7 +60,7 @@ impl Context {
     /// The context of a key pressed with `control` held, while the reader
     /// is `typing`, in the `phone` layout or not.
     #[must_use]
-    pub const fn of(phone: bool, control: bool, typing: bool) -> Self {
+    pub(crate) const fn of(phone: bool, control: bool, typing: bool) -> Self {
         if phone {
             Self::Phone
         } else if control {
@@ -83,7 +76,12 @@ impl Context {
 /// What `key` does after `pending` (whether a go-to key came first), pressed
 /// in `context`, the go-to targets `goto` each a letter and an address.
 #[must_use]
-pub fn press(key: &str, pending: bool, context: Context, goto: &[(String, String)]) -> Press {
+pub(crate) fn press(
+    key: &str,
+    pending: bool,
+    context: Context,
+    goto: &[(String, String)],
+) -> Press {
     match context {
         Context::Phone | Context::Typing => Press::Nothing,
         Context::Control => match key {
@@ -96,43 +94,29 @@ pub fn press(key: &str, pending: bool, context: Context, goto: &[(String, String
             .find(|(letter, _)| letter.eq_ignore_ascii_case(key))
             .map_or(Press::Nothing, |(_, href)| Press::Go(href.clone())),
         Context::Free => match key {
-            "?" => Press::Legend,
             "g" | "G" => Press::Wait,
             _ => Press::Nothing,
         },
     }
 }
 
-/// The console's keyboard shortcuts: `?` opens the legend of `groups` in
-/// `words`, a go-to pair from `goto` follows its link, Ctrl Enter submits
-/// the page's run form and Ctrl S its save form. The legend shows as the
-/// page arrives when `open`.
-#[island]
-pub fn Shortcuts(
-    /// The legend's groups, their words in the page's locale.
-    groups: Vec<ShortcutGroup>,
-    /// The legend's own words, in the page's locale.
-    words: LegendWords,
+/// The console's keyboard shortcuts: a go-to pair from `goto` follows its
+/// link in the page, Ctrl Enter submits the page's run form and Ctrl S its
+/// save form.
+#[component]
+#[expect(
+    unreachable_pub,
+    reason = "the leptos component macro emits a pub props type the crate never exports"
+)]
+pub(crate) fn Shortcuts(
     /// The go-to targets: each the second key of a `g` pair and the address
     /// it leads to.
     goto: Vec<(String, String)>,
-    /// Whether the legend shows as the page arrives.
-    open: bool,
 ) -> impl IntoView {
-    let (shown, set_shown) = signal(open);
     #[cfg(target_arch = "wasm32")]
-    {
-        listen(goto, set_shown);
-        mark_hydrated();
-    }
+    listen(goto);
     #[cfg(not(target_arch = "wasm32"))]
     drop(goto);
-    shortcut_legend(
-        groups,
-        words,
-        shown.into(),
-        Callback::new(move |()| set_shown.set(false)),
-    )
 }
 
 /// The button a shortcut presses for the form `marker` names.
@@ -141,7 +125,7 @@ pub fn Shortcuts(
 /// the preview in the composer) is submitted by that button; a form with no
 /// such button is submitted as it is.
 #[must_use]
-pub const fn submitter_of(marker: &str) -> &'static [&'static str] {
+pub(crate) const fn submitter_of(marker: &str) -> &'static [&'static str] {
     if marker.len() == SAVE.len() {
         &["button[name='intent'][value='save']"]
     } else {
@@ -152,23 +136,9 @@ pub const fn submitter_of(marker: &str) -> &'static [&'static str] {
     }
 }
 
-/// Marks `<html>` once this island, the last of the shell's, has hydrated,
-/// so a browser journey acts on controls that answer.
+/// Listens for the shortcuts on the window, the go-to targets `goto`.
 #[cfg(target_arch = "wasm32")]
-fn mark_hydrated() {
-    // NOTE: no specification governs this: our own design; the mark is for the
-    // journeys, which wait for it before they press anything.
-    if let Some(root) = document().document_element()
-        && root.set_attribute("data-hydrated", "").is_err()
-    {
-        leptos::logging::warn!("the browser refused the hydrated mark");
-    }
-}
-
-/// Listens for the shortcuts on the window, the go-to targets `goto`,
-/// opening the legend through `set_shown`.
-#[cfg(target_arch = "wasm32")]
-fn listen(goto: Vec<(String, String)>, set_shown: WriteSignal<bool>) {
+fn listen(goto: Vec<(String, String)>) {
     use leptos::wasm_bindgen::JsCast as _;
     let pending = StoredValue::new(false);
     let handle = window_event_listener(leptos::ev::keydown, move |event| {
@@ -184,15 +154,9 @@ fn listen(goto: Vec<(String, String)>, set_shown: WriteSignal<bool>) {
         pending.set_value(decided == Press::Wait);
         match decided {
             Press::Nothing | Press::Wait => {}
-            Press::Legend => {
-                event.prevent_default();
-                set_shown.set(true);
-            }
             Press::Go(href) => {
                 event.prevent_default();
-                if window().location().assign(&href).is_err() {
-                    leptos::logging::warn!("the browser refused to follow a shortcut");
-                }
+                ferrohealth_ui::widget::submit::follow(&href);
             }
             Press::Submit(marker) => {
                 let form = document()
@@ -252,11 +216,16 @@ mod tests {
     fn a_single_key_never_acts_while_the_reader_types() {
         assert_eq!(
             Press::Nothing,
-            press("?", false, Context::of(false, false, true), &targets())
+            press("g", false, Context::of(false, false, true), &targets())
         );
         assert_eq!(
-            Press::Legend,
-            press("?", false, Context::of(false, false, false), &targets())
+            Press::Wait,
+            press("g", false, Context::of(false, false, false), &targets())
+        );
+        assert_eq!(
+            Press::Nothing,
+            press("?", false, Context::of(false, false, false), &targets()),
+            "the legend's key is FerroUI's"
         );
         assert_eq!(
             Press::Submit(RUN),
@@ -314,17 +283,15 @@ mod tests {
     }
 
     #[test]
-    fn the_island_draws_the_legend_and_carries_its_props_to_the_browser() {
-        use ferrohealth_ui::view::kbd::{Shortcut, ShortcutGroup};
+    fn the_listener_draws_nothing_and_the_shell_s_legend_lists_the_console_s_keys() {
+        use ferrohealth_ui::island::ShortcutLegend;
         use ferrohealth_ui::widget::shortcuts::LegendWords;
         use leptos::prelude::{Owner, RenderHtml, view};
-        let groups = vec![ShortcutGroup {
-            title: String::from("Go to"),
-            shortcuts: vec![Shortcut {
-                keys: String::from("g c"),
-                does: String::from("Code systems"),
-            }],
-        }];
+        let listener = Owner::new().with(|| view! { <Shortcuts goto=targets() /> }.to_html());
+        assert_eq!(
+            "<!>", listener,
+            "the shortcuts draw no markup of their own, only the empty view's marker"
+        );
         let words = LegendWords {
             title: "Keyboard shortcuts".into(),
             intro: "Press a key.".into(),
@@ -332,23 +299,10 @@ mod tests {
             close: "Close".into(),
         };
         let html = Owner::new().with(|| {
-            view! { <Shortcuts groups=groups words=words goto=targets() open=true /> }.to_html()
+            view! { <ShortcutLegend groups=crate::pages::shortcuts::groups() words=words /> }
+                .to_html()
         });
-        assert!(
-            html.starts_with("<leptos-island data-component=\"Shortcuts_"),
-            "{html}"
-        );
-        let props = html.replace("&quot;", "\"");
-        assert!(
-            props.contains(r#""goto":[["d","/"],["c","/systems"]],"open":true"#),
-            "the browser hydrates with the go-to targets and the open state: {props}"
-        );
         assert!(html.contains("<dialog id=\"shortcuts\""), "{html}");
-        assert!(
-            html.contains("<h3 id=\"shortcuts-group-1\">Go to</h3>"),
-            "{html}"
-        );
-        assert!(html.contains("<dd>Code systems</dd>"), "{html}");
         assert!(html.contains("Close</button>"), "{html}");
     }
 }

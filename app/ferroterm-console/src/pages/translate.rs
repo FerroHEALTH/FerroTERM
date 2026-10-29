@@ -27,8 +27,8 @@ use crate::pages::lookup::CODE_PARAM;
 use crate::pages::operations::{
     Op, before, choices, frame, options, run, select, sent, text, verdict,
 };
-use crate::pages::parts::{failure, loaded, name_of};
-use crate::request::{Request, request};
+use crate::pages::parts::{failure, name_of};
+use crate::request::Request;
 use crate::routes::SYSTEM_PARAM;
 
 /// The address parameter carrying the concept map's canonical.
@@ -38,99 +38,85 @@ const URL_PARAM: &str = "url";
 const TARGET_PARAM: &str = "targetSystem";
 
 /// The Translate tab.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn TranslatePage() -> impl IntoView {
-    let request = request();
-    loaded(async move {
-        let systems_named = request
-            .client
-            .published_names(request.version, CODE_SYSTEM)
-            .await
-            .ok();
-        let systems = choices(systems_named.as_ref());
-        let system_names = systems_named
-            .as_ref()
-            .map(crate::fhir::named::NamedSearch::names)
-            .unwrap_or_default();
-        let maps_named = request
-            .client
-            .published_names(request.version, CONCEPT_MAP)
-            .await
-            .ok();
-        let maps = choices(maps_named.as_ref());
-        let map_names = maps_named
-            .as_ref()
-            .map(crate::fhir::named::NamedSearch::names)
-            .unwrap_or_default();
-        let code = request.text(CODE_PARAM);
-        let system = request.text(SYSTEM_PARAM);
-        let map = request.text(URL_PARAM);
-        let target = request.text(TARGET_PARAM);
-        let fields = view! {
-            {text(
-                "translate-code",
-                CODE_PARAM,
-                tr(Msg::LookupCode),
-                &code,
-                tr(Msg::LookupCodeHint),
-            )}
-            {select(
-                "translate-system",
-                SYSTEM_PARAM,
-                tr(Msg::CheckItsSystem),
-                &systems,
-                &system,
-                Some(tr(Msg::CheckChooseSystem)),
-            )}
-            {select(
-                "translate-map",
-                URL_PARAM,
-                tr(Msg::TranslateMap),
-                &maps,
-                &map,
-                Some(tr(Msg::TranslateAnyMap)),
-            )}
-            {select(
-                "translate-target",
-                TARGET_PARAM,
-                tr(Msg::TranslateTarget),
-                &systems,
-                &target,
-                Some(tr(Msg::TranslateAnyTarget)),
-            )}
-        }
-        .into_any();
-        let form = options(
-            &request,
-            &[],
-            fields,
-            run(
-                "translate-run",
-                tr(Msg::OpsTranslate),
-                Glyph::CORNER_DOWN_RIGHT,
-                "$translate",
-            ),
-        );
-        let asked = TranslateRequest {
-            concept_map: map.clone(),
-            system: system.clone(),
-            code: code.clone(),
-            target_system: target,
-            ..TranslateRequest::default()
-        };
-        let answer = if code.is_empty() {
-            before(tr(Msg::TranslateBefore))
-        } else if !asked.runnable() {
-            before(tr(Msg::CheckNeedsSystem))
-        } else {
-            answer(&request, &asked, &map_names, &system_names).await
-        };
-        frame(&request, Op::Translate, form, answer)
-    })
+pub(crate) async fn page(request: Request) -> AnyView {
+    let systems_named = request
+        .client
+        .published_names(request.version, CODE_SYSTEM)
+        .await
+        .ok();
+    let systems = choices(systems_named.as_ref());
+    let system_names = systems_named
+        .as_ref()
+        .map(crate::fhir::named::NamedSearch::names)
+        .unwrap_or_default();
+    let maps_named = request
+        .client
+        .published_names(request.version, CONCEPT_MAP)
+        .await
+        .ok();
+    let maps = choices(maps_named.as_ref());
+    let map_names = maps_named
+        .as_ref()
+        .map(crate::fhir::named::NamedSearch::names)
+        .unwrap_or_default();
+    let code = request.text(CODE_PARAM);
+    let system = request.text(SYSTEM_PARAM);
+    let map = request.text(URL_PARAM);
+    let target = request.text(TARGET_PARAM);
+    let fields = view! {
+        {text("translate-code", CODE_PARAM, tr(Msg::LookupCode), &code, tr(Msg::LookupCodeHint))}
+        {select(
+            "translate-system",
+            SYSTEM_PARAM,
+            tr(Msg::CheckItsSystem),
+            &systems,
+            &system,
+            Some(tr(Msg::CheckChooseSystem)),
+        )}
+        {select(
+            "translate-map",
+            URL_PARAM,
+            tr(Msg::TranslateMap),
+            &maps,
+            &map,
+            Some(tr(Msg::TranslateAnyMap)),
+        )}
+        {select(
+            "translate-target",
+            TARGET_PARAM,
+            tr(Msg::TranslateTarget),
+            &systems,
+            &target,
+            Some(tr(Msg::TranslateAnyTarget)),
+        )}
+    }
+    .into_any();
+    let form = options(
+        &request,
+        &[],
+        fields,
+        run(
+            "translate-run",
+            tr(Msg::OpsTranslate),
+            Glyph::CORNER_DOWN_RIGHT,
+            "$translate",
+        ),
+    );
+    let asked = TranslateRequest {
+        concept_map: map.clone(),
+        system: system.clone(),
+        code: code.clone(),
+        target_system: target,
+        ..TranslateRequest::default()
+    };
+    let answer = if code.is_empty() {
+        before(tr(Msg::TranslateBefore))
+    } else if !asked.runnable() {
+        before(tr(Msg::CheckNeedsSystem))
+    } else {
+        answer(&request, &asked, &map_names, &system_names).await
+    };
+    frame(&request, Op::Translate, form, answer)
 }
 
 /// The answer to `asked`, the maps named by `map_names` and the systems by

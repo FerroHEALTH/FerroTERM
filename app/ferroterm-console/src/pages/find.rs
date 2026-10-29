@@ -8,6 +8,13 @@
 //! gated on what the root's `CapabilityStatement` declares
 //! (<https://hl7.org/fhir/R5/capabilitystatement.html>), so an operation it
 //! does not declare is left out rather than offered and refused.
+#![cfg_attr(
+    target_arch = "wasm32",
+    allow(
+        clippy::unused_async_trait_impl,
+        reason = "the server function macro writes the browser half's call as an async trait method; only that target has it"
+    )
+)]
 
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::tone::Tone;
@@ -25,8 +32,8 @@ use crate::find::{
     Declared, EXPAND, LOOKUP, Offer, QUERY_PARAM, Subject, TRANSLATE, VALIDATE_CODE, offers,
 };
 use crate::locale::{Msg, tr, tr_with};
-use crate::pages::parts::{failure, heading, loaded};
-use crate::request::{Request, request};
+use crate::pages::parts::{failure, heading};
+use crate::request::Request;
 use crate::routes::{CONCEPT_MAPS_PATH, VALUE_SETS_PATH, resource_link, system_link};
 
 /// The address the panel under the top bar's search asks as you type
@@ -205,7 +212,7 @@ pub(crate) async fn find_answer(
     /// The words typed.
     q: String,
 ) -> Result<SearchAnswer, ServerFnError> {
-    let request = request();
+    let request = crate::request::request();
     let Some(subject) = Subject::of(&q) else {
         return Ok(SearchAnswer {
             query: String::new(),
@@ -226,69 +233,61 @@ pub(crate) async fn find_answer(
 }
 
 /// The Find page.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn FindPage() -> impl IntoView {
-    let request = request();
+pub(crate) async fn page(request: Request) -> AnyView {
     let typed = request.text(QUERY_PARAM);
-    loaded(async move {
-        let head = heading(
-            tr(Msg::TitleFind),
-            Some(tr(Msg::FindSubtitle)),
-            Vec::new(),
-            ActionGroup::none(),
-        );
-        let Some(subject) = Subject::of(&typed) else {
+    let head = heading(
+        tr(Msg::TitleFind),
+        Some(tr(Msg::FindSubtitle)),
+        Vec::new(),
+        ActionGroup::none(),
+    );
+    let Some(subject) = Subject::of(&typed) else {
+        return view! {
+            {head}
+            {notice(Tone::Info, Announce::Status, None, tr(Msg::NothingWasTyped))}
+        }
+        .into_any();
+    };
+    let statement = match request.client.capability_statement(request.version).await {
+        Ok(statement) => statement,
+        Err(error) => {
             return view! {
                 {head}
-                {notice(Tone::Info, Announce::Status, None, tr(Msg::NothingWasTyped))}
+                {failure(&error)}
             }
             .into_any();
-        };
-        let statement = match request.client.capability_statement(request.version).await {
-            Ok(statement) => statement,
-            Err(error) => {
-                return view! {
-                    {head}
-                    {failure(&error)}
-                }
-                .into_any();
-            }
-        };
-        let found = find(&request, &subject, Some(&declared_by(&statement))).await;
-        let read_as = found.groups.is_empty().then(|| {
-            notice(
-                Tone::Info,
-                Announce::Status,
-                None,
-                view! {
-                    <code>{subject.typed().to_owned()}</code>
-                    " "
-                    {tr_with(
-                        Msg::FindReadAs,
-                        &[
-                            ("subject", subject.label().into()),
-                            ("version", request.version.label().into()),
-                        ],
-                    )}
-                },
-            )
-        });
-        let results = find_results(found.answer(&request, &subject));
-        view! {
-            {head}
-            {stack(
-                view! {
-                    {read_as}
-                    {results}
-                },
-            )}
         }
-        .into_any()
-    })
+    };
+    let found = find(&request, &subject, Some(&declared_by(&statement))).await;
+    let read_as = found.groups.is_empty().then(|| {
+        notice(
+            Tone::Info,
+            Announce::Status,
+            None,
+            view! {
+                <code>{subject.typed().to_owned()}</code>
+                " "
+                {tr_with(
+                    Msg::FindReadAs,
+                    &[
+                        ("subject", subject.label().into()),
+                        ("version", request.version.label().into()),
+                    ],
+                )}
+            },
+        )
+    });
+    let results = find_results(found.answer(&request, &subject));
+    view! {
+        {head}
+        {stack(
+            view! {
+                {read_as}
+                {results}
+            },
+        )}
+    }
+    .into_any()
 }
 
 #[cfg(test)]

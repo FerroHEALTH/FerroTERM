@@ -13,12 +13,11 @@ use leptos_meta::Title;
 use crate::fhir::capability::CapabilityStatement;
 use crate::fhir::version::FhirVersion;
 use crate::locale::{Msg, tr, tr_with};
-use crate::pages::parts::loaded;
-use crate::request::request;
+use crate::request::Request;
 use crate::shell::{PRODUCT, VERSION};
 
 /// The library the console is drawn with, at the version its manifest pins.
-pub(crate) const FERROUI: &str = "ferrohealth-ui 0.4.0";
+pub(crate) const FERROUI: &str = "ferrohealth-ui 0.5.7";
 
 /// The id of the self-description's Copy button.
 const COPY_ID: &str = "about-copy";
@@ -36,74 +35,66 @@ fn roots() -> String {
 }
 
 /// About.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn AboutPage() -> impl IntoView {
-    let request = request();
-    loaded(async move {
-        let version = request.version;
-        let statement = request.client.capability_statement(version).await.ok();
-        let document = request.client.capability_document(version).await.ok();
-        let server = statement
-            .as_ref()
-            .and_then(CapabilityStatement::software_line)
-            .unwrap_or_else(|| tr(Msg::AboutServerUnanswered));
-        let self_description = document.map(|document| SelfDescription {
-            title: tr_with(
-                Msg::AboutStatementTitle,
-                &[("version", version.label().into())],
-            ),
-            line: tr_with(
-                Msg::AboutStatementLine,
-                &[
-                    ("version", version.label().into()),
-                    ("path", format!("/{}/metadata", version.segment()).into()),
-                ],
-            ),
-            language: Language::Json,
-            text: serde_json::to_string_pretty(&document).unwrap_or_default(),
-            copy_id: String::from(COPY_ID),
-            download: request.client.metadata_url(version),
-        });
-        let page = about_page(ferrohealth_ui::view::template::about::AboutPage {
-            header: Header {
-                title: tr(Msg::AboutTitle).into(),
-                subtitle: Some(tr(Msg::AboutSubtitle).into()),
-                subtitle_view: None,
-                crumbs: Vec::new(),
-                mono: false,
-                badge: None,
-            },
-            release: format!("{PRODUCT} {VERSION}"),
-            versions: vec![
-                (tr(Msg::AboutServer), server.into_any()),
-                (tr(Msg::AboutFhirRoots), roots().into_any()),
-                (tr(Msg::AboutFerroui), FERROUI.into_any()),
+pub(crate) async fn page(request: Request) -> AnyView {
+    let version = request.version;
+    let statement = request.client.capability_statement(version).await.ok();
+    let document = request.client.capability_document(version).await.ok();
+    let server = statement
+        .as_ref()
+        .and_then(CapabilityStatement::software_line)
+        .unwrap_or_else(|| tr(Msg::AboutServerUnanswered));
+    let self_description = document.map(|document| SelfDescription {
+        title: tr_with(
+            Msg::AboutStatementTitle,
+            &[("version", version.label().into())],
+        ),
+        line: tr_with(
+            Msg::AboutStatementLine,
+            &[
+                ("version", version.label().into()),
+                ("path", format!("/{}/metadata", version.segment()).into()),
             ],
-            manufacturer: Manufacturer {
-                licence: tr(Msg::AboutLicence),
-                support: Link {
-                    label: String::from(SUPPORT),
-                    href: format!("mailto:{SUPPORT}"),
-                },
-                documentation: Some(Link {
-                    label: tr(Msg::AboutBook),
-                    href: String::from(BOOK),
-                }),
+        ),
+        language: Language::Json,
+        text: serde_json::to_string_pretty(&document).unwrap_or_default(),
+        copy_id: String::from(COPY_ID),
+        download: request.client.metadata_url(version),
+    });
+    let page = about_page(ferrohealth_ui::view::template::about::AboutPage {
+        header: Header {
+            title: tr(Msg::AboutTitle).into(),
+            subtitle: Some(tr(Msg::AboutSubtitle).into()),
+            subtitle_view: None,
+            crumbs: Vec::new(),
+            mono: false,
+            badge: None,
+        },
+        release: format!("{PRODUCT} {VERSION}"),
+        versions: vec![
+            (tr(Msg::AboutServer), server.into_any()),
+            (tr(Msg::AboutFhirRoots), roots().into_any()),
+            (tr(Msg::AboutFerroui), FERROUI.into_any()),
+        ],
+        manufacturer: Manufacturer {
+            licence: tr(Msg::AboutLicence),
+            support: Link {
+                label: String::from(SUPPORT),
+                href: format!("mailto:{SUPPORT}"),
             },
-            cards: Vec::new(),
-            self_description,
-            replica: None,
-        });
-        view! {
-            <Title text=tr(Msg::AboutTitle) />
-            {page}
-        }
-        .into_any()
-    })
+            documentation: Some(Link {
+                label: tr(Msg::AboutBook),
+                href: String::from(BOOK),
+            }),
+        },
+        cards: Vec::new(),
+        self_description,
+        replica: None,
+    });
+    view! {
+        <Title text=tr(Msg::AboutTitle) />
+        {page}
+    }
+    .into_any()
 }
 
 /// The maker's support address.

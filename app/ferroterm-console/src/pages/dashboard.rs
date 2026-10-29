@@ -28,8 +28,8 @@ use crate::fhir::terminology::TerminologyCapabilities;
 use crate::fhir::version::FhirVersion;
 use crate::fhir::{CODE_SYSTEM, CONCEPT_MAP, FhirClient, VALUE_SET};
 use crate::locale::{Msg, tr, tr_with};
-use crate::pages::parts::{Source, failure, heading, loaded, relative, versions_word};
-use crate::request::{Request, request};
+use crate::pages::parts::{Source, failure, heading, relative, versions_word};
+use crate::request::Request;
 use crate::routes::{
     CONCEPT_MAPS_PATH, SYSTEMS_PATH, VALUE_SETS_PATH, history_link, system_link, ui_link, ui_path,
 };
@@ -93,17 +93,9 @@ async fn activity(client: &FhirClient, version: FhirVersion) -> Result<Vec<Chang
 }
 
 /// The dashboard.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn DashboardPage() -> impl IntoView {
-    let request = request();
-    loaded(async move {
-        let reads = Reads::of(&request.client, request.version).await;
-        dashboard(&request, &reads)
-    })
+pub(crate) async fn page(request: Request) -> AnyView {
+    let reads = Reads::of(&request.client, request.version).await;
+    dashboard(&request, &reads)
 }
 
 /// The host part of the server's address, as the subtitle names it.

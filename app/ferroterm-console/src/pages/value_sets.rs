@@ -20,8 +20,8 @@ use crate::fhir::searchset::SearchFilter;
 use crate::fhir::value_set::{ClauseRow, PublishedValueSet};
 use crate::locale::{Msg, message, tr, tr_with};
 use crate::pages::listing::{Frame, ListState, NAME_COLUMN, counted, status_state};
-use crate::pages::parts::{Source, failure, heading, loaded, name_of, system_names};
-use crate::request::{Request, request};
+use crate::pages::parts::{Source, failure, heading, name_of, system_names};
+use crate::request::Request;
 use crate::routes::{COMPOSE_PATH, VALUE_SETS_PATH, resource_link, ui_link, ui_path};
 
 /// What one clause selects, in words: its filters, its count of codes, the
@@ -79,41 +79,33 @@ pub(crate) fn selects(clauses: &[ClauseRow], names: &BTreeMap<String, String>) -
 }
 
 /// Value sets.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn ValueSetsPage() -> impl IntoView {
-    let request = request();
+pub(crate) async fn page(request: Request) -> AnyView {
     let deleted = request.param(DELETED_PARAM).filter(|id| !id.is_empty());
-    loaded(async move {
-        let found = request
-            .client
-            .value_set_search(request.version, &SearchFilter::default())
-            .await;
-        let names = system_names(&request.client, request.version).await;
-        let said = deleted.map(|id| {
-            ferrohealth_ui::view::notice::notice(
-                ferrohealth_ui::tone::Tone::Ok,
-                ferrohealth_ui::view::notice::Announce::Status,
-                None,
-                tr_with(Msg::ValueSetsDeleted, &[("id", id.into())]),
-            )
-        });
-        match found {
-            Ok(found) => view! {
-                {said}
-                {listing(&request, found.found().into_iter().cloned().collect(), &names)}
-            }
-            .into_any(),
-            Err(error) => view! {
-                {heading(tr(Msg::ShellValueSets), None, Vec::new(), ActionGroup::none())}
-                {failure(&error)}
-            }
-            .into_any(),
+    let found = request
+        .client
+        .value_set_search(request.version, &SearchFilter::default())
+        .await;
+    let names = system_names(&request.client, request.version).await;
+    let said = deleted.map(|id| {
+        ferrohealth_ui::view::notice::notice(
+            ferrohealth_ui::tone::Tone::Ok,
+            ferrohealth_ui::view::notice::Announce::Status,
+            None,
+            tr_with(Msg::ValueSetsDeleted, &[("id", id.into())]),
+        )
+    });
+    match found {
+        Ok(found) => view! {
+            {said}
+            {listing(&request, found.found().into_iter().cloned().collect(), &names)}
         }
-    })
+        .into_any(),
+        Err(error) => view! {
+            {heading(tr(Msg::ShellValueSets), None, Vec::new(), ActionGroup::none())}
+            {failure(&error)}
+        }
+        .into_any(),
+    }
 }
 
 /// The query parameter naming the value set a delete just removed.

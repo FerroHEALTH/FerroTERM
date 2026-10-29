@@ -97,6 +97,62 @@ pub(crate) fn standing(granted: &[String]) -> String {
     }
 }
 
+/// Why the sign-in page is shown, as its `state` parameter names it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SignInState {
+    /// The reader signed out of the console.
+    SignedOut,
+    /// The session ended after its idle timeout.
+    Expired,
+    /// The session ended at its absolute timeout.
+    ExpiredAbsolute,
+    /// The console holds as many sessions as it may.
+    Full,
+    /// The provider refused the sign-in.
+    Refused,
+    /// The provider's answer failed the console's checks.
+    Rejected,
+    /// The console could not reach the provider.
+    Unreachable,
+    /// The console offers no sign-in.
+    Unavailable,
+}
+
+impl SignInState {
+    /// Every state, in the order the page knows them.
+    pub const ALL: [Self; 8] = [
+        Self::SignedOut,
+        Self::Expired,
+        Self::ExpiredAbsolute,
+        Self::Full,
+        Self::Refused,
+        Self::Rejected,
+        Self::Unreachable,
+        Self::Unavailable,
+    ];
+
+    /// The `state` parameter that names it.
+    #[must_use]
+    pub const fn key(self) -> &'static str {
+        match self {
+            Self::SignedOut => "signed-out",
+            Self::Expired => "expired",
+            Self::ExpiredAbsolute => "expired-absolute",
+            Self::Full => "full",
+            Self::Refused => "refused",
+            Self::Rejected => "rejected",
+            Self::Unreachable => "unreachable",
+            Self::Unavailable => "unavailable",
+        }
+    }
+
+    /// The state `key` names, or `None` for one the page does not know.
+    #[must_use]
+    pub fn parse(key: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|state| state.key() == key)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{Operator, Session, read_only, standing};

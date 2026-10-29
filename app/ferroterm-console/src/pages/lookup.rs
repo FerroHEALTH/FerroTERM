@@ -23,8 +23,8 @@ use crate::locale::{Msg, tr, tr_with};
 use crate::pages::operations::{
     Op, before, choices, frame, options, run, select, sent, text, verdict,
 };
-use crate::pages::parts::{failure, loaded};
-use crate::request::{Request, request};
+use crate::pages::parts::failure;
+use crate::request::Request;
 use crate::routes::{BROWSE_PATH, SYSTEM_PARAM, SYSTEM_VERSION_PARAM, system_tool_link};
 
 /// The address parameter carrying the code to read.
@@ -34,107 +34,99 @@ pub(crate) const CODE_PARAM: &str = "code";
 const LANGUAGE_PARAM: &str = "displayLanguage";
 
 /// The Look up tab.
-#[component]
-#[expect(
-    unreachable_pub,
-    reason = "the leptos component macro emits a pub props type the crate never exports"
-)]
-pub(crate) fn LookupPage() -> impl IntoView {
-    let request = request();
-    loaded(async move {
-        let named = request
-            .client
-            .published_names(request.version, CODE_SYSTEM)
-            .await
-            .ok();
-        let systems = choices(named.as_ref());
-        let system = request.text(SYSTEM_PARAM);
-        let system = if system.is_empty() {
-            systems
-                .first()
-                .map(|(value, _)| value.clone())
-                .unwrap_or_default()
-        } else {
-            system
+pub(crate) async fn page(request: Request) -> AnyView {
+    let named = request
+        .client
+        .published_names(request.version, CODE_SYSTEM)
+        .await
+        .ok();
+    let systems = choices(named.as_ref());
+    let system = request.text(SYSTEM_PARAM);
+    let system = if system.is_empty() {
+        systems
+            .first()
+            .map(|(value, _)| value.clone())
+            .unwrap_or_default()
+    } else {
+        system
+    };
+    let card = request
+        .client
+        .terminology_capabilities(request.version)
+        .await
+        .ok()
+        .and_then(|capabilities| capabilities.card(&system));
+    let versions = versions(
+        named
+            .as_ref()
+            .map(|named| named.versions(&system))
+            .unwrap_or_default(),
+        card.as_ref(),
+    );
+    let version = request.text(SYSTEM_VERSION_PARAM);
+    let code = request.text(CODE_PARAM);
+    let language = request.text(LANGUAGE_PARAM);
+    let languages = card
+        .as_ref()
+        .map(|card| {
+            let mut tags: Vec<String> = card
+                .versions
+                .iter()
+                .flat_map(|row| row.languages.clone())
+                .collect();
+            tags.sort();
+            tags.dedup();
+            tags.into_iter()
+                .map(|tag| (tag.clone(), tag))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let fields = view! {
+        {select("lookup-system", SYSTEM_PARAM, tr(Msg::LookupSystem), &systems, &system, None)}
+        {select(
+            "lookup-version",
+            SYSTEM_VERSION_PARAM,
+            tr(Msg::LookupVersion),
+            &versions,
+            &version,
+            Some(tr(Msg::LookupServerVersion)),
+        )}
+        {text("lookup-code", CODE_PARAM, tr(Msg::LookupCode), &code, tr(Msg::LookupCodeHint))}
+        {select(
+            "lookup-language",
+            LANGUAGE_PARAM,
+            tr(Msg::LookupLanguage),
+            &languages,
+            &language,
+            Some(tr(Msg::LookupServerLanguage)),
+        )}
+    }
+    .into_any();
+    let form = options(
+        &request,
+        &[],
+        fields,
+        run("lookup-run", tr(Msg::OpsLookUp), Glyph::SEARCH, "$lookup"),
+    );
+    let answer = if system.is_empty() || code.is_empty() {
+        before(tr(Msg::LookupBefore))
+    } else {
+        let asked = LookupRequest {
+            system: system.clone(),
+            system_version: Some(version.clone()).filter(|text| !text.is_empty()),
+            code: code.clone(),
+            display_language: Some(language).filter(|text| !text.is_empty()),
         };
-        let card = request
-            .client
-            .terminology_capabilities(request.version)
-            .await
-            .ok()
-            .and_then(|capabilities| capabilities.card(&system));
-        let versions = versions(
+        answer(
+            &request,
+            &asked,
             named
                 .as_ref()
-                .map(|named| named.versions(&system))
-                .unwrap_or_default(),
-            card.as_ref(),
-        );
-        let version = request.text(SYSTEM_VERSION_PARAM);
-        let code = request.text(CODE_PARAM);
-        let language = request.text(LANGUAGE_PARAM);
-        let languages = card
-            .as_ref()
-            .map(|card| {
-                let mut tags: Vec<String> = card
-                    .versions
-                    .iter()
-                    .flat_map(|row| row.languages.clone())
-                    .collect();
-                tags.sort();
-                tags.dedup();
-                tags.into_iter()
-                    .map(|tag| (tag.clone(), tag))
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
-        let fields = view! {
-            {select("lookup-system", SYSTEM_PARAM, tr(Msg::LookupSystem), &systems, &system, None)}
-            {select(
-                "lookup-version",
-                SYSTEM_VERSION_PARAM,
-                tr(Msg::LookupVersion),
-                &versions,
-                &version,
-                Some(tr(Msg::LookupServerVersion)),
-            )}
-            {text("lookup-code", CODE_PARAM, tr(Msg::LookupCode), &code, tr(Msg::LookupCodeHint))}
-            {select(
-                "lookup-language",
-                LANGUAGE_PARAM,
-                tr(Msg::LookupLanguage),
-                &languages,
-                &language,
-                Some(tr(Msg::LookupServerLanguage)),
-            )}
-        }
-        .into_any();
-        let form = options(
-            &request,
-            &[],
-            fields,
-            run("lookup-run", tr(Msg::OpsLookUp), Glyph::SEARCH, "$lookup"),
-        );
-        let answer = if system.is_empty() || code.is_empty() {
-            before(tr(Msg::LookupBefore))
-        } else {
-            let asked = LookupRequest {
-                system: system.clone(),
-                system_version: Some(version.clone()).filter(|text| !text.is_empty()),
-                code: code.clone(),
-                display_language: Some(language).filter(|text| !text.is_empty()),
-            };
-            answer(
-                &request,
-                &asked,
-                named
-                    .as_ref()
-                    .and_then(|named| named.names().get(&system).cloned()),
-            )
-            .await
-        };
-        frame(&request, Op::Lookup, form, answer)
-    })
+                .and_then(|named| named.names().get(&system).cloned()),
+        )
+        .await
+    };
+    frame(&request, Op::Lookup, form, answer)
 }
 
 /// The versions a picker offers: each published version, the one an
