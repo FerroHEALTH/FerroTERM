@@ -134,8 +134,8 @@ console_error_panic_hook = "0.1.7"
 # 2026-10-23.
 web-sys = { version = "0.3.106", default-features = false }
 # The shared FerroHEALTH UI components, pinned exactly: a console moves its pin
-# after looking at its own screens. Verified against crates.io on 2026-10-28.
-ferrohealth-ui = "=0.5.6"
+# after looking at its own screens. Verified against crates.io on 2026-10-29.
+ferrohealth-ui = "=0.5.7"
 # The console's string catalogs: Project Fluent messages embedded at build
 # time from app/ferroterm-console/locales/, the crate and version
 # ferrohealth-ui catalogs its own words with, so one locale drives both.

@@ -1,4 +1,4 @@
-- The console runs on FerroUI 0.5.6 and the browser hydrates the whole
+- The console runs on FerroUI 0.5.7 and the browser hydrates the whole
   page: after the first page, a link, a `GET` form, a preference and the
   navigation rail draw the next page in place, with no document reload. The
   pages load in five groups as chunks of their own. The console's server

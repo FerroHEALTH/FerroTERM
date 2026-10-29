@@ -60,7 +60,7 @@ shape, and one operator experience. That is the reason for the shape:
 | Framework | Leptos 0.8, `leptos_axum`, `leptos_router`, `leptos_meta` |
 | Halves | chosen by compilation target, never by a Cargo feature: the host half links `leptos` with `ssr`, the `wasm32-unknown-unknown` half with `hydrate`; every page compiles for both |
 | Rendering | every route `SsrMode::Async`: the server waits for the reads a screen exists to show, so no content waits on a script; the browser hydrates the whole page and draws every page after it from the recording of the server's read; reads are links and `GET` forms, writes plain `POST` forms to the page's own address |
-| Components | `ferrohealth-ui` `=0.5.6` (crates.io), its stylesheet served at `/ferrohealth-ui.css` and the FerroTERM brand at `/theme.css`; the console has no stylesheet of its own |
+| Components | `ferrohealth-ui` `=0.5.7` (crates.io), its stylesheet served at `/ferrohealth-ui.css` and the FerroTERM brand at `/theme.css`; the console has no stylesheet of its own |
 | Build | cargo-leptos (`scripts/release/console-site.sh`), `wasm-opt` pinned and checked by SHA-256 (`scripts/release/console-tools.sh`); no Node |
 | Image | `docker/console/Dockerfile`, distroless static, the binary and the site bundle the release lane stages |
 
