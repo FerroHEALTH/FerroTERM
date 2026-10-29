@@ -90,7 +90,7 @@ The image serves UCUM, BCP 47, BCP 13 and ISO 3166-1 with no configuration,
 so the first call needs nothing beyond Docker:
 
 ```sh
-docker run --rm -p 8080:8080 ghcr.io/ferrohealth/ferroterm:0.3.1
+docker run --rm -p 8080:8080 ghcr.io/ferrohealth/ferroterm:0.3.2
 ```
 
 In a second terminal, look up a unit of measure:

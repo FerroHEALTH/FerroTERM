@@ -1,1 +1,0 @@
-Shipped with functional changes because: the fix exists only in `ferrohealth-server` 0.3.7, which carries functional fixes in the same serving path beside it, so there is no security-only release of the crate for FerroTERM to take.
