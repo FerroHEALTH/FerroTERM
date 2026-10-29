@@ -85,8 +85,8 @@ ferrohealth-server = { version = "=0.3.7" }
 # binary under `--config` or `<PREFIX>_CONFIG`, `<PREFIX>__SECTION__KEY`
 # overrides, `--set`, strict refusals and provenance, and the `<key>_file`
 # rule with the redacting `Secret`. Pinned exactly. Verified against
-# crates.io on 2026-10-28.
-ferrohealth-config = { version = "=0.2.6" }
+# crates.io on 2026-10-29.
+ferrohealth-config = { version = "=0.2.7" }
 ferrohealth-secret = { version = "=0.2.0" }
 # The FerroHEALTH telemetry: the `[telemetry]` section, the console, the
 # panic line, the request log with its product fields, and the one
