@@ -17,6 +17,83 @@ fragments here under the version and its date.
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-10-29
+
+### Added
+
+- A signed-in console page watches its session: it warns before the idle
+  timeout with Stay signed in and Sign out, leaves for the sign-in page the
+  moment the session ends, and a sign-out in one tab ends every tab of the
+  console together. The console answers FerroUI's session route at
+  `/auth/session`, where a read extends nothing and only the reader's own
+  activity extends the session (#930).
+
+### Changed
+
+- The server, the sync service and the console take `ferrohealth-smart`
+  0.8.6 and `ferrohealth-config` 0.2.6. Under `[auth] mode =
+  "introspection"`, `[auth] ca_file` is now trusted for the issuer's
+  metadata, the introspection call and the token call, as it already was
+  in JWT mode, so an issuer behind a private certificate authority is
+  reached with the same setting (#915).
+- The console runs on FerroUI 0.5.7 and the browser hydrates the whole
+  page: after the first page, a link, a `GET` form, a preference and the
+  navigation rail draw the next page in place, with no document reload. The
+  pages load in five groups as chunks of their own. The console's server
+  reads each page once, recording the requests it sends the terminology
+  server, and the browser draws the page from that recording, so a page
+  after a navigation costs one round trip to the console. FerroUI's
+  keyboard shortcut legend replaces the console's own, and a Configuration
+  value set by a `--set` argument now says "From the command line" in place
+  of "From the environment" (#916).
+- **`fhir-types` 0.1.128.** The server and the published crates build on
+  the generated FHIR model 0.1.128, and the crate line moves to 0.1.121 (#927).
+- The server, the sync service and the console take `ferrohealth-server`
+  0.3.9. A `[server.tls]` table that sets `client_ca_file` while
+  `client_auth` is `none`, the default, is now refused at start: before, the
+  CA was read and ignored, so a deployment that meant mutual TLS served
+  without it. Set `client_auth = "required"` (or `"optional"`) beside the
+  file, or remove it (#932).
+- Every error FerroTERM answers outside its FHIR bases is now an RFC 9457
+  problem, `application/problem+json`, with the status codes unchanged: the
+  server's admin listener (`POST /reload` and its refusals), a path of the
+  FHIR listener that names no FHIR base, the sync service's admin listener,
+  and the refusals the HTTP stack writes itself on those routes. Each
+  FerroTERM problem type links to its section of the book's new Problem
+  types page, and a problem quotes nothing from the request. Under `/r4`,
+  `/r4b`, `/r5` and `/r6` errors stay FHIR `OperationOutcome`s. The console
+  draws an admin route's problem as its issue (#932).
+
+### Fixed
+
+- A response to a request whose body FerroTERM left unread, such as a `404`
+  to a `POST` of a path it does not serve or a declared-length `413`, now
+  carries `Connection: close`, so a client opens a new connection for its
+  next request where it used to meet a closed socket (RFC 9112 §9.6) (#919).
+- Every request leaves one request line, a timeout `408`, a declared-length
+  `413` and the `500` of a panicked handler included, and a `413` for a body
+  with no declared length that passes `[server] body_limit_bytes` is
+  answered with an `OperationOutcome`, as the declared-length `413` is (#919).
+- Every accepted connection sets `TCP_NODELAY`, so a small response no
+  longer waits on the client's delayed acknowledgment, and an HTTP/2 request
+  still running when the drain bound passes is cancelled before the server
+  exits, as an HTTP/1.1 request already was (#919).
+
+### Security
+
+Shipped with functional changes because: the fix exists only in `ferrohealth-server` 0.3.7, which carries functional fixes in the same serving path beside it, so there is no security-only release of the crate for FerroTERM to take.
+
+- The server, the sync service and the console take `ferrohealth-server`
+  0.3.7 in place of 0.3.4 (GHSA-2mc2-h3jq-c5wg). Every earlier release held
+  a plain-HTTP connection that never sent a byte for as long as the client
+  kept it open, so silent connections from a client with no credentials
+  could exhaust the process's file descriptors and stop it answering, health
+  checks included; the listener then retried a failed `accept` at once and
+  logged every failure. Such a connection now closes once
+  `[server] header_read_timeout_ms` passes (30 s by default), counted from
+  accept, and after an `EMFILE` or `ENFILE` the listener pauses up to 1 s
+  before it accepts again and logs one warning every 10 seconds (#919).
+
 ## [0.3.1] - 2026-10-27
 
 ### Added
@@ -2143,7 +2220,8 @@ binary answers `GET /health` only.
 - No existing Rust terminology or FHIR crate is a dependency; the README
   records the evaluation and the reasons.
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.1.10...v0.2.0
