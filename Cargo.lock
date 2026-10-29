@@ -1328,9 +1328,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-server"
-version = "0.3.9"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb7ced1223ab4d3a98f77ff6fc5654a1e7b420f65f503a49752cd4ab1eb0d856"
+checksum = "7dae7c8ede8c34c69f107eb1b4813c5b877e3b5fa057d84b8dd754d447ce156f"
 dependencies = [
  "axum",
  "clap",

@@ -131,3 +131,39 @@ async fn a_panic_is_an_operation_outcome_500_without_its_message() {
     assert!(diagnostics.contains(&request_id), "{diagnostics}");
     assert!(!body.to_string().contains("Qz7sentinel"), "{body}");
 }
+
+#[tokio::test]
+async fn a_panic_names_the_server_s_request_id_when_the_client_sent_its_own() {
+    let server = Server::start();
+    let product = Router::new().route("/r4/boom", get(boom));
+    let app = stack::app(
+        product,
+        server.serving.health().clone(),
+        &ServerSection::default(),
+        ferroterm_server::stack_policy(&server.serving),
+    );
+    let response = app
+        .oneshot(
+            Request::get("/r4/boom")
+                .header("x-request-id", "the-client-s-own")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    let echoed = response
+        .headers()
+        .get("x-request-id")
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
+    assert_eq!(Some("the-client-s-own"), echoed.as_deref());
+    let (status, body) = json(response).await;
+    assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, status);
+    let diagnostics = issue(&body)["diagnostics"].as_str().expect("diagnostics");
+    let named = diagnostics
+        .strip_prefix("the server could not answer this request (request id ")
+        .and_then(|rest| rest.strip_suffix(')'))
+        .expect("the diagnostics name a request id");
+    assert!(uuid::Uuid::parse_str(named).is_ok(), "{diagnostics}");
+    assert!(!diagnostics.contains("the-client-s-own"), "{diagnostics}");
+}
