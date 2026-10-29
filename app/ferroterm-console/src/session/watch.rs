@@ -58,8 +58,13 @@ pub async fn status(
 fn gone() -> Response {
     (
         [(CACHE_CONTROL, "no-store")],
-        ferrohealth_server::problem::Problem::new(StatusCode::UNAUTHORIZED)
-            .with_detail("the session has ended; sign in again"),
+        ferrohealth_server::problem::Problem::new(StatusCode::UNAUTHORIZED).with_detail(
+            crate::locale::tr_in(
+                crate::locale::catalog(),
+                &ferrohealth_ui::i18n::Locale::english(),
+                crate::locale::Msg::SessionEndedDetail,
+            ),
+        ),
     )
         .into_response()
 }
