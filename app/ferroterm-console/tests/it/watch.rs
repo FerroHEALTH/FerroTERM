@@ -65,7 +65,7 @@ async fn a_read_leaves_the_session_s_idle_count_where_it_was() {
         .remaining(&id, false)
         .expect("usable")
         .expect("live");
-    std::thread::sleep(std::time::Duration::from_millis(5));
+    tokio::time::sleep(std::time::Duration::from_millis(5)).await;
     let read = send(&state, get("/auth/session", std::slice::from_ref(&session))).await;
     assert_eq!(StatusCode::OK, read.status());
     let after = state
