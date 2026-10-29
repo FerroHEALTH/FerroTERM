@@ -915,6 +915,29 @@ async fn the_admin_listener_requires_the_configured_scope() {
     assert_eq!(response.status(), StatusCode::OK);
 }
 
+// A path no admin route matches is answered inside the guard, through the
+// stack of `ferrohealth-server` (FerroHEALTH/FerroSYS#199); health stays open.
+#[tokio::test]
+async fn an_unknown_path_on_the_admin_listener_needs_a_token_and_health_does_not() {
+    let key = SigningKey::generate("k1");
+    let mock = issuer(&key).await;
+    let server = Server::start_persisting_with_smart(&mock.uri(), None, None).await;
+    let admin = server.admin_router();
+
+    for path in ["/nowhere", "/r4/CodeSystem"] {
+        let request = Request::get(path).body(Body::empty()).expect("request");
+        let response = admin.clone().oneshot(request).await.expect("response");
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "{path}");
+        assert!(challenge(&response).starts_with("Bearer realm="), "{path}");
+    }
+
+    let request = Request::get("/health")
+        .body(Body::empty())
+        .expect("request");
+    let response = admin.oneshot(request).await.expect("response");
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
 // The admin scope is a product scope, `__ferroterm.admin` when `[auth]` names
 // none (SMART App Launch 2.2.0, Scopes and Launch Context, §Extensibility).
 #[tokio::test]
