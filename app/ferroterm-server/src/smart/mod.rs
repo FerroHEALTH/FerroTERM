@@ -503,8 +503,8 @@ impl Render for Challenge {
     }
 }
 
-/// The renderer of a refusal on the admin listener, which answers plain JSON
-/// and never FHIR.
+/// The renderer of a refusal on the admin listener, which answers an RFC 9457
+/// problem and never FHIR ([`crate::problem`]).
 #[derive(Debug, Clone)]
 pub struct AdminRefusal {
     /// The status and the challenge.
@@ -514,19 +514,17 @@ pub struct AdminRefusal {
 impl Render for AdminRefusal {
     fn render(&self, refusal: &Refusal, _parts: &Parts) -> Response {
         let (_, text) = diagnostics(refusal);
-        let body = serde_json::json!({
-            "outcome": crate::metrics::Outcome::Failed.as_str(),
-            "reason": text,
-        });
-        let Ok(bytes) = serde_json::to_vec(&body) else {
-            return self.header.respond(refusal, Body::empty());
+        let challenged = self.header.respond(refusal, Body::empty());
+        let challenge = challenged.headers().get(http::header::WWW_AUTHENTICATE);
+        let problem = match refusal.status() {
+            StatusCode::UNAUTHORIZED => crate::problem::Kind::Unauthenticated.problem(text),
+            StatusCode::FORBIDDEN => crate::problem::Kind::NotPermitted.problem(text),
+            StatusCode::SERVICE_UNAVAILABLE => {
+                crate::problem::Kind::AuthorizationUnavailable.problem(text)
+            }
+            status => ferrohealth_server::problem::Problem::new(status).with_detail(text),
         };
-        let mut response = self.header.respond(refusal, Body::from(bytes));
-        response.headers_mut().insert(
-            http::header::CONTENT_TYPE,
-            http::HeaderValue::from_static("application/json"),
-        );
-        response
+        crate::problem::respond(problem, challenge)
     }
 }
 
@@ -539,7 +537,7 @@ pub async fn configuration(
     headers: HeaderMap,
 ) -> Response {
     let Some(smart) = smart else {
-        return crate::outcome::not_found(headers).await;
+        return crate::outcome::not_found(&headers);
     };
     let body = smart.configuration();
     match serde_json::to_vec(&body) {

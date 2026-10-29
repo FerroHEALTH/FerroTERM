@@ -18,6 +18,7 @@ use leptos_meta::Title;
 use crate::fhir::error::FhirError;
 use crate::fhir::named::Listed;
 use crate::fhir::outcome::OperationOutcome;
+use crate::fhir::problem::Problem;
 use crate::fhir::terminology::SystemCard;
 use crate::locale::{Msg, tr, tr_with};
 
@@ -273,6 +274,27 @@ pub(crate) fn issues(outcome: &OperationOutcome) -> Vec<Issue> {
         .collect()
 }
 
+/// The RFC 9457 problem an admin route answered `error` with, if its body
+/// is one.
+fn problem_of(error: &FhirError) -> Option<Problem> {
+    match error {
+        FhirError::Status { body, .. } => Problem::read(body),
+        FhirError::Refused { .. } | FhirError::Transport { .. } | FhirError::Decode { .. } => None,
+    }
+}
+
+/// The issue a problem draws as: its type's fragment as the code, its detail
+/// as the text, else its title.
+fn problem_issue(problem: &Problem) -> Issue {
+    Issue {
+        severity: Severity::Error,
+        code: problem.code(),
+        text: problem.detail.clone().or_else(|| problem.title.clone()),
+        place: String::new(),
+        details: Vec::new(),
+    }
+}
+
 /// The refusal `error` is, as FerroUI draws one.
 pub(crate) fn refusal_of(error: &FhirError) -> Refusal {
     Refusal {
@@ -282,9 +304,14 @@ pub(crate) fn refusal_of(error: &FhirError) -> Refusal {
             FhirError::Transport { .. } => tr(Msg::RequestGotNoAnswer),
             FhirError::Decode { .. } => tr(Msg::AnswerDidNotRead),
         },
-        issues: error.outcome().map(issues).unwrap_or_default(),
+        issues: error
+            .outcome()
+            .map(issues)
+            .or_else(|| problem_of(error).map(|problem| vec![problem_issue(&problem)]))
+            .unwrap_or_default(),
         request: Some(error.url().to_owned()),
         evidence: match error {
+            FhirError::Status { .. } if problem_of(error).is_some() => None,
             FhirError::Status { body, .. } if !body.is_empty() => Some(body.clone()),
             FhirError::Transport { message, .. } | FhirError::Decode { message, .. } => {
                 Some(message.clone())
@@ -365,5 +392,27 @@ mod tests {
             assert_eq!(Some(source), Source::parse(source.key()));
         }
         assert_eq!(None, Source::parse("written"));
+    }
+
+    #[test]
+    fn a_problem_an_admin_route_answers_is_drawn_as_its_issue_in_place_of_the_body() {
+        let refused = refusal_of(&FhirError::Status {
+            url: String::from("http://sync:8181/runs/x"),
+            status: StatusCode::NOT_FOUND,
+            body: String::from(
+                r#"{"type":"https://ferroterm.eu/docs/operate/problems.html#run-not-found","title":"The sync service holds no such run","status":404,"detail":"no run of this service has that id"}"#,
+            ),
+        });
+        assert_eq!(Some(404), refused.status);
+        assert_eq!(1, refused.issues.len());
+        assert_eq!("run-not-found", refused.issues[0].code);
+        assert_eq!(
+            Some("no run of this service has that id"),
+            refused.issues[0].text.as_deref()
+        );
+        assert_eq!(
+            None, refused.evidence,
+            "the problem is drawn, not its raw body"
+        );
     }
 }

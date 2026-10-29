@@ -24,6 +24,7 @@ pub mod elements;
 pub mod metrics;
 pub mod outcome;
 pub mod persistence;
+pub mod problem;
 pub mod r4;
 pub mod r4b;
 pub mod r5;
@@ -80,9 +81,10 @@ pub fn router(serving: Serving) -> Router {
 /// The FHIR routes over `serving`, without the stack.
 ///
 /// `GET /metrics` is the Prometheus exposition of [`Serving::telemetry`];
-/// every FHIR route lives under its version prefix. Any other path is an
-/// `OperationOutcome` `not-found`, and that includes `/reload`, which only
-/// the admin listener serves. Every request gets the fields
+/// every FHIR route lives under its version prefix. A path under a FHIR base
+/// that no route matches is an `OperationOutcome` `not-found`, and any other
+/// path, `/reload` among them, which only the admin listener serves, an
+/// RFC 9457 problem ([`problem`]). Every request gets the fields
 /// [`request_fields`] adds to its request line.
 pub fn routes(serving: Serving) -> Router {
     // The gate sits inside each version's router, so the path it reads is the
@@ -104,24 +106,38 @@ pub fn routes(serving: Serving) -> Router {
             ferrohealth_telemetry::telemetry::prometheus_route(telemetry),
         )
         .with_state(serving.clone())
-        .fallback(outcome::not_found)
+        .fallback(unmatched)
         .layer(axum::middleware::from_fn_with_state(
             serving,
             request_fields::record,
         ))
 }
 
+/// The answer to a path no route of the FHIR listener matches: the FHIR
+/// `not-found` under a FHIR base, a problem elsewhere.
+async fn unmatched(uri: http::Uri, headers: http::HeaderMap) -> axum::response::Response {
+    if problem::is_fhir(uri.path()) {
+        outcome::not_found(&headers)
+    } else {
+        problem::blank(
+            http::StatusCode::NOT_FOUND,
+            "nothing on this server answers this path; the FHIR bases are /r4, /r4b, /r5 and /r6",
+        )
+    }
+}
+
 /// What the FHIR listener decides inside the stack.
 ///
-/// A panic and each refusal answer an `OperationOutcome`, and the request
+/// A panic and each refusal answer an `OperationOutcome` under a FHIR base
+/// and an RFC 9457 problem elsewhere ([`problem`]), and the request
 /// log feeds the metrics and the usage report window, naming a request under
 /// a FHIR base that no route matched by its base.
 #[must_use]
 pub fn stack_policy(serving: &Serving) -> StackPolicy {
     let telemetry = serving.telemetry();
     StackPolicy {
-        panic_body: outcome::panic_body(),
-        refusal_body: outcome::refusal_body(),
+        panic_body: problem::panic_body(),
+        refusal_body: problem::refusal_body(),
         request_log: RequestLog::new(&serving.config().telemetry.logged_query_parameters)
             .with_metrics(&telemetry.meter(metrics::SCOPE))
             .with_recorder(serving.usage_window())
@@ -139,9 +155,10 @@ pub fn stack_policy(serving: &Serving) -> StackPolicy {
 pub fn admin_router(serving: Serving) -> Router {
     let telemetry = serving.telemetry();
     let policy = StackPolicy {
+        panic_body: ferrohealth_server::problem::panic_body(),
+        refusal_body: ferrohealth_server::problem::refusal_body(),
         request_log: RequestLog::new(&serving.config().telemetry.logged_query_parameters)
             .with_metrics(&telemetry.meter(metrics::SCOPE)),
-        ..StackPolicy::default()
     };
     let health = serving.health().clone();
     let section = serving.config().server.clone();

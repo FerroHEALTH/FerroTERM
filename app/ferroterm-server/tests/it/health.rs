@@ -5,7 +5,7 @@ use axum::body::Body;
 use http::{Request, StatusCode};
 use tower::ServiceExt;
 
-use crate::fixture::Server;
+use crate::fixture::{Server, problem};
 
 #[tokio::test]
 async fn health_answers_ok() -> Result<(), Box<dyn std::error::Error>> {
@@ -69,11 +69,20 @@ async fn readiness_is_withdrawn_once_the_server_drains() {
 }
 
 #[tokio::test]
-async fn unknown_route_is_an_operation_outcome() {
+async fn unknown_route_is_an_operation_outcome_under_a_fhir_base_and_a_problem_elsewhere() {
     let server = Server::start();
-    let (status, body) = server.get("/nope").await;
+    let (status, body) = server.get("/r4/nope").await;
     assert_eq!(status, StatusCode::NOT_FOUND);
     assert_eq!(body["resourceType"], "OperationOutcome");
     assert_eq!(body["issue"][0]["code"], "not-found");
     assert_eq!(body["issue"][0]["severity"], "error");
+    let request = Request::get("/nope").body(Body::empty()).expect("request");
+    let (status, body) = problem(server.send(request).await).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(body["type"], "about:blank");
+    assert_eq!(body["status"], 404);
+    assert!(
+        !body.to_string().contains("nope"),
+        "a problem quotes nothing of the request: {body}"
+    );
 }

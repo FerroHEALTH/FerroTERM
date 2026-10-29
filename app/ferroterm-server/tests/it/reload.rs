@@ -18,7 +18,7 @@ use http::{Request, StatusCode};
 use serde_json::Value;
 use tower::ServiceExt;
 
-use crate::fixture::json;
+use crate::fixture::{json, problem};
 
 /// A serving over `config`, loaded the way the binary loads it.
 fn serving(config: Config) -> Serving {
@@ -354,9 +354,9 @@ async fn the_admin_listener_serves_reload_and_the_fhir_surface_does_not() {
 
     for method in [Request::post("/reload"), Request::get("/reload")] {
         let request = method.body(Body::empty()).expect("request");
-        let (status, body) = json(fhir.clone().oneshot(request).await.expect("response")).await;
+        let (status, body) = problem(fhir.clone().oneshot(request).await.expect("response")).await;
         assert_eq!(status, StatusCode::NOT_FOUND);
-        assert_eq!(body["resourceType"], "OperationOutcome", "{body}");
+        assert_eq!(body["status"], 404, "{body}");
     }
 }
 
@@ -382,8 +382,12 @@ async fn a_refused_reload_answers_the_admin_request_with_the_reason() {
     let (status, body) = admin(&admin_router, request).await;
 
     assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
-    assert_eq!(body["outcome"], "failed");
-    let reason = body["reason"].as_str().unwrap_or_default();
+    assert_eq!(
+        body["type"],
+        "https://ferroterm.eu/docs/operate/problems.html#reload-failed"
+    );
+    assert_eq!(body["status"], 500);
+    let reason = body["detail"].as_str().unwrap_or_default();
     assert!(
         reason.contains(&index.display().to_string()),
         "the reason names the artifact: {reason}"

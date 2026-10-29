@@ -80,7 +80,7 @@ ferrohealth-smart = { version = "=0.8.6", features = ["axum"] }
 # module serves `/health`, `/health/liveness` and `/health/readiness` over
 # them. Pinned exactly. Verified against crates.io on 2026-10-26.
 ferrohealth-health = { version = "=0.1.1", features = ["registry"] }
-ferrohealth-server = { version = "=0.3.7" }
+ferrohealth-server = { version = "=0.3.9" }
 # The FerroHEALTH configuration loader and its secrets: one TOML tree per
 # binary under `--config` or `<PREFIX>_CONFIG`, `<PREFIX>__SECTION__KEY`
 # overrides, `--set`, strict refusals and provenance, and the `<key>_file`

@@ -36,6 +36,7 @@ pub mod config;
 pub mod holdings;
 pub mod metrics;
 pub mod naming;
+pub mod problem;
 pub mod record;
 pub mod reload;
 pub mod retention;

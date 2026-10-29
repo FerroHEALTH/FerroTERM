@@ -369,3 +369,76 @@ async fn a_deployment_names_its_own_product_scope() {
     let auth = AdminAuth::start(&named).await.expect("starts").expect("on");
     assert_eq!(auth.scope(), "__example.sync");
 }
+
+/// What `method` on `path` answers with `authorization`: the status, the
+/// content type and the body read as JSON.
+async fn answered(
+    router: &Router,
+    method: &str,
+    path: &str,
+    authorization: Option<&str>,
+) -> (StatusCode, Option<String>, serde_json::Value) {
+    let mut request = Request::builder().method(method).uri(path);
+    if let Some(value) = authorization {
+        request = request.header("authorization", value);
+    }
+    let response = router
+        .clone()
+        .oneshot(request.body(Body::empty()).expect("a request"))
+        .await
+        .expect("the listener answers");
+    let status = response.status();
+    let kind = response
+        .headers()
+        .get("content-type")
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
+    let bytes = axum::body::to_bytes(response.into_body(), 1 << 20)
+        .await
+        .expect("a body");
+    (status, kind, serde_json::from_slice(&bytes).expect("JSON"))
+}
+
+#[tokio::test]
+async fn every_refusal_and_error_is_a_problem_that_quotes_nothing_it_was_sent() {
+    let router = guarded().await;
+    let mut bodies = String::new();
+    let encoded =
+        base64::engine::general_purpose::STANDARD.encode("operator:a-sentinel-secret-9137");
+    let wrong = format!("Basic {encoded}");
+    let (status, kind, body) = answered(&router, "GET", "/runs", Some(&wrong)).await;
+    assert_eq!(StatusCode::UNAUTHORIZED, status);
+    assert_eq!(Some("application/problem+json"), kind.as_deref());
+    assert_eq!(
+        "https://ferroterm.eu/docs/operate/problems.html#unauthenticated",
+        body["type"]
+    );
+    bodies.push_str(&body.to_string());
+    let (status, _, body) = answered(&router, "GET", "/runs", Some(&basic("reader"))).await;
+    assert_eq!(StatusCode::FORBIDDEN, status);
+    assert_eq!(
+        "https://ferroterm.eu/docs/operate/problems.html#not-permitted",
+        body["type"]
+    );
+    bodies.push_str(&body.to_string());
+    let operator = basic("operator");
+    let (status, _, body) =
+        answered(&router, "GET", "/runs/a-sentinel-run-4471", Some(&operator)).await;
+    assert_eq!(StatusCode::NOT_FOUND, status);
+    assert_eq!(
+        "https://ferroterm.eu/docs/operate/problems.html#run-not-found",
+        body["type"]
+    );
+    bodies.push_str(&body.to_string());
+    let (status, _, body) = answered(&router, "GET", "/a-sentinel-path", Some(&operator)).await;
+    assert_eq!(StatusCode::NOT_FOUND, status);
+    assert_eq!("about:blank", body["type"]);
+    bodies.push_str(&body.to_string());
+    for sent in [
+        "a-sentinel-secret-9137",
+        "a-sentinel-run-4471",
+        "a-sentinel-path",
+    ] {
+        assert!(!bodies.contains(sent), "{bodies}");
+    }
+}

@@ -22,7 +22,7 @@ use std::sync::Arc;
 use axum::Router;
 use axum::body::Body;
 use axum::http::request::Parts;
-use axum::http::{Extensions, Method, Uri};
+use axum::http::{Extensions, Method, StatusCode, Uri};
 use axum::response::Response;
 use ferrohealth_smart::config::{AuthSection, ConfigError};
 use ferrohealth_smart::extract::HeaderOnly;
@@ -30,6 +30,8 @@ use ferrohealth_smart::guard::{AuthLayer, Gate, Render, Requirement, Target};
 use ferrohealth_smart::refusal::Refusal;
 use ferrohealth_smart::resource::introspection::{IntrospectionError, Introspector};
 use ferrohealth_smart::resource::{IssuerSet, ResourceError, ResourceServer};
+
+use crate::problem::Kind;
 
 /// The product scope of a deployment whose `[auth] product_scope` names none.
 ///
@@ -218,7 +220,7 @@ const fn reason(refusal: &Refusal) -> &'static str {
 }
 
 /// The answer to a refused request: the crate's status and challenge, with
-/// the JSON `error` body every other failure of the listener carries.
+/// the RFC 9457 problem every other failure of the listener carries.
 #[derive(Debug, Clone)]
 struct Refused {
     /// The status and the challenge.
@@ -227,16 +229,18 @@ struct Refused {
 
 impl Render for Refused {
     fn render(&self, refusal: &Refusal, _parts: &Parts) -> Response {
-        let body = serde_json::json!({ "error": reason(refusal) });
-        let Ok(bytes) = serde_json::to_vec(&body) else {
-            return self.header.respond(refusal, Body::empty());
+        let text = reason(refusal);
+        let challenged = self.header.respond(refusal, Body::empty());
+        let challenge = challenged
+            .headers()
+            .get(axum::http::header::WWW_AUTHENTICATE);
+        let problem = match refusal.status() {
+            StatusCode::UNAUTHORIZED => Kind::Unauthenticated.problem(text),
+            StatusCode::FORBIDDEN => Kind::NotPermitted.problem(text),
+            StatusCode::SERVICE_UNAVAILABLE => Kind::AuthorizationUnavailable.problem(text),
+            status => ferrohealth_server::problem::Problem::new(status).with_detail(text),
         };
-        let mut response = self.header.respond(refusal, Body::from(bytes));
-        response.headers_mut().insert(
-            axum::http::header::CONTENT_TYPE,
-            axum::http::HeaderValue::from_static("application/json"),
-        );
-        response
+        crate::problem::respond(problem, challenge)
     }
 }
 
