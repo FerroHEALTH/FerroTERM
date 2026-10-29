@@ -82,6 +82,12 @@ async fn a_session_that_is_gone_or_never_was_answers_401() {
     let state = console(Some(provider.oidc()), "");
     let none = send(&state, get("/auth/session", &[])).await;
     assert_eq!(StatusCode::UNAUTHORIZED, none.status());
+    assert_eq!(
+        Some("application/problem+json"),
+        none.headers()
+            .get(http::header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+    );
     let session = signed_in(&state, &provider).await;
     state.sessions().end(&session_id(&session)).expect("usable");
     let gone = send(&state, extend(std::slice::from_ref(&session))).await;

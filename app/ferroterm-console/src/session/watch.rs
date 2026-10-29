@@ -39,18 +39,29 @@ pub async fn status(
     headers: HeaderMap,
 ) -> Response {
     let Some(id) = state.sessions().cookie_in(&headers, COOKIE) else {
-        return StatusCode::UNAUTHORIZED.into_response();
+        return gone();
     };
     match state.sessions().remaining(&id, method == Method::POST) {
         Ok(Some(remaining)) => {
             ([(CACHE_CONTROL, "no-store")], axum::Json(left(remaining))).into_response()
         }
-        Ok(None) => StatusCode::UNAUTHORIZED.into_response(),
+        Ok(None) => gone(),
         Err(error) => {
             tracing::error!(%error, "the session store could not be read");
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }
+}
+
+/// The answer for a session that is gone: an `about:blank` problem of `401`
+/// (RFC 9457 §4.2.1), never kept by a cache.
+fn gone() -> Response {
+    (
+        [(CACHE_CONTROL, "no-store")],
+        ferrohealth_server::problem::Problem::new(StatusCode::UNAUTHORIZED)
+            .with_detail("the session has ended; sign in again"),
+    )
+        .into_response()
 }
 
 #[cfg(test)]
