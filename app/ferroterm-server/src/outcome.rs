@@ -18,6 +18,7 @@ use axum::body::Body;
 use axum::response::{IntoResponse, Response};
 use ferrohealth_server::panic::PanicBody;
 use ferrohealth_server::refusal::RefusalBody;
+use ferrohealth_server::request_id::RequestIds;
 use fhir_terminology::compose::Side;
 use fhir_terminology::operations::value_set_validate_code::TX_ISSUE_TYPE;
 use fhir_terminology::operations::{OperationError, Refused, RefusedInput};
@@ -341,15 +342,18 @@ pub fn not_found(headers: &http::HeaderMap) -> Response {
 /// The body of a request whose handler panicked.
 ///
 /// It is an `OperationOutcome` with the `exception` issue type naming the
-/// server's request id, and never the panic message
-/// (<https://hl7.org/fhir/R4B/valueset-issue-type.html>).
+/// server's request id, which the panic line names, and never the panic
+/// message (<https://hl7.org/fhir/R4B/valueset-issue-type.html>).
 #[must_use]
 pub fn panic_body() -> PanicBody {
-    Arc::new(|_uri, request_id| {
+    Arc::new(|_uri, ids: RequestIds<'_>| {
         Failure::new(
             StatusCode::INTERNAL_SERVER_ERROR,
             "exception",
-            format!("the server could not answer this request (request id {request_id})"),
+            format!(
+                "the server could not answer this request (request id {})",
+                ids.server
+            ),
         )
         .into_response()
     })
@@ -362,7 +366,7 @@ pub fn panic_body() -> PanicBody {
 /// `http.html`).
 #[must_use]
 pub fn refusal_body() -> RefusalBody {
-    Arc::new(|_uri, _request_id, status, reason| {
+    Arc::new(|_uri, _ids, status, reason| {
         Failure::new(status, refusal_code(status), reason).into_response()
     })
 }

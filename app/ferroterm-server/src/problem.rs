@@ -20,6 +20,7 @@ use axum::response::{IntoResponse as _, Response};
 use ferrohealth_server::panic::PanicBody;
 use ferrohealth_server::problem::{Problem, ProblemType, ProblemTypes};
 use ferrohealth_server::refusal::RefusalBody;
+use ferrohealth_server::request_id::RequestIds;
 use http::{HeaderValue, StatusCode, Uri, header};
 
 use crate::FHIR_BASES;
@@ -168,11 +169,11 @@ pub fn panic_body() -> PanicBody {
         crate::outcome::panic_body(),
         ferrohealth_server::problem::panic_body(),
     );
-    Arc::new(move |uri: &Uri, request_id: &str| {
+    Arc::new(move |uri: &Uri, ids: RequestIds<'_>| {
         if is_fhir(uri.path()) {
-            fhir(uri, request_id)
+            fhir(uri, ids)
         } else {
-            problem(uri, request_id)
+            problem(uri, ids)
         }
     })
 }
@@ -186,11 +187,11 @@ pub fn refusal_body() -> RefusalBody {
         ferrohealth_server::problem::refusal_body(),
     );
     Arc::new(
-        move |uri: &Uri, request_id: &str, status: StatusCode, reason: &str| {
+        move |uri: &Uri, ids: RequestIds<'_>, status: StatusCode, reason: &str| {
             if is_fhir(uri.path()) {
-                fhir(uri, request_id, status, reason)
+                fhir(uri, ids, status, reason)
             } else {
-                problem(uri, request_id, status, reason)
+                problem(uri, ids, status, reason)
             }
         },
     )
