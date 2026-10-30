@@ -320,7 +320,7 @@ fn navigation(locale: &ferrohealth_ui::i18n::Locale, sync: bool) -> Vec<Group> {
 }
 
 /// The top bar's search, whose panel asks the find's answer route as you
-/// type ([`crate::pages::find::find_answer`]).
+/// type ([`crate::pages::find::answer_route`]).
 #[must_use]
 pub(crate) fn search(request: &Request) -> Html {
     search_box(&request.locale, &search_of(request))
