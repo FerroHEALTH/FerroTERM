@@ -1,10 +1,12 @@
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 
-# The console release, as a REUSABLE workflow: the static binaries
-# and the site bundle built here, attested and attached to the draft release,
-# and packed into ghcr.io/ferrohealth/ferroterm-console with the same
-# provenance and SBOM attestations as the server image.
+# The console release, as a REUSABLE workflow: the static binaries built
+# here, attested and attached to the draft release, and packed into
+# ghcr.io/ferrohealth/ferroterm-console with the same provenance and SBOM
+# attestations as the server image. The binary carries everything a page
+# loads (FerroUI's stylesheet, themes and script modules, the brand's
+# files), so there is no site bundle.
 #
 # It is a reusable workflow for the reason release-build.yml and
 # release-image.yml are: SLSA v1.2 Build Level 3 needs the signing identity
@@ -12,11 +14,10 @@
 # a caller cannot add steps to
 # (https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-and-reusable-workflows-to-achieve-slsa-v1-build-level-3).
 #
-# Three jobs. `binary` builds the musl console binary with cargo auditable on
-# a runner of each architecture, and `site` builds the architecture-independent
-# site bundle with cargo-leptos; each attests what it built and attaches it to
-# the draft. `image` verifies both against this workflow's signer identity
-# before it stages them, so the image provenance chains to attested inputs,
+# Two jobs. `binary` builds the musl console binary with cargo auditable on
+# a runner of each architecture, attests what it built and attaches it to
+# the draft. `image` verifies it against this workflow's signer identity
+# before it stages it, so the image provenance chains to attested inputs,
 # then pushes the index by digest, attests the index and both platform
 # manifests as OCI referrers, and verifies its own output as a consumer would.
 # The index is tagged by scan-and-tag.yml only after its scan and the
@@ -111,8 +112,6 @@ jobs:
         with:
           tool: cargo-auditable@0.7.5
 
-      # LEPTOS_OUTPUT_NAME, the bundle name the page loads, comes from the
-      # repository's .cargo/config.toml.
       - name: Build the console server
         env:
           TARGET: ${{ matrix.target }}
@@ -227,98 +226,9 @@ jobs:
             "${ASSET_NAME}.sbom.sigstore.json" \
             "${ASSET_NAME}.intoto.jsonl"
 
-  site:
-    name: console site bundle
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
-    permissions:
-      contents: write # attach the bundle's assets to the draft release
-      id-token: write # Sigstore, for the bundle's provenance
-      attestations: write # store it against this repository
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          ref: ${{ github.sha }}
-      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
-        with:
-          cache: false
-          target: wasm32-unknown-unknown
-      # Prebuilt and checksum-verified by the installer; cargo-leptos finds
-      # the wasm-bindgen CLI on PATH, which must equal the wasm-bindgen crate
-      # Cargo.lock holds.
-      - name: Install cargo-leptos
-        uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
-        with:
-          tool: cargo-leptos@0.3.11
-      - name: Install the wasm-bindgen CLI
-        uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
-        with:
-          tool: wasm-bindgen@0.2.129
-      # Pinned and checked against its SHA-256 before use, so cargo-leptos
-      # finds it on PATH and does not download it itself in this attested job.
-      - name: Install wasm-opt
-        run: |
-          bash scripts/release/console-tools.sh "$RUNNER_TEMP/console-tools"
-          echo "$RUNNER_TEMP/console-tools/bin" >> "$GITHUB_PATH"
-      - name: Build the site bundle
-        run: bash scripts/release/console-site.sh --release
-      # One tarball, so the bundle is one attested subject.
-      - name: Pack the site bundle
-        env:
-          TAG: ${{ inputs.tag }}
-        run: |
-          set -euo pipefail
-          asset="ferroterm-console-${TAG}-site.tar.gz"
-          tar -C target -czf "$asset" site
-          sha256sum "$asset" > "${asset}.sha256sum"
-          cat "${asset}.sha256sum"
-          {
-            echo "ASSET=$asset"
-            echo "CHECKSUM=${asset}.sha256sum"
-          } >> "$GITHUB_ENV"
-      - name: Attest the bundle's provenance
-        id: provenance
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-path: ${{ env.ASSET }}
-      - name: Publish the attestation as release assets
-        env:
-          ASSET_NAME: ${{ env.ASSET }}
-          PROVENANCE_BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
-        run: |
-          set -euo pipefail
-          cp "$PROVENANCE_BUNDLE" "${ASSET_NAME}.sigstore.json"
-          jq -c '.dsseEnvelope' "$PROVENANCE_BUNDLE" > "${ASSET_NAME}.intoto.jsonl"
-          predicate="$(jq -r '.payload' "${ASSET_NAME}.intoto.jsonl" | base64 -d | jq -r '.predicateType')"
-          if [ "$predicate" != "https://slsa.dev/provenance/v1" ]; then
-            echo "::error::the provenance predicate is not SLSA v1 (${predicate})" >&2
-            exit 1
-          fi
-      - name: Hand the bundle to the image job
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: ferroterm-console-${{ inputs.tag }}-site
-          path: ${{ env.ASSET }}
-          if-no-files-found: error
-          retention-days: 1
-      - name: Attach every asset to the draft release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ inputs.tag }}
-          ASSET_NAME: ${{ env.ASSET }}
-          CHECKSUM_NAME: ${{ env.CHECKSUM }}
-        run: |
-          set -euo pipefail
-          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber \
-            "$ASSET_NAME" \
-            "$CHECKSUM_NAME" \
-            "${ASSET_NAME}.sigstore.json" \
-            "${ASSET_NAME}.intoto.jsonl"
-
   image:
     name: console image (linux/amd64, linux/arm64)
-    needs: [binary, site]
+    needs: [binary]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -335,8 +245,8 @@ jobs:
           persist-credentials: false
           ref: ${{ github.sha }}
 
-      # Every tarball of this run: one per target and the site bundle.
-      - name: Download the binaries and the site bundle
+      # Every tarball of this run: one per target.
+      - name: Download the binaries
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: ferroterm-console-${{ inputs.tag }}-*
@@ -367,12 +277,6 @@ jobs:
               echo "::error::no linux/${arch} console binary among the targets" >&2
               exit 1
             fi
-          done
-          site="inputs/ferroterm-console-${TAG}-site.tar.gz"
-          gh attestation verify "$site" --repo "$GITHUB_REPOSITORY" --signer-workflow "$signer"
-          tar -C dist/console -xzf "$site" site
-          for file in ferroterm-console.wasm ferroterm-console.js; do
-            test -s "dist/console/site/pkg/${file}"
           done
 
       # No QEMU: docker/console/Dockerfile runs no command, it only copies what

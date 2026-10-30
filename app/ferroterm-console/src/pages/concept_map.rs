@@ -14,9 +14,12 @@
 use std::collections::BTreeMap;
 
 use ferrohealth_ui::highlight::Language;
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::view::{Body, DataTable, Sorting, data_table, group_row};
 use ferrohealth_ui::view::action::ActionGroup;
+use ferrohealth_ui::view::action_menu::{Act, Action, Item, Menu};
 use ferrohealth_ui::view::code::{Code, CodeHead, code_section};
 use ferrohealth_ui::view::coding::{Coding, canonical};
 use ferrohealth_ui::view::mapping::{Mapping, Relationship, mapping_columns, mapping_row};
@@ -24,14 +27,13 @@ use ferrohealth_ui::view::surface::{
     SectionHead, definitions, or_none, panel_section, panel_sections, section_intro,
 };
 use ferrohealth_ui::view::template::list::HeadingCount;
-use ferrohealth_ui::widget::action_menu::{Act, Action, Item, Menu};
-use leptos::prelude::*;
 
 use crate::auth::scopes::Letter;
 use crate::fhir::concept_map::{MappingRow, PublishedConceptMap};
 use crate::fhir::version::FhirVersion;
 use crate::fhir::{CONCEPT_MAP, Document, resources_text};
 use crate::locale::{Msg, tr, tr_with};
+use crate::markup::{h, join, link, t};
 use crate::pages::detail::{Head, Kind, Links, PANE_PARAM, Pane, header, line, tabbed};
 use crate::pages::parts::{Source, failure, heading, system_names};
 use crate::request::Request;
@@ -40,21 +42,20 @@ use crate::routes::{
 };
 
 /// One concept map, on the tab the address names.
-pub(crate) async fn page(request: Request) -> AnyView {
+pub(crate) async fn page(request: Request) -> Html {
     let id = request.segment(1).unwrap_or_default();
     let Some(pane) = Pane::of(Kind::ConceptMap, request.param(PANE_PARAM).as_deref()) else {
-        return crate::pages::errors::not_found_page();
+        return crate::pages::errors::not_found_page(&request);
     };
     match request.client.concept_map_read(request.version, &id).await {
         Ok(document) => {
             let names = system_names(&request.client, request.version).await;
             screen(&request, &id, &document, &names, pane)
         }
-        Err(error) => view! {
-            {heading(id.clone(), None, Vec::new(), ActionGroup::none())}
-            {failure(&error)}
-        }
-        .into_any(),
+        Err(error) => Html::join([
+            heading(&request, id.clone(), None, Vec::new(), ActionGroup::none()),
+            failure(&request.locale, &error),
+        ]),
     }
 }
 
@@ -72,6 +73,7 @@ fn actions(
     source: Source,
     title: &str,
 ) -> ActionGroup {
+    let locale = &request.locale;
     let url = map.url().unwrap_or_default();
     let mut translate_href = format!(
         "{}&url={}",
@@ -84,7 +86,7 @@ fn actions(
     }
     let translate = Action::new(
         Some(Glyph::CORNER_DOWN_RIGHT),
-        tr(Msg::ConceptMapTranslate),
+        tr(locale, Msg::ConceptMapTranslate),
         Act::Link(translate_href),
     );
     let editable = source == Source::Stored && request.can(CONCEPT_MAP, Letter::Update);
@@ -93,16 +95,20 @@ fn actions(
         .map(|href| {
             Action::new(
                 Some(Glyph::PENCIL),
-                tr(Msg::CodeSystemEdit),
+                tr(locale, Msg::CodeSystemEdit),
                 Act::Link(href),
             )
         });
-    let menu_label = tr_with(Msg::DetailMoreFor, &[("name", title.to_owned().into())]);
+    let menu_label = tr_with(
+        locale,
+        Msg::DetailMoreFor,
+        &[("name", title.to_owned().into())],
+    );
     match edit {
         Some(edit) => ActionGroup::primary(edit).more(Menu::new(
             "concept-map-more",
             menu_label,
-            vec![Item::from(translate)],
+            vec![Item::new(translate)],
         )),
         None => ActionGroup::primary(translate),
     }
@@ -115,7 +121,8 @@ fn screen(
     document: &Document<PublishedConceptMap>,
     names: &BTreeMap<String, String>,
     pane: Pane,
-) -> AnyView {
+) -> Html {
+    let locale = &request.locale;
     let map = &document.value;
     let source = if map.stored().is_some() {
         Source::Stored
@@ -124,30 +131,26 @@ fn screen(
     };
     let title = map.label().or_else(|| map.url()).unwrap_or(id).to_owned();
     let head = header(
+        request,
         Head {
             kind: Kind::ConceptMap,
             title: title.clone(),
             status: map.status().map(str::to_owned),
             canonical: map.url().unwrap_or_default().to_owned(),
-            line: line(map.version(), source),
+            line: line(locale, map.version(), source),
             actions: actions(request, id, map, source, &title),
         },
-        request.version,
     );
     let panel = match pane {
         Pane::Second => overview(request, map, names, source),
-        Pane::Json => json(id, document),
-        Pane::First | Pane::History => mappings(request.version, map, names),
+        Pane::Json => json(locale, id, document),
+        Pane::First | Pane::History => mappings(locale, request.version, map, names),
     };
     let links = Links {
         page: resource_link(CONCEPT_MAPS_PATH, id, request.version),
         history: (source == Source::Stored).then(|| id.to_owned()),
     };
-    view! {
-        {head}
-        {tabbed(Kind::ConceptMap, pane, &links, request.version, panel)}
-    }
-    .into_any()
+    Html::join([head, tabbed(request, Kind::ConceptMap, pane, &links, panel)])
 }
 
 /// How `code` relates a target to its source, read the way `version`
@@ -181,27 +184,26 @@ fn mapping(version: FhirVersion, row: &MappingRow) -> Mapping {
 /// A group's system: its name, a link to its page, the canonical in its
 /// tooltip.
 fn system(
+    locale: &Locale,
     version: FhirVersion,
     names: &BTreeMap<String, String>,
     canonical: Option<&str>,
-) -> AnyView {
+) -> Html {
     match canonical {
         Some(canonical) => {
             let href = system_link(canonical, version);
             // NOTE: #775: a system this server names nothing reads as its canonical,
             // which breaks after each slash so the table keeps inside its card.
-            let shown = names.get(canonical).map_or_else(
-                || ferrohealth_ui::view::coding::canonical(canonical),
-                |name| name.clone().into_any(),
-            );
-            view! {
-                <a href=href title=canonical.to_owned()>
-                    {shown}
-                </a>
-            }
-            .into_any()
+            let shown = names
+                .get(canonical)
+                .map_or_else(|| ferrohealth_ui::view::coding::canonical(canonical), t);
+            h(format!(
+                r#"<a href="{}" title="{}">{shown}</a>"#,
+                t(href),
+                t(canonical)
+            ))
         }
-        None => tr(Msg::ConceptMapNoSystem).into_any(),
+        None => t(tr(locale, Msg::ConceptMapNoSystem)),
     }
 }
 
@@ -210,13 +212,14 @@ type Systems = (Option<String>, Option<String>);
 
 /// Mappings: every mapping the map writes, a group row over each group's.
 fn mappings(
+    locale: &Locale,
     version: FhirVersion,
     map: &PublishedConceptMap,
     names: &BTreeMap<String, String>,
-) -> AnyView {
+) -> Html {
     let rows = map.mappings();
     let comments = rows.iter().any(|row| row.comment.is_some());
-    let columns = mapping_columns(comments);
+    let columns = mapping_columns(locale, comments);
     let mut groups: Vec<(Systems, Vec<&MappingRow>)> = Vec::new();
     for row in &rows {
         let key = (row.source_system.clone(), row.target_system.clone());
@@ -225,34 +228,33 @@ fn mappings(
             _ => groups.push((key, vec![row])),
         }
     }
-    let bodies = groups
-        .into_iter()
-        .map(|((from, to), members)| {
-            let heading = view! {
-                {tr(Msg::ClauseFrom)}
-                " "
-                {system(version, names, from.as_deref())}
-                " "
-                {tr(Msg::ConceptMapTo)}
-                " "
-                {system(version, names, to.as_deref())}
-            };
-            let drawn = members
+    let bodies = join(groups.into_iter().map(|((from, to), members)| {
+        let heading = h(format!(
+            "{} {} {} {}",
+            t(tr(locale, Msg::ClauseFrom)),
+            system(locale, version, names, from.as_deref()),
+            t(tr(locale, Msg::ConceptMapTo)),
+            system(locale, version, names, to.as_deref()),
+        ));
+        let drawn = join(
+            members
                 .into_iter()
-                .map(|row| mapping_row(&columns, mapping(version, row)))
-                .collect_view();
-            view! { <tbody>{group_row(&columns, heading)} {drawn}</tbody> }
-        })
-        .collect_view()
-        .into_any();
-    let caption = tr(Msg::ConceptMapEvery);
+                .map(|row| mapping_row(locale, &columns, mapping(version, row))),
+        );
+        h(format!(
+            "<tbody>{}{drawn}</tbody>",
+            group_row(&columns, heading)
+        ))
+    }));
+    let caption = tr(locale, Msg::ConceptMapEvery);
     let body = if rows.is_empty() {
-        Body::Empty(section_intro(tr(Msg::ConceptMapNoMappings)))
+        Body::Empty(section_intro(tr(locale, Msg::ConceptMapNoMappings)))
     } else {
         Body::Bodies(bodies)
     };
     let count = u64::try_from(rows.len()).unwrap_or(u64::MAX);
     panel_sections(panel_section(
+        locale,
         Some(SectionHead {
             title: caption.clone(),
             count: Some(HeadingCount::All(count)),
@@ -269,22 +271,20 @@ fn mappings(
 
 /// A scope the map translates from or to: the system's name, linked when
 /// this server has a page for it, and its canonical.
-fn scope(version: FhirVersion, names: &BTreeMap<String, String>, url: Option<&str>) -> AnyView {
+fn scope(
+    locale: &Locale,
+    version: FhirVersion,
+    names: &BTreeMap<String, String>,
+    url: Option<&str>,
+) -> Html {
     match url {
-        None => or_none(String::new()),
+        None => or_none(locale, String::new()),
         Some(url) => {
             let name = names.get(url).map(|name| {
                 let href = system_link(url, version);
-                view! {
-                    <a href=href>{name.clone()}</a>
-                    " "
-                }
+                h(format!("{} ", link(&href, t(name))))
             });
-            view! {
-                {name}
-                {canonical(url)}
-            }
-            .into_any()
+            h(format!("{}{}", name.unwrap_or_default(), canonical(url)))
         }
     }
 }
@@ -295,7 +295,8 @@ fn overview(
     map: &PublishedConceptMap,
     names: &BTreeMap<String, String>,
     source: Source,
-) -> AnyView {
+) -> Html {
+    let locale = &request.locale;
     let details = map
         .facts()
         .into_iter()
@@ -310,7 +311,10 @@ fn overview(
                     | Msg::Groups
             )
         })
-        .filter_map(|fact| fact.value.map(|value| (tr(fact.label), or_none(value))))
+        .filter_map(|fact| {
+            fact.value
+                .map(|value| (tr(locale, fact.label), or_none(locale, value)))
+        })
         .collect::<Vec<_>>();
     let rows = map.mappings();
     let total = rows.len();
@@ -319,6 +323,7 @@ fn overview(
         total.to_string()
     } else {
         tr_with(
+            locale,
             Msg::ConceptMapCodesUnmapped,
             &[("count", total.into()), ("unmapped", unmapped.into())],
         )
@@ -335,43 +340,50 @@ fn overview(
     });
     let maps = vec![
         (
-            tr(Msg::TranslatesFrom),
-            scope(request.version, names, from.as_deref()),
+            tr(locale, Msg::TranslatesFrom),
+            scope(locale, request.version, names, from.as_deref()),
         ),
         (
-            tr(Msg::TranslatesTo),
-            scope(request.version, names, to.as_deref()),
+            tr(locale, Msg::TranslatesTo),
+            scope(locale, request.version, names, to.as_deref()),
         ),
-        (tr(Msg::Groups), groups.len().to_string().into_any()),
-        (tr(Msg::ConceptMapCodesMapped), codes.into_any()),
+        (tr(locale, Msg::Groups), t(groups.len().to_string())),
+        (tr(locale, Msg::ConceptMapCodesMapped), t(codes)),
     ];
-    let note = (source == Source::Loaded)
-        .then(|| panel_section(None, section_intro(tr(Msg::ValueSetLoadedNote))));
-    panel_sections(view! {
-        {note}
-        {panel_section(
+    let note = (source == Source::Loaded).then(|| {
+        panel_section(
+            locale,
+            None,
+            section_intro(tr(locale, Msg::ValueSetLoadedNote)),
+        )
+    });
+    panel_sections(Html::join([
+        note.unwrap_or_default(),
+        panel_section(
+            locale,
             Some(SectionHead {
-                title: tr(Msg::CodeSystemDetails),
+                title: tr(locale, Msg::CodeSystemDetails),
                 count: None,
                 actions: None,
             }),
             definitions(details),
-        )}
-        {panel_section(
+        ),
+        panel_section(
+            locale,
             Some(SectionHead {
-                title: tr(Msg::ConceptMapWhatItMaps),
+                title: tr(locale, Msg::ConceptMapWhatItMaps),
                 count: None,
                 actions: None,
             }),
             definitions(maps),
-        )}
-    })
+        ),
+    ]))
 }
 
 /// JSON: the concept map as the server sent it.
-fn json(id: &str, document: &Document<PublishedConceptMap>) -> AnyView {
+fn json(locale: &Locale, id: &str, document: &Document<PublishedConceptMap>) -> Html {
     let code = Code {
-        label: tr(Msg::ConceptMapJsonLabel),
+        label: tr(locale, Msg::ConceptMapJsonLabel),
         language: Language::Json,
         text: resources_text(&document.text),
         ids: None,
@@ -379,6 +391,7 @@ fn json(id: &str, document: &Document<PublishedConceptMap>) -> AnyView {
         diagnostics: Vec::new(),
     };
     panel_sections(code_section(
+        locale,
         CodeHead {
             title: format!("ConceptMap/{id}"),
             tags: vec![String::from("FHIR")],

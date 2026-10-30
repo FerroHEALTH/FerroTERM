@@ -272,7 +272,7 @@ impl FhirClient {
         url: &str,
     ) -> Result<(T, String), FhirError> {
         let answer = self.admin(method, url).await?;
-        let status = answered(answer.0, url)?;
+        let status = answered(&self.locale, answer.0, url)?;
         if !status.is_success() {
             return Err(FhirError::Status {
                 url: url.to_owned(),
@@ -295,8 +295,7 @@ impl FhirClient {
             .unwrap_or(url)
             .to_owned();
         let answer = self
-            .tape()
-            .send(Exchange::new(method, path, JSON))
+            .exchange(Exchange::new(method, path, JSON))
             .await
             .map_err(|error| FhirError::Transport {
                 url: url.to_owned(),
@@ -361,17 +360,22 @@ impl FhirClient {
     pub(crate) async fn reload(&self) -> Result<Reloaded, FhirError> {
         let url = self.admin_url(&[crate::fhir::exchange::RELOAD]);
         let (status, body) = self.admin(Method::Post, &url).await?;
-        let status = answered(status, &url)?;
+        let status = answered(&self.locale, status, &url)?;
         Ok(Reloaded { status, body })
     }
 }
 
 /// The status `status` as a [`StatusCode`]: a number outside 100 to 999 is
 /// no HTTP status (<https://www.rfc-editor.org/rfc/rfc9110#section-15>).
-fn answered(status: u16, url: &str) -> Result<StatusCode, FhirError> {
+fn answered(
+    locale: &ferrohealth_ui::i18n::Locale,
+    status: u16,
+    url: &str,
+) -> Result<StatusCode, FhirError> {
     StatusCode::from_u16(status).map_err(|_invalid| FhirError::Transport {
         url: url.to_owned(),
         message: tr_with(
+            locale,
             Msg::ServerAnsweredStatus,
             &[("status", status.to_string().into())],
         ),

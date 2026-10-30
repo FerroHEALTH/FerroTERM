@@ -16,9 +16,8 @@
 //! `compile_error!` naming what went wrong, so a stale or absent figure never
 //! ships.
 //!
-//! The output is a `const` rather than a JSON document the browser decodes.
-//! The figures are fixed when the bundle is built, so decoding them again in
-//! every reader's browser costs bytes for nothing, and a constant leaves no
+//! The output is a `const` rather than a JSON document read at run time.
+//! The figures are fixed when the binary is built, and a constant leaves no
 //! decode failure for the screen to have to render.
 
 use std::fs;
@@ -47,7 +46,7 @@ const MODE_TABLE_HEADER: [&str; 6] = [
     "open failures",
 ];
 
-/// Reads the committed evidence and writes what the bundle carries.
+/// Reads the committed evidence and writes what the binary carries.
 fn main() {
     let Some(out_dir) = std::env::var_os("OUT_DIR") else {
         println!("cargo::warning=OUT_DIR is unset, so the evidence cannot be written");
@@ -106,7 +105,7 @@ fn messages_source() -> String {
         .filter(|id| !id.starts_with("number-"))
         .collect();
     let mut out = String::from(
-        "/// A message of the console's catalog, by its id.\n#[cfg_attr(\n    target_arch = \"wasm32\",\n    expect(\n        dead_code,\n        reason = \"the words of the server's own routes, its sign-in and its form posts, are drawn on the server alone\"\n    )\n)]\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub(crate) enum Msg {\n",
+        "/// A message of the console's catalog, by its id.\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub(crate) enum Msg {\n",
     );
     for id in &ids {
         line(

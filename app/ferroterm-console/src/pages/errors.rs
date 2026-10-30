@@ -1,118 +1,84 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The error pages (R20): an address that is no screen, a write the
-//! reader's account may not make, and a session store the console cannot
-//! read.
+//! The error pages (R20): an address that is no screen, and a write the
+//! reader's account may not make.
 
+use ferrohealth_ui::html::Html;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::view::error_page::{ErrorPage, Status, Way, error_page};
-use leptos::prelude::*;
-use leptos_meta::Title;
 
 use crate::locale::{Msg, tr, tr_with};
-use crate::request::request;
+use crate::markup::{code, h, t};
+use crate::request::Request;
 use crate::routes::{VALUE_SETS_PATH, ui_path};
-
-/// Sets the status of the answer the page is drawn into.
-fn status(code: http::StatusCode) {
-    #[cfg(not(target_arch = "wasm32"))]
-    if let Some(response) = use_context::<leptos_axum::ResponseOptions>() {
-        response.set_status(code);
-    }
-    #[cfg(target_arch = "wasm32")]
-    let _: http::StatusCode = code;
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-/// Answers the read of a page with `200 OK` whatever status the page set as
-/// it was read: the page sets it again as it is drawn, as the document's.
-pub(crate) fn answered_ok() {
-    status(http::StatusCode::OK);
-}
-
-/// The page drawn when the console's server did not answer the read of the
-/// page, saying what the transport reported.
-pub(crate) fn unread_page(reported: &str) -> AnyView {
-    let body =
-        view! { {tr_with(Msg::ErrorsUnreadBody, &[("reported", reported.to_owned().into())])} }
-            .into_any();
-    view! {
-        <Title text=tr(Msg::ErrorsUnreadTitle) />
-        {error_page(ErrorPage {
-            status: Status::Fault,
-            title: tr(Msg::ErrorsUnreadTitle),
-            body,
-            hint: None,
-            ways: vec![
-                Way {
-                    label: tr(Msg::ShellDashboard),
-                    href: ui_path(""),
-                    glyph: Some(Glyph::LAYOUT_DASHBOARD),
-                },
-            ],
-            detail: None,
-        })}
-    }
-    .into_any()
-}
 
 /// The page for an address that names no screen: `404`, the address, and
 /// the ways on.
-pub(crate) fn not_found_page() -> AnyView {
-    status(http::StatusCode::NOT_FOUND);
-    let path = request().path;
-    let body = view! { {tr_with(Msg::ErrorsNotFoundBody, &[("path", path.into())])} }.into_any();
-    view! {
-        <Title text=tr(Msg::ErrorsNotFoundTitle) />
-        {error_page(ErrorPage {
+pub(crate) fn not_found_page(request: &Request) -> Html {
+    let locale = &request.locale;
+    request.answering.status(http::StatusCode::NOT_FOUND);
+    let title = tr(locale, Msg::ErrorsNotFoundTitle);
+    request.answering.title(&title);
+    let body = t(tr_with(
+        locale,
+        Msg::ErrorsNotFoundBody,
+        &[("path", request.path.clone().into())],
+    ));
+    error_page(
+        locale,
+        ErrorPage {
             status: Status::NotFound,
-            title: tr(Msg::ErrorsNotFoundTitle),
+            title,
             body,
             hint: None,
             ways: vec![
                 Way {
-                    label: tr(Msg::ShellDashboard),
+                    label: tr(locale, Msg::ShellDashboard),
                     href: ui_path(""),
                     glyph: Some(Glyph::LAYOUT_DASHBOARD),
                 },
                 Way {
-                    label: tr(Msg::ShellValueSets),
+                    label: tr(locale, Msg::ShellValueSets),
                     href: ui_path(VALUE_SETS_PATH),
                     glyph: Some(Glyph::LAYERS),
                 },
             ],
             detail: None,
-        })}
-    }
-    .into_any()
+        },
+    )
 }
 
 /// The page for a write the reader's account may not make: who they are,
 /// what still works, and the scope it needs as a quiet hint.
-pub(crate) fn forbidden_page(what: Msg, scope: &str, back: (String, String)) -> AnyView {
-    status(http::StatusCode::FORBIDDEN);
-    let request = request();
+pub(crate) fn forbidden_page(
+    request: &Request,
+    what: Msg,
+    scope: &str,
+    back: (String, String),
+) -> Html {
+    let locale = &request.locale;
+    request.answering.status(http::StatusCode::FORBIDDEN);
     let reader = request
         .session
         .who()
-        .unwrap_or_else(|| tr(Msg::ShellNotSignedIn));
-    let title = tr(what);
-    let body = tr_with(
+        .unwrap_or_else(|| tr(locale, Msg::ShellNotSignedIn));
+    let title = tr(locale, what);
+    request.answering.title(&title);
+    let body = t(tr_with(
+        locale,
         Msg::ErrorsForbiddenBody,
         &[("who", reader.into()), ("what", title.clone().into())],
-    )
-    .into_any();
-    let hint = view! {
-        {tr(Msg::ErrorsForbiddenScope)}
-        " "
-        <code>{scope.to_owned()}</code>
-    }
-    .into_any();
+    ));
+    let hint = h(format!(
+        "{} {}",
+        t(tr(locale, Msg::ErrorsForbiddenScope)),
+        code(scope)
+    ));
     let (label, href) = back;
-    view! {
-        <Title text=title.clone() />
-        {error_page(ErrorPage {
+    error_page(
+        locale,
+        ErrorPage {
             status: Status::Forbidden,
             title,
             body,
@@ -124,13 +90,12 @@ pub(crate) fn forbidden_page(what: Msg, scope: &str, back: (String, String)) -> 
                     glyph: Some(Glyph::ARROW_LEFT),
                 },
                 Way {
-                    label: tr(Msg::ErrorsSignInAgain),
+                    label: tr(locale, Msg::ErrorsSignInAgain),
                     href: crate::routes::sign_in_link(&request.back()),
                     glyph: Some(Glyph::LOG_IN),
                 },
             ],
             detail: None,
-        })}
-    }
-    .into_any()
+        },
+    )
 }

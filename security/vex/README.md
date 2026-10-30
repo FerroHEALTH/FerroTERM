@@ -72,7 +72,9 @@ one statement per vulnerability, naming the images it covers.
 
 `rust-advisories.openvex.json` is produced by
 `scripts/security/vex-generate.sh` from two inputs, and is never edited by
-hand:
+hand. An OpenVEX document groups one or more statements, so while the gate
+accepts no advisory there is no such document, and the checks hold that none
+is checked in:
 
 - **`deny.toml`** `[advisories].ignore`: the authoritative set of advisory
   ids. It is the gate that decides whether a build passes, so it is the only

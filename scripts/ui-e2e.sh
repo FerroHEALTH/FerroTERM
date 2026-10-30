@@ -17,8 +17,7 @@
 #   scripts/ui-e2e.sh -- composer::the_preview_and_the_save_are_reached_from_the_keyboard --stress-count 20
 #
 # The script owns everything it drives and stops it again by process id. It
-# builds the server, the console and its site bundle, and the stub identity
-# provider (e2e/src/bin/stub_issuer.rs), then starts on 127.0.0.1:
+# builds the server, the console and the stub identity provider (e2e/src/bin/stub_issuer.rs), then starts on 127.0.0.1:
 #
 #   18080  a server with no issuer: the read-only journeys' deployment
 #   18081  a server that trusts the stub issuer, its resource store in a
@@ -37,9 +36,8 @@
 # needed. The browser is Chrome for Testing with its chromedriver, named by
 # FERROTERM_UI_E2E_CHROME and FERROTERM_UI_E2E_CHROMEDRIVER, or found on PATH;
 # CI installs both at the release docs/VERSIONS.md pins. Without either, the
-# script fetches that release into target/journey-tools, and the site build's
-# wasm-opt into target/console-tools, so a fresh checkout runs
-# with nothing installed by hand beyond cargo-nextest and cargo-leptos.
+# script fetches that release into target/journey-tools, so a fresh checkout
+# runs with nothing installed by hand beyond cargo-nextest.
 #
 # The battery must not change a tracked file. The documentation capture pass
 # is the one exception, and it runs alone when --docs-shots asks for it: it
@@ -110,7 +108,6 @@ need() {
 }
 
 need cargo-nextest "cargo install cargo-nextest --locked"
-need cargo-leptos "cargo install cargo-leptos --locked --version 0.3.11"
 
 # The browser: the one FERROTERM_UI_E2E_CHROMEDRIVER and FERROTERM_UI_E2E_CHROME
 # name, else a chromedriver on PATH, else the pinned Chrome for Testing in
@@ -126,17 +123,6 @@ if [[ -z "$chromedriver" ]]; then
   export FERROTERM_UI_E2E_CHROME="${FERROTERM_UI_E2E_CHROME:-$(bash scripts/release/journey-tools.sh --paths "$tools" | sed -n 2p)}"
 fi
 [[ -x "$chromedriver" ]] || die "$chromedriver is not an executable chromedriver"
-
-# The site build's tool, wasm-opt: the pinned one on PATH, else the one in
-# target/console-tools, fetched there on first use.
-if ! bash scripts/release/console-tools.sh --check > /dev/null 2>&1; then
-  tools="$root/target/console-tools"
-  export PATH="$tools/bin:$PATH"
-  if ! bash scripts/release/console-tools.sh --check > /dev/null 2>&1; then
-    echo "ui-e2e: the pinned wasm-opt is not on PATH; fetching it into $tools"
-    bash scripts/release/console-tools.sh "$tools"
-  fi
-fi
 
 # How many journeys drive the browser at once: each opens its own Chrome under
 # the one chromedriver, and more sessions than the processors (four on the
@@ -221,9 +207,6 @@ for port in 18080 18081 18443 18090 13000 13001 4444; do
   fi
 done
 
-# The console's two halves are built the way the release lane builds them:
-# a debug build of cargo-leptos's front end is compiled with a cfg the plain
-# server build is not, and two halves built apart that way do not hydrate.
 if [[ -n "$pseudo_locale" ]]; then
   echo "ui-e2e: writing the pseudo-locale catalog $PSEUDO_TAG"
   mkdir -p "$(dirname "$PSEUDO_CATALOG")"
@@ -236,8 +219,6 @@ echo "ui-e2e: building the server, the console and the stub issuer"
 cargo build --locked -p ferroterm-server
 cargo build --locked --release -p ferroterm-console
 cargo build --locked --manifest-path e2e/Cargo.toml --bin stub-issuer --bin stub-sync
-echo "ui-e2e: building the console's site bundle"
-bash scripts/release/console-site.sh --release
 
 issuer="http://127.0.0.1:18443"
 e2e/target/debug/stub-issuer --plain --listen 127.0.0.1:18443 --issuer "$issuer" \
@@ -270,7 +251,6 @@ console() {
   local port="$1" upstream="$2" log="$3"
   shift 3
   env FERROTERM_CONSOLE__SERVER__LISTEN="127.0.0.1:$port" \
-    FERROTERM_CONSOLE__SERVER__SITE_ROOT=target/site \
     FERROTERM_CONSOLE__FERROTERM__BASE_URL="$upstream" \
     FERROTERM_CONSOLE__SESSION__SECURE_COOKIE=false "$@" \
     target/release/ferroterm-console serve > "$log" 2>&1 &

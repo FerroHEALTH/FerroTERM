@@ -12,11 +12,14 @@
 use std::collections::BTreeMap;
 
 use ferrohealth_ui::highlight::Language;
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::view::{
     Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::view::action::{ActionGroup, action_button};
+use ferrohealth_ui::view::action_menu::{Act, Action, Item, Menu};
 use ferrohealth_ui::view::button::Variant;
 use ferrohealth_ui::view::clause::{Clause, ClauseCode, ClauseKind, clause, clause_codes, clauses};
 use ferrohealth_ui::view::code::{Code, CodeHead, code_section};
@@ -26,8 +29,6 @@ use ferrohealth_ui::view::surface::{
     SectionHead, card_action, definitions, or_none, panel_section, panel_sections, section_intro,
 };
 use ferrohealth_ui::view::template::list::HeadingCount;
-use ferrohealth_ui::widget::action_menu::{Act, Action, Item, Menu};
-use leptos::prelude::*;
 
 use crate::auth::scopes::Letter;
 use crate::fhir::concept::LookupRequest;
@@ -37,8 +38,9 @@ use crate::fhir::value_set::{ClauseRow, PublishedValueSet};
 use crate::fhir::version::FhirVersion;
 use crate::fhir::{Document, FhirClient, VALUE_SET, resources_text};
 use crate::locale::{Msg, tr, tr_with};
+use crate::markup::{code, h, join, link, t};
 use crate::pages::detail::{Head, Kind, Links, PANE_PARAM, Pane, header, line, tabbed};
-use crate::pages::parts::{Source, failure, heading, name_of, redirect, system_names};
+use crate::pages::parts::{Source, failure, heading, name_of, system_names};
 use crate::pages::value_sets::DELETED_PARAM;
 use crate::posted::INTENT;
 use crate::request::Request;
@@ -68,10 +70,11 @@ struct Read {
 }
 
 /// One value set, on the tab the address names.
-pub(crate) async fn page(request: Request) -> AnyView {
+pub(crate) async fn page(request: Request) -> Html {
+    let locale = &request.locale;
     let id = request.segment(1).unwrap_or_default();
     let Some(pane) = Pane::of(Kind::ValueSet, request.param(PANE_PARAM).as_deref()) else {
-        return crate::pages::errors::not_found_page();
+        return crate::pages::errors::not_found_page(&request);
     };
     let form = request
         .posted
@@ -80,12 +83,12 @@ pub(crate) async fn page(request: Request) -> AnyView {
     let refused = match form {
         Some(_) => match request.client.delete(request.version, VALUE_SET, &id).await {
             Ok(()) => {
-                redirect(&format!(
+                request.answering.redirect(&format!(
                     "{}&{DELETED_PARAM}={}",
                     ui_link(VALUE_SETS_PATH, request.version),
                     percent(&id)
                 ));
-                return ().into_any();
+                return Html::empty();
             }
             Err(error) => Some(error),
         },
@@ -94,11 +97,10 @@ pub(crate) async fn page(request: Request) -> AnyView {
     let document = match request.client.value_set_read(request.version, &id).await {
         Ok(document) => document,
         Err(error) => {
-            return view! {
-                {heading(id.clone(), None, Vec::new(), ActionGroup::none())}
-                {failure(&error)}
-            }
-            .into_any();
+            return Html::join([
+                heading(&request, id.clone(), None, Vec::new(), ActionGroup::none()),
+                failure(locale, &error),
+            ]);
         }
     };
     let names = system_names(&request.client, request.version).await;
@@ -109,11 +111,23 @@ pub(crate) async fn page(request: Request) -> AnyView {
     } else {
         None
     };
-    view! {
-        {refused.as_ref().map(failure)}
-        {screen(&request, &id, &Read { document, names, displays }, pane, expansion)}
-    }
-    .into_any()
+    Html::join([
+        refused
+            .as_ref()
+            .map(|error| failure(locale, error))
+            .unwrap_or_default(),
+        screen(
+            &request,
+            &id,
+            &Read {
+                document,
+                names,
+                displays,
+            },
+            pane,
+            expansion,
+        ),
+    ])
 }
 
 /// The display of each concept a clause's filter names, read with
@@ -177,6 +191,7 @@ fn actions(
     source: Source,
     title: &str,
 ) -> ActionGroup {
+    let locale = &request.locale;
     let url = value_set.url().unwrap_or_default();
     let check_href = format!(
         "{}&url={}",
@@ -185,7 +200,7 @@ fn actions(
     );
     let check = Action::new(
         Some(Glyph::SHIELD_CHECK),
-        tr(Msg::ValueSetCheck),
+        tr(locale, Msg::ValueSetCheck),
         Act::Link(check_href),
     );
     let editable = source == Source::Stored && request.can(VALUE_SET, Letter::Update);
@@ -194,20 +209,24 @@ fn actions(
         .map(|href| {
             Action::new(
                 Some(Glyph::PENCIL),
-                tr(Msg::CodeSystemEdit),
+                tr(locale, Msg::CodeSystemEdit),
                 Act::Link(href),
             )
         });
     let expand = Action::new(
         Some(Glyph::LIST_TREE),
-        tr(Msg::ValueSetExpandAll),
+        tr(locale, Msg::ValueSetExpandAll),
         Act::Link(expansion_link(url, request.version)),
     );
-    let menu_label = tr_with(Msg::DetailMoreFor, &[("name", title.to_owned().into())]);
+    let menu_label = tr_with(
+        locale,
+        Msg::DetailMoreFor,
+        &[("name", title.to_owned().into())],
+    );
     let destructive = if deletable(request, source) {
-        vec![Item::from(Action::new(
+        vec![Item::new(Action::new(
             Some(Glyph::TRASH),
-            tr(Msg::ValueSetDelete),
+            tr(locale, Msg::ValueSetDelete),
             Act::Dialog(String::from(DELETE_DIALOG)),
         ))]
     } else {
@@ -218,12 +237,12 @@ fn actions(
             Menu::new(
                 "value-set-more",
                 menu_label,
-                vec![Item::from(check), Item::from(expand)],
+                vec![Item::new(check), Item::new(expand)],
             )
             .destructive(destructive),
         ),
         None => ActionGroup::primary(check).more(
-            Menu::new("value-set-more", menu_label, vec![Item::from(expand)])
+            Menu::new("value-set-more", menu_label, vec![Item::new(expand)])
                 .destructive(destructive),
         ),
     }
@@ -237,11 +256,13 @@ fn deletable(request: &Request, source: Source) -> bool {
 }
 
 /// The confirmation Delete opens, posting the delete to this screen.
-fn delete_dialog(request: &Request, id: &str, title: &str) -> AnyView {
+fn delete_dialog(request: &Request, id: &str, title: &str) -> Html {
+    let locale = &request.locale;
     let confirm = action_button(
+        locale,
         Action::new(
             Some(Glyph::TRASH),
-            tr(Msg::ValueSetDeleteConfirm),
+            tr(locale, Msg::ValueSetDeleteConfirm),
             Act::Post {
                 action: format!(
                     "{}?{}",
@@ -257,18 +278,19 @@ fn delete_dialog(request: &Request, id: &str, title: &str) -> AnyView {
         Variant::Destructive,
     );
     danger_dialog(
+        locale,
         Confirmation {
             id: DELETE_DIALOG.into(),
             title: tr_with(
+                locale,
                 Msg::ValueSetDeleteQuestion,
                 &[("name", title.to_owned().into())],
             )
             .into(),
-            message: tr(Msg::ValueSetDeleteMessage).into(),
+            message: tr(locale, Msg::ValueSetDeleteMessage).into(),
         },
         confirm,
     )
-    .into_any()
 }
 
 /// A value percent-encoded as one query component.
@@ -283,7 +305,8 @@ fn screen(
     read: &Read,
     pane: Pane,
     expansion: Option<Result<ExpandedValueSet, FhirError>>,
-) -> AnyView {
+) -> Html {
+    let locale = &request.locale;
     let value_set = &read.document.value;
     let source = if value_set.stored().is_some() {
         Source::Stored
@@ -296,44 +319,46 @@ fn screen(
         .unwrap_or(id)
         .to_owned();
     let head = header(
+        request,
         Head {
             kind: Kind::ValueSet,
             title: title.clone(),
             status: value_set.status().map(str::to_owned),
             canonical: value_set.url().unwrap_or_default().to_owned(),
-            line: line(value_set.version(), source),
+            line: line(locale, value_set.version(), source),
             actions: actions(request, id, value_set, source, &title),
         },
-        request.version,
     );
     let panel = match (pane, expansion) {
         (Pane::Second, Some(expansion)) => expansion_panel(request, value_set, &expansion),
-        (Pane::Json, _) => json(id, &read.document),
+        (Pane::Json, _) => json(locale, id, &read.document),
         _ => definition(request, read, source),
     };
     let links = Links {
         page: resource_link(VALUE_SETS_PATH, id, request.version),
         history: (source == Source::Stored).then(|| id.to_owned()),
     };
-    view! {
-        {head}
-        {deletable(request, source).then(|| delete_dialog(request, id, &title))}
-        {tabbed(Kind::ValueSet, pane, &links, request.version, panel)}
-    }
-    .into_any()
+    Html::join([
+        head,
+        if deletable(request, source) {
+            delete_dialog(request, id, &title)
+        } else {
+            Html::empty()
+        },
+        tabbed(request, Kind::ValueSet, pane, &links, panel),
+    ])
 }
 
 /// The sentence a clause's filter reads as.
-fn filter_sentence(part: &(String, String, String), display: Option<&String>) -> AnyView {
+fn filter_sentence(
+    locale: &Locale,
+    part: &(String, String, String),
+    display: Option<&String>,
+) -> Html {
     let (property, op, value) = part;
     let named = match display {
-        Some(display) => view! {
-            <code>{value.clone()}</code>
-            " "
-            {display.clone()}
-        }
-        .into_any(),
-        None => view! { <code>{value.clone()}</code> }.into_any(),
+        Some(display) => h(format!("{} {}", code(value), t(display))),
+        None => code(value),
     };
     let msg = match op.as_str() {
         "is-a" => Msg::FilterIsA,
@@ -343,24 +368,19 @@ fn filter_sentence(part: &(String, String, String), display: Option<&String>) ->
         "generalizes" => Msg::FilterGeneralizes,
         "=" if property == "concept" => Msg::FilterEquals,
         _ => {
-            let words = tr_with(
+            return t(tr_with(
+                locale,
                 Msg::FilterOther,
                 &[
                     ("property", property.clone().into()),
                     ("op", op.clone().into()),
                     ("value", value.clone().into()),
                 ],
-            );
-            return words.into_any();
+            ));
         }
     };
-    let (before, after) = split_sentence(&tr(msg));
-    view! {
-        {before}
-        {named}
-        {after}
-    }
-    .into_any()
+    let (before, after) = split_sentence(&tr(locale, msg));
+    h(format!("{}{named}{}", t(before), t(after)))
 }
 
 /// The words of a filter sentence before and after the concept it names,
@@ -374,101 +394,107 @@ fn split_sentence(sentence: &str) -> (String, String) {
 
 /// The sentence under a clause: its filters, how many codes or value sets it
 /// names, or the whole code system.
-fn clause_sentence(row: &ClauseRow, system: &str, read: &Read) -> AnyView {
+fn clause_sentence(locale: &Locale, row: &ClauseRow, system: &str, read: &Read) -> Html {
     if !row.filter_parts.is_empty() {
-        row.filter_parts
-            .iter()
-            .map(|part| {
-                filter_sentence(
-                    part,
-                    read.displays.get(&(system.to_owned(), part.2.clone())),
-                )
-            })
-            .collect_view()
-            .into_any()
+        join(row.filter_parts.iter().map(|part| {
+            filter_sentence(
+                locale,
+                part,
+                read.displays.get(&(system.to_owned(), part.2.clone())),
+            )
+        }))
     } else if !row.concepts.is_empty() {
-        let words = tr_with(
+        t(tr_with(
+            locale,
             if row.included {
                 Msg::ClauseIncludesCodes
             } else {
                 Msg::ClauseExcludesCodes
             },
             &[("count", row.concepts.len().into())],
-        );
-        words.into_any()
+        ))
     } else if !row.value_sets.is_empty() {
-        tr_with(
+        t(tr_with(
+            locale,
             Msg::ClauseValueSets,
             &[("count", row.value_sets.len().into())],
-        )
-        .into_any()
+        ))
     } else {
-        tr(Msg::ClauseWholeSystem).into_any()
+        t(tr(locale, Msg::ClauseWholeSystem))
     }
 }
 
+/// One clause of the definition, read-only.
+fn clause_card(request: &Request, read: &Read, row: &ClauseRow) -> Html {
+    let locale = &request.locale;
+    let system = row.system.clone().unwrap_or_default();
+    let named = name_of(&read.names, &system);
+    let title = if system.is_empty() {
+        t(tr(locale, Msg::ClauseNoSystem))
+    } else {
+        let href = system_link(&system, request.version);
+        let version = row.version.as_ref().map(|version| {
+            tr_with(
+                locale,
+                Msg::ClauseVersion,
+                &[("version", version.clone().into())],
+            )
+        });
+        h(format!(
+            "{} {}{}",
+            t(tr(locale, Msg::ClauseFrom)),
+            link(&href, t(&named)),
+            t(version.unwrap_or_default())
+        ))
+    };
+    let sentence = clause_sentence(locale, row, &system, read);
+    let body = (!row.concepts.is_empty()).then(|| {
+        clause_codes(
+            locale,
+            row.concepts
+                .iter()
+                .map(|(code, display)| ClauseCode {
+                    coding: Coding {
+                        display: display.clone(),
+                        code: code.clone(),
+                        system: None,
+                        inactive: false,
+                        href: None,
+                        current: false,
+                    },
+                    remove: None,
+                })
+                .collect(),
+            None,
+        )
+    });
+    clause(
+        locale,
+        Clause {
+            kind: if row.included {
+                ClauseKind::Include
+            } else {
+                ClauseKind::Exclude
+            },
+            title,
+            source: named,
+            sentence,
+            body,
+            actions: None,
+            issues: Vec::new(),
+        },
+    )
+}
+
 /// Definition: the clauses (M4), read-only, and what the value set declares.
-fn definition(request: &Request, read: &Read, source: Source) -> AnyView {
+fn definition(request: &Request, read: &Read, source: Source) -> Html {
+    let locale = &request.locale;
     let value_set = &read.document.value;
     let rows = value_set.clauses();
-    let drawn = rows
-        .iter()
-        .map(|row| {
-            let system = row.system.clone().unwrap_or_default();
-            let named = name_of(&read.names, &system);
-            let title = if system.is_empty() {
-                tr(Msg::ClauseNoSystem).into_any()
-            } else {
-                let href = system_link(&system, request.version);
-                let version = row.version.as_ref().map(|version| {
-                    tr_with(Msg::ClauseVersion, &[("version", version.clone().into())])
-                });
-                view! {
-                    {tr(Msg::ClauseFrom)}
-                    " "
-                    <a href=href>{named.clone()}</a>
-                    {version}
-                }
-                .into_any()
-            };
-            let sentence = clause_sentence(row, &system, read);
-            let body = (!row.concepts.is_empty()).then(|| {
-                clause_codes(
-                    row.concepts
-                        .iter()
-                        .map(|(code, display)| ClauseCode {
-                            coding: Coding {
-                                display: display.clone(),
-                                code: code.clone(),
-                                system: None,
-                                inactive: false,
-                                href: None,
-                                current: false,
-                            },
-                            remove: None,
-                        })
-                        .collect(),
-                    None,
-                )
-            });
-            clause(Clause {
-                kind: if row.included {
-                    ClauseKind::Include
-                } else {
-                    ClauseKind::Exclude
-                },
-                title,
-                source: named,
-                sentence,
-                body,
-                actions: None,
-                issues: Vec::new(),
-            })
-        })
-        .collect_view();
+    let drawn = join(rows.iter().map(|row| clause_card(request, read, row)));
     let count = u64::try_from(rows.len()).unwrap_or(u64::MAX);
     let selects = if rows.is_empty() {
-        section_intro(tr(Msg::ValueSetNoCompose))
+        section_intro(tr(locale, Msg::ValueSetNoCompose))
     } else {
         clauses(drawn)
     };
@@ -476,29 +502,39 @@ fn definition(request: &Request, read: &Read, source: Source) -> AnyView {
         .facts()
         .into_iter()
         .filter(|fact| !matches!(fact.label, Msg::Title | Msg::Version | Msg::Status))
-        .filter_map(|fact| fact.value.map(|value| (tr(fact.label), or_none(value))))
+        .filter_map(|fact| {
+            fact.value
+                .map(|value| (tr(locale, fact.label), or_none(locale, value)))
+        })
         .collect::<Vec<_>>();
-    let note = (source == Source::Loaded)
-        .then(|| panel_section(None, section_intro(tr(Msg::ValueSetLoadedNote))));
-    panel_sections(view! {
-        {note}
-        {panel_section(
+    let note = (source == Source::Loaded).then(|| {
+        panel_section(
+            locale,
+            None,
+            section_intro(tr(locale, Msg::ValueSetLoadedNote)),
+        )
+    });
+    panel_sections(Html::join([
+        note.unwrap_or_default(),
+        panel_section(
+            locale,
             Some(SectionHead {
-                title: tr(Msg::ValueSetSelects),
+                title: tr(locale, Msg::ValueSetSelects),
                 count: Some(HeadingCount::All(count)),
                 actions: None,
             }),
             selects,
-        )}
-        {panel_section(
+        ),
+        panel_section(
+            locale,
             Some(SectionHead {
-                title: tr(Msg::CodeSystemDetails),
+                title: tr(locale, Msg::CodeSystemDetails),
                 count: None,
                 actions: None,
             }),
             definitions(facts),
-        )}
-    })
+        ),
+    ]))
 }
 
 /// Expansion: the first page of `$expand`, with its total, and the way to
@@ -507,42 +543,40 @@ fn expansion_panel(
     request: &Request,
     value_set: &PublishedValueSet,
     expansion: &Result<ExpandedValueSet, FhirError>,
-) -> AnyView {
+) -> Html {
+    let locale = &request.locale;
     let url = value_set.url().unwrap_or_default();
     let open = card_action(
         expansion_link(url, request.version),
-        tr(Msg::ValueSetOpenInOperations),
+        tr(locale, Msg::ValueSetOpenInOperations),
     );
     let body = match expansion.as_ref().map(ExpandedValueSet::expansion) {
-        Err(error) => failure(error),
-        Ok(None) => section_intro(tr(Msg::ValueSetNoExpansion)),
+        Err(error) => failure(locale, error),
+        Ok(None) => section_intro(tr(locale, Msg::ValueSetNoExpansion)),
         Ok(Some(expanded)) => {
             let columns = [
-                Column::text("concept", tr(Msg::ValueSetConcept)).role(Role::Title),
-                Column::text("system", tr(Msg::ValueSetSystem)).role(Role::Quiet),
+                Column::text("concept", tr(locale, Msg::ValueSetConcept)).role(Role::Title),
+                Column::text("system", tr(locale, Msg::ValueSetSystem)).role(Role::Quiet),
             ];
             let [_, system] = &columns;
-            let rows = expanded
-                .concepts
-                .iter()
-                .map(|concept| {
-                    let mut drawn = Coding::new(
-                        concept.code.clone(),
-                        concept.display.clone().unwrap_or_default(),
-                    );
-                    if concept.inactive {
-                        drawn = drawn.inactive();
-                    }
-                    view! {
-                        <tr>
-                            {title_cell(None, coding(drawn, Layout::Inline), None)}
-                            {cell(system, ferrohealth_ui::view::coding::canonical(&concept.system))}
-                        </tr>
-                    }
-                })
-                .collect_view()
-                .into_any();
-            let caption = tr(Msg::ValueSetFirstPage);
+            let rows = join(expanded.concepts.iter().map(|concept| {
+                let mut drawn = Coding::new(
+                    concept.code.clone(),
+                    concept.display.clone().unwrap_or_default(),
+                );
+                if concept.inactive {
+                    drawn = drawn.inactive();
+                }
+                h(format!(
+                    "<tr>{}{}</tr>",
+                    title_cell(None, coding(locale, drawn, Layout::Inline), None),
+                    cell(
+                        system,
+                        ferrohealth_ui::view::coding::canonical(&concept.system)
+                    ),
+                ))
+            }));
+            let caption = tr(locale, Msg::ValueSetFirstPage);
             let table = data_table(DataTable {
                 caption: &caption,
                 columns: &columns,
@@ -550,24 +584,28 @@ fn expansion_panel(
                 body: Body::Rows(rows),
             });
             let total = expanded.total.map_or_else(
-                || tr_with(Msg::ValueSetShown, &[("shown", expanded.listed().into())]),
+                || {
+                    tr_with(
+                        locale,
+                        Msg::ValueSetShown,
+                        &[("shown", expanded.listed().into())],
+                    )
+                },
                 |total| {
                     tr_with(
+                        locale,
                         Msg::ValueSetShownOf,
                         &[("shown", expanded.listed().into()), ("total", total.into())],
                     )
                 },
             );
-            view! {
-                {section_intro(total)}
-                {table}
-            }
-            .into_any()
+            Html::join([section_intro(total), table])
         }
     };
     panel_sections(panel_section(
+        locale,
         Some(SectionHead {
-            title: tr(Msg::ValueSetExpansionTitle),
+            title: tr(locale, Msg::ValueSetExpansionTitle),
             count: None,
             actions: Some(open),
         }),
@@ -576,9 +614,9 @@ fn expansion_panel(
 }
 
 /// JSON: the value set as the server sent it.
-fn json(id: &str, document: &Document<PublishedValueSet>) -> AnyView {
+fn json(locale: &Locale, id: &str, document: &Document<PublishedValueSet>) -> Html {
     let code = Code {
-        label: tr(Msg::ValueSetJsonLabel),
+        label: tr(locale, Msg::ValueSetJsonLabel),
         language: Language::Json,
         text: resources_text(&document.text),
         ids: None,
@@ -586,6 +624,7 @@ fn json(id: &str, document: &Document<PublishedValueSet>) -> AnyView {
         diagnostics: Vec::new(),
     };
     panel_sections(code_section(
+        locale,
         CodeHead {
             title: format!("ValueSet/{id}"),
             tags: vec![String::from("FHIR")],

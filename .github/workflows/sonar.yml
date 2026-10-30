@@ -115,19 +115,6 @@ jobs:
       # The console's screens are proven by the browser journeys, which the
       # nextest run above never drives, so the journeys run here against an
       # instrumented console and their coverage is a second report.
-      - name: Add the WebAssembly target
-        if: ${{ hashFiles('Cargo.toml') != '' }}
-        run: rustup target add wasm32-unknown-unknown
-      - name: Install cargo-leptos, wasm-bindgen
-        if: ${{ hashFiles('Cargo.toml') != '' }}
-        uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
-        with:
-          tool: cargo-leptos@0.3.11, wasm-bindgen@0.2.129
-      - name: Install wasm-opt
-        if: ${{ hashFiles('Cargo.toml') != '' }}
-        run: |
-          bash scripts/release/console-tools.sh "$RUNNER_TEMP/console-tools"
-          echo "$RUNNER_TEMP/console-tools/bin" >> "$GITHUB_PATH"
       - name: Install Chrome and chromedriver
         if: ${{ hashFiles('Cargo.toml') != '' }}
         id: chrome

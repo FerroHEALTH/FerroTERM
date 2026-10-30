@@ -13,6 +13,8 @@
 
 use std::collections::BTreeMap;
 
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::view::clause::{Clause, ClauseIssue, ClauseKind, clause, clauses};
 use ferrohealth_ui::view::coding::{Coding, Layout, coding};
@@ -24,7 +26,6 @@ use ferrohealth_ui::view::surface::{
 };
 use ferrohealth_ui::view::template::list::HeadingCount;
 use ferrohealth_ui::view::transform::transform_quiet;
-use leptos::prelude::*;
 
 use crate::auth::scopes::Letter;
 use crate::fhir::compose::{Draft, Preview, STATUSES, StoredValueSet};
@@ -32,13 +33,14 @@ use crate::fhir::concept::chosen_version;
 use crate::fhir::terminology::{FilterRow, SystemCard};
 use crate::fhir::{CODE_SYSTEM, VALUE_SET};
 use crate::locale::{Msg, tr, tr_with};
+use crate::markup::{h, join, t};
 use crate::pages::detail::Kind;
 use crate::pages::editor::{
     DISCARD, OPENED, OPENED_AT, SAVE, SAVED_PARAM, Standing, add_button, dock, field, form,
     heading, icon_submit, name, opened_line, percent, refused, rows, text_field,
 };
-use crate::pages::operations::choices;
-use crate::pages::parts::{failure, name_of, redirect};
+use crate::pages::operations::{choices, hidden_field, option};
+use crate::pages::parts::{failure, name_of};
 use crate::posted::Posted;
 use crate::request::Request;
 use crate::routes::{
@@ -79,7 +81,8 @@ const OPERATORS: [&str; 10] = [
 ];
 
 /// The value set composer.
-pub(crate) async fn page(request: Request) -> AnyView {
+pub(crate) async fn page(request: Request) -> Html {
+    let locale = &request.locale;
     let posted = request.posted.clone();
     let letter = if request.text(COMPOSER_ID_PARAM).is_empty() {
         Letter::Create
@@ -88,13 +91,14 @@ pub(crate) async fn page(request: Request) -> AnyView {
     };
     if !request.can(VALUE_SET, letter) {
         if request.session.who().is_none() && request.sign_in {
-            redirect(&sign_in_link(&request.back()));
+            request.answering.redirect(&sign_in_link(&request.back()));
         }
         return crate::pages::errors::forbidden_page(
+            &request,
             Msg::EditorForbiddenValueSet,
             "user/ValueSet.cu",
             (
-                tr(Msg::ShellValueSets),
+                tr(locale, Msg::ShellValueSets),
                 ui_link(VALUE_SETS_PATH, request.version),
             ),
         );
@@ -113,12 +117,13 @@ fn address(request: &Request, id: &str) -> String {
 }
 
 /// The page, after whatever the reader `posted`.
-async fn edited(request: &Request, posted: Option<&Posted>) -> AnyView {
+async fn edited(request: &Request, posted: Option<&Posted>) -> Html {
+    let locale = &request.locale;
     let id = request.text(COMPOSER_ID_PARAM);
     let here = address(request, &id);
     if posted.is_some_and(|form| form.intent() == DISCARD) {
-        redirect(&here);
-        return ().into_any();
+        request.answering.redirect(&here);
+        return Html::empty();
     }
     let opened = match open(request, &id).await {
         Ok(opened) => opened,
@@ -127,16 +132,7 @@ async fn edited(request: &Request, posted: Option<&Posted>) -> AnyView {
     if let Some(saved) = request.param(SAVED_PARAM) {
         return saved_page(request, &opened, &saved);
     }
-    let systems_named = request
-        .client
-        .published_names(request.version, CODE_SYSTEM)
-        .await
-        .ok();
-    let systems = choices(systems_named.as_ref());
-    let names = systems_named
-        .as_ref()
-        .map(crate::fhir::named::NamedSearch::names)
-        .unwrap_or_default();
+    let (systems, names) = systems_of(request).await;
     let cards = request
         .client
         .terminology_capabilities(request.version)
@@ -157,60 +153,81 @@ async fn edited(request: &Request, posted: Option<&Posted>) -> AnyView {
         }
         if form.intent() == SAVE && draft.savable() {
             match save(request, &draft, &opened_version, &here).await {
-                Ok(()) => return ().into_any(),
+                Ok(()) => return Html::empty(),
                 Err(refusal) => answer = Some(*refusal),
             }
         }
     }
     let standing = match &answer {
         Some((_, standing)) => standing.clone(),
-        None => standing(&opened, &draft),
+        None => standing(locale, &opened, &draft),
     };
     let bar = dock(
-        tr(if draft.id.is_empty() {
-            Msg::EditorCreateValueSet
-        } else {
-            Msg::EditorSaveValueSet
-        }),
+        locale,
+        tr(
+            locale,
+            if draft.id.is_empty() {
+                Msg::EditorCreateValueSet
+            } else {
+                Msg::EditorSaveValueSet
+            },
+        ),
         &standing,
     );
     let resource = crumb(request, &opened);
-    let title = tr(if opened.id.is_empty() {
-        Msg::EditorNewValueSet
-    } else {
-        Msg::EditorEdit
-    });
-    let editor = panel_sections_card(
-        title.clone(),
-        view! {
-            {metadata(&draft)}
-            {compose(
-                &draft,
-                &Offers {
-                    systems: &systems,
-                    names: &names,
-                    cards: &cards,
-                },
-            )}
+    let title = tr(
+        locale,
+        if opened.id.is_empty() {
+            Msg::EditorNewValueSet
+        } else {
+            Msg::EditorEdit
         },
     );
-    let body = stack(view! {
-        {answer.map(|(view, _)| view)}
-        {main_aside(editor, preview_card(preview, &names))}
-    })
-    .into_any();
-    view! {
-        {heading(
+    let offers = Offers {
+        systems: &systems,
+        names: &names,
+        cards: &cards,
+    };
+    let editor = panel_sections_card(
+        title.clone(),
+        Html::join([metadata(locale, &draft), compose(locale, &draft, &offers)]),
+    );
+    let body = stack(Html::join([
+        answer.map(|(view, _)| view).unwrap_or_default(),
+        main_aside(editor, preview_card(locale, preview, &names)),
+    ]));
+    Html::join([
+        heading(
             request,
             Kind::ValueSet,
             resource,
             title,
-            opened_line(&opened.version_id, &opened_at),
-        )}
-        {form(here, &[(OPENED, opened_version), (OPENED_AT, opened_at)], true, body)}
-        {bar}
-    }
-    .into_any()
+            opened_line(locale, &opened.version_id, &opened_at),
+        ),
+        form(
+            here,
+            &[(OPENED, opened_version), (OPENED_AT, opened_at)],
+            body,
+        ),
+        bar,
+    ])
+}
+
+/// The code systems the root publishes, each its canonical and its name,
+/// and the name each goes by.
+pub(crate) async fn systems_of(
+    request: &Request,
+) -> (Vec<(String, String)>, BTreeMap<String, String>) {
+    let published = request
+        .client
+        .published_names(request.version, CODE_SYSTEM)
+        .await
+        .ok();
+    let names = published
+        .as_ref()
+        .map(crate::fhir::named::NamedSearch::names)
+        .unwrap_or_default();
+    (choices(published.as_ref()), names)
 }
 
 /// The first page of what `draft` selects, expanded by the server.
@@ -236,7 +253,7 @@ async fn save(
     draft: &Draft,
     opened: &str,
     here: &str,
-) -> Result<(), Box<(AnyView, Standing)>> {
+) -> Result<(), Box<(Html, Standing)>> {
     let body = draft.resource().to_string();
     match crate::pages::editor::send(request, VALUE_SET, &draft.id, &body, opened).await {
         Ok(written) => {
@@ -246,7 +263,7 @@ async fn save(
                 .and_then(|resource| resource.id.clone())
                 .unwrap_or_else(|| draft.id.clone());
             let version = written.version_id().unwrap_or_default().to_owned();
-            redirect(&format!(
+            request.answering.redirect(&format!(
                 "{}&{SAVED_PARAM}={}",
                 address(request, &saved_id),
                 percent(&version)
@@ -259,7 +276,7 @@ async fn save(
 
 /// The draft of the value set `id` names, a new one for none, or the page
 /// that says why it cannot be edited.
-async fn open(request: &Request, id: &str) -> Result<Draft, AnyView> {
+async fn open(request: &Request, id: &str) -> Result<Draft, Html> {
     if id.is_empty() {
         return Ok(Draft::new());
     }
@@ -276,14 +293,14 @@ async fn open(request: &Request, id: &str) -> Result<Draft, AnyView> {
                 ))
             }
         }
-        Err(error) => Err(failure(&error)),
+        Err(error) => Err(failure(&request.locale, &error)),
     }
 }
 
 /// Where `draft` stands against the value set `opened` read.
-fn standing(opened: &Draft, draft: &Draft) -> Standing {
+fn standing(locale: &Locale, opened: &Draft, draft: &Draft) -> Standing {
     if !draft.savable() {
-        Standing::Incomplete(tr(Msg::EditorValueSetNeeds))
+        Standing::Incomplete(tr(locale, Msg::EditorValueSetNeeds))
     } else if draft.resource() == opened.resource() {
         Standing::Unchanged
     } else {
@@ -400,129 +417,128 @@ fn apply(form: &Posted, draft: &mut Draft) {
 }
 
 /// The metadata section.
-fn metadata(draft: &Draft) -> AnyView {
-    let statuses = STATUSES
-        .iter()
-        .map(|status| {
-            view! {
-                <option value=*status selected=*status == draft.status>
-                    {status_words(status)}
-                </option>
-            }
-        })
-        .collect_view();
-    let inactive = [
-        ("", Msg::EditorInactiveServer),
-        ("true", Msg::EditorInactiveInclude),
-        ("false", Msg::EditorInactiveExclude),
-    ]
-    .into_iter()
-    .map(|(value, words)| {
-        let picked = match draft.inactive {
-            Some(true) => "true",
-            Some(false) => "false",
-            None => "",
-        };
-        view! {
-            <option value=value selected=value == picked>
-                {tr(words)}
-            </option>
-        }
-    })
-    .collect_view();
+fn metadata(locale: &Locale, draft: &Draft) -> Html {
+    let statuses = join(STATUSES.iter().map(|status| {
+        option(
+            status,
+            &status_words(locale, status),
+            *status == draft.status,
+        )
+    }));
+    let picked = match draft.inactive {
+        Some(true) => "true",
+        Some(false) => "false",
+        None => "",
+    };
+    let inactive = join(
+        [
+            ("", Msg::EditorInactiveServer),
+            ("true", Msg::EditorInactiveInclude),
+            ("false", Msg::EditorInactiveExclude),
+        ]
+        .into_iter()
+        .map(|(value, words)| option(value, &tr(locale, words), value == picked)),
+    );
     panel_section(
+        locale,
         Some(SectionHead {
-            title: tr(Msg::EditorMetadata),
+            title: tr(locale, Msg::EditorMetadata),
             count: None,
             actions: None,
         }),
-        view! {
-            <div class=FORM>
-                {text_field("vs-url", "url", tr(Msg::EditorCanonical), draft.url.clone(), true)}
-                {field_flow(
-                    view! {
-                        {text_field(
-                            "vs-title",
-                            "title",
-                            tr(Msg::EditorTitle),
-                            draft.title.clone(),
-                            false,
-                        )}
-                        {Field::new("vs-inactive", tr(Msg::EditorInactiveCodes))
-                            .view(
-                                view! {
-                                    <select id="vs-inactive" name="inactive" class=SELECT>
-                                        {inactive}
-                                    </select>
-                                },
-                            )}
-                    },
-                )}
-                {field_flow(
-                    view! {
-                        {text_field(
-                            "vs-name",
-                            "name",
-                            tr(Msg::EditorName),
-                            draft.name.clone(),
-                            true,
-                        )}
-                        {text_field(
-                            "vs-version",
-                            "version",
-                            tr(Msg::EditorBusinessVersion),
-                            draft.version.clone(),
-                            false,
-                        )}
-                        {Field::new("vs-status", tr(Msg::EditorStatus))
-                            .view(
-                                view! {
-                                    <select id="vs-status" name="status" class=SELECT>
-                                        {statuses}
-                                    </select>
-                                },
-                            )}
-                    },
-                )}
-            </div>
-        },
+        h(format!(
+            r#"<div class="{FORM}">{}{}{}</div>"#,
+            text_field(
+                "vs-url",
+                "url",
+                tr(locale, Msg::EditorCanonical),
+                draft.url.clone(),
+                true
+            ),
+            field_flow(Html::join([
+                text_field(
+                    "vs-title",
+                    "title",
+                    tr(locale, Msg::EditorTitle),
+                    draft.title.clone(),
+                    false,
+                ),
+                Field::new("vs-inactive", tr(locale, Msg::EditorInactiveCodes)).view(h(format!(
+                    r#"<select id="vs-inactive" name="inactive" class="{SELECT}">{inactive}</select>"#
+                ))),
+            ])),
+            field_flow(Html::join([
+                text_field(
+                    "vs-name",
+                    "name",
+                    tr(locale, Msg::EditorName),
+                    draft.name.clone(),
+                    true,
+                ),
+                text_field(
+                    "vs-version",
+                    "version",
+                    tr(locale, Msg::EditorBusinessVersion),
+                    draft.version.clone(),
+                    false,
+                ),
+                Field::new("vs-status", tr(locale, Msg::EditorStatus)).view(h(format!(
+                    r#"<select id="vs-status" name="status" class="{SELECT}">{statuses}</select>"#
+                ))),
+            ])),
+        )),
     )
 }
 
 /// The words of a publication status.
-fn status_words(status: &str) -> String {
-    tr(match status {
-        "active" => Msg::StatusActive,
-        "retired" => Msg::StatusRetired,
-        "unknown" => Msg::StatusUnknown,
-        _ => Msg::StatusDraft,
-    })
+fn status_words(locale: &Locale, status: &str) -> String {
+    tr(
+        locale,
+        match status {
+            "active" => Msg::StatusActive,
+            "retired" => Msg::StatusRetired,
+            "unknown" => Msg::StatusUnknown,
+            _ => Msg::StatusDraft,
+        },
+    )
 }
 
 /// The includes and excludes, each an editable clause, and the ways to add
 /// one.
-fn compose(draft: &Draft, offers: &Offers<'_>) -> AnyView {
-    let drawn = draft
-        .clauses
-        .iter()
-        .map(|each| clause_view(each, offers))
-        .collect_view();
+fn compose(locale: &Locale, draft: &Draft, offers: &Offers<'_>) -> Html {
+    let drawn = join(
+        draft
+            .clauses
+            .iter()
+            .map(|each| clause_view(locale, each, offers)),
+    );
     let count = u64::try_from(draft.clauses.len()).unwrap_or(u64::MAX);
     panel_section(
+        locale,
         Some(SectionHead {
-            title: tr(Msg::EditorIncludesExcludes),
+            title: tr(locale, Msg::EditorIncludesExcludes),
             count: Some(HeadingCount::All(count)),
             actions: None,
         }),
-        view! {
-            {section_intro(tr(Msg::EditorIncludesExcludesIntro))}
-            {clauses(drawn)}
-            <div class="fui-add-row">
-                {add_button(String::from("add-include"), tr(Msg::EditorAddInclude))}
-                {add_button(String::from("add-exclude"), tr(Msg::EditorAddExclude))}
-                {add_button(String::from("add-value-set"), tr(Msg::EditorAddValueSet))}
-            </div>
-        },
+        Html::join([
+            section_intro(tr(locale, Msg::EditorIncludesExcludesIntro)),
+            clauses(drawn),
+            h(format!(
+                r#"<div class="fui-add-row">{}{}{}</div>"#,
+                add_button(
+                    String::from("add-include"),
+                    tr(locale, Msg::EditorAddInclude)
+                ),
+                add_button(
+                    String::from("add-exclude"),
+                    tr(locale, Msg::EditorAddExclude)
+                ),
+                add_button(
+                    String::from("add-value-set"),
+                    tr(locale, Msg::EditorAddValueSet)
+                ),
+            )),
+        ]),
     )
 }
 
@@ -540,68 +556,57 @@ struct Offers<'a> {
 
 /// A clause's side, its code system and its version, as fields.
 fn clause_fields(
+    locale: &Locale,
     key: &str,
     each: &crate::fhir::compose::Clause,
     systems: &[(String, String)],
-) -> AnyView {
-    let blank = view! {
-        <option value="" selected=each.system.is_empty()>
-            {tr(Msg::EditorNoSystem)}
-        </option>
-    };
-    let offered = systems
-        .iter()
-        .map(|(value, words)| {
-            view! {
-                <option value=value.clone() selected=*value == each.system>
-                    {words.clone()}
-                </option>
-            }
-        })
-        .collect_view();
-    let system_options = view! {
-        {blank}
-        {offered}
-    };
+) -> Html {
+    let system_options = Html::join([
+        option("", &tr(locale, Msg::EditorNoSystem), each.system.is_empty()),
+        join(
+            systems
+                .iter()
+                .map(|(value, words)| option(value, words, *value == each.system)),
+        ),
+    ]);
     let system_id = format!("vs-{key}-system");
     let version_id = format!("vs-{key}-version");
-    view! {
-        <input
-            type="hidden"
-            name=name(CLAUSE, key, "side")
-            value=if each.included { "include" } else { "exclude" }
-        />
-        {field_flow(
-            view! {
-                {Field::new(system_id.clone(), tr(Msg::LookupSystem))
-                    .view(
-                        view! {
-                            <select id=system_id name=name(CLAUSE, key, "system") class=SELECT>
-                                {system_options}
-                            </select>
-                        },
-                    )}
-                {Field::new(version_id.clone(), tr(Msg::LookupVersion))
-                    .view(
-                        view! {
-                            <input
-                                id=version_id
-                                name=name(CLAUSE, key, "version")
-                                class=INPUT
-                                value=each.system_version.clone()
-                                placeholder=tr(Msg::LookupServerVersion)
-                            />
-                        },
-                    )}
-            },
-        )}
-    }
-    .into_any()
+    Html::join([
+        hidden_field(
+            &name(CLAUSE, key, "side"),
+            if each.included { "include" } else { "exclude" },
+        ),
+        field_flow(Html::join([
+            Field::new(system_id.clone(), tr(locale, Msg::LookupSystem)).view(h(format!(
+                r#"<select id="{system_id}" name="{}" class="{SELECT}">{system_options}</select>"#,
+                t(name(CLAUSE, key, "system"))
+            ))),
+            Field::new(version_id.clone(), tr(locale, Msg::LookupVersion)).view(h(format!(
+                r#"<input id="{version_id}" name="{}" class="{INPUT}" value="{}" placeholder="{}">"#,
+                t(name(CLAUSE, key, "version")),
+                t(&each.system_version),
+                t(tr(locale, Msg::LookupServerVersion))
+            ))),
+        ])),
+    ])
+}
+
+/// A label paragraph of a clause's part.
+fn part_label(words: String) -> Html {
+    h(format!(r#"<p class="fui-label">{}</p>"#, t(words)))
+}
+
+/// One Add row of a clause, asking for `intent`.
+fn add_row(intent: String, words: String) -> Html {
+    h(format!(
+        r#"<div class="fui-add-row">{}</div>"#,
+        add_button(intent, words)
+    ))
 }
 
 /// One clause, editable: its code system and version, its value sets, its
 /// filters and its codes, with the ways to add and remove each.
-fn clause_view(each: &crate::fhir::compose::Clause, offers: &Offers<'_>) -> AnyView {
+fn clause_view(locale: &Locale, each: &crate::fhir::compose::Clause, offers: &Offers<'_>) -> Html {
     let Offers {
         systems,
         names,
@@ -609,13 +614,14 @@ fn clause_view(each: &crate::fhir::compose::Clause, offers: &Offers<'_>) -> AnyV
     } = *offers;
     let key = format!("c{}", each.key);
     let system_name = if each.system.is_empty() {
-        tr(Msg::EditorPublishedValueSets)
+        tr(locale, Msg::EditorPublishedValueSets)
     } else {
         name_of(names, &each.system)
     };
     let source = match each.system_version.as_str() {
         "" => system_name.clone(),
         version => tr_with(
+            locale,
             Msg::CodeSystemOnVersion,
             &[
                 ("system", system_name.clone().into()),
@@ -623,50 +629,47 @@ fn clause_view(each: &crate::fhir::compose::Clause, offers: &Offers<'_>) -> AnyV
             ],
         ),
     };
-    let fields = clause_fields(&key, each, systems);
-    let filters = filter_rows(&key, each, cards);
-    let codes = code_rows(&key, each);
-    let sets = set_rows(&key, each);
-    let body = view! {
-        {fields}
-        {sets}
-        <p class="fui-label">{tr(Msg::EditorFilters)}</p>
-        {filters}
-        <div class="fui-add-row">
-            {add_button(format!("add-filter:{key}"), tr(Msg::EditorAddFilter))}
-        </div>
-        <p class="fui-label">{tr(Msg::EditorCodes)}</p>
-        {codes}
-        <div class="fui-add-row">
-            {add_button(format!("add-code:{key}"), tr(Msg::EditorAddCode))}
-        </div>
-    }
-    .into_any();
+    let body = Html::join([
+        clause_fields(locale, &key, each, systems),
+        set_rows(locale, &key, each),
+        part_label(tr(locale, Msg::EditorFilters)),
+        filter_rows(locale, &key, each, cards),
+        add_row(
+            format!("add-filter:{key}"),
+            tr(locale, Msg::EditorAddFilter),
+        ),
+        part_label(tr(locale, Msg::EditorCodes)),
+        code_rows(locale, &key, each),
+        add_row(format!("add-code:{key}"), tr(locale, Msg::EditorAddCode)),
+    ]);
     let issues = each
         .defect()
         .map(|defect| ClauseIssue {
             key: defect.constraint().to_owned(),
-            text: tr(defect.sentence()),
+            text: tr(locale, defect.sentence()),
         })
         .into_iter()
         .collect();
-    clause(Clause {
-        kind: if each.included {
-            ClauseKind::Include
-        } else {
-            ClauseKind::Exclude
+    clause(
+        locale,
+        Clause {
+            kind: if each.included {
+                ClauseKind::Include
+            } else {
+                ClauseKind::Exclude
+            },
+            title: t(&source),
+            source,
+            sentence: t(each.rule(locale)),
+            body: Some(body),
+            actions: Some(icon_submit(
+                format!("remove-clause:{key}"),
+                Glyph::TRASH,
+                tr(locale, Msg::EditorRemoveClause),
+            )),
+            issues,
         },
-        title: source.clone().into_any(),
-        source,
-        sentence: each.rule().into_any(),
-        body: Some(body),
-        actions: Some(icon_submit(
-            format!("remove-clause:{key}"),
-            Glyph::TRASH,
-            tr(Msg::EditorRemoveClause),
-        )),
-        issues,
-    })
+    )
 }
 
 /// The filter rows of the clause `each`, keyed by `key` in the form: the
@@ -675,27 +678,33 @@ fn clause_view(each: &crate::fhir::compose::Clause, offers: &Offers<'_>) -> AnyV
 /// (`TerminologyCapabilities.codeSystem.version.filter`,
 /// <https://hl7.org/fhir/R4B/terminologycapabilities.html>); a system that
 /// declares none takes any property and the operators FHIR defines.
-fn filter_rows(key: &str, each: &crate::fhir::compose::Clause, cards: &[SystemCard]) -> AnyView {
+fn filter_rows(
+    locale: &Locale,
+    key: &str,
+    each: &crate::fhir::compose::Clause,
+    cards: &[SystemCard],
+) -> Html {
     let declared: Vec<FilterRow> = cards
         .iter()
         .find(|card| card.url == each.system)
         .and_then(|card| chosen_version(card, Some(each.system_version.as_str())))
         .map(|row| row.filters)
         .unwrap_or_default();
-    each.filters
-        .iter()
-        .map(|row| filter_row(key, row, &declared))
-        .collect_view()
-        .into_any()
+    join(
+        each.filters
+            .iter()
+            .map(|row| filter_row(locale, key, row, &declared)),
+    )
 }
 
 /// One filter row of a clause, keyed by `key`, offering the `declared`
 /// filters.
 fn filter_row(
+    locale: &Locale,
     key: &str,
     row: &crate::fhir::compose::ClauseFilter,
     declared: &[FilterRow],
-) -> AnyView {
+) -> Html {
     let row_key = format!("f{}", row.key);
     let property_id = format!("vs-{row_key}-property");
     let op_id = format!("vs-{row_key}-op");
@@ -707,198 +716,135 @@ fn filter_row(
             || OPERATORS.iter().map(|op| (*op).to_owned()).collect(),
             |filter| filter.operators.clone(),
         );
-    let operators = operators
-        .iter()
-        .map(|op| {
-            view! {
-                <option value=op.clone() selected=*op == row.op>
-                    {op.clone()}
-                </option>
-            }
-        })
-        .collect_view();
+    let operators = join(operators.iter().map(|op| option(op, op, *op == row.op)));
     let property = if declared.is_empty() {
-        view! {
-            <input
-                id=property_id.clone()
-                name=name(FILTER, &row_key, "property")
-                class=format!("{INPUT} fui-mono")
-                value=row.property.clone()
-            />
-        }
-        .into_any()
+        h(format!(
+            r#"<input id="{property_id}" name="{}" class="{INPUT} fui-mono" value="{}">"#,
+            t(name(FILTER, &row_key, "property")),
+            t(&row.property)
+        ))
     } else {
-        let kept = (!declared.iter().any(|filter| filter.code == row.property)).then(|| {
-            view! {
-                <option value=row.property.clone() selected=true>
-                    {row.property.clone()}
-                </option>
-            }
-        });
-        let offered = declared
-            .iter()
-            .map(|filter| {
-                view! {
-                    <option value=filter.code.clone() selected=filter.code == row.property>
-                        {filter.code.clone()}
-                    </option>
-                }
-            })
-            .collect_view();
-        view! {
-            <select id=property_id.clone() name=name(FILTER, &row_key, "property") class=SELECT>
-                {kept}
-                {offered}
-            </select>
-        }
-        .into_any()
+        let kept = (!declared.iter().any(|filter| filter.code == row.property))
+            .then(|| option(&row.property, &row.property, true));
+        let offered = join(
+            declared
+                .iter()
+                .map(|filter| option(&filter.code, &filter.code, filter.code == row.property)),
+        );
+        h(format!(
+            r#"<select id="{property_id}" name="{}" class="{SELECT}">{}{offered}</select>"#,
+            t(name(FILTER, &row_key, "property")),
+            kept.unwrap_or_default()
+        ))
     };
-    view! {
-        <div class="fui-clause-filter">
-            <input type="hidden" name=name(FILTER, &row_key, "clause") value=key.to_owned() />
-            {Field::new(property_id, tr(Msg::EditorFilterProperty)).view(property)}
-            {Field::new(op_id.clone(), tr(Msg::EditorFilterOperator))
-                .view(
-                    view! {
-                        <select id=op_id name=name(FILTER, &row_key, "op") class=SELECT>
-                            {operators}
-                        </select>
-                    },
-                )}
-            {Field::new(value_id.clone(), tr(Msg::LookupValue))
-                .view(
-                    view! {
-                        <input
-                            id=value_id
-                            name=name(FILTER, &row_key, "value")
-                            class=format!("{INPUT} fui-mono")
-                            value=row.value.clone()
-                        />
-                    },
-                )}
-            {icon_submit(format!("remove-filter:{row_key}"), Glyph::X, tr(Msg::EditorRemoveFilter))}
-        </div>
-    }
-    .into_any()
+    h(format!(
+        r#"<div class="fui-clause-filter">{}{}{}{}{}</div>"#,
+        hidden_field(&name(FILTER, &row_key, "clause"), key),
+        Field::new(property_id, tr(locale, Msg::EditorFilterProperty)).view(property),
+        Field::new(op_id.clone(), tr(locale, Msg::EditorFilterOperator)).view(h(format!(
+            r#"<select id="{op_id}" name="{}" class="{SELECT}">{operators}</select>"#,
+            t(name(FILTER, &row_key, "op"))
+        ))),
+        Field::new(value_id.clone(), tr(locale, Msg::LookupValue)).view(h(format!(
+            r#"<input id="{value_id}" name="{}" class="{INPUT} fui-mono" value="{}">"#,
+            t(name(FILTER, &row_key, "value")),
+            t(&row.value)
+        ))),
+        icon_submit(
+            format!("remove-filter:{row_key}"),
+            Glyph::X,
+            tr(locale, Msg::EditorRemoveFilter)
+        ),
+    ))
 }
 
 /// The codes rows of the clause `each`, keyed by `key` in the form.
-fn code_rows(key: &str, each: &crate::fhir::compose::Clause) -> AnyView {
-    each.concepts
-        .iter()
-        .map(|row| {
-            let row_key = format!("p{}", row.key);
-            let code_id = format!("vs-{row_key}-code");
-            view! {
-                <div class="fui-clause-filter">
-                    <input type="hidden" name=name(CODE, &row_key, "clause") value=key.to_owned() />
-                    <input
-                        type="hidden"
-                        name=name(CODE, &row_key, "served")
-                        value=row.served_display.clone()
-                    />
-                    {Field::new(code_id.clone(), tr(Msg::LookupCode))
-                        .view(
-                            view! {
-                                <input
-                                    id=code_id
-                                    name=name(CODE, &row_key, "code")
-                                    class=format!("{INPUT} fui-mono")
-                                    value=row.code.clone()
-                                />
-                            },
-                        )}
-                    {Field::new(format!("vs-{row_key}-display"), tr(Msg::EditorConceptDisplay))
-                        .view(
-                            view! {
-                                <input
-                                    id=format!("vs-{row_key}-display")
-                                    name=name(CODE, &row_key, "display")
-                                    class=INPUT
-                                    value=row.display.clone()
-                                    placeholder=row.served_display.clone()
-                                />
-                            },
-                        )}
-                    {icon_submit(
-                        format!("remove-code:{row_key}"),
-                        Glyph::X,
-                        tr(Msg::EditorRemoveCode),
-                    )}
-                </div>
-            }
-        })
-        .collect_view()
-        .into_any()
+fn code_rows(locale: &Locale, key: &str, each: &crate::fhir::compose::Clause) -> Html {
+    join(each.concepts.iter().map(|row| {
+        let row_key = format!("p{}", row.key);
+        let code_id = format!("vs-{row_key}-code");
+        let display_id = format!("vs-{row_key}-display");
+        h(format!(
+            r#"<div class="fui-clause-filter">{}{}{}{}{}</div>"#,
+            hidden_field(&name(CODE, &row_key, "clause"), key),
+            hidden_field(&name(CODE, &row_key, "served"), &row.served_display),
+            Field::new(code_id.clone(), tr(locale, Msg::LookupCode)).view(h(format!(
+                r#"<input id="{code_id}" name="{}" class="{INPUT} fui-mono" value="{}">"#,
+                t(name(CODE, &row_key, "code")),
+                t(&row.code)
+            ))),
+            Field::new(display_id.clone(), tr(locale, Msg::EditorConceptDisplay)).view(h(
+                format!(
+                    r#"<input id="{display_id}" name="{}" class="{INPUT}" value="{}" placeholder="{}">"#,
+                    t(name(CODE, &row_key, "display")),
+                    t(&row.display),
+                    t(&row.served_display)
+                )
+            )),
+            icon_submit(
+                format!("remove-code:{row_key}"),
+                Glyph::X,
+                tr(locale, Msg::EditorRemoveCode),
+            ),
+        ))
+    }))
 }
 
 /// The sets rows of the clause `each`, keyed by `key` in the form.
-fn set_rows(key: &str, each: &crate::fhir::compose::Clause) -> AnyView {
-    each.value_sets
-        .iter()
-        .map(|row| {
-            let row_key = format!("v{}", row.key);
-            let url_id = format!("vs-{row_key}-url");
-            view! {
-                <div class="fui-repeater-row">
-                    <input
-                        type="hidden"
-                        name=name(VALUE_SET_ROW, &row_key, "clause")
-                        value=key.to_owned()
-                    />
-                    {Field::new(url_id.clone(), tr(Msg::EditorValueSetCanonical))
-                        .view(
-                            view! {
-                                <input
-                                    id=url_id
-                                    name=name(VALUE_SET_ROW, &row_key, "url")
-                                    class=format!("{INPUT} fui-mono")
-                                    value=row.canonical.clone()
-                                />
-                            },
-                        )}
-                    {icon_submit(
-                        format!("remove-vs:{row_key}"),
-                        Glyph::X,
-                        tr(Msg::EditorRemoveValueSet),
-                    )}
-                </div>
-            }
-        })
-        .collect_view()
-        .into_any()
+fn set_rows(locale: &Locale, key: &str, each: &crate::fhir::compose::Clause) -> Html {
+    join(each.value_sets.iter().map(|row| {
+        let row_key = format!("v{}", row.key);
+        let url_id = format!("vs-{row_key}-url");
+        h(format!(
+            r#"<div class="fui-repeater-row">{}{}{}</div>"#,
+            hidden_field(&name(VALUE_SET_ROW, &row_key, "clause"), key),
+            Field::new(url_id.clone(), tr(locale, Msg::EditorValueSetCanonical)).view(h(format!(
+                r#"<input id="{url_id}" name="{}" class="{INPUT} fui-mono" value="{}">"#,
+                t(name(VALUE_SET_ROW, &row_key, "url")),
+                t(&row.canonical)
+            ))),
+            icon_submit(
+                format!("remove-vs:{row_key}"),
+                Glyph::X,
+                tr(locale, Msg::EditorRemoveValueSet),
+            ),
+        ))
+    }))
 }
 
 /// The preview card: Run the preview, and the first page of what the draft
 /// selects once it ran.
 fn preview_card(
+    locale: &Locale,
     preview: Option<
         Result<crate::fhir::expansion::ExpandedValueSet, crate::fhir::error::FhirError>,
     >,
     names: &BTreeMap<String, String>,
-) -> AnyView {
-    let run = view! {
-        <button
-            type="submit"
-            class=ferrohealth_ui::view::button::Variant::Secondary.small()
-            name=crate::posted::INTENT
-            value=PREVIEW
-        >
-            {ferrohealth_ui::icon::icon(Glyph::PLAY, "14")}
-            {tr(Msg::EditorRunPreview)}
-        </button>
-    }
-    .into_any();
+) -> Html {
+    let run = h(format!(
+        r#"<button type="submit" class="{}" name="{}" value="{PREVIEW}">{}{}</button>"#,
+        ferrohealth_ui::view::button::Variant::Secondary.small(),
+        crate::posted::INTENT,
+        ferrohealth_ui::icon::icon(Glyph::PLAY, "14"),
+        t(tr(locale, Msg::EditorRunPreview))
+    ));
     let body = match preview {
-        None => transform_quiet(tr(Msg::EditorPreviewBefore)),
-        Some(Err(error)) => failure(&error),
+        None => transform_quiet(tr(locale, Msg::EditorPreviewBefore)),
+        Some(Err(error)) => failure(locale, &error),
         Some(Ok(expanded)) => match expanded.expansion() {
-            None => transform_quiet(tr(Msg::ValueSetNoExpansion)),
+            None => transform_quiet(tr(locale, Msg::ValueSetNoExpansion)),
             Some(expansion) => {
                 let total = expansion.total.map_or_else(
-                    || tr_with(Msg::ValueSetShown, &[("shown", expansion.listed().into())]),
+                    || {
+                        tr_with(
+                            locale,
+                            Msg::ValueSetShown,
+                            &[("shown", expansion.listed().into())],
+                        )
+                    },
                     |total| {
                         tr_with(
+                            locale,
                             Msg::ValueSetShownOf,
                             &[
                                 ("shown", expansion.listed().into()),
@@ -907,31 +853,30 @@ fn preview_card(
                         )
                     },
                 );
-                let rows = expansion
-                    .concepts
-                    .iter()
-                    .map(|concept| {
-                        let drawn = Coding::new(
-                            concept.code.clone(),
-                            concept.display.clone().unwrap_or_default(),
-                        )
-                        .system(name_of(names, &concept.system));
-                        view! { <li>{coding(drawn, Layout::Stacked)}</li> }
-                    })
-                    .collect_view();
-                view! {
-                    {section_intro(total)}
-                    <ul class="fui-match-list">{rows}</ul>
-                }
-                .into_any()
+                let rows = join(expansion.concepts.iter().map(|concept| {
+                    let drawn = Coding::new(
+                        concept.code.clone(),
+                        concept.display.clone().unwrap_or_default(),
+                    )
+                    .system(name_of(names, &concept.system));
+                    h(format!(
+                        "<li>{}</li>",
+                        coding(locale, drawn, Layout::Stacked)
+                    ))
+                }));
+                Html::join([
+                    section_intro(total),
+                    h(format!(r#"<ul class="fui-match-list">{rows}</ul>"#)),
+                ])
             }
         },
     };
     panel_sections_card(
-        tr(Msg::EditorPreview),
+        tr(locale, Msg::EditorPreview),
         panel_section(
+            locale,
             Some(SectionHead {
-                title: tr(Msg::EditorPreview),
+                title: tr(locale, Msg::EditorPreview),
                 count: None,
                 actions: Some(run),
             }),
@@ -942,31 +887,39 @@ fn preview_card(
 
 /// The page after a save: the version the server now holds, and the way to
 /// the value set.
-fn saved_page(request: &Request, opened: &Draft, saved: &str) -> AnyView {
+fn saved_page(request: &Request, opened: &Draft, saved: &str) -> Html {
+    let locale = &request.locale;
     let href = resource_link(VALUE_SETS_PATH, &opened.id, request.version);
-    let open = card_action(href.clone(), tr(Msg::EditorOpenValueSet));
+    let open = card_action(href.clone(), tr(locale, Msg::EditorOpenValueSet));
     let shown = if opened.title.is_empty() {
         opened.url.clone()
     } else {
         opened.title.clone()
     };
-    view! {
-        {heading(
+    Html::join([
+        heading(
             request,
             Kind::ValueSet,
             Some((shown, href)),
-            tr(Msg::EditorSavedTitle),
-            tr_with(Msg::EditorVersion, &[("version", saved.to_owned().into())]),
-        )}
-        {load_report(LoadReport {
+            tr(locale, Msg::EditorSavedTitle),
+            tr_with(
+                locale,
+                Msg::EditorVersion,
+                &[("version", saved.to_owned().into())],
+            ),
+        ),
+        load_report(LoadReport {
             outcome: Outcome::Ok,
             arrival: Arrival::AfterAction,
-            title: tr_with(Msg::EditorSaved, &[("version", saved.to_owned().into())]).into_any(),
+            title: t(tr_with(
+                locale,
+                Msg::EditorSaved,
+                &[("version", saved.to_owned().into())],
+            )),
             counts: Vec::new(),
             action: Some(open),
-        })}
-    }
-    .into_any()
+        }),
+    ])
 }
 
 #[cfg(test)]

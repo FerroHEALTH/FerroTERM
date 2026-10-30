@@ -1,48 +1,44 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The session of the request being rendered or answered, read from the
-//! context the server provides to every page and server function.
+//! The session of the request being answered, read from its cookie in the
+//! console's session store.
 //!
 //! A visitor reads the console with no session at all, as the terminology
 //! server's read surface asks for no token; a signed-in reader's session
 //! carries the access token every request to the server presents.
 
-use leptos::context::use_context;
 use secrecy::SecretString;
 
 use crate::auth::Operator;
 use crate::server::ConsoleState;
 use crate::session::{COOKIE, SessionError};
 
-/// The access token of the request's live signed-in session, or `None` for
-/// a visitor and for a session that is no longer live.
+/// The access token of the live signed-in session the request whose headers
+/// are `headers` carries, or `None` for a visitor and for a session that is
+/// no longer live.
 ///
 /// # Errors
 /// Returns [`SessionError::Poisoned`] when the session store is unusable.
-pub fn access_token() -> Result<Option<SecretString>, SessionError> {
-    let Some(state) = use_context::<ConsoleState>() else {
-        return Ok(None);
-    };
-    let Some(parts) = use_context::<http::request::Parts>() else {
-        return Ok(None);
-    };
-    let Some(id) = state.sessions().cookie_in(&parts.headers, COOKIE) else {
+pub fn access_token(
+    state: &ConsoleState,
+    headers: &http::HeaderMap,
+) -> Result<Option<SecretString>, SessionError> {
+    let Some(id) = state.sessions().cookie_in(headers, COOKIE) else {
         return Ok(None);
     };
     state.sessions().access_token(&id)
 }
 
-/// The signed-in reader of the request, as the page shows them.
+/// The signed-in reader of the request whose headers are `headers`, as the
+/// page shows them.
 ///
 /// The page is given their name and the scopes their token grants, never the
 /// token: `None` for a visitor, and for a session store that cannot be read,
 /// which the server logs.
 #[must_use]
-pub fn operator() -> Option<Operator> {
-    let state = use_context::<ConsoleState>()?;
-    let parts = use_context::<http::request::Parts>()?;
-    let id = state.sessions().cookie_in(&parts.headers, COOKIE)?;
+pub fn operator(state: &ConsoleState, headers: &http::HeaderMap) -> Option<Operator> {
+    let id = state.sessions().cookie_in(headers, COOKIE)?;
     let read = || -> Result<Option<Operator>, SessionError> {
         if state.sessions().access_token(&id)?.is_none() {
             return Ok(None);
@@ -57,13 +53,15 @@ pub fn operator() -> Option<Operator> {
     })
 }
 
-/// What the request's live signed-in session has left, read without
-/// extending it; `None` for a visitor or a session that is gone.
+/// What the live signed-in session of the request whose headers are
+/// `headers` has left, read without extending it; `None` for a visitor or a
+/// session that is gone.
 #[must_use]
-pub fn left() -> Option<ferrohealth_ui::widget::session::Left> {
-    let state = use_context::<ConsoleState>()?;
-    let parts = use_context::<http::request::Parts>()?;
-    let id = state.sessions().cookie_in(&parts.headers, COOKIE)?;
+pub fn left(
+    state: &ConsoleState,
+    headers: &http::HeaderMap,
+) -> Option<ferrohealth_ui::view::session::Left> {
+    let id = state.sessions().cookie_in(headers, COOKIE)?;
     state
         .sessions()
         .remaining(&id, false)

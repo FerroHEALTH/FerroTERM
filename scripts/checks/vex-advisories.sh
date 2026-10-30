@@ -37,19 +37,23 @@ cd "$(dirname "$0")/../.."
 readonly VEX_DIR="${VEX_DIR:-security/vex}"
 readonly OUT="$VEX_DIR/rust-advisories.openvex.json"
 
-[[ -f "$OUT" ]] || {
-  echo "error: $OUT does not exist — run scripts/security/vex-generate.sh" >&2
-  exit 1
-}
-
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 # The generator carries the id-set agreement and the OpenVEX vocabulary checks
-# and exits non-zero on any of them, so running it IS half this gate.
+# and exits non-zero on any of them, so running it IS half this gate. A gate
+# that accepts no advisory has no document, and none may be checked in.
 bash scripts/security/vex-generate.sh --stdout > "$work/expected.json"
-
-if ! diff -u "$OUT" "$work/expected.json" > "$work/diff.txt"; then
+if [[ ! -s "$work/expected.json" ]]; then
+  [[ ! -e "$OUT" ]] || {
+    echo "error: deny.toml accepts no advisory, so $OUT must not exist" >&2
+    echo "  run: bash scripts/security/vex-generate.sh" >&2
+    exit 1
+  }
+elif [[ ! -f "$OUT" ]]; then
+  echo "error: $OUT does not exist — run scripts/security/vex-generate.sh" >&2
+  exit 1
+elif ! diff -u "$OUT" "$work/expected.json" > "$work/diff.txt"; then
   echo "error: $OUT is not what the generator produces" >&2
   echo >&2
   sed 's/^/  /' "$work/diff.txt" >&2
@@ -64,8 +68,9 @@ fi
 # inherited container layers, where nothing in this repository resolves the
 # finding). They still have to be well-formed OpenVEX, so a typo does not ship
 # as a document a consumer's parser rejects.
+shopt -s nullglob
 docs=("$VEX_DIR"/*.openvex.json)
-for doc in "${docs[@]}"; do
+for doc in ${docs[@]+"${docs[@]}"}; do
   jq -e '
     (has("@context") and has("@id") and has("author") and has("timestamp")
      and has("version") and (.statements | type == "array" and length > 0))
@@ -86,4 +91,4 @@ for doc in "${docs[@]}"; do
   }
 done
 
-echo "ok: ${#docs[@]} VEX documents well-formed; $OUT matches deny.toml"
+echo "ok: ${#docs[@]} VEX documents well-formed; the generated document matches deny.toml"

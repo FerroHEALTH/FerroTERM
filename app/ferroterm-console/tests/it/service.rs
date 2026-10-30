@@ -1,16 +1,17 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The console's HTTP service: the liveness route, the stylesheets, the
-//! browser security headers every response carries, the compression of the
-//! site bundle alone, and the same-origin rule for every unsafe request.
+//! The console's HTTP service: the liveness route, FerroUI's assets and the
+//! brand's files, the browser security headers every response carries, no
+//! answer compressed, and the same-origin rule for every unsafe request.
 
 use axum::body::Body;
+use ferrohealth_ui::serve::Assets;
+use ferrohealth_ui::style::Brand;
 use ferroterm_console::config::Oidc;
-use ferroterm_console::server::THEME;
 use http::header::{
     ACCEPT_ENCODING, CACHE_CONTROL, CONTENT_ENCODING, CONTENT_SECURITY_POLICY, CONTENT_TYPE,
-    ORIGIN, REFERER, REFERRER_POLICY, VARY, X_CONTENT_TYPE_OPTIONS, X_FRAME_OPTIONS,
+    ORIGIN, REFERER, REFERRER_POLICY, X_CONTENT_TYPE_OPTIONS, X_FRAME_OPTIONS,
 };
 use http::{HeaderMap, Request, StatusCode};
 
@@ -27,18 +28,6 @@ fn directive<'p>(policy: &'p str, name: &str) -> Option<&'p str> {
         .split(';')
         .map(str::trim)
         .find(|directive| directive.starts_with(name))
-}
-
-/// The script nonce a Content-Security-Policy names.
-fn nonce_of(headers: &HeaderMap) -> String {
-    let policy = header(headers, &CONTENT_SECURITY_POLICY).expect("a policy");
-    let script = directive(policy, "script-src").expect("a script-src");
-    script
-        .split_whitespace()
-        .find_map(|source| source.strip_prefix("'nonce-"))
-        .and_then(|nonce| nonce.strip_suffix('\''))
-        .expect("a nonce source")
-        .to_owned()
 }
 
 /// A `POST` of a preference form to `/preference`, with `headers` added.
@@ -89,27 +78,47 @@ async fn every_response_carries_the_browser_security_headers() {
 }
 
 #[tokio::test]
-async fn every_response_carries_a_nonce_of_its_own() {
+async fn the_policy_takes_scripts_and_styles_from_the_console_alone_with_no_nonce() {
     let state = console(None, "");
-    let first = send(&state, get("/health", &[])).await;
-    let second = send(&state, get("/health", &[])).await;
-    assert_ne!(nonce_of(first.headers()), nonce_of(second.headers()));
+    for path in ["/health", "/about"] {
+        let response = send(&state, get(path, &[])).await;
+        let policy = header(response.headers(), &CONTENT_SECURITY_POLICY).expect("a policy");
+        assert_eq!(
+            Some("script-src 'self'"),
+            directive(policy, "script-src"),
+            "{path}: {policy}"
+        );
+        assert_eq!(
+            Some("style-src 'self'"),
+            directive(policy, "style-src"),
+            "{path}"
+        );
+        assert_eq!(
+            Some("default-src 'self'"),
+            directive(policy, "default-src"),
+            "{path}"
+        );
+        assert!(!policy.contains("'nonce-"), "{path}: {policy}");
+        assert!(!policy.contains("wasm-unsafe-eval"), "{path}: {policy}");
+    }
 }
 
 #[tokio::test]
-async fn a_page_s_scripts_carry_the_nonce_its_policy_names() {
+async fn a_page_loads_its_one_script_from_the_library_and_writes_none_inline() {
     let state = console(None, "");
     let response = send(&state, get("/about", &[])).await;
     assert_eq!(StatusCode::OK, response.status());
-    let nonce = nonce_of(response.headers());
     let html = text(response).await;
-    let scripts = html.matches("<script").count();
-    assert!(scripts > 0, "the document loads its islands: {html}");
-    assert_eq!(
-        scripts,
-        html.matches(&format!("nonce=\"{nonce}\"")).count(),
-        "every script carries the response's nonce"
+    let loader = Assets::of(Brand::Term).loader();
+    assert_eq!(1, html.matches("<script").count(), "{html}");
+    assert!(
+        html.contains(&format!(
+            r#"<script type="module" src="{loader}"></script>"#
+        )),
+        "the document loads FerroUI's loader: {html}"
     );
+    assert!(!html.contains(" style="), "no inline style: {html}");
+    assert!(!html.contains("<style"), "no style element: {html}");
 }
 
 #[tokio::test]
@@ -131,41 +140,38 @@ async fn the_policy_admits_a_form_redirect_to_the_end_session_endpoint_s_origin(
 }
 
 #[tokio::test]
-async fn the_stylesheets_are_served_as_css_and_revalidated() {
+async fn the_library_s_stylesheet_and_theme_are_served_as_css_for_a_year() {
     let state = console(None, "");
-    for path in ["/ferrohealth-ui.css", "/theme.css"] {
-        let response = send(&state, get(path, &[])).await;
+    let assets = Assets::of(Brand::Term);
+    for path in [assets.stylesheet(), assets.theme()] {
+        let response = send(&state, get(&path, &[])).await;
         assert_eq!(StatusCode::OK, response.status(), "{path}");
-        assert_eq!(
-            Some("text/css; charset=utf-8"),
-            header(response.headers(), &CONTENT_TYPE),
-            "{path}"
+        assert!(
+            header(response.headers(), &CONTENT_TYPE)
+                .is_some_and(|media| media.starts_with("text/css")),
+            "{path}: {:?}",
+            response.headers()
         );
         assert_eq!(
-            Some("no-cache"),
+            Some("public, max-age=31536000, immutable"),
             header(response.headers(), &CACHE_CONTROL),
-            "a rebuilt bundle is fetched again: {path}"
+            "a new pin is a new path: {path}"
         );
     }
-    let theme = send(&state, get("/theme.css", &[])).await;
-    assert_eq!(THEME, text(theme).await);
+    let theme = send(&state, get(&assets.theme(), &[])).await;
+    assert_eq!(Brand::Term.theme(), text(theme).await);
 }
 
 #[tokio::test]
-async fn the_site_bundle_is_compressed_as_the_request_asks() {
+async fn an_asset_is_never_compressed() {
     let state = console(None, "");
-    let request = Request::get("/ferrohealth-ui.css")
+    let request = Request::get(Assets::of(Brand::Term).stylesheet())
         .header(ACCEPT_ENCODING, "br")
         .body(Body::empty())
         .expect("a request");
     let response = send(&state, request).await;
-    assert_eq!(Some("br"), header(response.headers(), &CONTENT_ENCODING));
-    assert!(
-        header(response.headers(), &VARY)
-            .is_some_and(|vary| vary.to_ascii_lowercase().contains("accept-encoding")),
-        "{:?}",
-        response.headers()
-    );
+    assert_eq!(StatusCode::OK, response.status());
+    assert_eq!(None, header(response.headers(), &CONTENT_ENCODING));
 }
 
 #[tokio::test]
@@ -283,44 +289,38 @@ async fn a_posted_form_over_the_limit_is_refused_as_too_large() {
 }
 
 #[tokio::test]
-async fn a_bundle_file_that_is_not_there_is_a_plain_not_found() {
-    let site = tempfile::tempdir().expect("a site root");
-    std::fs::create_dir_all(site.path().join("pkg")).expect("the bundle directory");
-    let state = console(None, &site_root(site.path()));
-    let response = send(&state, get("/pkg/x.wasm", &[])).await;
+async fn an_asset_the_library_does_not_ship_is_a_plain_not_found() {
+    let state = console(None, "");
+    let path = format!(
+        "{}/{}/scripts/no-such-module.js",
+        ferrohealth_ui::serve::PREFIX,
+        ferrohealth_ui::serve::VERSION
+    );
+    let response = send(&state, get(&path, &[])).await;
     assert_eq!(StatusCode::NOT_FOUND, response.status());
     assert_eq!(
         Some("no-store"),
         header(response.headers(), &CACHE_CONTROL),
         "a miss is never kept"
     );
-    assert_eq!(
-        "",
-        text(response).await,
+    assert!(
+        !text(response).await.contains("<html"),
         "no page is drawn for a missing file"
     );
 }
 
 #[tokio::test]
-async fn a_bundle_file_is_served_as_it_stands_and_revalidated() {
-    let site = tempfile::tempdir().expect("a site root");
-    std::fs::create_dir_all(site.path().join("pkg")).expect("the bundle directory");
-    std::fs::write(site.path().join("pkg/x.wasm"), b"\0asm\x01\0\0\0").expect("a module");
-    let state = console(None, &site_root(site.path()));
-    let response = send(&state, get("/pkg/x.wasm", &[])).await;
+async fn a_brand_file_is_served_as_it_stands_and_revalidated() {
+    let state = console(None, "");
+    let response = send(&state, get("/favicon.svg", &[])).await;
     assert_eq!(StatusCode::OK, response.status());
     assert_eq!(
-        Some("application/wasm"),
+        Some("image/svg+xml"),
         header(response.headers(), &CONTENT_TYPE)
     );
     assert_eq!(Some("no-cache"), header(response.headers(), &CACHE_CONTROL));
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .expect("a body");
-    assert_eq!(&b"\0asm\x01\0\0\0"[..], &*body);
-}
-
-/// The configuration that serves the site from `root`.
-fn site_root(root: &std::path::Path) -> String {
-    format!("[server]\nsite_root = {:?}\n", root.display().to_string())
+    assert_eq!(&include_bytes!("../../public/favicon.svg")[..], &*body);
 }

@@ -1,15 +1,18 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 //! What a page reads of its request: the address, the reader's
-//! preferences, who is signed in and the console's own settings.
+//! preferences, who is signed in and the console's own settings, and what
+//! the page says of its answer: its title, its status, or a redirect.
 //!
-//! A page is drawn from a [`Request`] built from the visit the server read
-//! ([`crate::visit::Visit`]) and the address the router names, so the server
-//! and the browser draw it from the same value. No specification governs
-//! this: our own design.
+//! A handler builds a [`Request`] from the visit the server read
+//! ([`crate::visit::Visit`]) and the address, and the screen draws the page
+//! from it. No specification governs this: our own design.
+
+use std::sync::{Arc, Mutex};
 
 use ferrohealth_ui::i18n::Locale;
-use leptos::prelude::*;
+use ferrohealth_ui::view::session::Left;
+use http::StatusCode;
 
 use crate::auth::Session;
 use crate::auth::scopes::Letter;
@@ -18,7 +21,62 @@ use crate::fhir::version::FhirVersion;
 use crate::posted::Posted;
 use crate::prefs::Prefs;
 use crate::routes::VERSION_PARAM;
+use crate::server::ConsoleState;
 use crate::visit::{Listeners, Visit};
+
+/// What a screen says of the answer it is drawn into: the title the browser
+/// tab shows, the status, and an address to send the reader to in place of
+/// the page.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Said {
+    /// The page's own words in the document title.
+    pub(crate) title: Option<String>,
+    /// The answer's status, `200 OK` when the screen names none.
+    pub(crate) status: Option<StatusCode>,
+    /// Where the reader goes in place of the page, as a `303 See Other`.
+    pub(crate) redirect: Option<String>,
+}
+
+/// Where a screen says what it says of its answer, shared by every clone of
+/// the request it was drawn for.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct Answering(Arc<Mutex<Said>>);
+
+impl Answering {
+    /// Changes what is said with `change`.
+    fn say(&self, change: impl FnOnce(&mut Said)) {
+        // NOTE: no specification governs this: our own design; a lock poisoned by a
+        // panicking screen keeps what it held, and the panic answers the request.
+        match self.0.lock() {
+            Ok(mut said) => change(&mut said),
+            Err(poisoned) => change(&mut poisoned.into_inner()),
+        }
+    }
+
+    /// The page's title in the browser tab is `title`.
+    pub(crate) fn title(&self, title: &str) {
+        self.say(|said| said.title = Some(title.to_owned()));
+    }
+
+    /// The answer's status is `status`.
+    pub(crate) fn status(&self, status: StatusCode) {
+        self.say(|said| said.status = Some(status));
+    }
+
+    /// The reader goes to `to` in place of the page.
+    pub(crate) fn redirect(&self, to: &str) {
+        self.say(|said| said.redirect = Some(to.to_owned()));
+    }
+
+    /// What has been said.
+    #[must_use]
+    pub(crate) fn said(&self) -> Said {
+        match self.0.lock() {
+            Ok(said) => said.clone(),
+            Err(poisoned) => poisoned.into_inner().clone(),
+        }
+    }
+}
 
 /// The request a page is drawn for.
 #[derive(Clone, Debug)]
@@ -53,6 +111,12 @@ pub(crate) struct Request {
     pub(crate) browser: Locale,
     /// The form the request posted, for a page drawn as a post's answer.
     pub(crate) posted: Option<Posted>,
+    /// What the reader's session had left as the server read the request.
+    pub(crate) left: Option<Left>,
+    /// The console's state; none outside a server.
+    pub(crate) state: Option<ConsoleState>,
+    /// What the screen says of its answer.
+    pub(crate) answering: Answering,
 }
 
 impl Request {
@@ -63,8 +127,8 @@ impl Request {
         let named =
             param_in(&query, VERSION_PARAM).and_then(|text| text.parse::<FhirVersion>().ok());
         Self {
-            locale: visit.locale(),
-            browser: visit.browser(),
+            locale: visit.locale.clone(),
+            browser: visit.browser.clone(),
             version: named.or(prefs.session_fhir).unwrap_or(prefs.fhir),
             version_named: named.is_some(),
             prefs,
@@ -74,42 +138,35 @@ impl Request {
             sign_in: visit.issuer.is_some(),
             issuer: visit.issuer.clone(),
             listeners: visit.listeners,
-            client: FhirClient::new(visit.root.clone()),
+            client: match &visit.upstream {
+                Some(upstream) => {
+                    FhirClient::new(visit.root.clone()).with_upstream(upstream.clone())
+                }
+                None => FhirClient::new(visit.root.clone()),
+            }
+            .with_locale(visit.locale.clone()),
             root: visit.root.clone(),
             posted: visit.posted.clone(),
+            left: visit.left,
+            state: visit.state.clone(),
+            answering: Answering::default(),
         }
     }
 
-    /// The same request for the address `path` and `query`, as a part of the
-    /// shell drawn once reads the page in view.
+    /// The request the server reads of `parts`, served by `state`.
     #[must_use]
-    pub(crate) fn at(&self, path: String, query: String) -> Self {
-        let named =
-            param_in(&query, VERSION_PARAM).and_then(|text| text.parse::<FhirVersion>().ok());
-        Self {
-            version: named.or(self.prefs.session_fhir).unwrap_or(self.prefs.fhir),
-            version_named: named.is_some(),
-            path,
-            query,
-            ..self.clone()
-        }
+    pub(crate) fn read(state: &ConsoleState, parts: &http::request::Parts) -> Self {
+        Self::of(
+            &Visit::read(state, parts),
+            parts.uri.path().to_owned(),
+            parts.uri.query().unwrap_or_default().to_owned(),
+        )
     }
 
-    /// The request the server is drawing, read from its context: the
-    /// console's state and the request's parts.
-    #[cfg(not(target_arch = "wasm32"))]
+    /// The console's message `msg` in the page's locale.
     #[must_use]
-    pub(crate) fn read() -> Self {
-        let (path, query) = use_context::<http::request::Parts>().map_or_else(
-            || (String::from("/"), String::new()),
-            |parts| {
-                (
-                    parts.uri.path().to_owned(),
-                    parts.uri.query().unwrap_or_default().to_owned(),
-                )
-            },
-        );
-        Self::of(&Visit::requested(), path, query)
+    pub(crate) fn tr(&self, msg: crate::locale::Msg) -> String {
+        crate::locale::tr(&self.locale, msg)
     }
 
     /// The `index`th segment of the page's path, counted from the first after
@@ -192,33 +249,11 @@ pub(crate) fn params_in(query: &str, name: &str) -> Vec<String> {
         .collect()
 }
 
-/// The request the page being drawn was provided with, or the server's own
-/// request outside a page.
-#[must_use]
-pub(crate) fn request() -> Request {
-    if let Some(request) = use_context::<Request>() {
-        return request;
-    }
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        Request::read()
-    }
-    #[cfg(target_arch = "wasm32")]
-    {
-        Request::of(
-            &crate::visit::visit_untracked(),
-            String::from("/"),
-            String::new(),
-        )
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use leptos::prelude::{Owner, provide_context};
     use secrecy::SecretString;
 
-    use super::{Request, param_in, params_in, request};
+    use super::{Request, param_in, params_in};
     use crate::auth::scopes::Letter;
     use crate::config::{Config, Oidc};
     use crate::fhir::version::FhirVersion;
@@ -246,39 +281,33 @@ mod tests {
 
     /// The request the server reads for `uri` carrying `cookies`, under
     /// `state`.
-    fn read(state: Option<&ConsoleState>, uri: &str, cookies: &[&str]) -> Request {
-        Owner::new().with(|| {
-            if let Some(state) = state {
-                provide_context(state.clone());
-            }
-            let mut builder = http::Request::get(uri);
-            for cookie in cookies {
-                builder = builder.header(http::header::COOKIE, *cookie);
-            }
-            let (parts, ()) = builder.body(()).expect("a request").into_parts();
-            provide_context(parts);
-            Request::read()
-        })
+    fn read(state: &ConsoleState, uri: &str, cookies: &[&str]) -> Request {
+        let mut builder = http::Request::get(uri);
+        for cookie in cookies {
+            builder = builder.header(http::header::COOKIE, *cookie);
+        }
+        let (parts, ()) = builder.body(()).expect("a request").into_parts();
+        Request::read(state, &parts)
     }
 
     #[test]
     fn the_page_is_read_from_the_address_and_returns_to_itself() {
         let state = state(false);
-        let page = read(Some(&state), "/systems?q=%20colours%20&q=other", &[]);
+        let page = read(&state, "/systems?q=%20colours%20&q=other", &[]);
         assert_eq!("/systems", page.path);
         assert_eq!("q=%20colours%20&q=other", page.query);
         assert_eq!("/systems?q=%20colours%20&q=other", page.back());
         assert_eq!(Some(String::from(" colours ")), page.param("q"));
         assert_eq!("colours", page.text("q"), "the first value, trimmed");
         assert_eq!("", page.text("absent"));
-        assert_eq!("/about", read(Some(&state), "/about", &[]).back());
+        assert_eq!("/about", read(&state, "/about", &[]).back());
     }
 
     #[test]
     fn the_address_names_the_fhir_version_before_any_preference() {
         let state = state(false);
         let page = read(
-            Some(&state),
+            &state,
             "/systems?fhir=r5",
             &["__Host-ferroterm_console_session-fhir=r4b; __Host-ferroterm_console_fhir=r6"],
         );
@@ -290,7 +319,7 @@ mod tests {
     fn the_session_s_version_wins_over_the_reader_s_default() {
         let state = state(false);
         let page = read(
-            Some(&state),
+            &state,
             "/systems",
             &[
                 "__Host-ferroterm_console_fhir=r6",
@@ -299,20 +328,16 @@ mod tests {
         );
         assert_eq!(FhirVersion::R4B, page.version);
         assert!(!page.version_named);
-        let default_only = read(
-            Some(&state),
-            "/systems",
-            &["__Host-ferroterm_console_fhir=r6"],
-        );
+        let default_only = read(&state, "/systems", &["__Host-ferroterm_console_fhir=r6"]);
         assert_eq!(FhirVersion::R6, default_only.version);
     }
 
     #[test]
     fn a_preference_cookie_without_the_host_prefix_is_not_read_from_a_secure_console() {
         let state = state(false);
-        let page = read(Some(&state), "/systems", &["ferroterm_console_fhir=r6"]);
+        let page = read(&state, "/systems", &["ferroterm_console_fhir=r6"]);
         assert_eq!(
-            read(Some(&state), "/systems", &[]).version,
+            read(&state, "/systems", &[]).version,
             page.version,
             "a cookie a sibling host could set is ignored"
         );
@@ -321,7 +346,7 @@ mod tests {
     #[test]
     fn the_root_and_the_client_are_the_address_readers_reach_the_server_at() {
         let state = state(false);
-        let page = read(Some(&state), "/", &[]);
+        let page = read(&state, "/", &[]);
         assert_eq!("https://tx.example.org", page.root);
         assert_eq!(
             "https://tx.example.org/r4/metadata",
@@ -331,8 +356,8 @@ mod tests {
 
     #[test]
     fn the_page_offers_a_sign_in_only_when_a_provider_is_configured() {
-        assert!(read(Some(&state(true)), "/", &[]).sign_in);
-        assert!(!read(Some(&state(false)), "/", &[]).sign_in);
+        assert!(read(&state(true), "/", &[]).sign_in);
+        assert!(!read(&state(false), "/", &[]).sign_in);
     }
 
     #[test]
@@ -350,18 +375,22 @@ mod tests {
             })
             .expect("room");
         let cookie = format!("__Host-ferroterm_console_session={}", id.as_str());
-        let page = read(Some(&state), "/", &[&cookie]);
+        let page = read(&state, "/", &[&cookie]);
         assert_eq!(Some(String::from("Synthetic Operator")), page.session.who());
         assert!(page.can("CodeSystem", Letter::Update));
         assert!(!page.can("ValueSet", Letter::Update));
-        let visitor = read(Some(&state), "/", &[]);
+        let visitor = read(&state, "/", &[]);
         assert!(!visitor.session.signed_in());
         assert!(!visitor.can("CodeSystem", Letter::Update));
     }
 
     #[test]
-    fn a_page_drawn_with_no_server_context_reads_the_defaults() {
-        let page = Owner::new().with(Request::read);
+    fn a_page_drawn_with_no_server_reads_the_defaults() {
+        let page = Request::of(
+            &crate::visit::Visit::default(),
+            String::from("/"),
+            String::new(),
+        );
         assert_eq!("/", page.path);
         assert_eq!("", page.query);
         assert_eq!("", page.root);
@@ -370,14 +399,17 @@ mod tests {
     }
 
     #[test]
-    fn the_page_tree_reads_the_request_its_root_provided() {
+    fn every_clone_of_a_request_says_into_one_answer() {
         let state = state(false);
-        let provided = read(Some(&state), "/expand?fhir=r4", &[]);
-        let path = Owner::new().with(|| {
-            provide_context(provided.clone());
-            request().path
-        });
-        assert_eq!("/expand", path);
+        let page = read(&state, "/expand?fhir=r4", &[]);
+        assert_eq!("/expand", page.path);
+        let drawn = page.clone();
+        drawn.answering.title("Expand");
+        drawn.answering.status(http::StatusCode::NOT_FOUND);
+        let said = page.answering.said();
+        assert_eq!(Some(String::from("Expand")), said.title);
+        assert_eq!(Some(http::StatusCode::NOT_FOUND), said.status);
+        assert_eq!(None, said.redirect);
     }
 
     #[test]

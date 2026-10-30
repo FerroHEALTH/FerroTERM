@@ -353,43 +353,24 @@ else
   note "no Cargo.toml, Cargo.lock, or docs/VERSIONS.md yet — skipped"
 fi
 
-# --- the console tool pins (docs/VERSIONS.md <-> Cargo.toml <-> the scripts <-> the workflows) ---
-echo "== console tool pins (docs/VERSIONS.md <-> Cargo.toml <-> the scripts <-> the workflows)"
+# --- the console's journey browser (docs/VERSIONS.md <-> the script <-> the workflows) ---
+echo "== console journey browser (docs/VERSIONS.md <-> the script <-> the workflows)"
 if [[ -d app/ferroterm-console ]] && [[ -f docs/VERSIONS.md ]]; then
-  pin_leptos="$(sed -n 's/^| cargo-leptos | \([0-9][0-9.]*\),.*/\1/p' docs/VERSIONS.md | head -n1)"
-  pin_bindgen="$(sed -n 's/^| .wasm-bindgen. CLI | \([0-9][0-9.]*\),.*/\1/p' docs/VERSIONS.md | head -n1)"
-  pin_binaryen="$(sed -n 's/^| Binaryen .wasm-opt. | \(version_[0-9]*\),.*/\1/p' docs/VERSIONS.md | head -n1)"
-  pin_leptosfmt="$(sed -n 's/^| .leptosfmt. | \([0-9][0-9.]*\),.*/\1/p' docs/VERSIONS.md | head -n1)"
   pin_chrome="$(sed -n 's/^| Chrome for Testing | \([0-9][0-9.]*\) .*/\1/p' docs/VERSIONS.md | head -n1)"
-  if [[ -z "$pin_leptos" || -z "$pin_bindgen" || -z "$pin_binaryen" || -z "$pin_leptosfmt" || -z "$pin_chrome" ]]; then
-    bad "docs/VERSIONS.md lacks a Console toolchain row for cargo-leptos, wasm-bindgen, wasm-opt, leptosfmt or Chrome for Testing"
+  if [[ -z "$pin_chrome" ]]; then
+    bad "docs/VERSIONS.md lacks the Console toolchain row for Chrome for Testing"
   else
-    crate_bindgen="$(sed -n 's/^wasm-bindgen[[:space:]]*=[[:space:]]*"=\([0-9][0-9.]*\)".*/\1/p' Cargo.toml | head -n1)"
-    [[ "$crate_bindgen" == "$pin_bindgen" ]] \
-      || bad "Cargo.toml wasm-bindgen (${crate_bindgen:-unset}) != docs/VERSIONS.md pin ($pin_bindgen)"
-    tools_binaryen="$(sed -n 's/^binaryen_version="\(version_[0-9]*\)"/\1/p' scripts/release/console-tools.sh | head -n1)"
-    [[ "$tools_binaryen" == "$pin_binaryen" ]] \
-      || bad "console-tools.sh Binaryen (${tools_binaryen:-unset}) != docs/VERSIONS.md pin ($pin_binaryen)"
     tools_chrome="$(sed -n 's/^chrome_version="\([0-9][0-9.]*\)"/\1/p' scripts/release/journey-tools.sh | head -n1)"
     [[ "$tools_chrome" == "$pin_chrome" ]] \
       || bad "journey-tools.sh Chrome (${tools_chrome:-unset}) != docs/VERSIONS.md pin ($pin_chrome)"
-    # Every workflow that installs a console tool installs the pinned version.
-    for wf in .github/workflows/ci.yml .github/workflows/release-console.yml; do
+    # Every workflow that installs the journeys' browser installs the pinned version.
+    for wf in .github/workflows/ci.yml .github/workflows/sonar.yml; do
       [[ -f "$wf" ]] || continue
-      while read -r got; do
-        [[ "$got" == "$pin_leptos" ]] || bad "$wf installs cargo-leptos@$got, docs/VERSIONS.md pins $pin_leptos"
-      done < <(grep -o 'cargo-leptos@[0-9][0-9.]*' "$wf" | sed 's/.*@//')
-      while read -r got; do
-        [[ "$got" == "$pin_bindgen" ]] || bad "$wf installs wasm-bindgen@$got, docs/VERSIONS.md pins $pin_bindgen"
-      done < <(grep -o 'wasm-bindgen@[0-9][0-9.]*' "$wf" | sed 's/.*@//')
-      while read -r got; do
-        [[ "$got" == "$pin_leptosfmt" ]] || bad "$wf installs leptosfmt $got, docs/VERSIONS.md pins $pin_leptosfmt"
-      done < <(sed -n 's/.*cargo install leptosfmt .*--version \([0-9][0-9.]*\).*/\1/p' "$wf")
       while read -r got; do
         [[ "$got" == "$pin_chrome" ]] || bad "$wf installs Chrome $got, docs/VERSIONS.md pins $pin_chrome"
       done < <(sed -n 's/^[[:space:]]*chrome-version:[[:space:]]*\([0-9][0-9.]*\).*/\1/p' "$wf")
     done
-    [[ "$fail" -ne 0 ]] || note "OK: cargo-leptos $pin_leptos, wasm-bindgen $pin_bindgen, wasm-opt $pin_binaryen, leptosfmt $pin_leptosfmt, Chrome $pin_chrome"
+    [[ "$fail" -ne 0 ]] || note "OK: Chrome $pin_chrome"
   fi
 else
   note "no console crate yet — skipped"

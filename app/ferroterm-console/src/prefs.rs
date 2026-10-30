@@ -14,7 +14,6 @@
 //! preference offers. No specification governs this: our own design.
 
 use ferrohealth_ui::theme::Preferences;
-#[cfg(not(target_arch = "wasm32"))]
 use ferrohealth_ui::theme::{Density, Hints, Language, Motion, Preference, Theme, WeekStart};
 
 use crate::fhir::version::FhirVersion;
@@ -42,7 +41,6 @@ pub(crate) const PAGE_SIZE: &str = "page-size";
 /// preferences but is kept the same way.
 pub(crate) const SIDEBAR: &str = "sidebar";
 
-#[cfg(not(target_arch = "wasm32"))]
 /// The console's own preferences, each its cookie key.
 pub(crate) const OWN: [&str; 3] = [FHIR, DISPLAY_LANGUAGE, PAGE_SIZE];
 
@@ -132,7 +130,6 @@ pub(crate) fn display_language(text: &str) -> Option<String> {
     plain.then(|| tag.to_owned())
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 /// The value the cookie of the preference `key` keeps for the posted
 /// `value`, when the preference offers it, and `None` for anything else.
 ///
@@ -160,7 +157,6 @@ pub(crate) fn kept(key: &str, value: &str, offered: impl Fn(&str) -> bool) -> Op
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 /// Every cookie key Reset to defaults clears: the family's and the
 /// console's own.
 #[must_use]

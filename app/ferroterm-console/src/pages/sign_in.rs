@@ -9,18 +9,19 @@
 //! at the configured OpenID Provider, which the console's server runs
 //! (`crate::oidc`); the reader returns to the page they came from.
 
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
-use ferrohealth_ui::island::SessionEnded;
+use ferrohealth_ui::view::session::session_ended;
 use ferrohealth_ui::view::shell::{brand_mark, centred, lockup_plain};
 use ferrohealth_ui::view::sign_in::{Notice, Provider, Retry, SignIn, State, sign_in};
-use leptos::prelude::*;
-use leptos_meta::Title;
 
 use crate::auth::SignInState;
 use crate::locale::{Msg, tr};
+use crate::markup::{h, link, t};
 use crate::request::Request;
 use crate::routes::{BACK_PARAM, LOGIN_ROUTE, ui_path};
-use crate::shell::footer;
+use crate::shell::{MARK_DARK, MARK_LIGHT, footer};
 
 /// Where the book documents the console.
 const DOCS: &str = "https://ferroterm.eu/docs/operate/console.html";
@@ -38,14 +39,14 @@ fn provider_host(issuer: &str) -> String {
 
 /// The library's state of the page for `state`, with `retry` the address
 /// that tries again.
-fn state_of(state: Option<SignInState>, retry: &str) -> State {
-    let notice = |msg: Msg| Notice::new(tr(msg));
+fn state_of(locale: &Locale, state: Option<SignInState>, retry: &str) -> State {
+    let notice = |msg: Msg| Notice::new(tr(locale, msg));
     let again = |msg: Msg| Notice {
         retry: Some(Retry {
-            label: tr(Msg::SignInTryAgain),
+            label: tr(locale, Msg::SignInTryAgain),
             href: retry.to_owned(),
         }),
-        ..Notice::new(tr(msg))
+        ..Notice::new(tr(locale, msg))
     };
     match state {
         None => State::Ready,
@@ -57,18 +58,19 @@ fn state_of(state: Option<SignInState>, retry: &str) -> State {
         Some(SignInState::Rejected) => State::Rejected(notice(Msg::SignInRejected)),
         Some(SignInState::Unreachable) => State::ProviderUnreachable(again(Msg::SignInUnreachable)),
         Some(SignInState::Unavailable) => State::Unavailable(Notice {
-            detail: Some(tr(Msg::SignInUnavailableDetail)),
-            ..Notice::new(tr(Msg::SignInUnavailable))
+            detail: Some(tr(locale, Msg::SignInUnavailableDetail)),
+            ..Notice::new(tr(locale, Msg::SignInUnavailable))
         }),
     }
 }
 
 /// The sign-in page.
-pub(crate) async fn page(request: Request) -> AnyView {
+pub(crate) fn page(request: &Request) -> Html {
+    let locale = &request.locale;
     let issuer = request.issuer.clone();
     let back = request
         .param(BACK_PARAM)
-        .or_else(|| request.param(ferrohealth_ui::widget::session::RETURN))
+        .or_else(|| request.param(ferrohealth_ui::view::session::RETURN))
         .and_then(|back| crate::routes::return_path(&back).map(str::to_owned))
         .unwrap_or_else(|| ui_path(""));
     let login = format!(
@@ -81,8 +83,8 @@ pub(crate) async fn page(request: Request) -> AnyView {
         .param("state")
         .and_then(|key| SignInState::parse(&key));
     let state = match &issuer {
-        None => state_of(Some(SignInState::Unavailable), &login),
-        Some(_) => state_of(named, &login),
+        None => state_of(locale, Some(SignInState::Unavailable), &login),
+        Some(_) => state_of(locale, named, &login),
     };
     // NOTE: FerroUI `docs/consoles.md`, "The session's end": the page a session that
     // ended lands on tells every other tab of the console, which then leaves too.
@@ -90,7 +92,7 @@ pub(crate) async fn page(request: Request) -> AnyView {
         named,
         Some(SignInState::SignedOut | SignInState::Expired | SignInState::ExpiredAbsolute)
     )
-    .then(|| view! { <SessionEnded /> });
+    .then(session_ended);
     let rejected = matches!(state, State::Rejected(_));
     let unavailable = matches!(state, State::Unavailable(_));
     let provider = issuer
@@ -100,57 +102,62 @@ pub(crate) async fn page(request: Request) -> AnyView {
             let host = provider_host(issuer);
             Provider {
                 href: login.clone(),
-                label: format!("{} {host}", tr(Msg::SignInAt)),
-                busy: format!("{} {host}", tr(Msg::SignInTaking)),
+                label: format!("{} {host}", tr(locale, Msg::SignInAt)),
+                busy: format!("{} {host}", tr(locale, Msg::SignInTaking)),
                 glyph: Glyph::LOG_IN,
             }
         });
     let read = ui_path("");
     let line = if rejected || unavailable {
-        view! {
-            <a href=read class="fui-button fui-button-primary">
-                {ferrohealth_ui::view::button::label(Some(Glyph::ARROW_RIGHT), tr(Msg::SignInRead))}
-            </a>
-        }
-        .into_any()
+        h(format!(
+            r#"<a href="{}" class="fui-button fui-button-primary">{}</a>"#,
+            t(&read),
+            ferrohealth_ui::view::button::label(
+                Some(Glyph::ARROW_RIGHT),
+                tr(locale, Msg::SignInRead)
+            )
+        ))
     } else {
-        view! {
-            <p class="fui-small fui-sign-in-line">
-                <a href=read>{tr(Msg::SignInRead)}</a>
-                {tr(Msg::SignInReadLine)}
-            </p>
-        }
-        .into_any()
+        h(format!(
+            r#"<p class="fui-small fui-sign-in-line">{}{}</p>"#,
+            link(&read, t(tr(locale, Msg::SignInRead))),
+            t(tr(locale, Msg::SignInReadLine))
+        ))
     };
     let title = if unavailable {
-        tr(Msg::SignInReadOnlyTitle)
+        tr(locale, Msg::SignInReadOnlyTitle)
     } else {
-        tr(Msg::SignInTitle)
+        tr(locale, Msg::SignInTitle)
     };
-    let card = sign_in(SignIn {
-        lockup: lockup_plain(
-            brand_mark("/mark-light.svg", "/mark-dark.svg"),
-            "FerroTERM",
-            tr(Msg::ShellConsole),
-        )
-        .into_any(),
-        title: Some(title.clone()),
-        state,
-        provider,
-        basic: None,
-        line: Some(line),
-        note: (!unavailable).then(|| tr(Msg::SignInNote)),
-        links: vec![
-            (tr(Msg::SignInDocumentation), String::from(DOCS)),
-            (tr(Msg::SignInPrivacy), String::from(PRIVACY)),
-        ],
-        caption: Some(tr(Msg::SignInCaption)),
-    })
-    .into_any();
-    view! {
-        <Title text=title />
-        {centred(card, footer())}
-        {ended}
-    }
-    .into_any()
+    let card = sign_in(
+        locale,
+        SignIn {
+            lockup: lockup_plain(
+                brand_mark(MARK_LIGHT, MARK_DARK),
+                "FerroTERM",
+                tr(locale, Msg::ShellConsole),
+            ),
+            title: Some(title.clone()),
+            state,
+            provider,
+            basic: None,
+            line: Some(line),
+            note: (!unavailable).then(|| tr(locale, Msg::SignInNote)),
+            links: vec![
+                (tr(locale, Msg::SignInDocumentation), String::from(DOCS)),
+                (tr(locale, Msg::SignInPrivacy), String::from(PRIVACY)),
+            ],
+            caption: Some(tr(locale, Msg::SignInCaption)),
+        },
+    );
+    request.answering.title(&title);
+    Html::join([
+        centred(
+            locale,
+            card,
+            ferrohealth_ui::view::toast::toast_region(locale, Vec::new()),
+            footer(),
+        ),
+        ended.unwrap_or_default(),
+    ])
 }

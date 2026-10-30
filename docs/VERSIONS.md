@@ -91,19 +91,15 @@ version is a conformance fact, not a build detail.
 
 ## Console toolchain
 
-The console (`app/ferroterm-console`) is a Leptos app rendered on the server
-and hydrated in the browser. cargo-leptos builds its WebAssembly half and the
-site bundle; the server half is an ordinary `cargo build`. Its crate versions
-live in the root `Cargo.toml` like every other dependency, `ferrohealth-ui`
-among them; the pins below are the tools.
+The console (`app/ferroterm-console`) is an axum service that draws every page
+on its server with FerroUI (`ferrohealth-ui`, pinned in the root `Cargo.toml`
+like every other dependency), whose stylesheet, themes and script modules the
+binary carries and serves. It builds with an ordinary `cargo build`: no
+WebAssembly target, no site bundle and no Node. The one tool pinned here is
+the browser its journeys drive.
 
 | Item | Pin |
 |---|---|
-| Compilation target | `wasm32-unknown-unknown` (`rustup target add wasm32-unknown-unknown`) |
-| cargo-leptos | 0.3.11, installed by `ci.yml` and `release-console.yml` |
-| `wasm-bindgen` CLI | 0.2.129, the version of the `wasm-bindgen` crate the root `Cargo.toml` pins |
-| Binaryen `wasm-opt` | version_133, downloaded and checked against its SHA-256 by `scripts/release/console-tools.sh`, so there is no Node and no npm |
-| `leptosfmt` | 0.1.33, the `view!` macro formatter |
 | Chrome for Testing | 155.0.8059.79 with its chromedriver, installed by `browser-actions/setup-chrome` in the `ui-e2e` job of `ci.yml`, and on a developer machine by `scripts/release/journey-tools.sh`, which checks each zip against its SHA-256 |
 
 ## GitHub Actions pins

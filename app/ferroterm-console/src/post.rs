@@ -5,7 +5,7 @@
 //! the navigation folded, and the FHIR version chosen for the session.
 //!
 //! Each is a plain form post (the version a plain link) that works with no
-//! WebAssembly: the server checks what was posted against what the
+//! script: the server checks what was posted against what the
 //! preference offers, keeps it in its cookie, and sends the browser back to
 //! the page it came from, which it checks is one of the console's own. No
 //! specification governs these routes: our own design.
@@ -46,12 +46,13 @@ fn redirect(back: &str, cookies: &[String]) -> Response {
     response
 }
 
-/// A plain-text refusal of a post, saying `why`.
+/// A plain-text refusal of a post, saying `why` in English, the console's
+/// fallback, since a refused post carries no page to draw in its locale.
 fn bad(why: Msg) -> Response {
     (
         StatusCode::BAD_REQUEST,
         [(CACHE_CONTROL, "no-store")],
-        tr(why),
+        tr(&ferrohealth_ui::i18n::Locale::english(), why),
     )
         .into_response()
 }

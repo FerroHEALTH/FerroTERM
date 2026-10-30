@@ -5,12 +5,12 @@
 //! where a resource comes from, a relative time, and the refusal of a
 //! request the server answered with a failure.
 
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::refusal::{Issue, Refusal, Severity, refusal};
 use ferrohealth_ui::view::surface::{Crumb, Header, page_heading};
 use ferrohealth_ui::view::tag::Tag;
-use leptos::prelude::*;
-use leptos_meta::Title;
 
 use crate::fhir::error::FhirError;
 use crate::fhir::named::Listed;
@@ -18,30 +18,20 @@ use crate::fhir::outcome::OperationOutcome;
 use crate::fhir::problem::Problem;
 use crate::fhir::terminology::SystemCard;
 use crate::locale::{Msg, tr, tr_with};
-
-/// Sends the reader to `to` in place of the page being read.
-///
-/// The server reads every page ([`crate::groups::read_page`]), so the
-/// redirect is the server's: the document's own answer on a first load or a
-/// post, and the read's on a page the browser draws, which the browser then
-/// follows. The browser drawing the page from that read redirects nowhere
-/// itself.
-pub(crate) fn redirect(to: &str) {
-    #[cfg(not(target_arch = "wasm32"))]
-    leptos_axum::redirect(to);
-    #[cfg(target_arch = "wasm32")]
-    let _: &str = to;
-}
+use crate::markup::{h, t};
+use crate::request::Request;
 
 /// The page's title in the browser tab, and its heading with `subtitle`,
 /// the trail `crumbs` and `actions`.
 pub(crate) fn heading(
+    request: &Request,
     title: String,
     subtitle: Option<String>,
     crumbs: Vec<Crumb>,
     actions: ActionGroup,
-) -> AnyView {
+) -> Html {
     headed(
+        request,
         Header {
             title: title.into(),
             subtitle: subtitle.map(Into::into),
@@ -56,13 +46,9 @@ pub(crate) fn heading(
 
 /// The page's title in the browser tab, from `header`, and the heading
 /// `header` draws with `actions`.
-pub(crate) fn headed(header: Header, actions: ActionGroup) -> AnyView {
-    let tab = header.title.text().to_owned();
-    view! {
-        <Title text=tab />
-        {page_heading(header, actions)}
-    }
-    .into_any()
+pub(crate) fn headed(request: &Request, header: Header, actions: ActionGroup) -> Html {
+    request.answering.title(header.title.text());
+    page_heading(&request.locale, header, actions)
 }
 
 /// Where a published resource comes from, as the listings say it.
@@ -138,24 +124,31 @@ impl Source {
 
     /// The source's words, with a capital.
     #[must_use]
-    pub(crate) fn word(self) -> String {
-        tr(match self {
-            Self::Stored => Msg::SourceStored,
-            Self::Index => Msg::SourceIndex,
-            Self::Loaded => Msg::SourceLoaded,
-        })
+    pub(crate) fn word(self, locale: &Locale) -> String {
+        tr(
+            locale,
+            match self {
+                Self::Stored => Msg::SourceStored,
+                Self::Index => Msg::SourceIndex,
+                Self::Loaded => Msg::SourceLoaded,
+            },
+        )
     }
 
     /// The source as a tag (R2): a plain tag for a stored resource, and the
     /// provenance tag (F4) for one the console cannot change, its owner in
     /// its tooltip.
     #[must_use]
-    pub(crate) fn tag(self) -> AnyView {
+    pub(crate) fn tag(self, locale: &Locale) -> Html {
         match self {
-            Self::Stored => Tag::new(self.word()).title(tr(Msg::SourceStoredTip)).view(),
-            Self::Index => Tag::new(self.word()).locked(tr(Msg::SourceIndexTip)).view(),
-            Self::Loaded => Tag::new(self.word())
-                .locked(tr(Msg::SourceLoadedTip))
+            Self::Stored => Tag::new(self.word(locale))
+                .title(tr(locale, Msg::SourceStoredTip))
+                .view(),
+            Self::Index => Tag::new(self.word(locale))
+                .locked(tr(locale, Msg::SourceIndexTip))
+                .view(),
+            Self::Loaded => Tag::new(self.word(locale))
+                .locked(tr(locale, Msg::SourceLoadedTip))
                 .view(),
         }
     }
@@ -188,11 +181,15 @@ pub(crate) fn name_of(
 /// A code system's versions in words, so a phone card that drops the
 /// column header still says what the figure is.
 #[must_use]
-pub(crate) fn versions_word(versions: &[String]) -> String {
+pub(crate) fn versions_word(locale: &Locale, versions: &[String]) -> String {
     match versions {
-        [] => tr(Msg::VersionsNone),
-        [one] => tr_with(Msg::VersionsOne, &[("version", one.clone().into())]),
-        many => tr_with(Msg::VersionsMany, &[("versions", many.join(", ").into())]),
+        [] => tr(locale, Msg::VersionsNone),
+        [one] => tr_with(locale, Msg::VersionsOne, &[("version", one.clone().into())]),
+        many => tr_with(
+            locale,
+            Msg::VersionsMany,
+            &[("versions", many.join(", ").into())],
+        ),
     }
 }
 
@@ -200,43 +197,50 @@ pub(crate) fn versions_word(versions: &[String]) -> String {
 /// `now`: in seconds, minutes, hours, yesterday or days (FerroUI's family
 /// rule 11), the full timestamp in its tooltip; a value that is no instant
 /// is drawn as it came.
-pub(crate) fn relative(raw: &str, now: jiff::Timestamp) -> AnyView {
-    let reading = ferrohealth_ui::view::time::reading(raw);
+pub(crate) fn relative(locale: &Locale, raw: &str, now: jiff::Timestamp) -> Html {
+    let reading = ferrohealth_ui::view::time::reading(locale, raw);
     let Ok(then) = raw.parse::<jiff::Timestamp>() else {
-        return view! { <span class="fui-time">{raw.to_owned()}</span> }.into_any();
+        return h(format!(r#"<span class="fui-time">{}</span>"#, t(raw)));
     };
-    let words = ago(now.as_second().saturating_sub(then.as_second()));
-    view! {
-        <time class="fui-time" datetime=raw.to_owned() title=reading>
-            {words}
-        </time>
-    }
-    .into_any()
+    let words = ago(locale, now.as_second().saturating_sub(then.as_second()));
+    h(format!(
+        r#"<time class="fui-time" datetime="{}" title="{}">{}</time>"#,
+        t(raw),
+        t(reading),
+        t(words)
+    ))
 }
 
 /// The words of a moment `seconds` ago.
 #[must_use]
-pub(crate) fn ago(seconds: i64) -> String {
+pub(crate) fn ago(locale: &Locale, seconds: i64) -> String {
     const MINUTE: i64 = 60;
     const HOUR: i64 = 60 * MINUTE;
     const DAY: i64 = 24 * HOUR;
     let seconds = seconds.max(0);
     if seconds < MINUTE {
-        tr_with(Msg::AgoSeconds, &[("count", seconds.to_string().into())])
+        tr_with(
+            locale,
+            Msg::AgoSeconds,
+            &[("count", seconds.to_string().into())],
+        )
     } else if seconds < HOUR {
         tr_with(
+            locale,
             Msg::AgoMinutes,
             &[("count", seconds.div_euclid(MINUTE).to_string().into())],
         )
     } else if seconds < DAY {
         tr_with(
+            locale,
             Msg::AgoHours,
             &[("count", seconds.div_euclid(HOUR).to_string().into())],
         )
     } else if seconds < 2 * DAY {
-        tr(Msg::AgoYesterday)
+        tr(locale, Msg::AgoYesterday)
     } else {
         tr_with(
+            locale,
             Msg::AgoDays,
             &[("count", seconds.div_euclid(DAY).to_string().into())],
         )
@@ -257,9 +261,9 @@ fn severity(code: &str) -> Severity {
 
 /// The issues `outcome` carries, each with the text the server wrote and the
 /// codes that classify it.
-pub(crate) fn issues(outcome: &OperationOutcome) -> Vec<Issue> {
+pub(crate) fn issues(locale: &Locale, outcome: &OperationOutcome) -> Vec<Issue> {
     outcome
-        .lines()
+        .lines(locale)
         .into_iter()
         .map(|line| Issue {
             severity: severity(&line.severity),
@@ -293,17 +297,19 @@ fn problem_issue(problem: &Problem) -> Issue {
 }
 
 /// The refusal `error` is, as FerroUI draws one.
-pub(crate) fn refusal_of(error: &FhirError) -> Refusal {
+pub(crate) fn refusal_of(locale: &Locale, error: &FhirError) -> Refusal {
     Refusal {
         status: error.status().map(|status| status.as_u16()),
         summary: match error {
-            FhirError::Refused { .. } | FhirError::Status { .. } => tr(Msg::ServerRefusedRequest),
-            FhirError::Transport { .. } => tr(Msg::RequestGotNoAnswer),
-            FhirError::Decode { .. } => tr(Msg::AnswerDidNotRead),
+            FhirError::Refused { .. } | FhirError::Status { .. } => {
+                tr(locale, Msg::ServerRefusedRequest)
+            }
+            FhirError::Transport { .. } => tr(locale, Msg::RequestGotNoAnswer),
+            FhirError::Decode { .. } => tr(locale, Msg::AnswerDidNotRead),
         },
         issues: error
             .outcome()
-            .map(issues)
+            .map(|outcome| issues(locale, outcome))
             .or_else(|| problem_of(error).map(|problem| vec![problem_issue(&problem)]))
             .unwrap_or_default(),
         request: Some(error.url().to_owned()),
@@ -321,12 +327,13 @@ pub(crate) fn refusal_of(error: &FhirError) -> Refusal {
 /// Explains why a request failed, in the server's own words: its
 /// `OperationOutcome` issue by issue, never paraphrased, or the start of a
 /// body that carried none, and the address asked, so a reader can repeat it.
-pub(crate) fn failure(error: &FhirError) -> AnyView {
-    refusal(&refusal_of(error)).into_any()
+pub(crate) fn failure(locale: &Locale, error: &FhirError) -> Html {
+    refusal(locale, &refusal_of(locale, error))
 }
 
 #[cfg(test)]
 mod tests {
+    use ferrohealth_ui::i18n::Locale;
     use ferrohealth_ui::view::refusal::Severity;
     use http::StatusCode;
 
@@ -342,11 +349,14 @@ mod tests {
                 {"severity":"warning","code":"informational","details":{"text":"a hint"}}]}"#,
         )
         .expect("an outcome");
-        let refused = refusal_of(&FhirError::Refused {
-            url: String::from("http://x/r4/ValueSet/$expand"),
-            status: StatusCode::NOT_FOUND,
-            outcome,
-        });
+        let refused = refusal_of(
+            &Locale::english(),
+            &FhirError::Refused {
+                url: String::from("http://x/r4/ValueSet/$expand"),
+                status: StatusCode::NOT_FOUND,
+                outcome,
+            },
+        );
         assert_eq!(Some(404), refused.status);
         assert_eq!(2, refused.issues.len());
         assert_eq!(Severity::Error, refused.issues[0].severity);
@@ -356,10 +366,13 @@ mod tests {
 
     #[test]
     fn a_request_with_no_answer_has_no_status() {
-        let refused = refusal_of(&FhirError::Transport {
-            url: String::from("http://x/health"),
-            message: String::from("connection refused"),
-        });
+        let refused = refusal_of(
+            &Locale::english(),
+            &FhirError::Transport {
+                url: String::from("http://x/health"),
+                message: String::from("connection refused"),
+            },
+        );
         assert_eq!(None, refused.status);
         assert_eq!(
             refused.issues,
@@ -371,14 +384,15 @@ mod tests {
 
     #[test]
     fn a_moment_reads_in_the_largest_whole_unit() {
-        assert_eq!("13 s ago", ago(13));
-        assert_eq!("13 min ago", ago(13 * 60 + 5));
-        assert_eq!("1 h ago", ago(3_700));
-        assert_eq!("yesterday", ago(25 * 3_600));
-        assert_eq!("7 days ago", ago(7 * 86_400 + 10));
+        let english = Locale::english();
+        assert_eq!("13 s ago", ago(&english, 13));
+        assert_eq!("13 min ago", ago(&english, 13 * 60 + 5));
+        assert_eq!("1 h ago", ago(&english, 3_700));
+        assert_eq!("yesterday", ago(&english, 25 * 3_600));
+        assert_eq!("7 days ago", ago(&english, 7 * 86_400 + 10));
         assert_eq!(
             "0 s ago",
-            ago(-5),
+            ago(&english, -5),
             "a clock ahead of the console reads as now"
         );
     }
@@ -393,13 +407,16 @@ mod tests {
 
     #[test]
     fn a_problem_an_admin_route_answers_is_drawn_as_its_issue_in_place_of_the_body() {
-        let refused = refusal_of(&FhirError::Status {
-            url: String::from("http://sync:8181/runs/x"),
-            status: StatusCode::NOT_FOUND,
-            body: String::from(
-                r#"{"type":"https://ferroterm.eu/docs/operate/problems.html#run-not-found","title":"The sync service holds no such run","status":404,"detail":"no run of this service has that id"}"#,
-            ),
-        });
+        let refused = refusal_of(
+            &Locale::english(),
+            &FhirError::Status {
+                url: String::from("http://sync:8181/runs/x"),
+                status: StatusCode::NOT_FOUND,
+                body: String::from(
+                    r#"{"type":"https://ferroterm.eu/docs/operate/problems.html#run-not-found","title":"The sync service holds no such run","status":404,"detail":"no run of this service has that id"}"#,
+                ),
+            },
+        );
         assert_eq!(Some(404), refused.status);
         assert_eq!(1, refused.issues.len());
         assert_eq!("run-not-found", refused.issues[0].code);

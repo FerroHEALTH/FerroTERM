@@ -12,6 +12,8 @@
 //! is a query parameter the next link or form carries. No specification
 //! governs the listing: our own design.
 
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::filter::{FilterChoice, FilterMenu, MenuForm, filter_menu};
 use ferrohealth_ui::table::model::{
@@ -20,7 +22,6 @@ use ferrohealth_ui::table::model::{
 use ferrohealth_ui::view::state::{Mark, state};
 use ferrohealth_ui::view::template::list::HeadingCount;
 use ferrohealth_ui::view::template::list::{ActiveFilters, FilterChip};
-use leptos::prelude::*;
 
 use crate::locale::{Msg, tr, tr_with};
 use crate::pages::parts::Source;
@@ -161,10 +162,12 @@ impl ListState {
     /// it, and Clear filters; `shown` how many rows the filters keep.
     #[must_use]
     pub(crate) fn chips(&self, request: &Request, path: &str, shown: usize) -> ActiveFilters {
+        let locale = &request.locale;
         let mut chips = Vec::new();
         if !self.query.is_empty() {
             chips.push(FilterChip {
                 label: tr_with(
+                    locale,
                     Msg::ListingFindChip,
                     &[("words", self.query.clone().into())],
                 ),
@@ -180,7 +183,11 @@ impl ListState {
                     .map(|other| (String::from(SOURCE_PARAM), other.key().to_owned())),
             );
             chips.push(FilterChip {
-                label: tr_with(Msg::ListingSourceChip, &[("source", source.word().into())]),
+                label: tr_with(
+                    locale,
+                    Msg::ListingSourceChip,
+                    &[("source", source.word(locale).into())],
+                ),
                 remove: Self::href(path, &kept),
             });
         }
@@ -198,29 +205,32 @@ impl ListState {
     /// `counts` that holds a row, each with its count, sent with the find
     /// field's form.
     #[must_use]
-    pub(crate) fn source_filter(&self, counts: &[(Source, usize)]) -> AnyView {
+    pub(crate) fn source_filter(&self, locale: &Locale, counts: &[(Source, usize)]) -> Html {
         let choices = counts
             .iter()
             .filter(|(_, count)| *count > 0)
             .map(|(source, count)| {
                 FilterChoice::new(
                     source.key(),
-                    source.word(),
+                    source.word(locale),
                     u64::try_from(*count).unwrap_or(u64::MAX),
                     self.sources.is_empty() || self.sources.contains(source),
                 )
             })
             .collect();
-        filter_menu(FilterMenu {
-            id: "source-filter",
-            name: SOURCE_PARAM,
-            glyph: Glyph::LIST_FILTER,
-            label: tr(Msg::ListingSource).into(),
-            title: tr(Msg::ListingSourceShow),
-            choices,
-            note: None,
-            form: MenuForm::Enclosing,
-        })
+        filter_menu(
+            locale,
+            FilterMenu {
+                id: "source-filter",
+                name: SOURCE_PARAM,
+                glyph: Glyph::LIST_FILTER,
+                label: tr(locale, Msg::ListingSource).into(),
+                title: tr(locale, Msg::ListingSourceShow),
+                choices,
+                note: None,
+                form: MenuForm::Enclosing,
+            },
+        )
     }
 }
 
@@ -244,7 +254,7 @@ pub(crate) struct Frame {
     /// The find field's label and placeholder.
     pub(crate) find: String,
     /// The table, or the line of an empty listing.
-    pub(crate) body: AnyView,
+    pub(crate) body: Html,
     /// The pager's name and the noun of its rows.
     pub(crate) pages: (String, ferrohealth_ui::table::model::Noun),
 }
@@ -252,12 +262,13 @@ pub(crate) struct Frame {
 impl ListState {
     /// The listing page `frame`, as the address filters, sorts and pages it.
     #[must_use]
-    pub(crate) fn frame(&self, request: &Request, frame: Frame) -> AnyView {
+    pub(crate) fn frame(&self, request: &Request, frame: Frame) -> Html {
         use ferrohealth_ui::table::filter::{Find, find_form};
         use ferrohealth_ui::table::model::{SIZES, StateSource};
         use ferrohealth_ui::table::pager::{Listing, link_pager};
         use ferrohealth_ui::view::surface::Header;
         use ferrohealth_ui::view::template::list::{ListCard, ListPage, list_page};
+        let locale = &request.locale;
         let Frame {
             title,
             subtitle,
@@ -275,6 +286,7 @@ impl ListState {
             let fields = self.fields(request, &[PAGE_KEY, SIZE_KEY]);
             let (label, noun) = pages;
             link_pager(
+                locale,
                 Listing {
                     label: label.into(),
                     noun,
@@ -301,37 +313,36 @@ impl ListState {
                 action: None,
                 fields: &fields,
             },
-            self.source_filter(&counts),
+            self.source_filter(locale, &counts),
         );
-        let page = list_page(ListPage {
-            header: Header {
-                title: title.clone().into(),
-                subtitle: Some(subtitle.into()),
-                subtitle_view: None,
-                crumbs: Vec::new(),
-                mono: false,
-                badge: None,
+        request.answering.title(&title);
+        list_page(
+            locale,
+            ListPage {
+                header: Header {
+                    title: title.clone().into(),
+                    subtitle: Some(subtitle.into()),
+                    subtitle_view: None,
+                    crumbs: Vec::new(),
+                    mono: false,
+                    badge: None,
+                },
+                actions,
+                total: Some(u64::try_from(total).unwrap_or(u64::MAX)),
+                summary: None,
+                toolbar: Some(toolbar),
+                filters: self.chips(request, &path, kept),
+                card: ListCard {
+                    title: title.clone(),
+                    count: Some(HeadingCount::All(u64::try_from(kept).unwrap_or(u64::MAX))),
+                    order: None,
+                    tabs: None,
+                    actions: None,
+                    body,
+                    pager,
+                },
             },
-            actions,
-            total: Some(u64::try_from(total).unwrap_or(u64::MAX)),
-            summary: None,
-            toolbar: Some(toolbar),
-            filters: self.chips(request, &path, kept),
-            card: ListCard {
-                title: title.clone(),
-                count: Some(HeadingCount::All(u64::try_from(kept).unwrap_or(u64::MAX))),
-                order: None,
-                tabs: None,
-                actions: None,
-                body,
-                pager,
-            },
-        });
-        view! {
-            <leptos_meta::Title text=title />
-            {page}
-        }
-        .into_any()
+        )
     }
 
     /// The sorting of the listing's table, which carries the rest of the
@@ -353,12 +364,16 @@ impl ListState {
 
     /// The line of a listing the filter emptied, with the link that clears it.
     #[must_use]
-    pub(crate) fn emptied(&self, request: &Request, path: &str, line: String) -> AnyView {
+    pub(crate) fn emptied(&self, request: &Request, path: &str, line: String) -> Html {
+        let locale = &request.locale;
         let clear = Self::href(
             path,
             &self.fields(request, &[QUERY_PARAM, SOURCE_PARAM, PAGE_KEY]),
         );
-        ferrohealth_ui::view::template::list::list_empty(line, Some((tr(Msg::ListingClear), clear)))
+        ferrohealth_ui::view::template::list::list_empty(
+            line,
+            Some((tr(locale, Msg::ListingClear), clear)),
+        )
     }
 }
 
@@ -378,13 +393,13 @@ pub(crate) fn counted(sources: impl Iterator<Item = Source>) -> Vec<(Source, usi
 /// A publication status as the F12 state: Active, Draft, Retired, or the
 /// code as the resource wrote it.
 #[must_use]
-pub(crate) fn status_state(status: Option<&str>) -> AnyView {
+pub(crate) fn status_state(locale: &Locale, status: Option<&str>) -> Html {
     let (mark, words) = match status {
-        Some("active") => (Mark::Ok, tr(Msg::StatusActive)),
-        Some("draft") => (Mark::Neutral, tr(Msg::StatusDraft)),
-        Some("retired") => (Mark::Off, tr(Msg::StatusRetired)),
+        Some("active") => (Mark::Ok, tr(locale, Msg::StatusActive)),
+        Some("draft") => (Mark::Neutral, tr(locale, Msg::StatusDraft)),
+        Some("retired") => (Mark::Off, tr(locale, Msg::StatusRetired)),
         Some(other) => (Mark::Neutral, other.to_owned()),
-        None => (Mark::Neutral, tr(Msg::StatusUnknown)),
+        None => (Mark::Neutral, tr(locale, Msg::StatusUnknown)),
     };
     state(mark, words, None)
 }
@@ -424,13 +439,10 @@ mod tests {
 
     #[test]
     fn the_source_filter_offers_a_checkbox_per_source_that_holds_a_row() {
-        use leptos::prelude::{Owner, RenderHtml};
         let counts = [(Source::Stored, 2), (Source::Index, 0), (Source::Loaded, 3)];
-        let html = Owner::new().with(|| {
-            state("", &[Source::Loaded], Direction::Ascending)
-                .source_filter(&counts)
-                .to_html()
-        });
+        let html = state("", &[Source::Loaded], Direction::Ascending)
+            .source_filter(&ferrohealth_ui::i18n::Locale::english(), &counts);
+        let html = html.as_str();
         assert_eq!(2, html.matches("type=\"checkbox\"").count(), "{html}");
         assert!(html.contains("value=\"loaded\" checked"), "{html}");
         assert!(!html.contains("value=\"stored\" checked"), "{html}");

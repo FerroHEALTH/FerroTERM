@@ -253,14 +253,15 @@ async fn one_concept_is_authored_with_the_keyboard_alone() {
             journey.type_here("key").await?;
             journey.tab(1).await?;
             journey.type_here("Typed with the keyboard").await?;
-            // NOTE: WebDriver 2, Element Send Keys: a modifier stays held until the
-            // sequence ends, so U+E009 then `s` is Control and S together.
-            journey.type_here("\u{e009}s").await?;
+            journey
+                .tab_to("Create this code system", "the docked Save")
+                .await;
+            journey.type_here("\u{e007}").await?;
             journey
                 .text_becoming(
                     By::Css(SAVED),
                     StringMatch::new("The server now holds version").partial(),
-                    "Ctrl S to save the code system",
+                    "Enter on the docked Save to save the code system",
                 )
                 .await;
             journey.no_console_errors().await;

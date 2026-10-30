@@ -7,6 +7,8 @@
 
 use std::collections::BTreeMap;
 
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::view::{
     Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
@@ -16,12 +18,12 @@ use ferrohealth_ui::view::load_report::Outcome;
 use ferrohealth_ui::view::mapping::{Relationship, relation};
 use ferrohealth_ui::view::surface::{SectionHead, panel_section};
 use ferrohealth_ui::view::template::list::HeadingCount;
-use leptos::prelude::*;
 
 use crate::fhir::translate::{TranslateRequest, TranslationMatch};
 use crate::fhir::version::FhirVersion;
 use crate::fhir::{CODE_SYSTEM, CONCEPT_MAP};
 use crate::locale::{Msg, tr, tr_with};
+use crate::markup::{code, h, join, p, strong, t};
 use crate::pages::concept_map::relationship;
 use crate::pages::lookup::CODE_PARAM;
 use crate::pages::operations::{
@@ -38,7 +40,8 @@ const URL_PARAM: &str = "url";
 const TARGET_PARAM: &str = "targetSystem";
 
 /// The Translate tab.
-pub(crate) async fn page(request: Request) -> AnyView {
+pub(crate) async fn page(request: Request) -> Html {
+    let locale = &request.locale;
     let systems_named = request
         .client
         .published_names(request.version, CODE_SYSTEM)
@@ -63,41 +66,47 @@ pub(crate) async fn page(request: Request) -> AnyView {
     let system = request.text(SYSTEM_PARAM);
     let map = request.text(URL_PARAM);
     let target = request.text(TARGET_PARAM);
-    let fields = view! {
-        {text("translate-code", CODE_PARAM, tr(Msg::LookupCode), &code, tr(Msg::LookupCodeHint))}
-        {select(
+    let fields = Html::join([
+        text(
+            "translate-code",
+            CODE_PARAM,
+            tr(locale, Msg::LookupCode),
+            &code,
+            tr(locale, Msg::LookupCodeHint),
+        ),
+        select(
             "translate-system",
             SYSTEM_PARAM,
-            tr(Msg::CheckItsSystem),
+            tr(locale, Msg::CheckItsSystem),
             &systems,
             &system,
-            Some(tr(Msg::CheckChooseSystem)),
-        )}
-        {select(
+            Some(tr(locale, Msg::CheckChooseSystem)),
+        ),
+        select(
             "translate-map",
             URL_PARAM,
-            tr(Msg::TranslateMap),
+            tr(locale, Msg::TranslateMap),
             &maps,
             &map,
-            Some(tr(Msg::TranslateAnyMap)),
-        )}
-        {select(
+            Some(tr(locale, Msg::TranslateAnyMap)),
+        ),
+        select(
             "translate-target",
             TARGET_PARAM,
-            tr(Msg::TranslateTarget),
+            tr(locale, Msg::TranslateTarget),
             &systems,
             &target,
-            Some(tr(Msg::TranslateAnyTarget)),
-        )}
-    }
-    .into_any();
+            Some(tr(locale, Msg::TranslateAnyTarget)),
+        ),
+    ]);
     let form = options(
         &request,
         &[],
         fields,
         run(
+            locale,
             "translate-run",
-            tr(Msg::OpsTranslate),
+            tr(locale, Msg::OpsTranslate),
             Glyph::CORNER_DOWN_RIGHT,
             "$translate",
         ),
@@ -110,9 +119,9 @@ pub(crate) async fn page(request: Request) -> AnyView {
         ..TranslateRequest::default()
     };
     let answer = if code.is_empty() {
-        before(tr(Msg::TranslateBefore))
+        before(locale, tr(locale, Msg::TranslateBefore))
     } else if !asked.runnable() {
-        before(tr(Msg::CheckNeedsSystem))
+        before(locale, tr(locale, Msg::CheckNeedsSystem))
     } else {
         answer(&request, &asked, &map_names, &system_names).await
     };
@@ -126,21 +135,21 @@ async fn answer(
     asked: &TranslateRequest,
     map_names: &BTreeMap<String, String>,
     names: &BTreeMap<String, String>,
-) -> AnyView {
+) -> Html {
+    let locale = &request.locale;
     let url = request.client.translate_url(request.version, asked);
     match request.client.translate(request.version, asked).await {
-        Err(error) => view! {
-            {panel_section(None, failure(&error))}
-            {sent(&url, None)}
-        }
-        .into_any(),
+        Err(error) => Html::join([
+            panel_section(locale, None, failure(locale, &error)),
+            sent(locale, &url, None),
+        ]),
         Ok(document) => {
             let answer = &document.value;
             let used = answer.used_maps();
             let through = if !asked.concept_map.is_empty() {
                 name_of(map_names, &asked.concept_map)
             } else if used.is_empty() {
-                tr(Msg::TranslateTheMaps)
+                tr(locale, Msg::TranslateTheMaps)
             } else {
                 used.iter()
                     .map(|map| name_of(map_names, map))
@@ -152,16 +161,21 @@ async fn answer(
                 .iter()
                 .filter(|each| !each.no_map && each.target.is_some())
                 .count();
-            let title = view! {
-                {tr(Msg::TranslateTranslated)}
-                " "
-                <code>{asked.code.clone()}</code>
-                " "
-                {tr_with(Msg::TranslateThrough, &[("map", through.into())])}
-                " "
-                <strong>{tr_with(Msg::TranslateMatches, &[("count", found.into())])}</strong>
-            }
-            .into_any();
+            let title = h(format!(
+                "{} {} {} {}",
+                t(tr(locale, Msg::TranslateTranslated)),
+                code(&asked.code),
+                t(tr_with(
+                    locale,
+                    Msg::TranslateThrough,
+                    &[("map", through.into())]
+                )),
+                strong(tr_with(
+                    locale,
+                    Msg::TranslateMatches,
+                    &[("count", found.into())]
+                )),
+            ));
             let outcome = if answer.result() == Some(true) {
                 Outcome::Ok
             } else {
@@ -169,22 +183,26 @@ async fn answer(
             };
             let message = answer.message().map(|message| {
                 panel_section(
+                    locale,
                     Some(SectionHead {
-                        title: tr(Msg::CheckServerSays),
+                        title: tr(locale, Msg::CheckServerSays),
                         count: None,
                         actions: None,
                     }),
-                    view! { <p>{message}</p> },
+                    p(t(message)),
                 )
             });
-            view! {
-                {verdict(outcome, title, None)}
-                {table(request.version, &matches, names)}
-                {comments(&matches)}
-                {message}
-                {sent(&url, Some((tr(Msg::CheckRaw), document.text)))}
-            }
-            .into_any()
+            Html::join([
+                verdict(locale, outcome, title, None),
+                table(locale, request.version, &matches, names).unwrap_or_default(),
+                comments(locale, &matches).unwrap_or_default(),
+                message.unwrap_or_default(),
+                sent(
+                    locale,
+                    &url,
+                    Some((tr(locale, Msg::CheckRaw), document.text)),
+                ),
+            ])
         }
     }
 }
@@ -206,45 +224,47 @@ fn related(version: FhirVersion, found: &TranslationMatch) -> Relationship {
 
 /// The matches: each target coding and how it relates.
 fn table(
+    locale: &Locale,
     version: FhirVersion,
     matches: &[TranslationMatch],
     names: &BTreeMap<String, String>,
-) -> Option<AnyView> {
+) -> Option<Html> {
     if matches.is_empty() {
         return None;
     }
     let columns = [
-        Column::text("target", tr(Msg::TranslateTargetColumn)).role(Role::Title),
-        Column::text("relationship", tr(Msg::TranslateRelationship)),
+        Column::text("target", tr(locale, Msg::TranslateTargetColumn)).role(Role::Title),
+        Column::text("relationship", tr(locale, Msg::TranslateRelationship)),
     ];
     let [_, related_column] = &columns;
-    let rows = matches
-        .iter()
-        .map(|found| {
-            let target = found.target.as_ref().map_or_else(
-                || view! { <span class="fui-muted">{tr(Msg::TranslateNoTarget)}</span> }.into_any(),
-                |target| {
-                    let mut drawn = Coding::new(
-                        target.code.clone().unwrap_or_default(),
-                        target.display.clone().unwrap_or_default(),
-                    );
-                    if let Some(system) = &target.system {
-                        drawn = drawn.system(name_of(names, system));
-                    }
-                    coding(drawn, Layout::Stacked)
-                },
-            );
-            view! {
-                <tr>
-                    {title_cell(None, target, None)}
-                    {cell(related_column, relation(related(version, found)))}
-                </tr>
-            }
-        })
-        .collect_view()
-        .into_any();
-    let caption = tr(Msg::TranslateMatchesTitle);
+    let rows = join(matches.iter().map(|found| {
+        let target = found.target.as_ref().map_or_else(
+            || {
+                h(format!(
+                    r#"<span class="fui-muted">{}</span>"#,
+                    t(tr(locale, Msg::TranslateNoTarget))
+                ))
+            },
+            |target| {
+                let mut drawn = Coding::new(
+                    target.code.clone().unwrap_or_default(),
+                    target.display.clone().unwrap_or_default(),
+                );
+                if let Some(system) = &target.system {
+                    drawn = drawn.system(name_of(names, system));
+                }
+                coding(locale, drawn, Layout::Stacked)
+            },
+        );
+        h(format!(
+            "<tr>{}{}</tr>",
+            title_cell(None, target, None),
+            cell(related_column, relation(locale, related(version, found))),
+        ))
+    }));
+    let caption = tr(locale, Msg::TranslateMatchesTitle);
     Some(panel_section(
+        locale,
         Some(SectionHead {
             title: caption.clone(),
             count: Some(HeadingCount::All(
@@ -262,20 +282,18 @@ fn table(
 }
 
 /// The comments the map writes on its matches.
-fn comments(matches: &[TranslationMatch]) -> Option<AnyView> {
+fn comments(locale: &Locale, matches: &[TranslationMatch]) -> Option<Html> {
     let written: Vec<String> = matches
         .iter()
         .flat_map(|found| [found.source_comment.clone(), found.target_comment.clone()])
         .flatten()
         .collect();
     (!written.is_empty()).then(|| {
-        let lines = written
-            .into_iter()
-            .map(|line| view! { <p>{line}</p> })
-            .collect_view();
+        let lines = join(written.into_iter().map(|line| p(t(line))));
         panel_section(
+            locale,
             Some(SectionHead {
-                title: tr(Msg::TranslateComment),
+                title: tr(locale, Msg::TranslateComment),
                 count: None,
                 actions: None,
             }),

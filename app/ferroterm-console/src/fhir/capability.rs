@@ -80,9 +80,7 @@ struct RestResource {
     r#type: Option<String>,
     /// `resource.interaction`, the RESTful interactions this root answers.
     ///
-    /// Only the editor bundle reads it, and a field serde does not know is
-    /// passed over, so the reader bundle carries neither the element nor the
-    /// decoder for it.
+    /// Only the editors read it, to offer a write the server answers.
     #[serde(default)]
     interaction: Vec<RestInteraction>,
     /// `resource.operation`, the operations this root answers on that type.

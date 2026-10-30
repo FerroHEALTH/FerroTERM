@@ -214,9 +214,8 @@ impl Draft {
 
     /// The keys of the clauses one side of the compose is drawn from.
     ///
-    /// A key is minted once and never derived from a position, so it is the
-    /// data-derived key a `<For>` needs
-    /// (<https://github.com/leptos-rs/book/blob/main/src/view/04_iteration.md>).
+    /// A key is minted once and never derived from a position, so a posted
+    /// field names its clause whatever was added or removed before it.
     pub(crate) fn clause_keys(&self, included: bool) -> Vec<u32> {
         self.clauses
             .iter()
@@ -422,7 +421,10 @@ impl Draft {
         let mut body = Map::new();
         body.insert(
             String::from("resourceType"),
-            Value::String(tr(Msg::Parameters)),
+            Value::String(tr(
+                &ferrohealth_ui::i18n::Locale::english(),
+                Msg::Parameters,
+            )),
         );
         body.insert(String::from("parameter"), Value::Array(parameters));
         Value::Object(body).to_string()
@@ -470,40 +472,47 @@ impl Clause {
     /// The criteria within one include intersect, so this names each of them
     /// and says they are taken together
     /// (<https://hl7.org/fhir/R4B/valueset.html#compositions>).
-    pub(crate) fn rule(&self) -> String {
+    pub(crate) fn rule(&self, locale: &ferrohealth_ui::i18n::Locale) -> String {
         let mut criteria: Vec<String> = Vec::new();
         match self.value_sets.len() {
             0 => {}
-            1 => criteria.push(tr(Msg::ValueSetNamedHere)),
+            1 => criteria.push(tr(locale, Msg::ValueSetNamedHere)),
             several => criteria.push(tr_with(
+                locale,
                 Msg::EveryOneValueSetsNamedHere,
                 &[("several", (several).to_string().into())],
             )),
         }
         if !self.system.trim().is_empty() {
-            criteria.push(tr(Msg::ComesFromCodeSystemNamedHere));
+            criteria.push(tr(locale, Msg::ComesFromCodeSystemNamedHere));
         }
         if !self.concepts.is_empty() {
             criteria.push(tr_with(
+                locale,
                 Msg::OneCodesListed,
                 &[("concepts", (self.concepts.len()).to_string().into())],
             ));
         }
         if !self.filters.is_empty() {
             criteria.push(tr_with(
+                locale,
                 Msg::MatchesEveryOneFilters,
                 &[("filters", (self.filters.len()).to_string().into())],
             ));
         }
         let verb = if self.included {
-            tr(Msg::ClauseDrawsEveryCode)
+            tr(locale, Msg::ClauseDrawsEveryCode)
         } else {
-            tr(Msg::ClauseTakesBackOutEveryCode)
+            tr(locale, Msg::ClauseTakesBackOutEveryCode)
         };
         if criteria.is_empty() {
-            return tr_with(Msg::NothingSelectsYet, &[("verb", (verb).clone().into())]);
+            return tr_with(
+                locale,
+                Msg::NothingSelectsYet,
+                &[("verb", (verb).clone().into())],
+            );
         }
-        format!("{verb} {}.", criteria.join(&tr(Msg::And)))
+        format!("{verb} {}.", criteria.join(&tr(locale, Msg::And)))
     }
 
     /// This clause as `compose.include` or `compose.exclude`.
@@ -896,7 +905,7 @@ mod tests {
             .clauses
             .iter()
             .find(|clause| clause.key == key)
-            .map(Clause::rule)
+            .map(|clause| clause.rule(&ferrohealth_ui::i18n::Locale::english()))
             .unwrap_or_default();
         assert!(
             rule.contains("is in the value set named here")
@@ -916,7 +925,7 @@ mod tests {
             .clauses
             .iter()
             .find(|clause| clause.key == key)
-            .map(Clause::rule)
+            .map(|clause| clause.rule(&ferrohealth_ui::i18n::Locale::english()))
             .unwrap_or_default();
         assert!(
             rule.contains("is in every one of the 2 value sets named here"),
@@ -933,7 +942,7 @@ mod tests {
             .clauses
             .iter()
             .find(|clause| clause.key == key)
-            .map(Clause::rule)
+            .map(|clause| clause.rule(&ferrohealth_ui::i18n::Locale::english()))
             .unwrap_or_default();
         assert!(
             rule.starts_with("This clause takes back out"),

@@ -4,10 +4,9 @@
 //! The FHIR client: the one module in the console that builds a request.
 //!
 //! Every request is an ordinary request to the terminology server's public
-//! FHIR API, written as an [`exchange::Exchange`] and sent from whichever half
-//! of the console runs it: the server half calls the server itself, and the
-//! browser half asks the console's server to, so no token reaches the
-//! browser. No component builds a request, and no second client exists.
+//! FHIR API, written as an [`exchange::Exchange`] and sent by the console's
+//! server ([`crate::upstream::Upstream`]), so no token reaches the browser.
+//! No component builds a request, and no second client exists.
 
 pub(crate) mod activity;
 pub(crate) mod authoring;
@@ -25,7 +24,6 @@ pub(crate) mod outcome;
 pub(crate) mod problem;
 pub(crate) mod searchset;
 pub(crate) mod sync;
-pub(crate) mod tape;
 pub(crate) mod terminology;
 pub(crate) mod translate;
 pub(crate) mod validation;
@@ -56,7 +54,6 @@ use crate::fhir::named::NamedSearch;
 use crate::fhir::outcome::OperationOutcome;
 use crate::fhir::searchset::SearchFilter;
 use crate::fhir::searchset::SearchSet;
-use crate::fhir::tape::Tape;
 use crate::fhir::terminology::TerminologyCapabilities;
 use crate::fhir::translate::TranslateAnswer;
 use crate::fhir::translate::TranslateRequest;
@@ -77,7 +74,6 @@ use crate::url::RequestUrl;
 /// (<https://hl7.org/fhir/R4B/http.html#mime-type>).
 const FHIR_JSON: &str = "application/fhir+json";
 
-#[cfg(not(target_arch = "wasm32"))]
 /// The media type of everything the console reads that is not FHIR: the
 /// health route and the sync service's admin listener answer ordinary JSON.
 const PLAIN_JSON: &str = "application/json";
@@ -102,29 +98,43 @@ pub(crate) const CONCEPT_MAP: &str = "ConceptMap";
 #[derive(Clone, Debug, Default)]
 pub(crate) struct FhirClient {
     root: String,
-    tape: Tape,
+    upstream: Option<crate::upstream::Upstream>,
+    locale: ferrohealth_ui::i18n::Locale,
 }
 
 impl FhirClient {
     /// A client whose disclosed addresses start with `root`, the server's
-    /// public root without a final `/`.
+    /// public root without a final `/`, with no way to the server: each
+    /// exchange is answered [`ExchangeError::Unavailable`].
     pub(crate) fn new(root: String) -> Self {
         Self {
             root,
-            tape: Tape::Live,
+            upstream: None,
+            locale: ferrohealth_ui::i18n::Locale::english(),
         }
     }
 
-    /// The same client sending its exchanges through `tape`.
+    /// The same client saying what went wrong in `locale`.
     #[must_use]
-    pub(crate) fn with_tape(self, tape: Tape) -> Self {
-        Self { tape, ..self }
+    pub(crate) fn with_locale(self, locale: ferrohealth_ui::i18n::Locale) -> Self {
+        Self { locale, ..self }
     }
 
-    /// The tape the client sends its exchanges through.
+    /// The same client sending its exchanges through `upstream`.
     #[must_use]
-    pub(crate) const fn tape(&self) -> &Tape {
-        &self.tape
+    pub(crate) fn with_upstream(self, upstream: crate::upstream::Upstream) -> Self {
+        Self {
+            upstream: Some(upstream),
+            ..self
+        }
+    }
+
+    /// Sends `exchange` through the client's way to the server.
+    pub(crate) async fn exchange(&self, exchange: Exchange) -> Result<Answer, ExchangeError> {
+        match &self.upstream {
+            Some(upstream) => upstream.send(exchange).await,
+            None => Err(ExchangeError::Unavailable),
+        }
     }
 
     /// The FHIR base of one served version, as a reader would type it.
@@ -134,7 +144,6 @@ impl FhirClient {
             .render(&self.root)
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     /// Probes `GET /health` and returns the status the server answered.
     ///
     /// `/health` sits outside the FHIR base, so no content negotiation applies
@@ -147,7 +156,7 @@ impl FhirClient {
     pub(crate) async fn health(&self) -> Result<StatusCode, FhirError> {
         let url = RequestUrl::new().segment("health").render(&self.root);
         let answer = self.send(Method::Get, &url, PLAIN_JSON).await?;
-        let status = status_of(&answer, &url)?;
+        let status = status_of(&self.locale, &answer, &url)?;
         if status.is_success() {
             Ok(status)
         } else {
@@ -155,7 +164,6 @@ impl FhirClient {
         }
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     /// The status `GET /health` answers, or `None` when the server did not
     /// answer at all.
     pub(crate) async fn probe(&self) -> Option<StatusCode> {
@@ -165,7 +173,6 @@ impl FhirClient {
         }
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     /// Whether the root of `version` serves with no sign-in: it answers its
     /// SMART discovery document `404`, as a deployment with authentication
     /// switched off does
@@ -179,7 +186,7 @@ impl FhirClient {
         let Ok(answer) = self.send(Method::Get, &url, PLAIN_JSON).await else {
             return false;
         };
-        status_of(&answer, &url).is_ok_and(|status| status == StatusCode::NOT_FOUND)
+        status_of(&self.locale, &answer, &url).is_ok_and(|status| status == StatusCode::NOT_FOUND)
     }
 
     /// The address of the `CapabilityStatement` of one served FHIR version.
@@ -771,7 +778,7 @@ impl FhirClient {
     ) -> Result<(), FhirError> {
         let url = self.resource_url(version, resource_type, id);
         let answer = self.send(Method::Delete, &url, FHIR_JSON).await?;
-        let status = status_of(&answer, &url)?;
+        let status = status_of(&self.locale, &answer, &url)?;
         if status.is_success() {
             Ok(())
         } else {
@@ -822,11 +829,10 @@ impl FhirClient {
     /// Sends one write and reads what the server committed.
     async fn write(&self, exchange: Exchange, url: &str) -> Result<Written, FhirError> {
         let answer = self
-            .tape
-            .send(exchange)
+            .exchange(exchange)
             .await
             .map_err(|error| transport(url, &error))?;
-        let status = status_of(&answer, url)?;
+        let status = status_of(&self.locale, &answer, url)?;
         if !status.is_success() {
             return Err(failure(&answer, status, url));
         }
@@ -995,20 +1001,20 @@ impl FhirClient {
     /// The path below the server's root that `url`, one of this client's
     /// addresses, names, as an exchange carries it.
     fn path_of(&self, url: &str) -> Result<String, FhirError> {
+        let locale = &self.locale;
         url.strip_prefix(self.root.as_str())
             .filter(|path| path.starts_with('/'))
             .map(str::to_owned)
             .ok_or_else(|| FhirError::Transport {
                 url: url.to_owned(),
-                message: tr(Msg::AddressNotBelowServerSRoot),
+                message: tr(locale, Msg::AddressNotBelowServerSRoot),
             })
     }
 
     /// Sends a request of `method` to `url` with no body, asking for
     /// `accept`, and answers what came back.
     async fn send(&self, method: Method, url: &str, accept: &str) -> Result<Answer, FhirError> {
-        self.tape
-            .send(Exchange::new(method, self.path_of(url)?, accept))
+        self.exchange(Exchange::new(method, self.path_of(url)?, accept))
             .await
             .map_err(|error| transport(url, &error))
     }
@@ -1017,7 +1023,7 @@ impl FhirClient {
     /// the document as the server sent it, which a screen shows as JSON.
     async fn get_document<T: DeserializeOwned>(&self, url: &str) -> Result<Document<T>, FhirError> {
         let answer = self.send(Method::Get, url, FHIR_JSON).await?;
-        let value = read_json(&answer, url)?;
+        let value = read_json(&self.locale, &answer, url)?;
         Ok(Document {
             value,
             text: pretty(&answer.body),
@@ -1027,7 +1033,7 @@ impl FhirClient {
     /// Sends a FHIR JSON `GET` and decodes the resource it answers.
     async fn get_json<T: DeserializeOwned>(&self, url: &str) -> Result<T, FhirError> {
         let answer = self.send(Method::Get, url, FHIR_JSON).await?;
-        read_json(&answer, url)
+        read_json(&self.locale, &answer, url)
     }
 
     /// Sends a FHIR JSON `POST` and decodes the resource it answers.
@@ -1035,11 +1041,10 @@ impl FhirClient {
         let exchange = Exchange::new(Method::Post, self.path_of(url)?, FHIR_JSON)
             .with_body(FHIR_JSON, body.to_owned());
         let answer = self
-            .tape
-            .send(exchange)
+            .exchange(exchange)
             .await
             .map_err(|error| transport(url, &error))?;
-        read_json(&answer, url)
+        read_json(&self.locale, &answer, url)
     }
 }
 
@@ -1053,8 +1058,12 @@ fn pretty(body: &str) -> String {
         .unwrap_or_else(|| body.to_owned())
 }
 
-fn read_json<T: DeserializeOwned>(answer: &Answer, url: &str) -> Result<T, FhirError> {
-    let status = status_of(answer, url)?;
+fn read_json<T: DeserializeOwned>(
+    locale: &ferrohealth_ui::i18n::Locale,
+    answer: &Answer,
+    url: &str,
+) -> Result<T, FhirError> {
+    let status = status_of(locale, answer, url)?;
     if !status.is_success() {
         return Err(failure(answer, status, url));
     }
@@ -1077,10 +1086,15 @@ fn transport(url: &str, error: &ExchangeError) -> FhirError {
 /// A status outside 100 to 999 is no HTTP status
 /// (<https://www.rfc-editor.org/rfc/rfc9110#section-15>), so the conversion is
 /// fallible and says so.
-fn status_of(answer: &Answer, url: &str) -> Result<StatusCode, FhirError> {
+fn status_of(
+    locale: &ferrohealth_ui::i18n::Locale,
+    answer: &Answer,
+    url: &str,
+) -> Result<StatusCode, FhirError> {
     StatusCode::from_u16(answer.status).map_err(|_invalid| FhirError::Transport {
         url: url.to_owned(),
         message: tr_with(
+            locale,
             Msg::ServerAnsweredStatus,
             &[("status", (answer.status).to_string().into())],
         ),
@@ -1368,23 +1382,22 @@ mod client_tests {
             .expect("the clients build")
     }
 
-    /// Runs `run` in the context the server provides a page: the console's
-    /// state and the request's parts carrying `cookie`.
-    async fn served<T>(
+    /// Runs `run` with a client reaching the server through `state`, as the
+    /// request carrying `cookie` does.
+    async fn served<T, F: Future<Output = T>>(
         state: crate::server::ConsoleState,
         cookie: Option<&str>,
-        run: impl Future<Output = T>,
+        run: impl FnOnce(FhirClient) -> F,
     ) -> T {
-        let owner = leptos::prelude::Owner::new();
-        owner.set();
-        leptos::prelude::provide_context(state);
-        let mut builder = http::Request::get("/");
+        let mut headers = http::HeaderMap::new();
         if let Some(cookie) = cookie {
-            builder = builder.header(http::header::COOKIE, cookie);
+            headers.insert(
+                http::header::COOKIE,
+                http::HeaderValue::from_str(cookie).expect("a cookie header"),
+            );
         }
-        let (parts, ()) = builder.body(()).expect("a request").into_parts();
-        leptos::prelude::provide_context(parts);
-        run.await
+        let upstream = crate::upstream::Upstream::of(&state, &headers);
+        run(FhirClient::new(ROOT.to_owned()).with_upstream(upstream)).await
     }
 
     /// A FHIR server answering `GET path` with `status` and `body`.
@@ -1414,9 +1427,8 @@ mod client_tests {
     #[tokio::test]
     async fn a_healthy_server_answers_its_status_and_the_probe_reads_it() {
         let server = answering("/health", 200, "").await;
-        let client = FhirClient::new(ROOT.to_owned());
         let state = console_at(&server.uri());
-        let (health, probe) = served(state, None, async {
+        let (health, probe) = served(state, None, |client| async move {
             (client.health().await, client.probe().await)
         })
         .await;
@@ -1427,8 +1439,7 @@ mod client_tests {
     #[tokio::test]
     async fn a_failing_server_s_status_is_a_failure_the_probe_still_reports() {
         let server = answering("/health", 503, "down").await;
-        let client = FhirClient::new(ROOT.to_owned());
-        let (health, probe) = served(console_at(&server.uri()), None, async {
+        let (health, probe) = served(console_at(&server.uri()), None, |client| async move {
             (client.health().await, client.probe().await)
         })
         .await;
@@ -1443,8 +1454,7 @@ mod client_tests {
 
     #[tokio::test]
     async fn a_server_that_does_not_answer_probes_as_none() {
-        let client = FhirClient::new(ROOT.to_owned());
-        let (health, probe) = served(console_at(UNREACHABLE), None, async {
+        let (health, probe) = served(console_at(UNREACHABLE), None, |client| async move {
             (client.health().await, client.probe().await)
         })
         .await;
@@ -1458,9 +1468,8 @@ mod client_tests {
     #[tokio::test]
     async fn a_root_whose_smart_discovery_is_absent_serves_without_sign_in() {
         let server = answering("/r4/.well-known/smart-configuration", 404, "").await;
-        let client = FhirClient::new(ROOT.to_owned());
         assert!(
-            served(console_at(&server.uri()), None, async {
+            served(console_at(&server.uri()), None, |client| async move {
                 client.serves_without_sign_in(FhirVersion::R4).await
             })
             .await
@@ -1470,15 +1479,14 @@ mod client_tests {
     #[tokio::test]
     async fn a_root_that_publishes_smart_discovery_asks_for_a_sign_in() {
         let server = answering("/r5/.well-known/smart-configuration", 200, "{}").await;
-        let client = FhirClient::new(ROOT.to_owned());
         assert!(
-            !served(console_at(&server.uri()), None, async {
+            !served(console_at(&server.uri()), None, |client| async move {
                 client.serves_without_sign_in(FhirVersion::R5).await
             })
             .await
         );
         assert!(
-            !served(console_at(UNREACHABLE), None, async {
+            !served(console_at(UNREACHABLE), None, |client| async move {
                 client.serves_without_sign_in(FhirVersion::R5).await
             })
             .await,
@@ -1490,8 +1498,7 @@ mod client_tests {
     async fn a_code_system_summary_asks_without_concepts_and_keeps_the_document() {
         let body = r#"{"resourceType":"Bundle","type":"searchset","total":1,"entry":[{"resource":{"resourceType":"CodeSystem","url":"https://terminology.example/x?e=1","name":"X"}}]}"#;
         let server = answering("/r4b/CodeSystem", 200, body).await;
-        let client = FhirClient::new(ROOT.to_owned());
-        let document = served(console_at(&server.uri()), None, async {
+        let document = served(console_at(&server.uri()), None, |client| async move {
             client
                 .code_system_summary(FhirVersion::R4B, "https://terminology.example/x?e=1")
                 .await
@@ -1522,8 +1529,7 @@ mod client_tests {
     async fn the_published_names_are_read_narrowed_to_what_a_picker_shows() {
         let body = r#"{"resourceType":"Bundle","entry":[{"resource":{"resourceType":"ValueSet","url":"https://terminology.example/vs","title":"Colours"}}]}"#;
         let server = answering("/r5/ValueSet", 200, body).await;
-        let client = FhirClient::new(ROOT.to_owned());
-        let names = served(console_at(&server.uri()), None, async {
+        let names = served(console_at(&server.uri()), None, |client| async move {
             client.published_names(FhirVersion::R5, "ValueSet").await
         })
         .await
@@ -1543,8 +1549,7 @@ mod client_tests {
         let body =
             r#"{"resourceType":"CapabilityStatement","fhirVersion":"4.0.1","x-extra":[1,2]}"#;
         let server = answering("/r4/metadata", 200, body).await;
-        let client = FhirClient::new(ROOT.to_owned());
-        let document = served(console_at(&server.uri()), None, async {
+        let document = served(console_at(&server.uri()), None, |client| async move {
             client.capability_document(FhirVersion::R4).await
         })
         .await
@@ -1559,13 +1564,12 @@ mod client_tests {
     async fn a_lookup_reads_the_concept_the_server_answers() {
         let body = r#"{"resourceType":"Parameters","parameter":[{"name":"name","valueString":"Colours"},{"name":"display","valueString":"Red"}]}"#;
         let server = answering("/r4/CodeSystem/$lookup", 200, body).await;
-        let client = FhirClient::new(ROOT.to_owned());
         let request = LookupRequest {
             system: "https://terminology.example/colours".to_owned(),
             code: "red".to_owned(),
             ..LookupRequest::default()
         };
-        let document = served(console_at(&server.uri()), None, async {
+        let document = served(console_at(&server.uri()), None, |client| async move {
             client.lookup(FhirVersion::R4, &request).await
         })
         .await
@@ -1581,13 +1585,12 @@ mod client_tests {
     async fn a_refusal_with_an_operation_outcome_carries_it_to_the_reader() {
         let body = r#"{"resourceType":"OperationOutcome","issue":[{"severity":"error","code":"not-found","diagnostics":"no such code"}]}"#;
         let server = answering("/r4/CodeSystem/$lookup", 404, body).await;
-        let client = FhirClient::new(ROOT.to_owned());
         let request = LookupRequest {
             system: "https://terminology.example/colours".to_owned(),
             code: "mauve".to_owned(),
             ..LookupRequest::default()
         };
-        let error = served(console_at(&server.uri()), None, async {
+        let error = served(console_at(&server.uri()), None, |client| async move {
             client.lookup(FhirVersion::R4, &request).await
         })
         .await
@@ -1599,13 +1602,12 @@ mod client_tests {
     #[tokio::test]
     async fn a_success_whose_body_is_no_json_is_a_decode_failure() {
         let server = answering("/r4/CodeSystem/$lookup", 200, "<html/>").await;
-        let client = FhirClient::new(ROOT.to_owned());
         let request = LookupRequest {
             system: "s".to_owned(),
             code: "c".to_owned(),
             ..LookupRequest::default()
         };
-        let error = served(console_at(&server.uri()), None, async {
+        let error = served(console_at(&server.uri()), None, |client| async move {
             client.lookup(FhirVersion::R4, &request).await
         })
         .await
@@ -1617,7 +1619,6 @@ mod client_tests {
     async fn a_validation_reads_the_result_the_server_answers() {
         let body = r#"{"resourceType":"Parameters","parameter":[{"name":"result","valueBoolean":false},{"name":"message","valueString":"Unknown code"}]}"#;
         let server = answering("/r4b/ValueSet/$validate-code", 200, body).await;
-        let client = FhirClient::new(ROOT.to_owned());
         let request = ValidateRequest {
             on: validation::ValidateOn::ValueSet,
             url: "https://terminology.example/vs".to_owned(),
@@ -1625,12 +1626,14 @@ mod client_tests {
             code: "mauve".to_owned(),
             ..ValidateRequest::default()
         };
-        let document = served(console_at(&server.uri()), None, async {
+        let document = served(console_at(&server.uri()), None, |client| async move {
             client.validate_code(FhirVersion::R4B, &request).await
         })
         .await
         .expect("an answer");
-        let validation = document.value.validation();
+        let validation = document
+            .value
+            .validation(&ferrohealth_ui::i18n::Locale::english());
         assert_eq!(
             Some(false),
             validation.result,
@@ -1643,14 +1646,13 @@ mod client_tests {
     async fn a_subsumption_reads_the_outcome_the_server_answers() {
         let body = r#"{"resourceType":"Parameters","parameter":[{"name":"outcome","valueCode":"subsumes"}]}"#;
         let server = answering("/r5/CodeSystem/colours/$subsumes", 200, body).await;
-        let client = FhirClient::new(ROOT.to_owned());
         let request = SubsumesRequest {
             id: "colours".to_owned(),
             code_a: "red".to_owned(),
             code_b: "crimson".to_owned(),
             ..SubsumesRequest::default()
         };
-        let document = served(console_at(&server.uri()), None, async {
+        let document = served(console_at(&server.uri()), None, |client| async move {
             client.subsumes(FhirVersion::R5, &request).await
         })
         .await
@@ -1663,13 +1665,12 @@ mod client_tests {
         let body =
             r#"{"resourceType":"Parameters","parameter":[{"name":"result","valueBoolean":true}]}"#;
         let server = answering("/r4/ConceptMap/$translate", 200, body).await;
-        let client = FhirClient::new(ROOT.to_owned());
         let request = TranslateRequest {
             system: "https://terminology.example/colours".to_owned(),
             code: "red".to_owned(),
             ..TranslateRequest::default()
         };
-        let document = served(console_at(&server.uri()), None, async {
+        let document = served(console_at(&server.uri()), None, |client| async move {
             client.translate(FhirVersion::R4, &request).await
         })
         .await
@@ -1693,13 +1694,12 @@ mod client_tests {
             })
             .expect("room");
         let cookie = format!("__Host-ferroterm_console_session={}", id.as_str());
-        let client = FhirClient::new(ROOT.to_owned());
-        served(state.clone(), Some(&cookie), async {
+        served(state.clone(), Some(&cookie), |client| async move {
             client.health().await
         })
         .await
         .expect("healthy");
-        served(state, None, async { client.health().await })
+        served(state, None, |client| async move { client.health().await })
             .await
             .expect("healthy");
         let received = server.received_requests().await.expect("recording");

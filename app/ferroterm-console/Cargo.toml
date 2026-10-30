@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BUSL-1.1
 [package]
 name = "ferroterm-console"
-description = "The FerroTERM Console: a Leptos app the server draws and the browser hydrates whole, with a backend-for-frontend over the terminology server's FHIR API"
+description = "The FerroTERM Console: a terminology browser and editor whose every page its server draws, with a backend-for-frontend over the terminology server's FHIR API"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -13,12 +13,7 @@ authors.workspace = true
 # Never published: the console ships as its own binary and image.
 publish = false
 
-# One crate, two halves: the rlib feeds the server binary and the cdylib is
-# the WebAssembly that hydrates the whole page and draws every page after the
-# first in the browser (FerroUI `docs/consoles.md`, "How a console builds").
-# cargo-leptos builds the cdylib for wasm32 and the binary for the host.
 [lib]
-crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [[bin]]
@@ -30,52 +25,14 @@ path = "src/main.rs"
 [build-dependencies]
 serde_json.workspace = true
 
-# Both halves on every target. The server half and the browser half are
-# chosen by target rather than by Cargo feature, so `--all-features` over the
-# workspace can never turn both on at once; a target dependency's features
-# apply only to a build for that target (the Cargo reference, resolver
-# version 2 and later). No specification governs this: our own design.
-#
 # The console is a FHIR client and depends on NO workspace crate, so that
 # anything it can do a client can do. scripts/checks/console-boundary.sh fails
-# when an edge into the engine appears. Every page, its FHIR client and its
-# catalog compile for both halves; neither turns on the `leptos` feature
-# `islands`.
+# when an edge into the engine appears. It is one axum service: every page is
+# a handler that reads the terminology server and returns the whole document,
+# drawn with FerroUI's components, whose stylesheet, theme and script modules
+# its router serves. No specification governs this: our own design.
 [dependencies]
 ferrohealth-ui.workspace = true
-leptos.workspace = true
-leptos_meta.workspace = true
-leptos_router.workspace = true
-# The state the server read and every FHIR answer a page was drawn from cross
-# to the browser as JSON, through serde.
-serde.workspace = true
-serde_json.workspace = true
-# The console's own string catalogs under locales/, embedded in both halves,
-# so a page drawn in the browser speaks as the server's does.
-fluent-templates.workspace = true
-# The status of an answer, the addresses a page builds, and the time a page
-# says it answered at.
-http.workspace = true
-jiff.workspace = true
-percent-encoding.workspace = true
-thiserror.workspace = true
-url.workspace = true
-# A run's record offered as a download, and the warnings of a page's read,
-# which a browser with no subscriber drops.
-base64.workspace = true
-tracing.workspace = true
-
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-leptos = { workspace = true, features = ["hydrate"] }
-wasm-bindgen.workspace = true
-console_error_panic_hook.workspace = true
-# The clock a page drawn in the browser reads.
-jiff = { workspace = true, features = ["js"] }
-# The keyboard shortcuts read the key that was pressed and submit the form
-# they name.
-web-sys = { workspace = true, features = ["Document", "Element", "HtmlElement", "HtmlFormElement", "KeyboardEvent", "Location", "Window"] }
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # The configuration loader and the `<key>_file` rule of its secrets.
 ferrohealth-config.workspace = true
 ferrohealth-health.workspace = true
@@ -84,11 +41,20 @@ ferrohealth-server = { workspace = true, features = ["console"] }
 # The console log and the panic line; `otlp` exports the console's spans
 # when `[telemetry.otlp]` names a collector.
 ferrohealth-telemetry = { workspace = true, features = ["otlp"] }
-# The per-request script nonce of the Content-Security-Policy rides `nonce`.
-leptos = { workspace = true, features = ["ssr", "nonce"] }
-leptos_axum.workspace = true
-leptos_meta = { workspace = true, features = ["ssr"] }
-leptos_router = { workspace = true, features = ["ssr"] }
+serde.workspace = true
+serde_json.workspace = true
+# The console's own string catalogs under locales/, embedded in the binary.
+fluent-templates.workspace = true
+# The status of an answer, the addresses a page builds, and the time a page
+# says it answered at.
+http.workspace = true
+jiff.workspace = true
+percent-encoding.workspace = true
+thiserror.workspace = true
+url.workspace = true
+# A run's record offered as a download.
+base64.workspace = true
+tracing.workspace = true
 aws-lc-rs.workspace = true
 axum.workspace = true
 clap.workspace = true
@@ -103,9 +69,8 @@ secrecy.workspace = true
 # `sync` holds one refresh of a session's access token at a time.
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "signal", "sync", "time"] }
 toml.workspace = true
-tower-http.workspace = true
 
-[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+[dev-dependencies]
 tempfile.workspace = true
 # The router driven in-process with `ServiceExt::oneshot`.
 tower = { workspace = true, features = ["util"] }
@@ -113,17 +78,3 @@ wiremock.workspace = true
 
 [lints]
 workspace = true
-
-# cargo-leptos: the site bundle (the WebAssembly and its JavaScript glue)
-# under target/site, the server binary beside it. The console has no
-# stylesheet of its own: it serves the components' stylesheet and the
-# FerroTERM theme from the library's constants.
-[package.metadata.leptos]
-output-name = "ferroterm-console"
-site-root = "target/site"
-site-pkg-dir = "pkg"
-# Copied into the site root as it stands: the brand favicon.
-assets-dir = "public"
-site-addr = "127.0.0.1:3000"
-reload-port = 3001
-lib-profile-release = "wasm-release"

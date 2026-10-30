@@ -294,17 +294,18 @@ pub(crate) enum Problem {
 
 impl Problem {
     /// The sentence the screen shows for this problem.
-    pub(crate) fn text(&self) -> String {
+    pub(crate) fn text(&self, locale: &ferrohealth_ui::i18n::Locale) -> String {
         match self {
-            Self::NoCanonical => tr(Msg::ConceptMapNeedsCanonicalBeforeCan),
-            Self::NoStatus => tr(Msg::ConceptMapNeedsPublicationStatus),
-            Self::GrouplessSystems => tr(Msg::EveryGroupNamesSystemMapsFrom),
-            Self::GroupWithoutCodes => tr(Msg::EveryGroupCarriesLeastOneCode),
+            Self::NoCanonical => tr(locale, Msg::ConceptMapNeedsCanonicalBeforeCan),
+            Self::NoStatus => tr(locale, Msg::ConceptMapNeedsPublicationStatus),
+            Self::GrouplessSystems => tr(locale, Msg::EveryGroupNamesSystemMapsFrom),
+            Self::GroupWithoutCodes => tr(locale, Msg::EveryGroupCarriesLeastOneCode),
             Self::CommentRequired {
                 element,
                 code,
                 relationship,
             } => tr_with(
+                locale,
                 Msg::TargetFhirVersionRequiresCommentTarget,
                 &[
                     ("code", (code).clone().into()),
@@ -313,6 +314,7 @@ impl Problem {
                 ],
             ),
             Self::RelationshipMissing { element, code } => tr_with(
+                locale,
                 Msg::TargetStatesNoRelationshipSourceWhich,
                 &[
                     ("code", (code).clone().into()),
@@ -320,6 +322,7 @@ impl Problem {
                 ],
             ),
             Self::MappedAndUnmapped { element } => tr_with(
+                locale,
                 Msg::MarkedMappingNothingCarriesTargetWell,
                 &[("element", (element).clone().into())],
             ),
@@ -1108,7 +1111,12 @@ mod tests {
                 element: String::from("red"),
             },
         ] {
-            assert!(!problem.text().is_empty(), "{problem:?} renders as nothing");
+            assert!(
+                !problem
+                    .text(&ferrohealth_ui::i18n::Locale::english())
+                    .is_empty(),
+                "{problem:?} renders as nothing"
+            );
         }
     }
 

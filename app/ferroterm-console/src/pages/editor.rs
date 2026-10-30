@@ -5,7 +5,7 @@
 //! own address; the rows a post carries; the docked Save; and what the
 //! server answered a save with.
 //!
-//! An editor works with no WebAssembly: Add, Remove, Discard and Save are
+//! An editor works with no script: Add, Remove, Discard and Save are
 //! submit buttons of the editor's form, so every press posts the whole draft
 //! and the server draws the page again from what was posted
 //! (`crate::posted`). A save is an ordinary create or update; an update
@@ -16,9 +16,12 @@
 
 use std::collections::BTreeMap;
 
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::{ActionGroup, action_button};
+use ferrohealth_ui::view::action_menu::{Act, Action};
 use ferrohealth_ui::view::button::Variant;
 use ferrohealth_ui::view::dock::{
     Decision, DecisionBar, DecisionState, DockForm, DockLine, decision_bar,
@@ -27,14 +30,14 @@ use ferrohealth_ui::view::form::{Field, INPUT};
 use ferrohealth_ui::view::notice::{Announce, notice};
 use ferrohealth_ui::view::refusal::refusal;
 use ferrohealth_ui::view::surface::{Crumb, Header};
-use ferrohealth_ui::widget::action_menu::{Act, Action};
 use http::StatusCode;
-use leptos::prelude::*;
 
 use crate::fhir::error::FhirError;
 use crate::fhir::write::Written;
 use crate::locale::{Msg, tr, tr_with};
+use crate::markup::{h, join, p, t};
 use crate::pages::detail::Kind;
+use crate::pages::operations::hidden_field;
 use crate::pages::parts::{ago, headed, refusal_of};
 use crate::posted::Posted;
 use crate::request::Request;
@@ -111,36 +114,26 @@ pub(crate) fn text_field(
     label: String,
     value: String,
     mono: bool,
-) -> AnyView {
+) -> Html {
     let class = if mono {
         format!("{INPUT} fui-mono")
     } else {
         INPUT.to_owned()
     };
-    Field::new(id, label)
-        .view(view! { <input id=id name=name class=class value=value /> })
-        .into_any()
+    Field::new(id, label).view(h(format!(
+        r#"<input id="{id}" name="{name}" class="{class}" value="{}">"#,
+        t(value)
+    )))
 }
 
-/// The editor's form around `body`, posted to `action`, Ctrl S saving it and,
-/// when it can `run` a preview, Ctrl Enter running it.
-pub(crate) fn form(
-    action: String,
-    hidden: &[(&'static str, String)],
-    run: bool,
-    body: AnyView,
-) -> AnyView {
-    let hidden = hidden
-        .iter()
-        .map(|(name, value)| view! { <input type="hidden" name=*name value=value.clone() /> })
-        .collect_view();
-    view! {
-        <form id=FORM_ID method="post" action=action data-save="" data-run=run.then_some("")>
-            {hidden}
-            {body}
-        </form>
-    }
-    .into_any()
+/// The editor's form around `body`, posted to `action`.
+pub(crate) fn form(action: String, hidden: &[(&'static str, String)], body: Html) -> Html {
+    let hidden = join(hidden.iter().map(|(name, value)| hidden_field(name, value)));
+    h(format!(
+        r#"<form id="{FORM_ID}" method="post" action="{}">{}</form>"#,
+        t(action),
+        Html::join([hidden, body])
+    ))
 }
 
 /// The editor's heading: the trail to the listing and the resource, the
@@ -151,12 +144,13 @@ pub(crate) fn heading(
     resource: Option<(String, String)>,
     title: String,
     line: String,
-) -> AnyView {
-    let mut crumbs = vec![kind.listing(request.version)];
+) -> Html {
+    let mut crumbs = vec![kind.listing(&request.locale, request.version)];
     if let Some((name, href)) = resource {
         crumbs.push(Crumb::new(name, href));
     }
     headed(
+        request,
         Header {
             title: title.into(),
             subtitle: Some(line.into()),
@@ -171,22 +165,27 @@ pub(crate) fn heading(
 
 /// The line under an editor's title: the version opened and how long ago.
 #[must_use]
-pub(crate) fn opened_line(version: &str, opened_at: &str) -> String {
+pub(crate) fn opened_line(locale: &Locale, version: &str, opened_at: &str) -> String {
     let since = opened_at
         .parse::<jiff::Timestamp>()
         .map(|then| {
-            ago(jiff::Timestamp::now()
-                .as_second()
-                .saturating_sub(then.as_second()))
+            ago(
+                locale,
+                jiff::Timestamp::now()
+                    .as_second()
+                    .saturating_sub(then.as_second()),
+            )
         })
         .unwrap_or_default();
     match (version.is_empty(), since.is_empty()) {
-        (true, _) => tr(Msg::EditorNew),
+        (true, _) => tr(locale, Msg::EditorNew),
         (false, true) => tr_with(
+            locale,
             Msg::EditorVersion,
             &[("version", version.to_owned().into())],
         ),
         (false, false) => tr_with(
+            locale,
             Msg::EditorOpened,
             &[
                 ("version", version.to_owned().into()),
@@ -215,14 +214,14 @@ pub(crate) enum Standing {
 /// line saying where the draft stands. It is the last part of the page, so
 /// it docks to the foot of the main area while the reader scrolls.
 #[must_use]
-pub(crate) fn dock(save: String, standing: &Standing) -> AnyView {
+pub(crate) fn dock(locale: &Locale, save: String, standing: &Standing) -> Html {
     let (line, state) = match standing {
         Standing::Unchanged => (
-            Some(state_line(Glyph::INFO, tr(Msg::EditorUnchanged))),
+            Some(state_line(Glyph::INFO, tr(locale, Msg::EditorUnchanged))),
             DecisionState::Ready,
         ),
         Standing::Changed => (
-            Some(state_line(Glyph::PENCIL, tr(Msg::EditorChanged))),
+            Some(state_line(Glyph::PENCIL, tr(locale, Msg::EditorChanged))),
             DecisionState::Ready,
         ),
         // NOTE: no specification governs this: our own design; Save stays pressable, since
@@ -232,20 +231,23 @@ pub(crate) fn dock(save: String, standing: &Standing) -> AnyView {
             DecisionState::Ready,
         ),
         Standing::Refused => (
-            Some(state_line(Glyph::CIRCLE_X, tr(Msg::EditorRefusedLine))),
+            Some(state_line(
+                Glyph::CIRCLE_X,
+                tr(locale, Msg::EditorRefusedLine),
+            )),
             DecisionState::Ready,
         ),
         Standing::Expired => (
             Some(state_line(
                 Glyph::TRIANGLE_ALERT,
-                tr(Msg::EditorExpiredLine),
+                tr(locale, Msg::EditorExpiredLine),
             )),
             DecisionState::Ready,
         ),
     };
     decision_bar(DecisionBar {
         id: String::from("editor-dock"),
-        label: tr(Msg::EditorDock),
+        label: tr(locale, Msg::EditorDock),
         form: DockForm::Page(String::from(FORM_ID)),
         fields: Vec::new(),
         line,
@@ -253,7 +255,7 @@ pub(crate) fn dock(save: String, standing: &Standing) -> AnyView {
             Decision {
                 name: String::from(crate::posted::INTENT),
                 value: String::from(DISCARD),
-                label: tr(Msg::EditorDiscard),
+                label: tr(locale, Msg::EditorDiscard),
                 variant: Variant::Secondary,
                 glyph: Some(Glyph::X),
                 leaves: true,
@@ -265,7 +267,7 @@ pub(crate) fn dock(save: String, standing: &Standing) -> AnyView {
                 label: save,
                 variant: Variant::Primary,
                 glyph: Some(Glyph::SAVE),
-                shortcut: Some(String::from("Ctrl S")),
+                shortcut: None,
                 state,
                 leaves: false,
             },
@@ -284,108 +286,113 @@ fn state_line(glyph: Glyph, said: String) -> DockLine {
 /// What the server answered a save with, over the draft: the session that
 /// ended with the way to sign in again, the conflict with the way to the
 /// current version at `reload`, or the refusal in the server's words.
-pub(crate) fn refused(request: &Request, error: &FhirError, reload: &str) -> (AnyView, Standing) {
+pub(crate) fn refused(request: &Request, error: &FhirError, reload: &str) -> (Html, Standing) {
+    let locale = &request.locale;
     match error.status() {
         Some(StatusCode::UNAUTHORIZED) => {
             let again = action_button(
+                locale,
                 Action::new(
                     Some(Glyph::LOG_IN),
-                    tr(Msg::EditorSignInAgain),
+                    tr(locale, Msg::EditorSignInAgain),
                     Act::Link(sign_in_link(&request.back())),
                 ),
                 Variant::Primary,
             );
             (
-                view! {
-                    {notice(Tone::Warn, Announce::Alert, None, tr(Msg::EditorExpired))}
-                    <p>{again}</p>
-                }
-                .into_any(),
+                Html::join([
+                    notice(
+                        Tone::Warn,
+                        Announce::Alert,
+                        None,
+                        t(tr(locale, Msg::EditorExpired)),
+                    ),
+                    p(again),
+                ]),
                 Standing::Expired,
             )
         }
         Some(StatusCode::PRECONDITION_FAILED | StatusCode::CONFLICT) => {
-            let mut said = refusal_of(error);
-            said.summary = tr(Msg::EditorConflict);
+            let mut said = refusal_of(locale, error);
+            said.summary = tr(locale, Msg::EditorConflict);
             let again = action_button(
+                locale,
                 Action::new(
                     Some(Glyph::REFRESH_CW),
-                    tr(Msg::EditorReload),
+                    tr(locale, Msg::EditorReload),
                     Act::Link(reloaded(reload)),
                 ),
                 Variant::Primary,
             );
             (
-                view! {
-                    {refusal(&said)}
-                    <p>{again}</p>
-                }
-                .into_any(),
+                Html::join([refusal(locale, &said), p(again)]),
                 Standing::Refused,
             )
         }
-        _ => (refusal(&refusal_of(error)).into_any(), Standing::Refused),
+        _ => (
+            refusal(locale, &refusal_of(locale, error)),
+            Standing::Refused,
+        ),
     }
 }
 
 /// The page for a resource the deployment loaded: it has no write path, so
 /// the editor says so and leads back to the resource at `back`.
-pub(crate) fn unmanaged(request: &Request, kind: Kind, back: String) -> AnyView {
+pub(crate) fn unmanaged(request: &Request, kind: Kind, back: String) -> Html {
+    let locale = &request.locale;
     let open = action_button(
+        locale,
         Action::new(
             Some(Glyph::ARROW_LEFT),
-            tr(Msg::EditorBackToResource),
+            tr(locale, Msg::EditorBackToResource),
             Act::Link(back),
         ),
         Variant::Secondary,
     );
-    view! {
-        {heading(request, kind, None, tr(Msg::EditorEdit), String::new())}
-        {notice(Tone::Info, Announce::Status, None, tr(Msg::EditorUnmanaged))}
-        <p>{open}</p>
-    }
-    .into_any()
+    Html::join([
+        heading(
+            request,
+            kind,
+            None,
+            tr(locale, Msg::EditorEdit),
+            String::new(),
+        ),
+        notice(
+            Tone::Info,
+            Announce::Status,
+            None,
+            t(tr(locale, Msg::EditorUnmanaged)),
+        ),
+        p(open),
+    ])
 }
 
 /// A quiet submit button of the editor's form that asks for `intent`, such
 /// as Add a concept: it posts the draft, and the server answers with the
 /// row added.
 #[must_use]
-pub(crate) fn add_button(intent: String, words: String) -> AnyView {
-    view! {
-        <button
-            type="submit"
-            class=Variant::Ghost.small()
-            name=crate::posted::INTENT
-            value=intent
-            formnovalidate=true
-        >
-            {ferrohealth_ui::icon::icon(Glyph::PLUS, "16")}
-            {words}
-        </button>
-    }
-    .into_any()
+pub(crate) fn add_button(intent: String, words: String) -> Html {
+    h(format!(
+        r#"<button type="submit" class="{}" name="{}" value="{}" formnovalidate>{}{}</button>"#,
+        Variant::Ghost.small(),
+        crate::posted::INTENT,
+        t(intent),
+        ferrohealth_ui::icon::icon(Glyph::PLUS, "16"),
+        t(words)
+    ))
 }
 
 /// An icon button of the editor's form that asks for `intent`, named
 /// `words`, such as the Remove of a clause.
 #[must_use]
-pub(crate) fn icon_submit(intent: String, glyph: Glyph, words: String) -> AnyView {
-    let title = words.clone();
-    view! {
-        <button
-            type="submit"
-            class="fui-icon-button"
-            name=crate::posted::INTENT
-            value=intent
-            formnovalidate=true
-            aria-label=words
-            title=title
-        >
-            {ferrohealth_ui::icon::icon(glyph, "16")}
-        </button>
-    }
-    .into_any()
+pub(crate) fn icon_submit(intent: String, glyph: Glyph, words: String) -> Html {
+    h(format!(
+        r#"<button type="submit" class="fui-icon-button" name="{}" value="{}" formnovalidate aria-label="{words}" title="{words}">{}</button>"#,
+        crate::posted::INTENT,
+        t(intent),
+        ferrohealth_ui::icon::icon(glyph, "16"),
+        words = t(words),
+    ))
 }
 
 /// Sends a save of `body`: a create for a resource with no `id`, else an
@@ -422,9 +429,9 @@ pub(crate) fn percent(value: &str) -> String {
     url::form_urlencoded::byte_serialize(value.as_bytes()).collect()
 }
 
-/// The editor's address `reload` asked for again, marked so the router
-/// reads it afresh even from the page the refused post drew at the same
-/// address; the editor reads no such parameter.
+/// The editor's address `reload` asked for again, marked apart from the
+/// page the refused post drew at the same address, so the browser loads it
+/// afresh; the editor reads no such parameter.
 fn reloaded(reload: &str) -> String {
     let separator = if reload.contains('?') { '&' } else { '?' };
     format!("{reload}{separator}reload=current")

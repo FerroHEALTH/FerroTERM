@@ -98,7 +98,7 @@ impl OperationOutcome {
     /// (<https://hl7.org/fhir/R4B/operationoutcome.html>): the first is the
     /// message written for a person. An issue carrying neither still produces
     /// a line, so a refusal never renders as nothing.
-    pub(crate) fn lines(&self) -> Vec<IssueLine> {
+    pub(crate) fn lines(&self, locale: &ferrohealth_ui::i18n::Locale) -> Vec<IssueLine> {
         self.issue
             .iter()
             .map(|issue| IssueLine {
@@ -109,7 +109,7 @@ impl OperationOutcome {
                     .as_ref()
                     .and_then(|details| details.text.clone())
                     .or_else(|| issue.diagnostics.clone())
-                    .unwrap_or_else(|| tr(Msg::ServerSentNoDiagnostic).clone()),
+                    .unwrap_or_else(|| tr(locale, Msg::ServerSentNoDiagnostic).clone()),
                 details: issue
                     .details
                     .as_ref()
@@ -152,7 +152,7 @@ mod tests {
                  "diagnostics":"lookup failed"}]}"#,
         );
         assert_eq!(
-            outcome.lines(),
+            outcome.lines(&ferrohealth_ui::i18n::Locale::english()),
             vec![IssueLine {
                 severity: "error".to_owned(),
                 code: "not-found".to_owned(),
@@ -174,7 +174,10 @@ mod tests {
                  "text":"the expansion is too large"}}]}"#,
         );
         assert_eq!(
-            outcome.lines().first().map(|line| line.details.clone()),
+            outcome
+                .lines(&ferrohealth_ui::i18n::Locale::english())
+                .first()
+                .map(|line| line.details.clone()),
             Some(vec![
                 "http://hl7.org/fhir/tools/CodeSystem/tx-issue-type#too-costly".to_owned(),
                 "bare".to_owned(),
@@ -190,7 +193,10 @@ mod tests {
                 {"severity":"warning","code":"invalid","diagnostics":"count must be >= 0"}]}"#,
         );
         assert_eq!(
-            outcome.lines().first().map(|line| line.text.clone()),
+            outcome
+                .lines(&ferrohealth_ui::i18n::Locale::english())
+                .first()
+                .map(|line| line.text.clone()),
             Some("count must be >= 0".to_owned()),
             "the fallback is the server's diagnostic, not a paraphrase"
         );
@@ -200,7 +206,9 @@ mod tests {
     fn an_issue_with_no_wording_still_produces_a_line() {
         let outcome = parse(r#"{"issue":[{"severity":"fatal","code":"exception"}]}"#);
         assert_eq!(
-            outcome.lines().len(),
+            outcome
+                .lines(&ferrohealth_ui::i18n::Locale::english())
+                .len(),
             1,
             "a refusal never renders as nothing"
         );
@@ -212,7 +220,11 @@ mod tests {
             r#"{"issue":[{"code":"invalid","diagnostics":"first"},
                          {"code":"not-found","diagnostics":"second"}]}"#,
         );
-        let texts: Vec<String> = outcome.lines().into_iter().map(|line| line.text).collect();
+        let texts: Vec<String> = outcome
+            .lines(&ferrohealth_ui::i18n::Locale::english())
+            .into_iter()
+            .map(|line| line.text)
+            .collect();
         assert_eq!(
             texts,
             vec!["first".to_owned(), "second".to_owned()],
@@ -224,7 +236,10 @@ mod tests {
     fn a_missing_severity_reads_as_an_error_rather_than_as_nothing() {
         let outcome = parse(r#"{"issue":[{"code":"processing"}]}"#);
         assert_eq!(
-            outcome.lines().first().map(|line| line.severity.clone()),
+            outcome
+                .lines(&ferrohealth_ui::i18n::Locale::english())
+                .first()
+                .map(|line| line.severity.clone()),
             Some("error".to_owned()),
             "severity is 1..1 in the specification; a missing one is still a refusal"
         );

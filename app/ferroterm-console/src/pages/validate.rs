@@ -8,18 +8,20 @@
 
 use std::collections::BTreeMap;
 
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::view::load_report::Outcome;
 use ferrohealth_ui::view::refusal::{Issue, Severity, issue_list};
 use ferrohealth_ui::view::segmented::segmented_links;
 use ferrohealth_ui::view::surface::{SectionHead, panel_section};
-use leptos::prelude::*;
 
 use crate::fhir::validation::{
     SubsumesRequest, ValidateOn, ValidateRequest, Validation, subsumption_sentence,
 };
 use crate::fhir::{CODE_SYSTEM, VALUE_SET};
 use crate::locale::{Msg, tr, tr_with};
+use crate::markup::{code, h, p, strong, t};
 use crate::pages::lookup::CODE_PARAM;
 use crate::pages::operations::{
     Op, before, choices, frame, options, run, select, sent, text, verdict,
@@ -44,7 +46,7 @@ const CODE_A_PARAM: &str = "codeA";
 const CODE_B_PARAM: &str = "codeB";
 
 /// The Check tab.
-pub(crate) async fn page(request: Request) -> AnyView {
+pub(crate) async fn page(request: Request) -> Html {
     let relation = request.text(MODE_PARAM) == RELATION;
     let systems_named = request
         .client
@@ -67,7 +69,8 @@ pub(crate) async fn page(request: Request) -> AnyView {
 }
 
 /// The choice of what to check, two links that keep the code system.
-fn mode(request: &Request, relation: bool, system: &str) -> AnyView {
+fn mode(request: &Request, relation: bool, system: &str) -> Html {
+    let locale = &request.locale;
     let base = ui_link(Op::Check.path(), request.version);
     let keep = if system.is_empty() {
         String::new()
@@ -75,25 +78,20 @@ fn mode(request: &Request, relation: bool, system: &str) -> AnyView {
         format!("&{SYSTEM_PARAM}={}", percent(system))
     };
     let links = segmented_links(
-        tr(Msg::CheckWhat),
+        tr(locale, Msg::CheckWhat),
         vec![
-            (format!("{base}{keep}"), tr(Msg::CheckMembership)),
+            (format!("{base}{keep}"), tr(locale, Msg::CheckMembership)),
             (
                 format!("{base}&{MODE_PARAM}={RELATION}{keep}"),
-                tr(Msg::CheckRelation),
+                tr(locale, Msg::CheckRelation),
             ),
         ],
         usize::from(relation),
     );
-    view! {
-        <div class="fui-field">
-            <span class="fui-label" aria-hidden="true">
-                {tr(Msg::CheckWhat)}
-            </span>
-            {links}
-        </div>
-    }
-    .into_any()
+    h(format!(
+        r#"<div class="fui-field"><span class="fui-label" aria-hidden="true">{}</span>{links}</div>"#,
+        t(tr(locale, Msg::CheckWhat))
+    ))
 }
 
 /// A value percent-encoded as one query component.
@@ -104,11 +102,12 @@ fn percent(value: &str) -> String {
 /// Whether a code is in a value set: the options and the answer.
 async fn membership_tab(
     request: &Request,
-    mode: AnyView,
+    mode: Html,
     systems: &[(String, String)],
     system_names: &BTreeMap<String, String>,
     system: String,
-) -> (AnyView, AnyView) {
+) -> (Html, Html) {
+    let locale = &request.locale;
     let sets_named = request
         .client
         .published_names(request.version, VALUE_SET)
@@ -128,27 +127,40 @@ async fn membership_tab(
         url
     };
     let code = request.text(CODE_PARAM);
-    let fields = view! {
-        {mode}
-        {select("check-url", URL_PARAM, tr(Msg::CheckValueSet), &sets, &url, None)}
-        {text("check-code", CODE_PARAM, tr(Msg::LookupCode), &code, tr(Msg::LookupCodeHint))}
-        {select(
+    let fields = Html::join([
+        mode,
+        select(
+            "check-url",
+            URL_PARAM,
+            tr(locale, Msg::CheckValueSet),
+            &sets,
+            &url,
+            None,
+        ),
+        text(
+            "check-code",
+            CODE_PARAM,
+            tr(locale, Msg::LookupCode),
+            &code,
+            tr(locale, Msg::LookupCodeHint),
+        ),
+        select(
             "check-system",
             SYSTEM_PARAM,
-            tr(Msg::CheckItsSystem),
+            tr(locale, Msg::CheckItsSystem),
             systems,
             &system,
-            Some(tr(Msg::CheckChooseSystem)),
-        )}
-    }
-    .into_any();
+            Some(tr(locale, Msg::CheckChooseSystem)),
+        ),
+    ]);
     let form = options(
         request,
         &[],
         fields,
         run(
+            locale,
             "check-run",
-            tr(Msg::OpsCheck),
+            tr(locale, Msg::OpsCheck),
             Glyph::SHIELD_CHECK,
             "$validate-code",
         ),
@@ -161,28 +173,35 @@ async fn membership_tab(
         ..ValidateRequest::default()
     };
     if code.is_empty() {
-        return (form, before(tr(Msg::CheckBefore)));
+        return (form, before(locale, tr(locale, Msg::CheckBefore)));
     }
     if !asked.runnable() {
-        return (form, before(tr(Msg::CheckNeedsSystem)));
+        return (form, before(locale, tr(locale, Msg::CheckNeedsSystem)));
     }
     let sent_url = request.client.validate_code_url(request.version, &asked);
     let answer = match request.client.validate_code(request.version, &asked).await {
-        Err(error) => view! {
-            {panel_section(None, failure(&error))}
-            {sent(&sent_url, None)}
-        }
-        .into_any(),
+        Err(error) => Html::join([
+            panel_section(locale, None, failure(locale, &error)),
+            sent(locale, &sent_url, None),
+        ]),
         Ok(document) => {
-            let validation = document.value.validation();
+            let validation = document.value.validation(locale);
             let set = name_of(&set_names, &url);
-            view! {
-                {verdict(outcome(&validation), membership_title(&validation, &code, &set), None)}
-                {concept(&validation, &code, system_names)}
-                {issues(&validation)}
-                {sent(&sent_url, Some((tr(Msg::CheckRaw), document.text)))}
-            }
-            .into_any()
+            Html::join([
+                verdict(
+                    locale,
+                    outcome(&validation),
+                    membership_title(locale, &validation, &code, &set),
+                    None,
+                ),
+                concept(locale, &validation, &code, system_names).unwrap_or_default(),
+                issues(locale, &validation).unwrap_or_default(),
+                sent(
+                    locale,
+                    &sent_url,
+                    Some((tr(locale, Msg::CheckRaw), document.text)),
+                ),
+            ])
         }
     };
     (form, answer)
@@ -198,44 +217,44 @@ fn outcome(validation: &Validation) -> Outcome {
 }
 
 /// The verdict's sentence about `code` in the value set named `set`.
-fn membership_title(validation: &Validation, code: &str, set: &str) -> AnyView {
-    let display = validation.display.clone().map(|display| {
-        view! {
-            <strong>{display}</strong>
-            " · "
-        }
-    });
-    let code = view! { <code>{code.to_owned()}</code> };
+fn membership_title(locale: &Locale, validation: &Validation, code_typed: &str, set: &str) -> Html {
+    let display = validation
+        .display
+        .as_ref()
+        .map(|display| h(format!("{} · ", strong(display))))
+        .unwrap_or_default();
+    let typed = code(code_typed);
     match validation.result {
-        Some(true) => view! {
-            {tr(Msg::CheckValid)}
-            " "
-            {display}
-            {code}
-            " "
-            {tr_with(Msg::CheckIsIn, &[("set", set.to_owned().into())])}
-        }
-        .into_any(),
-        Some(false) => view! {
-            {tr(Msg::CheckNotValid)}
-            " "
-            {display}
-            {code}
-            " "
-            {tr_with(Msg::CheckIsNotIn, &[("set", set.to_owned().into())])}
-        }
-        .into_any(),
-        None => tr(Msg::CheckNoResult).into_any(),
+        Some(true) => h(format!(
+            "{} {display}{typed} {}",
+            t(tr(locale, Msg::CheckValid)),
+            t(tr_with(
+                locale,
+                Msg::CheckIsIn,
+                &[("set", set.to_owned().into())]
+            ))
+        )),
+        Some(false) => h(format!(
+            "{} {display}{typed} {}",
+            t(tr(locale, Msg::CheckNotValid)),
+            t(tr_with(
+                locale,
+                Msg::CheckIsNotIn,
+                &[("set", set.to_owned().into())]
+            ))
+        )),
+        None => t(tr(locale, Msg::CheckNoResult)),
     }
 }
 
 /// The concept the answer names: its display, code, system and version.
 fn concept(
+    locale: &Locale,
     validation: &Validation,
-    code: &str,
+    code_typed: &str,
     names: &BTreeMap<String, String>,
-) -> Option<AnyView> {
-    validation.display.as_ref()?;
+) -> Option<Html> {
+    let display = validation.display.as_ref()?;
     let system = validation
         .system
         .as_deref()
@@ -243,6 +262,7 @@ fn concept(
         .unwrap_or_default();
     let place = match &validation.version {
         Some(version) => tr_with(
+            locale,
             Msg::CheckSystemVersion,
             &[
                 ("system", system.into()),
@@ -251,39 +271,42 @@ fn concept(
         ),
         None => system,
     };
-    let inactive = (validation.inactive == Some(true)).then(|| {
-        view! {
-            " "
-            {tr(Msg::CheckInactive)}
-        }
-    });
+    let inactive = if validation.inactive == Some(true) {
+        format!(" {}", t(tr(locale, Msg::CheckInactive)))
+    } else {
+        String::new()
+    };
     Some(panel_section(
+        locale,
         Some(SectionHead {
-            title: tr(Msg::CheckConcept),
+            title: tr(locale, Msg::CheckConcept),
             count: None,
             actions: None,
         }),
-        view! {
-            <p>{validation.display.clone()}</p>
-            <p class="fui-small fui-muted">
-                <code>{validation.code.clone().unwrap_or_else(|| code.to_owned())}</code>
-                " "
-                {place}
-                {inactive}
-            </p>
-        },
+        h(format!(
+            r#"{}<p class="fui-small fui-muted">{} {}{inactive}</p>"#,
+            p(t(display)),
+            code(
+                validation
+                    .code
+                    .clone()
+                    .unwrap_or_else(|| code_typed.to_owned())
+            ),
+            t(place),
+        )),
     ))
 }
 
 /// The message and the issues the server answered with, in its own words.
-fn issues(validation: &Validation) -> Option<AnyView> {
+fn issues(locale: &Locale, validation: &Validation) -> Option<Html> {
     if validation.message.is_none() && validation.issues.is_empty() {
         return None;
     }
     let message = validation
         .message
-        .clone()
-        .map(|message| view! { <p>{message}</p> });
+        .as_ref()
+        .map(|message| p(t(message)))
+        .unwrap_or_default();
     let listed: Vec<Issue> = validation
         .issues
         .iter()
@@ -300,25 +323,24 @@ fn issues(validation: &Validation) -> Option<AnyView> {
         })
         .collect();
     Some(panel_section(
+        locale,
         Some(SectionHead {
-            title: tr(Msg::CheckServerSays),
+            title: tr(locale, Msg::CheckServerSays),
             count: None,
             actions: None,
         }),
-        view! {
-            {message}
-            {issue_list(&listed)}
-        },
+        Html::join([message, issue_list(locale, &listed)]),
     ))
 }
 
 /// How two codes of one system relate: the options and the answer.
 async fn relation_tab(
     request: &Request,
-    mode: AnyView,
+    mode: Html,
     systems: &[(String, String)],
     system: String,
-) -> (AnyView, AnyView) {
+) -> (Html, Html) {
+    let locale = &request.locale;
     let system = if system.is_empty() {
         systems
             .first()
@@ -329,20 +351,39 @@ async fn relation_tab(
     };
     let code_a = request.text(CODE_A_PARAM);
     let code_b = request.text(CODE_B_PARAM);
-    let fields = view! {
-        {mode}
-        {select("check-system", SYSTEM_PARAM, tr(Msg::LookupSystem), systems, &system, None)}
-        {text("check-code-a", CODE_A_PARAM, tr(Msg::CheckCodeA), &code_a, tr(Msg::LookupCodeHint))}
-        {text("check-code-b", CODE_B_PARAM, tr(Msg::CheckCodeB), &code_b, tr(Msg::LookupCodeHint))}
-    }
-    .into_any();
+    let fields = Html::join([
+        mode,
+        select(
+            "check-system",
+            SYSTEM_PARAM,
+            tr(locale, Msg::LookupSystem),
+            systems,
+            &system,
+            None,
+        ),
+        text(
+            "check-code-a",
+            CODE_A_PARAM,
+            tr(locale, Msg::CheckCodeA),
+            &code_a,
+            tr(locale, Msg::LookupCodeHint),
+        ),
+        text(
+            "check-code-b",
+            CODE_B_PARAM,
+            tr(locale, Msg::CheckCodeB),
+            &code_b,
+            tr(locale, Msg::LookupCodeHint),
+        ),
+    ]);
     let form = options(
         request,
         &[(MODE_PARAM, String::from(RELATION))],
         fields,
         run(
+            locale,
             "check-run",
-            tr(Msg::CheckTheRelation),
+            tr(locale, Msg::CheckTheRelation),
             Glyph::GIT_BRANCH,
             "$subsumes",
         ),
@@ -354,25 +395,27 @@ async fn relation_tab(
         ..SubsumesRequest::default()
     };
     if !asked.runnable() {
-        return (form, before(tr(Msg::CheckRelationBefore)));
+        return (form, before(locale, tr(locale, Msg::CheckRelationBefore)));
     }
     let sent_url = request.client.subsumes_url(request.version, &asked);
     let answer = match request.client.subsumes(request.version, &asked).await {
-        Err(error) => view! {
-            {panel_section(None, failure(&error))}
-            {sent(&sent_url, None)}
-        }
-        .into_any(),
+        Err(error) => Html::join([
+            panel_section(locale, None, failure(locale, &error)),
+            sent(locale, &sent_url, None),
+        ]),
         Ok(document) => {
             let said = document.value.subsumption().map_or_else(
-                || tr(Msg::CheckNoOutcome),
-                |outcome| subsumption_sentence(&outcome, &code_a, &code_b),
+                || tr(locale, Msg::CheckNoOutcome),
+                |outcome| subsumption_sentence(locale, &outcome, &code_a, &code_b),
             );
-            view! {
-                {verdict(Outcome::Ok, view! { {said} }.into_any(), None)}
-                {sent(&sent_url, Some((tr(Msg::CheckRaw), document.text)))}
-            }
-            .into_any()
+            Html::join([
+                verdict(locale, Outcome::Ok, t(said), None),
+                sent(
+                    locale,
+                    &sent_url,
+                    Some((tr(locale, Msg::CheckRaw), document.text)),
+                ),
+            ])
         }
     };
     (form, answer)

@@ -9,6 +9,8 @@
 
 use std::collections::BTreeMap;
 
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::model::{Noun, Paging, Window};
 use ferrohealth_ui::table::pager::{Listing, link_pager};
@@ -20,11 +22,11 @@ use ferrohealth_ui::view::form::{Field, INPUT, NARROW, check};
 use ferrohealth_ui::view::load_report::Outcome;
 use ferrohealth_ui::view::surface::{SectionHead, definitions, panel_section};
 use ferrohealth_ui::view::transform::field_checks;
-use leptos::prelude::*;
 
 use crate::fhir::expansion::{ExpandRequest, Expansion};
 use crate::fhir::{CODE_SYSTEM, VALUE_SET};
 use crate::locale::{Msg, message, tr, tr_with};
+use crate::markup::{h, join, t};
 use crate::pages::operations::{
     Op, before, choices, frame, options, run, select, sent, text, verdict,
 };
@@ -116,8 +118,17 @@ impl Asked {
     }
 }
 
+/// A checkbox named `name` with the id `id`, sending `true` when ticked.
+pub(crate) fn checkbox(id: &str, name: &str, checked: bool) -> Html {
+    h(format!(
+        r#"<input type="checkbox" id="{id}" name="{name}" value="true"{}>"#,
+        if checked { " checked" } else { "" }
+    ))
+}
+
 /// The Expand tab.
-pub(crate) async fn page(request: Request) -> AnyView {
+pub(crate) async fn page(request: Request) -> Html {
+    let locale = &request.locale;
     let sets_named = request
         .client
         .published_names(request.version, VALUE_SET)
@@ -137,74 +148,53 @@ pub(crate) async fn page(request: Request) -> AnyView {
         asked.url.clone()
     };
     let count = asked.count.to_string();
-    let fields = view! {
-        {select("expand-url", URL_PARAM, tr(Msg::CheckValueSet), &sets, &picked, None)}
-        {text(
+    let fields = Html::join([
+        select(
+            "expand-url",
+            URL_PARAM,
+            tr(locale, Msg::CheckValueSet),
+            &sets,
+            &picked,
+            None,
+        ),
+        text(
             "expand-filter",
             FILTER_PARAM,
-            tr(Msg::ExpandFilter),
+            tr(locale, Msg::ExpandFilter),
             &asked.filter,
-            tr(Msg::ExpandFilterHint),
-        )}
-        {Field::new("expand-count", tr(Msg::ExpandPageSize))
-            .view(
-                view! {
-                    <input
-                        id="expand-count"
-                        name=COUNT_PARAM
-                        type="number"
-                        min="1"
-                        max=MAX_COUNT.to_string()
-                        class=format!("{INPUT} {NARROW}")
-                        value=count
-                    />
-                },
-            )}
-        {field_checks(
-            view! {
-                {check(
-                    "expand-active",
-                    tr(Msg::ExpandActiveOnly),
-                    view! {
-                        <input
-                            type="checkbox"
-                            id="expand-active"
-                            name=ACTIVE_PARAM
-                            value="true"
-                            checked=asked.active
-                        />
-                    },
-                )}
-                {check(
-                    "expand-designations",
-                    tr(Msg::ExpandDesignations),
-                    view! {
-                        <input
-                            type="checkbox"
-                            id="expand-designations"
-                            name=DESIGNATIONS_PARAM
-                            value="true"
-                            checked=asked.designations
-                        />
-                    },
-                )}
-            },
-        )}
-    }
-    .into_any();
+            tr(locale, Msg::ExpandFilterHint),
+        ),
+        Field::new("expand-count", tr(locale, Msg::ExpandPageSize)).view(h(format!(
+            r#"<input id="expand-count" name="{COUNT_PARAM}" type="number" min="1" max="{MAX_COUNT}" class="{INPUT} {NARROW}" value="{}">"#,
+            t(count)
+        ))),
+        field_checks(Html::join([
+            check(
+                "expand-active",
+                tr(locale, Msg::ExpandActiveOnly),
+                checkbox("expand-active", ACTIVE_PARAM, asked.active),
+            ),
+            check(
+                "expand-designations",
+                tr(locale, Msg::ExpandDesignations),
+                checkbox("expand-designations", DESIGNATIONS_PARAM, asked.designations),
+            ),
+        ])),
+    ]);
     let form = options(
         &request,
         &[],
         fields,
         run(
+            locale,
             "expand-run",
-            tr(Msg::OpsExpand),
+            tr(locale, Msg::OpsExpand),
             Glyph::LIST_TREE,
             "$expand",
         ),
     );
     let answer = if asked.url.is_empty() {
-        before(tr(Msg::ExpandBefore))
+        before(locale, tr(locale, Msg::ExpandBefore))
     } else {
         answer(&request, &asked, &name_of(&set_names, &asked.url)).await
     };
@@ -212,21 +202,25 @@ pub(crate) async fn page(request: Request) -> AnyView {
 }
 
 /// The answer to `asked`, the value set named `set`.
-async fn answer(request: &Request, asked: &Asked, set: &str) -> AnyView {
+async fn answer(request: &Request, asked: &Asked, set: &str) -> Html {
+    let locale = &request.locale;
     let sent_request = asked.request(&request.prefs.display_language);
     let url = request.client.expand_url(request.version, &sent_request);
     match request.client.expand(request.version, &sent_request).await {
-        Err(error) => view! {
-            {panel_section(None, failure(&error))}
-            {sent(&url, None)}
-        }
-        .into_any(),
+        Err(error) => Html::join([
+            panel_section(locale, None, failure(locale, &error)),
+            sent(locale, &url, None),
+        ]),
         Ok(expanded) => match expanded.expansion() {
-            None => view! {
-                {verdict(Outcome::Warn, tr(Msg::ValueSetNoExpansion).into_any(), None)}
-                {sent(&url, None)}
-            }
-            .into_any(),
+            None => Html::join([
+                verdict(
+                    locale,
+                    Outcome::Warn,
+                    t(tr(locale, Msg::ValueSetNoExpansion)),
+                    None,
+                ),
+                sent(locale, &url, None),
+            ]),
             Some(expansion) => {
                 let names = request
                     .client
@@ -234,26 +228,31 @@ async fn answer(request: &Request, asked: &Asked, set: &str) -> AnyView {
                     .await
                     .map(|named| named.names())
                     .unwrap_or_default();
-                view! {
-                    {verdict(Outcome::Ok, title(&expansion, asked, set), None)}
-                    {concepts(request, &expansion, asked, &names)}
-                    {applied(&expansion)}
-                    {sent(&url, None)}
-                }
-                .into_any()
+                Html::join([
+                    verdict(
+                        locale,
+                        Outcome::Ok,
+                        title(locale, &expansion, asked, set),
+                        None,
+                    ),
+                    concepts(request, &expansion, asked, &names),
+                    applied(locale, &expansion).unwrap_or_default(),
+                    sent(locale, &url, None),
+                ])
             }
         },
     }
 }
 
 /// The verdict's sentence: which concepts of how many the page shows.
-fn title(expansion: &Expansion, asked: &Asked, set: &str) -> AnyView {
+fn title(locale: &Locale, expansion: &Expansion, asked: &Asked, set: &str) -> Html {
     let shown = expansion.listed();
     let first = asked.offset.saturating_add(1);
     let last = asked.offset.saturating_add(shown);
     let words = match expansion.total {
-        _ if shown == 0 => tr_with(Msg::ExpandNone, &[("set", set.to_owned().into())]),
+        _ if shown == 0 => tr_with(locale, Msg::ExpandNone, &[("set", set.to_owned().into())]),
         Some(total) => tr_with(
+            locale,
             Msg::ExpandShownOf,
             &[
                 ("first", first.into()),
@@ -263,6 +262,7 @@ fn title(expansion: &Expansion, asked: &Asked, set: &str) -> AnyView {
             ],
         ),
         None => tr_with(
+            locale,
             Msg::ExpandShown,
             &[
                 ("first", first.into()),
@@ -271,7 +271,7 @@ fn title(expansion: &Expansion, asked: &Asked, set: &str) -> AnyView {
             ],
         ),
     };
-    words.into_any()
+    t(words)
 }
 
 /// The page of concepts, with the pager when the expansion has more.
@@ -280,39 +280,34 @@ fn concepts(
     expansion: &Expansion,
     asked: &Asked,
     names: &BTreeMap<String, String>,
-) -> AnyView {
+) -> Html {
+    let locale = &request.locale;
     let columns = [
-        Column::text("concept", tr(Msg::ValueSetConcept)).role(Role::Title),
-        Column::text("system", tr(Msg::ValueSetSystem)),
-        Column::text("version", tr(Msg::LookupVersion)).role(Role::Quiet),
+        Column::text("concept", tr(locale, Msg::ValueSetConcept)).role(Role::Title),
+        Column::text("system", tr(locale, Msg::ValueSetSystem)),
+        Column::text("version", tr(locale, Msg::LookupVersion)).role(Role::Quiet),
     ];
     let [_, system, version] = &columns;
-    let rows = expansion
-        .concepts
-        .iter()
-        .map(|concept| {
-            let mut drawn = Coding::new(
-                concept.code.clone(),
-                concept.display.clone().unwrap_or_default(),
-            );
-            if concept.inactive {
-                drawn = drawn.inactive();
-            }
-            let system_name = names.get(&concept.system).cloned().map_or_else(
-                || ferrohealth_ui::view::coding::canonical(&concept.system),
-                IntoAny::into_any,
-            );
-            view! {
-                <tr>
-                    {title_cell(None, coding(drawn, Layout::Inline), None)}
-                    {cell(system, system_name)}
-                    {cell(version, concept.version.clone().unwrap_or_default())}
-                </tr>
-            }
-        })
-        .collect_view()
-        .into_any();
-    let caption = tr(Msg::ExpandConcepts);
+    let rows = join(expansion.concepts.iter().map(|concept| {
+        let mut drawn = Coding::new(
+            concept.code.clone(),
+            concept.display.clone().unwrap_or_default(),
+        );
+        if concept.inactive {
+            drawn = drawn.inactive();
+        }
+        let system_name = names.get(&concept.system).map_or_else(
+            || ferrohealth_ui::view::coding::canonical(&concept.system),
+            t,
+        );
+        h(format!(
+            "<tr>{}{}{}</tr>",
+            title_cell(None, coding(locale, drawn, Layout::Inline), None),
+            cell(system, system_name),
+            cell(version, t(concept.version.clone().unwrap_or_default())),
+        ))
+    }));
+    let caption = tr(locale, Msg::ExpandConcepts);
     let pager = expansion
         .total
         .filter(|total| *total > asked.count)
@@ -326,8 +321,9 @@ fn concepts(
                 },
             );
             link_pager(
+                locale,
                 Listing {
-                    label: tr(Msg::ExpandPages).into(),
+                    label: tr(locale, Msg::ExpandPages).into(),
                     noun: Noun::new(message(Msg::ExpandNoun)),
                     sizes: &[],
                     stated: None,
@@ -340,36 +336,38 @@ fn concepts(
             )
         });
     panel_section(
+        locale,
         Some(SectionHead {
             title: caption.clone(),
             count: None,
             actions: None,
         }),
-        view! {
-            {data_table(DataTable {
+        Html::join([
+            data_table(DataTable {
                 caption: &caption,
                 columns: &columns,
                 sorting: Sorting::default(),
                 body: Body::Rows(rows),
-            })}
-            {pager}
-        },
+            }),
+            pager.unwrap_or_default(),
+        ]),
     )
 }
 
 /// The parameters the server says it applied, each with its name.
-fn applied(expansion: &Expansion) -> Option<AnyView> {
+fn applied(locale: &Locale, expansion: &Expansion) -> Option<Html> {
     if expansion.parameters.is_empty() {
         return None;
     }
     let rows = expansion
         .parameters
         .iter()
-        .map(|line| (line.name.clone(), view! { {line.value.clone()} }.into_any()))
+        .map(|line| (line.name.clone(), t(&line.value)))
         .collect::<Vec<_>>();
     Some(panel_section(
+        locale,
         Some(SectionHead {
-            title: tr(Msg::ExpandApplied),
+            title: tr(locale, Msg::ExpandApplied),
             count: None,
             actions: None,
         }),
@@ -391,7 +389,11 @@ mod tests {
             active: true,
             designations: false,
         };
-        let request = crate::request::Request::read();
+        let request = crate::request::Request::of(
+            &crate::visit::Visit::default(),
+            String::from("/expand"),
+            String::new(),
+        );
         let href = asked.at(&request, 20);
         assert!(href.contains("url=http%3A%2F%2Fx%2Fvs"), "{href}");
         assert!(href.contains("offset=20"), "{href}");

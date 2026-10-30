@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
-# The FerroTERM console image: one static binary and its site
-# bundle on distroless static, per platform. Nothing is compiled here. The
-# release lane (.github/workflows/release-console.yml) builds and attests the
-# musl binaries and the site bundle and stages them under dist/console/ before
-# this file is built for linux/amd64 and linux/arm64. The root .dockerignore
-# holds the build context to dist/.
+# The FerroTERM console image: one static binary on distroless static, per
+# platform; the binary carries every file a page loads. Nothing is compiled
+# here. The release lane (.github/workflows/release-console.yml) builds and
+# attests the musl binaries and stages them under dist/console/ before this
+# file is built for linux/amd64 and linux/arm64. The root .dockerignore holds
+# the build context to dist/.
 #
 # Build from a staged dist/console tree, at the repository root:
 #   docker buildx build -f docker/console/Dockerfile --platform linux/arm64 .
@@ -24,18 +24,14 @@ FROM gcr.io/distroless/static-debian13:nonroot@sha256:18f4cc26c9ffa7f20a359298be
 ARG TARGETOS
 ARG TARGETARCH
 
-# Root-owned, executable, and not writable by the runtime user. The site
-# bundle is the same for every architecture and root-owned too, so the
-# runtime user reads it and cannot change it.
+# Root-owned, executable, and not writable by the runtime user.
 COPY --chmod=0555 dist/console/${TARGETOS}_${TARGETARCH}/ferroterm-console /usr/local/bin/ferroterm-console
-COPY dist/console/site/ /site/
 
-# The binary's own defaults are loopback and a checkout's target/site, so the
-# image listens on every interface on the documented port and serves the
-# bundle it carries. Every override is FERROTERM_CONSOLE__<SECTION>__<KEY>,
-# and every secret is read from the file its `_file` sibling names.
-ENV FERROTERM_CONSOLE__SERVER__LISTEN=0.0.0.0:3000 \
-    FERROTERM_CONSOLE__SERVER__SITE_ROOT=/site
+# The binary's own default is loopback, so the image listens on every
+# interface on the documented port. Every override is
+# FERROTERM_CONSOLE__<SECTION>__<KEY>, and every secret is read from the file
+# its `_file` sibling names.
+ENV FERROTERM_CONSOLE__SERVER__LISTEN=0.0.0.0:3000
 EXPOSE 3000/tcp
 
 # Numeric on purpose: the kubelet cannot resolve a user name against an image

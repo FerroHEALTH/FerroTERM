@@ -10,20 +10,21 @@
 //! is; nothing here names a system, assumes a hierarchy or a language.
 
 use ferrohealth_ui::highlight::Language;
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::view::{
     Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
+use ferrohealth_ui::view::action_menu::{Act, Action, Item, Menu};
 use ferrohealth_ui::view::code::{Code, CodeHead, code_section};
 use ferrohealth_ui::view::notice::{Announce, notice};
 use ferrohealth_ui::view::surface::{
     SectionHead, definitions, or_none, panel_section, panel_sections, section_intro,
 };
 use ferrohealth_ui::view::template::list::HeadingCount;
-use ferrohealth_ui::widget::action_menu::{Act, Action, Item, Menu};
-use leptos::prelude::*;
 
 use crate::auth::scopes::Letter;
 use crate::fhir::code_system::{CodeSystemSearch, PublishedCodeSystem};
@@ -31,6 +32,7 @@ use crate::fhir::concept::{Hierarchy, chosen_version};
 use crate::fhir::terminology::{SystemCard, VersionRow};
 use crate::fhir::{CODE_SYSTEM, Document, resources_text};
 use crate::locale::{Msg, tr, tr_with};
+use crate::markup::{code, h, join, t};
 use crate::pages::code_systems::content_word;
 use crate::pages::detail::{Head, Kind, Links, PANE_PARAM, Pane, header, line, tabbed};
 use crate::pages::parts::{Source, failure, heading};
@@ -53,10 +55,10 @@ struct Read {
 }
 
 /// One code system, on the tab the address names.
-pub(crate) async fn page(request: Request) -> AnyView {
+pub(crate) async fn page(request: Request) -> Html {
     let system = request.segment(1).unwrap_or_default();
     let Some(pane) = Pane::of(Kind::CodeSystem, request.param(PANE_PARAM).as_deref()) else {
-        return crate::pages::errors::not_found_page();
+        return crate::pages::errors::not_found_page(&request);
     };
     let capabilities = match request
         .client
@@ -64,7 +66,7 @@ pub(crate) async fn page(request: Request) -> AnyView {
         .await
     {
         Ok(capabilities) => capabilities,
-        Err(error) => return refused(&system, &error),
+        Err(error) => return refused(&request, &system, &error),
     };
     let Some(card) = capabilities.card(&system) else {
         return undeclared(&request, &system);
@@ -112,39 +114,50 @@ pub(crate) async fn page(request: Request) -> AnyView {
 }
 
 /// The page of a read that was refused.
-fn refused(system: &str, error: &crate::fhir::error::FhirError) -> AnyView {
-    view! {
-        {heading(system.to_owned(), None, Vec::new(), ActionGroup::none())}
-        {failure(error)}
-    }
-    .into_any()
+fn refused(request: &Request, system: &str, error: &crate::fhir::error::FhirError) -> Html {
+    Html::join([
+        heading(
+            request,
+            system.to_owned(),
+            None,
+            Vec::new(),
+            ActionGroup::none(),
+        ),
+        failure(&request.locale, error),
+    ])
 }
 
 /// The page of a canonical the root does not declare.
-fn undeclared(request: &Request, system: &str) -> AnyView {
+fn undeclared(request: &Request, system: &str) -> Html {
+    let locale = &request.locale;
     let title = if system.is_empty() {
-        tr(Msg::CodeSystemNoCanonical)
+        tr(locale, Msg::CodeSystemNoCanonical)
     } else {
         system.to_owned()
     };
-    view! {
-        {header(
+    Html::join([
+        header(
+            request,
             Head {
                 kind: Kind::CodeSystem,
                 title,
                 status: None,
                 canonical: String::new(),
                 line: tr_with(
+                    locale,
                     Msg::CodeSystemOnVersion,
                     &[("version", request.version.label().into())],
                 ),
                 actions: ActionGroup::none(),
             },
-            request.version,
-        )}
-        {notice(Tone::Neutral, Announce::Status, None, tr(Msg::RootSTerminologyCapabilitiesDoNot))}
-    }
-    .into_any()
+        ),
+        notice(
+            Tone::Neutral,
+            Announce::Status,
+            None,
+            t(tr(locale, Msg::RootSTerminologyCapabilitiesDoNot)),
+        ),
+    ])
 }
 
 /// The version the root serves by default.
@@ -155,6 +168,7 @@ fn served(card: &SystemCard) -> Option<VersionRow> {
 /// The title row's action group: Edit for a stored system the reader may
 /// write, else Browse concepts where there is a tree, the operations in More.
 fn actions(request: &Request, read: &Read, title: &str) -> ActionGroup {
+    let locale = &request.locale;
     let url = &read.card.url;
     let version = served(&read.card);
     let code = version.as_ref().and_then(|row| row.code.clone());
@@ -164,22 +178,22 @@ fn actions(request: &Request, read: &Read, title: &str) -> ActionGroup {
     let tool = |path: &str| system_tool_link(path, url, code.as_deref(), request.version);
     let browse = Action::new(
         Some(Glyph::NETWORK),
-        tr(Msg::CodeSystemBrowse),
+        tr(locale, Msg::CodeSystemBrowse),
         Act::Link(tool(BROWSE_PATH)),
     );
     let look_up = Action::new(
         Some(Glyph::SEARCH),
-        tr(Msg::CodeSystemLookUp),
+        tr(locale, Msg::CodeSystemLookUp),
         Act::Link(tool(LOOKUP_PATH)),
     );
     let check = Action::new(
         Some(Glyph::SHIELD_CHECK),
-        tr(Msg::CodeSystemCheck),
+        tr(locale, Msg::CodeSystemCheck),
         Act::Link(tool(VALIDATE_PATH)),
     );
     let expand = Action::new(
         Some(Glyph::LIST_CHECKS),
-        tr(Msg::CodeSystemExpand),
+        tr(locale, Msg::CodeSystemExpand),
         Act::Link(tool(EXPAND_PATH)),
     );
     let editable = read.source == Source::Stored && request.can(CODE_SYSTEM, Letter::Update);
@@ -187,7 +201,7 @@ fn actions(request: &Request, read: &Read, title: &str) -> ActionGroup {
         let edit = editing_link(CODE_SYSTEM, url, "", request.version).map(|href| {
             Action::new(
                 Some(Glyph::PENCIL),
-                tr(Msg::CodeSystemEdit),
+                tr(locale, Msg::CodeSystemEdit),
                 Act::Link(href),
             )
         });
@@ -210,15 +224,20 @@ fn actions(request: &Request, read: &Read, title: &str) -> ActionGroup {
     more.extend([check, expand]);
     let menu = Menu::new(
         "code-system-more",
-        tr_with(Msg::DetailMoreFor, &[("name", title.to_owned().into())]),
-        more.into_iter().map(Item::from).collect(),
+        tr_with(
+            locale,
+            Msg::DetailMoreFor,
+            &[("name", title.to_owned().into())],
+        ),
+        more.into_iter().map(Item::new).collect(),
     );
     let group = primary.map_or_else(ActionGroup::none, ActionGroup::primary);
     group.more(menu)
 }
 
 /// The page of `read` on `pane`.
-fn screen(request: &Request, read: &Read, pane: Pane) -> AnyView {
+fn screen(request: &Request, read: &Read, pane: Pane) -> Html {
+    let locale = &request.locale;
     let title = read
         .published
         .as_ref()
@@ -231,6 +250,7 @@ fn screen(request: &Request, read: &Read, pane: Pane) -> AnyView {
         .map(str::to_owned)
         .or_else(|| served(&read.card).and_then(|row| row.code));
     let head = header(
+        request,
         Head {
             kind: Kind::CodeSystem,
             title: title.clone(),
@@ -240,15 +260,14 @@ fn screen(request: &Request, read: &Read, pane: Pane) -> AnyView {
                 .and_then(PublishedCodeSystem::status)
                 .map(str::to_owned),
             canonical: read.card.url.clone(),
-            line: line(version.as_deref(), read.source),
+            line: line(locale, version.as_deref(), read.source),
             actions: actions(request, read, &title),
         },
-        request.version,
     );
     let panel = match pane {
-        Pane::First | Pane::History => overview(read),
-        Pane::Second => versions(read),
-        Pane::Json => json(read),
+        Pane::First | Pane::History => overview(locale, read),
+        Pane::Second => versions(locale, read),
+        Pane::Json => json(locale, read),
     };
     let links = Links {
         page: system_link(&read.card.url, request.version),
@@ -259,159 +278,161 @@ fn screen(request: &Request, read: &Read, pane: Pane) -> AnyView {
             .and_then(PublishedCodeSystem::id)
             .map(str::to_owned),
     };
-    view! {
-        {head}
-        {tabbed(Kind::CodeSystem, pane, &links, request.version, panel)}
-    }
-    .into_any()
+    Html::join([head, tabbed(request, Kind::CodeSystem, pane, &links, panel)])
 }
 
 /// A declared boolean as its word.
-fn yes_no(value: Option<bool>) -> AnyView {
+fn yes_no(locale: &Locale, value: Option<bool>) -> Html {
     match value {
-        Some(true) => tr(Msg::DetailYes).into_any(),
-        Some(false) => tr(Msg::DetailNo).into_any(),
-        None => or_none(String::new()),
+        Some(true) => t(tr(locale, Msg::DetailYes)),
+        Some(false) => t(tr(locale, Msg::DetailNo)),
+        None => or_none(locale, String::new()),
     }
 }
 
 /// A declared text, or the quiet word for none.
-fn text(value: Option<&str>) -> AnyView {
-    or_none(value.unwrap_or_default().to_owned())
+fn text(locale: &Locale, value: Option<&str>) -> Html {
+    or_none(locale, value.unwrap_or_default().to_owned())
 }
 
 /// The quiet note on a system the console cannot edit, saying why.
-fn read_only_note(source: Source) -> Option<AnyView> {
+fn read_only_note(locale: &Locale, source: Source) -> Option<Html> {
     let words = match source {
         Source::Stored => return None,
-        Source::Index => tr(Msg::CodeSystemIndexNote),
-        Source::Loaded => tr(Msg::CodeSystemLoadedNote),
+        Source::Index => tr(locale, Msg::CodeSystemIndexNote),
+        Source::Loaded => tr(locale, Msg::CodeSystemLoadedNote),
     };
     Some(panel_section(
+        locale,
         None,
-        notice(Tone::Neutral, Announce::Status, None, words),
+        notice(Tone::Neutral, Announce::Status, None, t(words)),
     ))
 }
 
 /// Overview: what the code system says it is.
-fn overview(read: &Read) -> AnyView {
-    let note = read_only_note(read.source);
+fn overview(locale: &Locale, read: &Read) -> Html {
+    let note = read_only_note(locale, read.source).unwrap_or_default();
     let Some(published) = &read.published else {
-        return panel_sections(view! {
-            {note}
-            {panel_section(None, section_intro(tr(Msg::CodeSystemNoResource)))}
-        });
+        return panel_sections(Html::join([
+            note,
+            panel_section(
+                locale,
+                None,
+                section_intro(tr(locale, Msg::CodeSystemNoResource)),
+            ),
+        ]));
     };
     let date = published
         .date()
-        .map(|raw| ferrohealth_ui::view::time::timestamp(raw).into_any());
+        .map(|raw| ferrohealth_ui::view::time::timestamp(locale, raw));
     let details = definitions(vec![
-        (tr(Msg::CodeSystemComputerName), text(published.name())),
         (
-            tr(Msg::CodeSystemExperimental),
-            yes_no(published.experimental()),
-        ),
-        (tr(Msg::CodeSystemPublisher), text(published.publisher())),
-        (
-            tr(Msg::CodeSystemLastChanged),
-            date.unwrap_or_else(|| or_none(String::new())),
+            tr(locale, Msg::CodeSystemComputerName),
+            text(locale, published.name()),
         ),
         (
-            tr(Msg::CodeSystemDescription),
-            text(published.description()),
+            tr(locale, Msg::CodeSystemExperimental),
+            yes_no(locale, published.experimental()),
+        ),
+        (
+            tr(locale, Msg::CodeSystemPublisher),
+            text(locale, published.publisher()),
+        ),
+        (
+            tr(locale, Msg::CodeSystemLastChanged),
+            date.unwrap_or_else(|| or_none(locale, String::new())),
+        ),
+        (
+            tr(locale, Msg::CodeSystemDescription),
+            text(locale, published.description()),
         ),
     ]);
     let content = match (published.content(), published.count()) {
         (content, Some(count)) => tr_with(
+            locale,
             Msg::CodeSystemContentCount,
             &[
-                ("content", content_word(content).into()),
+                ("content", content_word(locale, content).into()),
                 ("count", count.into()),
             ],
         ),
-        (content, None) => content_word(content),
+        (content, None) => content_word(locale, content),
     };
     let structure = definitions(vec![
-        (tr(Msg::CodeSystemsContent), content.into_any()),
+        (tr(locale, Msg::CodeSystemsContent), t(content)),
         (
-            tr(Msg::CodeSystemHierarchyMeaning),
-            text(published.hierarchy_meaning()),
+            tr(locale, Msg::CodeSystemHierarchyMeaning),
+            text(locale, published.hierarchy_meaning()),
         ),
         (
-            tr(Msg::CodeSystemCaseSensitive),
-            yes_no(published.case_sensitive()),
+            tr(locale, Msg::CodeSystemCaseSensitive),
+            yes_no(locale, published.case_sensitive()),
         ),
         (
-            tr(Msg::CodeSystemVersionNeeded),
-            yes_no(published.version_needed()),
+            tr(locale, Msg::CodeSystemVersionNeeded),
+            yes_no(locale, published.version_needed()),
         ),
         (
-            tr(Msg::CodeSystemCompositional),
-            yes_no(published.compositional()),
+            tr(locale, Msg::CodeSystemCompositional),
+            yes_no(locale, published.compositional()),
         ),
         (
-            tr(Msg::CodeSystemSupplements),
-            text(published.supplements()),
+            tr(locale, Msg::CodeSystemSupplements),
+            text(locale, published.supplements()),
         ),
     ]);
-    let properties = declared_properties(published);
-    panel_sections(view! {
-        {note}
-        {panel_section(
+    let properties = declared_properties(locale, published).unwrap_or_default();
+    panel_sections(Html::join([
+        note,
+        panel_section(
+            locale,
             Some(SectionHead {
-                title: tr(Msg::CodeSystemDetails),
+                title: tr(locale, Msg::CodeSystemDetails),
                 count: None,
                 actions: None,
             }),
             details,
-        )}
-        {panel_section(
+        ),
+        panel_section(
+            locale,
             Some(SectionHead {
-                title: tr(Msg::CodeSystemStructure),
+                title: tr(locale, Msg::CodeSystemStructure),
                 count: None,
                 actions: None,
             }),
             structure,
-        )}
-        {properties}
-    })
+        ),
+        properties,
+    ]))
 }
 
 /// The properties the code system declares, as a table; nothing when it
 /// declares none.
-fn declared_properties(published: &PublishedCodeSystem) -> Option<AnyView> {
+fn declared_properties(locale: &Locale, published: &PublishedCodeSystem) -> Option<Html> {
     let declared = published.properties();
     (!declared.is_empty()).then(|| {
         let columns = [
-            Column::text("property", tr(Msg::CodeSystemProperty)).role(Role::Title),
-            Column::text("type", tr(Msg::CodeSystemPropertyType)).role(Role::Sub),
-            Column::text("meaning", tr(Msg::CodeSystemPropertyMeaning)).role(Role::Quiet),
+            Column::text("property", tr(locale, Msg::CodeSystemProperty)).role(Role::Title),
+            Column::text("type", tr(locale, Msg::CodeSystemPropertyType)).role(Role::Sub),
+            Column::text("meaning", tr(locale, Msg::CodeSystemPropertyMeaning)).role(Role::Quiet),
         ];
         let [_, kind, meaning] = &columns;
-        let rows = declared
-            .iter()
-            .map(|property| {
-                view! {
-                    <tr>
-                        {title_cell(
-                            None,
-                            view! { <code>{property.code.clone().unwrap_or_default()}</code> },
-                            None,
-                        )} {cell(kind, property.kind.clone().unwrap_or_default())}
-                        {cell(
-                            meaning,
-                            property
-                                .description
-                                .clone()
-                                .or_else(|| property.uri.clone())
-                                .unwrap_or_default(),
-                        )}
-                    </tr>
-                }
-            })
-            .collect_view()
-            .into_any();
-        let caption = tr(Msg::CodeSystemDeclaredProperties);
+        let rows = join(declared.iter().map(|property| {
+            h(format!(
+                "<tr>{}{}{}</tr>",
+                title_cell(None, code(property.code.clone().unwrap_or_default()), None),
+                cell(kind, t(property.kind.clone().unwrap_or_default())),
+                cell(
+                    meaning,
+                    t(property
+                        .description
+                        .clone()
+                        .or_else(|| property.uri.clone())
+                        .unwrap_or_default()),
+                ),
+            ))
+        }));
+        let caption = tr(locale, Msg::CodeSystemDeclaredProperties);
         let table = data_table(DataTable {
             caption: &caption,
             columns: &columns,
@@ -419,6 +440,7 @@ fn declared_properties(published: &PublishedCodeSystem) -> Option<AnyView> {
             body: Body::Rows(rows),
         });
         panel_section(
+            locale,
             Some(SectionHead {
                 title: caption.clone(),
                 count: Some(HeadingCount::All(
@@ -432,160 +454,140 @@ fn declared_properties(published: &PublishedCodeSystem) -> Option<AnyView> {
 }
 
 /// The title of one served version: Release for one read from an index.
-fn version_title(row: &VersionRow) -> String {
+fn version_title(locale: &Locale, row: &VersionRow) -> String {
     let code = row
         .code
         .clone()
-        .unwrap_or_else(|| tr(Msg::CodeSystemUnnamedVersion));
+        .unwrap_or_else(|| tr(locale, Msg::CodeSystemUnnamedVersion));
     if row.artifact.is_some() {
-        tr_with(Msg::CodeSystemRelease, &[("version", code.into())])
+        tr_with(locale, Msg::CodeSystemRelease, &[("version", code.into())])
     } else {
-        tr_with(Msg::VersionsOne, &[("version", code.into())])
+        tr_with(locale, Msg::VersionsOne, &[("version", code.into())])
     }
 }
 
+/// Codes in the code face, a space after each.
+fn codes(each: &[String]) -> Html {
+    join(each.iter().map(|one| h(format!("{} ", code(one)))))
+}
+
 /// The filters one served version declares, as a table.
-fn version_filters(row: &VersionRow, filters_title: &str) -> AnyView {
+fn version_filters(locale: &Locale, row: &VersionRow, filters_title: &str) -> Html {
     if row.filters.is_empty() {
-        section_intro(tr(Msg::CodeSystemNoFilters))
+        section_intro(tr(locale, Msg::CodeSystemNoFilters))
     } else {
         let columns = [
-            Column::text("property", tr(Msg::CodeSystemProperty)).role(Role::Title),
-            Column::text("operators", tr(Msg::CodeSystemOperators)),
+            Column::text("property", tr(locale, Msg::CodeSystemProperty)).role(Role::Title),
+            Column::text("operators", tr(locale, Msg::CodeSystemOperators)),
         ];
         let [_, operators] = &columns;
-        let rows = row
-            .filters
-            .iter()
-            .map(|filter| {
-                let ops = filter
-                    .operators
-                    .iter()
-                    .map(|op| {
-                        view! {
-                            <code>{op.clone()}</code>
-                            " "
-                        }
-                    })
-                    .collect_view();
-                view! {
-                    <tr>
-                        {title_cell(None, view! { <code>{filter.code.clone()}</code> }, None)}
-                        {cell(operators, ops)}
-                    </tr>
-                }
-            })
-            .collect_view()
-            .into_any();
+        let rows = join(row.filters.iter().map(|filter| {
+            h(format!(
+                "<tr>{}{}</tr>",
+                title_cell(None, code(&filter.code), None),
+                cell(operators, codes(&filter.operators)),
+            ))
+        }));
         data_table(DataTable {
             caption: filters_title,
             columns: &columns,
             sorting: Sorting::default(),
             body: Body::Rows(rows),
         })
-        .into_any()
     }
 }
 
 /// Versions: what the server declares it can do with each version.
-fn versions(read: &Read) -> AnyView {
-    let sections = read
-        .card
-        .versions
-        .iter()
-        .map(|row| {
-            let title = version_title(row);
-            let answers = if row.is_default {
-                tr_with(
-                    Msg::CodeSystemAnswersDefault,
-                    &[("version", title.clone().into())],
-                )
-            } else {
-                tr_with(
-                    Msg::CodeSystemAnswersOnly,
-                    &[("version", title.clone().into())],
-                )
-            };
-            let subsumption = if read.card.subsumption == Some(true) {
-                tr(Msg::CodeSystemSubsumes)
-            } else {
-                tr(Msg::CodeSystemNoSubsumption)
-            };
-            let languages = if row.languages.is_empty() {
-                or_none(String::new())
-            } else {
-                row.languages.join(", ").into_any()
-            };
-            let properties = if row.properties.is_empty() {
-                or_none(String::new())
-            } else {
-                row.properties
-                    .iter()
-                    .map(|property| {
-                        view! {
-                            <code>{property.clone()}</code>
-                            " "
-                        }
-                    })
-                    .collect_view()
-                    .into_any()
-            };
-            let mut facts = vec![
-                (tr(Msg::CodeSystemAnswersRequests), answers.into_any()),
-                (tr(Msg::CodeSystemSubsumption), subsumption.into_any()),
-                (tr(Msg::CodeSystemLanguages), languages),
-                (tr(Msg::CodeSystemLookUpReturns), properties),
-            ];
-            if let Some(artifact) = &row.artifact {
-                let name = artifact
-                    .name
-                    .clone()
-                    .or_else(|| artifact.release.clone())
-                    .unwrap_or_default();
-                facts.push((
-                    tr(Msg::CodeSystemReadFrom),
-                    view! { <code>{name}</code> }.into_any(),
-                ));
-            }
-            let filters_title = tr_with(
-                Msg::CodeSystemFiltersOf,
+fn versions(locale: &Locale, read: &Read) -> Html {
+    let sections = join(read.card.versions.iter().map(|row| {
+        let title = version_title(locale, row);
+        let answers = if row.is_default {
+            tr_with(
+                locale,
+                Msg::CodeSystemAnswersDefault,
                 &[("version", title.clone().into())],
-            );
-            let filters = version_filters(row, &filters_title);
-            view! {
-                {panel_section(
-                    Some(SectionHead {
-                        title,
-                        count: None,
-                        actions: None,
-                    }),
-                    definitions(facts),
-                )}
-                {panel_section(
-                    Some(SectionHead {
-                        title: filters_title.clone(),
-                        count: None,
-                        actions: None,
-                    }),
-                    filters,
-                )}
-            }
-            .into_any()
-        })
-        .collect_view();
-    panel_sections(view! {
-        {panel_section(None, section_intro(tr(Msg::CodeSystemVersionsIntro)))}
-        {sections}
-    })
+            )
+        } else {
+            tr_with(
+                locale,
+                Msg::CodeSystemAnswersOnly,
+                &[("version", title.clone().into())],
+            )
+        };
+        let subsumption = if read.card.subsumption == Some(true) {
+            tr(locale, Msg::CodeSystemSubsumes)
+        } else {
+            tr(locale, Msg::CodeSystemNoSubsumption)
+        };
+        let languages = if row.languages.is_empty() {
+            or_none(locale, String::new())
+        } else {
+            t(row.languages.join(", "))
+        };
+        let properties = if row.properties.is_empty() {
+            or_none(locale, String::new())
+        } else {
+            codes(&row.properties)
+        };
+        let mut facts = vec![
+            (tr(locale, Msg::CodeSystemAnswersRequests), t(answers)),
+            (tr(locale, Msg::CodeSystemSubsumption), t(subsumption)),
+            (tr(locale, Msg::CodeSystemLanguages), languages),
+            (tr(locale, Msg::CodeSystemLookUpReturns), properties),
+        ];
+        if let Some(artifact) = &row.artifact {
+            let name = artifact
+                .name
+                .clone()
+                .or_else(|| artifact.release.clone())
+                .unwrap_or_default();
+            facts.push((tr(locale, Msg::CodeSystemReadFrom), code(name)));
+        }
+        let filters_title = tr_with(
+            locale,
+            Msg::CodeSystemFiltersOf,
+            &[("version", title.clone().into())],
+        );
+        let filters = version_filters(locale, row, &filters_title);
+        Html::join([
+            panel_section(
+                locale,
+                Some(SectionHead {
+                    title,
+                    count: None,
+                    actions: None,
+                }),
+                definitions(facts),
+            ),
+            panel_section(
+                locale,
+                Some(SectionHead {
+                    title: filters_title.clone(),
+                    count: None,
+                    actions: None,
+                }),
+                filters,
+            ),
+        ])
+    }));
+    panel_sections(Html::join([
+        panel_section(
+            locale,
+            None,
+            section_intro(tr(locale, Msg::CodeSystemVersionsIntro)),
+        ),
+        sections,
+    ]))
 }
 
 /// JSON: the resource as the server sent it, read with `_summary=true` for
 /// a system served from an index.
-fn json(read: &Read) -> AnyView {
+fn json(locale: &Locale, read: &Read) -> Html {
     let Some(text) = &read.text else {
         return panel_sections(panel_section(
+            locale,
             None,
-            section_intro(tr(Msg::CodeSystemNoResource)),
+            section_intro(tr(locale, Msg::CodeSystemNoResource)),
         ));
     };
     let id = read
@@ -596,6 +598,7 @@ fn json(read: &Read) -> AnyView {
     let summary = read.source == Source::Index;
     let title = if summary {
         tr_with(
+            locale,
             Msg::DetailJsonSummaryTitle,
             &[("path", format!("CodeSystem/{id}").into())],
         )
@@ -603,17 +606,24 @@ fn json(read: &Read) -> AnyView {
         format!("CodeSystem/{id}")
     };
     let code = Code {
-        label: tr(Msg::CodeSystemJsonLabel),
+        label: tr(locale, Msg::CodeSystemJsonLabel),
         language: Language::Json,
         text: text.clone(),
         ids: None,
         current: None,
         diagnostics: Vec::new(),
     };
-    let note = summary.then(|| panel_section(None, section_intro(tr(Msg::CodeSystemSummaryNote))));
-    panel_sections(view! {
-        {note}
-        {code_section(
+    let note = summary.then(|| {
+        panel_section(
+            locale,
+            None,
+            section_intro(tr(locale, Msg::CodeSystemSummaryNote)),
+        )
+    });
+    panel_sections(Html::join([
+        note.unwrap_or_default(),
+        code_section(
+            locale,
             CodeHead {
                 title,
                 tags: vec![String::from("FHIR")],
@@ -622,6 +632,6 @@ fn json(read: &Read) -> AnyView {
                 actions: None,
             },
             &code,
-        )}
-    })
+        ),
+    ]))
 }

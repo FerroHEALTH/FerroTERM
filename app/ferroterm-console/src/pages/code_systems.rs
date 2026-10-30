@@ -11,13 +11,14 @@
 
 use std::collections::BTreeMap;
 
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::model::Noun;
 use ferrohealth_ui::table::view::{Body, Column, DataTable, Role, cell, data_table, title_cell};
 use ferrohealth_ui::view::action::ActionGroup;
+use ferrohealth_ui::view::action_menu::{Act, Action};
 use ferrohealth_ui::view::coding::canonical;
-use ferrohealth_ui::widget::action_menu::{Act, Action};
-use leptos::prelude::*;
 
 use crate::auth::scopes::Letter;
 use crate::fhir::CODE_SYSTEM;
@@ -25,6 +26,7 @@ use crate::fhir::concept::Hierarchy;
 use crate::fhir::named::{Listed, NamedSearch};
 use crate::fhir::terminology::SystemCard;
 use crate::locale::{Msg, message, tr, tr_with};
+use crate::markup::{h, join, t};
 use crate::pages::listing::{Frame, ListState, NAME_COLUMN, counted};
 use crate::pages::parts::{Source, failure, heading, versions_word};
 use crate::request::Request;
@@ -63,35 +65,36 @@ pub(crate) fn rows(cards: Vec<SystemCard>, listed: &[Listed]) -> Vec<SystemRow> 
 /// The content a code system holds, in words: `codeSystem.content`, which
 /// R5 and R6 declare and R4 and R4B do not.
 #[must_use]
-pub(crate) fn content_word(content: Option<&str>) -> String {
+pub(crate) fn content_word(locale: &Locale, content: Option<&str>) -> String {
     match content {
-        Some("complete") => tr(Msg::ContentComplete),
-        Some("not-present") => tr(Msg::ContentNotPresent),
-        Some("example") => tr(Msg::ContentExample),
-        Some("fragment") => tr(Msg::ContentFragment),
-        Some("supplement") => tr(Msg::ContentSupplement),
+        Some("complete") => tr(locale, Msg::ContentComplete),
+        Some("not-present") => tr(locale, Msg::ContentNotPresent),
+        Some("example") => tr(locale, Msg::ContentExample),
+        Some("fragment") => tr(locale, Msg::ContentFragment),
+        Some("supplement") => tr(locale, Msg::ContentSupplement),
         Some(other) => other.to_owned(),
-        None => tr(Msg::ContentUndeclared),
+        None => tr(locale, Msg::ContentUndeclared),
     }
 }
 
 /// Whether a code system has a hierarchy the browser can walk, in words.
 #[must_use]
-pub(crate) fn hierarchy_word(card: &SystemCard) -> String {
+pub(crate) fn hierarchy_word(locale: &Locale, card: &SystemCard) -> String {
     let default = card
         .versions
         .iter()
         .find(|version| version.is_default)
         .or_else(|| card.versions.first());
     match default.map(Hierarchy::of) {
-        Some(Hierarchy::Walkable { .. }) => tr(Msg::HierarchyTree),
-        Some(Hierarchy::WithoutChildren { .. }) => tr(Msg::HierarchyNoTree),
-        Some(Hierarchy::Absent) | None => tr(Msg::HierarchyFlat),
+        Some(Hierarchy::Walkable { .. }) => tr(locale, Msg::HierarchyTree),
+        Some(Hierarchy::WithoutChildren { .. }) => tr(locale, Msg::HierarchyNoTree),
+        Some(Hierarchy::Absent) | None => tr(locale, Msg::HierarchyFlat),
     }
 }
 
 /// Code systems.
-pub(crate) async fn page(request: Request) -> AnyView {
+pub(crate) async fn page(request: Request) -> Html {
+    let locale = &request.locale;
     let capabilities = request
         .client
         .terminology_capabilities(request.version)
@@ -104,16 +107,22 @@ pub(crate) async fn page(request: Request) -> AnyView {
         .unwrap_or_default();
     match capabilities {
         Ok(capabilities) => listing(&request, rows(capabilities.cards(), &listed)),
-        Err(error) => view! {
-            {heading(tr(Msg::ShellCodeSystems), None, Vec::new(), ActionGroup::none())}
-            {failure(&error)}
-        }
-        .into_any(),
+        Err(error) => Html::join([
+            heading(
+                &request,
+                tr(locale, Msg::ShellCodeSystems),
+                None,
+                Vec::new(),
+                ActionGroup::none(),
+            ),
+            failure(locale, &error),
+        ]),
     }
 }
 
 /// The listing of `all` the root serves, as the address filters it.
-fn listing(request: &Request, all: Vec<SystemRow>) -> AnyView {
+fn listing(request: &Request, all: Vec<SystemRow>) -> Html {
+    let locale = &request.locale;
     let state = ListState::read(request);
     let path = ui_path(SYSTEMS_PATH);
     let counts = counted(all.iter().map(|row| row.source));
@@ -125,46 +134,43 @@ fn listing(request: &Request, all: Vec<SystemRow>) -> AnyView {
         |row| row.source,
     );
     let columns = [
-        Column::text(NAME_COLUMN, tr(Msg::CodeSystemsSystem))
+        Column::text(NAME_COLUMN, tr(locale, Msg::CodeSystemsSystem))
             .role(Role::Title)
             .sortable(),
-        Column::text("source", tr(Msg::CodeSystemsSource)).role(Role::Meta),
-        Column::text("versions", tr(Msg::CodeSystemsVersions)).role(Role::Meta),
-        Column::text("content", tr(Msg::CodeSystemsContent)).role(Role::Quiet),
-        Column::text("hierarchy", tr(Msg::CodeSystemsHierarchy)).role(Role::Quiet),
+        Column::text("source", tr(locale, Msg::CodeSystemsSource)).role(Role::Meta),
+        Column::text("versions", tr(locale, Msg::CodeSystemsVersions)).role(Role::Meta),
+        Column::text("content", tr(locale, Msg::CodeSystemsContent)).role(Role::Quiet),
+        Column::text("hierarchy", tr(locale, Msg::CodeSystemsHierarchy)).role(Role::Quiet),
     ];
     let [_, source, versions, content, hierarchy] = &columns;
-    let title = tr(Msg::ShellCodeSystems);
+    let title = tr(locale, Msg::ShellCodeSystems);
     let body = if kept.is_empty() {
         state.emptied(
             request,
             &path,
-            tr_with(Msg::CodeSystemsNoMatch, &[("count", total.into())]),
+            tr_with(locale, Msg::CodeSystemsNoMatch, &[("count", total.into())]),
         )
     } else {
-        let drawn = state
-            .window(kept.len())
-            .slice(&kept)
-            .iter()
-            .map(|row| {
-                let href = system_link(&row.card.url, request.version);
-                let codes: Vec<String> = row
-                    .card
-                    .versions
-                    .iter()
-                    .filter_map(|version| version.code.clone())
-                    .collect();
-                view! {
-                    <tr>
-                        {title_cell(Some(&href), row.name.clone(), Some(canonical(&row.card.url)))}
-                        {cell(source, row.source.tag())} {cell(versions, versions_word(&codes))}
-                        {cell(content, content_word(row.card.content.as_deref()))}
-                        {cell(hierarchy, hierarchy_word(&row.card))}
-                    </tr>
-                }
-            })
-            .collect_view()
-            .into_any();
+        let drawn = join(state.window(kept.len()).slice(&kept).iter().map(|row| {
+            let href = system_link(&row.card.url, request.version);
+            let codes: Vec<String> = row
+                .card
+                .versions
+                .iter()
+                .filter_map(|version| version.code.clone())
+                .collect();
+            h(format!(
+                "<tr>{}{}{}{}{}</tr>",
+                title_cell(Some(&href), t(&row.name), Some(canonical(&row.card.url))),
+                cell(source, row.source.tag(locale)),
+                cell(versions, t(versions_word(locale, &codes))),
+                cell(
+                    content,
+                    t(content_word(locale, row.card.content.as_deref()))
+                ),
+                cell(hierarchy, t(hierarchy_word(locale, &row.card))),
+            ))
+        }));
         let fields = state.fields(request, &[]);
         let sort = state.sort();
         data_table(DataTable {
@@ -173,12 +179,11 @@ fn listing(request: &Request, all: Vec<SystemRow>) -> AnyView {
             sorting: ListState::sorting(&sort, &fields),
             body: Body::Rows(drawn),
         })
-        .into_any()
     };
     let actions = if request.can(CODE_SYSTEM, Letter::Create) {
         ActionGroup::primary(Action::new(
             Some(Glyph::FILE_PLUS),
-            tr(Msg::CodeSystemsNew),
+            tr(locale, Msg::CodeSystemsNew),
             Act::Link(ui_link(CODE_SYSTEM_EDITOR_PATH, request.version)),
         ))
     } else {
@@ -189,6 +194,7 @@ fn listing(request: &Request, all: Vec<SystemRow>) -> AnyView {
         Frame {
             title,
             subtitle: tr_with(
+                locale,
                 Msg::CodeSystemsSubtitle,
                 &[("version", request.version.label().into())],
             ),
@@ -197,10 +203,10 @@ fn listing(request: &Request, all: Vec<SystemRow>) -> AnyView {
             total,
             kept: kept.len(),
             counts,
-            find: tr(Msg::CodeSystemsFind),
+            find: tr(locale, Msg::CodeSystemsFind),
             body,
             pages: (
-                tr(Msg::CodeSystemsPages),
+                tr(locale, Msg::CodeSystemsPages),
                 Noun::new(message(Msg::NounCodeSystems)),
             ),
         },

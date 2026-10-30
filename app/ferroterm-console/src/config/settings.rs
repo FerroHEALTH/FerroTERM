@@ -25,8 +25,6 @@ use crate::config::{Config, Oidc};
 pub struct Settings {
     /// The socket address the console listens on.
     pub listen: SocketAddr,
-    /// The directory holding the site bundle.
-    pub site_root: PathBuf,
     /// The locale a page renders in when the request names none the
     /// console's catalog holds.
     pub locale: Locale,
@@ -224,7 +222,6 @@ impl Config {
         }
         Ok(Settings {
             listen,
-            site_root: self.server.site_root.clone(),
             locale,
             ferroterm: FerrotermSettings {
                 base,

@@ -258,7 +258,12 @@ fn strong_tag_of(etag: &str) -> &str {
 
 /// The `If-Match` header value for a resource at `version_id`.
 pub(crate) fn if_match(version_id: &str) -> String {
-    tr_with(Msg::W, &[("version_id", (version_id).to_string().into())])
+    // NOTE: RFC 9110 §8.8.3: the header is wire syntax, so it never follows the page's language.
+    tr_with(
+        &ferrohealth_ui::i18n::Locale::english(),
+        Msg::W,
+        &[("version_id", (version_id).to_string().into())],
+    )
 }
 
 #[cfg(test)]

@@ -116,26 +116,13 @@ anyhow = "1.0.104"
 jiff = "0.2.35"
 # Expansion identifiers (`ValueSet.expansion.identifier`, a `urn:uuid:`).
 uuid = { version = "1.26.0", features = ["v4"] }
-# The console (app/ferroterm-console): a Leptos app the server draws and the
-# browser hydrates whole, with a backend-for-frontend that reaches the FHIR
-# API server to server. The halves are chosen by target, so the workspace
-# pins leptos with no render-mode feature and the console turns `ssr` on for
-# the host and `hydrate` for wasm32. The wasm-bindgen CLI cargo-leptos runs
-# must equal the crate (docs/VERSIONS.md). Verified against crates.io on
-# 2026-10-18.
-leptos = "0.8.22"
-leptos_axum = "0.8.10"
-leptos_meta = "0.8.7"
-leptos_router = "0.8.17"
-wasm-bindgen = "=0.2.129"
-console_error_panic_hook = "0.1.7"
-# The console's keyboard shortcuts read the key pressed in the browser, at the
-# release wasm-bindgen 0.2.129 resolves with. Verified against crates.io on
-# 2026-10-23.
-web-sys = { version = "0.3.106", default-features = false }
-# The shared FerroHEALTH UI components, pinned exactly: a console moves its pin
-# after looking at its own screens. Verified against crates.io on 2026-10-29.
-ferrohealth-ui = "=0.5.7"
+# The console (app/ferroterm-console): an axum service that draws every page
+# on its server with the shared FerroHEALTH UI components, pinned exactly: a
+# console moves its pin after looking at its own screens. FerroUI 0.6 renders
+# its components from Askama templates and serves its stylesheet, themes and
+# script modules through its own router. Verified against crates.io on
+# 2026-10-30.
+ferrohealth-ui = "=0.6.0"
 # The console's string catalogs: Project Fluent messages embedded at build
 # time from app/ferroterm-console/locales/, the crate and version
 # ferrohealth-ui catalogs its own words with, so one locale drives both.
@@ -151,9 +138,6 @@ cookie = { version = "0.18.2", default-features = false }
 aws-lc-rs = { version = "1.18.2", default-features = false, features = ["aws-lc-sys"] }
 secrecy = { version = "0.10.3", features = ["serde"] }
 url = "2.5.8"
-# Only the console's site bundle is compressed, brotli or gzip as the request
-# asks; the security headers are set per response. Verified 2026-10-18.
-tower-http = { version = "0.7.1", default-features = false, features = ["set-header", "compression-br", "compression-gzip", "fs"] }
 # Observability. `opentelemetry` is the API the product instruments are made
 # with on the meter of ferrohealth-telemetry, at the version that crate
 # builds on. Verified against crates.io on 2026-10-26.
@@ -338,17 +322,4 @@ let_underscore_lock = "deny"
 panic = "unwind"
 overflow-checks = true
 debug = "line-tables-only"
-
-# The console's WebAssembly is downloaded by every reader, so it optimizes for
-# size where the server optimizes for speed. cargo-leptos selects this profile
-# with `lib-profile-release` in app/ferroterm-console/Cargo.toml.
-[profile.wasm-release]
-inherits = "release"
-opt-level = "z"
-lto = true
-codegen-units = 1
-# A WebAssembly stack trace is a browser-console concern, and the debug info
-# is dead weight in a downloaded artifact.
-debug = false
-strip = "debuginfo"
 

@@ -288,7 +288,9 @@ mod tests {
         resource
             .facts()
             .into_iter()
-            .find(|fact| crate::locale::tr(fact.label) == label)
+            .find(|fact| {
+                crate::locale::tr(&ferrohealth_ui::i18n::Locale::english(), fact.label) == label
+            })
             .expect("the screen draws a row for every fact it names")
             .value
     }
@@ -363,10 +365,10 @@ mod tests {
             "an undeclared boolean is not the same claim as a declared `no`"
         );
         assert!(
-            resource
-                .facts()
-                .iter()
-                .any(|fact| crate::locale::tr(fact.label) == "Purpose"),
+            resource.facts().iter().any(|fact| crate::locale::tr(
+                &ferrohealth_ui::i18n::Locale::english(),
+                fact.label
+            ) == "Purpose"),
             "the row is drawn so the screen can state the absence"
         );
     }

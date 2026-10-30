@@ -1,28 +1,16 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! One HTTP exchange with the terminology server, the same value on both
-//! halves of the console.
+//! One HTTP exchange with the terminology server.
 //!
 //! Every request the console makes is written as an [`Exchange`] by
-//! `crate::fhir`. On the server half [`send`] hands it to the console's own
-//! client of the FHIR API, which adds the signed-in reader's access token; in
-//! the browser it goes to the [`forward`] server function, which does the
-//! same on the server, so no token ever reaches the browser. The answer comes
-//! back as an [`Answer`] holding the status, the three headers a write reads,
-//! and the body as text, which `crate::fhir` reads into its own types on
-//! whichever half asked. No specification governs this: our own design.
-#![cfg_attr(
-    target_arch = "wasm32",
-    allow(
-        clippy::unused_async_trait_impl,
-        reason = "the server function macro writes the browser half's call as an async trait method; only that target has it"
-    )
-)]
+//! `crate::fhir`, and the console's own client of the FHIR API sends it
+//! (`crate::upstream::Upstream`), adding the signed-in reader's access
+//! token, so no token ever reaches the browser. The answer comes back as an
+//! [`Answer`] holding the status, the three headers a write reads, and the
+//! body as text, which `crate::fhir` reads into its own types. No
+//! specification governs this: our own design.
 
-use leptos::prelude::*;
-use leptos::server_fn::codec::JsonEncoding;
-use leptos::server_fn::error::{FromServerFnError, ServerFnErrorErr};
 use serde::{Deserialize, Serialize};
 
 /// The sync service's run list, served by its admin listener.
@@ -148,63 +136,8 @@ pub enum ExchangeError {
     /// The console's session store could not be read.
     #[error("the console cannot read its sessions")]
     Sessions,
-    /// The console could not serve the request.
+    /// The console could not serve the request: the client has no way to
+    /// the server.
     #[error("the console could not serve this request")]
     Unavailable,
-    /// The request could not reach the console's server.
-    #[error("the console could not be reached: {message}")]
-    Fetch {
-        /// What the server function transport reported.
-        message: String,
-    },
-}
-
-impl FromServerFnError for ExchangeError {
-    type Encoder = JsonEncoding;
-
-    fn from_server_fn_error(value: ServerFnErrorErr) -> Self {
-        Self::Fetch {
-            message: value.to_string(),
-        }
-    }
-}
-
-/// Sends `exchange` to the terminology server from whichever half runs it.
-///
-/// # Errors
-/// Returns the [`ExchangeError`] of an exchange that produced no answer; an
-/// answer of any status is `Ok`.
-pub async fn send(exchange: Exchange) -> Result<Answer, ExchangeError> {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        crate::upstream::forward(exchange).await
-    }
-    #[cfg(target_arch = "wasm32")]
-    {
-        forward(exchange).await
-    }
-}
-
-/// Forwards `exchange` to the terminology server as the reader whose session
-/// the request carries, and answers what it answered.
-///
-/// The server function is a public endpoint of the console, so it reads the
-/// session itself and forwards only the paths `crate::upstream` allows (the
-/// Leptos book, `server/25_server_functions`).
-///
-/// # Errors
-/// As [`send`].
-#[cfg_attr(
-    not(target_arch = "wasm32"),
-    allow(
-        clippy::unused_async,
-        reason = "the server_fn #[server] macro copies this onto the items it writes (https://docs.rs/server_fn/0.8/server_fn/attr.server.html)"
-    )
-)]
-#[server(endpoint = "fhir")]
-pub async fn forward(
-    /// The request to forward.
-    exchange: Exchange,
-) -> Result<Answer, ExchangeError> {
-    crate::upstream::forward(exchange).await
 }
