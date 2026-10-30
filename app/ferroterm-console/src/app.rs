@@ -5,8 +5,8 @@
 //!
 //! Every page is one document the server draws whole (FerroUI
 //! `docs/consoles.md`, "How a console builds"): a handler draws the screen
-//! the address names ([`crate::screen`]), puts it in the shell
-//! ([`crate::shell`]) unless it stands on its own, and [`answer`] writes the
+//! the address names (`crate::screen`), puts it in the shell
+//! (`crate::shell`) unless it stands on its own, and `answer` writes the
 //! document around it in the reader's theme, density, motion and shortcut
 //! hints, read from their cookies so the page arrives drawn in them, and the
 //! locale as `lang`. The stylesheet, the FerroTERM theme and the one loader

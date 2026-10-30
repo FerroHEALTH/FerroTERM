@@ -156,7 +156,7 @@ check() {
         covered: ([$joined[] | select(.statement != null)] | length),
         uncovered: ([$joined[] | select(.statement == null)] | length),
         records: $joined
-      }' "${docs[@]}" > "$work/record.json"
+      }' ${docs[@]+"${docs[@]}"} > "$work/record.json"
 
   if [[ -n "$record" ]]; then
     cp "$work/record.json" "$record"

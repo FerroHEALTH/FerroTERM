@@ -27,6 +27,10 @@
 # the documents are JSON-LD and the `@context` defines no term for it, a
 # JSON-LD parser drops it on expansion rather than misreading it.
 #
+# An OpenVEX document groups one or more statements (the specification, "VEX
+# Documents"), so when the gate accepts no advisory there is no document:
+# --write removes it and --stdout prints nothing.
+#
 # Usage: scripts/security/vex-generate.sh [--write | --stdout]
 #   --write   (default) overwrite security/vex/rust-advisories.openvex.json
 #   --stdout  print the document instead, changing nothing on disk
@@ -190,7 +194,12 @@ document="$(jq -S --arg key "$REACHABILITY_KEY" '
 
 # jq -S sorts object keys alphabetically, which is what makes the output
 # byte-stable across jq versions; the statement ORDER is fixed above by id.
-if [[ "$mode" = "--stdout" ]]; then
+if [[ "$(jq '.statements | length' <<<"$document")" -eq 0 ]]; then
+  if [[ "$mode" != "--stdout" ]]; then
+    rm -f -- "$OUT"
+    echo "ok: the gate accepts no advisory, so there is no $OUT"
+  fi
+elif [[ "$mode" = "--stdout" ]]; then
   printf '%s\n' "$document"
 else
   printf '%s\n' "$document" > "$OUT"

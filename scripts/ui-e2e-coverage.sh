@@ -12,9 +12,8 @@
 # book, "Instrumentation-based Code Coverage"), each process writing its raw
 # profile into a scratch directory, then merges the profiles with the
 # toolchain's llvm-profdata and exports what the console binary ran, as lcov,
-# to OUT.lcov. The site bundle is built for wasm32 and stays uninstrumented:
-# only the host target's flags carry the instrumentation, so the server half
-# is what the report measures. The console stops on the battery's SIGTERM and
+# to OUT.lcov. The console draws every page on its server, so the binary is
+# all the report measures. The console stops on the battery's SIGTERM and
 # writes its profile as it exits.
 #
 # The battery's own failures fail this script, and the report is written only
@@ -39,8 +38,8 @@ done
 profiles="$(mktemp -d)"
 trap 'rm -f -- "$profiles"/*.profraw "$profiles"/merged.profdata; rmdir -- "$profiles" 2> /dev/null || true' EXIT
 
-# The host triple's own flags, so a `--target wasm32-unknown-unknown` build is
-# untouched (the Cargo reference, configuration, `target.<triple>.rustflags`).
+# The host triple's own flags, so a build script stays uninstrumented (the
+# Cargo reference, configuration, `target.<triple>.rustflags`).
 flags_var="CARGO_TARGET_$(tr '[:lower:]-' '[:upper:]_' <<< "$host")_RUSTFLAGS"
 export "$flags_var=-C instrument-coverage"
 export LLVM_PROFILE_FILE="$profiles/%p-%m.profraw"

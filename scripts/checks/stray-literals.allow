@@ -22,7 +22,6 @@ allow ^user/                                # a SMART scope
 allow ^Coding$                              # a FHIR data type name
 allow ^CONCEPT$                             # the marker a filter sentence places its concept at
 allow ^%                                    # a time format
-allow ^[A-Z]$                               # a KeyboardEvent.key letter with Shift held
-allow ^(Ctrl (Enter|s|S)|Esc|g [a-z]|up \| down)$   # key caps of the shortcuts, written as the keys read
+allow ^(Esc|up \| down)$                    # key caps of the shortcuts, written as the keys read
 allow ^CARGO_                               # a variable cargo sets at build time
-allow ^form\[data-                          # a CSS selector the shortcuts island presses a form's button by
+allow ^ (checked|disabled|selected)$          # a boolean attribute a screen writes into its own markup

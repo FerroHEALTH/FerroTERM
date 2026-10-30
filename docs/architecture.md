@@ -360,7 +360,7 @@ code system adds a loader crate (`rf2` is the first) that feeds them.
 | `app/ferroterm-server` | The `axum` HTTP server: FHIR endpoints, content negotiation, runtime version routing | hand-written |
 | `app/ferroterm-sync` | The synchronisation service: the schedule, the two lanes, activation, retention, and the run records; the one member that links an add-on | hand-written |
 | `addons/nts` | The Nationale Terminologieserver (NTS) source add-on for the sync service: the Nictiz feed, its Keycloak grants, its subscription, and the NL fix-ups; depends on `terminology-syndication` only | hand-written |
-| `app/ferroterm-console` | The FerroTERM Console: a Leptos app rendered on the server and hydrated, its own binary and image, a backend-for-frontend that reaches the server's public FHIR API and links no workspace crate | hand-written |
+| `app/ferroterm-console` | The FerroTERM Console: every page drawn on its own server with FerroUI and complete with no script, its own binary and image, a backend-for-frontend that reaches the server's public FHIR API and links no workspace crate | hand-written |
 | `tools/ferroterm-build` | The offline build: a code system release (RF2 first) → the graph/store/text artifacts the server reads, once per release | tooling |
 | `tools/ferroterm-testkit` | Synthetic fixtures for the test suites, a shaped edition written the way the build writes it; a dev-dependency only, never shipped | tooling |
 | `tools/ferroterm-bench` | The benchmark harness: ingest, footprint, and latency of every served code system into reproducible records | tooling |

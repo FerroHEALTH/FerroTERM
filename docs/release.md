@@ -52,9 +52,7 @@ cut follows, in order.
    `cargo clippy --workspace --all-targets --all-features`, `cargo nextest run
    --workspace --locked`, `RUSTDOCFLAGS="-D warnings" cargo doc`, and the
    guards under `scripts/checks/`, run as CI runs them. The two that compare a
-   change against its base take `origin/main HEAD` on the release branch, and
-   the console's two bundle checks read the site `scripts/release/console-site.sh
-   --release` builds:
+   change against its base take `origin/main HEAD` on the release branch:
 
    ```sh
    bash scripts/checks/versions.sh
@@ -76,9 +74,6 @@ cut follows, in order.
    bash scripts/checks/no-client-in-server.sh
    bash scripts/checks/changelog-guard.sh origin/main HEAD
    bash scripts/checks/crate-version-guard.sh origin/main HEAD
-   bash scripts/release/console-site.sh --release
-   bash scripts/checks/console-bundle.sh
-   bash scripts/checks/console-paths.sh
    ```
 
    `contribution-licence.sh` reads the pull request body, so it runs in CI

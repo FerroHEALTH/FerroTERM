@@ -292,11 +292,8 @@ fn rooted(link: String) -> String {
 ///
 /// The canonical is one percent-encoded path segment, so a URI that carries
 /// its own query string, or any other structural character, survives the
-/// route: `leptos_router` splits the raw path on a literal `/` and only then
-/// decodes the segment it captured.
-// NOTE: a click navigation runs the path through `decodeURI`, which keeps the
-// reserved set escaped (<https://tc39.es/ecma262/#sec-decodeuri-encodeduri>),
-// so a canonical carrying a literal `%` is the one shape that does not survive.
+/// route: the console's router matches the raw path on a literal `/` and only
+/// then decodes the segment it captured.
 pub(crate) fn system_link(system: &str, version: FhirVersion) -> String {
     base_url()
         .segment(SYSTEMS_PATH)
@@ -398,11 +395,10 @@ pub(crate) fn return_path(path: &str) -> Option<&str> {
 mod tests {
     use super::*;
 
-    /// An address under the bundle's own base.
+    /// An address under the console's own base.
     ///
     /// Every expectation is written against the base rather than against a
-    /// literal, because the crate builds twice and the two bundles are based
-    /// at different paths.
+    /// literal, so a console served under another base keeps its tests.
     fn under(path: &str) -> String {
         format!("{UI_BASE}{path}")
     }
@@ -438,7 +434,7 @@ mod tests {
         );
     }
 
-    /// The segment `system_link` wrote, as `leptos_router` reads it back.
+    /// The segment `system_link` wrote, as the console's router reads it back.
     ///
     /// The router splits the raw path on a literal `/` and decodes the
     /// captured segment afterwards, so this models both halves: take the

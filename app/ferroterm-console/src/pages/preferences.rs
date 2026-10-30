@@ -79,8 +79,7 @@ fn own_rows(request: &Request, post: &Post, saved: Option<&str>) -> Vec<Html> {
                  value: String,
                  input: &'static str,
                  placeholder: Option<String>| {
-        // NOTE: no specification governs this: our own design; FerroUI 0.6 draws a
-        // preference's form for a select or a switch alone, so a typed one posts plainly.
+        // TODO(#946): draw these with FerroUI's typed preference once FerroUI#527 ships.
         h(format!(
             r#"<form method="post" action="{}" class="fui-preference-form">{}<input id="{name}" name="{name}" type="{input}" class="fui-input fui-setting-select" value="{}"{} autocomplete="off" spellcheck="false"><button type="submit" class="{}">{}</button></form>"#,
             t(&post.action),

@@ -239,11 +239,11 @@ jobs:
       title: FerroTERM sync
       description: "The FerroTERM synchronisation service: one way from a terminology syndication feed into a running FerroTERM"
 
-  # ── build-console: the console's binaries, site bundle and image ─────────────
+  # ── build-console: the console's binaries and image ─────────────────────────
   # A call and nothing else, for the same L3 reason. It attaches the console's
   # assets to the draft, so it waits for the draft to exist.
   build-console:
-    name: console (binaries, site bundle, image)
+    name: console (binaries, image)
     needs: [plan, github-release]
     permissions:
       contents: write # attach the console's assets to the draft release
@@ -430,8 +430,7 @@ jobs:
               | grep -Fxq "ferroterm-sync-${TAG}-${target}.cdx.json" \
               || missing="$missing ferroterm-sync-${TAG}-${target}.cdx.json"
           done
-          # Every suffix release-console.yml uploads: per console target, and
-          # once for the architecture-independent site bundle.
+          # Every suffix release-console.yml uploads, per console target.
           for target in x86_64-unknown-linux-musl aarch64-unknown-linux-musl; do
             for suffix in \
               ".tar.gz" \
@@ -443,10 +442,6 @@ jobs:
               printf '%s\n' "$assets" | grep -Fxq "ferroterm-console-${TAG}-${target}${suffix}" \
                 || missing="$missing ferroterm-console-${TAG}-${target}${suffix}"
             done
-          done
-          for suffix in ".tar.gz" ".tar.gz.sha256sum" ".tar.gz.sigstore.json" ".tar.gz.intoto.jsonl"; do
-            printf '%s\n' "$assets" | grep -Fxq "ferroterm-console-${TAG}-site${suffix}" \
-              || missing="$missing ferroterm-console-${TAG}-site${suffix}"
           done
           printf '%s\n' "$assets" | grep -Fxq "compose.yaml" || missing="$missing compose.yaml"
           for name in "ferroterm-${TAG}-vulnerability-record.json" "ferroterm-${TAG}-trivy-reports.tar.gz"; do

@@ -6,7 +6,7 @@
 //! security headers.
 //!
 //! Every page is a handler that reads the terminology server and answers the
-//! whole document ([`page`]). Every response carries the browser security
+//! whole document (`page`). Every response carries the browser security
 //! headers of `ferrohealth-server`'s `console` (`nosniff`, `DENY` framing, no
 //! referrer, a same-origin opener, every document `no-store`) with the
 //! console's own Content-Security-Policy in place of the family's
@@ -251,9 +251,10 @@ pub fn policy(form_action: &str) -> HeaderValue {
 }
 
 /// Sets the console's own policy `policy` on the answer, in the place of
-/// the family's, which admits the WebAssembly and the nonce a hydrated
-/// console needs.
+/// the family's, which still admits the WebAssembly and the nonce of a
+/// hydrated console.
 async fn strict_policy(policy: HeaderValue, request: Request, next: Next) -> Response {
+    // TODO(#948): take this policy from ferrohealth-server once FerroSYS#202 ships.
     let mut response = next.run(request).await;
     response
         .headers_mut()

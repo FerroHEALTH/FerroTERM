@@ -6,7 +6,7 @@
 No FHIR or SNOMED CT specification governs a terminology server's user
 interface: this is our own design. What the console *reads* is spec-bound, and
 every citation below points at the FHIR specification, OpenID Connect, the
-Leptos book, or a pinned crate's own documentation.
+HTML standard, or a pinned crate's own documentation.
 
 FerroTERM answers the FHIR terminology API and nothing else. Someone who has
 just started it cannot see what it loaded, browse a hierarchy, or try an
@@ -18,13 +18,11 @@ and editors for the resources a deployment writes.
 ## 1. The shape
 
 **The console is its own binary and its own image, a backend-for-frontend in
-front of the server.** `ferroterm-console` draws the first page on the
-server: it arrives whole and works with no WebAssembly. The browser then
-hydrates the whole page and draws every page after it, each group of pages
-loaded as chunks of its own, so no link or `GET` form reloads the document
-(FerroUI's consumer guide, "How a console builds"). The console's server
-reads each page once, recording what it asks the terminology server, and
-the browser draws the page from that recording. It reaches the terminology
+front of the server.** `ferroterm-console` draws every page on its own
+server and answers it whole: each page works with no script, and FerroUI's
+plain script modules only improve what is already there (FerroUI's consumer
+guide, `docs/consoles.md`). A link or a `GET` form loads the next page, a
+`POST` form writes and the server answers with what it wrote. It reaches the terminology
 server over the server's public FHIR API, server to server, and the
 terminology server serves no user interface of its own.
 
@@ -57,12 +55,11 @@ shape, and one operator experience. That is the reason for the shape:
 
 | Concern | Choice |
 |---|---|
-| Framework | Leptos 0.8, `leptos_axum`, `leptos_router`, `leptos_meta` |
-| Halves | chosen by compilation target, never by a Cargo feature: the host half links `leptos` with `ssr`, the `wasm32-unknown-unknown` half with `hydrate`; every page compiles for both |
-| Rendering | every route `SsrMode::Async`: the server waits for the reads a screen exists to show, so no content waits on a script; the browser hydrates the whole page and draws every page after it from the recording of the server's read; reads are links and `GET` forms, writes plain `POST` forms to the page's own address |
-| Components | `ferrohealth-ui` `=0.5.7` (crates.io), its stylesheet served at `/ferrohealth-ui.css` and the FerroTERM brand at `/theme.css`; the console has no stylesheet of its own |
-| Build | cargo-leptos (`scripts/release/console-site.sh`), `wasm-opt` pinned and checked by SHA-256 (`scripts/release/console-tools.sh`); no Node |
-| Image | `docker/console/Dockerfile`, distroless static, the binary and the site bundle the release lane stages |
+| Server | axum: one handler per page reads the terminology server and answers the whole document |
+| Rendering | every page drawn on the server with the reads a screen exists to show, so no content waits on a script; reads are links and `GET` forms, writes plain `POST` forms to the page's own address |
+| Components | `ferrohealth-ui` `=0.6.0` (crates.io): its components return HTML, and its stylesheet, plain script modules and brand assets are served from the library under `/ferrohealth-ui/0.6.0/`, cached as immutable; the console has no stylesheet or script of its own |
+| Build | `cargo build`: one binary, no site bundle, no WebAssembly, no Node |
+| Image | `docker/console/Dockerfile`, distroless static, the binary the release lane stages |
 
 ## 3. Screens
 
@@ -81,7 +78,7 @@ shape, and one operator experience. That is the reason for the shape:
 | Server | `/server`, `/server/operations`, `/server/evidence` | the four `CapabilityStatement` documents side by side, the operations each root declares, the evidence the build ships |
 | Configuration | `/configuration` and its tabs | the console's running configuration, secrets redacted |
 | Your preferences | `/preferences`, `/preferences/reading`, `/preferences/keyboard` | FerroUI's family preferences and the console's own, each its own cookie |
-| Shortcuts, About | `/shortcuts`, `/about` | the keyboard shortcuts; the versions of the console, the server and FerroUI |
+| Shortcuts, About | `/shortcuts`, `/about` | the keyboard shortcuts FerroUI's modules answer; the versions of the console, the server and FerroUI |
 | Sign-in | `/auth/sign-in` | the sign-in and every state it ends in |
 
 No code system is a special case: every screen renders from
@@ -101,8 +98,9 @@ before any script runs. Nothing is kept in browser storage.
 
 ## 5. Security
 
-Every answer carries a Content-Security-Policy with scripts by a nonce minted
-per response, `style-src 'self'` (no `style` attribute, no `<style>`),
+Every answer carries a Content-Security-Policy with `script-src 'self'` (no
+inline script, no nonce, no WebAssembly) and `style-src 'self'` (no `style`
+attribute, no `<style>`),
 `frame-ancestors 'none'` and `form-action` the console and the provider's
 end-session origin, plus `nosniff`, `DENY` framing and no referrer. Documents
 are `no-store`. A request that is not a safe
@@ -114,11 +112,12 @@ endpoint (RFC 7009 §2.1), and follows the provider's end-session endpoint
 
 ## 6. Testing
 
-Business logic lives outside components, in plain types with unit tests. The
+Business logic lives outside the markup, in plain types with unit tests. The
 journeys (`e2e/`, thirtyfour) are the merge gate for what a reader sees:
 `scripts/ui-e2e.sh` starts two servers, the stub identity provider and two
 consoles on loopback and drives Chrome for Testing through chromedriver. They
 cover every screen, the sign-in and sign-out, the authoring round trips, the
 keyboard paths, and the colours the browser painted against WCAG 2.2 AA in
-both themes and both densities. The bundle budget is in
-`.claude/rules/leptos-ui.md`, checked by `scripts/checks/console-bundle.sh`.
+both themes and both densities. They run with FerroUI's modules loaded and
+again with every script refused, and they draw every screen at 320 px
+(WCAG 2.2 SC 1.4.10).

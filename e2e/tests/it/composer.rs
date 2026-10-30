@@ -130,7 +130,8 @@ async fn a_value_set_is_composed_previewed_and_saved() {
     outcome.expect("the journey ran and the browser session ended cleanly");
 }
 
-/// The preview runs on Ctrl Enter and the save on Ctrl S.
+/// The preview and the save are reached and pressed from the keyboard
+/// alone.
 #[tokio::test]
 async fn the_preview_and_the_save_are_reached_from_the_keyboard() {
     let Some(deployment) = signed_in() else {
@@ -142,23 +143,30 @@ async fn the_preview_and_the_save_are_reached_from_the_keyboard() {
             let journey = Journey::open(driver, &deployment.base, "/").await;
             open_new(&journey, &deployment, "writer", "composes-by-keyboard").await;
             compose(&journey, &run_canonical("e2e-composed-keys"), "ba-branch").await?;
-            journey.type_here("\u{e009}\u{e007}").await?;
+            journey
+                .press(By::Css(TITLE_FIELD), "the title field")
+                .await?;
+            journey.tab_to("Run the preview", "the preview's Run").await;
+            journey.type_here("\u{e007}").await?;
             journey
                 .text_becoming(
                     By::Css("main .fui-aside-part"),
                     StringMatch::new("First leaf").partial(),
-                    "Ctrl Enter to run the preview",
+                    "Enter on Run the preview",
                 )
                 .await;
             journey
                 .press(By::Css(TITLE_FIELD), "the title field")
                 .await?;
-            journey.type_here("\u{e009}s").await?;
+            journey
+                .tab_to("Create this value set", "the docked Save")
+                .await;
+            journey.type_here("\u{e007}").await?;
             journey
                 .text_becoming(
                     By::Css("main .fui-load-report"),
                     StringMatch::new("The server now holds version").partial(),
-                    "Ctrl S to save the value set",
+                    "Enter on the docked Save to save the value set",
                 )
                 .await;
             journey.no_console_errors().await;

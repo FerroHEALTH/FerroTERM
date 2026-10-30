@@ -731,10 +731,10 @@ async fn the_four_roots_are_compared() {
     outcome.expect("the journey ran and the browser session ended cleanly");
 }
 
-/// The keyboard shortcuts open FerroUI's legend and go to a screen, once
-/// the page has hydrated; with no WebAssembly the same shortcuts are a page.
+/// The keyboard shortcuts open FerroUI's legend once its module runs and
+/// close it on Escape; with no script the same shortcuts are a page.
 #[tokio::test]
-async fn the_shortcuts_open_their_legend_and_go_to_a_screen() {
+async fn the_shortcuts_open_their_legend_and_are_listed_at_their_own_address() {
     let Some(base) = server() else {
         return;
     };
@@ -753,17 +753,13 @@ async fn the_shortcuts_open_their_legend_and_go_to_a_screen() {
             journey
                 .count_becoming(By::Css("dialog[open]"), 0, "the legend to close")
                 .await;
-            journey.type_here("gc").await?;
-            journey
-                .address_carrying("/systems", "the code systems screen")
-                .await;
             journey.reopen(&format!("{base}/shortcuts")).await;
             journey
                 .text_becoming(
                     By::Css("main"),
-                    StringMatch::new("Go to").partial(),
+                    StringMatch::new("Read the concept").partial(),
                     "the shortcuts listed at their own address, the page the menu's item \
-                     leads to with no WebAssembly",
+                     leads to with no script",
                 )
                 .await;
             journey.no_console_errors().await;

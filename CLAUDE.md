@@ -80,14 +80,15 @@ server. Every crate carries its own `CLAUDE.md` with crate-local discipline.
   member that may link an `addons/*` crate. Designed in
   `website/book/src/operate/sync.md`, tracked under issue #579.
 - `app/ferroterm-console`: the FerroTERM Console, its own binary and image
-  (`ferroterm-console`, `docker/console/Dockerfile`): a Leptos app rendered on
-  the server and hydrated, drawn with the shared FerroHEALTH components of
-  `ferrohealth-ui`, and a backend-for-frontend in front of the server: it
+  (`ferroterm-console`, `docker/console/Dockerfile`): every page drawn on its
+  own server with the shared FerroHEALTH components of `ferrohealth-ui` and
+  complete with no script, and a backend-for-frontend in front of the server: it
   signs the reader in with OpenID Connect and calls the FHIR API server to
   server, so no token reaches the browser. A pure FHIR client that depends on
   no other crate in the workspace, which `scripts/checks/console-boundary.sh`
-  enforces. Built by cargo-leptos (`scripts/release/console-site.sh`); its
-  `target/site` is never committed. The terminology server serves no UI.
+  enforces. One binary carries the whole console: FerroUI's stylesheet,
+  modules and brand assets are served from the library under
+  `/ferrohealth-ui/<version>/`. The terminology server serves no UI.
   Designed in `docs/console.md`.
 - `tools/ferroterm-build`: the offline build, from an RF2 release to the
   graph/store/text artifacts the server reads, once per edition.
@@ -266,8 +267,8 @@ apply always. Read the relevant one before working in that area.
   advisory on every entry) and the release notes' CRA facts.
 - `.claude/rules/crates-publishing.md`: the published `crates/*` line (plain
   names on crates.io, the lockstep bump rule, Trusted Publishing lanes).
-- `.claude/rules/leptos-ui.md`: the console's own rules (the backend-for-frontend,
-  server rendering and hydration, the FHIR-client boundary, code-system
+- `.claude/rules/console-ui.md`: the console's own rules (the backend-for-frontend,
+  the server-drawn page that works with no script, the FHIR-client boundary, code-system
   neutrality), scoped to `app/ferroterm-console`. FerroUI leads the console's
   UI: its [consumer guide](https://github.com/FerroHEALTH/FerroUI/blob/main/docs/consoles.md),
   component rules and design, read at the tag matching the `ferrohealth-ui`
@@ -276,9 +277,9 @@ apply always. Read the relevant one before working in that area.
   the tracker work-style.
 - Skills: `/spec-lookup` (find the authoritative spec answer in oracle order),
   `/next-task`, `/phase-done`, `/phase-status` (the issue loop),
-  `/leptos-lookup` and `/ui-gates` (the console).
+  `/ferroui-lookup` and `/ui-gates` (the console).
 - Agents: `spec-researcher`, `fhir-conformance-reviewer`, `implementer`,
-  `leptos-reviewer`, `ui-implementer` (all on Opus 5).
+  `ui-reviewer`, `ui-implementer` (all on Opus 5).
 
 **Spec-oracle precedence:** (1) the FHIR normative spec for the served wire
 version, (2) the SNOMED CT URI and ECL specifications, (3) the SNOMED-on-FHIR IG,

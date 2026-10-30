@@ -550,71 +550,10 @@ jobs:
           persist-credentials: false
       - run: bash scripts/checks/console-tokens.sh
 
-  # The console, app/ferroterm-console: a Leptos app rendered on the server and
-  # hydrated, halves chosen by target (no specification governs it: our own
-  # design). The workspace lanes build, lint and test its server half on the
-  # host; this job lints its browser half on the target it ships to, so a
-  # dependency that cannot compile for wasm32 fails here, and builds the
-  # release site bundle with the tools docs/VERSIONS.md pins, against the
-  # budget of .claude/rules/leptos-ui.md. There is no Node in this build.
-  console:
-    name: console
-    needs: detect
-    if: needs.detect.outputs.cargo == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup-rust
-        with:
-          components: clippy, rustfmt
-          cache-key: console
-      - name: Add the WebAssembly target
-        run: rustup target add wasm32-unknown-unknown
-      # leptosfmt is not in install-action's manifest, so install-action would
-      # fall back to cargo-binstall guessing an asset name. A version-pinned
-      # `cargo install --locked` is the deterministic build of the same tool.
-      - name: Install leptosfmt
-        run: cargo install leptosfmt --locked --version 0.1.33
-      - name: Formatting
-        run: |
-          set -euo pipefail
-          cargo fmt -p ferroterm-console --check
-          leptosfmt --check app/ferroterm-console/src
-      - name: Clippy on the target the browser half ships to
-        run: cargo clippy -p ferroterm-console --locked --lib --target wasm32-unknown-unknown -- -D warnings
-      - name: Install cargo-leptos
-        uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
-        with:
-          tool: cargo-leptos@0.3.11
-      - name: Install the wasm-bindgen CLI
-        uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
-        with:
-          tool: wasm-bindgen@0.2.129
-      # Pinned and checked against its SHA-256 before use, so cargo-leptos
-      # finds it on PATH and does not download it itself.
-      - name: Install wasm-opt
-        run: |
-          bash scripts/release/console-tools.sh "$RUNNER_TEMP/console-tools"
-          echo "$RUNNER_TEMP/console-tools/bin" >> "$GITHUB_PATH"
-      - run: bash scripts/release/console-site.sh --release
-      # The bundle's raw and compressed sizes go to the job summary, and the
-      # step fails above the budget of .claude/rules/leptos-ui.md.
-      - name: Measure the bundle against its budget
-        run: bash scripts/checks/console-bundle.sh
-      # The bundle names no home, runner, registry or toolchain directory of
-      # the build host.
-      - name: Check the bundle names no build-host path
-        run: bash scripts/checks/console-paths.sh
-
   # The console's browser journeys (no specification governs them: our own
   # design). A unit test sees none of what a reader sees: a page the server
-  # rendered and the browser hydrated. This job builds the server, the console
-  # and its site bundle the way the release lane does, starts them on loopback
+  # drew and FerroUI's modules ran over, or the same page with them refused.
+  # This job builds the server and the console, starts them on loopback
   # with the stub identity provider, and drives Chrome for Testing at the
   # release docs/VERSIONS.md pins through chromedriver. Rust only: the
   # no-JavaScript mandate covers the test suite as well as the product.
@@ -638,15 +577,9 @@ jobs:
         with:
           components: clippy, rustfmt
           cache-key: ui-e2e
-      - name: Add the WebAssembly target
-        run: rustup target add wasm32-unknown-unknown
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
         with:
-          tool: cargo-leptos@0.3.11, wasm-bindgen@0.2.129, cargo-nextest
-      - name: Install wasm-opt
-        run: |
-          bash scripts/release/console-tools.sh "$RUNNER_TEMP/console-tools"
-          echo "$RUNNER_TEMP/console-tools/bin" >> "$GITHUB_PATH"
+          tool: cargo-nextest
       - name: Install Chrome and chromedriver
         id: chrome
         uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # v2.2.0
@@ -993,7 +926,6 @@ jobs:
       - addon-boundary
       - console-tokens
       - no-client-in-server
-      - console
       - ui-e2e
       - crate-version-guard
       - tracker-helpers

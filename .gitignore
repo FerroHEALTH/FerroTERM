@@ -34,9 +34,6 @@ der2_*
 *.redb
 *.fst
 
-# The console's site bundle is written under target/site by cargo-leptos and
-# staged by the release lane; a checkout never carries one.
-
 # RustRover
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore

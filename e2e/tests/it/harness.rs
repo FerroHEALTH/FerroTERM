@@ -93,10 +93,10 @@ window.__journeyPress = {
 "#;
 
 /// Where the press [`TAG`] watched has left the browser: `loaded` once the
-/// tagged document is gone, `drawn` once the router has drawn another page
-/// in place of the tagged one, `leaving` while the tagged page is still in
-/// front of the browser and another is on its way, `staying` when the press
-/// loads nothing.
+/// tagged document is gone, `drawn` once a page was drawn in place of the
+/// tagged one in the same document, `leaving` while the tagged page is still
+/// in front of the browser and another is on its way, `staying` when the
+/// press loads nothing.
 const LEFT: &str = r#"
 const press = window.__journeyPress;
 if (press === undefined) { return "loaded"; }
@@ -117,8 +117,8 @@ const POLL: Duration = Duration::from_millis(100);
 /// replaced it.
 const STALE_TRIES: usize = 3;
 
-/// The level chromedriver reports for `console.error` and for an uncaught
-/// panic, which `console_error_panic_hook` turns into one.
+/// The level chromedriver reports for `console.error`, an uncaught error in
+/// a module, and a request the page made that failed.
 const SEVERE: &str = "SEVERE";
 
 /// The flags the browser is started with.
@@ -145,18 +145,27 @@ const SIGNED_IN_AS: &str = "Practitioner/e2e-terminologist";
 /// route, in the top bar.
 const SIGN_IN_CONTROL: &str = "//a[normalize-space()='Sign in']";
 
-/// The shell's own mark, which proves a bundle booted.
+/// The shell's own mark, which proves the page drew its shell.
 const SHELL_MARK: &str = "header a.fui-lockup";
 
 /// Whether the page in front of the browser has finished loading and, when
-/// it is the console's, FerroUI has marked it hydrated
-/// (`data-ferroui-hydrated`). A page that is not the console's (the issuer's,
-/// a refusal in plain text) loads no FerroUI stylesheet and is not waited on.
-const HYDRATED: &str = r#"
+/// it is the console's, FerroUI's loader has run over it and marked `<html>`
+/// with `data-fui-script` (`ferrohealth_ui::script::MARK`), so the modules
+/// answer the next press. A page that is not the console's (the issuer's, a
+/// refusal in plain text) loads no FerroUI stylesheet and is not waited on.
+const READY: &str = r#"
 return document.readyState === "complete"
-    && (document.documentElement.hasAttribute("data-ferroui-hydrated")
-        || document.querySelector("link[href='/ferrohealth-ui.css']") === null);
+    && (document.documentElement.hasAttribute("data-fui-script")
+        || document.querySelector("link[href^='/ferrohealth-ui/']") === null);
 "#;
+
+/// Whether the page in front of the browser has finished loading, for a
+/// journey whose browser refuses the modules: nothing marks the page.
+const LOADED: &str = r#"return document.readyState === "complete";"#;
+
+/// The address pattern of FerroUI's script modules, the loader among them,
+/// which a journey without scripts refuses the browser.
+const MODULES: &str = "*/ferrohealth-ui/*/scripts/*";
 
 /// Opens the issuer's profile address, which decides what the sign-in grants.
 ///
@@ -303,7 +312,7 @@ pub async fn session() -> WebDriver {
             .expect("chrome accepts a binary path");
     }
     // chromedriver records the browser log only for a session that asked for
-    // it at creation, and that log is where an uncaught panic lands.
+    // it at creation, and that log is where an uncaught module error lands.
     capabilities
         .set_browser_log_level(LoggingPrefsLogLevel::All)
         .expect("chrome accepts a logging preference");
@@ -345,39 +354,67 @@ fn slug(what: &str) -> String {
 pub struct Journey {
     /// The session every step drives.
     driver: WebDriver,
+    /// Whether the browser loads FerroUI's script modules.
+    scripts: bool,
 }
 
 impl Journey {
     /// Opens `path` on `base` and returns the journey over it.
     pub async fn open(driver: WebDriver, base: &str, path: &str) -> Self {
+        Self::opened(driver, base, path, true).await
+    }
+
+    /// Opens `path` on `base` in a browser refused every one of FerroUI's
+    /// script modules, the loader among them, and returns the journey over
+    /// it: the page as a reader whose modules never load reads it.
+    pub async fn open_without_scripts(driver: WebDriver, base: &str, path: &str) -> Self {
+        let devtools = driver.cdp();
+        devtools
+            .send_raw("Network.enable", serde_json::json!({}))
+            .await
+            .unwrap_or_else(|error| panic!("the browser refused its network domain: {error}"));
+        devtools
+            .send_raw(
+                "Network.setBlockedURLs",
+                serde_json::json!({ "urls": [MODULES] }),
+            )
+            .await
+            .unwrap_or_else(|error| panic!("the browser refused to block the modules: {error}"));
+        Self::opened(driver, base, path, false).await
+    }
+
+    /// Opens `path` on `base`, the browser loading the modules when
+    /// `scripts`.
+    async fn opened(driver: WebDriver, base: &str, path: &str, scripts: bool) -> Self {
         let address = format!("{base}{path}");
         driver
             .goto(address.clone())
             .await
             .unwrap_or_else(|error| panic!("the browser could not open {address}: {error}"));
-        let journey = Self { driver };
-        journey.hydrated().await;
+        let journey = Self { driver, scripts };
+        journey.ready().await;
         journey
     }
 
-    /// Waits, on a console page, until the browser half has attached to it.
+    /// Waits until the page in front of the browser is ready for the next
+    /// step: loaded, and on a console page with its modules running.
     ///
     /// The server sends a whole page, so its controls are on screen before
-    /// their handlers are; a key typed in between reaches the field and never
-    /// the form's state. FerroUI marks `<html>` with `data-ferroui-hydrated`
-    /// once the page and its lazy route have hydrated. A page that is not the
-    /// console's (the issuer's, a refusal in plain text) is not waited on. A
-    /// document still loading is waited on, because its script may not have
-    /// run yet.
-    async fn hydrated(&self) {
+    /// the modules that answer them have run; a key typed in between reaches
+    /// the field and never the module. FerroUI's loader marks `<html>` with
+    /// `data-fui-script` once it has run. A page that is not the console's
+    /// (the issuer's, a refusal in plain text) is not waited on, nor is a
+    /// page whose browser refuses the modules, past its load.
+    async fn ready(&self) {
         // The page is read whole on every poll, so a navigation still settling
         // when the wait starts is judged on the page it lands on, and a script
-        // the navigation interrupts reads as not yet hydrated.
+        // the navigation interrupts reads as not yet ready.
+        let script = if self.scripts { READY } else { LOADED };
         let started = std::time::Instant::now();
         while started.elapsed() <= WAIT {
             let ready = self
                 .driver
-                .execute(HYDRATED, Vec::new())
+                .execute(script, Vec::new())
                 .await
                 .is_ok_and(|answer| answer.convert::<bool>().is_ok_and(|ready| ready));
             if ready {
@@ -387,7 +424,7 @@ impl Journey {
         }
         panic!(
             "{}",
-            self.failure("the page to hydrate", "no data-ferroui-hydrated mark")
+            self.failure("the page to be ready", "no data-fui-script mark")
                 .await
         );
     }
@@ -401,7 +438,7 @@ impl Journey {
             .goto(address)
             .await
             .unwrap_or_else(|error| panic!("the browser could not open {address}: {error}"));
-        self.hydrated().await;
+        self.ready().await;
     }
 
     /// Drops every cookie the console set in this browser, so the next load
@@ -447,16 +484,16 @@ impl Journey {
         self.driver.switch_to_window(window.clone()).await
     }
 
-    /// The first element matching `selector`, once the bundle has rendered it.
+    /// The first element matching `selector`, once the page carries it.
     ///
     /// The wait is the library's own poller over the element condition, so
     /// nothing here sleeps for a fixed time and hopes. A press may have loaded
-    /// a whole new page, so the wait starts with that page's hydration.
+    /// a whole new page, so the wait starts with that page being ready.
     pub async fn element(&self, selector: By, what: &str) -> WebElement {
         // A page a press reloads can replace the element between finding it
         // and centring it, so a stale element is looked up again.
         for _ in 0..STALE_TRIES {
-            self.hydrated().await;
+            self.ready().await;
             let element = match self
                 .driver
                 .query(selector.clone())
@@ -491,7 +528,7 @@ impl Journey {
     /// An element the page holds hidden, such as a control in a closed menu,
     /// is in the document before it is drawn, and a press on it is refused.
     pub async fn visible(&self, selector: By, what: &str) -> WebElement {
-        self.hydrated().await;
+        self.ready().await;
         match self
             .driver
             .query(selector)
@@ -506,7 +543,7 @@ impl Journey {
     }
 
     /// Presses the element matching `selector` once it is on the page, and
-    /// returns once the page the press loads, if any, has hydrated.
+    /// returns once the page the press loads, if any, is ready.
     ///
     /// # Errors
     ///
@@ -517,7 +554,7 @@ impl Journey {
     }
 
     /// Presses `element`, which a journey already holds, and returns once the
-    /// page the press loads, if any, has hydrated.
+    /// page the press loads, if any, is ready.
     ///
     /// # Errors
     ///
@@ -527,14 +564,12 @@ impl Journey {
     }
 
     /// Runs `act`, a press or keys, on a tagged page, and returns once the
-    /// page it loads, if any, has hydrated.
+    /// page it loads, if any, is ready.
     ///
     /// A click can return while the page it leaves is still in front of the
-    /// browser, hydrated, and carrying the controls the next step looks for,
-    /// so every wait after it would pass on a page about to go away. The tag
-    /// goes with that document and marks the page drawn in it, which is how
-    /// the next one is told apart: a new document, or a page the router drew
-    /// in place of the marked one.
+    /// browser, ready, and carrying the controls the next step looks for, so
+    /// every wait after it would pass on a page about to go away. The tag goes
+    /// with that document, which is how the next one is told apart.
     async fn acting<F, A>(&self, what: &str, act: F) -> WebDriverResult<()>
     where
         F: FnOnce() -> A,
@@ -555,7 +590,7 @@ impl Journey {
             match left.as_deref() {
                 Some("staying") => return Ok(()),
                 Some("loaded" | "drawn") => {
-                    self.hydrated().await;
+                    self.ready().await;
                     return Ok(());
                 }
                 _ => {}
@@ -569,7 +604,7 @@ impl Journey {
     }
 
     /// Keeps one preference of Your preferences: the choice card of `key`
-    /// carrying `value` is chosen, the hydrated page keeps it on the change,
+    /// carrying `value` is chosen, the `preference` module keeps it on the change,
     /// and the console's answer is waited for on `<html>`, where `drawn`
     /// carries the theme or the density.
     ///
@@ -601,7 +636,7 @@ impl Journey {
             .await?;
         self.count_becoming(kept, 1, "the console to draw the kept setting")
             .await;
-        self.hydrated().await;
+        self.ready().await;
         Ok(())
     }
 
@@ -614,7 +649,7 @@ impl Journey {
     where
         N: Needle + Clone + Send + Sync + 'static,
     {
-        self.hydrated().await;
+        self.ready().await;
         let deadline = Instant::now() + WAIT;
         loop {
             // NOTE: a press that posts a form loads a new page under the poll,
@@ -689,7 +724,7 @@ impl Journey {
     /// after a key press, the colour a browser actually painted, the height
     /// of the viewport, because Get Window Rect reports the window around it
     /// (<https://www.w3.org/TR/webdriver2/#get-window-rect>), whether a
-    /// document has finished loading, which `hydrated` reads, and whether a
+    /// document has finished loading, which `ready` reads, and whether a
     /// press is loading another page, which `acting` reads. They are read
     /// through a script (<https://www.w3.org/TR/webdriver2/#execute-script>)
     /// and nothing else is.
@@ -726,16 +761,16 @@ impl Journey {
     /// (<https://www.w3.org/TR/webdriver2/#key-actions>). A leading Control
     /// is held down over the rest, as a chord.
     ///
-    /// A shortcut answers only once the page has hydrated, and the last press
-    /// may have loaded a page whose controls are on screen before then, so
-    /// the keys wait for the page. A key that submits a form returns once the
-    /// page it loads has hydrated, as a press does.
+    /// A key a module answers does so only once the loader has run, and the
+    /// last press may have loaded a page whose controls are on screen before
+    /// then, so the keys wait for the page. A key that submits a form returns
+    /// once the page it loads is ready, as a press does.
     ///
     /// # Errors
     ///
     /// Returns the WebDriver error when the browser refused the keys.
     pub async fn type_here(&self, text: &str) -> WebDriverResult<()> {
-        self.hydrated().await;
+        self.ready().await;
         let chain = self.driver.action_chain();
         self.acting("the keys typed", || async move {
             match text.strip_prefix('\u{e009}') {

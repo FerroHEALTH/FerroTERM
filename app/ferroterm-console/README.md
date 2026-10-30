@@ -9,9 +9,9 @@ same public FHIR API any client uses, so anything it does, your own client can
 do. It is one of the FerroHEALTH consoles and draws with their shared
 components.
 
-This archive holds the console server, `ferroterm-console`. It serves the site
-bundle from the release's `ferroterm-console-site` archive, which you unpack
-beside it.
+This archive holds the console server, `ferroterm-console`. The one binary
+carries everything the browser loads; there is no separate site bundle to
+unpack.
 
 ## Run
 

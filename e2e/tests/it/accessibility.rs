@@ -33,7 +33,7 @@ use crate::harness::session;
 /// and `history` against the deployment that has one. The shortcuts' own
 /// address opens their legend as a modal dialog, which the walk would only
 /// tab inside, so `console` reads it instead.
-const SCREENS: [&str; 24] = [
+pub const SCREENS: [&str; 24] = [
     "/",
     "/systems",
     "/systems/https%3A%2F%2Fferroterm.eu%2Ffhir%2FCodeSystem%2Fe2e-taxonomy",
@@ -65,7 +65,7 @@ const SCREENS: [&str; 24] = [
 /// R5 declares the `child-of` filter operator, so the browser offers its tree
 /// and the walk covers the one control with a non-obvious keyboard contract
 /// (<https://www.w3.org/TR/WCAG22/#keyboard>).
-const VERSION: &str = "r5";
+pub const VERSION: &str = "r5";
 
 /// The two densities a reader can choose between.
 const DENSITIES: [&str; 2] = ["comfortable", "compact"];
@@ -138,8 +138,8 @@ const rest = (node) => {
 // below leave out (a skip link drawn off screen until it is focused) still
 // needs its resting look, and a disclosure's summary rests closed.
 document.querySelectorAll('body, body *').forEach(rest);
-// An island that hydrates may put new nodes in place of the ones read above,
-// so every element added later is read at rest as it arrives.
+// A module may put new nodes in place of the ones read above, so every
+// element added later is read at rest as it arrives.
 new MutationObserver((changes) => changes.forEach((change) => change.addedNodes.forEach((added) => {
   if (added.nodeType !== Node.ELEMENT_NODE) { return; }
   [added, ...added.querySelectorAll('*')].forEach(rest);

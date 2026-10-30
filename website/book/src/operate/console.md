@@ -47,7 +47,6 @@ console log, and `RUST_LOG` sets the filter too.
 ```toml
 [server]
 listen = "0.0.0.0:3000"
-site_root = "/site"
 
 [ferroterm]
 # Where the console reaches the server, on your private network.
@@ -107,8 +106,10 @@ endpoint when one is configured.
 ## The screens
 
 Every screen is drawn whole on the console's server and works with scripting
-off; the browser adds the theme menu, the copy buttons, the concept tree and
-the keyboard shortcuts on top. The top bar carries the command bar, the FHIR
+off; FerroUI's script modules add the theme menu, the copy buttons, the
+concept tree's keys and the keyboard shortcuts on top. `/` focuses the
+command bar, `?` opens the list of shortcuts, and **Keyboard shortcuts** under
+your name lists them at their own address. The top bar carries the command bar, the FHIR
 version you are reading through, the server's health, and the menu under your
 name with the theme. The version menu keeps the version for your session, so
 every screen you open next reads the same root. An address that names a
@@ -216,7 +217,7 @@ Signed in with the write scopes, the **Code system editor**, the **Value set
 composer** and the **Concept map editor** write local resources through the
 same REST API any client uses. Each is a plain form: **Save** posts it, the
 console sends the resource, and the page says which version the server wrote.
-`Ctrl S` presses Save. Every save states `If-Match`, so a resource someone
+Every save states `If-Match`, so a resource someone
 changed since you opened it is refused with `412`, your draft stays in the
 form, and the screen offers to reload the current version. Content your
 server serves from its loaded indexes has no write path, so it opens to read
@@ -310,7 +311,7 @@ the resource.
 **Run now** asks first and then posts the service's `POST /run`. The service
 answers once the run has finished, which can take as long as a build, and the
 list then names the run with a link to it. **Activate what is staged**, under
-**More**, posts `POST /activate` the same way. Neither needs WebAssembly. A
+**More**, posts `POST /activate` the same way. Neither needs a script. A
 reader without the scope, or a console without `sync_url`, has no
 Synchronisation entry and its address is not found.
 

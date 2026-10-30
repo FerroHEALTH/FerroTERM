@@ -30,6 +30,7 @@ fn shortcut(locale: &Locale, keys: &str, does: Msg) -> Shortcut {
 /// The groups the legend lists, their words in `locale`.
 #[must_use]
 pub(crate) fn groups(locale: &Locale) -> Vec<ShortcutGroup> {
+    // TODO(#945): list the go-to pairs and the run and save chords once FerroUI#526 ships.
     vec![
         ShortcutGroup {
             title: tr(locale, Msg::KeysEverywhere),

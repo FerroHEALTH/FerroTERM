@@ -65,10 +65,16 @@ readonly KEY="${VEX_REACHABILITY_KEY:-ferroterm:reachability}"
 for tool in cargo jq comm; do
   command -v "$tool" >/dev/null || { echo "vex-reachability: $tool is required" >&2; exit 1; }
 done
-[[ -f "$DOC" ]] || {
+if [[ ! -f "$DOC" ]]; then
+  # NOTE: the OpenVEX specification, "VEX Documents": a gate that accepts no
+  # advisory has no document, and then no dependency path to compare.
+  if [[ -z "$(bash scripts/security/vex-generate.sh --stdout)" ]]; then
+    echo "ok: the gate accepts no advisory, so there is no reachability to compare"
+    exit 0
+  fi
   echo "error: $DOC does not exist — run scripts/security/vex-generate.sh" >&2
   exit 1
-}
+fi
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT

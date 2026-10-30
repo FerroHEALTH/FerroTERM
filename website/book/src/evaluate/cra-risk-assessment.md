@@ -165,10 +165,8 @@ the evidence only).
   each carries its dependency list for a scanner.
 - **Evidence:** `deny.toml`; `.github/workflows/ci.yml` (`cargo-deny`);
   `.github/dependabot.yml`; `.github/workflows/release-build.yml`.
-- **Status:** partial. Two advisories are accepted in `deny.toml`, both
-  `unmaintained` rather than a vulnerability, both compile-time only in the
-  console's Leptos tree, tracked on #432. No release lane scans the container
-  images before they are tagged.
+- **Status:** partial. No advisory is accepted in `deny.toml`. No release
+  lane scans the container images before they are tagged.
 
 ### (b) Secure by default, and reset to the original state
 

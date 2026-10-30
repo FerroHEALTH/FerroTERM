@@ -30,7 +30,6 @@ exist.
 | `image-scan.yml` | weekly: the published `latest` images scanned with every `security/vex/` document as `--vex`, one tracking issue filed or updated on a finding | weekly |
 | `ci.yml` (`vex` job) | the Rust-advisory OpenVEX document regenerated from `deny.toml` and `security/vex/rust-advisories.toml` and diffed, every hand-written document well-formed (`scripts/checks/vex-advisories.sh`), and the release record's coverage check self-tested | always |
 | `ci.yml` (`hadolint` job) | `hadolint` over every `Dockerfile` in the tree, plus `docker/Dockerfile.sync` by name | now |
-| `ci.yml` (`console` job) | the console's browser half: `cargo fmt` and `leptosfmt --check` over `app/ferroterm-console`, `cargo clippy --target wasm32-unknown-unknown -D warnings`, the release site bundle built by cargo-leptos (`scripts/release/console-site.sh --release`), its size against the budget (`scripts/checks/console-bundle.sh`) and no build-host path in it (`scripts/checks/console-paths.sh`) | on workspace |
 | `ci.yml` (`console-boundary` job) | the console's resolved dependency closure links no workspace crate (`scripts/checks/console-boundary.sh`) | on workspace |
 | `ci.yml` (`no-client-in-server` job) | the server binary's resolved dependency tree carries no HTTP client outside `ferrohealth-smart` and `ferrohealth-usage-report`, so its only outbound calls are the authorization server `[auth]` names and the usage report (`scripts/checks/no-client-in-server.sh`) | on workspace |
 | `ci.yml` (`addon-boundary` job) | only `app/ferroterm-sync` links an `addons/*` crate, and an add-on links the syndication client and the leaf crates the script names (`scripts/checks/addon-boundary.sh`, run with `--self-test` first) | on workspace |
@@ -79,31 +78,22 @@ artifact digest and signed by the pinnable workflow identity, verifiable with
 ## The console
 
 `app/ferroterm-console` is the FerroTERM Console, its own binary and image
-(`ghcr.io/ferrohealth/ferroterm-console`), rendered on the server and hydrated
-in the browser. cargo-leptos builds the WebAssembly half and the site bundle;
-Binaryen's `wasm-opt` is downloaded and checked against its SHA-256 by
-`scripts/release/console-tools.sh`, so there
-is no Node in any lane. `scripts/checks/versions.sh` fails when a tool pin of
-`docs/VERSIONS.md` and a workflow or script drift apart.
-
-On a pull request the workspace lanes build, lint and test the console's
-server half like any other crate, and the `console` job gates its browser half:
-`cargo fmt` plus `leptosfmt --check`, clippy against `wasm32-unknown-unknown`
-(the only place a dependency that cannot compile for WebAssembly shows up),
-the release site bundle, its brotli-compressed size against the budget in
-`.claude/rules/leptos-ui.md`, and a check that it names no build-host path.
+(`ghcr.io/ferrohealth/ferroterm-console`), every page drawn on its server
+with FerroUI 0.6. It is one crate built by `cargo build`: there is no
+WebAssembly half, no site bundle and no Node in any lane, and the workspace
+lanes build, lint and test it like any other crate. `scripts/checks/versions.sh`
+fails when the Chrome for Testing pin of `docs/VERSIONS.md` and a workflow
+drift apart.
 
 The `ui-e2e` job proves what a reader sees. `scripts/ui-e2e.sh` builds the
-server, the console (both halves in release, the way the release lane builds
-them, since two halves built apart do not hydrate) and the stub identity
+server, the console (in release, the way the release lane builds it) and the stub identity
 provider from `e2e/src/bin/stub_issuer.rs`, starts two servers, the provider
 and two consoles on loopback, one console offering no sign-in and one signing
 in at the provider, and runs the journeys against them with Chrome for Testing
 and its chromedriver at the release `docs/VERSIONS.md` pins. On a developer
 machine without them the script fetches that release into
-`target/journey-tools` with `scripts/release/journey-tools.sh`, and the site
-build's tools into `target/console-tools`, each checked against its pinned
-SHA-256. Every address is loopback, so no certificate is needed and no check
+`target/journey-tools` with `scripts/release/journey-tools.sh`, checked
+against its pinned SHA-256. Every address is loopback, so no certificate is needed and no check
 is turned off. The journeys
 are plain `#[tokio::test]`s in `e2e/`, a crate the root manifest excludes:
 `thirtyfour` depends on `serde_json` with `preserve_order`, and cargo unifies
@@ -112,12 +102,18 @@ test run write FHIR JSON in a key order the shipped server does not. The job
 therefore also runs the formatting and clippy passes that crate would
 otherwise miss.
 
+The journeys run with FerroUI's script modules loaded, and the `no_script`
+journeys run the same pages with every module refused through the
+DevTools protocol, so a page that needs a script to work fails the merge.
+The `reflow` journeys draw every screen at 320 CSS pixels and fail on a
+sideways scroll (WCAG 2.2 SC 1.4.10).
+
 A failing journey leaves the page it failed on: the harness writes a
 screenshot and the whole document into `target/ui-e2e-failures`, and the job
 uploads that directory as the `ui-e2e-failure` artifact.
 
 On a tag, `release-console.yml` (called by `release.yml`) builds the console's
-binary per architecture and its site bundle once, attests both, and publishes
+binary per architecture, attests it, and publishes
 the multi-platform image from `docker/console/Dockerfile`, which copies what
 the lane staged and compiles nothing. The terminology server's image carries
 no user interface.
