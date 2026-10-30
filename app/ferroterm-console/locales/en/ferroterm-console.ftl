@@ -334,8 +334,6 @@ config-limit = Session limit
 config-limit-line = How many sessions the console holds at once.
 config-listen = Listener
 config-listen-line = Address and port the console listens on.
-config-site-root = Site root
-config-site-root-line = Where the console's built site is read from.
 config-no-sign-in = Sign-in is not set up
 config-no-sign-in-line = Reading stays open; editing needs an [oidc] section.
 config-on = On
@@ -376,9 +374,6 @@ errors-forbidden-body = You are signed in as { $who }, and this account may not 
 errors-forbidden-scope = Needs the scope
 errors-sign-in-again = Sign in again
 session-ended-detail = The session has ended; sign in again.
-errors-unread-title = The page did not load
-errors-unread-body = The console could not read this page from its server: { $reported }. Load the page again, or go back to the dashboard.
-
 ## The keyboard shortcuts
 
 keys-title = Keyboard shortcuts
@@ -388,22 +383,11 @@ keys-everywhere = Everywhere
 keys-find = Find a resource, a code or a phrase
 keys-legend = This legend
 keys-close = Close a dialog, a menu or a panel
-keys-dashboard = Go to the dashboard
-keys-code-systems = Go to code systems
-keys-value-sets = Go to value sets
-keys-concept-maps = Go to concept maps
-keys-browser = Go to the concept browser
-keys-operations = Go to operations
-keys-server = Go to the server
 keys-tree = Concept tree
 keys-tree-move = Previous and next concept
 keys-tree-open = Open a level, or go to its first child
 keys-tree-close = Close a level, or go to the parent
 keys-tree-read = Read the concept
-keys-operations-group = Operations and editors
-keys-run = Run, or run the preview
-keys-save = Save
-
 ## The listings
 
 listing-find-chip = Name: { $words }

@@ -7,10 +7,12 @@
 //!
 //! Every parameter of a run lives in the address, so a run is a link a
 //! reader can share, the back button walks the runs, and the page works
-//! with no WebAssembly. The operations read and never write. No
+//! with no script. The operations read and never write. No
 //! specification governs the layout: our own design.
 
 use ferrohealth_ui::highlight::Language;
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::code::{Code, code_viewer};
@@ -21,10 +23,10 @@ use ferrohealth_ui::view::tabs::{Tab, binder};
 use ferrohealth_ui::view::transform::{
     Density, Run, RunState, request, run_button, transform_options, transform_quiet,
 };
-use leptos::prelude::*;
 
 use crate::fhir::named::NamedSearch;
 use crate::locale::{Msg, tr};
+use crate::markup::{h, join, t};
 use crate::pages::parts::heading;
 use crate::request::Request;
 use crate::routes::{
@@ -64,42 +66,49 @@ impl Op {
     }
 
     /// The tab's words.
-    fn words(self) -> String {
-        tr(match self {
-            Self::Lookup => Msg::OpsLookUp,
-            Self::Check => Msg::OpsCheck,
-            Self::Expand => Msg::OpsExpand,
-            Self::Translate => Msg::OpsTranslate,
-        })
+    fn words(self, locale: &Locale) -> String {
+        tr(
+            locale,
+            match self {
+                Self::Lookup => Msg::OpsLookUp,
+                Self::Check => Msg::OpsCheck,
+                Self::Expand => Msg::OpsExpand,
+                Self::Translate => Msg::OpsTranslate,
+            },
+        )
     }
 }
 
 /// The Operations page on the tab of `op`: the options row `form` over the
 /// `answer`, both in the one plain `GET` form Run submits, which is the
 /// tab's panel (`fui-panel`) so its sections run edge to edge.
-pub(crate) fn frame(request: &Request, op: Op, form: AnyView, answer: AnyView) -> AnyView {
+pub(crate) fn frame(request: &Request, op: Op, form: Html, answer: Html) -> Html {
+    let locale = &request.locale;
     let tabs = Op::ALL
         .into_iter()
         .map(|each| {
             Tab::new(
                 each.path(),
                 ui_link(each.path(), request.version),
-                each.words(),
+                each.words(locale),
             )
         })
         .collect();
-    let panel = view! {
-        <form method="get" action=op.route() class="fui-panel" data-run="">
-            {form}
-            {answer}
-        </form>
-    }
-    .into_any();
-    view! {
-        {heading(tr(Msg::OpsTitle), Some(tr(Msg::OpsSubtitle)), Vec::new(), ActionGroup::none())}
-        {binder(tr(Msg::OpsTabs), tabs, op.path(), panel)}
-    }
-    .into_any()
+    let panel = h(format!(
+        r#"<form method="get" action="{}" class="fui-panel">{}</form>"#,
+        t(op.route()),
+        Html::join([form, answer])
+    ));
+    Html::join([
+        heading(
+            request,
+            tr(locale, Msg::OpsTitle),
+            Some(tr(locale, Msg::OpsSubtitle)),
+            Vec::new(),
+            ActionGroup::none(),
+        ),
+        binder(locale, tr(locale, Msg::OpsTabs), tabs, op.path(), panel),
+    ])
 }
 
 /// The options row: `fields` with `run` at its end, keeping the FHIR version
@@ -107,36 +116,51 @@ pub(crate) fn frame(request: &Request, op: Op, form: AnyView, answer: AnyView) -
 pub(crate) fn options(
     request: &Request,
     hidden: &[(&'static str, String)],
-    fields: AnyView,
-    run: AnyView,
-) -> AnyView {
-    let hidden = hidden
-        .iter()
-        .map(|(name, value)| view! { <input type="hidden" name=*name value=value.clone() /> })
-        .collect_view();
+    fields: Html,
+    run: Html,
+) -> Html {
+    let hidden = join(hidden.iter().map(|(name, value)| hidden_field(name, value)));
     transform_options(
         Density::Dense,
-        view! {
-            <input type="hidden" name=VERSION_PARAM value=request.version.segment() />
-            {hidden}
-            {fields}
-        },
+        Html::join([
+            hidden_field(VERSION_PARAM, request.version.segment()),
+            hidden,
+            fields,
+        ]),
         run,
     )
 }
 
-/// Run, its `label` and `glyph`, pressed by Ctrl Enter and naming the
-/// `operation` it calls.
-pub(crate) fn run(id: &str, label: String, glyph: Glyph, operation: &str) -> AnyView {
+/// A hidden field named `name` carrying `value`.
+pub(crate) fn hidden_field(name: &str, value: &str) -> Html {
+    h(format!(
+        r#"<input type="hidden" name="{}" value="{}">"#,
+        t(name),
+        t(value)
+    ))
+}
+
+/// Run, its `label` and `glyph`, naming the `operation` it calls.
+pub(crate) fn run(locale: &Locale, id: &str, label: String, glyph: Glyph, operation: &str) -> Html {
     run_button(Run {
         id: id.to_owned(),
         label,
-        busy: tr(Msg::OpsRunning),
+        busy: tr(locale, Msg::OpsRunning),
         glyph,
-        shortcut: Some(String::from("Ctrl Enter")),
+        shortcut: None,
         operation: Some(operation.to_owned()),
         state: RunState::Ready,
     })
+}
+
+/// An `<option>` of `value` reading `words`, chosen when `selected`.
+pub(crate) fn option(value: &str, words: &str, selected: bool) -> Html {
+    h(format!(
+        r#"<option value="{}"{}>{}</option>"#,
+        t(value),
+        if selected { " selected" } else { "" },
+        t(words)
+    ))
 }
 
 /// A select named `name` of `choices` (each its value and words), `picked`
@@ -150,39 +174,20 @@ pub(crate) fn select(
     choices: &[(String, String)],
     picked: &str,
     blank: Option<String>,
-) -> AnyView {
-    let blank = blank.map(|words| {
-        view! {
-            <option value="" selected=picked.is_empty()>
-                {words}
-            </option>
-        }
-    });
-    let kept =
-        (!picked.is_empty() && !choices.iter().any(|(value, _)| value == picked)).then(|| {
-            view! {
-                <option value=picked.to_owned() selected=true>
-                    {picked.to_owned()}
-                </option>
-            }
-        });
-    let offered = choices
-        .iter()
-        .map(|(value, words)| {
-            view! {
-                <option value=value.clone() selected=value == picked>
-                    {words.clone()}
-                </option>
-            }
-        })
-        .collect_view();
-    Field::new(id, label).view(view! {
-        <select id=id name=name class=SELECT>
-            {blank}
-            {kept}
-            {offered}
-        </select>
-    })
+) -> Html {
+    let blank = blank.map(|words| option("", &words, picked.is_empty()));
+    let kept = (!picked.is_empty() && !choices.iter().any(|(value, _)| value == picked))
+        .then(|| option(picked, picked, true));
+    let offered = join(
+        choices
+            .iter()
+            .map(|(value, words)| option(value, words, value == picked)),
+    );
+    Field::new(id, label).view(h(format!(
+        r#"<select id="{id}" name="{name}" class="{SELECT}">{}{}{offered}</select>"#,
+        blank.unwrap_or_default(),
+        kept.unwrap_or_default(),
+    )))
 }
 
 /// A text field named `name` holding `value`, with the hint `placeholder`.
@@ -192,17 +197,12 @@ pub(crate) fn text(
     label: String,
     value: &str,
     placeholder: String,
-) -> AnyView {
-    Field::new(id, label).view(view! {
-        <input
-            id=id
-            name=name
-            class=INPUT
-            value=value.to_owned()
-            placeholder=placeholder
-            autocomplete="off"
-        />
-    })
+) -> Html {
+    Field::new(id, label).view(h(format!(
+        r#"<input id="{id}" name="{name}" class="{INPUT}" value="{}" placeholder="{}" autocomplete="off">"#,
+        t(value),
+        t(placeholder)
+    )))
 }
 
 /// The choices a picker of published resources offers: each canonical with
@@ -220,14 +220,20 @@ pub(crate) fn choices(named: Option<&NamedSearch>) -> Vec<(String, String)> {
 }
 
 /// The one quiet line that stands where the answer will be.
-pub(crate) fn before(line: String) -> AnyView {
-    panel_section(None, transform_quiet(line))
+pub(crate) fn before(locale: &Locale, line: String) -> Html {
+    panel_section(locale, None, transform_quiet(line))
 }
 
 /// The verdict line of an answer: how it went, in a sentence, and its one
 /// action.
-pub(crate) fn verdict(outcome: Outcome, title: AnyView, action: Option<AnyView>) -> AnyView {
+pub(crate) fn verdict(
+    locale: &Locale,
+    outcome: Outcome,
+    title: Html,
+    action: Option<Html>,
+) -> Html {
     panel_section(
+        locale,
         None,
         load_report(LoadReport {
             outcome,
@@ -241,7 +247,7 @@ pub(crate) fn verdict(outcome: Outcome, title: AnyView, action: Option<AnyView>)
 
 /// The request an answer came from, `GET url`, with Copy, and the answer
 /// as the server sent it under `raw` when there is one.
-pub(crate) fn sent(url: &str, raw: Option<(String, String)>) -> AnyView {
+pub(crate) fn sent(locale: &Locale, url: &str, raw: Option<(String, String)>) -> Html {
     let raw = raw.map(|(summary, text)| {
         let code = Code {
             label: summary.clone(),
@@ -251,18 +257,22 @@ pub(crate) fn sent(url: &str, raw: Option<(String, String)>) -> AnyView {
             current: None,
             diagnostics: Vec::new(),
         };
-        (summary, code_viewer(None, &code))
+        (summary, code_viewer(locale, None, &code))
     });
     panel_section(
+        locale,
         Some(SectionHead {
-            title: tr(Msg::OpsRequest),
+            title: tr(locale, Msg::OpsRequest),
             count: None,
             actions: None,
         }),
-        request(ferrohealth_ui::view::transform::Request {
-            text: format!("GET {url}"),
-            copy: Some(String::from("operation-request-copy")),
-            raw,
-        }),
+        request(
+            locale,
+            ferrohealth_ui::view::transform::Request {
+                text: format!("GET {url}"),
+                copy: Some(String::from("operation-request-copy")),
+                raw,
+            },
+        ),
     )
 }

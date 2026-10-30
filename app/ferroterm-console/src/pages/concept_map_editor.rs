@@ -13,6 +13,8 @@
 
 use std::collections::BTreeMap;
 
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::coding::Coding;
@@ -23,22 +25,23 @@ use ferrohealth_ui::view::notice::{Announce, notice};
 use ferrohealth_ui::view::surface::{
     SectionHead, card_action, panel_section, panel_sections_card, section_intro, stack,
 };
-use leptos::prelude::*;
 
 use crate::auth::scopes::Letter;
 use crate::authoring::code_system::Key;
 use crate::authoring::concept_map::{MapDraft, MapElement, MapGroup, MapTarget, dialect};
+use crate::fhir::CONCEPT_MAP;
 use crate::fhir::compose::STATUSES;
 use crate::fhir::version::FhirVersion;
-use crate::fhir::{CODE_SYSTEM, CONCEPT_MAP};
 use crate::locale::{Msg, tr, tr_with};
+use crate::markup::{h, join, t};
 use crate::pages::detail::Kind;
 use crate::pages::editor::{
     DISCARD, OPENED, OPENED_AT, SAVE, SAVED_PARAM, Standing, add_button, dock, field, form,
     heading, icon_submit, name, opened_line, percent, refused, rows, text_field,
 };
-use crate::pages::operations::choices;
-use crate::pages::parts::{failure, name_of, redirect};
+use crate::pages::expand::checkbox;
+use crate::pages::operations::{hidden_field, option};
+use crate::pages::parts::{failure, name_of};
 use crate::posted::Posted;
 use crate::request::Request;
 use crate::routes::{
@@ -84,7 +87,7 @@ const RELATIONSHIPS: [&str; 5] = [
 type ReadRelationship = fn(&str) -> Option<Relationship>;
 
 /// The relationship codes `version` writes, each with its words.
-fn relationship_choices(version: FhirVersion) -> Vec<(&'static str, String)> {
+fn relationship_choices(locale: &Locale, version: FhirVersion) -> Vec<(&'static str, String)> {
     let (codes, read): (&[&'static str], ReadRelationship) = match version {
         FhirVersion::R4 | FhirVersion::R4B => (&EQUIVALENCES, Relationship::from_r4),
         FhirVersion::R5 | FhirVersion::R6 => (&RELATIONSHIPS, Relationship::from_r5),
@@ -94,7 +97,7 @@ fn relationship_choices(version: FhirVersion) -> Vec<(&'static str, String)> {
         .map(|code| {
             let words = read(code).map_or_else(
                 || (*code).to_owned(),
-                |relation| relation.words().text().to_owned(),
+                |relation| relation.words(locale).text().to_owned(),
             );
             (*code, format!("{words} ({code})"))
         })
@@ -102,7 +105,8 @@ fn relationship_choices(version: FhirVersion) -> Vec<(&'static str, String)> {
 }
 
 /// The concept map editor.
-pub(crate) async fn page(request: Request) -> AnyView {
+pub(crate) async fn page(request: Request) -> Html {
+    let locale = &request.locale;
     let posted = request.posted.clone();
     let letter = if request.text(MAP_EDITOR_PARAM).is_empty() {
         Letter::Create
@@ -111,13 +115,14 @@ pub(crate) async fn page(request: Request) -> AnyView {
     };
     if !request.can(CONCEPT_MAP, letter) {
         if request.session.who().is_none() && request.sign_in {
-            redirect(&sign_in_link(&request.back()));
+            request.answering.redirect(&sign_in_link(&request.back()));
         }
         return crate::pages::errors::forbidden_page(
+            &request,
             Msg::EditorForbiddenConceptMap,
             "user/ConceptMap.cu",
             (
-                tr(Msg::ShellConceptMaps),
+                tr(locale, Msg::ShellConceptMaps),
                 ui_link(CONCEPT_MAPS_PATH, request.version),
             ),
         );
@@ -139,12 +144,13 @@ fn address(request: &Request, canonical: &str) -> String {
 }
 
 /// The page, after whatever the reader `posted`.
-async fn edited(request: &Request, posted: Option<&Posted>) -> AnyView {
+async fn edited(request: &Request, posted: Option<&Posted>) -> Html {
+    let locale = &request.locale;
     let canonical = request.text(MAP_EDITOR_PARAM);
     let here = address(request, &canonical);
     if posted.is_some_and(|form| form.intent() == DISCARD) {
-        redirect(&here);
-        return ().into_any();
+        request.answering.redirect(&here);
+        return Html::empty();
     }
     let opened = match open(request, &canonical).await {
         Ok(opened) => opened,
@@ -153,16 +159,7 @@ async fn edited(request: &Request, posted: Option<&Posted>) -> AnyView {
     if let Some(saved) = request.param(SAVED_PARAM) {
         return saved_page(request, &opened, &saved);
     }
-    let systems_named = request
-        .client
-        .published_names(request.version, CODE_SYSTEM)
-        .await
-        .ok();
-    let systems = choices(systems_named.as_ref());
-    let names = systems_named
-        .as_ref()
-        .map(crate::fhir::named::NamedSearch::names)
-        .unwrap_or_default();
+    let (systems, names) = crate::pages::composer::systems_of(request).await;
     let mut draft = opened.clone();
     let mut opened_version = opened.version_id.clone();
     let mut opened_at = jiff::Timestamp::now().to_string();
@@ -173,7 +170,7 @@ async fn edited(request: &Request, posted: Option<&Posted>) -> AnyView {
         apply(form, &opened, &mut draft);
         if form.intent() == SAVE && draft.problems(request.version).is_empty() {
             match save(request, &draft, &opened_version, &here).await {
-                Ok(()) => return ().into_any(),
+                Ok(()) => return Html::empty(),
                 Err(refusal) => answer = Some(*refusal),
             }
         }
@@ -181,67 +178,80 @@ async fn edited(request: &Request, posted: Option<&Posted>) -> AnyView {
     let problems = draft.problems(request.version);
     let standing = match (&answer, problems.first()) {
         (Some((_, standing)), _) => standing.clone(),
-        (None, Some(problem)) => Standing::Incomplete(problem.text()),
+        (None, Some(problem)) => Standing::Incomplete(problem.text(locale)),
         (None, None) if draft.body(request.version) == opened.body(request.version) => {
             Standing::Unchanged
         }
         (None, None) => Standing::Changed,
     };
     let bar = dock(
-        tr(if draft.id.is_empty() {
-            Msg::EditorCreateConceptMap
-        } else {
-            Msg::EditorSaveConceptMap
-        }),
+        locale,
+        tr(
+            locale,
+            if draft.id.is_empty() {
+                Msg::EditorCreateConceptMap
+            } else {
+                Msg::EditorSaveConceptMap
+            },
+        ),
         &standing,
     );
     let resource = crumb(request, &opened);
-    let title = tr(if opened.id.is_empty() {
-        Msg::EditorNewConceptMap
-    } else {
-        Msg::EditorEdit
-    });
-    let issues = (problems.len() > 1 && posted.is_some()).then(|| {
-        let lines = problems
-            .iter()
-            .map(|problem| view! { <li>{problem.text()}</li> })
-            .collect_view();
-        notice(
-            Tone::Warn,
-            Announce::Status,
-            None,
-            view! { <ul>{lines}</ul> },
-        )
-    });
-    let body = stack(view! {
-        {answer.map(|(view, _)| view)}
-        {issues}
-        {panel_sections_card(
+    let title = tr(
+        locale,
+        if opened.id.is_empty() {
+            Msg::EditorNewConceptMap
+        } else {
+            Msg::EditorEdit
+        },
+    );
+    let issues = (problems.len() > 1 && posted.is_some()).then(|| listed(locale, &problems));
+    let body = stack(Html::join([
+        answer.map(|(view, _)| view).unwrap_or_default(),
+        issues.unwrap_or_default(),
+        panel_sections_card(
             title.clone(),
-            view! {
-                {metadata(&draft)}
-                {groups(request.version, &draft, &systems, &names)}
-            },
-        )}
-    })
-    .into_any();
-    view! {
-        {heading(
+            Html::join([
+                metadata(locale, &draft),
+                groups(locale, request.version, &draft, &systems, &names),
+            ]),
+        ),
+    ]));
+    Html::join([
+        heading(
             request,
             Kind::ConceptMap,
             resource,
             title,
-            opened_line(&opened.version_id, &opened_at),
-        )}
-        {form(here, &[(OPENED, opened_version), (OPENED_AT, opened_at)], false, body)}
-        {bar}
-    }
-    .into_any()
+            opened_line(locale, &opened.version_id, &opened_at),
+        ),
+        form(
+            here,
+            &[(OPENED, opened_version), (OPENED_AT, opened_at)],
+            body,
+        ),
+        bar,
+    ])
+}
+
+/// Every problem of the draft, listed in one notice.
+fn listed(locale: &Locale, problems: &[crate::authoring::concept_map::Problem]) -> Html {
+    let lines = join(
+        problems
+            .iter()
+            .map(|problem| h(format!("<li>{}</li>", t(problem.text(locale))))),
+    );
+    notice(
+        Tone::Warn,
+        Announce::Status,
+        None,
+        h(format!("<ul>{lines}</ul>")),
+    )
 }
 
 /// The draft of the concept map `canonical` names, a new one for none, or
 /// the page that says why it cannot be edited.
-async fn open(request: &Request, canonical: &str) -> Result<MapDraft, AnyView> {
+async fn open(request: &Request, canonical: &str) -> Result<MapDraft, Html> {
     if canonical.is_empty() {
         return Ok(MapDraft::new());
     }
@@ -251,8 +261,8 @@ async fn open(request: &Request, canonical: &str) -> Result<MapDraft, AnyView> {
         .await
     {
         Ok(Some(resource)) => MapDraft::of(&resource),
-        Ok(None) => return Err(crate::pages::errors::not_found_page()),
-        Err(error) => return Err(failure(&error)),
+        Ok(None) => return Err(crate::pages::errors::not_found_page(request)),
+        Err(error) => return Err(failure(&request.locale, &error)),
     };
     if opened.managed() {
         Ok(opened)
@@ -272,12 +282,12 @@ async fn save(
     draft: &MapDraft,
     opened: &str,
     here: &str,
-) -> Result<(), Box<(AnyView, Standing)>> {
+) -> Result<(), Box<(Html, Standing)>> {
     let body = draft.body(request.version);
     match crate::pages::editor::send(request, CONCEPT_MAP, &draft.id, &body, opened).await {
         Ok(written) => {
             let version = written.version_id().unwrap_or_default().to_owned();
-            redirect(&format!(
+            request.answering.redirect(&format!(
                 "{}&{SAVED_PARAM}={}",
                 address(request, draft.url.trim()),
                 percent(&version)
@@ -403,99 +413,87 @@ fn apply(form: &Posted, opened: &MapDraft, draft: &mut MapDraft) {
 }
 
 /// The metadata section.
-fn metadata(draft: &MapDraft) -> AnyView {
-    let statuses = STATUSES
-        .iter()
-        .map(|status| {
-            let words = tr(match *status {
+fn metadata(locale: &Locale, draft: &MapDraft) -> Html {
+    let statuses = join(STATUSES.iter().map(|status| {
+        let words = tr(
+            locale,
+            match *status {
                 "active" => Msg::StatusActive,
                 "retired" => Msg::StatusRetired,
                 "unknown" => Msg::StatusUnknown,
                 _ => Msg::StatusDraft,
-            });
-            view! {
-                <option value=*status selected=*status == draft.status>
-                    {words}
-                </option>
-            }
-        })
-        .collect_view();
+            },
+        );
+        option(status, &words, *status == draft.status)
+    }));
     panel_section(
+        locale,
         Some(SectionHead {
-            title: tr(Msg::EditorMetadata),
+            title: tr(locale, Msg::EditorMetadata),
             count: None,
             actions: None,
         }),
-        view! {
-            <div class=FORM>
-                {text_field("cm-url", "url", tr(Msg::EditorCanonical), draft.url.clone(), true)}
-                {field_flow(
-                    view! {
-                        {text_field(
-                            "cm-title",
-                            "title",
-                            tr(Msg::EditorTitle),
-                            draft.title.clone(),
-                            false,
-                        )}
-                        {text_field(
-                            "cm-name",
-                            "name",
-                            tr(Msg::EditorName),
-                            draft.name.clone(),
-                            true,
-                        )}
-                        {text_field(
-                            "cm-version",
-                            "version",
-                            tr(Msg::EditorBusinessVersion),
-                            draft.version.clone(),
-                            false,
-                        )}
-                        {Field::new("cm-status", tr(Msg::EditorStatus))
-                            .view(
-                                view! {
-                                    <select id="cm-status" name="status" class=SELECT>
-                                        {statuses}
-                                    </select>
-                                },
-                            )}
-                    },
-                )}
-            </div>
-        },
+        h(format!(
+            r#"<div class="{FORM}">{}{}</div>"#,
+            text_field(
+                "cm-url",
+                "url",
+                tr(locale, Msg::EditorCanonical),
+                draft.url.clone(),
+                true
+            ),
+            field_flow(Html::join([
+                text_field(
+                    "cm-title",
+                    "title",
+                    tr(locale, Msg::EditorTitle),
+                    draft.title.clone(),
+                    false,
+                ),
+                text_field(
+                    "cm-name",
+                    "name",
+                    tr(locale, Msg::EditorName),
+                    draft.name.clone(),
+                    true,
+                ),
+                text_field(
+                    "cm-version",
+                    "version",
+                    tr(locale, Msg::EditorBusinessVersion),
+                    draft.version.clone(),
+                    false,
+                ),
+                Field::new("cm-status", tr(locale, Msg::EditorStatus)).view(h(format!(
+                    r#"<select id="cm-status" name="status" class="{SELECT}">{statuses}</select>"#
+                ))),
+            ])),
+        )),
     )
 }
 
 /// A select of `systems` named `field_name`, `picked` chosen.
 fn system_select(
+    locale: &Locale,
     id: String,
     field_name: String,
     label: String,
     systems: &[(String, String)],
     picked: &str,
-) -> AnyView {
-    let blank = view! {
-        <option value="" selected=picked.is_empty()>
-            {tr(Msg::BrowseChooseSystem)}
-        </option>
-    };
-    let offered = systems
-        .iter()
-        .map(|(value, words)| {
-            view! {
-                <option value=value.clone() selected=value == picked>
-                    {words.clone()}
-                </option>
-            }
-        })
-        .collect_view();
-    Field::new(id.clone(), label).view(view! {
-        <select id=id name=field_name class=SELECT>
-            {blank}
-            {offered}
-        </select>
-    })
+) -> Html {
+    let offered = Html::join([
+        option("", &tr(locale, Msg::BrowseChooseSystem), picked.is_empty()),
+        join(
+            systems
+                .iter()
+                .map(|(value, words)| option(value, words, value == picked)),
+        ),
+    ]);
+    Field::new(id.clone(), label).view(h(format!(
+        r#"<select id="{}" name="{}" class="{SELECT}">{offered}</select>"#,
+        t(id),
+        t(field_name)
+    )))
 }
 
 /// The row key of a draft row.
@@ -506,278 +504,267 @@ fn keyed(lead: &str, key: Key) -> String {
 /// The groups, each its two systems and its source codes with their
 /// targets, and the way to add one.
 fn groups(
+    locale: &Locale,
     version: FhirVersion,
     draft: &MapDraft,
     systems: &[(String, String)],
     names: &BTreeMap<String, String>,
-) -> AnyView {
-    let choices = relationship_choices(version);
+) -> Html {
+    let choices = relationship_choices(locale, version);
     let no_map = dialect(version).no_map;
-    let drawn = draft
-        .groups
-        .iter()
-        .zip(1_usize..)
-        .map(|(group, place)| {
-            let group_key = keyed("g", group.key);
-            let source_name = if group.source.is_empty() {
-                tr(Msg::EditorNoSystemYet)
-            } else {
-                name_of(names, &group.source)
-            };
-            let target_name = if group.target.is_empty() {
-                tr(Msg::EditorNoSystemYet)
-            } else {
-                name_of(names, &group.target)
-            };
-            let title = tr_with(
-                Msg::EditorGroupTitle,
-                &[
-                    ("place", place.into()),
-                    ("source", source_name.into()),
-                    ("target", target_name.into()),
-                ],
-            );
-            let blocks = group
+    let drawn = join(draft.groups.iter().zip(1_usize..).map(|(group, place)| {
+        let group_key = keyed("g", group.key);
+        let source_name = if group.source.is_empty() {
+            tr(locale, Msg::EditorNoSystemYet)
+        } else {
+            name_of(names, &group.source)
+        };
+        let target_name = if group.target.is_empty() {
+            tr(locale, Msg::EditorNoSystemYet)
+        } else {
+            name_of(names, &group.target)
+        };
+        let title = tr_with(
+            locale,
+            Msg::EditorGroupTitle,
+            &[
+                ("place", place.into()),
+                ("source", source_name.into()),
+                ("target", target_name.into()),
+            ],
+        );
+        let blocks = join(
+            group
                 .elements
                 .iter()
-                .map(|element| element_block(&group_key, element, &choices, no_map))
-                .collect_view();
-            panel_section(
-                Some(SectionHead {
-                    title,
-                    count: None,
-                    actions: Some(icon_submit(
-                        format!("remove-group:{group_key}"),
-                        Glyph::TRASH,
-                        tr(Msg::EditorRemoveGroup),
-                    )),
-                }),
-                view! {
-                    {field_flow(
-                        view! {
-                            {system_select(
-                                format!("cm-{group_key}-source"),
-                                name(GROUP, &group_key, "source"),
-                                tr(Msg::EditorSourceSystem),
-                                systems,
-                                &group.source,
-                            )}
-                            {system_select(
-                                format!("cm-{group_key}-target"),
-                                name(GROUP, &group_key, "target"),
-                                tr(Msg::EditorTargetSystem),
-                                systems,
-                                &group.target,
-                            )}
-                        },
-                    )}
-                    <p class="fui-label">
-                        {tr_with(Msg::EditorCodesCount, &[("count", group.elements.len().into())])}
-                    </p>
-                    {map_elements(blocks)}
-                    <div class="fui-add-row">
-                        {add_button(format!("add-element:{group_key}"), tr(Msg::EditorAddMapCode))}
-                    </div>
-                },
-            )
-        })
-        .collect_view();
-    view! {
-        {drawn}
-        {panel_section(
+                .map(|element| element_block(locale, &group_key, element, &choices, no_map)),
+        );
+        panel_section(
+            locale,
+            Some(SectionHead {
+                title,
+                count: None,
+                actions: Some(icon_submit(
+                    format!("remove-group:{group_key}"),
+                    Glyph::TRASH,
+                    tr(locale, Msg::EditorRemoveGroup),
+                )),
+            }),
+            Html::join([
+                field_flow(Html::join([
+                    system_select(
+                        locale,
+                        format!("cm-{group_key}-source"),
+                        name(GROUP, &group_key, "source"),
+                        tr(locale, Msg::EditorSourceSystem),
+                        systems,
+                        &group.source,
+                    ),
+                    system_select(
+                        locale,
+                        format!("cm-{group_key}-target"),
+                        name(GROUP, &group_key, "target"),
+                        tr(locale, Msg::EditorTargetSystem),
+                        systems,
+                        &group.target,
+                    ),
+                ])),
+                h(format!(
+                    r#"<p class="fui-label">{}</p>"#,
+                    t(tr_with(
+                        locale,
+                        Msg::EditorCodesCount,
+                        &[("count", group.elements.len().into())]
+                    ))
+                )),
+                map_elements(blocks),
+                h(format!(
+                    r#"<div class="fui-add-row">{}</div>"#,
+                    add_button(
+                        format!("add-element:{group_key}"),
+                        tr(locale, Msg::EditorAddMapCode)
+                    )
+                )),
+            ]),
+        )
+    }));
+    Html::join([
+        drawn,
+        panel_section(
+            locale,
             None,
-            view! {
-                <div class="fui-add-row">
-                    {add_button(String::from("add-group"), tr(Msg::EditorAddGroup))}
-                </div>
-                {section_intro(tr(Msg::EditorGroupIntro))}
-            },
-        )}
-    }
-    .into_any()
+            Html::join([
+                h(format!(
+                    r#"<div class="fui-add-row">{}</div>"#,
+                    add_button(String::from("add-group"), tr(locale, Msg::EditorAddGroup))
+                )),
+                section_intro(tr(locale, Msg::EditorGroupIntro)),
+            ]),
+        ),
+    ])
 }
 
 /// One target of a mapped code: its code, the relationship and a comment,
 /// with its Remove.
-fn target_row(key: &str, each: &MapTarget, choices: &[(&'static str, String)]) -> AnyView {
+fn target_row(
+    locale: &Locale,
+    key: &str,
+    each: &MapTarget,
+    choices: &[(&'static str, String)],
+) -> Html {
     let target_key = keyed("t", each.key);
-    let relation = choices
-        .iter()
-        .map(|(code, words)| {
-            view! {
-                <option value=*code selected=*code == each.relationship>
-                    {words.clone()}
-                </option>
-            }
-        })
-        .collect_view();
+    let relation = Html::join([
+        option(
+            "",
+            &tr(locale, Msg::EditorChooseRelationship),
+            each.relationship.is_empty(),
+        ),
+        join(
+            choices
+                .iter()
+                .map(|(code, words)| option(code, words, *code == each.relationship)),
+        ),
+    ]);
     let code_id = format!("cm-{target_key}-code");
     let relation_id = format!("cm-{target_key}-relationship");
     let comment_id = format!("cm-{target_key}-comment");
-    view! {
-        <div class="fui-clause-filter">
-            <input type="hidden" name=name(TARGET, &target_key, "element") value=key.to_owned() />
-            <input
-                type="hidden"
-                name=name(TARGET, &target_key, "display")
-                value=each.display.clone()
-            />
-            {Field::new(code_id.clone(), tr(Msg::EditorTargetCode))
-                .view(
-                    view! {
-                        <input
-                            id=code_id
-                            name=name(TARGET, &target_key, "code")
-                            class=format!("{INPUT} fui-mono")
-                            value=each.code.clone()
-                            placeholder=tr(Msg::EditorNoTarget)
-                        />
-                    },
-                )}
-            {Field::new(relation_id.clone(), tr(Msg::TranslateRelationship))
-                .view(
-                    view! {
-                        <select
-                            id=relation_id
-                            name=name(TARGET, &target_key, "relationship")
-                            class=SELECT
-                        >
-                            <option value="" selected=each.relationship.is_empty()>
-                                {tr(Msg::EditorChooseRelationship)}
-                            </option>
-                            {relation}
-                        </select>
-                    },
-                )}
-            {Field::new(comment_id.clone(), tr(Msg::TranslateComment))
-                .view(
-                    view! {
-                        <input
-                            id=comment_id
-                            name=name(TARGET, &target_key, "comment")
-                            class=INPUT
-                            value=each.comment.clone()
-                            placeholder=tr(Msg::EditorOptional)
-                        />
-                    },
-                )}
-            {icon_submit(
-                format!("remove-target:{target_key}"),
-                Glyph::X,
-                tr(Msg::EditorRemoveTarget),
-            )}
-        </div>
-    }
-    .into_any()
+    h(format!(
+        r#"<div class="fui-clause-filter">{}{}{}{}{}{}</div>"#,
+        hidden_field(&name(TARGET, &target_key, "element"), key),
+        hidden_field(&name(TARGET, &target_key, "display"), &each.display),
+        Field::new(code_id.clone(), tr(locale, Msg::EditorTargetCode)).view(h(format!(
+            r#"<input id="{code_id}" name="{}" class="{INPUT} fui-mono" value="{}" placeholder="{}">"#,
+            t(name(TARGET, &target_key, "code")),
+            t(&each.code),
+            t(tr(locale, Msg::EditorNoTarget))
+        ))),
+        Field::new(relation_id.clone(), tr(locale, Msg::TranslateRelationship)).view(h(
+            format!(
+                r#"<select id="{relation_id}" name="{}" class="{SELECT}">{relation}</select>"#,
+                t(name(TARGET, &target_key, "relationship"))
+            )
+        )),
+        Field::new(comment_id.clone(), tr(locale, Msg::TranslateComment)).view(h(format!(
+            r#"<input id="{comment_id}" name="{}" class="{INPUT}" value="{}" placeholder="{}">"#,
+            t(name(TARGET, &target_key, "comment")),
+            t(&each.comment),
+            t(tr(locale, Msg::EditorOptional))
+        ))),
+        icon_submit(
+            format!("remove-target:{target_key}"),
+            Glyph::X,
+            tr(locale, Msg::EditorRemoveTarget),
+        ),
+    ))
 }
 
 /// One source code's block: its code and display, and its targets as rows.
 fn element_block(
+    locale: &Locale,
     group_key: &str,
     element: &MapElement,
     choices: &[(&'static str, String)],
     no_map: bool,
-) -> AnyView {
+) -> Html {
     let key = keyed("e", element.key);
     let code_id = format!("cm-{key}-code");
     let display_id = format!("cm-{key}-display");
-    let head = view! {
-        <input type="hidden" name=name(ELEMENT, &key, "group") value=group_key.to_owned() />
-        {field_flow(
-            view! {
-                {Field::new(code_id.clone(), tr(Msg::EditorSourceCode))
-                    .view(
-                        view! {
-                            <input
-                                id=code_id
-                                name=name(ELEMENT, &key, "code")
-                                class=format!("{INPUT} fui-mono")
-                                value=element.code.clone()
-                            />
-                        },
-                    )}
-                {Field::new(display_id.clone(), tr(Msg::EditorConceptDisplay))
-                    .view(
-                        view! {
-                            <input
-                                id=display_id
-                                name=name(ELEMENT, &key, "display")
-                                class=INPUT
-                                value=element.display.clone()
-                            />
-                        },
-                    )}
-            },
-        )}
-        {no_map
-            .then(|| {
-                let id = format!("cm-{key}-nomap");
-                check_keyed(id, tr(Msg::EditorNoMap), name(ELEMENT, &key, "nomap"), element.no_map)
-            })}
-    };
-    let rows = element
-        .targets
-        .iter()
-        .map(|each| target_row(&key, each, choices))
-        .collect_view();
-    let actions = view! {
-        {icon_submit(format!("add-target:{key}"), Glyph::PLUS, tr(Msg::EditorAddTarget))}
-        {icon_submit(format!("remove-element:{key}"), Glyph::TRASH, tr(Msg::EditorRemoveMapCode))}
-    }
-    .into_any();
+    let head = Html::join([
+        hidden_field(&name(ELEMENT, &key, "group"), group_key),
+        field_flow(Html::join([
+            Field::new(code_id.clone(), tr(locale, Msg::EditorSourceCode)).view(h(format!(
+                r#"<input id="{code_id}" name="{}" class="{INPUT} fui-mono" value="{}">"#,
+                t(name(ELEMENT, &key, "code")),
+                t(&element.code)
+            ))),
+            Field::new(display_id.clone(), tr(locale, Msg::EditorConceptDisplay)).view(h(format!(
+                r#"<input id="{display_id}" name="{}" class="{INPUT}" value="{}">"#,
+                t(name(ELEMENT, &key, "display")),
+                t(&element.display)
+            ))),
+        ])),
+        if no_map {
+            let id = format!("cm-{key}-nomap");
+            check_keyed(
+                &id,
+                tr(locale, Msg::EditorNoMap),
+                &name(ELEMENT, &key, "nomap"),
+                element.no_map,
+            )
+        } else {
+            Html::empty()
+        },
+    ]);
+    let rows = join(
+        element
+            .targets
+            .iter()
+            .map(|each| target_row(locale, &key, each, choices)),
+    );
+    let actions = Html::join([
+        icon_submit(
+            format!("add-target:{key}"),
+            Glyph::PLUS,
+            tr(locale, Msg::EditorAddTarget),
+        ),
+        icon_submit(
+            format!("remove-element:{key}"),
+            Glyph::TRASH,
+            tr(locale, Msg::EditorRemoveMapCode),
+        ),
+    ]);
     let source = Coding::new(element.code.clone(), element.display.clone());
-    view! {
-        {map_element(Block {
+    map_element(
+        locale,
+        Block {
             source,
             actions: Some(actions),
-            targets: view! {
-                {head}
-                {rows}
-            }
-                .into_any(),
+            targets: Html::join([head, rows]),
             after: None,
-        })}
-    }
-    .into_any()
+        },
+    )
 }
 
 /// A check box named `field_name` with the id `id`, labelled `label`.
-fn check_keyed(id: String, label: String, field_name: String, on: bool) -> AnyView {
-    ferrohealth_ui::view::form::keyed_check(
-        id.clone(),
-        label,
-        view! { <input type="checkbox" id=id name=field_name value="true" checked=on /> },
-    )
-    .into_any()
+fn check_keyed(id: &str, label: String, field_name: &str, on: bool) -> Html {
+    ferrohealth_ui::view::form::keyed_check(id, label, checkbox(id, field_name, on))
 }
 
 /// The page after a save: the version the server now holds, and the way to
 /// the concept map.
-fn saved_page(request: &Request, opened: &MapDraft, saved: &str) -> AnyView {
+fn saved_page(request: &Request, opened: &MapDraft, saved: &str) -> Html {
+    let locale = &request.locale;
     let href = resource_link(CONCEPT_MAPS_PATH, &opened.id, request.version);
-    let open = card_action(href.clone(), tr(Msg::EditorOpenConceptMap));
+    let open = card_action(href.clone(), tr(locale, Msg::EditorOpenConceptMap));
     let shown = if opened.title.is_empty() {
         opened.url.clone()
     } else {
         opened.title.clone()
     };
-    view! {
-        {heading(
+    Html::join([
+        heading(
             request,
             Kind::ConceptMap,
             Some((shown, href)),
-            tr(Msg::EditorSavedTitle),
-            tr_with(Msg::EditorVersion, &[("version", saved.to_owned().into())]),
-        )}
-        {load_report(LoadReport {
+            tr(locale, Msg::EditorSavedTitle),
+            tr_with(
+                locale,
+                Msg::EditorVersion,
+                &[("version", saved.to_owned().into())],
+            ),
+        ),
+        load_report(LoadReport {
             outcome: Outcome::Ok,
             arrival: Arrival::AfterAction,
-            title: tr_with(Msg::EditorSaved, &[("version", saved.to_owned().into())]).into_any(),
+            title: t(tr_with(
+                locale,
+                Msg::EditorSaved,
+                &[("version", saved.to_owned().into())],
+            )),
             counts: Vec::new(),
             action: Some(open),
-        })}
-    }
-    .into_any()
+        }),
+    ])
 }
 
 #[cfg(test)]
@@ -790,12 +777,12 @@ mod tests {
     #[test]
     fn each_version_offers_its_own_relationship_codes() {
         assert!(
-            relationship_choices(FhirVersion::R4)
+            relationship_choices(&ferrohealth_ui::i18n::Locale::english(), FhirVersion::R4)
                 .iter()
                 .any(|(code, _)| *code == "narrower")
         );
         assert!(
-            relationship_choices(FhirVersion::R5)
+            relationship_choices(&ferrohealth_ui::i18n::Locale::english(), FhirVersion::R5)
                 .iter()
                 .all(|(code, _)| *code != "narrower")
         );

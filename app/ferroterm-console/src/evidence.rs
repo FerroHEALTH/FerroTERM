@@ -9,12 +9,12 @@
 //! open that file in the repository and check it.
 //!
 //! These are facts about the build, never about the deployment serving this
-//! page. The screen says so, and the release below is the version the bundle
+//! page. The screen says so, and the release below is the version the binary
 //! was built from.
 //!
-//! The evidence is a constant rather than a document the browser decodes. It
-//! is fixed when the bundle is built, so decoding it in every reader's browser
-//! would cost bytes for nothing and leave a failure the screen has to render.
+//! The evidence is a constant rather than a document read at run time. It is
+//! fixed when the binary is built, so it leaves no failure the screen has to
+//! render.
 
 // The generated source binds `EVIDENCE`, or refuses to compile with the reason
 // the emitter could not read a figure.
@@ -23,7 +23,7 @@ include!(concat!(env!("OUT_DIR"), "/evidence.rs"));
 /// The whole evidence this build read.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Evidence {
-    /// The version of FerroTERM this bundle was built from.
+    /// The version of FerroTERM this binary was built from.
     pub(crate) release: &'static str,
     /// The HL7 terminology ecosystem suite, mode by mode.
     pub(crate) conformance: Conformance,

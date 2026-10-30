@@ -61,11 +61,11 @@ impl RootAnswer {
     }
 
     /// The one word a column header carries about this root's state.
-    fn state(&self) -> String {
+    fn state(&self, locale: &ferrohealth_ui::i18n::Locale) -> String {
         match self {
-            Self::Declared(_) => tr(Msg::StateAnswered),
-            Self::Absent => tr(Msg::NotServed),
-            Self::Refused(_) => tr(Msg::StateRefusedWord),
+            Self::Declared(_) => tr(locale, Msg::StateAnswered),
+            Self::Absent => tr(locale, Msg::NotServed),
+            Self::Refused(_) => tr(locale, Msg::StateRefusedWord),
         }
     }
 
@@ -123,7 +123,10 @@ pub(crate) struct Comparison {
 }
 
 /// Builds the comparison from what the four roots answered.
-pub(crate) fn compare(answers: &[(FhirVersion, RootAnswer)]) -> Comparison {
+pub(crate) fn compare(
+    locale: &ferrohealth_ui::i18n::Locale,
+    answers: &[(FhirVersion, RootAnswer)],
+) -> Comparison {
     Comparison {
         columns: answers
             .iter()
@@ -134,13 +137,13 @@ pub(crate) fn compare(answers: &[(FhirVersion, RootAnswer)]) -> Comparison {
                     .and_then(|statement| statement.fhir_version.clone()),
             })
             .collect(),
-        facts: facts(answers),
-        operations: operations(answers),
+        facts: facts(locale, answers),
+        operations: operations(locale, answers),
     }
 }
 
 /// What each root says about itself, one row per fact.
-fn facts(answers: &[(FhirVersion, RootAnswer)]) -> Vec<Row> {
+fn facts(locale: &ferrohealth_ui::i18n::Locale, answers: &[(FhirVersion, RootAnswer)]) -> Vec<Row> {
     let row = |label: &str, of: &dyn Fn(&CapabilityStatement) -> Option<String>| Row {
         label: label.to_owned(),
         cells: answers
@@ -152,8 +155,11 @@ fn facts(answers: &[(FhirVersion, RootAnswer)]) -> Vec<Row> {
             .collect(),
     };
     vec![
-        row(&tr(Msg::Software), &CapabilityStatement::software_line),
-        row(&tr(Msg::WhatRootSaysServes), &|statement| {
+        row(
+            &tr(locale, Msg::Software),
+            &CapabilityStatement::software_line,
+        ),
+        row(&tr(locale, Msg::WhatRootSaysServes), &|statement| {
             statement.description.clone()
         }),
     ]
@@ -164,7 +170,10 @@ fn facts(answers: &[(FhirVersion, RootAnswer)]) -> Vec<Row> {
 /// The rows are the union of what the four documents declare, in the order
 /// they were first seen, so an operation one root drops keeps its row and the
 /// difference is visible instead of vanishing.
-fn operations(answers: &[(FhirVersion, RootAnswer)]) -> Vec<Row> {
+fn operations(
+    locale: &ferrohealth_ui::i18n::Locale,
+    answers: &[(FhirVersion, RootAnswer)],
+) -> Vec<Row> {
     let declared: Vec<Vec<OperationDeclaration>> = answers
         .iter()
         .map(|(_, answer)| {
@@ -197,7 +206,7 @@ fn operations(answers: &[(FhirVersion, RootAnswer)]) -> Vec<Row> {
                         .iter()
                         .find(|operation| operation.resource == resource && operation.code == code)
                         .map_or(Cell::NotDeclared, |operation| {
-                            Cell::Stated(levels_of(operation))
+                            Cell::Stated(levels_of(locale, operation))
                         })
                 })
                 .collect(),
@@ -219,20 +228,24 @@ fn operation_label(resource: &str, code: &str) -> String {
 }
 
 /// The levels one declared operation is answered at, as a reader reads them.
-fn levels_of(operation: &OperationDeclaration) -> String {
+fn levels_of(locale: &ferrohealth_ui::i18n::Locale, operation: &OperationDeclaration) -> String {
     if operation.levels.is_empty() {
-        return tr(Msg::StateDeclared);
+        return tr(locale, Msg::StateDeclared);
     }
     operation.levels.join(", ")
 }
 
 /// How the reads went, as the one sentence the live region announces.
-pub(crate) fn state_sentence(answers: &[(FhirVersion, RootAnswer)]) -> String {
+pub(crate) fn state_sentence(
+    locale: &ferrohealth_ui::i18n::Locale,
+    answers: &[(FhirVersion, RootAnswer)],
+) -> String {
     let answered = answers
         .iter()
         .filter(|(_, answer)| answer.answered())
         .count();
     let sentence = tr_with(
+        locale,
         Msg::OfRootsAnswered,
         &[
             ("answered", (answered).to_string().into()),
@@ -242,7 +255,7 @@ pub(crate) fn state_sentence(answers: &[(FhirVersion, RootAnswer)]) -> String {
     let rest: Vec<String> = answers
         .iter()
         .filter(|(_, answer)| !answer.answered())
-        .map(|(version, answer)| format!("{} {}", version.label(), answer.state()))
+        .map(|(version, answer)| format!("{} {}", version.label(), answer.state(locale)))
         .collect();
     if rest.is_empty() {
         format!("{sentence}.")
@@ -270,6 +283,11 @@ pub(crate) fn notes(answer: &RootAnswer) -> Vec<(String, String)> {
 
 #[cfg(test)]
 mod tests {
+    /// The English locale the tests read the words in.
+    fn english() -> ferrohealth_ui::i18n::Locale {
+        ferrohealth_ui::i18n::Locale::english()
+    }
+
     use super::*;
 
     /// The recorded answer of each root, as the server sends it.
@@ -316,7 +334,7 @@ mod tests {
 
     #[test]
     fn every_root_gets_a_column_carrying_the_release_it_declares() {
-        let comparison = compare(&recorded());
+        let comparison = compare(&english(), &recorded());
         let declared: Vec<(&str, Option<&str>)> = comparison
             .columns
             .iter()
@@ -338,7 +356,7 @@ mod tests {
     // ships no definition for it (<https://hl7.org/fhir/R5/conceptmap-operation-closure.html>).
     #[test]
     fn the_closure_the_r6_ballot_dropped_reads_as_not_declared() {
-        let comparison = compare(&recorded());
+        let comparison = compare(&english(), &recorded());
         assert_eq!(
             row(&comparison.operations, "$closure").cells,
             [
@@ -356,7 +374,7 @@ mod tests {
     // (<https://hl7.org/fhir/R5/codesystem-operation-lookup.html>).
     #[test]
     fn the_instance_level_lookup_split_reads_from_the_documents() {
-        let comparison = compare(&recorded());
+        let comparison = compare(&english(), &recorded());
         assert_eq!(
             row(&comparison.operations, "CodeSystem/$lookup").cells,
             [
@@ -381,7 +399,7 @@ mod tests {
 
     #[test]
     fn only_the_ballot_root_states_what_it_serves() {
-        let comparison = compare(&recorded());
+        let comparison = compare(&english(), &recorded());
         let cells = &row(&comparison.facts, "What the root says it serves").cells;
         assert_eq!(
             cells
@@ -410,9 +428,9 @@ mod tests {
         assert!(matches!(answer, RootAnswer::Absent), "{answer:?}");
         let mut answers = recorded();
         answers[3] = (FhirVersion::R6, answer);
-        let comparison = compare(&answers);
+        let comparison = compare(&english(), &answers);
         assert_eq!(
-            answers[3].1.state(),
+            answers[3].1.state(&english()),
             "not served",
             "the header says so in words"
         );
@@ -436,8 +454,8 @@ mod tests {
         assert!(matches!(answer, RootAnswer::Refused(_)), "{answer:?}");
         let mut answers = recorded();
         answers[2] = (FhirVersion::R5, answer);
-        let comparison = compare(&answers);
-        assert_eq!(answers[2].1.state(), "refused");
+        let comparison = compare(&english(), &answers);
+        assert_eq!(answers[2].1.state(&english()), "refused");
         let cells = &row(&comparison.operations, "CodeSystem/$lookup").cells;
         assert_eq!(cells[2], Cell::Unread);
         assert_eq!(cells[0], Cell::Stated("type".to_owned()));
@@ -446,7 +464,7 @@ mod tests {
 
     #[test]
     fn the_rows_are_the_union_of_what_the_documents_declare() {
-        let comparison = compare(&recorded());
+        let comparison = compare(&english(), &recorded());
         let keys: Vec<&str> = comparison
             .operations
             .iter()
@@ -468,9 +486,9 @@ mod tests {
             serde_json::from_str(r#"{"resourceType":"CapabilityStatement"}"#)
                 .expect("the answer parses");
         let answers = vec![(FhirVersion::R4B, RootAnswer::read(Ok(empty)))];
-        let comparison = compare(&answers);
+        let comparison = compare(&english(), &answers);
         assert_eq!(comparison.columns.len(), 1);
-        assert_eq!(answers[0].1.state(), "answered");
+        assert_eq!(answers[0].1.state(&english()), "answered");
         assert!(
             comparison.operations.is_empty(),
             "there is nothing to compare, and the screen says so"
@@ -509,11 +527,14 @@ mod tests {
 
     #[test]
     fn the_announced_sentence_names_every_root_that_did_not_answer() {
-        assert_eq!(state_sentence(&recorded()), "4 of 4 roots answered.");
+        assert_eq!(
+            state_sentence(&english(), &recorded()),
+            "4 of 4 roots answered."
+        );
         let mut answers = recorded();
         answers[3] = (FhirVersion::R6, RootAnswer::Absent);
         assert_eq!(
-            state_sentence(&answers),
+            state_sentence(&english(), &answers),
             "3 of 4 roots answered: R6 not served.",
             "a reader who cannot see the table still hears which root is missing"
         );

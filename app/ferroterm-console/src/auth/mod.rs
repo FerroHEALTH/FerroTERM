@@ -13,6 +13,8 @@ pub(crate) mod scopes;
 
 use serde::{Deserialize, Serialize};
 
+use ferrohealth_ui::i18n::Locale;
+
 use crate::auth::scopes::Letter;
 use crate::locale::{Msg, tr};
 
@@ -65,35 +67,36 @@ impl Session {
     }
 
     /// What the reader may change, as the line under their name says it.
-    pub(crate) fn standing(&self) -> String {
-        self.0
-            .as_ref()
-            .map_or_else(read_only, |operator| standing(&operator.scopes))
+    pub(crate) fn standing(&self, locale: &Locale) -> String {
+        self.0.as_ref().map_or_else(
+            || read_only(locale),
+            |operator| standing(locale, &operator.scopes),
+        )
     }
 }
 
 /// The line under the name of a reader whose scopes open no write.
-fn read_only() -> String {
-    tr(Msg::ReadOnlyAccountHasNoEditing)
+fn read_only(locale: &Locale) -> String {
+    tr(locale, Msg::ReadOnlyAccountHasNoEditing)
 }
 
 /// What `granted` lets a reader change, as one line under their name: the
 /// three resource types the console writes, each one a create or an update
 /// opens (SMART App Launch 2.x, scopes and launch context).
-pub(crate) fn standing(granted: &[String]) -> String {
+pub(crate) fn standing(locale: &Locale, granted: &[String]) -> String {
     let edits = |resource_type: &str| {
         scopes::can_any(granted, resource_type, Letter::Create)
             || scopes::can_any(granted, resource_type, Letter::Update)
     };
     match (edits("CodeSystem"), edits("ValueSet"), edits("ConceptMap")) {
-        (true, true, true) => tr(Msg::MayEditCodesystemValuesetConceptmap),
-        (true, true, false) => tr(Msg::MayEditCodesystemValueset),
-        (true, false, true) => tr(Msg::MayEditCodesystemConceptmap),
-        (false, true, true) => tr(Msg::MayEditValuesetConceptmap),
-        (true, false, false) => tr(Msg::MayEditCodesystem),
-        (false, true, false) => tr(Msg::MayEditValueset),
-        (false, false, true) => tr(Msg::MayEditConceptmap),
-        (false, false, false) => read_only(),
+        (true, true, true) => tr(locale, Msg::MayEditCodesystemValuesetConceptmap),
+        (true, true, false) => tr(locale, Msg::MayEditCodesystemValueset),
+        (true, false, true) => tr(locale, Msg::MayEditCodesystemConceptmap),
+        (false, true, true) => tr(locale, Msg::MayEditValuesetConceptmap),
+        (true, false, false) => tr(locale, Msg::MayEditCodesystem),
+        (false, true, false) => tr(locale, Msg::MayEditValueset),
+        (false, false, true) => tr(locale, Msg::MayEditConceptmap),
+        (false, false, false) => read_only(locale),
     }
 }
 
@@ -155,6 +158,8 @@ impl SignInState {
 
 #[cfg(test)]
 mod tests {
+    use ferrohealth_ui::i18n::Locale;
+
     use super::{Operator, Session, read_only, standing};
     use crate::auth::scopes::Letter;
 
@@ -163,18 +168,30 @@ mod tests {
         let granted = |scopes: &[&str]| scopes.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
         assert_eq!(
             "May edit CodeSystem, ValueSet and ConceptMap",
-            standing(&granted(&[
-                "user/CodeSystem.cud",
-                "user/ValueSet.cud",
-                "user/ConceptMap.cud"
-            ]))
+            standing(
+                &Locale::english(),
+                &granted(&[
+                    "user/CodeSystem.cud",
+                    "user/ValueSet.cud",
+                    "user/ConceptMap.cud"
+                ])
+            )
         );
         assert_eq!(
             "May edit ValueSet",
-            standing(&granted(&["openid", "system/ValueSet.u"]))
+            standing(
+                &Locale::english(),
+                &granted(&["openid", "system/ValueSet.u"])
+            )
         );
-        assert_eq!(read_only(), standing(&granted(&["openid", "fhirUser"])));
-        assert_eq!(read_only(), standing(&granted(&["user/CodeSystem.rs"])));
+        assert_eq!(
+            read_only(&Locale::english()),
+            standing(&Locale::english(), &granted(&["openid", "fhirUser"]))
+        );
+        assert_eq!(
+            read_only(&Locale::english()),
+            standing(&Locale::english(), &granted(&["user/CodeSystem.rs"]))
+        );
     }
 
     #[test]

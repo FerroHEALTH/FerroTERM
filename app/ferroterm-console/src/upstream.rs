@@ -20,8 +20,7 @@
 use http::header::{
     ACCEPT, AUTHORIZATION, CONTENT_LOCATION, CONTENT_TYPE, ETAG, IF_MATCH, LOCATION,
 };
-use leptos::context::use_context;
-use secrecy::ExposeSecret as _;
+use secrecy::{ExposeSecret as _, SecretString};
 use url::Url;
 
 use crate::fhir::exchange::{ACTIVATE, Answer, Exchange, ExchangeError, Method, RELOAD, RUN, RUNS};
@@ -95,17 +94,67 @@ fn joined(base: &Url, path: &str, expected: Target) -> Result<Url, ExchangeError
     Ok(url)
 }
 
-/// Sends `exchange` as the request's reader and answers what came back.
-///
-/// # Errors
-/// Returns [`ExchangeError::Forbidden`] for a path the console forwards
-/// nowhere, [`ExchangeError::NoSync`] for the runs on a console with no sync
-/// service, [`ExchangeError::NoAdmin`] for a reload on a console with no
-/// admin listener, [`ExchangeError::Sessions`] when the session store cannot be
-/// read, [`ExchangeError::Unavailable`] outside a request, and
-/// [`ExchangeError::Unreachable`] when no answer came.
-pub async fn forward(exchange: Exchange) -> Result<Answer, ExchangeError> {
-    let state = use_context::<ConsoleState>().ok_or(ExchangeError::Unavailable)?;
+/// The console's way to the terminology server for one request: the
+/// console's state and the access token of the request's reader, if one is
+/// signed in.
+#[derive(Clone)]
+pub struct Upstream {
+    state: ConsoleState,
+    /// The reader's token, `None` for a visitor; an `Err` when the session
+    /// store could not be read, which refuses every exchange.
+    token: Result<Option<SecretString>, ExchangeError>,
+}
+
+impl std::fmt::Debug for Upstream {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let token = match &self.token {
+            Ok(Some(_token)) => "[redacted]",
+            Ok(None) => "none",
+            Err(_unread) => "unread",
+        };
+        f.debug_struct("Upstream")
+            .field("token", &token)
+            .finish_non_exhaustive()
+    }
+}
+
+impl Upstream {
+    /// The way to the server for the reader of the request whose headers
+    /// are `headers`: its live session's access token, none for a visitor.
+    #[must_use]
+    pub fn of(state: &ConsoleState, headers: &http::HeaderMap) -> Self {
+        let token = crate::session::request::access_token(state, headers).map_err(|error| {
+            tracing::error!(%error, "the session store could not be read");
+            ExchangeError::Sessions
+        });
+        Self {
+            state: state.clone(),
+            token,
+        }
+    }
+
+    /// Sends `exchange` as the reader and answers what came back.
+    ///
+    /// # Errors
+    /// Returns [`ExchangeError::Forbidden`] for a path the console forwards
+    /// nowhere, [`ExchangeError::NoSync`] for the runs on a console with no
+    /// sync service, [`ExchangeError::NoAdmin`] for a reload on a console
+    /// with no admin listener, [`ExchangeError::Sessions`] when the session
+    /// store could not be read, and [`ExchangeError::Unreachable`] when no
+    /// answer came.
+    pub async fn send(&self, exchange: Exchange) -> Result<Answer, ExchangeError> {
+        let token = self.token.clone()?;
+        forward(&self.state, token.as_ref(), exchange).await
+    }
+}
+
+/// Sends `exchange` through `state`'s client, carrying `token`, and answers
+/// what came back.
+async fn forward(
+    state: &ConsoleState,
+    token: Option<&SecretString>,
+    exchange: Exchange,
+) -> Result<Answer, ExchangeError> {
     let target = target(&exchange.path).ok_or(ExchangeError::Forbidden)?;
     let url = match target {
         Target::Fhir => joined(&state.settings().ferroterm.base, &exchange.path, target)?,
@@ -128,10 +177,6 @@ pub async fn forward(exchange: Exchange) -> Result<Answer, ExchangeError> {
             joined(base, &exchange.path, target)?
         }
     };
-    let token = crate::session::request::access_token().map_err(|error| {
-        tracing::error!(%error, "the session store could not be read");
-        ExchangeError::Sessions
-    })?;
     let client = state.upstream();
     let method = match exchange.method {
         Method::Get => reqwest::Method::GET,
@@ -148,7 +193,7 @@ pub async fn forward(exchange: Exchange) -> Result<Answer, ExchangeError> {
     if let Some(if_match) = &exchange.if_match {
         request = request.header(IF_MATCH, if_match.as_str());
     }
-    if let Some(token) = &token {
+    if let Some(token) = token {
         request = request.header(AUTHORIZATION, format!("Bearer {}", token.expose_secret()));
     }
     if let Some(body) = exchange.body {

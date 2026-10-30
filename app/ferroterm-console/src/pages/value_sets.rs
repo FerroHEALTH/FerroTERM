@@ -6,19 +6,21 @@
 
 use std::collections::BTreeMap;
 
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::model::Noun;
 use ferrohealth_ui::table::view::{Body, Column, DataTable, Role, cell, data_table, title_cell};
 use ferrohealth_ui::view::action::ActionGroup;
+use ferrohealth_ui::view::action_menu::{Act, Action};
 use ferrohealth_ui::view::coding::canonical;
-use ferrohealth_ui::widget::action_menu::{Act, Action};
-use leptos::prelude::*;
 
 use crate::auth::scopes::Letter;
 use crate::fhir::VALUE_SET;
 use crate::fhir::searchset::SearchFilter;
 use crate::fhir::value_set::{ClauseRow, PublishedValueSet};
 use crate::locale::{Msg, message, tr, tr_with};
+use crate::markup::{h, join, t};
 use crate::pages::listing::{Frame, ListState, NAME_COLUMN, counted, status_state};
 use crate::pages::parts::{Source, failure, heading, name_of, system_names};
 use crate::request::Request;
@@ -26,7 +28,7 @@ use crate::routes::{COMPOSE_PATH, VALUE_SETS_PATH, resource_link, ui_link, ui_pa
 
 /// What one clause selects, in words: its filters, its count of codes, the
 /// value sets it draws in, or the whole code system.
-fn clause_words(clause: &ClauseRow, names: &BTreeMap<String, String>) -> String {
+fn clause_words(locale: &Locale, clause: &ClauseRow, names: &BTreeMap<String, String>) -> String {
     let system = clause
         .system
         .as_deref()
@@ -36,41 +38,48 @@ fn clause_words(clause: &ClauseRow, names: &BTreeMap<String, String>) -> String 
     } else if clause.codes > 0 {
         match system {
             Some(system) => tr_with(
+                locale,
                 Msg::SelectsCodesOf,
                 &[("count", clause.codes.into()), ("system", system.into())],
             ),
-            None => tr_with(Msg::SelectsCodes, &[("count", clause.codes.into())]),
+            None => tr_with(locale, Msg::SelectsCodes, &[("count", clause.codes.into())]),
         }
     } else if !clause.value_sets.is_empty() {
         tr_with(
+            locale,
             Msg::SelectsValueSets,
             &[("count", clause.value_sets.len().into())],
         )
     } else {
-        tr(Msg::SelectsWholeSystem)
+        tr(locale, Msg::SelectsWholeSystem)
     }
 }
 
 /// What a value set selects, in words: its includes, then less its
 /// excludes.
 #[must_use]
-pub(crate) fn selects(clauses: &[ClauseRow], names: &BTreeMap<String, String>) -> String {
+pub(crate) fn selects(
+    locale: &Locale,
+    clauses: &[ClauseRow],
+    names: &BTreeMap<String, String>,
+) -> String {
     let included: Vec<String> = clauses
         .iter()
         .filter(|clause| clause.included)
-        .map(|clause| clause_words(clause, names))
+        .map(|clause| clause_words(locale, clause, names))
         .collect();
     let excluded: Vec<String> = clauses
         .iter()
         .filter(|clause| !clause.included)
-        .map(|clause| clause_words(clause, names))
+        .map(|clause| clause_words(locale, clause, names))
         .collect();
     if included.is_empty() {
-        return tr(Msg::SelectsNothingStated);
+        return tr(locale, Msg::SelectsNothingStated);
     }
     let mut words = included.join("; ");
     if !excluded.is_empty() {
         words.push_str(&tr_with(
+            locale,
             Msg::SelectsLess,
             &[("excluded", excluded.join("; ").into())],
         ));
@@ -79,7 +88,8 @@ pub(crate) fn selects(clauses: &[ClauseRow], names: &BTreeMap<String, String>) -
 }
 
 /// Value sets.
-pub(crate) async fn page(request: Request) -> AnyView {
+pub(crate) async fn page(request: Request) -> Html {
+    let locale = &request.locale;
     let deleted = request.param(DELETED_PARAM).filter(|id| !id.is_empty());
     let found = request
         .client
@@ -91,20 +101,28 @@ pub(crate) async fn page(request: Request) -> AnyView {
             ferrohealth_ui::tone::Tone::Ok,
             ferrohealth_ui::view::notice::Announce::Status,
             None,
-            tr_with(Msg::ValueSetsDeleted, &[("id", id.into())]),
+            t(tr_with(locale, Msg::ValueSetsDeleted, &[("id", id.into())])),
         )
     });
     match found {
-        Ok(found) => view! {
-            {said}
-            {listing(&request, found.found().into_iter().cloned().collect(), &names)}
-        }
-        .into_any(),
-        Err(error) => view! {
-            {heading(tr(Msg::ShellValueSets), None, Vec::new(), ActionGroup::none())}
-            {failure(&error)}
-        }
-        .into_any(),
+        Ok(found) => Html::join([
+            said.unwrap_or_default(),
+            listing(
+                &request,
+                found.found().into_iter().cloned().collect(),
+                &names,
+            ),
+        ]),
+        Err(error) => Html::join([
+            heading(
+                &request,
+                tr(locale, Msg::ShellValueSets),
+                None,
+                Vec::new(),
+                ActionGroup::none(),
+            ),
+            failure(locale, &error),
+        ]),
     }
 }
 
@@ -130,7 +148,8 @@ fn listing(
     request: &Request,
     all: Vec<PublishedValueSet>,
     names: &BTreeMap<String, String>,
-) -> AnyView {
+) -> Html {
+    let locale = &request.locale;
     let state = ListState::read(request);
     let path = ui_path(VALUE_SETS_PATH);
     let counts = counted(all.iter().map(source_of));
@@ -142,21 +161,20 @@ fn listing(
         source_of,
     );
     let columns = [
-        Column::text(NAME_COLUMN, tr(Msg::ValueSetsValueSet))
+        Column::text(NAME_COLUMN, tr(locale, Msg::ValueSetsValueSet))
             .role(Role::Title)
             .sortable(),
-        Column::text("source", tr(Msg::CodeSystemsSource)).role(Role::Meta),
-        Column::text("version", tr(Msg::ValueSetsVersion)).role(Role::Meta),
-        Column::text("status", tr(Msg::ValueSetsStatus)).role(Role::Meta),
-        Column::text("selects", tr(Msg::ValueSetsSelects)).role(Role::Quiet),
+        Column::text("source", tr(locale, Msg::CodeSystemsSource)).role(Role::Meta),
+        Column::text("version", tr(locale, Msg::ValueSetsVersion)).role(Role::Meta),
+        Column::text("status", tr(locale, Msg::ValueSetsStatus)).role(Role::Meta),
+        Column::text("selects", tr(locale, Msg::ValueSetsSelects)).role(Role::Quiet),
     ];
-    let [_, source, version, status, selection] = &columns;
-    let title = tr(Msg::ShellValueSets);
+    let title = tr(locale, Msg::ShellValueSets);
     let body = if kept.is_empty() && total == 0 {
-        let line = tr(Msg::ValueSetsNone);
+        let line = tr(locale, Msg::ValueSetsNone);
         let first = request.can(VALUE_SET, Letter::Create).then(|| {
             (
-                tr(Msg::ValueSetsFirst),
+                tr(locale, Msg::ValueSetsFirst),
                 ui_link(COMPOSE_PATH, request.version),
             )
         });
@@ -165,34 +183,16 @@ fn listing(
         state.emptied(
             request,
             &path,
-            tr_with(Msg::ValueSetsNoMatch, &[("count", total.into())]),
+            tr_with(locale, Msg::ValueSetsNoMatch, &[("count", total.into())]),
         )
     } else {
-        let drawn = state
-            .window(kept.len())
-            .slice(&kept)
-            .iter()
-            .map(|value_set| {
-                let href = resource_link(
-                    VALUE_SETS_PATH,
-                    value_set.id().unwrap_or_default(),
-                    request.version,
-                );
-                let url = value_set.url().unwrap_or_default();
-                let version_words = value_set
-                    .version()
-                    .map(|code| tr_with(Msg::VersionsOne, &[("version", code.to_owned().into())]));
-                view! {
-                    <tr>
-                        {title_cell(Some(&href), label_of(value_set), Some(canonical(url)))}
-                        {cell(source, source_of(value_set).tag())} {cell(version, version_words)}
-                        {cell(status, status_state(value_set.status()))}
-                        {cell(selection, selects(&value_set.clauses(), names))}
-                    </tr>
-                }
-            })
-            .collect_view()
-            .into_any();
+        let drawn = join(
+            state
+                .window(kept.len())
+                .slice(&kept)
+                .iter()
+                .map(|value_set| row(request, &columns, value_set, names)),
+        );
         let fields = state.fields(request, &[]);
         let sort = state.sort();
         data_table(DataTable {
@@ -201,7 +201,6 @@ fn listing(
             sorting: ListState::sorting(&sort, &fields),
             body: Body::Rows(drawn),
         })
-        .into_any()
     };
     let actions = create_action(request);
     state.frame(
@@ -209,6 +208,7 @@ fn listing(
         Frame {
             title,
             subtitle: tr_with(
+                locale,
                 Msg::ValueSetsSubtitle,
                 &[("version", request.version.label().into())],
             ),
@@ -217,22 +217,55 @@ fn listing(
             total,
             kept: kept.len(),
             counts,
-            find: tr(Msg::ValueSetsFind),
+            find: tr(locale, Msg::ValueSetsFind),
             body,
             pages: (
-                tr(Msg::ValueSetsPages),
+                tr(locale, Msg::ValueSetsPages),
                 Noun::new(message(Msg::NounValueSets)),
             ),
         },
     )
 }
 
+/// One value set's row of the listing, its cells under `columns`.
+fn row(
+    request: &Request,
+    columns: &[Column; 5],
+    value_set: &PublishedValueSet,
+    names: &BTreeMap<String, String>,
+) -> Html {
+    let locale = &request.locale;
+    let [_, source, version, status, selection] = columns;
+    let href = resource_link(
+        VALUE_SETS_PATH,
+        value_set.id().unwrap_or_default(),
+        request.version,
+    );
+    let url = value_set.url().unwrap_or_default();
+    let version_words = value_set.version().map(|code| {
+        tr_with(
+            locale,
+            Msg::VersionsOne,
+            &[("version", code.to_owned().into())],
+        )
+    });
+    h(format!(
+        "<tr>{}{}{}{}{}</tr>",
+        title_cell(Some(&href), t(label_of(value_set)), Some(canonical(url))),
+        cell(source, source_of(value_set).tag(locale)),
+        cell(version, t(version_words.unwrap_or_default())),
+        cell(status, status_state(locale, value_set.status())),
+        cell(selection, t(selects(locale, &value_set.clauses(), names))),
+    ))
+}
+
 /// The title row's action: a new resource, for a reader who may create one.
 fn create_action(request: &Request) -> ActionGroup {
+    let locale = &request.locale;
     if request.can(VALUE_SET, Letter::Create) {
         ActionGroup::primary(Action::new(
             Some(Glyph::FILE_PLUS),
-            tr(Msg::ValueSetsNew),
+            tr(locale, Msg::ValueSetsNew),
             Act::Link(ui_link(COMPOSE_PATH, request.version)),
         ))
     } else {

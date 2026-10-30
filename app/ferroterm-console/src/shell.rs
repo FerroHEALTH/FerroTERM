@@ -2,52 +2,40 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The chrome around every screen: the top bar, the navigation, the banner
-//! and the footer, drawn once from FerroUI's shell around the routes.
+//! and the footer, drawn from FerroUI's shell around the page.
 //!
 //! The top bar carries what is true of every screen at once: the search, the
 //! FHIR version the reader is reading through (M3), the server's state as
 //! the status pill (F12), Sign in for a visitor, and the user menu (F13),
 //! which holds the theme, since the top bar carries no theme control
 //! (FerroUI's family rule 5). The navigation folds to its rail by a form
-//! post the console keeps in a cookie. The shell is drawn once and follows
-//! the router (FerroUI `docs/consoles.md`, "How a console builds", step
-//! 10): the navigation marks the page in view by itself, the version select
-//! follows the address, and the parts that read the visit draw again when
-//! it changes. No specification governs the chrome: our own design.
-#![cfg_attr(
-    target_arch = "wasm32",
-    allow(
-        clippy::unused_async_trait_impl,
-        reason = "the server function macro writes the browser half's call as an async trait method; only that target has it"
-    )
-)]
+//! post the console keeps in a cookie. Every page draws the whole shell
+//! from its own request, so the navigation marks the page in view and the
+//! version select names its address. No specification governs the chrome:
+//! our own design.
 
 use std::borrow::Cow;
 
+use ferrohealth_ui::html::Html;
 use ferrohealth_ui::icon::Glyph;
-use ferrohealth_ui::island::{SessionWatch, ShortcutLegend};
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::button::{Variant, label};
+use ferrohealth_ui::view::menu::{ThemeChoice, UserMenu, user_menu};
+use ferrohealth_ui::view::nav::{Entry, Group, Rail, Sidebar, sidebar};
 use ferrohealth_ui::view::search::{SearchBox, search_box};
+use ferrohealth_ui::view::session::{Watch, session_watch};
 use ferrohealth_ui::view::shell::{Footer, Shell, TopBar, brand_mark, lockup, shell, topbar};
+use ferrohealth_ui::view::shortcuts::shortcut_legend;
 use ferrohealth_ui::view::status::{Reach, StatusPill, banner, status_pill};
-use ferrohealth_ui::widget::menu::{ThemeChoice, UserMenu, user_menu};
-use ferrohealth_ui::widget::nav::{Entry, Group, Rail, Sidebar, sidebar};
-use ferrohealth_ui::widget::session::{Left, Watch};
-use ferrohealth_ui::widget::shortcuts::LegendWords;
-use ferrohealth_ui::widget::version::{VersionRoot, VersionSelect, version_select};
-#[cfg(not(target_arch = "wasm32"))]
+use ferrohealth_ui::view::toast::toast_region;
+use ferrohealth_ui::view::version::{VersionRoot, VersionSelect, version_select};
 use http::StatusCode;
-use leptos::prelude::*;
-use leptos_router::hooks::use_location;
-use serde::{Deserialize, Serialize};
 
 use crate::fhir::version::FhirVersion;
 use crate::locale::{Msg, tr, tr_with};
+use crate::markup::{h, t};
 use crate::request::Request;
 use crate::routes;
-use crate::shortcuts::Shortcuts;
-use crate::visit::Visits;
 
 /// The product name as a reader reads it, the same in every language.
 pub(crate) const PRODUCT: &str = "FerroTERM Console";
@@ -71,14 +59,14 @@ pub(crate) const SEARCH_ID: &str = "find";
 /// The id of the FHIR version select's menu.
 const VERSION_MENU_ID: &str = "fhir-version";
 
-/// The brand mark drawn on a light ground, from the site root.
-const MARK_LIGHT: &str = "/mark-light.svg";
+/// The brand mark drawn on a light ground.
+pub(crate) const MARK_LIGHT: &str = "/mark-light.svg";
 
-/// The brand mark drawn on a dark ground, from the site root.
-const MARK_DARK: &str = "/mark-dark.svg";
+/// The brand mark drawn on a dark ground.
+pub(crate) const MARK_DARK: &str = "/mark-dark.svg";
 
 /// How the terminology server answered the console's probe.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Probe {
     /// It answered `200`.
     Up,
@@ -91,7 +79,6 @@ pub(crate) enum Probe {
 }
 
 impl Probe {
-    #[cfg(not(target_arch = "wasm32"))]
     /// The state `status` names, or [`Probe::Unreachable`] for none.
     #[must_use]
     pub(crate) fn of(status: Option<StatusCode>) -> Self {
@@ -116,7 +103,7 @@ impl Probe {
 
 /// How the terminology server answered the console, read once for the
 /// shell.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Reached {
     /// How it answered the probe of its health.
     probe: Probe,
@@ -128,148 +115,90 @@ pub(crate) struct Reached {
 /// Asks the server for its health, for the status pill, and, on a console
 /// with no sign-in, whether the server itself asks for one, for the
 /// development banner.
-///
-/// # Errors
-///
-/// When the server function cannot be reached or answered.
-#[server(endpoint = "reached")]
-pub(crate) async fn server_reached() -> Result<Reached, ServerFnError> {
-    let request = Request::read();
+pub(crate) async fn reached(request: &Request) -> Reached {
     let health = request.client.probe().await;
     let open = if request.sign_in {
         false
     } else {
         request.client.serves_without_sign_in(request.version).await
     };
-    Ok(Reached {
+    Reached {
         probe: Probe::of(health),
         open,
-    })
+    }
 }
 
-/// The request of the address in view, as the visit the shell knows read
-/// it.
-fn in_view(visits: Option<Visits>, path: String, query: String) -> Request {
-    let visit = visits.map_or_else(crate::visit::server_visit, |visits| visits.0.get());
-    Request::of(&visit, path, query)
-}
-
-/// The console's chrome around `content`, the routes: drawn once, each part
-/// following the router or the visit as it changes.
-pub(crate) fn console_shell(content: AnyView) -> AnyView {
-    ferrohealth_ui::widget::nav::follow_path();
-    let location = use_location();
-    let visits = use_context::<Visits>();
-    let path = location.pathname.get_untracked();
-    let query = location
-        .search
-        .get_untracked()
-        .trim_start_matches('?')
-        .to_owned();
-    let reached = OnceResource::new(server_reached());
-    let drawn_at = (path.clone(), query.clone());
-    let bar = view! {
-        <Suspense>
-            {move || {
-                let request = in_view(visits, drawn_at.0.clone(), drawn_at.1.clone());
-                Suspend::new(async move {
-                    let reached = reached.await.ok();
-                    top_bar(&request, reached)
-                })
-            }}
-        </Suspense>
-    }
-    .into_any();
-    let drawn_at = (path.clone(), query.clone());
-    let nav = (move || {
-        let request = in_view(visits, drawn_at.0.clone(), drawn_at.1.clone());
-        navigation_of(&request)
-    })
-    .into_any();
-    let banner = view! {
-        <Suspense>
-            {Suspend::new(async move {
-                reached.await.ok().filter(|reached| reached.open).map(|_| development_banner())
-            })}
-        </Suspense>
-    }
-    .into_any();
-    let page = shell(Shell {
-        topbar: bar,
-        banner: Some(banner),
-        sidebar: nav,
-        content,
-        dock: None,
-        footer: footer(),
-    });
+/// The console's chrome around `content`, the page `request` names, with
+/// the server as it was `reached`: the shell, the session watch of a
+/// signed-in reader and the shortcut legend.
+pub(crate) fn console_shell(request: &Request, reached: Reached, content: Html) -> Html {
+    let locale = &request.locale;
+    let bar = top_bar(request, reached);
+    let nav = navigation_of(request);
+    let banner = reached.open.then(|| development_banner(request));
     // NOTE: FerroUI `docs/consoles.md`, "The session's end": the watch starts from what
-    // the session had left as the server drew the page, carried to the browser.
-    let left = *SharedValue::new(session_left);
-    let watch = left.map(|left| {
-        let watch = Watch::new(
+    // the session had left as the server drew the page.
+    let watch = request.left.map(|left| {
+        session_watch(&Watch::new(
+            locale,
             routes::SESSION_ROUTE,
             routes::SIGN_IN_PAGE,
             routes::SIGN_OUT_ROUTE,
             left,
-        );
-        view! { <SessionWatch watch /> }
+        ))
     });
-    view! {
-        {page}
-        {watch}
-        <Shortcuts goto=crate::pages::shortcuts::goto() />
-        <ShortcutLegend groups=crate::pages::shortcuts::groups() words=LegendWords::of_page() />
-    }
-    .into_any()
-}
-
-/// What the reader's session had left as the server drew the page; none for
-/// a visitor, and in the browser, which reads the value the server
-/// serialized.
-fn session_left() -> Option<Left> {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        crate::session::request::left()
-    }
-    #[cfg(target_arch = "wasm32")]
-    {
-        None
-    }
+    let legend = shortcut_legend(locale, crate::pages::shortcuts::groups(locale));
+    let content = Html::join([content, watch.unwrap_or_default(), legend]);
+    shell(
+        locale,
+        Shell {
+            topbar: bar,
+            banner,
+            sidebar: nav,
+            content,
+            dock: None,
+            toasts: toast_region(locale, Vec::new()),
+            footer: footer(),
+        },
+    )
 }
 
 /// The navigation of `request`, its rail as the reader left it.
-fn navigation_of(request: &Request) -> AnyView {
+fn navigation_of(request: &Request) -> Html {
     let rail = Rail {
         collapsed: request.prefs.rail,
         action: String::from(routes::SIDEBAR_ROUTE),
         back: request.back(),
     };
-    sidebar(Sidebar {
-        id: NAV_ID,
-        label: tr(Msg::ShellNavigation),
-        groups: navigation(request.reads_sync()),
-        current: request.path.clone(),
-        rail: Some(rail),
-        nest: None,
-    })
+    sidebar(
+        &request.locale,
+        Sidebar {
+            id: NAV_ID,
+            label: request.tr(Msg::ShellNavigation),
+            groups: navigation(&request.locale, request.reads_sync()),
+            current: request.path.clone(),
+            rail: Some(rail),
+            nest: None,
+        },
+    )
 }
 
 /// The top bar of `request`, the server as it was `reached`.
-fn top_bar(request: &Request, reached: Option<Reached>) -> AnyView {
-    let probe = reached.map_or(Probe::Unreachable, |reached| reached.probe);
-    let open = reached.is_some_and(|reached| reached.open);
-    topbar(TopBar {
-        sidebar: NAV_ID,
-        lockup: lockup(
-            routes::ui_link("", request.version),
-            brand_mark(MARK_LIGHT, MARK_DARK),
-            LOCKUP_NAME,
-            tr(Msg::ShellConsole),
-        )
-        .into_any(),
-        search: Some(search(request)),
-        end: end(request, probe, open),
-    })
+fn top_bar(request: &Request, reached: Reached) -> Html {
+    topbar(
+        &request.locale,
+        TopBar {
+            sidebar: NAV_ID,
+            lockup: lockup(
+                routes::ui_link("", request.version),
+                brand_mark(MARK_LIGHT, MARK_DARK),
+                LOCKUP_NAME,
+                request.tr(Msg::ShellConsole),
+            ),
+            search: Some(search(request)),
+            end: end(request, reached.probe, reached.open),
+        },
+    )
 }
 
 /// The footer every page carries.
@@ -284,12 +213,12 @@ pub(crate) fn footer() -> Footer {
 
 /// The banner of a development deployment: no sign-in on the console, and
 /// none on the server, so anyone who reaches it can write.
-fn development_banner() -> AnyView {
+fn development_banner(request: &Request) -> Html {
     banner(
         Tone::Warn,
         Glyph::TRIANGLE_ALERT,
-        tr(Msg::ShellDevelopmentTitle),
-        &tr(Msg::ShellDevelopmentBody),
+        request.tr(Msg::ShellDevelopmentTitle),
+        &request.tr(Msg::ShellDevelopmentBody),
         None,
     )
 }
@@ -297,10 +226,10 @@ fn development_banner() -> AnyView {
 /// The navigation's groups, each entry a plain path, so the page in view is
 /// marked whatever its query, with Synchronisation when `sync` (the reader
 /// may read the sync service's runs).
-fn navigation(sync: bool) -> Vec<Group> {
+fn navigation(locale: &ferrohealth_ui::i18n::Locale, sync: bool) -> Vec<Group> {
     let entry = |path: &str, label: Msg, glyph: Glyph, exact: bool| Entry {
         href: Cow::Owned(routes::ui_path(path)),
-        label: Cow::Owned(tr(label)),
+        label: Cow::Owned(tr(locale, label)),
         glyph,
         exact,
         count: None,
@@ -334,7 +263,7 @@ fn navigation(sync: bool) -> Vec<Group> {
     vec![
         Group {
             id: "nav-overview",
-            title: Cow::Owned(tr(Msg::ShellGroupOverview)),
+            title: Cow::Owned(tr(locale, Msg::ShellGroupOverview)),
             entries: vec![entry(
                 "",
                 Msg::ShellDashboard,
@@ -344,7 +273,7 @@ fn navigation(sync: bool) -> Vec<Group> {
         },
         Group {
             id: "nav-terminology",
-            title: Cow::Owned(tr(Msg::ShellGroupTerminology)),
+            title: Cow::Owned(tr(locale, Msg::ShellGroupTerminology)),
             entries: vec![
                 entry(
                     routes::SYSTEMS_PATH,
@@ -374,7 +303,7 @@ fn navigation(sync: bool) -> Vec<Group> {
         },
         Group {
             id: "nav-operations",
-            title: Cow::Owned(tr(Msg::ShellGroupOperations)),
+            title: Cow::Owned(tr(locale, Msg::ShellGroupOperations)),
             entries: vec![entry(
                 routes::OPERATIONS_PATH,
                 Msg::ShellOperations,
@@ -384,7 +313,7 @@ fn navigation(sync: bool) -> Vec<Group> {
         },
         Group {
             id: "nav-console",
-            title: Cow::Owned(tr(Msg::ShellGroupConsole)),
+            title: Cow::Owned(tr(locale, Msg::ShellGroupConsole)),
             entries: console,
         },
     ]
@@ -393,8 +322,8 @@ fn navigation(sync: bool) -> Vec<Group> {
 /// The top bar's search, whose panel asks the find's answer route as you
 /// type ([`crate::pages::find::find_answer`]).
 #[must_use]
-pub(crate) fn search(request: &Request) -> AnyView {
-    search_box(search_of(request))
+pub(crate) fn search(request: &Request) -> Html {
+    search_box(&request.locale, &search_of(request))
 }
 
 /// The top bar's search box of `request`, holding the words of the find
@@ -408,11 +337,12 @@ fn search_of(request: &Request) -> SearchBox {
     SearchBox {
         id: String::from(SEARCH_ID),
         name: String::from(crate::find::QUERY_PARAM),
-        label: tr(Msg::ShellSearchLabel),
-        placeholder: tr(Msg::ShellSearchPlaceholder),
+        label: request.tr(Msg::ShellSearchLabel),
+        placeholder: request.tr(Msg::ShellSearchPlaceholder),
         action: routes::ui_path(routes::FIND_PATH),
         value,
         suggest: Some(String::from(crate::pages::find::ANSWER_ROUTE)),
+        glyphs: crate::pages::find::GLYPHS.to_vec(),
         ..SearchBox::default()
     }
 }
@@ -423,7 +353,7 @@ fn versions(request: &Request) -> VersionSelect {
     let (path, query) = (&request.path, &request.query);
     VersionSelect {
         id: String::from(VERSION_MENU_ID),
-        label: tr(Msg::ShellFhirVersion),
+        label: request.tr(Msg::ShellFhirVersion),
         roots: FhirVersion::ALL
             .into_iter()
             .map(|version| VersionRoot {
@@ -438,52 +368,31 @@ fn versions(request: &Request) -> VersionSelect {
 }
 
 /// The end of the top bar: the version select, the status pill, Sign in for
-/// a visitor, and the user menu, each part that names the page in view
-/// following the router.
-fn end(request: &Request, probe: Probe, open: bool) -> AnyView {
-    let location = use_location();
-    let at = {
-        let request = request.clone();
-        move || {
-            request.at(
-                location.pathname.get(),
-                location.search.get().trim_start_matches('?').to_owned(),
-            )
-        }
-    };
+/// a visitor, and the user menu.
+fn end(request: &Request, probe: Probe, open: bool) -> Html {
+    let locale = &request.locale;
     let (reach, words) = probe.pill();
     let pill = status_pill(StatusPill {
         reach,
-        words: tr(words),
+        words: tr(locale, words),
         detail: Some(tr_with(
+            locale,
             Msg::ShellServerAt,
             &[("root", request.root.clone().into())],
         )),
     });
-    let select = {
-        let at = at.clone();
-        move || version_select(versions(&at()))
-    };
+    let select = version_select(locale, versions(request));
     let signed_in = request.session.signed_in();
     let sign_in = (!signed_in && request.sign_in).then(|| {
-        let at = at.clone();
-        (move || {
-            view! {
-                <a href=routes::sign_in_link(&at().back()) class=Variant::Secondary.small()>
-                    {label(Some(Glyph::LOG_IN), tr(Msg::ShellSignIn))}
-                </a>
-            }
-        })
-        .into_any()
+        h(format!(
+            r#"<a href="{}" class="{}">{}</a>"#,
+            t(routes::sign_in_link(&request.back())),
+            Variant::Secondary.small(),
+            label(Some(Glyph::LOG_IN), tr(locale, Msg::ShellSignIn)),
+        ))
     });
-    let menu = move || user_menu(menu_of(&at(), open));
-    view! {
-        {select}
-        {pill}
-        {sign_in}
-        {menu}
-    }
-    .into_any()
+    let menu = user_menu(locale, menu_of(request, open));
+    Html::join([select, pill, sign_in.unwrap_or_default(), menu])
 }
 
 /// The user menu of `request`, saying the server is `open` to a visitor.
@@ -498,13 +407,13 @@ fn menu_of(request: &Request, open: bool) -> UserMenu {
         let who = request
             .session
             .who()
-            .unwrap_or_else(|| tr(Msg::ShellSignedIn));
+            .unwrap_or_else(|| request.tr(Msg::ShellSignedIn));
         UserMenu {
             id: USER_MENU_ID,
             label: who.clone(),
             name: Some(who.clone()),
             who,
-            line: request.session.standing(),
+            line: request.session.standing(&request.locale),
             preferences: routes::ui_path(routes::PREFERENCES_PATH),
             theme,
             choices,
@@ -520,10 +429,10 @@ fn menu_of(request: &Request, open: bool) -> UserMenu {
         };
         UserMenu {
             id: USER_MENU_ID,
-            label: tr(label),
+            label: request.tr(label),
             name: None,
-            who: tr(Msg::ShellNotSignedIn),
-            line: tr(line),
+            who: request.tr(Msg::ShellNotSignedIn),
+            line: request.tr(line),
             preferences: routes::ui_path(routes::PREFERENCES_PATH),
             theme,
             choices,

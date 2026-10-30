@@ -7,19 +7,21 @@
 
 use std::collections::BTreeMap;
 
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::model::Noun;
 use ferrohealth_ui::table::view::{Body, Column, DataTable, Role, cell, data_table, title_cell};
 use ferrohealth_ui::view::action::ActionGroup;
+use ferrohealth_ui::view::action_menu::{Act, Action};
 use ferrohealth_ui::view::coding::canonical;
-use ferrohealth_ui::widget::action_menu::{Act, Action};
-use leptos::prelude::*;
 
 use crate::auth::scopes::Letter;
 use crate::fhir::CONCEPT_MAP;
 use crate::fhir::concept_map::PublishedConceptMap;
 use crate::fhir::searchset::SearchFilter;
 use crate::locale::{Msg, message, tr, tr_with};
+use crate::markup::{h, join, t};
 use crate::pages::listing::{Frame, ListState, NAME_COLUMN, counted, status_state};
 use crate::pages::parts::{Source, failure, heading, name_of, system_names};
 use crate::request::Request;
@@ -37,6 +39,7 @@ fn label_of(map: &PublishedConceptMap) -> String {
 /// group, named, else its scopes.
 #[must_use]
 pub(crate) fn from_to(
+    locale: &Locale,
     map: &PublishedConceptMap,
     names: &BTreeMap<String, String>,
 ) -> Option<String> {
@@ -49,6 +52,7 @@ pub(crate) fn from_to(
         .and_then(|group| group.target)
         .or_else(|| map.target_scope().map(str::to_owned))?;
     Some(tr_with(
+        locale,
         Msg::ConceptMapsFromTo,
         &[
             ("source", name_of(names, &source).into()),
@@ -58,7 +62,8 @@ pub(crate) fn from_to(
 }
 
 /// Concept maps.
-pub(crate) async fn page(request: Request) -> AnyView {
+pub(crate) async fn page(request: Request) -> Html {
+    let locale = &request.locale;
     let found = request
         .client
         .concept_map_search(request.version, &SearchFilter::default())
@@ -70,11 +75,16 @@ pub(crate) async fn page(request: Request) -> AnyView {
             found.found().into_iter().cloned().collect(),
             &names,
         ),
-        Err(error) => view! {
-            {heading(tr(Msg::ShellConceptMaps), None, Vec::new(), ActionGroup::none())}
-            {failure(&error)}
-        }
-        .into_any(),
+        Err(error) => Html::join([
+            heading(
+                &request,
+                tr(locale, Msg::ShellConceptMaps),
+                None,
+                Vec::new(),
+                ActionGroup::none(),
+            ),
+            failure(locale, &error),
+        ]),
     }
 }
 
@@ -92,7 +102,8 @@ fn listing(
     request: &Request,
     all: Vec<PublishedConceptMap>,
     names: &BTreeMap<String, String>,
-) -> AnyView {
+) -> Html {
+    let locale = &request.locale;
     let state = ListState::read(request);
     let path = ui_path(CONCEPT_MAPS_PATH);
     let counts = counted(all.iter().map(source_of));
@@ -104,61 +115,56 @@ fn listing(
         source_of,
     );
     let columns = [
-        Column::text(NAME_COLUMN, tr(Msg::ConceptMapsMap))
+        Column::text(NAME_COLUMN, tr(locale, Msg::ConceptMapsMap))
             .role(Role::Title)
             .sortable(),
-        Column::text("source", tr(Msg::CodeSystemsSource)).role(Role::Meta),
-        Column::text("mappings", tr(Msg::ConceptMapsMappings)).numeric(),
-        Column::text("status", tr(Msg::ValueSetsStatus)).role(Role::Meta),
+        Column::text("source", tr(locale, Msg::CodeSystemsSource)).role(Role::Meta),
+        Column::text("mappings", tr(locale, Msg::ConceptMapsMappings)).numeric(),
+        Column::text("status", tr(locale, Msg::ValueSetsStatus)).role(Role::Meta),
     ];
     let [_, source, mappings, status] = &columns;
-    let title = tr(Msg::ShellConceptMaps);
+    let title = tr(locale, Msg::ShellConceptMaps);
     let body = if kept.is_empty() && total == 0 {
         let first = request.can(CONCEPT_MAP, Letter::Create).then(|| {
             (
-                tr(Msg::ConceptMapsFirst),
+                tr(locale, Msg::ConceptMapsFirst),
                 ui_link(CONCEPT_MAP_EDITOR_PATH, request.version),
             )
         });
-        ferrohealth_ui::view::template::list::list_empty(tr(Msg::ConceptMapsNone), first)
+        ferrohealth_ui::view::template::list::list_empty(tr(locale, Msg::ConceptMapsNone), first)
     } else if kept.is_empty() {
         state.emptied(
             request,
             &path,
-            tr_with(Msg::ConceptMapsNoMatch, &[("count", total.into())]),
+            tr_with(locale, Msg::ConceptMapsNoMatch, &[("count", total.into())]),
         )
     } else {
-        let drawn = state
-            .window(kept.len())
-            .slice(&kept)
-            .iter()
-            .map(|map| {
-                let href = resource_link(
-                    CONCEPT_MAPS_PATH,
-                    map.id().unwrap_or_default(),
-                    request.version,
-                );
-                let url = map.url().unwrap_or_default();
-                let sub = view! {
-                    {canonical(url)}
-                    {from_to(map, names)
-                        .map(|words| view! { <span class="fui-row-sub">{words}</span> })}
-                }
-                .into_any();
-                let count = u32::try_from(map.mappings().len()).unwrap_or(u32::MAX);
-                view! {
-                    <tr>
-                        {title_cell(Some(&href), label_of(map), Some(sub))}
-                        {cell(source, source_of(map).tag())}
-                        {cell(
-                            mappings,
-                            tr_with(Msg::ConceptMapsMappingCount, &[("count", count.into())]),
-                        )} {cell(status, status_state(map.status()))}
-                    </tr>
-                }
-            })
-            .collect_view()
-            .into_any();
+        let drawn = join(state.window(kept.len()).slice(&kept).iter().map(|map| {
+            let href = resource_link(
+                CONCEPT_MAPS_PATH,
+                map.id().unwrap_or_default(),
+                request.version,
+            );
+            let url = map.url().unwrap_or_default();
+            let from_to = from_to(locale, map, names)
+                .map(|words| h(format!(r#"<span class="fui-row-sub">{}</span>"#, t(words))));
+            let sub = h(format!("{}{}", canonical(url), from_to.unwrap_or_default()));
+            let count = u32::try_from(map.mappings().len()).unwrap_or(u32::MAX);
+            h(format!(
+                "<tr>{}{}{}{}</tr>",
+                title_cell(Some(&href), t(label_of(map)), Some(sub)),
+                cell(source, source_of(map).tag(locale)),
+                cell(
+                    mappings,
+                    t(tr_with(
+                        locale,
+                        Msg::ConceptMapsMappingCount,
+                        &[("count", count.into())]
+                    ))
+                ),
+                cell(status, status_state(locale, map.status())),
+            ))
+        }));
         let fields = state.fields(request, &[]);
         let sort = state.sort();
         data_table(DataTable {
@@ -167,7 +173,6 @@ fn listing(
             sorting: ListState::sorting(&sort, &fields),
             body: Body::Rows(drawn),
         })
-        .into_any()
     };
     let actions = create_action(request);
     state.frame(
@@ -175,6 +180,7 @@ fn listing(
         Frame {
             title,
             subtitle: tr_with(
+                locale,
                 Msg::ConceptMapsSubtitle,
                 &[("version", request.version.label().into())],
             ),
@@ -183,10 +189,10 @@ fn listing(
             total,
             kept: kept.len(),
             counts,
-            find: tr(Msg::ValueSetsFind),
+            find: tr(locale, Msg::ValueSetsFind),
             body,
             pages: (
-                tr(Msg::ConceptMapsPages),
+                tr(locale, Msg::ConceptMapsPages),
                 Noun::new(message(Msg::NounConceptMaps)),
             ),
         },
@@ -195,10 +201,11 @@ fn listing(
 
 /// The title row's action: a new resource, for a reader who may create one.
 fn create_action(request: &Request) -> ActionGroup {
+    let locale = &request.locale;
     if request.can(CONCEPT_MAP, Letter::Create) {
         ActionGroup::primary(Action::new(
             Some(Glyph::FILE_PLUS),
-            tr(Msg::ConceptMapsNew),
+            tr(locale, Msg::ConceptMapsNew),
             Act::Link(ui_link(CONCEPT_MAP_EDITOR_PATH, request.version)),
         ))
     } else {

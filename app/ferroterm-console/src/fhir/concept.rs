@@ -274,7 +274,10 @@ impl ConceptQuery {
         let mut body = Map::new();
         body.insert(
             String::from("resourceType"),
-            Value::String(tr(Msg::Parameters)),
+            Value::String(tr(
+                &ferrohealth_ui::i18n::Locale::english(),
+                Msg::Parameters,
+            )),
         );
         body.insert(String::from("parameter"), Value::Array(parameters));
         Value::Object(body).to_string()

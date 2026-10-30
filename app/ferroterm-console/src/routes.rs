@@ -118,22 +118,24 @@ pub(crate) fn editing_link(
 /// concept map's by the logical id. A type with no screen here, or a resource
 /// missing the fact its screen needs, answers `None`.
 pub(crate) fn screen_link(
+    locale: &ferrohealth_ui::i18n::Locale,
     resource_type: &str,
     canonical: &str,
     id: &str,
     version: FhirVersion,
 ) -> Option<(String, String)> {
     match resource_type {
-        "CodeSystem" if !canonical.is_empty() => {
-            Some((system_link(canonical, version), tr(Msg::BackCodeSystem)))
-        }
+        "CodeSystem" if !canonical.is_empty() => Some((
+            system_link(canonical, version),
+            tr(locale, Msg::BackCodeSystem),
+        )),
         "ValueSet" if !id.is_empty() => Some((
             resource_link(VALUE_SETS_PATH, id, version),
-            tr(Msg::BackValueSet),
+            tr(locale, Msg::BackValueSet),
         )),
         "ConceptMap" if !id.is_empty() => Some((
             resource_link(CONCEPT_MAPS_PATH, id, version),
-            tr(Msg::BackConceptMap),
+            tr(locale, Msg::BackConceptMap),
         )),
         _ => None,
     }
@@ -193,7 +195,6 @@ pub(crate) const RESET_ROUTE: &str = "/preferences/reset";
 /// The route the navigation's Collapse and Expand post to.
 pub(crate) const SIDEBAR_ROUTE: &str = "/sidebar";
 
-#[cfg(not(target_arch = "wasm32"))]
 /// The route the top bar's FHIR version select leads to, which keeps the
 /// version for the browser's session and returns to the page.
 pub(crate) const FHIR_VERSION_ROUTE: &str = "/fhir-version";
@@ -601,19 +602,58 @@ mod tests {
     fn a_resource_screen_is_addressed_by_what_it_is_read_by() {
         let system = "https://example.org/fhir/CodeSystem/colours";
         assert_eq!(
-            screen_link("CodeSystem", system, "colours", FhirVersion::R4B).map(|(link, _)| link),
+            screen_link(
+                &ferrohealth_ui::i18n::Locale::english(),
+                "CodeSystem",
+                system,
+                "colours",
+                FhirVersion::R4B
+            )
+            .map(|(link, _)| link),
             Some(system_link(system, FhirVersion::R4B))
         );
         assert_eq!(
-            screen_link("ValueSet", system, "palette", FhirVersion::R5).map(|(link, _)| link),
+            screen_link(
+                &ferrohealth_ui::i18n::Locale::english(),
+                "ValueSet",
+                system,
+                "palette",
+                FhirVersion::R5
+            )
+            .map(|(link, _)| link),
             Some("/valuesets/palette?fhir=r5".to_owned())
         );
         assert_eq!(
-            screen_link("ConceptMap", system, "m", FhirVersion::R6).map(|(link, _)| link),
+            screen_link(
+                &ferrohealth_ui::i18n::Locale::english(),
+                "ConceptMap",
+                system,
+                "m",
+                FhirVersion::R6
+            )
+            .map(|(link, _)| link),
             Some("/conceptmaps/m?fhir=r6".to_owned())
         );
-        assert_eq!(screen_link("ValueSet", system, "", FhirVersion::R4), None);
-        assert_eq!(screen_link("Patient", system, "p", FhirVersion::R4), None);
+        assert_eq!(
+            screen_link(
+                &ferrohealth_ui::i18n::Locale::english(),
+                "ValueSet",
+                system,
+                "",
+                FhirVersion::R4
+            ),
+            None
+        );
+        assert_eq!(
+            screen_link(
+                &ferrohealth_ui::i18n::Locale::english(),
+                "Patient",
+                system,
+                "p",
+                FhirVersion::R4
+            ),
+            None
+        );
     }
 
     /// The `back` a link carries, decoded as the route reads it.

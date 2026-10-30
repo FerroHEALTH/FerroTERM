@@ -9,17 +9,20 @@
 //! deployment loaded has no write path, so it has no History tab and no
 //! Edit. No specification governs the page: our own design.
 
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::coding::canonical;
 use ferrohealth_ui::view::surface::{Crumb, Header};
 use ferrohealth_ui::view::tabs::{Tab, binder};
-use leptos::prelude::*;
 
 use crate::fhir::version::FhirVersion;
 use crate::fhir::{CODE_SYSTEM, CONCEPT_MAP, VALUE_SET};
 use crate::locale::{Msg, tr, tr_with};
+use crate::markup::{h, t};
 use crate::pages::listing::status_state;
 use crate::pages::parts::{Source, headed};
+use crate::request::Request;
 use crate::routes::{CONCEPT_MAPS_PATH, SYSTEMS_PATH, VALUE_SETS_PATH, history_link, ui_link};
 
 /// The query parameter that names a resource page's tab.
@@ -59,22 +62,25 @@ impl Kind {
     }
 
     /// The listing the trail leads back to: its words and its address.
-    pub(crate) fn listing(self, version: FhirVersion) -> Crumb {
+    pub(crate) fn listing(self, locale: &Locale, version: FhirVersion) -> Crumb {
         let (words, path) = match self {
             Self::CodeSystem => (Msg::ShellCodeSystems, SYSTEMS_PATH),
             Self::ValueSet => (Msg::ShellValueSets, VALUE_SETS_PATH),
             Self::ConceptMap => (Msg::ShellConceptMaps, CONCEPT_MAPS_PATH),
         };
-        Crumb::new(tr(words), ui_link(path, version))
+        Crumb::new(tr(locale, words), ui_link(path, version))
     }
 
     /// The name of the tab row.
-    fn tabs_label(self) -> String {
-        tr(match self {
-            Self::CodeSystem => Msg::DetailTabsCodeSystem,
-            Self::ValueSet => Msg::DetailTabsValueSet,
-            Self::ConceptMap => Msg::DetailTabsConceptMap,
-        })
+    fn tabs_label(self, locale: &Locale) -> String {
+        tr(
+            locale,
+            match self {
+                Self::CodeSystem => Msg::DetailTabsCodeSystem,
+                Self::ValueSet => Msg::DetailTabsValueSet,
+                Self::ConceptMap => Msg::DetailTabsConceptMap,
+            },
+        )
     }
 
     /// The words of its first and second tab.
@@ -152,27 +158,22 @@ pub(crate) struct Head {
 
 /// The heading of a resource page.
 #[must_use]
-pub(crate) fn header(head: Head, version: FhirVersion) -> AnyView {
+pub(crate) fn header(request: &Request, head: Head) -> Html {
     let (subtitle, subtitle_view) = if head.canonical.is_empty() {
         (Some(head.line.into()), None)
     } else {
-        let line = head.line;
-        let drawn = view! {
-            {canonical(&head.canonical)}
-            " · "
-            {line}
-        }
-        .into_any();
+        let drawn = h(format!("{} · {}", canonical(&head.canonical), t(head.line)));
         (None, Some(drawn))
     };
     headed(
+        request,
         Header {
             title: head.title.into(),
             subtitle,
             subtitle_view,
-            crumbs: vec![head.kind.listing(version)],
+            crumbs: vec![head.kind.listing(&request.locale, request.version)],
             mono: false,
-            badge: Some(status_state(head.status.as_deref())),
+            badge: Some(status_state(&request.locale, head.status.as_deref())),
         },
         head.actions,
     )
@@ -180,14 +181,15 @@ pub(crate) fn header(head: Head, version: FhirVersion) -> AnyView {
 
 /// Its version and where it comes from, as the heading's line says them.
 #[must_use]
-pub(crate) fn line(version: Option<&str>, source: Source) -> String {
+pub(crate) fn line(locale: &Locale, version: Option<&str>, source: Source) -> String {
     let source = match source {
-        Source::Stored => tr(Msg::DetailStored),
-        Source::Index => tr(Msg::DetailIndex),
-        Source::Loaded => tr(Msg::DetailLoaded),
+        Source::Stored => tr(locale, Msg::DetailStored),
+        Source::Index => tr(locale, Msg::DetailIndex),
+        Source::Loaded => tr(locale, Msg::DetailLoaded),
     };
     match version {
         Some(version) => tr_with(
+            locale,
             Msg::DetailVersionLine,
             &[
                 ("version", version.to_owned().into()),
@@ -217,34 +219,35 @@ fn pane_href(page: &str, key: &str) -> String {
 /// The binder tabs of a `kind` page over `panel`, `current` raised.
 #[must_use]
 pub(crate) fn tabbed(
+    request: &Request,
     kind: Kind,
     current: Pane,
     links: &Links,
-    version: FhirVersion,
-    panel: AnyView,
-) -> AnyView {
+    panel: Html,
+) -> Html {
+    let locale = &request.locale;
     let (first, second) = kind.tab_words();
     let mut tabs = vec![
-        Tab::new(Pane::First.key(), links.page.clone(), tr(first)),
+        Tab::new(Pane::First.key(), links.page.clone(), tr(locale, first)),
         Tab::new(
             Pane::Second.key(),
             pane_href(&links.page, kind.second()),
-            tr(second),
+            tr(locale, second),
         ),
     ];
     if let Some(id) = &links.history {
         tabs.push(Tab::new(
             Pane::History.key(),
-            history_link(kind.resource_type(), id, version),
-            tr(Msg::DetailHistory),
+            history_link(kind.resource_type(), id, request.version),
+            tr(locale, Msg::DetailHistory),
         ));
     }
     tabs.push(Tab::new(
         Pane::Json.key(),
         pane_href(&links.page, "json"),
-        tr(Msg::DetailJson),
+        tr(locale, Msg::DetailJson),
     ));
-    binder(kind.tabs_label(), tabs, current.key(), panel)
+    binder(locale, kind.tabs_label(locale), tabs, current.key(), panel)
 }
 
 #[cfg(test)]

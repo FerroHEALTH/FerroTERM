@@ -5,8 +5,9 @@
 //! its hierarchy, three panes of one panel.
 //!
 //! Every move is a link or a `GET` form, so the browser walks with no
-//! WebAssembly: a match or a tree item selects its concept, a toggle opens
-//! or closes one level, and the tree island folds in place once it runs.
+//! script: a match or a tree item selects its concept, a toggle opens or
+//! closes one level, and FerroUI's `tree` module folds a level it drew in
+//! place and keeps the folds for the session.
 //! The tree walks one level at a time with the direct-child filter the
 //! served version declares (`TerminologyCapabilities.codeSystem.version.filter`,
 //! <https://hl7.org/fhir/R4B/terminologycapabilities.html>), read with an
@@ -14,7 +15,8 @@
 
 use std::collections::BTreeSet;
 
-use ferrohealth_ui::island::TreeView;
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::table::filter::Find;
 use ferrohealth_ui::table::model::StateSource;
 use ferrohealth_ui::table::view::{
@@ -30,8 +32,7 @@ use ferrohealth_ui::view::surface::{
 };
 use ferrohealth_ui::view::template::list::HeadingCount;
 use ferrohealth_ui::view::transform::{Density, transform_options};
-use ferrohealth_ui::widget::tree::{TreeData, TreeKind, TreeNode, TreeWords, path_key};
-use leptos::prelude::*;
+use ferrohealth_ui::view::tree::{Tree, TreeKind, TreeNode, TreeWords, path_key, tree_view};
 
 use crate::fhir::concept::{
     CHILD_OF_OPERATOR, ChildOf, Concept, ConceptQuery, Hierarchy, LookupRequest, chosen_version,
@@ -41,8 +42,9 @@ use crate::fhir::terminology::SystemCard;
 use crate::fhir::version::FhirVersion;
 use crate::fhir::{CODE_SYSTEM, FhirClient};
 use crate::locale::{Msg, tr, tr_with};
+use crate::markup::{code, h, join, t};
 use crate::pages::lookup::CODE_PARAM;
-use crate::pages::operations::{choices, select};
+use crate::pages::operations::{choices, hidden_field, select};
 use crate::pages::parts::{failure, heading};
 use crate::request::Request;
 use crate::routes::{
@@ -167,7 +169,8 @@ fn percent(value: &str) -> String {
 }
 
 /// The concept browser.
-pub(crate) async fn page(request: Request) -> AnyView {
+pub(crate) async fn page(request: Request) -> Html {
+    let locale = &request.locale;
     let state = State::read(&request);
     let named = request
         .client
@@ -198,28 +201,28 @@ pub(crate) async fn page(request: Request) -> AnyView {
         &request,
         &state,
         &systems,
-        &versions(card.as_ref()),
+        &versions(locale, card.as_ref()),
         &languages,
     );
     let body = panes(&request, &state, &hierarchy).await;
-    view! {
-        {heading(
-            tr(Msg::BrowseTitle),
-            Some(tr(Msg::BrowseSubtitle)),
+    Html::join([
+        heading(
+            &request,
+            tr(locale, Msg::BrowseTitle),
+            Some(tr(locale, Msg::BrowseSubtitle)),
             Vec::new(),
             ActionGroup::none(),
-        )}
-        <section class="fui-card fui-panel" aria-label=tr(Msg::BrowseTitle)>
-            {options}
-            {body}
-        </section>
-    }
-    .into_any()
+        ),
+        h(format!(
+            r#"<section class="fui-card fui-panel" aria-label="{}">{options}{body}</section>"#,
+            t(tr(locale, Msg::BrowseTitle))
+        )),
+    ])
 }
 
 /// The versions the picker offers, the one an unversioned request resolves
 /// to marked as the default.
-fn versions(card: Option<&SystemCard>) -> Vec<(String, String)> {
+fn versions(locale: &Locale, card: Option<&SystemCard>) -> Vec<(String, String)> {
     card.map(|card| {
         card.versions
             .iter()
@@ -227,6 +230,7 @@ fn versions(card: Option<&SystemCard>) -> Vec<(String, String)> {
                 let code = row.code.clone()?;
                 let words = if row.is_default {
                     tr_with(
+                        locale,
                         Msg::LookupDefaultVersion,
                         &[("version", code.clone().into())],
                     )
@@ -242,7 +246,8 @@ fn versions(card: Option<&SystemCard>) -> Vec<(String, String)> {
 
 /// The panes: the search, the hierarchy where the version declares a walk,
 /// and the concept, or what to choose first.
-async fn panes(request: &Request, state: &State, hierarchy: &Hierarchy) -> AnyView {
+async fn panes(request: &Request, state: &State, hierarchy: &Hierarchy) -> Html {
+    let locale = &request.locale;
     if state.system.is_empty() {
         return browser(
             Panes::Three,
@@ -250,12 +255,12 @@ async fn panes(request: &Request, state: &State, hierarchy: &Hierarchy) -> AnyVi
             vec![
                 search_pane(request, state, None, None),
                 BrowserPane::new(
-                    tr(Msg::BrowseHierarchy),
-                    pane_body(section_intro(tr(Msg::BrowseChooseSystemTree))),
+                    tr(locale, Msg::BrowseHierarchy),
+                    pane_body(section_intro(tr(locale, Msg::BrowseChooseSystemTree))),
                 ),
                 BrowserPane::new(
-                    tr(Msg::BrowseConcept),
-                    pane_body(section_intro(tr(Msg::BrowseChooseConcept))),
+                    tr(locale, Msg::BrowseConcept),
+                    pane_body(section_intro(tr(locale, Msg::BrowseChooseConcept))),
                 ),
             ],
         );
@@ -276,7 +281,7 @@ async fn panes(request: &Request, state: &State, hierarchy: &Hierarchy) -> AnyVi
             ],
         )
     } else {
-        let note = flat_note(hierarchy);
+        let note = flat_note(locale, hierarchy);
         browser(
             Panes::Flat,
             Heading::Two,
@@ -295,49 +300,48 @@ fn picker(
     systems: &[(String, String)],
     versions: &[(String, String)],
     languages: &[(String, String)],
-) -> AnyView {
-    let fields = view! {
-        <input type="hidden" name=VERSION_PARAM value=request.version.segment() />
-        {select(
+) -> Html {
+    let locale = &request.locale;
+    let fields = Html::join([
+        hidden_field(VERSION_PARAM, request.version.segment()),
+        select(
             "browse-system",
             SYSTEM_PARAM,
-            tr(Msg::LookupSystem),
+            tr(locale, Msg::LookupSystem),
             systems,
             &state.system,
-            Some(tr(Msg::BrowseChooseSystem)),
-        )}
-        {select(
+            Some(tr(locale, Msg::BrowseChooseSystem)),
+        ),
+        select(
             "browse-version",
             SYSTEM_VERSION_PARAM,
-            tr(Msg::LookupVersion),
+            tr(locale, Msg::LookupVersion),
             versions,
             &state.version,
-            Some(tr(Msg::LookupServerVersion)),
-        )}
-        {select(
+            Some(tr(locale, Msg::LookupServerVersion)),
+        ),
+        select(
             "browse-language",
             LANGUAGE_PARAM,
-            tr(Msg::LookupLanguage),
+            tr(locale, Msg::LookupLanguage),
             languages,
             &state.language,
-            Some(tr(Msg::LookupServerLanguage)),
-        )}
-    };
-    let open = view! {
-        <button type="submit" class=ferrohealth_ui::view::button::Variant::Secondary.class()>
-            {tr(Msg::BrowseOpen)}
-        </button>
-    };
-    view! {
-        <form method="get" action=format!("/{BROWSE_PATH}")>
-            {transform_options(
-                Density::Plain,
-                fields,
-                view! { <div class="fui-transform-run">{open}</div> },
-            )}
-        </form>
-    }
-    .into_any()
+            Some(tr(locale, Msg::LookupServerLanguage)),
+        ),
+    ]);
+    let open = h(format!(
+        r#"<button type="submit" class="{}">{}</button>"#,
+        ferrohealth_ui::view::button::Variant::Secondary.class(),
+        t(tr(locale, Msg::BrowseOpen))
+    ));
+    h(format!(
+        r#"<form method="get" action="/{BROWSE_PATH}">{}</form>"#,
+        transform_options(
+            Density::Plain,
+            fields,
+            h(format!(r#"<div class="fui-transform-run">{open}</div>"#)),
+        )
+    ))
 }
 
 /// The concepts the search finds, or the first ones of the system when it
@@ -391,10 +395,11 @@ fn search_pane(
     request: &Request,
     state: &State,
     found: Option<Result<Vec<ConceptRow>, crate::fhir::error::FhirError>>,
-    note: Option<AnyView>,
+    note: Option<Html>,
 ) -> BrowserPane {
+    let locale = &request.locale;
     let fields = state.fields(request.version, &[FILTER_PARAM]);
-    let label = tr(Msg::BrowseSearchHint);
+    let label = tr(locale, Msg::BrowseSearchHint);
     let find = browser_find(Find {
         id: "browse-find",
         name: FILTER_PARAM,
@@ -405,10 +410,11 @@ fn search_pane(
         fields: &fields,
     });
     let results = match found {
-        None => section_intro(tr(Msg::BrowseChooseSystemFirst)),
-        Some(Err(error)) => failure(&error),
+        None => section_intro(tr(locale, Msg::BrowseChooseSystemFirst)),
+        Some(Err(error)) => failure(locale, &error),
         Some(Ok(concepts)) => {
             let count = section_intro(tr_with(
+                locale,
                 Msg::BrowseCount,
                 &[("count", concepts.len().into())],
             ));
@@ -426,39 +432,34 @@ fn search_pane(
                     } else {
                         drawn
                     };
-                    coding(drawn, Layout::Stacked)
+                    coding(locale, drawn, Layout::Stacked)
                 })
                 .collect();
-            view! {
-                {pane_body(count)}
-                {match_list(tr(Msg::BrowseMatches), rows)}
-            }
-            .into_any()
+            Html::join([
+                pane_body(count),
+                match_list(&tr(locale, Msg::BrowseMatches), rows),
+            ])
         }
     };
     BrowserPane::new(
-        tr(Msg::BrowseSearch),
-        view! {
-            {pane_body(
-                view! {
-                    {find}
-                    {note}
-                },
-            )}
-            {results}
-        },
+        tr(locale, Msg::BrowseSearch),
+        Html::join([
+            pane_body(Html::join([find, note.unwrap_or_default()])),
+            results,
+        ]),
     )
 }
 
 /// The sentence a flat version's search pane says about its hierarchy.
-fn flat_note(hierarchy: &Hierarchy) -> AnyView {
+fn flat_note(locale: &Locale, hierarchy: &Hierarchy) -> Html {
     let said = match hierarchy {
         Hierarchy::WithoutChildren { operators } => tr_with(
+            locale,
             Msg::VersionDeclaresHierarchyOperatorsNoneThem,
             &[("operators", operators.join(", ").into())],
         ),
         Hierarchy::Absent | Hierarchy::Walkable { .. } => {
-            tr(Msg::VersionDeclaresNoHierarchyFilterOperator)
+            tr(locale, Msg::VersionDeclaresNoHierarchyFilterOperator)
         }
     };
     section_intro(said)
@@ -539,11 +540,12 @@ async fn tree_pane(
     property: &str,
     concept: Option<&Concept>,
 ) -> BrowserPane {
-    let title = tr(Msg::BrowseHierarchy);
+    let locale = &request.locale;
+    let title = tr(locale, Msg::BrowseHierarchy);
     let Some(concept) = concept else {
         return BrowserPane::new(
             title,
-            pane_body(section_intro(tr(Msg::BrowseChooseConceptTree))),
+            pane_body(section_intro(tr(locale, Msg::BrowseChooseConceptTree))),
         );
     };
     let path = ancestors(&request.client, request.version, state, concept).await;
@@ -569,7 +571,7 @@ async fn tree_pane(
     }
     chain.push(&state.code);
     let selected = Some(path_key(&chain));
-    let tree = TreeData {
+    let tree = Tree {
         id: String::from("browse-tree"),
         label: title.clone(),
         kind: TreeKind::Concept,
@@ -578,8 +580,10 @@ async fn tree_pane(
         open: keys.into_iter().collect(),
         selected,
         open_field: None,
+        words: TreeWords::of(locale),
     };
     let declared = tr_with(
+        locale,
         Msg::VersionDeclaresOperatorFilterSoTree,
         &[
             ("child_of_operator", CHILD_OF_OPERATOR.into()),
@@ -588,12 +592,13 @@ async fn tree_pane(
     );
     BrowserPane::new(
         title,
-        view! {
-            <div class="fui-browser-body">
-                <TreeView tree=tree words=TreeWords::of_page() />
-            </div>
-            {pane_body(section_intro(declared))}
-        },
+        Html::join([
+            h(format!(
+                r#"<div class="fui-browser-body">{}</div>"#,
+                tree_view(&tree)
+            )),
+            pane_body(section_intro(declared)),
+        ]),
     )
 }
 
@@ -667,7 +672,8 @@ fn concept_pane(
     state: &State,
     concept: Option<&Result<Concept, crate::fhir::error::FhirError>>,
 ) -> BrowserPane {
-    let title = tr(Msg::BrowseConcept);
+    let locale = &request.locale;
+    let title = tr(locale, Msg::BrowseConcept);
     let all = card_action(
         format!(
             "{}&{CODE_PARAM}={}",
@@ -679,65 +685,59 @@ fn concept_pane(
             ),
             percent(&state.code)
         ),
-        tr(Msg::BrowseAllProperties),
+        tr(locale, Msg::BrowseAllProperties),
     );
     match concept {
         None => BrowserPane::new(
             title,
-            pane_body(section_intro(tr(Msg::BrowseChooseConcept))),
+            pane_body(section_intro(tr(locale, Msg::BrowseChooseConcept))),
         ),
-        Some(Err(error)) => BrowserPane::new(title, pane_body(failure(error))),
+        Some(Err(error)) => BrowserPane::new(title, pane_body(failure(locale, error))),
         Some(Ok(concept)) => {
-            let link = |code: &String| {
-                let href = state.selecting(code).href(request.version);
-                view! {
-                    <span class="fui-browser-rel-item">
-                        <a href=href>
-                            <code>{code.clone()}</code>
-                        </a>
-                    </span>
-                }
-                .into_any()
+            let link = |each: &String| {
+                let href = state.selecting(each).href(request.version);
+                h(format!(
+                    r#"<span class="fui-browser-rel-item"><a href="{}">{}</a></span>"#,
+                    t(href),
+                    code(each)
+                ))
             };
-            let parents: Vec<AnyView> = concept.parents().iter().map(link).collect();
-            let children: Vec<AnyView> = concept.children().iter().map(link).collect();
+            let parents: Vec<Html> = concept.parents().iter().map(link).collect();
+            let children: Vec<Html> = concept.children().iter().map(link).collect();
             let mut related = Vec::new();
             if !parents.is_empty() {
-                related.push((
-                    tr(Msg::BrowseParent),
-                    parents.into_iter().collect_view().into_any(),
-                ));
+                related.push((tr(locale, Msg::BrowseParent), join(parents)));
             }
             if !children.is_empty() {
-                related.push((
-                    tr(Msg::BrowseChildren),
-                    children.into_iter().collect_view().into_any(),
-                ));
+                related.push((tr(locale, Msg::BrowseChildren), join(children)));
             }
             let read_from = concept
                 .version
                 .as_ref()
                 .map_or_else(String::new, |version| {
-                    tr_with(Msg::BrowseReadFrom, &[("version", version.clone().into())])
+                    tr_with(
+                        locale,
+                        Msg::BrowseReadFrom,
+                        &[("version", version.clone().into())],
+                    )
                 });
-            let head = view! {
-                <h3 class="fui-concept-title">
-                    {concept.display.clone().unwrap_or_else(|| state.code.clone())}
-                </h3>
-                <p class="fui-small fui-muted">
-                    <code>{state.code.clone()}</code>
-                    " "
-                    {read_from}
-                </p>
-                <div class="fui-browser-rel">{definitions(related)}</div>
-            };
+            let head = h(format!(
+                r#"<h3 class="fui-concept-title">{}</h3><p class="fui-small fui-muted">{} {}</p><div class="fui-browser-rel">{}</div>"#,
+                t(concept
+                    .display
+                    .clone()
+                    .unwrap_or_else(|| state.code.clone())),
+                code(&state.code),
+                t(read_from),
+                definitions(related),
+            ));
             BrowserPane::new(
                 title,
-                view! {
-                    {pane_body(head)}
-                    {designations(concept)}
-                    {properties(concept)}
-                },
+                Html::join([
+                    pane_body(head),
+                    designations(locale, concept).unwrap_or_default(),
+                    properties(locale, concept).unwrap_or_default(),
+                ]),
             )
             .actions(all)
         }
@@ -745,32 +745,27 @@ fn concept_pane(
 }
 
 /// The concept's designations.
-fn designations(concept: &Concept) -> Option<AnyView> {
+fn designations(locale: &Locale, concept: &Concept) -> Option<Html> {
     if concept.designations.is_empty() {
         return None;
     }
     let columns = [
-        Column::text("term", tr(Msg::LookupTerm)).role(Role::Title),
-        Column::text("language", tr(Msg::LookupTermLanguage)),
-        Column::text("use", tr(Msg::LookupUse)),
+        Column::text("term", tr(locale, Msg::LookupTerm)).role(Role::Title),
+        Column::text("language", tr(locale, Msg::LookupTermLanguage)),
+        Column::text("use", tr(locale, Msg::LookupUse)),
     ];
     let [_, language, usage] = &columns;
-    let rows = concept
-        .designations
-        .iter()
-        .map(|row| {
-            view! {
-                <tr>
-                    {title_cell(None, row.value.clone(), None)}
-                    {cell(language, row.language.clone().unwrap_or_default())}
-                    {cell(usage, row.usage.clone().unwrap_or_default())}
-                </tr>
-            }
-        })
-        .collect_view()
-        .into_any();
-    let caption = tr(Msg::LookupDesignations);
+    let rows = join(concept.designations.iter().map(|row| {
+        h(format!(
+            "<tr>{}{}{}</tr>",
+            title_cell(None, t(&row.value), None),
+            cell(language, t(row.language.clone().unwrap_or_default())),
+            cell(usage, t(row.usage.clone().unwrap_or_default())),
+        ))
+    }));
+    let caption = tr(locale, Msg::LookupDesignations);
     Some(panel_section(
+        locale,
         Some(SectionHead {
             title: caption.clone(),
             count: Some(HeadingCount::All(
@@ -788,33 +783,25 @@ fn designations(concept: &Concept) -> Option<AnyView> {
 }
 
 /// The concept's properties.
-fn properties(concept: &Concept) -> Option<AnyView> {
+fn properties(locale: &Locale, concept: &Concept) -> Option<Html> {
     if concept.properties.is_empty() {
         return None;
     }
     let columns = [
-        Column::text("property", tr(Msg::LookupProperty)).role(Role::Title),
-        Column::text("value", tr(Msg::LookupValue)),
+        Column::text("property", tr(locale, Msg::LookupProperty)).role(Role::Title),
+        Column::text("value", tr(locale, Msg::LookupValue)),
     ];
     let [_, value] = &columns;
-    let rows = concept
-        .properties
-        .iter()
-        .map(|row| {
-            view! {
-                <tr>
-                    {title_cell(
-                        None,
-                        view! { <code>{row.code.clone()}</code> },
-                        row.description.clone().map(IntoAny::into_any),
-                    )} {cell(value, row.value.clone().unwrap_or_default())}
-                </tr>
-            }
-        })
-        .collect_view()
-        .into_any();
-    let caption = tr(Msg::LookupProperties);
+    let rows = join(concept.properties.iter().map(|row| {
+        h(format!(
+            "<tr>{}{}</tr>",
+            title_cell(None, code(&row.code), row.description.as_ref().map(t)),
+            cell(value, t(row.value.clone().unwrap_or_default())),
+        ))
+    }));
+    let caption = tr(locale, Msg::LookupProperties);
     Some(panel_section(
+        locale,
         Some(SectionHead {
             title: caption.clone(),
             count: Some(HeadingCount::All(

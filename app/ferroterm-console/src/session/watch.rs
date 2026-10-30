@@ -13,7 +13,7 @@
 
 use axum::Extension;
 use axum::response::{IntoResponse, Response};
-use ferrohealth_ui::widget::session::Left;
+use ferrohealth_ui::view::session::Left;
 use http::header::CACHE_CONTROL;
 use http::{HeaderMap, Method, StatusCode};
 

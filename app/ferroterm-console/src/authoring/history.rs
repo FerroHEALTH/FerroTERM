@@ -87,10 +87,12 @@ impl Support {
     }
 
     /// The sentence a screen puts beside an empty version list.
-    pub(crate) fn why_empty(self) -> String {
+    pub(crate) fn why_empty(self, locale: &ferrohealth_ui::i18n::Locale) -> String {
         match self {
-            Self::History | Self::VersionRead => tr(Msg::ServerHoldsNoEarlierVersionResource),
-            Self::Neither => tr(Msg::ServerSCapabilityStatementDeclaresNeither),
+            Self::History | Self::VersionRead => {
+                tr(locale, Msg::ServerHoldsNoEarlierVersionResource)
+            }
+            Self::Neither => tr(locale, Msg::ServerSCapabilityStatementDeclaresNeither),
         }
     }
 }
@@ -278,14 +280,18 @@ impl Comparison {
     }
 
     /// The sentence the screen announces about the comparison.
-    pub(crate) fn sentence(&self) -> String {
+    pub(crate) fn sentence(&self, locale: &ferrohealth_ui::i18n::Locale) -> String {
         match self {
-            Self::Unasked => tr(Msg::ChooseTwoVersionsAboveCompareThem),
-            Self::Unread => tr(Msg::OneTheseTwoVersionsCarriesNo),
+            Self::Unasked => tr(locale, Msg::ChooseTwoVersionsAboveCompareThem),
+            Self::Unread => tr(locale, Msg::OneTheseTwoVersionsCarriesNo),
             Self::Differences(found) => match found.len() {
-                0 => tr(Msg::TheseTwoVersionsStateSameElements),
-                1 => tr(Msg::N1ElementDiffers),
-                more => tr_with(Msg::ElementsDiffer, &[("more", (more).to_string().into())]),
+                0 => tr(locale, Msg::TheseTwoVersionsStateSameElements),
+                1 => tr(locale, Msg::N1ElementDiffers),
+                more => tr_with(
+                    locale,
+                    Msg::ElementsDiffer,
+                    &[("more", (more).to_string().into())],
+                ),
             },
         }
     }
@@ -646,13 +652,17 @@ mod tests {
     fn an_empty_version_list_says_why_it_is_empty() {
         assert!(
             Support::Neither
-                .why_empty()
+                .why_empty(&ferrohealth_ui::i18n::Locale::english())
                 .contains("capability statement")
         );
-        assert!(Support::History.why_empty().contains("no earlier version"));
+        assert!(
+            Support::History
+                .why_empty(&ferrohealth_ui::i18n::Locale::english())
+                .contains("no earlier version")
+        );
         assert_eq!(
-            Support::VersionRead.why_empty(),
-            Support::History.why_empty()
+            Support::VersionRead.why_empty(&ferrohealth_ui::i18n::Locale::english()),
+            Support::History.why_empty(&ferrohealth_ui::i18n::Locale::english())
         );
     }
 
@@ -678,9 +688,11 @@ mod tests {
         assert_eq!(unread, Comparison::Unread);
         assert_eq!(unread.rows(), []);
         assert!(
-            unread.sentence().contains("nothing to compare"),
+            unread
+                .sentence(&ferrohealth_ui::i18n::Locale::english())
+                .contains("nothing to compare"),
             "a deleted version says so rather than agreeing: `{}`",
-            unread.sentence()
+            unread.sentence(&ferrohealth_ui::i18n::Locale::english())
         );
         assert_eq!(Comparison::of(Some(&held), None), Comparison::Unread);
     }
@@ -690,11 +702,13 @@ mod tests {
         let before = resource(r#"{"status":"draft","version":"1"}"#);
         let after = resource(r#"{"status":"active","version":"2"}"#);
         assert_eq!(
-            Comparison::of(Some(&before), Some(&after)).sentence(),
+            Comparison::of(Some(&before), Some(&after))
+                .sentence(&ferrohealth_ui::i18n::Locale::english()),
             "2 elements differ."
         );
         assert_eq!(
-            Comparison::of(Some(&before), Some(&before)).sentence(),
+            Comparison::of(Some(&before), Some(&before))
+                .sentence(&ferrohealth_ui::i18n::Locale::english()),
             "These two versions state the same elements."
         );
         assert_eq!(
@@ -702,11 +716,11 @@ mod tests {
                 Some(&before),
                 Some(&resource(r#"{"status":"active","version":"1"}"#))
             )
-            .sentence(),
+            .sentence(&ferrohealth_ui::i18n::Locale::english()),
             "1 element differs."
         );
         assert_eq!(
-            Comparison::Unasked.sentence(),
+            Comparison::Unasked.sentence(&ferrohealth_ui::i18n::Locale::english()),
             "Choose two versions above to compare them.",
             "the region is in the document before the first comparison, saying what to do"
         );

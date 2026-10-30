@@ -10,9 +10,12 @@
 
 use std::time::Duration;
 
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
+use ferrohealth_ui::view::action_menu::{Act, Action, Item, Menu};
 use ferrohealth_ui::view::dialog::{Explanation, info_dialog};
 use ferrohealth_ui::view::secret::{SecretState, secret_state};
 use ferrohealth_ui::view::status::badge;
@@ -21,12 +24,9 @@ use ferrohealth_ui::view::tabs::{Tab, TabRow};
 use ferrohealth_ui::view::template::settings::{
     How, Setting, SettingsPage, Source, ValueSource, settings_page,
 };
-use ferrohealth_ui::widget::action_menu::{Act, Action, Item, Menu};
-use leptos::prelude::*;
-use leptos_meta::Title;
-use serde::{Deserialize, Serialize};
 
 use crate::locale::{Msg, tr, tr_with};
+use crate::markup::{h, join, p, t};
 use crate::request::Request;
 use crate::routes::{CONFIGURATION_PATH, ui_path};
 
@@ -48,7 +48,7 @@ pub(crate) enum ConfigTab {
     SignIn,
     /// The sign-in sessions.
     Sessions,
-    /// The listener and the site root.
+    /// The listener.
     Listener,
 }
 
@@ -83,13 +83,16 @@ impl ConfigTab {
     }
 
     /// The tab's words.
-    fn words(self) -> String {
-        tr(match self {
-            Self::Connection => Msg::ConfigConnection,
-            Self::SignIn => Msg::ConfigSignIn,
-            Self::Sessions => Msg::ConfigSessions,
-            Self::Listener => Msg::ConfigListener,
-        })
+    fn words(self, locale: &Locale) -> String {
+        tr(
+            locale,
+            match self {
+                Self::Connection => Msg::ConfigConnection,
+                Self::SignIn => Msg::ConfigSignIn,
+                Self::Sessions => Msg::ConfigSessions,
+                Self::Listener => Msg::ConfigListener,
+            },
+        )
     }
 
     /// The tab's route.
@@ -106,7 +109,7 @@ impl ConfigTab {
 /// A setting row of `label` and `description`, the value `value`, set by
 /// the key `key`.
 /// Where a key took its value from, as the configuration loader reports it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum KeySource {
     /// The configuration file.
     File,
@@ -119,7 +122,7 @@ pub(crate) enum KeySource {
 }
 
 /// How the client secret of the sign-in is set.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum SecretShown {
     /// Read from the file at this path.
     File(String),
@@ -130,7 +133,7 @@ pub(crate) enum SecretShown {
 }
 
 /// The `[oidc]` settings the page shows.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct OidcShown {
     /// The issuer.
     issuer: String,
@@ -147,8 +150,8 @@ pub(crate) struct OidcShown {
 }
 
 /// What the Configuration page shows of the console's running settings,
-/// read on the server and carried to the page, with no secret in it.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// with no secret in it.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Shown {
     /// The configuration file the settings were read from, if one was.
     file: Option<String>,
@@ -174,15 +177,12 @@ pub(crate) struct Shown {
     max_sessions: u64,
     /// The listener's address.
     listen: String,
-    /// The site root.
-    site_root: String,
     /// Where each key a row names took its value from.
     sources: Vec<(String, KeySource)>,
 }
 
 impl Shown {
     /// What the page shows of `settings`.
-    #[cfg(not(target_arch = "wasm32"))]
     #[must_use]
     pub(crate) fn of(settings: &crate::config::settings::Settings) -> Self {
         use ferrohealth_config::provenance::Source;
@@ -226,7 +226,6 @@ impl Shown {
             absolute_timeout: settings.session.absolute_timeout,
             max_sessions: u64::try_from(settings.session.max_sessions).unwrap_or(u64::MAX),
             listen: settings.listen.to_string(),
-            site_root: settings.site_root.display().to_string(),
             sources,
         }
     }
@@ -240,9 +239,8 @@ impl Shown {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 /// The first key of every row, whose source the row marks.
-const ROW_KEYS: [&str; 17] = [
+const ROW_KEYS: [&str; 16] = [
     "ferroterm.base_url",
     "ferroterm.public_url",
     "ferroterm.sync_url",
@@ -259,13 +257,12 @@ const ROW_KEYS: [&str; 17] = [
     "session.absolute_timeout_s",
     "session.max_sessions",
     "server.listen",
-    "server.site_root",
 ];
 
-fn row(label: Msg, description: Msg, value: AnyView, key: &str) -> Setting {
+fn row(locale: &Locale, label: Msg, description: Msg, value: Html, key: &str) -> Setting {
     Setting {
-        label: tr(label),
-        description: tr(description),
+        label: tr(locale, label),
+        description: tr(locale, description),
         value,
         keys: vec![key.to_owned()],
         next_start: false,
@@ -274,28 +271,30 @@ fn row(label: Msg, description: Msg, value: AnyView, key: &str) -> Setting {
 }
 
 /// A value in the code face.
-fn code(text: impl Into<String>) -> AnyView {
-    let text = text.into();
-    view! { <code>{text}</code> }.into_any()
+fn code(text: impl Into<String>) -> Html {
+    crate::markup::code(text.into())
 }
 
 /// A duration in whole seconds, minutes or hours, the largest that is whole.
-fn duration(value: Duration) -> String {
+fn duration(locale: &Locale, value: Duration) -> String {
     let seconds = value.as_secs();
     if seconds != 0 && seconds.is_multiple_of(3_600) {
         tr_with(
+            locale,
             Msg::ConfigHours,
             &[("count", seconds.div_euclid(3_600).into())],
         )
     } else if seconds != 0 && seconds.is_multiple_of(60) {
         tr_with(
+            locale,
             Msg::ConfigMinutes,
             &[("count", seconds.div_euclid(60).into())],
         )
     } else if value.subsec_millis() == 0 {
-        tr_with(Msg::ConfigSeconds, &[("count", seconds.into())])
+        tr_with(locale, Msg::ConfigSeconds, &[("count", seconds.into())])
     } else {
         tr_with(
+            locale,
             Msg::ConfigMilliseconds,
             &[(
                 "count",
@@ -306,21 +305,21 @@ fn duration(value: Duration) -> String {
 }
 
 /// On or Off, as a badge with its word.
-fn on(value: bool) -> AnyView {
+fn on(locale: &Locale, value: bool) -> Html {
     if value {
-        badge(Tone::Ok, tr(Msg::ConfigOn)).into_any()
+        badge(Tone::Ok, tr(locale, Msg::ConfigOn))
     } else {
-        badge(Tone::Neutral, tr(Msg::ConfigOff)).into_any()
+        badge(Tone::Neutral, tr(locale, Msg::ConfigOff))
     }
 }
 
 /// The settings of `tab` from `settings`.
-fn settings_of(tab: ConfigTab, settings: &Shown) -> Vec<Setting> {
+fn settings_of(locale: &Locale, tab: ConfigTab, settings: &Shown) -> Vec<Setting> {
     let rows = match tab {
-        ConfigTab::Connection => connection(settings),
-        ConfigTab::SignIn => sign_in(settings),
-        ConfigTab::Sessions => sessions(settings),
-        ConfigTab::Listener => listener(settings),
+        ConfigTab::Connection => connection(locale, settings),
+        ConfigTab::SignIn => sign_in(locale, settings),
+        ConfigTab::Sessions => sessions(locale, settings),
+        ConfigTab::Listener => listener(locale, settings),
     };
     rows.into_iter()
         .map(|row| Setting {
@@ -346,51 +345,62 @@ fn marker(source: KeySource) -> Option<ValueSource> {
 }
 
 /// The settings of the terminology server and the sync service.
-fn connection(settings: &Shown) -> Vec<Setting> {
-    let sync = settings.sync.as_ref().map_or_else(
-        || view! { <span class="fui-muted">{tr(Msg::ConfigNotSet)}</span> }.into_any(),
-        |url| code(url.as_str()),
-    );
-    let admin = settings.admin.as_ref().map_or_else(
-        || view! { <span class="fui-muted">{tr(Msg::ConfigNotSet)}</span> }.into_any(),
-        |url| code(url.as_str()),
-    );
+fn connection(locale: &Locale, settings: &Shown) -> Vec<Setting> {
+    let not_set = || {
+        h(format!(
+            r#"<span class="fui-muted">{}</span>"#,
+            t(tr(locale, Msg::ConfigNotSet))
+        ))
+    };
+    let sync = settings
+        .sync
+        .as_ref()
+        .map_or_else(not_set, |url| code(url.as_str()));
+    let admin = settings
+        .admin
+        .as_ref()
+        .map_or_else(not_set, |url| code(url.as_str()));
     vec![
         row(
+            locale,
             Msg::ConfigServer,
             Msg::ConfigServerLine,
             code(settings.base.as_str()),
             "ferroterm.base_url",
         ),
         row(
+            locale,
             Msg::ConfigPublic,
             Msg::ConfigPublicLine,
             code(settings.public.as_str()),
             "ferroterm.public_url",
         ),
         row(
+            locale,
             Msg::ConfigSync,
             Msg::ConfigSyncLine,
             sync,
             "ferroterm.sync_url",
         ),
         row(
+            locale,
             Msg::ConfigAdmin,
             Msg::ConfigAdminLine,
             admin,
             "ferroterm.admin_url",
         ),
         row(
+            locale,
             Msg::ConfigTimeout,
             Msg::ConfigTimeoutLine,
-            duration(settings.timeout).into_any(),
+            t(duration(locale, settings.timeout)),
             "ferroterm.timeout_ms",
         ),
     ]
 }
 
 /// The settings of the OpenID Provider.
-fn sign_in(settings: &Shown) -> Vec<Setting> {
+fn sign_in(locale: &Locale, settings: &Shown) -> Vec<Setting> {
     settings.oidc.as_ref().map_or_else(Vec::new, |oidc| {
         let secret = match &oidc.secret {
             SecretShown::File(file) => SecretState::Set(file.clone()),
@@ -398,45 +408,51 @@ fn sign_in(settings: &Shown) -> Vec<Setting> {
             SecretShown::Unset => SecretState::Unset,
         };
         let sign_out = if oidc.end_session {
-            tr(Msg::ConfigSetUp)
+            tr(locale, Msg::ConfigSetUp)
         } else {
-            tr(Msg::ConfigNotSet)
+            tr(locale, Msg::ConfigNotSet)
         };
         vec![
             row(
+                locale,
                 Msg::ConfigIssuer,
                 Msg::ConfigIssuerLine,
                 code(oidc.issuer.clone()),
                 "oidc.issuer",
             ),
             row(
+                locale,
                 Msg::ConfigClient,
                 Msg::ConfigClientLine,
                 code(oidc.client_id.clone()),
                 "oidc.client_id",
             ),
             row(
+                locale,
                 Msg::ConfigSecret,
                 Msg::ConfigSecretLine,
-                secret_state(&secret),
+                secret_state(locale, &secret),
                 "oidc.client_secret_file",
             ),
             row(
+                locale,
                 Msg::ConfigRedirect,
                 Msg::ConfigRedirectLine,
                 code(oidc.redirect_uri.clone()),
                 "oidc.redirect_uri",
             ),
             row(
+                locale,
                 Msg::ConfigScopes,
                 Msg::ConfigScopesLine,
                 code(oidc.scopes.join(" ")),
                 "oidc.scopes",
             ),
             row(
+                locale,
                 Msg::ConfigSignOut,
                 Msg::ConfigSignOutLine,
-                sign_out.into_any(),
+                t(sign_out),
                 "oidc.end_session_endpoint",
             ),
         ]
@@ -444,68 +460,68 @@ fn sign_in(settings: &Shown) -> Vec<Setting> {
 }
 
 /// The settings of the sessions.
-fn sessions(settings: &Shown) -> Vec<Setting> {
+fn sessions(locale: &Locale, settings: &Shown) -> Vec<Setting> {
     vec![
         row(
+            locale,
             Msg::ConfigSecureCookie,
             Msg::ConfigSecureCookieLine,
-            on(settings.secure_cookie),
+            on(locale, settings.secure_cookie),
             "session.secure_cookie",
         ),
         row(
+            locale,
             Msg::ConfigIdle,
             Msg::ConfigIdleLine,
-            duration(settings.idle_timeout).into_any(),
+            t(duration(locale, settings.idle_timeout)),
             "session.idle_timeout_s",
         ),
         row(
+            locale,
             Msg::ConfigAbsolute,
             Msg::ConfigAbsoluteLine,
-            duration(settings.absolute_timeout).into_any(),
+            t(duration(locale, settings.absolute_timeout)),
             "session.absolute_timeout_s",
         ),
         row(
+            locale,
             Msg::ConfigLimit,
             Msg::ConfigLimitLine,
-            ferrohealth_ui::i18n::number::grouped(settings.max_sessions).into_any(),
+            t(ferrohealth_ui::i18n::number::grouped(
+                locale,
+                settings.max_sessions,
+            )),
             "session.max_sessions",
         ),
     ]
 }
 
 /// The settings of the listener.
-fn listener(settings: &Shown) -> Vec<Setting> {
-    vec![
-        row(
-            Msg::ConfigListen,
-            Msg::ConfigListenLine,
-            code(settings.listen.clone()),
-            "server.listen",
-        ),
-        row(
-            Msg::ConfigSiteRoot,
-            Msg::ConfigSiteRootLine,
-            code(settings.site_root.clone()),
-            "server.site_root",
-        ),
-    ]
+fn listener(locale: &Locale, settings: &Shown) -> Vec<Setting> {
+    vec![row(
+        locale,
+        Msg::ConfigListen,
+        Msg::ConfigListenLine,
+        code(settings.listen.clone()),
+        "server.listen",
+    )]
 }
 
 /// The title row's actions: a More menu that copies the path of the
 /// configuration file `file`, and none when the console was started with no
 /// file named.
-fn more(file: Option<&std::path::Path>) -> ActionGroup {
+fn more(locale: &Locale, file: Option<&std::path::Path>) -> ActionGroup {
     let Some(file) = file else {
         return ActionGroup::none();
     };
     let path = file.display().to_string();
     ActionGroup::more_only(Menu::new(
         MORE_MENU,
-        tr(Msg::ConfigMore),
+        tr(locale, Msg::ConfigMore),
         vec![
             Item::new(Action::new(
                 Some(Glyph::COPY),
-                tr(Msg::ConfigCopyPath),
+                tr(locale, Msg::ConfigCopyPath),
                 Act::Copy(path.clone()),
             ))
             .note(path),
@@ -513,14 +529,19 @@ fn more(file: Option<&std::path::Path>) -> ActionGroup {
     ))
 }
 
-/// Configuration, on the tab the route names, from the settings the server
-/// read for it.
-pub(crate) async fn page(request: Request) -> AnyView {
+/// Configuration, on the tab the route names, from the settings the console
+/// runs on.
+pub(crate) fn page(request: &Request) -> Html {
+    let locale = &request.locale;
     let Some(tab) = ConfigTab::of(request.segment(1).as_deref()) else {
-        return crate::pages::errors::not_found_page();
+        return crate::pages::errors::not_found_page(request);
     };
-    let Some(settings) = use_context::<Shown>() else {
-        return crate::pages::errors::not_found_page();
+    let Some(settings) = request
+        .state
+        .as_ref()
+        .map(|state| Shown::of(state.settings()))
+    else {
+        return crate::pages::errors::not_found_page(request);
     };
     let settings = &settings;
     let shown_file = settings
@@ -532,62 +553,73 @@ pub(crate) async fn page(request: Request) -> AnyView {
             || String::from(DEFAULT_FILE),
             |name| name.to_string_lossy().into_owned(),
         );
-    let mut rows = settings_of(tab, settings);
+    let mut rows = settings_of(locale, tab, settings);
     let empty = tab == ConfigTab::SignIn && rows.is_empty();
     if empty {
         rows.push(Setting {
-            label: tr(Msg::ConfigNoSignIn),
-            description: tr(Msg::ConfigNoSignInLine),
-            value: ().into_any(),
+            label: tr(locale, Msg::ConfigNoSignIn),
+            description: tr(locale, Msg::ConfigNoSignInLine),
+            value: Html::empty(),
             keys: vec![String::from("oidc")],
             next_start: false,
             source: None,
         });
     }
-    let page = settings_page(SettingsPage {
-        header: Header {
-            title: tr(Msg::ShellConfiguration).into(),
-            subtitle: Some(
-                tr_with(Msg::ConfigSubtitle, &[("file", shown_file.clone().into())]).into(),
-            ),
-            subtitle_view: None,
-            crumbs: Vec::new(),
-            mono: false,
-            badge: None,
-        },
-        actions: more(settings.file.as_deref().map(std::path::Path::new)),
-        source: Source::File {
-            file: shown_file.clone(),
-            how: How::Dialog(HOW_DIALOG.into()),
-        },
-        tabs: Some(TabRow {
-            label: tr(Msg::ConfigSections),
-            tabs: ConfigTab::ALL
-                .into_iter()
-                .map(|each| Tab::new(each.key(), each.href(), each.words()))
-                .collect(),
-            current: tab.key().to_owned(),
-        }),
-        settings: rows,
-        replica: None,
-    });
-    let how = info_dialog(
-        Explanation {
-            id: HOW_DIALOG.into(),
-            title: tr(Msg::ConfigHow).into(),
-        },
-        view! {
-            <p>{tr_with(Msg::ConfigHowRead, &[("file", shown_file.into())])}</p>
-            <p>{tr(Msg::ConfigHowChange)}</p>
-            <p>{tr(Msg::ConfigHowShown)}</p>
+    request
+        .answering
+        .title(&tr(locale, Msg::ShellConfiguration));
+    let page = settings_page(
+        locale,
+        SettingsPage {
+            header: Header {
+                title: tr(locale, Msg::ShellConfiguration).into(),
+                subtitle: Some(
+                    tr_with(
+                        locale,
+                        Msg::ConfigSubtitle,
+                        &[("file", shown_file.clone().into())],
+                    )
+                    .into(),
+                ),
+                subtitle_view: None,
+                crumbs: Vec::new(),
+                mono: false,
+                badge: None,
+            },
+            actions: more(locale, settings.file.as_deref().map(std::path::Path::new)),
+            source: Source::File {
+                file: shown_file.clone(),
+                how: How::Dialog(HOW_DIALOG.into()),
+            },
+            tabs: Some(TabRow {
+                label: tr(locale, Msg::ConfigSections),
+                tabs: ConfigTab::ALL
+                    .into_iter()
+                    .map(|each| Tab::new(each.key(), each.href(), each.words(locale)))
+                    .collect(),
+                current: tab.key().to_owned(),
+            }),
+            settings: rows,
+            replica: None,
         },
     );
-    view! {
-        <Title text=tr(Msg::ShellConfiguration) />
-        {page}
-        {how}
-    }
-    .into_any()
+    let how = info_dialog(
+        locale,
+        Explanation {
+            id: HOW_DIALOG.into(),
+            title: tr(locale, Msg::ConfigHow).into(),
+        },
+        join([
+            p(t(tr_with(
+                locale,
+                Msg::ConfigHowRead,
+                &[("file", shown_file.into())],
+            ))),
+            p(t(tr(locale, Msg::ConfigHowChange))),
+            p(t(tr(locale, Msg::ConfigHowShown))),
+        ]),
+    );
+    Html::join([page, how])
 }
 
 #[cfg(test)]
@@ -596,17 +628,21 @@ mod tests {
 
     use std::path::Path;
 
-    use ferrohealth_ui::widget::action_menu::Act;
+    use ferrohealth_ui::i18n::Locale;
+    use ferrohealth_ui::view::action_menu::Act;
 
     use super::{ConfigTab, duration, more};
 
     #[test]
     fn more_copies_the_path_of_the_file_named() {
         assert!(
-            more(None).is_empty(),
+            more(&Locale::english(), None).is_empty(),
             "with no file named there is no path to copy"
         );
-        let group = more(Some(Path::new("/etc/ferroterm/console.toml")));
+        let group = more(
+            &Locale::english(),
+            Some(Path::new("/etc/ferroterm/console.toml")),
+        );
         let menu = group
             .more
             .expect("a named file gives the title row its More menu");
@@ -632,9 +668,18 @@ mod tests {
 
     #[test]
     fn a_duration_reads_in_its_largest_whole_unit() {
-        assert_eq!("30 s", duration(Duration::from_secs(30)));
-        assert_eq!("30 min", duration(Duration::from_mins(30)));
-        assert_eq!("8 h", duration(Duration::from_hours(8)));
-        assert_eq!("1,500 ms", duration(Duration::from_millis(1_500)));
+        assert_eq!(
+            "30 s",
+            duration(&Locale::english(), Duration::from_secs(30))
+        );
+        assert_eq!(
+            "30 min",
+            duration(&Locale::english(), Duration::from_mins(30))
+        );
+        assert_eq!("8 h", duration(&Locale::english(), Duration::from_hours(8)));
+        assert_eq!(
+            "1,500 ms",
+            duration(&Locale::english(), Duration::from_millis(1_500))
+        );
     }
 }

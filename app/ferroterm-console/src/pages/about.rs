@@ -5,19 +5,19 @@
 //! `CapabilityStatement` of the FHIR version in view.
 
 use ferrohealth_ui::highlight::Language;
+use ferrohealth_ui::html::Html;
 use ferrohealth_ui::view::surface::Header;
 use ferrohealth_ui::view::template::about::{Link, Manufacturer, SelfDescription, about_page};
-use leptos::prelude::*;
-use leptos_meta::Title;
 
 use crate::fhir::capability::CapabilityStatement;
 use crate::fhir::version::FhirVersion;
 use crate::locale::{Msg, tr, tr_with};
+use crate::markup::t;
 use crate::request::Request;
 use crate::shell::{PRODUCT, VERSION};
 
 /// The library the console is drawn with, at the version its manifest pins.
-pub(crate) const FERROUI: &str = "ferrohealth-ui 0.5.7";
+pub(crate) const FERROUI: &str = "ferrohealth-ui 0.6.0";
 
 /// The id of the self-description's Copy button.
 const COPY_ID: &str = "about-copy";
@@ -35,20 +35,23 @@ fn roots() -> String {
 }
 
 /// About.
-pub(crate) async fn page(request: Request) -> AnyView {
+pub(crate) async fn page(request: Request) -> Html {
+    let locale = &request.locale;
     let version = request.version;
     let statement = request.client.capability_statement(version).await.ok();
     let document = request.client.capability_document(version).await.ok();
     let server = statement
         .as_ref()
         .and_then(CapabilityStatement::software_line)
-        .unwrap_or_else(|| tr(Msg::AboutServerUnanswered));
+        .unwrap_or_else(|| tr(locale, Msg::AboutServerUnanswered));
     let self_description = document.map(|document| SelfDescription {
         title: tr_with(
+            locale,
             Msg::AboutStatementTitle,
             &[("version", version.label().into())],
         ),
         line: tr_with(
+            locale,
             Msg::AboutStatementLine,
             &[
                 ("version", version.label().into()),
@@ -60,41 +63,40 @@ pub(crate) async fn page(request: Request) -> AnyView {
         copy_id: String::from(COPY_ID),
         download: request.client.metadata_url(version),
     });
-    let page = about_page(ferrohealth_ui::view::template::about::AboutPage {
-        header: Header {
-            title: tr(Msg::AboutTitle).into(),
-            subtitle: Some(tr(Msg::AboutSubtitle).into()),
-            subtitle_view: None,
-            crumbs: Vec::new(),
-            mono: false,
-            badge: None,
-        },
-        release: format!("{PRODUCT} {VERSION}"),
-        versions: vec![
-            (tr(Msg::AboutServer), server.into_any()),
-            (tr(Msg::AboutFhirRoots), roots().into_any()),
-            (tr(Msg::AboutFerroui), FERROUI.into_any()),
-        ],
-        manufacturer: Manufacturer {
-            licence: tr(Msg::AboutLicence),
-            support: Link {
-                label: String::from(SUPPORT),
-                href: format!("mailto:{SUPPORT}"),
+    request.answering.title(&tr(locale, Msg::AboutTitle));
+    about_page(
+        locale,
+        ferrohealth_ui::view::template::about::AboutPage {
+            header: Header {
+                title: tr(locale, Msg::AboutTitle).into(),
+                subtitle: Some(tr(locale, Msg::AboutSubtitle).into()),
+                subtitle_view: None,
+                crumbs: Vec::new(),
+                mono: false,
+                badge: None,
             },
-            documentation: Some(Link {
-                label: tr(Msg::AboutBook),
-                href: String::from(BOOK),
-            }),
+            release: format!("{PRODUCT} {VERSION}"),
+            versions: vec![
+                (tr(locale, Msg::AboutServer), t(server)),
+                (tr(locale, Msg::AboutFhirRoots), t(roots())),
+                (tr(locale, Msg::AboutFerroui), t(FERROUI)),
+            ],
+            manufacturer: Manufacturer {
+                licence: tr(locale, Msg::AboutLicence),
+                support: Link {
+                    label: String::from(SUPPORT),
+                    href: format!("mailto:{SUPPORT}"),
+                },
+                documentation: Some(Link {
+                    label: tr(locale, Msg::AboutBook),
+                    href: String::from(BOOK),
+                }),
+            },
+            cards: Vec::new(),
+            self_description,
+            replica: None,
         },
-        cards: Vec::new(),
-        self_description,
-        replica: None,
-    });
-    view! {
-        <Title text=tr(Msg::AboutTitle) />
-        {page}
-    }
-    .into_any()
+    )
 }
 
 /// The maker's support address.

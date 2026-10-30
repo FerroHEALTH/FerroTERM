@@ -6,6 +6,8 @@
 
 use std::collections::BTreeMap;
 
+use ferrohealth_ui::html::Html;
+use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::view::{
     Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
@@ -19,7 +21,6 @@ use ferrohealth_ui::view::surface::{
 };
 use ferrohealth_ui::view::template::list::HeadingCount;
 use ferrohealth_ui::view::template::list::{ListCard, list_card, list_empty};
-use leptos::prelude::*;
 
 use crate::fhir::activity::{Change, recent};
 use crate::fhir::error::FhirError;
@@ -28,6 +29,7 @@ use crate::fhir::terminology::TerminologyCapabilities;
 use crate::fhir::version::FhirVersion;
 use crate::fhir::{CODE_SYSTEM, CONCEPT_MAP, FhirClient, VALUE_SET};
 use crate::locale::{Msg, tr, tr_with};
+use crate::markup::{code, h, join, t};
 use crate::pages::parts::{Source, failure, heading, relative, versions_word};
 use crate::request::Request;
 use crate::routes::{
@@ -93,7 +95,7 @@ async fn activity(client: &FhirClient, version: FhirVersion) -> Result<Vec<Chang
 }
 
 /// The dashboard.
-pub(crate) async fn page(request: Request) -> AnyView {
+pub(crate) async fn page(request: Request) -> Html {
     let reads = Reads::of(&request.client, request.version).await;
     dashboard(&request, &reads)
 }
@@ -107,12 +109,13 @@ pub(crate) fn host(root: &str) -> String {
 }
 
 /// A count as the page writes it, grouped in the page's language.
-fn grouped(count: usize) -> String {
-    ferrohealth_ui::i18n::number::grouped(u64::try_from(count).unwrap_or(u64::MAX))
+fn grouped(locale: &Locale, count: usize) -> String {
+    ferrohealth_ui::i18n::number::grouped(locale, u64::try_from(count).unwrap_or(u64::MAX))
 }
 
 /// The dashboard drawn from `reads`.
-fn dashboard(request: &Request, reads: &Reads) -> AnyView {
+fn dashboard(request: &Request, reads: &Reads) -> Html {
+    let locale = &request.locale;
     if let Err(error) = &reads.capabilities
         && error.status().is_none()
     {
@@ -121,6 +124,7 @@ fn dashboard(request: &Request, reads: &Reads) -> AnyView {
     let version = request.version;
     let answered_at = jiff::Zoned::now().strftime("%H:%M").to_string();
     let subtitle = tr_with(
+        locale,
         Msg::DashboardSubtitle,
         &[
             ("host", host(&request.root).into()),
@@ -129,7 +133,8 @@ fn dashboard(request: &Request, reads: &Reads) -> AnyView {
         ],
     );
     let header = heading(
-        tr(Msg::ShellDashboard),
+        request,
+        tr(locale, Msg::ShellDashboard),
         Some(subtitle),
         Vec::new(),
         ActionGroup::none(),
@@ -148,18 +153,19 @@ fn dashboard(request: &Request, reads: &Reads) -> AnyView {
     if reads.capabilities.is_ok() && cards.is_empty() && sets.is_empty() && maps.is_empty() {
         let instead = FhirVersion::default();
         let line = tr_with(
+            locale,
             Msg::DashboardServesNothing,
             &[("version", version.label().into())],
         );
         let instead_words = tr_with(
+            locale,
             Msg::DashboardReadInstead,
             &[("version", instead.label().into())],
         );
-        return view! {
-            {header}
-            {list_empty(line, Some((instead_words, ui_link("", instead))))}
-        }
-        .into_any();
+        return Html::join([
+            header,
+            list_empty(line, Some((instead_words, ui_link("", instead)))),
+        ]);
     }
     let stored_systems = cards
         .iter()
@@ -171,75 +177,82 @@ fn dashboard(request: &Request, reads: &Reads) -> AnyView {
             .filter(|resource| Source::of_resource(resource) == Source::Stored)
             .count()
     };
-    let stats = stat_grid(view! {
-        {counted_stat(
+    let stats = stat_grid(Html::join([
+        counted_stat(
+            locale,
             Glyph::BOOK_OPEN,
             cards.len(),
             Msg::ShellCodeSystems,
             stored_systems,
             &ui_path(SYSTEMS_PATH),
-        )}
-        {counted_stat(
+        ),
+        counted_stat(
+            locale,
             Glyph::LAYERS,
             sets.len(),
             Msg::ShellValueSets,
             stored(&sets),
             &ui_path(VALUE_SETS_PATH),
-        )}
-        {counted_stat(
+        ),
+        counted_stat(
+            locale,
             Glyph::ARROW_LEFT_RIGHT,
             maps.len(),
             Msg::ShellConceptMaps,
             stored(&maps),
             &ui_path(CONCEPT_MAPS_PATH),
-        )}
-        {writes_stat(&reads.activity)}
-    })
-    .into_any();
-    let recent = recent_card(&reads.activity, version);
+        ),
+        writes_stat(locale, &reads.activity),
+    ]));
+    let recent = recent_card(locale, &reads.activity, version);
     let preview = systems_card(request, &reads.capabilities, &systems);
-    view! {
-        {header}
-        {stack(
-            view! {
-                {stats}
-                {grid_start(
-                    view! {
-                        {recent}
-                        {preview}
-                    },
-                )}
-            },
-        )}
-    }
-    .into_any()
+    Html::join([
+        header,
+        stack(Html::join([
+            stats,
+            grid_start(Html::join([recent, preview])),
+        ])),
+    ])
 }
 
 /// A stat card of `count` items, marked with how many of them are `stored`.
-fn counted_stat(glyph: Glyph, count: usize, label: Msg, stored: usize, href: &str) -> AnyView {
-    let mark = tr_with(Msg::DashboardStored, &[("count", stored.into())]);
+fn counted_stat(
+    locale: &Locale,
+    glyph: Glyph,
+    count: usize,
+    label: Msg,
+    stored: usize,
+    href: &str,
+) -> Html {
+    let mark = tr_with(locale, Msg::DashboardStored, &[("count", stored.into())]);
     stat_card_marked(
         Stat {
             glyph,
-            value: grouped(count),
-            label: tr(label).into(),
+            value: grouped(locale, count),
+            label: tr(locale, label).into(),
             href: Some(href.to_owned()),
         },
         badge(Tone::Neutral, mark),
     )
-    .into_any()
 }
 
 /// The stat card of the recent writes, marked with the day the oldest of
 /// them fell on.
-fn writes_stat(activity: &Result<Vec<Change>, FhirError>) -> AnyView {
+fn writes_stat(locale: &Locale, activity: &Result<Vec<Change>, FhirError>) -> Html {
     let (value, mark) = match activity {
         Ok(changes) => {
             let since = changes.iter().filter_map(Change::day).min().map(|day| {
-                let line = tr_with(Msg::DashboardSince, &[("day", day.to_owned().into())]);
-                view! { <span class="fui-small fui-muted">{line}</span> }.into_any()
+                let line = tr_with(
+                    locale,
+                    Msg::DashboardSince,
+                    &[("day", day.to_owned().into())],
+                );
+                h(format!(
+                    r#"<span class="fui-small fui-muted">{}</span>"#,
+                    t(line)
+                ))
             });
-            (grouped(changes.len()), since)
+            (grouped(locale, changes.len()), since)
         }
         Err(_refused) => (String::from("\u{2013}"), None),
     };
@@ -247,26 +260,30 @@ fn writes_stat(activity: &Result<Vec<Change>, FhirError>) -> AnyView {
         Stat {
             glyph: Glyph::ROTATE_CCW_CLOCK,
             value,
-            label: tr(Msg::DashboardRecentWrites).into(),
+            label: tr(locale, Msg::DashboardRecentWrites).into(),
             href: Some(String::from("#recent-changes")),
         },
-        mark,
+        mark.unwrap_or_default(),
     )
-    .into_any()
 }
 
 /// The words of a resource type as the recent changes name it.
-pub(crate) fn type_word(resource_type: &str) -> String {
+pub(crate) fn type_word(locale: &Locale, resource_type: &str) -> String {
     match resource_type {
-        CODE_SYSTEM => tr(Msg::TypeCodeSystem),
-        VALUE_SET => tr(Msg::TypeValueSet),
-        CONCEPT_MAP => tr(Msg::TypeConceptMap),
+        CODE_SYSTEM => tr(locale, Msg::TypeCodeSystem),
+        VALUE_SET => tr(locale, Msg::TypeValueSet),
+        CONCEPT_MAP => tr(locale, Msg::TypeConceptMap),
         other => other.to_owned(),
     }
 }
 
 /// One write as a row: what it was made on, the interaction, and when.
-fn change_row(change: &Change, columns: &[Column; 3], version: FhirVersion) -> AnyView {
+fn change_row(
+    locale: &Locale,
+    change: &Change,
+    columns: &[Column; 3],
+    version: FhirVersion,
+) -> Html {
     let now = jiff::Timestamp::now();
     let named = if change.named.is_empty() {
         format!("{}/{}", change.resource_type, change.id)
@@ -275,68 +292,73 @@ fn change_row(change: &Change, columns: &[Column; 3], version: FhirVersion) -> A
     };
     let sub = match &change.version_id {
         Some(id) => tr_with(
+            locale,
             Msg::DashboardTypeVersion,
             &[
-                ("type", type_word(&change.resource_type).into()),
+                ("type", type_word(locale, &change.resource_type).into()),
                 ("version", id.clone().into()),
             ],
         ),
-        None => type_word(&change.resource_type),
+        None => type_word(locale, &change.resource_type),
     };
     let interaction = match change.method.as_deref() {
-        Some("POST") => tr(Msg::DashboardCreated),
-        Some("DELETE") => tr(Msg::DashboardDeleted),
-        _ => tr(Msg::DashboardUpdated),
+        Some("POST") => tr(locale, Msg::DashboardCreated),
+        Some("DELETE") => tr(locale, Msg::DashboardDeleted),
+        _ => tr(locale, Msg::DashboardUpdated),
     };
     let href = history_link(&change.resource_type, &change.id, version);
-    let when = change.when.as_deref().map(|raw| relative(raw, now));
+    let when = change.when.as_deref().map(|raw| relative(locale, raw, now));
     let [_, change_column, when_column] = columns;
-    view! {
-        <tr>
-            {title_cell(Some(&href), named, Some(sub.into_any()))}
-            {cell(change_column, interaction)} {cell(when_column, when)}
-        </tr>
-    }
-    .into_any()
+    h(format!(
+        "<tr>{}{}{}</tr>",
+        title_cell(Some(&href), t(named), Some(t(sub))),
+        cell(change_column, t(interaction)),
+        cell(when_column, when.unwrap_or_default()),
+    ))
 }
 
 /// The card of the recent writes, each row opening its resource's history.
-fn recent_card(activity: &Result<Vec<Change>, FhirError>, version: FhirVersion) -> AnyView {
+fn recent_card(
+    locale: &Locale,
+    activity: &Result<Vec<Change>, FhirError>,
+    version: FhirVersion,
+) -> Html {
     let columns = [
-        Column::text("resource", tr(Msg::DashboardResource)).role(Role::Title),
-        Column::text("change", tr(Msg::DashboardChange)).role(Role::Meta),
-        Column::text("when", tr(Msg::DashboardWhen)).role(Role::Meta),
+        Column::text("resource", tr(locale, Msg::DashboardResource)).role(Role::Title),
+        Column::text("change", tr(locale, Msg::DashboardChange)).role(Role::Meta),
+        Column::text("when", tr(locale, Msg::DashboardWhen)).role(Role::Meta),
     ];
-    let caption = tr(Msg::DashboardRecentChanges);
+    let caption = tr(locale, Msg::DashboardRecentChanges);
     let (body, count) = match activity {
         Ok(changes) if changes.is_empty() => (
-            list_empty(tr(Msg::DashboardNothingWritten), None),
+            list_empty(tr(locale, Msg::DashboardNothingWritten), None),
             Some(shown_of(0, 0)),
         ),
         Ok(changes) => {
-            let rows = changes
-                .iter()
-                .take(ACTIVITY_SHOWN)
-                .map(|change| change_row(change, &columns, version))
-                .collect_view()
-                .into_any();
+            let rows = join(
+                changes
+                    .iter()
+                    .take(ACTIVITY_SHOWN)
+                    .map(|change| change_row(locale, change, &columns, version)),
+            );
             let table = data_table(DataTable {
                 caption: &caption,
                 columns: &columns,
                 sorting: Sorting::default(),
                 body: Body::Rows(rows),
-            })
-            .into_any();
+            });
             (
                 table,
                 Some(shown_of(changes.len().min(ACTIVITY_SHOWN), changes.len())),
             )
         }
-        Err(error) => (failure(error), None),
+        Err(error) => (failure(locale, error), None),
     };
-    view! {
-        <div id="recent-changes">
-            {list_card(ListCard {
+    h(format!(
+        r#"<div id="recent-changes">{}</div>"#,
+        list_card(
+            locale,
+            ListCard {
                 title: caption.clone(),
                 count,
                 order: None,
@@ -344,10 +366,9 @@ fn recent_card(activity: &Result<Vec<Change>, FhirError>, version: FhirVersion) 
                 actions: None,
                 body,
                 pager: None,
-            })}
-        </div>
-    }
-    .into_any()
+            }
+        )
+    ))
 }
 
 /// A card's count: every item when it shows all `total`, else the `shown`
@@ -369,13 +390,14 @@ fn systems_card(
     request: &Request,
     capabilities: &Result<TerminologyCapabilities, FhirError>,
     listed: &[Listed],
-) -> AnyView {
+) -> Html {
+    let locale = &request.locale;
     let columns = [
-        Column::text("system", tr(Msg::DashboardCodeSystem)).role(Role::Title),
-        Column::text("source", tr(Msg::DashboardSource)).role(Role::Meta),
-        Column::text("versions", tr(Msg::DashboardVersions)).role(Role::Meta),
+        Column::text("system", tr(locale, Msg::DashboardCodeSystem)).role(Role::Title),
+        Column::text("source", tr(locale, Msg::DashboardSource)).role(Role::Meta),
+        Column::text("versions", tr(locale, Msg::DashboardVersions)).role(Role::Meta),
     ];
-    let caption = tr(Msg::ShellCodeSystems);
+    let caption = tr(locale, Msg::ShellCodeSystems);
     let (body, count) = match capabilities {
         Ok(capabilities) => {
             let cards = capabilities.cards();
@@ -384,63 +406,62 @@ fn systems_card(
                 .map(|resource| (resource.url.as_str(), resource.label.as_str()))
                 .collect();
             let [_, source_column, versions_column] = &columns;
-            let rows = cards
-                .iter()
-                .take(PREVIEW_ROWS)
-                .map(|card| {
-                    let name = names
-                        .get(card.url.as_str())
-                        .map_or_else(|| card.url.clone(), |name| (*name).to_owned());
-                    let versions: Vec<String> = card
-                        .versions
-                        .iter()
-                        .filter_map(|row| row.code.clone())
-                        .collect();
-                    let href = system_link(&card.url, request.version);
-                    view! {
-                        <tr>
-                            {title_cell(Some(&href), name, None)}
-                            {cell(source_column, Source::of_system(card, listed).tag())}
-                            {cell(versions_column, versions_word(&versions))}
-                        </tr>
-                    }
-                })
-                .collect_view()
-                .into_any();
+            let rows = join(cards.iter().take(PREVIEW_ROWS).map(|card| {
+                let name = names
+                    .get(card.url.as_str())
+                    .map_or_else(|| card.url.clone(), |name| (*name).to_owned());
+                let versions: Vec<String> = card
+                    .versions
+                    .iter()
+                    .filter_map(|row| row.code.clone())
+                    .collect();
+                let href = system_link(&card.url, request.version);
+                h(format!(
+                    "<tr>{}{}{}</tr>",
+                    title_cell(Some(&href), t(name), None),
+                    cell(source_column, Source::of_system(card, listed).tag(locale)),
+                    cell(versions_column, t(versions_word(locale, &versions))),
+                ))
+            }));
             let table = data_table(DataTable {
                 caption: &caption,
                 columns: &columns,
                 sorting: Sorting::default(),
                 body: Body::Rows(rows),
-            })
-            .into_any();
+            });
             (
                 table,
                 Some(shown_of(cards.len().min(PREVIEW_ROWS), cards.len())),
             )
         }
-        Err(error) => (failure(error), None),
+        Err(error) => (failure(locale, error), None),
     };
-    list_card(ListCard {
-        title: caption,
-        count,
-        order: None,
-        tabs: None,
-        actions: Some(card_action(
-            ui_link(SYSTEMS_PATH, request.version),
-            tr(Msg::DashboardAllCodeSystems),
-        )),
-        body,
-        pager: None,
-    })
+    list_card(
+        locale,
+        ListCard {
+            title: caption,
+            count,
+            order: None,
+            tabs: None,
+            actions: Some(card_action(
+                ui_link(SYSTEMS_PATH, request.version),
+                tr(locale, Msg::DashboardAllCodeSystems),
+            )),
+            body,
+            pager: None,
+        },
+    )
 }
 
 /// The dashboard of a server that did not answer: the refusal in plain
 /// words, Try again, and the detail behind a disclosure.
-fn unreachable(request: &Request, error: &FhirError) -> AnyView {
+fn unreachable(request: &Request, error: &FhirError) -> Html {
+    let locale = &request.locale;
     let header = heading(
-        tr(Msg::ShellDashboard),
+        request,
+        tr(locale, Msg::ShellDashboard),
         Some(tr_with(
+            locale,
             Msg::DashboardSubtitleUnanswered,
             &[
                 ("host", host(&request.root).into()),
@@ -451,26 +472,23 @@ fn unreachable(request: &Request, error: &FhirError) -> AnyView {
         ActionGroup::none(),
     );
     let detail = definitions(vec![
-        (tr(Msg::DashboardFailure), error.to_string().into_any()),
-        (
-            tr(Msg::DashboardAddress),
-            view! { <code>{error.url().to_owned()}</code> }.into_any(),
-        ),
+        (tr(locale, Msg::DashboardFailure), t(error.to_string())),
+        (tr(locale, Msg::DashboardAddress), code(error.url())),
     ]);
-    view! {
-        {header}
-        {stack(
-            view! {
-                {failure(error)}
-                <p>
-                    <a href=request.back() class="fui-button fui-button-primary">
-                        {label(Some(Glyph::REFRESH_CW), tr(Msg::DashboardTryAgain))}
-                    </a>
-                </p>
-                <p class="fui-small fui-muted">{tr(Msg::DashboardKeepsNoCopy)}</p>
-                {disclosure(tr(Msg::DashboardTechnicalDetail), detail)}
-            },
-        )}
-    }
-    .into_any()
+    Html::join([
+        header,
+        stack(Html::join([
+            failure(locale, error),
+            h(format!(
+                r#"<p><a href="{}" class="fui-button fui-button-primary">{}</a></p>"#,
+                t(request.back()),
+                label(Some(Glyph::REFRESH_CW), tr(locale, Msg::DashboardTryAgain))
+            )),
+            h(format!(
+                r#"<p class="fui-small fui-muted">{}</p>"#,
+                t(tr(locale, Msg::DashboardKeepsNoCopy))
+            )),
+            disclosure(tr(locale, Msg::DashboardTechnicalDetail), detail),
+        ])),
+    ])
 }

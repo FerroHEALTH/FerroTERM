@@ -15,15 +15,15 @@
 //! The server chooses the locale once per request: the best language of the
 //! request's `Accept-Language` the catalog holds, else the configured
 //! `[server] locale`, and a language the reader chose in Your preferences
-//! wins over both. [`crate::app::App`] provides it through
-//! `ferrohealth_ui::i18n::provide_locale`, so the console's words and the
-//! components' words follow the same choice, and the document writes it as
-//! `<html lang>` (WCAG 2.2 SC 3.1.1). A number a message takes is written in
-//! the marks of the page's language by the library's formatter, which reads
-//! the catalog's `number-group` and `number-decimal`. No specification
-//! governs the catalog layout or the choice: our own design.
+//! wins over both. The request carries it (`crate::request::Request`), and
+//! every word a screen draws, its own and the components', is looked up in
+//! it, so the document writes it as `<html lang>` (WCAG 2.2 SC 3.1.1). A
+//! number a message takes is written in the marks of the page's language by
+//! the library's formatter, which reads the catalog's `number-group` and
+//! `number-decimal`. No specification governs the catalog layout or the
+//! choice: our own design.
 
-use ferrohealth_ui::i18n::{Arg, Locale, Message, locale};
+use ferrohealth_ui::i18n::{Arg, Locale, Message};
 use fluent_templates::Loader;
 
 fluent_templates::static_loader! {
@@ -47,17 +47,17 @@ pub(crate) fn catalog() -> &'static (dyn Loader + Send + Sync) {
     &*CATALOG
 }
 
-/// The console's message `msg` in the page's locale.
+/// The console's message `msg` in `locale`.
 #[must_use]
-pub(crate) fn tr(msg: Msg) -> String {
-    tr_in(catalog(), &locale(), msg)
+pub(crate) fn tr(locale: &Locale, msg: Msg) -> String {
+    tr_in(catalog(), locale, msg)
 }
 
-/// The console's message `msg` in the page's locale, with the placeables
-/// `args` filled in.
+/// The console's message `msg` in `locale`, with the placeables `args`
+/// filled in.
 #[must_use]
-pub(crate) fn tr_with(msg: Msg, args: &[(&'static str, Arg)]) -> String {
-    locale().lookup_with(catalog(), msg.id(), args)
+pub(crate) fn tr_with(locale: &Locale, msg: Msg, args: &[(&'static str, Arg)]) -> String {
+    locale.lookup_with(catalog(), msg.id(), args)
 }
 
 /// The console's message `msg` as a [`Message`] a component looks up as it
@@ -73,43 +73,27 @@ pub(crate) fn tr_in(catalog: &dyn Loader, locale: &Locale, msg: Msg) -> String {
     locale.lookup(catalog, msg.id())
 }
 
-/// The locale of the request being served: the best language of its
-/// `Accept-Language` the catalog holds, else the configured one, English
-/// with no configuration in reach.
-#[cfg(not(target_arch = "wasm32"))]
+/// The locale a request whose `Accept-Language` is `header` asks for: the
+/// best language of it the catalog holds, else `configured`.
 #[must_use]
-pub(crate) fn requested() -> Locale {
-    use leptos::context::use_context;
-    let configured = use_context::<crate::server::ConsoleState>()
-        .map_or_else(Locale::english, |state| state.settings().locale.clone());
-    let header = use_context::<http::request::Parts>()
-        .and_then(|parts| {
-            parts
-                .headers
-                .get(http::header::ACCEPT_LANGUAGE)
-                .and_then(|value| value.to_str().ok())
-                .map(str::to_owned)
-        })
-        .unwrap_or_default();
-    Locale::negotiate_with(&header, catalog(), configured)
+pub(crate) fn requested(header: &str, configured: Locale) -> Locale {
+    Locale::negotiate_with(header, catalog(), configured)
 }
 
 /// The locale the page is drawn in: the language the reader chose in Your
-/// preferences when the console ships a catalog of it, else the language
-/// [`requested`] negotiates.
-#[cfg(not(target_arch = "wasm32"))]
+/// preferences when the console ships a catalog of it, else `requested`,
+/// the language the request negotiates.
 #[must_use]
-pub(crate) fn chosen(prefs: &crate::prefs::Prefs) -> Locale {
+pub(crate) fn chosen(prefs: &crate::prefs::Prefs, requested: Locale) -> Locale {
     prefs
         .family
         .language
         .tag()
         .filter(|tag| offered(tag))
         .and_then(|tag| Locale::parse(tag).ok())
-        .unwrap_or_else(requested)
+        .unwrap_or(requested)
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 /// Whether the console ships a catalog of the language `tag`.
 #[must_use]
 pub(crate) fn offered(tag: &str) -> bool {
@@ -293,7 +277,9 @@ mod tests {
                     }
                 }
                 let call = rest.get(..end).unwrap_or_default();
-                let Some(variant) = call.trim_start().strip_prefix("Msg::") else {
+                // NOTE: no specification governs this: our own design; the call
+                // names its locale first, then the message.
+                let Some((_locale, variant)) = call.split_once("Msg::") else {
                     continue;
                 };
                 let variant: String = variant
