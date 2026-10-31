@@ -150,13 +150,16 @@ const SHELL_MARK: &str = "header a.fui-lockup";
 
 /// Whether the page in front of the browser has finished loading and, when
 /// it is the console's, FerroUI's loader has run over it and marked `<html>`
-/// with `data-fui-script` (`ferrohealth_ui::script::MARK`), so the modules
+/// with `data-fui-script` (`ferrohealth_ui::script::MARK`), which it writes
+/// before any module arrives, and every element that asks for a module
+/// carries `data-fui-ready` (`ferrohealth_ui::script::READY`), so the modules
 /// answer the next press. A page that is not the console's (the issuer's, a
 /// refusal in plain text) loads no FerroUI stylesheet and is not waited on.
 const READY: &str = r#"
 return document.readyState === "complete"
-    && (document.documentElement.hasAttribute("data-fui-script")
-        || document.querySelector("link[href^='/ferrohealth-ui/']") === null);
+    && (document.querySelector("link[href^='/ferrohealth-ui/']") === null
+        || (document.documentElement.hasAttribute("data-fui-script")
+            && document.querySelector("[data-fui]:not([data-fui-ready])") === null));
 "#;
 
 /// Whether the page in front of the browser has finished loading, for a
@@ -402,7 +405,8 @@ impl Journey {
     /// The server sends a whole page, so its controls are on screen before
     /// the modules that answer them have run; a key typed in between reaches
     /// the field and never the module. FerroUI's loader marks `<html>` with
-    /// `data-fui-script` once it has run. A page that is not the console's
+    /// `data-fui-script` once it has run, and each enhanced element with
+    /// `data-fui-ready`. A page that is not the console's
     /// (the issuer's, a refusal in plain text) is not waited on, nor is a
     /// page whose browser refuses the modules, past its load.
     async fn ready(&self) {
@@ -424,8 +428,11 @@ impl Journey {
         }
         panic!(
             "{}",
-            self.failure("the page to be ready", "no data-fui-script mark")
-                .await
+            self.failure(
+                "the page to be ready",
+                "no data-fui-script or data-fui-ready mark"
+            )
+            .await
         );
     }
 

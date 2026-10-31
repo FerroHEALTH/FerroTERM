@@ -57,7 +57,7 @@ shape, and one operator experience. That is the reason for the shape:
 |---|---|
 | Server | axum: one handler per page reads the terminology server and answers the whole document |
 | Rendering | every page drawn on the server with the reads a screen exists to show, so no content waits on a script; reads are links and `GET` forms, writes plain `POST` forms to the page's own address |
-| Components | `ferrohealth-ui` `=0.6.0` (crates.io): its components return HTML, and its stylesheet, plain script modules and brand assets are served from the library under `/ferrohealth-ui/0.6.0/`, cached as immutable; the console has no stylesheet or script of its own |
+| Components | `ferrohealth-ui` `=0.6.2` (crates.io): its components return HTML, and its stylesheet, plain script modules and brand assets are served from the library under `/ferrohealth-ui/0.6.2/`, cached as immutable; the console has no stylesheet or script of its own |
 | Build | `cargo build`: one binary, no site bundle, no WebAssembly, no Node |
 | Image | `docker/console/Dockerfile`, distroless static, the binary the release lane stages |
 

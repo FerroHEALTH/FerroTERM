@@ -21,7 +21,7 @@ Stop and report on the first hard failure; run the cheap gates first.
 
 FerroUI leads the console's UI, and its gates hold every component the
 console draws before a release reaches the pin (`ferrohealth-ui` in the
-root `Cargo.toml`, `=0.6.0` today): the library gates of FerroUI's
+root `Cargo.toml`, `=0.6.2` today): the library gates of FerroUI's
 `.claude/rules/console-ui.md` (fmt, clippy, nextest, the markup rules, the
 script budget, the gallery's journeys with the modules refused and loaded,
 and its screenshots), and the design checks of `design/COMPONENTS.md`

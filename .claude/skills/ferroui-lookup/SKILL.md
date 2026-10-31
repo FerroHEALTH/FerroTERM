@@ -29,8 +29,8 @@ every page works with them refused.
 
 1. **Read FerroUI at the pinned tag** (FerroHEALTH/FerroUI; a local
    checkout or GitHub). Take the tag from the console's pin
-   (`ferrohealth-ui` in the root `Cargo.toml`, `=0.6.0` today, tag
-   `v0.6.0`):
+   (`ferrohealth-ui` in the root `Cargo.toml`, `=0.6.2` today, tag
+   `v0.6.2`):
 
    ```bash
    UI=~/.cache/ferroterm/ferroui
