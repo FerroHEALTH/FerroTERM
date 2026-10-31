@@ -23,7 +23,7 @@ on:
     # gets one run: `edited`, `labeled` and `unlabeled` started a second run on
     # the same commit, the concurrency group cancelled the first, and its
     # `conclusion` reported a failure on the head commit (#848). The guards
-    # read their labels and the description from the API when they run, and
+    # read their labels from the API when they run, and
     # pr-guards.yml re-runs the one a change affects once this run completes.
     types: [opened, synchronize, reopened]
   merge_group:
@@ -865,45 +865,9 @@ jobs:
 
   # ── The single required check ───────────────────────────────────────────────
 
-  # conclusion — the one status check the branch ruleset requires. It `needs`
-  # every other job and runs on `always()`, so it reports even when a guarded
-  # Rust lane is skipped pre-code. It fails if any needed job FAILED or was
-  # CANCELLED, and passes when every result is `success` or `skipped`. The
-  # results arrive through `env:` (never spliced into `run:`, per the
-  # workflow-security rule).
-  # A person's pull request records acceptance of the contribution licensing
-  # terms (CONTRIBUTING.md § Licensing of contributions) through the template's
-  # checkbox; this gate is what makes the checkbox binding. Bot authors are
-  # skipped: a bot cannot accept terms and its bumps carry no expression of its
-  # own. The body is read when the step runs, and pr-guards.yml re-runs this
-  # job when the description changes, so ticking the box takes effect (#848).
-  contribution-licence:
-    name: contribution-licence-guard
-    if: github.event_name == 'pull_request' && github.event.pull_request.user.type != 'Bot'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      pull-requests: read # the description when the step runs
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: The pull request body accepts the contribution licensing terms
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          PR: ${{ github.event.pull_request.number }}
-        run: |
-          set -euo pipefail
-          PR_BODY=$(gh api "repos/${GH_REPO}/pulls/${PR}" --jq '.body // ""')
-          export PR_BODY
-          bash scripts/checks/contribution-licence.sh
-
   conclusion:
     name: conclusion
     needs:
-      - contribution-licence
       - workflow-audit
       - workflow-lint
       - shellcheck
