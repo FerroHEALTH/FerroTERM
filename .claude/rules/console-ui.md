@@ -12,26 +12,26 @@ repository FerroHEALTH/FerroUI) is the family's component library and the
 one source of its console design and its component rules. Read these first,
 before any console change:
 
-- the consumer guide, [`docs/consoles.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.0/docs/consoles.md):
+- the consumer guide, [`docs/consoles.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.2/docs/consoles.md):
   how a console takes the library, what it keeps local, how it moves to a
   new release; and the move from 0.5,
-  [`docs/migration-0.6.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.0/docs/migration-0.6.md);
-- the component rules, [`.claude/rules/console-ui.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.0/.claude/rules/console-ui.md):
+  [`docs/migration-0.6.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.2/docs/migration-0.6.md);
+- the component rules, [`.claude/rules/console-ui.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.2/.claude/rules/console-ui.md):
   the mandates (§0: server-rendered HTML, a little plain JavaScript, no
   inline style, no route or state in the library, no patient identifier in
   a URL), the interaction contract (§1), templates and markup, modules,
   accessibility, tokens and themes, icons, the catalogs;
-- the crate discipline, [`crates/ferrohealth-ui/CLAUDE.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.0/crates/ferrohealth-ui/CLAUDE.md):
+- the crate discipline, [`crates/ferrohealth-ui/CLAUDE.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.2/crates/ferrohealth-ui/CLAUDE.md):
   the interaction contract and the rendering mode;
-- the reviewed design, [`design/README.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.0/design/README.md),
-  [`design/COMPONENTS.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.0/design/COMPONENTS.md)
+- the reviewed design, [`design/README.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.2/design/README.md),
+  [`design/COMPONENTS.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.2/design/COMPONENTS.md)
   (the component IDs such as R9, F13 and M1 to M6, the family rules, the
   page templates) and the console's mockup under
-  [`design/consoles/ferroterm/`](https://github.com/FerroHEALTH/FerroUI/tree/v0.6.0/design/consoles/ferroterm).
+  [`design/consoles/ferroterm/`](https://github.com/FerroHEALTH/FerroUI/tree/v0.6.2/design/consoles/ferroterm).
 
 **The pin decides the version you read.** The console pins `ferrohealth-ui
-= "=0.6.0"` (root `Cargo.toml`), so every FerroUI document above is read at
-the tag `v0.6.0`. FerroUI's `design/` is the only design source: a design
+= "=0.6.2"` (root `Cargo.toml`), so every FerroUI document above is read at
+the tag `v0.6.2`. FerroUI's `design/` is the only design source: a design
 folder anywhere else is stale and never synced from.
 
 **Nothing FerroUI has or should have is built here.** A missing component,
@@ -149,8 +149,9 @@ axum documentation of the pinned release.
 
 ## 5. Security headers
 
-Every answer carries the console's own Content-Security-Policy
-(`server::policy`): scripts and styles from the console alone with no nonce
+Every answer carries the Content-Security-Policy of a server-rendered
+console (`ConsoleHeaders::server_rendered` of `ferrohealth-server`
+0.4.2): scripts and styles from the console alone with no nonce
 (`script-src 'self'; style-src 'self'`, no `style` attribute, no `<style>`,
 no inline script), `frame-ancestors 'none'` and `form-action` the console and
 the provider's end-session origin, beside `ferrohealth-server`'s `nosniff`,
@@ -170,6 +171,7 @@ versioned assets are cached for a year, and no answer is compressed.
 - `cargo fmt` clean; `cargo clippy -p ferroterm-console --all-targets --
   -D warnings`; `cargo nextest run -p ferroterm-console`.
 - The journeys wait for FerroUI's loader mark, `html[data-fui-script]`,
+  and for every element that asks for a module to carry `data-fui-ready`
   before they act, and a press waits for the new document it loads
   (`e2e/tests/it/harness.rs`). `Journey::open_without_scripts` refuses the
   browser every module: `no_script` holds every page to its content, its

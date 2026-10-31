@@ -30,7 +30,7 @@ read-only commands (git diff, git log, `git -C <FerroUI checkout> show`,
 grep, dry-run clippy).
 
 **First, read FerroUI, which leads the console's UI.** The console pins
-`ferrohealth-ui` in the root `Cargo.toml` (`=0.6.0` today, tag `v0.6.0`).
+`ferrohealth-ui` in the root `Cargo.toml` (`=0.6.2` today, tag `v0.6.2`).
 Read, from a FerroUI checkout or from GitHub (FerroHEALTH/FerroUI), at the
 tag matching the pin: `.claude/rules/console-ui.md` (the component rules),
 `docs/consoles.md` (the consumer guide), `crates/ferrohealth-ui/CLAUDE.md`

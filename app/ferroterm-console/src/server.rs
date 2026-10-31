@@ -8,12 +8,12 @@
 //! Every page is a handler that reads the terminology server and answers the
 //! whole document (`page`). Every response carries the browser security
 //! headers of `ferrohealth-server`'s `console` (`nosniff`, `DENY` framing, no
-//! referrer, a same-origin opener, every document `no-store`) with the
-//! console's own Content-Security-Policy in place of the family's
-//! ([`policy`]): scripts and styles from this origin alone, no nonce and no
-//! WebAssembly, as FerroUI's server-drawn pages need. A request that is not a
-//! safe method is taken only from the console's own pages, and a session's
-//! access token is refreshed before the request it arrives with is served.
+//! referrer, a same-origin opener, every document `no-store`) under the
+//! policy of a server-rendered console (`ConsoleHeaders::server_rendered`):
+//! scripts and styles from this origin alone, no nonce and no WebAssembly,
+//! as FerroUI's server-drawn pages need. A request that is not a safe
+//! method is taken only from the console's own pages, and a session's access
+//! token is refreshed before the request it arrives with is served.
 //! No specification governs the console's HTTP surface: our own design.
 
 use std::sync::Arc;
@@ -29,7 +29,7 @@ use ferrohealth_server::console::{self, ConsoleHeaders};
 use ferrohealth_server::health::Health;
 use ferrohealth_server::section::ServerSection;
 use ferrohealth_server::serve::Drained;
-use http::header::{CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE};
+use http::header::{CACHE_CONTROL, CONTENT_TYPE};
 use http::{HeaderValue, Method, StatusCode};
 
 use crate::config::settings::{OidcSettings, Settings};
@@ -172,7 +172,6 @@ impl ConsoleState {
 /// Builds the console's whole HTTP service over `state`.
 pub fn router(state: ConsoleState) -> axum::Router {
     let form_action = form_action(state.settings());
-    let policy = policy(&form_action);
     let health = ferrohealth_server::health::routes(state.health().clone());
     let mut pages = axum::Router::new()
         .merge(health)
@@ -214,7 +213,7 @@ pub fn router(state: ConsoleState) -> axum::Router {
             pages.route(path, get(page))
         };
     }
-    let headers = ConsoleHeaders::new(form_action);
+    let headers = ConsoleHeaders::server_rendered(form_action);
     pages
         .fallback(page)
         .layer(axum::middleware::from_fn(
@@ -225,41 +224,6 @@ pub fn router(state: ConsoleState) -> axum::Router {
         .layer(axum::middleware::from_fn(move |request, next| {
             console::headers(headers.clone(), request, next)
         }))
-        .layer(axum::middleware::from_fn(move |request, next| {
-            strict_policy(policy.clone(), request, next)
-        }))
-}
-
-/// The Content-Security-Policy of every response, whose forms post to
-/// `form_action`.
-///
-/// Scripts and styles come from the console alone, with no inline script
-/// or style, no nonce and no `eval` (Content Security Policy Level 3), the
-/// policy FerroUI's server-drawn pages need (`docs/migration-0.6.md`,
-/// step 2).
-#[must_use]
-pub fn policy(form_action: &str) -> HeaderValue {
-    let text = format!(
-        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; \
-         connect-src 'self'; object-src 'none'; base-uri 'self'; form-action {form_action}; \
-         frame-ancestors 'none'"
-    );
-    // NOTE: no specification governs this: our own design; a form action that cannot
-    // be a header falls back to the strictest policy, which still blocks scripts.
-    HeaderValue::from_str(&text)
-        .unwrap_or_else(|_invalid| HeaderValue::from_static("default-src 'none'"))
-}
-
-/// Sets the console's own policy `policy` on the answer, in the place of
-/// the family's, which still admits the WebAssembly and the nonce of a
-/// hydrated console.
-async fn strict_policy(policy: HeaderValue, request: Request, next: Next) -> Response {
-    // TODO(#948): take this policy from ferrohealth-server once FerroSYS#202 ships.
-    let mut response = next.run(request).await;
-    response
-        .headers_mut()
-        .insert(CONTENT_SECURITY_POLICY, policy);
-    response
 }
 
 /// One of the brand's files, `bytes` of the media type `media`, revalidated
