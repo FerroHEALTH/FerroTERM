@@ -76,8 +76,7 @@ cut follows, in order.
    bash scripts/checks/crate-version-guard.sh origin/main HEAD
    ```
 
-   `contribution-licence.sh` reads the pull request body, so it runs in CI
-   only. The guards that need a running server or the licensed editions run
+   The guards that need a running server or the licensed editions run
    in the steps below or in their own lanes: `bench-bars.sh` in step 5,
    `served-bars.sh` over the record set of step 6, `served-artifacts.sh
    --server URL --index DIRS` against a server over the local editions, and

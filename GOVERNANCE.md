@@ -122,7 +122,7 @@ request:
   included, and every version becomes Apache 2.0 on its Change Date. A
   contribution grants the Licensor, Cadasto B.V., the relicensing right in
   [CONTRIBUTING.md § Licensing of contributions](CONTRIBUTING.md#licensing-of-contributions),
-  recorded by the pull request checkbox, so the work stays one work under one
+  accepted by opening the pull request, so the work stays one work under one
   licensor. This is a deliberate position, not an oversight.
 - **No re-modelling of the FHIR type system or operations by hand.** The FHIR
   crate is generated from the machine-readable packages; a change goes into
