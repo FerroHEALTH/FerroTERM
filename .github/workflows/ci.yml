@@ -191,6 +191,46 @@ jobs:
           persist-credentials: false
       - run: bash scripts/checks/stray-literals.sh app/ferroterm-console/src
 
+  # The duplicated lines of the hand-written Rust may fall and never rise
+  # (#950, .claude/rules/rust-style.md, Code is written once). jscpd runs from
+  # its official image, pinned by digest in docs/VERSIONS.md, and the count
+  # and the key of every counted block are committed beside the guard. A rise
+  # fails and names the new blocks by both places; a fall passes, and
+  # ratchet-tighten.yml lowers the count on main.
+  duplication:
+    name: duplication
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Duplication ratchet self-test
+        run: bash scripts/checks/duplication.sh --self-test
+      - name: The duplicated lines have not risen
+        run: bash scripts/checks/duplication.sh
+
+  # A hand-written source file carries at most 800 lines, its inline tests
+  # included (#950). A file over it on the day the guard landed stands in
+  # scripts/checks/file-size.list with its length and may shrink and never
+  # grow; a shrink passes, and ratchet-tighten.yml lowers the entry on main.
+  file-size:
+    name: file-size
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: File-size ratchet self-test
+        run: bash scripts/checks/file-size.sh --self-test
+      - name: No file over the budget or past its entry
+        run: bash scripts/checks/file-size.sh
+
   # dockerfile-lint — hadolint over the container recipe. The image copies a
   # prebuilt binary onto a digest-pinned base, so the rules that matter are
   # the pinned FROM, the numeric non-root USER, and the exec-form ENTRYPOINT.
@@ -874,6 +914,8 @@ jobs:
       - shellcheck
       - comment-style
       - stray-literals
+      - duplication
+      - file-size
       - tree-guards
       - dockerfile-lint
       - versions

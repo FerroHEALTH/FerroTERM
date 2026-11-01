@@ -1,14 +1,16 @@
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 
-# Ratchet tighten (#954). No specification governs this: our own design.
+# Ratchet tighten (#954, #950). No specification governs this: our own design.
 #
-# The ratchet guards fail a rise and pass a fall with a note, so a pull
-# request that moves strings to the catalogs touches none of the shared
-# ratchet files and conflicts with no other open pull request. This lane does
-# the tightening instead: once a day it runs each guard's --update on main and
-# opens one pull request that holds only the ratchet files, or moves its open
-# one to the new counts. When nothing fell it does nothing.
+# The ratchet guards (scripts/checks/duplication.sh, file-size.sh and
+# stray-literals.sh) fail a rise and pass a fall with a note, so a pull
+# request that removes duplication, shortens a file or moves strings to the
+# catalogs touches none of the shared ratchet files and conflicts with no
+# other open pull request. This lane does the tightening instead: once a day
+# it runs each guard's --update on main and opens one pull request that holds
+# only the ratchet files, or moves its open one to the new counts. When
+# nothing fell it does nothing.
 #
 # It is a pull request, never a push to main. The commit is made through the
 # Git Data REST API, so GitHub signs it and it shows Verified
@@ -58,15 +60,28 @@ jobs:
       - name: No ratchet has risen on main
         run: |
           set -euo pipefail
+          bash scripts/checks/duplication.sh
+          bash scripts/checks/file-size.sh
           bash scripts/checks/stray-literals.sh app/ferroterm-console/src
 
       - name: Lower the counts
         id: update
         run: |
           set -euo pipefail
+          count_before=$(git show HEAD:scripts/checks/duplication.count | awk '/^[[:space:]]*(#|$)/ { next } { print; exit }')
+          bash scripts/checks/duplication.sh --update
+          count_after=$(awk '/^[[:space:]]*(#|$)/ { next } { print; exit }' scripts/checks/duplication.count)
+          # A block that moved and kept the count changes only its key, which
+          # the check already tolerates; that alone is no reason for a PR.
+          if [ "$count_before" = "$count_after" ]; then
+            git checkout -- scripts/checks/duplication.count scripts/checks/duplication-baseline.txt
+          fi
+          bash scripts/checks/file-size.sh --update
           bash scripts/checks/stray-literals.sh --update app/ferroterm-console/src
 
-          git diff --name-only -- scripts/checks/stray-literals.baseline >changed-files.txt
+          git diff --name-only -- \
+            scripts/checks/duplication.count scripts/checks/duplication-baseline.txt \
+            scripts/checks/file-size.list scripts/checks/stray-literals.baseline >changed-files.txt
           other=$(git status --porcelain --untracked-files=no | awk '{ print $2 }' | grep -vxF -f changed-files.txt || true)
           if [ -n "$other" ]; then
             echo "$other"
@@ -79,6 +94,10 @@ jobs:
             exit 0
           fi
           echo "changed=1" >>"$GITHUB_OUTPUT"
+          {
+            echo "duplication_before=$count_before"
+            echo "duplication_after=$count_after"
+          } >>"$GITHUB_OUTPUT"
           {
             echo '### Ratchet files lowered'
             echo
@@ -94,6 +113,8 @@ jobs:
           HAVE_TOKEN: ${{ secrets.RATCHET_TIGHTEN_TOKEN != '' && '1' || '0' }}
           REPO: ${{ github.repository }}
           BASE_SHA: ${{ github.sha }}
+          DUP_BEFORE: ${{ steps.update.outputs.duplication_before }}
+          DUP_AFTER: ${{ steps.update.outputs.duplication_after }}
         run: |
           set -euo pipefail
           branch="chore/ratchet-tighten"
@@ -133,9 +154,13 @@ jobs:
             -f "ref=refs/heads/${branch}" -f "sha=${commit}" --jq .ref
 
           {
-            echo "The ratchet guards pass a fall and fail only a rise, so pull requests leave the ratchet files alone (#954). This pull request records what fell on \`main\`, and carries only the ratchet files:"
+            echo "The ratchet guards pass a fall and fail only a rise, so pull requests leave the ratchet files alone (#954, #950). This pull request records what fell on \`main\`, and carries only the ratchet files:"
             echo
             while IFS= read -r f; do echo "- \`$f\`"; done <changed-files.txt
+            if [ -n "$DUP_BEFORE" ] && [ "$DUP_BEFORE" != "$DUP_AFTER" ]; then
+              echo
+              echo "Duplicated lines: ${DUP_BEFORE} -> ${DUP_AFTER}."
+            fi
             echo
             echo "Made by \`.github/workflows/ratchet-tighten.yml\` from each guard's \`--update\`. No user-visible change, so no changelog fragment."
             if [ "$HAVE_TOKEN" != "1" ]; then
