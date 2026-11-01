@@ -176,8 +176,9 @@ jobs:
 
   # stray-literals: a string the console draws belongs in its catalog under
   # app/ferroterm-console/locales/, and a file holds no more stray literals
-  # than its baseline while the strings move (#749). It reads the checkout
-  # and needs no toolchain, so it sits in tier 1.
+  # than its baseline while the strings move (#749). A fall passes with a
+  # note, and ratchet-tighten.yml lowers the baseline on main (#954). It
+  # reads the checkout and needs no toolchain, so it sits in tier 1.
   stray-literals:
     name: stray-literals
     runs-on: ubuntu-latest

@@ -40,6 +40,7 @@ exist.
 | `ci.yml` (`tx-ecosystem` job) | the HL7 terminology ecosystem suite (`general` mode) against a release build through the FHIR Validator's `txTests`, gated by the committed pass list `conformance/tx-ecosystem/passing.txt` (`scripts/checks/tx-ecosystem.sh`) | on workspace |
 | `ci.yml` (`ui-e2e` job) | the console's browser journeys: the server, the console and the stub identity provider on loopback, driven by Chrome for Testing at the pinned release over WebDriver (`scripts/ui-e2e.sh`) | on workspace |
 | `differential.yml` | weekly: the request sample of `conformance/differential/` answered by FerroTERM and by Snowstorm over the same licensed edition (`scripts/checks/differential.sh`), an issue filed on divergence | when `SNOMED_RF2_URL` and `SNOWSTORM_URL` are set |
+| `ratchet-tighten.yml` | daily: each ratchet guard (`stray-literals.sh`) run with `--update` on `main`, and one pull request opened or moved with only the lowered baseline; nothing when nothing fell | daily |
 
 Dependabot (`github-actions` + `cargo`) keeps `uses:` SHAs (the workflows and
 the composite action under `.github/actions`) and crate pins current.
