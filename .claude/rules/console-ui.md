@@ -210,5 +210,6 @@ catalog file with no code change. What is particular here:
   no screen falls back to a message key.
 - `scripts/checks/stray-literals.sh app/ferroterm-console/src` runs in CI
   against `scripts/checks/stray-literals.baseline`: a file may hold no more
-  stray literals than its count, and a change that moves strings into the
-  catalog lowers the count with `--update`.
+  stray literals than its count. A change that moves strings into the
+  catalog passes with a note and leaves the baseline alone; the
+  `Ratchet tighten` workflow lowers the counts on `main`.
