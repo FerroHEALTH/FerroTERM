@@ -229,7 +229,8 @@ async fn a_write_without_the_scope_is_refused_in_the_server_s_own_words() {
     outcome.expect("the journey ran and the browser session ended cleanly");
 }
 
-/// One concept is authored and saved with the keyboard alone.
+/// One concept is authored with the keyboard alone and saved on Ctrl S from
+/// inside its field.
 #[tokio::test]
 async fn one_concept_is_authored_with_the_keyboard_alone() {
     let Some(deployment) = signed_in() else {
@@ -253,15 +254,14 @@ async fn one_concept_is_authored_with_the_keyboard_alone() {
             journey.type_here("key").await?;
             journey.tab(1).await?;
             journey.type_here("Typed with the keyboard").await?;
-            journey
-                .tab_to("Create this code system", "the docked Save")
-                .await;
-            journey.type_here("\u{e007}").await?;
+            // NOTE: WebDriver 2, Element Send Keys: a modifier stays held until the
+            // sequence ends, so U+E009 then `s` is Control and S together.
+            journey.type_here("\u{e009}s").await?;
             journey
                 .text_becoming(
                     By::Css(SAVED),
                     StringMatch::new("The server now holds version").partial(),
-                    "Enter on the docked Save to save the code system",
+                    "Ctrl S in the display field to save the code system",
                 )
                 .await;
             journey.no_console_errors().await;

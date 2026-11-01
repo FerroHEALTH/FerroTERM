@@ -377,7 +377,7 @@ session-ended-detail = The session has ended; sign in again.
 ## The keyboard shortcuts
 
 keys-title = Keyboard shortcuts
-keys-intro = A shortcut acts only when no field has the focus. Every shortcut has a control on the screen that does the same.
+keys-intro = A single key acts only when no field has the focus; a chord with Ctrl acts from inside a field too. Every shortcut has a control on the screen that does the same.
 keys-or = or
 keys-everywhere = Everywhere
 keys-find = Find a resource, a code or a phrase
@@ -388,6 +388,10 @@ keys-tree-move = Previous and next concept
 keys-tree-open = Open a level, or go to its first child
 keys-tree-close = Close a level, or go to the parent
 keys-tree-read = Read the concept
+keys-go-to = Go to
+keys-operations-group = Operations and editors
+keys-run = Run, or run the preview
+keys-save = Save
 ## The listings
 
 listing-find-chip = Name: { $words }

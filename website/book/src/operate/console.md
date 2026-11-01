@@ -108,7 +108,11 @@ endpoint when one is configured.
 Every screen is drawn whole on the console's server and works with scripting
 off; FerroUI's script modules add the theme menu, the copy buttons, the
 concept tree's keys and the keyboard shortcuts on top. `/` focuses the
-command bar, `?` opens the list of shortcuts, and **Keyboard shortcuts** under
+command bar, `?` opens the list of shortcuts, `g` then a letter opens a
+screen of the navigation (`g c` code systems, `g v` value sets, `g m` concept
+maps, `g b` the concept browser, `g o` operations, `g s` the server, `g d`
+the dashboard), `Ctrl Enter` runs an operation or the composer's preview from
+inside a field, and `Ctrl S` saves an editor. **Keyboard shortcuts** under
 your name lists them at their own address. The top bar carries the command bar, the FHIR
 version you are reading through, the server's health, and the menu under your
 name with the theme. The version menu keeps the version for your session, so

@@ -28,6 +28,7 @@ use crate::fhir::named::NamedSearch;
 use crate::locale::{Msg, tr};
 use crate::markup::{h, join, t};
 use crate::pages::parts::heading;
+use crate::pages::shortcuts::RUN_KEYS;
 use crate::request::Request;
 use crate::routes::{
     EXPAND_PATH, LOOKUP_PATH, TRANSLATE_PATH, VALIDATE_PATH, VERSION_PARAM, ui_link,
@@ -140,14 +141,15 @@ pub(crate) fn hidden_field(name: &str, value: &str) -> Html {
     ))
 }
 
-/// Run, its `label` and `glyph`, naming the `operation` it calls.
+/// Run, its `label` and `glyph`, naming the `operation` it calls and
+/// pressed by [`RUN_KEYS`].
 pub(crate) fn run(locale: &Locale, id: &str, label: String, glyph: Glyph, operation: &str) -> Html {
     run_button(Run {
         id: id.to_owned(),
         label,
         busy: tr(locale, Msg::OpsRunning),
         glyph,
-        shortcut: None,
+        shortcut: Some(RUN_KEYS.to_owned()),
         operation: Some(operation.to_owned()),
         state: RunState::Ready,
     })
@@ -275,4 +277,28 @@ pub(crate) fn sent(locale: &Locale, url: &str, raw: Option<(String, String)>) ->
             },
         ),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use ferrohealth_ui::i18n::Locale;
+    use ferrohealth_ui::icon::Glyph;
+
+    use super::run;
+
+    #[test]
+    fn run_announces_ctrl_enter_for_the_keys_module() {
+        let html = run(
+            &Locale::english(),
+            "lookup-run",
+            String::from("Look up"),
+            Glyph::PLAY,
+            "$lookup",
+        );
+        let html = html.as_str();
+        assert!(
+            html.contains("aria-keyshortcuts=\"Control+Enter\" data-fui=\"keys\""),
+            "{html}"
+        );
+    }
 }
