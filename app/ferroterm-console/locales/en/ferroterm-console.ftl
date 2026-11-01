@@ -232,7 +232,6 @@ dashboard-technical-detail = Technical detail
 ## Your preferences
 
 preferences-title = Your preferences
-preferences-save = Save
 preferences-accent = Teal
 preferences-default-fhir = Default FHIR version
 preferences-default-fhir-line = Used when an address names no version. The version select in the top bar switches only this session.

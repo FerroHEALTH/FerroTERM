@@ -47,8 +47,8 @@ pub(crate) const OWN: [&str; 3] = [FHIR, DISPLAY_LANGUAGE, PAGE_SIZE];
 /// The page size a reader who set none reads at.
 pub(crate) const DEFAULT_PAGE_SIZE: u32 = 25;
 
-/// The longest display language tag the console keeps.
-const LANGUAGE_TAG_MAX: usize = 64;
+/// The longest display language tag the console keeps, in characters.
+pub(crate) const LANGUAGE_TAG_MAX: u32 = 64;
 
 /// What the reader chose, as the request's cookies say.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -123,7 +123,7 @@ pub(crate) fn display_language(text: &str) -> Option<String> {
     let tag = text.trim();
     // NOTE: RFC 5646 §2.1: a language tag is ASCII letters, digits and hyphens,
     // so anything else is no tag and never reaches a cookie.
-    let plain = tag.len() <= LANGUAGE_TAG_MAX
+    let plain = u32::try_from(tag.len()).is_ok_and(|length| length <= LANGUAGE_TAG_MAX)
         && tag
             .chars()
             .all(|character| character.is_ascii_alphanumeric() || character == '-');
