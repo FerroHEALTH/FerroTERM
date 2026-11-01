@@ -13,17 +13,14 @@
 
 use ferrohealth_ui::calendar::Weekday;
 use ferrohealth_ui::html::Html;
-use ferrohealth_ui::view::button::Variant;
 use ferrohealth_ui::view::preferences::{
-    Post, PreferenceRow, Section, SectionRoutes, SelectPreference, preference_row,
-    preferences_page, select_preference,
+    Post, PreferenceRow, Section, SectionRoutes, SelectPreference, Typed, TypedPreference,
+    preference_row, preferences_page, select_preference, typed_preference,
 };
 
 use crate::fhir::version::FhirVersion;
 use crate::locale::{Msg, tr};
-use crate::markup::{h, t};
-use crate::pages::operations::hidden_field;
-use crate::prefs::{DISPLAY_LANGUAGE, FHIR, PAGE_SIZE};
+use crate::prefs::{DISPLAY_LANGUAGE, FHIR, LANGUAGE_TAG_MAX, MAX_COUNT, PAGE_SIZE};
 use crate::request::Request;
 use crate::routes::{PREFERENCE_ROUTE, RESET_ROUTE, SHORTCUTS_PATH, ui_path};
 
@@ -75,34 +72,36 @@ fn own_rows(request: &Request, post: &Post, saved: Option<&str>) -> Vec<Html> {
             saved: fhir_saved,
         },
     );
-    let typed = |name: &'static str,
-                 value: String,
-                 input: &'static str,
-                 placeholder: Option<String>| {
-        // TODO(#946): draw these with FerroUI's typed preference once FerroUI#527 ships.
-        h(format!(
-            r#"<form method="post" action="{}" class="fui-preference-form">{}<input id="{name}" name="{name}" type="{input}" class="fui-input fui-setting-select" value="{}"{} autocomplete="off" spellcheck="false"><button type="submit" class="{}">{}</button></form>"#,
-            t(&post.action),
-            hidden_field(crate::routes::BACK_PARAM, &post.back),
-            t(value),
-            placeholder
-                .map(|words| format!(r#" placeholder="{}""#, t(words)))
-                .unwrap_or_default(),
-            Variant::Secondary.small(),
-            t(tr(locale, Msg::PreferencesSave)),
-        ))
-    };
-    let language = typed(
-        DISPLAY_LANGUAGE,
-        request.prefs.display_language.clone(),
-        "text",
-        Some(tr(locale, Msg::PreferencesDisplayLanguageExample)),
+    // NOTE: FerroUI `docs/consoles.md`, "Your own preferences": the browser holds each
+    // field to the bounds `prefs::kept` checks again on the post.
+    let language = typed_preference(
+        locale,
+        TypedPreference {
+            name: String::from(DISPLAY_LANGUAGE),
+            kind: Typed::Text {
+                min_length: None,
+                max_length: Some(LANGUAGE_TAG_MAX),
+            },
+            value: request.prefs.display_language.clone(),
+            placeholder: Some(tr(locale, Msg::PreferencesDisplayLanguageExample)),
+            post: post.clone(),
+            saved: language_saved,
+        },
     );
-    let size = typed(
-        PAGE_SIZE,
-        request.prefs.page_size.to_string(),
-        "number",
-        None,
+    let size = typed_preference(
+        locale,
+        TypedPreference {
+            name: String::from(PAGE_SIZE),
+            kind: Typed::Number {
+                min: Some(1),
+                max: Some(i64::from(MAX_COUNT)),
+                step: None,
+            },
+            value: request.prefs.page_size.to_string(),
+            placeholder: None,
+            post: post.clone(),
+            saved: size_saved,
+        },
     );
     vec![
         preference_row(

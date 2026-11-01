@@ -879,3 +879,51 @@ async fn a_preference_is_kept_and_every_page_is_drawn_in_it() {
         .await;
     outcome.expect("the journey ran and the browser session ended cleanly");
 }
+
+/// The typed preferences post on change once FerroUI's `preference` module
+/// runs: Enter keeps the page size, leaving the display language changed
+/// keeps it, and each field kept takes the focus back.
+#[tokio::test]
+async fn the_typed_preferences_are_kept_on_change_and_keep_their_focus() {
+    let Some(base) = server() else {
+        return;
+    };
+    let outcome = session()
+        .await
+        .run_and_quit(|driver| async move {
+            let journey = Journey::open(driver, &base, "/preferences/reading").await;
+            journey
+                .press(By::Css("#page-size"), "the page size field")
+                .await?;
+            journey.type_here("\u{e009}a").await?;
+            journey.type_here("50\u{e007}").await?;
+            journey
+                .element(
+                    By::Css("input#page-size[value='50']"),
+                    "the page size kept at 50",
+                )
+                .await;
+            journey
+                .focus_becoming("page-size", "the focus back on the page size")
+                .await;
+            journey
+                .press(By::Css("#display-language"), "the display language field")
+                .await?;
+            journey.type_here("\u{e009}a").await?;
+            journey.type_here("nl").await?;
+            journey.tab(1).await?;
+            journey
+                .element(
+                    By::Css("input#display-language[value='nl']"),
+                    "the display language kept as nl when the focus left it",
+                )
+                .await;
+            journey
+                .focus_becoming("display-language", "the focus back on the display language")
+                .await;
+            journey.no_console_errors().await;
+            Ok::<(), WebDriverError>(())
+        })
+        .await;
+    outcome.expect("the journey ran and the browser session ended cleanly");
+}

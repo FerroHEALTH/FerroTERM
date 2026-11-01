@@ -795,6 +795,24 @@ impl Journey {
         .await
     }
 
+    /// Waits until the keyboard is on the control `wanted` names, as a page
+    /// that gives a field the focus back puts it there once its module runs.
+    pub async fn focus_becoming(&self, wanted: &str, what: &str) {
+        self.ready().await;
+        let deadline = Instant::now() + WAIT;
+        loop {
+            let on = self.focused().await.unwrap_or_default();
+            if on.contains(wanted) {
+                return;
+            }
+            if Instant::now() >= deadline {
+                let reason = format!("the keyboard is on `{on}`");
+                panic!("{}", self.failure(what, &reason).await);
+            }
+            tokio::time::sleep(POLL).await;
+        }
+    }
+
     /// Presses tab until the keyboard is on the control `wanted` names.
     ///
     /// The walk is bounded, so a control the keyboard never reaches fails the

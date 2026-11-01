@@ -69,6 +69,45 @@ async fn a_preference_kept_on_your_preferences_returns_saying_which() {
 }
 
 #[tokio::test]
+async fn the_typed_preferences_are_ferroui_s_bounded_fields_and_the_saved_one_is_marked() {
+    let state = console(None, "");
+    let response = send(
+        &state,
+        get(
+            "/preferences/reading?saved=page-size",
+            &[String::from(
+                "__Host-ferroterm_console_page-size=50; __Host-ferroterm_console_display-language=nl",
+            )],
+        ),
+    )
+    .await;
+    assert_eq!(StatusCode::OK, response.status());
+    let page = text(response).await;
+    assert!(
+        page.contains(
+            "<input type=\"number\" id=\"page-size\" name=\"page-size\" value=\"50\" min=\"1\" max=\"1000\" inputmode=\"numeric\""
+        ),
+        "the page size is a number field held to 1 to 1000: {page}"
+    );
+    assert!(
+        page.contains(
+            "<input type=\"text\" id=\"display-language\" name=\"display-language\" value=\"nl\""
+        ) && page.contains("maxlength=\"64\""),
+        "the display language is a text field held to 64 characters: {page}"
+    );
+    assert_eq!(
+        1,
+        page.matches("data-fui-saved data-fui=\"preference\"")
+            .count(),
+        "only the page size's form is marked saved: {page}"
+    );
+    assert!(
+        page.matches("data-fui=\"preference\"").count() >= 3,
+        "the FHIR version, the display language and the page size post on change: {page}"
+    );
+}
+
+#[tokio::test]
 async fn a_switch_keeps_the_last_value_it_posts() {
     let state = console(None, "");
     let response = send(

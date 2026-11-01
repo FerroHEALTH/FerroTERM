@@ -203,3 +203,56 @@ async fn a_preference_is_kept_by_its_form_with_no_script() {
         .await;
     outcome.expect("the journey ran and the browser session ended cleanly");
 }
+
+/// The typed preferences, the page size and the display language, are kept
+/// by their forms' Save with no script, and the page draws each kept value.
+#[tokio::test]
+async fn the_typed_preferences_are_kept_by_their_forms_with_no_script() {
+    let Some(base) = server() else {
+        return;
+    };
+    let outcome = session()
+        .await
+        .run_and_quit(|driver| async move {
+            let journey =
+                Journey::open_without_scripts(driver, &base, "/preferences/reading").await;
+            for (name, value) in [("page-size", "50"), ("display-language", "nl")] {
+                journey
+                    .press(By::Css(format!("#{name}")), &format!("the {name} field"))
+                    .await?;
+                journey.type_here("\u{e009}a").await?;
+                journey.type_here(value).await?;
+                journey
+                    .press(
+                        By::XPath(format!(
+                            "//form[.//input[@name='{name}']]//button[@type='submit']"
+                        )),
+                        &format!("the {name}'s Save"),
+                    )
+                    .await?;
+                journey
+                    .element(
+                        By::Css(format!("input#{name}[value='{value}']")),
+                        &format!("the {name} kept as {value}"),
+                    )
+                    .await;
+            }
+            journey.reopen(&format!("{base}/preferences/reading")).await;
+            journey
+                .element(
+                    By::Css("input#page-size[value='50']"),
+                    "the page size kept on the next page",
+                )
+                .await;
+            journey
+                .element(
+                    By::Css("input#display-language[value='nl']"),
+                    "the display language kept on the next page",
+                )
+                .await;
+            journey.no_console_errors_but(&REFUSED).await;
+            Ok::<(), WebDriverError>(())
+        })
+        .await;
+    outcome.expect("the journey ran and the browser session ended cleanly");
+}

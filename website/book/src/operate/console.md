@@ -207,7 +207,10 @@ Open from the menu under your name: the theme and the density, reduced
 motion, the default FHIR version, the display language concept names are
 asked for in, the page size (25 rows unless you choose another) and the
 keyboard hints. The console keeps each in a cookie of its own for your
-browser and draws the next page in it.
+browser and draws the next page in it. A choice saves as you make it, and
+the display language and the page size save when you press Enter or leave
+the field changed (from 1 to 1000 rows); with scripts off, each has a
+**Save** button.
 
 ![Your preferences](img/console/preferences.png)
 
