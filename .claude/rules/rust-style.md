@@ -191,6 +191,73 @@ of one thing would collide, the module path disambiguates (`fhir::` versus
 `snapshot`, `closure`), verbs only for a stage that is genuinely a
 transformation (`lower`, `render`, `emit`).
 
+## Code is written once
+
+No specification governs this: our own design (#950, ported from
+VernumBOEK's rule of the same name, as FerroEHR did).
+
+- **Share knowledge and decisions, never text that only looks alike.** Two
+  copies that change for the same reason (one business rule, one wire rule,
+  one security rule) move to one owner in the same change. Two pieces with
+  different reasons to change stay apart, however alike they read.
+- **The owner is the module that owns the concern.** Across crates it is the
+  crate lower in the layering (a substrate such as `concept-graph`,
+  `concept-store` or `designation-index` below `fhir-terminology`,
+  `fhir-terminology` below `app/ferroterm-server`, and
+  `terminology-syndication` below an add-on). Within a crate it is the module
+  whose part of the domain the code serves. It is never a `util`, `utils`,
+  `helpers` or `common` module, whose name says nothing about what it holds,
+  and never a function that takes a flag to choose between two behaviours.
+- **One copy is fine, two are looked at, three are extracted.**
+- **The ratchet measures it.** `scripts/checks/duplication.sh` runs jscpd
+  (pinned by version and image digest in `docs/VERSIONS.md`, CI tools) over
+  `addons/*/src/`, `app/*/src/`, `crates/*/src/` and `tools/*/src/` in the
+  `duplication` CI job and holds the total of duplicated lines to the count
+  in `scripts/checks/duplication.count`. A rise fails and names both places
+  of each new block. A fall passes with a one-line note, and your pull
+  request leaves the count alone: the `Ratchet tighten` workflow runs
+  `scripts/checks/duplication.sh --update` on `main` each day and opens one
+  pull request with the lower count and
+  `scripts/checks/duplication-baseline.txt`, the guard's own key of every
+  counted block: its two paths and the sha256 of the lines at each, with no
+  line number, so a change that leaves a block's lines alone leaves its key
+  alone. A pull request that rewrote the shared count files would conflict
+  with every other open one (#954). `--update` never raises the count; a
+  rise that has to stay is a hand edit of the file in a change that says
+  why. Locally the guard takes a `jscpd` on `PATH` of the pinned version,
+  then the pinned image through docker or podman, then the release binary
+  `scripts/checks/duplication.sh --install` puts under `target/tools/`.
+- **The threshold is 50 tokens over at least 5 lines**, jscpd's own
+  defaults. The scan leaves out the `use` declarations, a file that opens
+  with `// @generated`, a file from its first column-one `#[cfg(test)]` line
+  on (the inline test module), and `tests/`. Measured on 2026-11-01 at
+  `1cc74120` with those exclusions, over 307 files and 122,696 lines:
+
+  | Threshold | Blocks | Duplicated lines | Blocks across two files | Blocks in the console |
+  | --- | --- | --- | --- | --- |
+  | 50 tokens, 5 lines | 321 | 4,081 | 204 | 53 |
+  | 70 tokens, 5 lines | 196 | 2,990 | 127 | 20 |
+  | 100 tokens, 5 lines | 88 | 1,763 | 65 | 7 |
+
+  The last column counts the blocks whose first place is in
+  `app/ferroterm-console`, spread over its pages, the most in the code
+  system editor and the browse screen. Raising the threshold drops the short blocks (two getters,
+  two `format!` helpers, two match arms written side by side) and keeps
+  whole functions, yet each short block is code written twice as well, so 50
+  it is. Raising the threshold is a change to this section and to the guard
+  together, with the table measured again.
+- **A hand-written file carries at most 800 lines**, its inline test module
+  included. `scripts/checks/file-size.sh` measures every tracked `.rs` file
+  under `addons/*/src/`, `app/*/src/`, `crates/*/src/` and `tools/*/src/`
+  that does not open with `// @generated`, in the `file-size` CI job and per
+  edit through `.claude/hooks/rust_fmt_clippy.sh`. The 34 files over the
+  budget when the guard landed stand in `scripts/checks/file-size.list` with
+  their length; a listed file may shrink and never grow. A shrink, a listed
+  file back within the budget and a listed file that is gone pass with a
+  one-line note, and the `Ratchet tighten` workflow lowers or removes the
+  entry on `main`; your pull request leaves the list alone. A file over the
+  budget is split by concern.
+
 ## No Python, anywhere
 
 The tooling languages are **bash and Rust**. Python is banned across the

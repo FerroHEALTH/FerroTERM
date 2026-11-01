@@ -58,6 +58,8 @@ cut follows, in order.
    bash scripts/checks/versions.sh
    bash scripts/checks/comment-style.sh --all
    bash scripts/checks/stray-literals.sh app/ferroterm-console/src
+   bash scripts/checks/duplication.sh
+   bash scripts/checks/file-size.sh
    bash scripts/checks/spdx-headers.sh
    bash scripts/checks/copyright-holder.sh
    bash scripts/checks/vendor-dests.sh

@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The hand-written files under addons/*/src/, app/*/src/, crates/*/src/
+# and tools/*/src/ over the budget of 800 lines that
+# scripts/checks/file-size.sh admits, each with the length it may not
+# pass. An entry may fall and never rise; --update lowers and removes
+# entries.
+app/ferroterm-console/src/authoring/code_system.rs 1178
+app/ferroterm-console/src/authoring/concept_map.rs 1138
+app/ferroterm-console/src/fhir/compose.rs 1282
+app/ferroterm-console/src/fhir/concept.rs 907
+app/ferroterm-console/src/fhir/mod.rs 1720
+app/ferroterm-console/src/fhir/terminology.rs 816
+app/ferroterm-console/src/pages/browse.rs 842
+app/ferroterm-console/src/pages/composer.rs 953
+app/ferroterm-console/src/pages/concept_map_editor.rs 808
+app/ferroterm-console/src/pages/sync.rs 939
+app/ferroterm-console/src/session/mod.rs 868
+app/ferroterm-server/src/persistence.rs 843
+app/ferroterm-server/src/state.rs 2212
+app/ferroterm-server/src/version/operations.rs 1204
+app/ferroterm-server/src/version/store.rs 1569
+crates/fhir-terminology/src/compose.rs 1319
+crates/fhir-terminology/src/icd11.rs 1186
+crates/fhir-terminology/src/loinc.rs 1029
+crates/fhir-terminology/src/operations/expand.rs 817
+crates/fhir-terminology/src/operations/mod.rs 1109
+crates/fhir-terminology/src/operations/value_set_validate_code.rs 2042
+crates/fhir-terminology/src/provider.rs 1235
+crates/fhir-terminology/src/registries/bcp47.rs 841
+crates/fhir-terminology/src/snomed.rs 1802
+crates/fhir-terminology/src/snomed/expression.rs 1030
+crates/labcodeset/src/lib.rs 925
+crates/rf2/src/refset.rs 859
+crates/sct-ecl/src/eval.rs 1499
+crates/sct-ecl/src/parser.rs 1078
+tools/ferroterm-bench/src/main.rs 824
+tools/ferroterm-build/src/archive.rs 833
+tools/ferroterm-build/src/loinc.rs 830
+tools/ferroterm-build/src/pipeline.rs 1316
+tools/ferroterm-testkit/src/snomed.rs 1268
