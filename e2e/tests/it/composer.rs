@@ -130,8 +130,8 @@ async fn a_value_set_is_composed_previewed_and_saved() {
     outcome.expect("the journey ran and the browser session ended cleanly");
 }
 
-/// The preview and the save are reached and pressed from the keyboard
-/// alone.
+/// The preview runs on Ctrl Enter from inside a field, and the docked Save
+/// is reached with Tab and pressed, from the keyboard alone.
 #[tokio::test]
 async fn the_preview_and_the_save_are_reached_from_the_keyboard() {
     let Some(deployment) = signed_in() else {
@@ -146,13 +146,14 @@ async fn the_preview_and_the_save_are_reached_from_the_keyboard() {
             journey
                 .press(By::Css(TITLE_FIELD), "the title field")
                 .await?;
-            journey.tab_to("Run the preview", "the preview's Run").await;
-            journey.type_here("\u{e007}").await?;
+            // NOTE: WebDriver 2, Element Send Keys: a modifier stays held until the
+            // sequence ends, so U+E009 then Enter is Control and Enter together.
+            journey.type_here("\u{e009}\u{e007}").await?;
             journey
                 .text_becoming(
                     By::Css("main .fui-aside-part"),
                     StringMatch::new("First leaf").partial(),
-                    "Enter on Run the preview",
+                    "Ctrl Enter in the title field to run the preview",
                 )
                 .await;
             journey

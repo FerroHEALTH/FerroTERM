@@ -22,6 +22,6 @@ allow ^user/                                # a SMART scope
 allow ^Coding$                              # a FHIR data type name
 allow ^CONCEPT$                             # the marker a filter sentence places its concept at
 allow ^%                                    # a time format
-allow ^(Esc|up \| down)$                    # key caps of the shortcuts, written as the keys read
+allow ^(Esc|up \| down|Ctrl Enter|Ctrl s)$   # key caps of the shortcuts, written as the keys read
 allow ^CARGO_                               # a variable cargo sets at build time
 allow ^ (checked|disabled|selected)$          # a boolean attribute a screen writes into its own markup

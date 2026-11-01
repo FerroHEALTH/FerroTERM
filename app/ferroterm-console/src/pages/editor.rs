@@ -39,6 +39,7 @@ use crate::markup::{h, join, p, t};
 use crate::pages::detail::Kind;
 use crate::pages::operations::hidden_field;
 use crate::pages::parts::{ago, headed, refusal_of};
+use crate::pages::shortcuts::SAVE_KEYS;
 use crate::posted::Posted;
 use crate::request::Request;
 use crate::routes::sign_in_link;
@@ -210,9 +211,10 @@ pub(crate) enum Standing {
     Expired,
 }
 
-/// The editor's docked bar (R4): Discard and Save, `save` its words, the
-/// line saying where the draft stands. It is the last part of the page, so
-/// it docks to the foot of the main area while the reader scrolls.
+/// The editor's docked bar (R4): Discard and Save on [`SAVE_KEYS`], `save`
+/// its words, the line saying where the draft stands. It is the last part
+/// of the page, so it docks to the foot of the main area while the reader
+/// scrolls.
 #[must_use]
 pub(crate) fn dock(locale: &Locale, save: String, standing: &Standing) -> Html {
     let (line, state) = match standing {
@@ -267,7 +269,7 @@ pub(crate) fn dock(locale: &Locale, save: String, standing: &Standing) -> Html {
                 label: save,
                 variant: Variant::Primary,
                 glyph: Some(Glyph::SAVE),
-                shortcut: None,
+                shortcut: Some(SAVE_KEYS.to_owned()),
                 state,
                 leaves: false,
             },
@@ -439,8 +441,18 @@ fn reloaded(reload: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{field, reloaded, rows};
+    use ferrohealth_ui::i18n::Locale;
+
+    use super::{Standing, dock, field, reloaded, rows};
     use crate::posted::Posted;
+
+    #[test]
+    fn the_docked_save_announces_ctrl_s_for_the_keys_module() {
+        let html = dock(&Locale::english(), String::from("Save"), &Standing::Changed);
+        let html = html.as_str();
+        assert!(html.contains("aria-keyshortcuts=\"Control+S\""), "{html}");
+        assert_eq!(1, html.matches("aria-keyshortcuts").count(), "{html}");
+    }
 
     #[test]
     fn rows_come_back_in_the_order_the_form_drew_them() {

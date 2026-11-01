@@ -427,7 +427,8 @@ async fn the_search_panel_answers_as_you_type_and_follows_the_keys() {
 }
 
 /// A code is looked up with no canonical typed: the code system is picked
-/// from what the root publishes, and the answer names what it found.
+/// from what the root publishes, Ctrl Enter in the code field runs it, and
+/// the answer names what it found.
 #[tokio::test]
 async fn a_code_is_looked_up_from_a_picked_code_system() {
     let Some(base) = server() else {
@@ -451,12 +452,18 @@ async fn a_code_is_looked_up_from_a_picked_code_system() {
                 .press(By::Css("#lookup-code"), "the code field")
                 .await?;
             journey.type_here("ba-branch").await?;
-            journey.press(By::Css(RUN), "Look up").await?;
+            journey
+                .element(
+                    By::Css(format!("{RUN}[aria-keyshortcuts='Control+Enter']")),
+                    "Look up announcing Ctrl Enter",
+                )
+                .await;
+            journey.type_here("\u{e009}\u{e007}").await?;
             journey
                 .text_becoming(
                     By::Css(VERDICT),
                     StringMatch::new("First branch").partial(),
-                    "the answer to name the concept found",
+                    "Ctrl Enter in the code field to look the code up",
                 )
                 .await;
             journey
@@ -732,7 +739,8 @@ async fn the_four_roots_are_compared() {
 }
 
 /// The keyboard shortcuts open FerroUI's legend once its module runs and
-/// close it on Escape; with no script the same shortcuts are a page.
+/// close it on Escape, every go-to pair follows its link of the
+/// navigation, and with no script the same shortcuts are a page.
 #[tokio::test]
 async fn the_shortcuts_open_their_legend_and_are_listed_at_their_own_address() {
     let Some(base) = server() else {
@@ -753,15 +761,42 @@ async fn the_shortcuts_open_their_legend_and_are_listed_at_their_own_address() {
             journey
                 .count_becoming(By::Css("dialog[open]"), 0, "the legend to close")
                 .await;
+            for (keys, entry) in [
+                ("gc", "Code systems"),
+                ("gv", "Value sets"),
+                ("gm", "Concept maps"),
+                ("gb", "Concept browser"),
+                ("go", "Operations"),
+                ("gs", "Server"),
+                ("gd", "Dashboard"),
+            ] {
+                journey.type_here(keys).await?;
+                journey
+                    .text_becoming(
+                        By::Css(CURRENT_SCREEN),
+                        StringMatch::new(entry).partial(),
+                        &format!("the go-to pair {keys} to reach {entry}"),
+                    )
+                    .await;
+            }
             journey.reopen(&format!("{base}/shortcuts")).await;
-            journey
-                .text_becoming(
-                    By::Css("main"),
-                    StringMatch::new("Read the concept").partial(),
-                    "the shortcuts listed at their own address, the page the menu's item \
-                     leads to with no script",
-                )
-                .await;
+            for listed in [
+                "Read the concept",
+                "Go to",
+                "Run, or run the preview",
+                "Save",
+            ] {
+                journey
+                    .text_becoming(
+                        By::Css("main"),
+                        StringMatch::new(listed).partial(),
+                        &format!(
+                            "{listed} listed at the shortcuts' own address, the page the \
+                             menu's item leads to with no script"
+                        ),
+                    )
+                    .await;
+            }
             journey.no_console_errors().await;
             Ok::<(), WebDriverError>(())
         })

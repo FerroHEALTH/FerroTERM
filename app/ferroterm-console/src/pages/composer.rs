@@ -19,6 +19,7 @@ use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::view::clause::{Clause, ClauseIssue, ClauseKind, clause, clauses};
 use ferrohealth_ui::view::coding::{Coding, Layout, coding};
 use ferrohealth_ui::view::form::{FORM, Field, INPUT, SELECT, field_flow};
+use ferrohealth_ui::view::kbd::{aria_keys, kbd};
 use ferrohealth_ui::view::layout::main_aside;
 use ferrohealth_ui::view::load_report::{Arrival, LoadReport, Outcome, load_report};
 use ferrohealth_ui::view::surface::{
@@ -41,6 +42,7 @@ use crate::pages::editor::{
 };
 use crate::pages::operations::{choices, hidden_field, option};
 use crate::pages::parts::{failure, name_of};
+use crate::pages::shortcuts::RUN_KEYS;
 use crate::posted::Posted;
 use crate::request::Request;
 use crate::routes::{
@@ -812,8 +814,9 @@ fn set_rows(locale: &Locale, key: &str, each: &crate::fhir::compose::Clause) -> 
     }))
 }
 
-/// The preview card: Run the preview, and the first page of what the draft
-/// selects once it ran.
+/// The preview card: Run the preview, announcing [`RUN_KEYS`] for FerroUI's
+/// `keys` module to press (FerroUI `docs/consoles.md`, "Keyboard
+/// shortcuts"), and the first page of what the draft selects once it ran.
 fn preview_card(
     locale: &Locale,
     preview: Option<
@@ -821,12 +824,16 @@ fn preview_card(
     >,
     names: &BTreeMap<String, String>,
 ) -> Html {
+    let keys = aria_keys(RUN_KEYS)
+        .map(|keys| format!(r#" aria-keyshortcuts="{}""#, t(keys)))
+        .unwrap_or_default();
     let run = h(format!(
-        r#"<button type="submit" class="{}" name="{}" value="{PREVIEW}">{}{}</button>"#,
+        r#"<button type="submit" class="{}" name="{}" value="{PREVIEW}"{keys}>{}{}{}</button>"#,
         ferrohealth_ui::view::button::Variant::Secondary.small(),
         crate::posted::INTENT,
         ferrohealth_ui::icon::icon(Glyph::PLAY, "14"),
-        t(tr(locale, Msg::EditorRunPreview))
+        t(tr(locale, Msg::EditorRunPreview)),
+        kbd(RUN_KEYS),
     ));
     let body = match preview {
         None => transform_quiet(tr(locale, Msg::EditorPreviewBefore)),
@@ -924,9 +931,24 @@ fn saved_page(request: &Request, opened: &Draft, saved: &str) -> Html {
 
 #[cfg(test)]
 mod tests {
-    use super::{apply, target};
+    use std::collections::BTreeMap;
+
+    use ferrohealth_ui::i18n::Locale;
+
+    use super::{apply, preview_card, target};
     use crate::fhir::compose::Draft;
     use crate::posted::Posted;
+
+    #[test]
+    fn run_the_preview_announces_ctrl_enter_for_the_keys_module() {
+        let html = preview_card(&Locale::english(), None, &BTreeMap::new());
+        let html = html.as_str();
+        assert!(
+            html.contains("value=\"preview\" aria-keyshortcuts=\"Control+Enter\""),
+            "{html}"
+        );
+        assert!(html.contains("<kbd class=\"fui-kbd\">Ctrl</kbd>"), "{html}");
+    }
 
     #[test]
     fn an_intent_names_the_row_it_acts_on() {

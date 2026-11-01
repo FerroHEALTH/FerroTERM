@@ -25,7 +25,7 @@ use ferrohealth_ui::view::nav::{Entry, Group, Rail, Sidebar, sidebar};
 use ferrohealth_ui::view::search::{SearchBox, search_box};
 use ferrohealth_ui::view::session::{Watch, session_watch};
 use ferrohealth_ui::view::shell::{Footer, Shell, TopBar, brand_mark, lockup, shell, topbar};
-use ferrohealth_ui::view::shortcuts::shortcut_legend;
+use ferrohealth_ui::view::shortcuts::shortcut_legend_with_go_to;
 use ferrohealth_ui::view::status::{Reach, StatusPill, banner, status_pill};
 use ferrohealth_ui::view::toast::toast_region;
 use ferrohealth_ui::view::version::{VersionRoot, VersionSelect, version_select};
@@ -147,7 +147,11 @@ pub(crate) fn console_shell(request: &Request, reached: Reached, content: Html) 
             left,
         ))
     });
-    let legend = shortcut_legend(locale, crate::pages::shortcuts::groups(locale));
+    let legend = shortcut_legend_with_go_to(
+        locale,
+        crate::pages::shortcuts::groups(locale),
+        crate::pages::shortcuts::go_to(locale),
+    );
     let content = Html::join([content, watch.unwrap_or_default(), legend]);
     shell(
         locale,
