@@ -627,7 +627,7 @@ reference set" selects none of them:
    set with concept members in the edition
 ```
 
-The ECL refusal is the same reading: ECL 2.2 §memberOf returns the
+The ECL refusal is the same reading: ECL 2.3 §memberOf returns the
 components a reference set references, and descriptions are not concepts, so
 the expression has no concept-set answer here.
 

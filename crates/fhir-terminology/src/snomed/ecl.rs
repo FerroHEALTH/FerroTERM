@@ -138,7 +138,7 @@ impl SnomedProvider {
                 }
                 DescriptionPredicate::Active(active) => {
                     active_asked = true;
-                    designation.active == *active
+                    active.is_none_or(|active| designation.active == active)
                 }
                 DescriptionPredicate::Id { operator, ids } => {
                     let actual = designation
@@ -210,7 +210,7 @@ impl SnomedProvider {
             {
                 let active_only = !predicates
                     .iter()
-                    .any(|p| matches!(p, DescriptionPredicate::Active(false)));
+                    .any(|p| matches!(p, DescriptionPredicate::Active(None | Some(false))));
                 let mut out = RoaringBitmap::new();
                 for term in terms {
                     if let TypedSearchTerm::Match(words) = term {
@@ -410,7 +410,7 @@ impl Model for SnomedProvider {
 
 /// The concept filters of `{{ C … }}`, one method each: the predicates a
 /// filter states are applied in turn, and each narrows the set on its own
-/// terms (ECL 2.2 §Concept filter constraints).
+/// terms (ECL 2.3 §Concept filter constraints).
 impl SnomedProvider {
     /// The concepts of `set` that are active, or the inactive ones.
     fn by_activity(&self, set: &RoaringBitmap, active: bool) -> Result<RoaringBitmap, EvalError> {

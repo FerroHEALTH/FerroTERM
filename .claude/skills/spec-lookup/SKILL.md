@@ -48,7 +48,7 @@ the decision; never treat them as spec authority.
   - FHIR SNOMED CT page: <https://hl7.org/fhir/R4/snomedct.html>
   - SNOMED URI Standard:
     <https://docs.snomed.org/snomed-ct-specifications/snomed-ct-uri-standard>
-  - ECL 2.2:
+  - ECL 2.3:
     <https://docs.snomed.org/snomed-ct-specifications/snomed-ct-expression-constraint-language>
     · grammar <https://github.com/IHTSDO/snomed-expression-constraint-language>
   - RF2:

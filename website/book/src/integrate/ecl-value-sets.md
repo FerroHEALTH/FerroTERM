@@ -71,11 +71,12 @@ defines `in` for SNOMED CT), plus the generic `is-not-a`, `generalizes`,
 
 An expression constraint names a set of concepts, and the evaluator answers it
 as set algebra over the precomputed structures: `<< X` is the descendant
-bitmap plus `X`, `^ X` the members of the reference set, a refinement such as
+bitmap plus `X`, `^ X` the members of the reference set, `^R X` the
+reference sets with a member in `X`, a refinement such as
 `< 404684003 : 363698007 = << 39057004` the sources of the attribute with a
 value in the set (from an inverted index), a grouped refinement counts the
 role groups that satisfy it, and `AND`, `OR`, and `MINUS` are bitmap
-operations. The parser follows the official ANTLR grammar for ECL 2.2 rule
+operations. The parser follows the official ANTLR grammar for ECL 2.3 rule
 for rule and is tested against the published example corpus. Every operator
 evaluates, as do the concept filters, the history supplements, and alternate
 identifiers. Four filters are refused because the artifact does not carry what

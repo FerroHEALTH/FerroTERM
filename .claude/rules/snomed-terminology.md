@@ -20,7 +20,7 @@ land (`docs/terminologies.md`).
 SNOMED International's specifications are the oracle for everything SNOMED: the
 URI standard, the implicit value-set / concept-map conventions, ECL, and the RF2
 release format. Cite the spec section (e.g. "snomedct.html §Implicit Value
-Sets", "ECL 2.2 §Refinement", "RF2 spec §Language Reference Set") for any
+Sets", "ECL 2.3 §Refinement", "RF2 spec §Language Reference Set") for any
 conformance decision. Reference servers (Snowstorm, Ontoserver, tx.fhir.org) are
 behavioural oracles for spec-silent edge cases only.
 
@@ -54,7 +54,7 @@ behavioural oracles for spec-silent edge cases only.
 
 ## ECL (Expression Constraint Language)
 
-- **[S-ECL-1]** Target **ECL 2.2** (superset-compatible with 2.0/2.1); build the
+- **[S-ECL-1]** Target **ECL 2.3** (superset-compatible with 2.0 to 2.2); build the
   parser faithful to the official ANTLR `ECL.g4` for that version, never a
   hand-rolled divergent grammar. Port it in pure Rust (`logos` + `winnow`,
   preferred over the pre-1.0 `chumsky`) mirroring the grammar, and test against

@@ -19,12 +19,13 @@ use winnow::stream::{ContainsToken, Stream, TokenSlice};
 use winnow::token::{any, one_of};
 
 use crate::ast::{
-    Acceptability, AcceptabilitySet, AltIdentifier, Attribute, AttributeSet, AttributeValue,
-    Cardinality, Comparison, ConceptFilter, ConceptReference, ConceptSet, ConstraintOperator,
-    DefinitionStatus, DescriptionFilter, DialectAlias, DialectIdValue, Equality,
-    ExpressionConstraint, FieldValue, FilterConstraint, FocusConcept, HistorySupplement,
-    MemberFilter, MemberOf, NumericValue, Refinement, RefsetFields, Sctid, SubAttributeSet,
-    SubExpressionConstraint, SubRefinement, TimeValue, TypeToken, TypedSearchTerm,
+    Acceptability, AcceptabilitySet, ActiveValue, AltIdentifier, Attribute, AttributeSet,
+    AttributeValue, Cardinality, Comparison, ConceptFilter, ConceptReference, ConceptSet,
+    ConcreteString, ConstraintOperator, DefinitionStatus, DescriptionFilter, DialectAlias,
+    DialectIdValue, Equality, ExpressionConstraint, FieldValue, FilterConstraint, FocusConcept,
+    HistorySupplement, MemberFilter, MemberOf, NumericValue, Refinement, RefsetFields,
+    RefsetOperator, Sctid, SubAttributeSet, SubExpressionConstraint, SubRefinement, TimeValue,
+    TypeToken, TypedSearchTerm,
 };
 use crate::lexer::{Kind, Token};
 
@@ -318,9 +319,40 @@ fn refset_field_name(i: &mut Tokens<'_>) -> PResult<String> {
         .parse_next(i)
 }
 
-/// `memberof`: `^`, optionally `[ fields ]`.
-fn member_of(i: &mut Tokens<'_>) -> PResult<MemberOf> {
-    kind(Kind::Caret).parse_next(i)?;
+/// `refsetOperator`: `^R` (`refsetContainingAny`, the caret touching an
+/// upper-case `R`) or `memberof`. With no whitespace before the focus, the
+/// lexer reads `^R73211009` as `^` and one word, so the identifier after the
+/// `R` comes back as the focus.
+fn refset_operator(i: &mut Tokens<'_>) -> PResult<(RefsetOperator, Option<FocusConcept>)> {
+    let caret = kind(Kind::Caret).parse_next(i)?;
+    let start = i.checkpoint();
+    if let Some(word) = i
+        .peek_token()
+        .filter(|t| t.kind == Kind::Identifier && adjacent(caret, t))
+        && let Some(rest) = word.text.strip_prefix('R')
+        && rest.bytes().all(|b| b.is_ascii_digit())
+    {
+        any.void().parse_next(i)?;
+        if rest.is_empty() {
+            return Ok((RefsetOperator::ContainingAny, None));
+        }
+        let Some(id) = ((6..=18).contains(&rest.len()) && !rest.starts_with('0'))
+            .then(|| rest.parse().ok().map(Sctid))
+            .flatten()
+        else {
+            return refuse(i, &start, "a SNOMED CT identifier");
+        };
+        let term = opt(term).parse_next(i)?;
+        let focus = FocusConcept::Reference(ConceptReference { id, term });
+        return Ok((RefsetOperator::ContainingAny, Some(focus)));
+    }
+    member_of_fields
+        .map(|member_of| (RefsetOperator::MemberOf(member_of), None))
+        .parse_next(i)
+}
+
+/// `memberof` after its `^`: optionally `[ fields ]`.
+fn member_of_fields(i: &mut Tokens<'_>) -> PResult<MemberOf> {
     let fields = opt(delimited(
         kind(Kind::LeftBracket),
         cut_err(alt((
@@ -336,11 +368,14 @@ fn member_of(i: &mut Tokens<'_>) -> PResult<MemberOf> {
 /// `subexpressionconstraint`.
 fn sub_expression_constraint(i: &mut Tokens<'_>) -> PResult<SubExpressionConstraint> {
     let operator = opt(constraint_operator).parse_next(i)?;
-    let member_of = opt(member_of).parse_next(i)?;
-    let focus = if operator.is_some() || member_of.is_some() {
-        cut_err(focus).parse_next(i)?
-    } else {
-        focus.parse_next(i)?
+    let (refset_operator, glued) = match opt(refset_operator).parse_next(i)? {
+        Some((refset_operator, glued)) => (Some(refset_operator), glued),
+        None => (None, None),
+    };
+    let focus = match glued {
+        Some(focus) => focus,
+        None if operator.is_some() || refset_operator.is_some() => cut_err(focus).parse_next(i)?,
+        None => focus.parse_next(i)?,
     };
     let member_filters = repeat(0.., member_filter_constraint).parse_next(i)?;
     let filters = repeat(
@@ -351,7 +386,7 @@ fn sub_expression_constraint(i: &mut Tokens<'_>) -> PResult<SubExpressionConstra
     let history = opt(history_supplement).parse_next(i)?;
     Ok(SubExpressionConstraint {
         operator,
-        member_of,
+        refset_operator,
         focus,
         member_filters,
         filters,
@@ -583,6 +618,30 @@ fn typed_search_term(i: &mut Tokens<'_>) -> PResult<TypedSearchTerm> {
     }
 }
 
+/// `concretestring`: a quoted string of one or more characters whose only
+/// escapes are `\"`, `\\`, and `\*`, decoded.
+fn concrete_string(i: &mut Tokens<'_>) -> PResult<ConcreteString> {
+    let start = i.checkpoint();
+    let content = string_content.parse_next(i)?;
+    if content.is_empty() || !escapes_only(content, &['"', '\\', '*']) {
+        return refuse(i, &start, "a concrete string");
+    }
+    let mut value = String::with_capacity(content.len());
+    let mut chars = content.chars();
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' => value.extend(chars.next()),
+            other => value.push(other),
+        }
+    }
+    Ok(ConcreteString(value))
+}
+
+/// `concretestring | concretestringset`.
+fn concrete_strings(i: &mut Tokens<'_>) -> PResult<Vec<ConcreteString>> {
+    bare_or_set(concrete_string, "a concrete string").parse_next(i)
+}
+
 /// `typedsearchterm | typedsearchtermset`.
 fn typed_search_terms(i: &mut Tokens<'_>) -> PResult<Vec<TypedSearchTerm>> {
     bare_or_set(typed_search_term, "a search term").parse_next(i)
@@ -609,17 +668,26 @@ fn time_value(i: &mut Tokens<'_>) -> PResult<TimeValue> {
     Ok(TimeValue(text.to_owned()))
 }
 
-/// `activevalue`: `1`, `0`, `true`, or `false`.
-fn active_value(i: &mut Tokens<'_>) -> PResult<bool> {
+/// `activevalue`: `1`, `0`, `true`, `false`, or `*` (ECL 2.3).
+// NOTE: ECL 2.3 `activevalue` (ABNF and `ECL.g4`) admits a bare `*`; the
+// specification's filter examples quote it, which neither grammar admits.
+fn active_value(i: &mut Tokens<'_>) -> PResult<ActiveValue> {
     alt((
         kind(Kind::Integer).verify_map(|t: &Token<'_>| match t.text {
-            "1" => Some(true),
-            "0" => Some(false),
+            "1" => Some(ActiveValue::Active),
+            "0" => Some(ActiveValue::Inactive),
             _ => None,
         }),
-        boolean,
+        boolean.map(|active| {
+            if active {
+                ActiveValue::Active
+            } else {
+                ActiveValue::Inactive
+            }
+        }),
+        kind(Kind::Asterisk).value(ActiveValue::Any),
     ))
-    .expecting("1, 0, true, or false")
+    .expecting("1, 0, true, false, or *")
     .parse_next(i)
 }
 
@@ -973,8 +1041,8 @@ fn attribute_value(i: &mut Tokens<'_>) -> PResult<AttributeValue> {
             .map(|(operator, value)| AttributeValue::Expression { operator, value }),
         (comparison, numeric_value)
             .map(|(operator, value)| AttributeValue::Numeric { operator, value }),
-        (equality, typed_search_terms)
-            .map(|(operator, terms)| AttributeValue::String { operator, terms }),
+        (equality, concrete_strings)
+            .map(|(operator, values)| AttributeValue::String { operator, values }),
         (equality, boolean).map(|(operator, value)| AttributeValue::Boolean { operator, value }),
         preceded(
             alt((equality.void(), comparison.void())),

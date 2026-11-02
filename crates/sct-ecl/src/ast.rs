@@ -84,13 +84,22 @@ pub struct MemberOf {
     pub fields: Option<RefsetFields>,
 }
 
+/// `refsetOperator`: `memberOf` or `refsetContainingAny`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum RefsetOperator {
+    /// `^`: the members of the reference sets the focus names.
+    MemberOf(MemberOf),
+    /// `^R`: the reference sets with a member the focus names.
+    ContainingAny,
+}
+
 /// `subexpressionconstraint`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SubExpressionConstraint {
     /// The constraint operator before the focus.
     pub operator: Option<ConstraintOperator>,
-    /// The `^` before the focus.
-    pub member_of: Option<MemberOf>,
+    /// The `^` or `^R` before the focus.
+    pub refset_operator: Option<RefsetOperator>,
     /// The focus concept or nested constraint.
     pub focus: FocusConcept,
     /// `memberfilterconstraint`s, one list per `{{ M ... }}`.
@@ -219,12 +228,13 @@ pub enum AttributeValue {
         /// The number.
         value: NumericValue,
     },
-    /// `= "string"`, `= wild:"..."`, or a set of them.
+    /// `= "string"` or `= ("string" "string")`: `concretestring` or
+    /// `concretestringset`.
     String {
         /// The operator.
         operator: Equality,
-        /// The search terms; one prints bare, more print as a set.
-        terms: Vec<TypedSearchTerm>,
+        /// The strings; one prints bare, more print as a set.
+        values: Vec<ConcreteString>,
     },
     /// `= true` or `= false`.
     Boolean {
@@ -275,6 +285,22 @@ pub enum Comparison {
 /// digits, an optional fraction).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NumericValue(pub String);
+
+/// `concretestring`: the string between the quotes with its escapes
+/// (`\"`, `\\`, `\*`) decoded, compared exactly.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ConcreteString(pub String);
+
+/// `activevalue`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ActiveValue {
+    /// `1` or `true`.
+    Active,
+    /// `0` or `false`.
+    Inactive,
+    /// `*`: either status.
+    Any,
+}
 
 /// `typedsearchterm`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -353,7 +379,7 @@ pub enum DescriptionFilter {
         /// The operator.
         operator: Equality,
         /// The value.
-        value: bool,
+        value: ActiveValue,
     },
     /// `id op ids`.
     Id {
@@ -461,7 +487,7 @@ pub enum ConceptFilter {
         /// The operator.
         operator: Equality,
         /// The value.
-        value: bool,
+        value: ActiveValue,
     },
 }
 
@@ -496,7 +522,7 @@ pub enum MemberFilter {
         /// The operator.
         operator: Equality,
         /// The value.
-        value: bool,
+        value: ActiveValue,
     },
     /// `memberfieldfilter`: a reference set field compared to a value.
     Field {

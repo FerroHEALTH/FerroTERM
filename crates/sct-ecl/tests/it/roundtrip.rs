@@ -5,12 +5,13 @@
 
 use proptest::prelude::*;
 use sct_ecl::ast::{
-    Acceptability, AcceptabilitySet, AltIdentifier, Attribute, AttributeSet, AttributeValue,
-    Cardinality, Comparison, ConceptFilter, ConceptReference, ConceptSet, ConstraintOperator,
-    DefinitionStatus, DescriptionFilter, DialectAlias, DialectIdValue, Equality,
-    ExpressionConstraint, FieldValue, FilterConstraint, FocusConcept, HistorySupplement,
-    MemberFilter, MemberOf, NumericValue, Refinement, RefsetFields, Sctid, SubAttributeSet,
-    SubExpressionConstraint, SubRefinement, TimeValue, TypeToken, TypedSearchTerm,
+    Acceptability, AcceptabilitySet, ActiveValue, AltIdentifier, Attribute, AttributeSet,
+    AttributeValue, Cardinality, Comparison, ConceptFilter, ConceptReference, ConceptSet,
+    ConcreteString, ConstraintOperator, DefinitionStatus, DescriptionFilter, DialectAlias,
+    DialectIdValue, Equality, ExpressionConstraint, FieldValue, FilterConstraint, FocusConcept,
+    HistorySupplement, MemberFilter, MemberOf, NumericValue, Refinement, RefsetFields,
+    RefsetOperator, Sctid, SubAttributeSet, SubExpressionConstraint, SubRefinement, TimeValue,
+    TypeToken, TypedSearchTerm,
 };
 
 fn sctid() -> impl Strategy<Value = Sctid> {
@@ -76,6 +77,18 @@ fn typed_search_term() -> impl Strategy<Value = TypedSearchTerm> {
             .prop_map(TypedSearchTerm::Match),
         "[A-Za-z*][A-Za-z0-9*]{0,8}".prop_map(TypedSearchTerm::Wild),
     ]
+}
+
+fn active_value() -> impl Strategy<Value = ActiveValue> {
+    prop_oneof![
+        Just(ActiveValue::Active),
+        Just(ActiveValue::Inactive),
+        Just(ActiveValue::Any),
+    ]
+}
+
+fn concrete_string() -> impl Strategy<Value = ConcreteString> {
+    "[A-Za-z0-9 \"\\\\*é]{1,10}".prop_map(ConcreteString)
 }
 
 fn time_value() -> impl Strategy<Value = TimeValue> {
@@ -189,7 +202,7 @@ fn description_filter(
             .prop_map(|(operator, value)| DescriptionFilter::Module { operator, value }),
         (comparison(), prop::collection::vec(time_value(), 1..3))
             .prop_map(|(operator, values)| DescriptionFilter::EffectiveTime { operator, values }),
-        (equality(), any::<bool>())
+        (equality(), active_value())
             .prop_map(|(operator, value)| DescriptionFilter::Active { operator, value }),
         (equality(), prop::collection::vec(sctid(), 1..3))
             .prop_map(|(operator, ids)| DescriptionFilter::Id { operator, ids }),
@@ -217,7 +230,7 @@ fn concept_filter(
             .prop_map(|(operator, value)| ConceptFilter::Module { operator, value }),
         (comparison(), prop::collection::vec(time_value(), 1..3))
             .prop_map(|(operator, values)| ConceptFilter::EffectiveTime { operator, values }),
-        (equality(), any::<bool>())
+        (equality(), active_value())
             .prop_map(|(operator, value)| ConceptFilter::Active { operator, value }),
     ]
 }
@@ -235,7 +248,7 @@ fn member_filter(
             .prop_map(|(operator, value)| MemberFilter::Module { operator, value }),
         (comparison(), prop::collection::vec(time_value(), 1..3))
             .prop_map(|(operator, values)| MemberFilter::EffectiveTime { operator, values }),
-        (equality(), any::<bool>())
+        (equality(), active_value())
             .prop_map(|(operator, value)| MemberFilter::Active { operator, value }),
         (
             field_name,
@@ -264,8 +277,8 @@ fn attribute_value(
             .prop_map(|(operator, value)| AttributeValue::Expression { operator, value }),
         (comparison(), numeric_value())
             .prop_map(|(operator, value)| AttributeValue::Numeric { operator, value }),
-        (equality(), prop::collection::vec(typed_search_term(), 1..3))
-            .prop_map(|(operator, terms)| AttributeValue::String { operator, terms }),
+        (equality(), prop::collection::vec(concrete_string(), 1..3))
+            .prop_map(|(operator, values)| AttributeValue::String { operator, values }),
         (equality(), any::<bool>())
             .prop_map(|(operator, value)| AttributeValue::Boolean { operator, value }),
     ]
@@ -361,10 +374,14 @@ fn refinement(sub: BoxedStrategy<SubExpressionConstraint>) -> BoxedStrategy<Refi
 fn plain_sub() -> BoxedStrategy<SubExpressionConstraint> {
     (
         prop::option::of(operator()),
-        prop::option::of(prop::option::of(prop_oneof![
-            Just(RefsetFields::Any),
-            prop::collection::vec("[a-zA-Z]{2,10}", 1..3).prop_map(RefsetFields::Names),
-        ])),
+        prop::option::of(prop_oneof![
+            prop::option::of(prop_oneof![
+                Just(RefsetFields::Any),
+                prop::collection::vec("[a-zA-Z]{2,10}", 1..3).prop_map(RefsetFields::Names),
+            ])
+            .prop_map(|fields| RefsetOperator::MemberOf(MemberOf { fields })),
+            Just(RefsetOperator::ContainingAny),
+        ]),
         prop_oneof![
             concept_reference().prop_map(FocusConcept::Reference),
             Just(FocusConcept::Wildcard),
@@ -378,14 +395,16 @@ fn plain_sub() -> BoxedStrategy<SubExpressionConstraint> {
                 )),
         ],
     )
-        .prop_map(|(operator, member_of, focus)| SubExpressionConstraint {
-            operator,
-            member_of: member_of.map(|fields| MemberOf { fields }),
-            focus,
-            member_filters: Vec::new(),
-            filters: Vec::new(),
-            history: None,
-        })
+        .prop_map(
+            |(operator, refset_operator, focus)| SubExpressionConstraint {
+                operator,
+                refset_operator,
+                focus,
+                member_filters: Vec::new(),
+                filters: Vec::new(),
+                history: None,
+            },
+        )
         .boxed()
 }
 
@@ -446,7 +465,7 @@ fn sub_expression(depth: u32) -> BoxedStrategy<SubExpressionConstraint> {
         .prop_map(
             |(plain, focus, member_filters, filters, history)| SubExpressionConstraint {
                 operator: plain.operator,
-                member_of: plain.member_of,
+                refset_operator: plain.refset_operator,
                 focus,
                 member_filters,
                 filters,
