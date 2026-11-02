@@ -937,7 +937,7 @@
       "uri": "urn:ietf:bcp:47",
       "version": [
         {
-          "code": "2026-08-08",
+          "code": "2026-09-17",
           "compositional": true,
           "filter": [
             {
@@ -1049,7 +1049,7 @@
       ]
     }
   ],
-  "date": "2026-10-29T07:04:28.552127Z",
+  "date": "2026-11-02T23:33:07.553409Z",
   "expansion": {
     "hierarchical": false,
     "incomplete": false,

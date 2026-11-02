@@ -1013,7 +1013,7 @@
             "region",
             "variant"
           ],
-          "value": "2026-08-08"
+          "value": "2026-09-17"
         }
       ]
     },
@@ -1065,7 +1065,7 @@
       ]
     }
   ],
-  "date": "2026-10-29T07:04:28.573654Z",
+  "date": "2026-11-02T23:33:07.575399Z",
   "description": "Serves the FHIR R6 ballot (version 6.0.0-ballot5). Every behaviour grounded only in the ballot is re-verified against the published specification when it appears, and may change with it.",
   "expansion": {
     "hierarchical": false,
