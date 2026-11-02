@@ -78,7 +78,7 @@ in a change that moves the pin with it.
 
 | Item | Pin |
 |---|---|
-| FerroPULSE report v2 | 26957066ad7a7dcd5fc38947b6baa8df0c08609d (the commit of the private `FerroHEALTH/FerroPULSE` repository; the report envelope v2 JSON Schema and its examples vendored under `app/ferroterm-server/tests/fixtures/ferropulse/` by `scripts/vendor/ferropulse-schemas.sh`) |
+| FerroPULSE report v2 | 9b39d868f2fdc23424be8c271cbb9cc1a03685f5 (the commit of the private `FerroHEALTH/FerroPULSE` repository; the report envelope v2 JSON Schema and its examples vendored under `app/ferroterm-server/tests/fixtures/ferropulse/` by `scripts/vendor/ferropulse-schemas.sh`) |
 
 ## Rust dependency pins
 

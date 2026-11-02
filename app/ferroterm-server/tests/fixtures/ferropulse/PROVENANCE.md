@@ -2,8 +2,8 @@
 
 - Source: <https://github.com/FerroHEALTH/FerroPULSE> (private; Cadasto B.V., the Licensor of
   this repository too)
-- Commit: 26957066ad7a7dcd5fc38947b6baa8df0c08609d
-- Fetched: 2026-10-21 by `scripts/vendor/ferropulse-schemas.sh`
+- Commit: 9b39d868f2fdc23424be8c271cbb9cc1a03685f5
+- Fetched: 2026-11-02 by `scripts/vendor/ferropulse-schemas.sh`
 - Licence: upstream declares `LicenseRef-Proprietary`; Cadasto B.V. holds the
   copyright of both repositories and publishes this copy under this
   repository's BUSL-1.1

@@ -1,0 +1,15 @@
+{
+  "schema": 2,
+  "event": "start",
+  "product": "ferropix",
+  "instance_id": "8c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f",
+  "version": "0.1.0",
+  "git_sha": "1a2b3c4d",
+  "licence": "non-commercial",
+  "deployment": "compose",
+  "uptime_s": 0,
+  "cpu_bucket": "3-4",
+  "memory_bucket": "8-16",
+  "status": {},
+  "first_start": true
+}
