@@ -29,7 +29,7 @@ ISO 3166); never edit a file here, re-run `scripts/vendor/registries.sh`.
 ## UCUM essence
 
 - Files: `ucum/ucum-essence.xml` (the unit definitions), `ucum/LICENSE.md`
-- Source: <https://github.com/ucum-org/ucum>, ref `ef4c31cd7d3bc81de1a1bf2cc8414bf502b6304f` at commit `ef4c31cd7d3bc81de1a1bf2cc8414bf502b6304f`
+- Source: <https://github.com/ucum-org/ucum>, ref `v2.2` at commit `d060c6d3dfe3b0deb196c190b8024d95385e0b92`
 - UCUM version: 2.2
 - Fetched: 2026-11-02
 - License: the UCUM licence (`ucum/LICENSE.md`), verbatim redistribution with the notice

@@ -85,7 +85,7 @@ date.
 | Item | Pin |
 |---|---|
 | Unicode CLDR | 49.0.0 (the release tag of `unicode-org/cldr-json`; the English territory names and the ISO 3166-1 code mappings behind the ISO 3166 code system) |
-| UCUM | ef4c31cd7d3bc81de1a1bf2cc8414bf502b6304f (a commit on `main` of `ucum-org/ucum`, whose `ucum-essence.xml` 2.2 is byte-identical to tag `v2.2`), held: whether UCUM follows its `v2.2` tag or `main` is an open owner decision on #965 |
+| UCUM | v2.2 (the release tag of `ucum-org/ucum`; `ucum-essence.xml` and its licence behind the UCUM code system, the bytes FerroBRIDGE pins) |
 
 ## Usage report contract
 
