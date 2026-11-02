@@ -26,7 +26,7 @@
       "description": "start only: true when this start created the instance_id.",
       "type": "boolean"
     },
-    "product": { "enum": ["ferroehr", "ferroterm", "ferrobridge", "ferrofed"] },
+    "product": { "enum": ["ferroehr", "ferroterm", "ferrobridge", "ferrofed", "ferropix"] },
     "instance_id": {
       "description": "A UUID, random per installation, in the hyphenated form.",
       "type": "string",
