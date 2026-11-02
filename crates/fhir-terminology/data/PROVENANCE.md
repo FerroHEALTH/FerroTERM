@@ -21,8 +21,8 @@ ISO 3166); never edit a file here, re-run `scripts/vendor/registries.sh`.
 ## Unicode CLDR (ISO 3166-1)
 
 - Files: `cldr/codeMappings.json` (alpha-2 to alpha-3 and numeric), `cldr/territories.json` (English names), `cldr/LICENSE`
-- Source: <https://github.com/unicode-org/cldr-json>, ref `1aaabe99aa652d6f22ea488cf25baea46aa69b42` at commit `1aaabe99aa652d6f22ea488cf25baea46aa69b42`
-- CLDR version: 48
+- Source: <https://github.com/unicode-org/cldr-json>, ref `49.0.0` at commit `a4b67247b446fd51b475991017a2481911210c60`
+- CLDR version: 49
 - Fetched: 2026-11-02
 - License: Unicode License v3 (`cldr/LICENSE`)
 
