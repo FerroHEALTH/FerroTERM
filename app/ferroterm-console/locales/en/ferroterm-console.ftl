@@ -56,7 +56,6 @@ clause-takes-back-out-every-code = This clause takes back out every code that
 clause-draws-every-code = This clause draws in every code that
 comes-from-code-system-named-here = comes from the code system named here
 value-set-named-here = is in the value set named here
-parameters = Parameters
 clause-lists-codes-filters-once-split = This clause lists codes and filters at once. Split it into two clauses: they union.
 clause-lists-codes-filters-which-name = This clause lists codes or filters, which name a code system to be read from.
 clause-names-neither-value-set-nor = This clause names neither a value set nor a code system, so it selects nothing.

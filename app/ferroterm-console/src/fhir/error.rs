@@ -6,6 +6,7 @@
 use http::StatusCode;
 
 use crate::fhir::outcome::Outcome;
+use crate::fhir::version::FhirVersion;
 
 /// Why a FHIR request did not produce the resource the caller asked for.
 ///
@@ -55,6 +56,15 @@ pub(crate) enum FhirError {
 }
 
 impl FhirError {
+    /// The failure of a document that is not the resource `version` defines,
+    /// naming the version and the decoder's element path.
+    pub(crate) fn undecoded(url: &str, version: FhirVersion, error: &serde_json::Error) -> Self {
+        Self::Decode {
+            url: url.to_owned(),
+            message: format!("FHIR {version}: {error}"),
+        }
+    }
+
     /// The URL that produced this failure, for the reader to retry by hand.
     pub(crate) fn url(&self) -> &str {
         match self {

@@ -16,22 +16,17 @@
 //! `equivalence` on an R5 root would be refused, and one that wrote R5's
 //! `relationship` on an R4B root would be refused the other way.
 
-use serde_json::Map;
 use serde_json::Value;
-use serde_json::json;
 
 use crate::authoring::code_system::Key;
 use crate::authoring::code_system::Keys;
-use crate::fhir::authoring::StoredConceptMap;
-use crate::fhir::authoring::StoredMapElement;
-use crate::fhir::authoring::StoredMapGroup;
-use crate::fhir::authoring::StoredMapTarget;
+use crate::fhir::release::{Release, Rewritable, rewritten};
 use crate::fhir::version::FhirVersion;
+
+mod typed;
 use crate::locale::{Msg, tr, tr_with};
 
 /// The resource type this form authors.
-const CONCEPT_MAP: &str = "ConceptMap";
-
 /// How one served FHIR version spells a concept map.
 ///
 /// Every name here is read from that version's own definition page, so a save
@@ -40,26 +35,11 @@ const CONCEPT_MAP: &str = "ConceptMap";
 /// <https://hl7.org/fhir/R5/conceptmap.html>).
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct Dialect {
-    /// The element one target's relationship to its source is written under.
-    pub(crate) relationship: &'static str,
     /// The value set whose codes that element admits.
     ///
     /// The control offers what the served root expands this to, so a root that
     /// admits another code offers it without a new build.
     pub(crate) relationship_value_set: &'static str,
-    /// The element the map's source scope is written under.
-    pub(crate) source_scope: &'static str,
-    /// The element the map's target scope is written under.
-    pub(crate) target_scope: &'static str,
-    /// Whether the version carries a version element beside a group's system.
-    ///
-    /// R4 and R4B state the system as a `uri` with `group.sourceVersion`
-    /// beside it; R5 made it a `canonical(CodeSystem)` and dropped the version
-    /// element (<https://hl7.org/fhir/R5/conceptmap.html>).
-    // NOTE: no FHIR text says the dropped version moved into the canonical, so
-    // writing it after a `|` is our own design over the general canonical rule
-    // (<https://hl7.org/fhir/R5/references.html#canonical>).
-    pub(crate) group_version_element: bool,
     /// Whether the version defines `element.noMap`.
     pub(crate) no_map: bool,
     /// The relationship codes whose target the version requires a comment on.
@@ -83,25 +63,6 @@ pub(crate) struct Dialect {
 /// The `ConceptMap.status` code that excuses `cmd-1` on R5.
 const DRAFT: &str = "draft";
 
-/// Every element name a scope is spelled with, in any served version.
-///
-/// A save removes all of them before writing the one the served version
-/// defines, so a resource read on one root and saved on another does not reach
-/// the server carrying both spellings of the same fact.
-const SCOPE_ELEMENTS: [&str; 8] = [
-    "sourceUri",
-    "sourceCanonical",
-    "targetUri",
-    "targetCanonical",
-    "sourceScopeUri",
-    "sourceScopeCanonical",
-    "targetScopeUri",
-    "targetScopeCanonical",
-];
-
-/// Every element name a target's relationship is spelled with.
-const RELATIONSHIP_ELEMENTS: [&str; 2] = ["equivalence", "relationship"];
-
 /// The value set `ConceptMap.group.element.target.equivalence` is bound to.
 const EQUIVALENCE_VALUE_SET: &str = "http://hl7.org/fhir/ValueSet/concept-map-equivalence";
 
@@ -115,11 +76,7 @@ pub(crate) fn dialect(version: FhirVersion) -> Dialect {
         // target's relation in `equivalence`, and define no `noMap`
         // (<https://hl7.org/fhir/R4B/conceptmap.html>).
         FhirVersion::R4 | FhirVersion::R4B => Dialect {
-            relationship: "equivalence",
             relationship_value_set: EQUIVALENCE_VALUE_SET,
-            source_scope: "sourceCanonical",
-            target_scope: "targetCanonical",
-            group_version_element: true,
             no_map: false,
             comment_required: &["narrower", "inexact"],
             draft_excuses_comment: false,
@@ -130,21 +87,13 @@ pub(crate) fn dialect(version: FhirVersion) -> Dialect {
         // The R6 ballot carries the same four
         // (<https://hl7.org/fhir/6.0.0-ballot5/conceptmap.html>).
         FhirVersion::R5 => Dialect {
-            relationship: "relationship",
             relationship_value_set: RELATIONSHIP_VALUE_SET,
-            source_scope: "sourceScopeCanonical",
-            target_scope: "targetScopeCanonical",
-            group_version_element: false,
             no_map: true,
             comment_required: &["source-is-broader-than-target", "not-related-to"],
             draft_excuses_comment: true,
         },
         FhirVersion::R6 => Dialect {
-            relationship: "relationship",
             relationship_value_set: RELATIONSHIP_VALUE_SET,
-            source_scope: "sourceScopeCanonical",
-            target_scope: "targetScopeCanonical",
-            group_version_element: false,
             no_map: true,
             comment_required: &[],
             draft_excuses_comment: true,
@@ -369,39 +318,6 @@ impl MapDraft {
         }
     }
 
-    /// The draft for a concept map the server already holds.
-    pub(crate) fn of(resource: &Value) -> Self {
-        let stored = StoredConceptMap::of(resource);
-        let mut keys = Keys::default();
-        let groups = stored
-            .group
-            .iter()
-            .map(|group| group_of(group, &mut keys))
-            .collect();
-        Self {
-            id: stored.id.clone().unwrap_or_default(),
-            version_id: stored.version_id().unwrap_or_default(),
-            url: stored.url.clone().unwrap_or_default(),
-            version: stored.version.clone().unwrap_or_default(),
-            title: resource
-                .get("title")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_owned(),
-            name: resource
-                .get("name")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_owned(),
-            status: stored.status.clone().unwrap_or_default(),
-            source_scope: stored.source_scope().unwrap_or_default().to_owned(),
-            target_scope: stored.target_scope().unwrap_or_default().to_owned(),
-            groups,
-            keys,
-            base: resource.clone(),
-        }
-    }
-
     /// Whether the server states a version for this resource.
     ///
     /// `meta.versionId` is what an update states in `If-Match`
@@ -494,122 +410,26 @@ impl MapDraft {
         (!url.is_empty() && named).then(|| scope.to_owned())
     }
 
-    /// The resource a save sends, as the version `version` defines it.
-    pub(crate) fn resource(&self, version: FhirVersion) -> Value {
-        let dialect = dialect(version);
-        let mut resource = object(&self.base);
-        resource.insert("resourceType".to_owned(), json!(CONCEPT_MAP));
-        if self.id.is_empty() {
-            resource.remove("id");
-        } else {
-            resource.insert("id".to_owned(), json!(self.id));
-        }
-        resource.insert("url".to_owned(), json!(self.url.trim()));
-        set(&mut resource, "version", self.version.trim());
-        set(&mut resource, "title", self.title.trim());
-        set(&mut resource, "name", self.name.trim());
-        resource.insert("status".to_owned(), json!(self.status));
-        // A resource read on one root and saved on another would otherwise
-        // reach the server carrying two spellings of the same scope.
-        for element in SCOPE_ELEMENTS {
-            resource.remove(element);
-        }
-        set(
-            &mut resource,
-            dialect.source_scope,
-            self.source_scope.trim(),
-        );
-        set(
-            &mut resource,
-            dialect.target_scope,
-            self.target_scope.trim(),
-        );
-
-        let groups: Vec<Value> = self
-            .groups
-            .iter()
-            .filter(|group| !group.source.trim().is_empty() && !group.target.trim().is_empty())
-            .map(|group| self.group_body(group, dialect))
-            .collect();
-        if groups.is_empty() {
-            resource.remove("group");
-        } else {
-            resource.insert("group".to_owned(), Value::Array(groups));
-        }
-        Value::Object(resource)
-    }
-
-    /// The FHIR JSON a save sends.
-    pub(crate) fn body(&self, version: FhirVersion) -> String {
-        self.resource(version).to_string()
-    }
-
-    /// The group of the stored resource that maps the same pair of systems.
+    /// The `ConceptMap` a save sends, written as the `ConceptMap` of
+    /// `version`.
     ///
-    /// A group is identified by the two systems it maps between
-    /// (<https://hl7.org/fhir/R4B/conceptmap.html>), so that is what an
-    /// authored group is matched to the stored one by, and everything the form
-    /// does not draw on it survives the save.
-    fn held_group(&self, source: &str, target: &str) -> Map<String, Value> {
-        self.base
-            .get("group")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .filter_map(Value::as_object)
-            .find(|held| {
-                systemless(
-                    held.get("source")
-                        .and_then(Value::as_str)
-                        .unwrap_or_default(),
-                ) == source
-                    && systemless(
-                        held.get("target")
-                            .and_then(Value::as_str)
-                            .unwrap_or_default(),
-                    ) == target
-            })
-            .cloned()
-            .unwrap_or_default()
+    /// It starts from the resource this draft was read from, so an element the
+    /// form does not draw is carried back rather than deleted by an update
+    /// that replaces the whole resource
+    /// (<https://hl7.org/fhir/R4B/http.html#update>).
+    ///
+    /// # Errors
+    ///
+    /// Returns the decoder's error for a stored resource that is not a
+    /// `ConceptMap` at `version`.
+    pub(crate) fn body(&self, version: FhirVersion) -> Result<String, serde_json::Error> {
+        version.rewrite(self)
     }
+}
 
-    /// One group, as the resource carries it.
-    fn group_body(&self, group: &MapGroup, dialect: Dialect) -> Value {
-        let source = group.source.trim();
-        let target = group.target.trim();
-        let mut written = self.held_group(source, target);
-        if dialect.group_version_element {
-            written.insert("source".to_owned(), json!(source));
-            written.insert("target".to_owned(), json!(target));
-            set(&mut written, "sourceVersion", group.source_version.trim());
-            set(&mut written, "targetVersion", group.target_version.trim());
-        } else {
-            // The system is a canonical here, which carries its own version
-            // after a `|`, so the two controls write one element
-            // (<https://hl7.org/fhir/R5/references.html#canonical>).
-            written.remove("sourceVersion");
-            written.remove("targetVersion");
-            written.insert(
-                "source".to_owned(),
-                json!(canonical(source, group.source_version.trim())),
-            );
-            written.insert(
-                "target".to_owned(),
-                json!(canonical(target, group.target_version.trim())),
-            );
-        }
-        let elements: Vec<Value> = group
-            .elements
-            .iter()
-            .filter(|element| !element.code.trim().is_empty())
-            .map(|element| element_body(&written, element, dialect))
-            .collect();
-        if elements.is_empty() {
-            written.remove("element");
-        } else {
-            written.insert("element".to_owned(), Value::Array(elements));
-        }
-        Value::Object(written)
+impl Rewritable for MapDraft {
+    fn rewrite<R: Release>(&self) -> Result<String, serde_json::Error> {
+        rewritten::<R::ConceptMap, Self>(&self.base, self)
     }
 }
 
@@ -636,151 +456,6 @@ fn canonical(system: &str, version: &str) -> String {
         system.to_owned()
     } else {
         format!("{system}|{version}")
-    }
-}
-
-/// One group, read off the resource the server sent.
-fn group_of(group: &StoredMapGroup, keys: &mut Keys) -> MapGroup {
-    let (source, source_version) = split_canonical(group.source.as_deref().unwrap_or_default());
-    let (target, target_version) = split_canonical(group.target.as_deref().unwrap_or_default());
-    MapGroup {
-        key: keys.next(),
-        source,
-        // A version stated beside the system wins over one inside the
-        // canonical: only one of the two is ever present on a given version,
-        // and the element is the version's own spelling.
-        source_version: group
-            .source_version
-            .clone()
-            .filter(|held| !held.is_empty())
-            .unwrap_or(source_version),
-        target,
-        target_version: group
-            .target_version
-            .clone()
-            .filter(|held| !held.is_empty())
-            .unwrap_or(target_version),
-        elements: group
-            .element
-            .iter()
-            .map(|element| element_of(element, keys))
-            .collect(),
-    }
-}
-
-/// One source code, read off the resource the server sent.
-fn element_of(element: &StoredMapElement, keys: &mut Keys) -> MapElement {
-    MapElement {
-        key: keys.next(),
-        code: element.code.clone().unwrap_or_default(),
-        display: element.display.clone().unwrap_or_default(),
-        no_map: element.no_map.unwrap_or_default(),
-        targets: element
-            .target
-            .iter()
-            .map(|target| target_of(target, keys))
-            .collect(),
-    }
-}
-
-/// One target, read off the resource the server sent.
-///
-/// Whichever element the resource stated the relationship in is what the form
-/// holds: a map written on an R4B root and opened on an R5 one shows the value
-/// it carries, and the save then writes it under R5's own element.
-fn target_of(target: &StoredMapTarget, keys: &mut Keys) -> MapTarget {
-    MapTarget {
-        key: keys.next(),
-        code: target.code.clone().unwrap_or_default(),
-        display: target.display.clone().unwrap_or_default(),
-        relationship: target
-            .relationship
-            .clone()
-            .or_else(|| target.equivalence.clone())
-            .unwrap_or_default(),
-        comment: target.comment.clone().unwrap_or_default(),
-    }
-}
-
-/// One source code, as the resource carries it.
-fn element_body(group: &Map<String, Value>, element: &MapElement, dialect: Dialect) -> Value {
-    let code = element.code.trim();
-    let mut written = held_element(group, code);
-    written.insert("code".to_owned(), json!(code));
-    set(&mut written, "display", element.display.trim());
-    let unmapped = dialect.no_map && element.no_map;
-    if unmapped {
-        written.insert("noMap".to_owned(), json!(true));
-    } else {
-        written.remove("noMap");
-    }
-    let targets: Vec<Value> = if unmapped {
-        // `noMap` says the code maps to nothing, so a target beside it would
-        // say both things at once; `problems` refuses the draft before a save
-        // reaches here, and this keeps the JSON honest either way.
-        Vec::new()
-    } else {
-        element
-            .targets
-            .iter()
-            .filter(|target| !target.code.trim().is_empty())
-            .map(|target| target_body(&written, target, dialect))
-            .collect()
-    };
-    if targets.is_empty() {
-        written.remove("target");
-    } else {
-        written.insert("target".to_owned(), Value::Array(targets));
-    }
-    Value::Object(written)
-}
-
-/// The stored element of `group` that `code` names.
-fn held_element(group: &Map<String, Value>, code: &str) -> Map<String, Value> {
-    held(group, "element", code)
-}
-
-/// One target, as the resource carries it.
-fn target_body(element: &Map<String, Value>, target: &MapTarget, dialect: Dialect) -> Value {
-    let code = target.code.trim();
-    let mut written = held(element, "target", code);
-    written.insert("code".to_owned(), json!(code));
-    set(&mut written, "display", target.display.trim());
-    for spelling in RELATIONSHIP_ELEMENTS {
-        written.remove(spelling);
-    }
-    set(
-        &mut written,
-        dialect.relationship,
-        target.relationship.trim(),
-    );
-    set(&mut written, "comment", target.comment.trim());
-    Value::Object(written)
-}
-
-/// The member of `list` inside `held` whose `code` is `code`.
-fn held(held: &Map<String, Value>, list: &str, code: &str) -> Map<String, Value> {
-    held.get(list)
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .filter_map(Value::as_object)
-        .find(|member| member.get("code").and_then(Value::as_str) == Some(code))
-        .cloned()
-        .unwrap_or_default()
-}
-
-/// The object `resource` carries, or an empty one when it is not an object.
-fn object(resource: &Value) -> Map<String, Value> {
-    resource.as_object().cloned().unwrap_or_default()
-}
-
-/// Writes `value` under `name`, or removes the element when nothing was typed.
-fn set(written: &mut Map<String, Value>, name: &str, value: &str) {
-    if value.is_empty() {
-        written.remove(name);
-    } else {
-        written.insert(name.to_owned(), json!(value));
     }
 }
 

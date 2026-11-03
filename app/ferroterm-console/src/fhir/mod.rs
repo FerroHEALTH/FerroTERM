@@ -9,7 +9,6 @@
 //! No component builds a request, and no second client exists.
 
 pub(crate) mod activity;
-pub(crate) mod authoring;
 pub(crate) mod capability;
 pub(crate) mod code_system;
 pub(crate) mod compose;
@@ -68,6 +67,7 @@ use crate::fhir::validation::ValidationAnswer;
 use crate::fhir::value_set::PublishedValueSet;
 use crate::fhir::version::FhirVersion;
 use crate::fhir::write::History;
+use crate::fhir::write::Stored;
 use crate::fhir::write::Written;
 use crate::fhir::write::if_match;
 use crate::locale::{Msg, tr, tr_with};
@@ -696,12 +696,11 @@ impl FhirClient {
         draft: &Draft,
         page: &Preview,
     ) -> Result<ExpandedValueSet, FhirError> {
-        self.post_answer(
-            version,
-            &self.expand_post_url(version),
-            &draft.preview_body(page),
-        )
-        .await
+        let url = self.expand_post_url(version);
+        let body = draft
+            .preview_body(version, page)
+            .map_err(|error| FhirError::undecoded(&url, version, &error))?;
+        self.post_answer(version, &url, &body).await
     }
 }
 
@@ -829,7 +828,7 @@ impl FhirClient {
         version: FhirVersion,
         resource_type: &str,
     ) -> Result<History, FhirError> {
-        self.get_json(version, &self.type_history_url(version, resource_type))
+        self.get_answer(version, &self.type_history_url(version, resource_type))
             .await
     }
 
@@ -844,7 +843,7 @@ impl FhirClient {
         resource_type: &str,
         id: &str,
     ) -> Result<History, FhirError> {
-        self.get_json(version, &self.history_url(version, resource_type, id))
+        self.get_answer(version, &self.history_url(version, resource_type, id))
             .await
     }
 
@@ -870,10 +869,9 @@ impl FhirClient {
             None
         } else {
             Some(
-                serde_json::from_str(&answer.body).map_err(|error| FhirError::Decode {
-                    url: url.to_owned(),
-                    message: error.to_string(),
-                })?,
+                version
+                    .decode(&answer.body)
+                    .map_err(|error| FhirError::undecoded(url, version, &error))?,
             )
         };
         Ok(Written {
@@ -935,10 +933,11 @@ impl FhirClient {
         &self,
         version: FhirVersion,
         system: &str,
-    ) -> Result<Option<serde_json::Value>, FhirError> {
+    ) -> Result<Option<crate::authoring::code_system::Draft>, FhirError> {
         let url = self.code_system_search_url(version, system);
-        let answer: authoring::AuthoredSearch = self.get_json(version, &url).await?;
-        Ok(answer.first())
+        let found: Found<crate::authoring::code_system::Draft> =
+            self.get_answer(version, &url).await?;
+        Ok(found.found().into_iter().next().cloned())
     }
 
     /// Reads the `ConceptMap` one root holds for a canonical, for authoring.
@@ -957,14 +956,15 @@ impl FhirClient {
         &self,
         version: FhirVersion,
         canonical: &str,
-    ) -> Result<Option<serde_json::Value>, FhirError> {
+    ) -> Result<Option<crate::authoring::concept_map::MapDraft>, FhirError> {
         let filter = SearchFilter {
             url: canonical.to_owned(),
             version: String::new(),
         };
         let url = self.search_url(version, CONCEPT_MAP, &filter);
-        let answer: authoring::AuthoredSearch = self.get_json(version, &url).await?;
-        Ok(answer.first_of(CONCEPT_MAP))
+        let found: Found<crate::authoring::concept_map::MapDraft> =
+            self.get_answer(version, &url).await?;
+        Ok(found.found().into_iter().next().cloned())
     }
 
     /// The address one version of one resource is read from.
@@ -1002,8 +1002,8 @@ impl FhirClient {
         version: FhirVersion,
         resource_type: &str,
         id: &str,
-    ) -> Result<serde_json::Value, FhirError> {
-        self.get_json(version, &self.resource_url(version, resource_type, id))
+    ) -> Result<Stored, FhirError> {
+        self.get_answer(version, &self.resource_url(version, resource_type, id))
             .await
     }
 
@@ -1018,8 +1018,8 @@ impl FhirClient {
         resource_type: &str,
         id: &str,
         version_id: &str,
-    ) -> Result<serde_json::Value, FhirError> {
-        self.get_json(
+    ) -> Result<Stored, FhirError> {
+        self.get_answer(
             version,
             &self.version_read_url(version, resource_type, id, version_id),
         )
@@ -1142,10 +1142,7 @@ fn decoded<A: Decodes>(
     }
     version
         .decode(&answer.body)
-        .map_err(|error| FhirError::Decode {
-            url: url.to_owned(),
-            message: format!("FHIR {version}: {error}"),
-        })
+        .map_err(|error| FhirError::undecoded(url, version, &error))
 }
 
 fn read_json<T: DeserializeOwned>(
