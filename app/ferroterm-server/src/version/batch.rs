@@ -169,23 +169,12 @@ macro_rules! batch {
             fn bundle_of(headers: &HeaderMap, body: &Bytes) -> Result<Bundle, Failure> {
                 let structure =
                     |text: String| Failure::new(StatusCode::BAD_REQUEST, "structure", text);
-                let object = match Wire::of_body(headers)? {
-                    Wire::Json => {
-                        let value: fhir_types::codec::Value = serde_json::from_slice(body)
-                            .map_err(|error| structure(format!("the body is not JSON: {error}")))?;
-                        let path = fhir_types::codec::Path::root("Bundle");
-                        fhir_types::codec::expect_object(&value, &path)
-                            .map_err(|error| structure(error.to_string()))?
-                            .clone()
-                    }
-                    Wire::Xml => {
-                        let text = std::str::from_utf8(body).map_err(|error| {
-                            structure(format!("the body is not UTF-8: {error}"))
-                        })?;
-                        fhir_types::xml::from_xml(&fhir_types::$fhir::schema::SCHEMAS, text)
-                            .map_err(|error| structure(error.to_string()))?
-                    }
-                };
+                let object = crate::version::store::object_of(
+                    headers,
+                    "Bundle",
+                    &fhir_types::$fhir::schema::SCHEMAS,
+                    body,
+                )?;
                 let mut path = fhir_types::codec::Path::root("Bundle");
                 Json::from_json(&object, &mut path).map_err(|error| structure(error.to_string()))
             }
@@ -218,13 +207,7 @@ macro_rules! batch {
                 full_url: Option<fhir_types::$fhir::primitives::Uri>,
                 failure: &Failure,
             ) -> BundleEntry {
-                let resource = failure.outcome().to_json().ok().and_then(|object| {
-                    Resource::from_json(
-                        &object,
-                        &mut fhir_types::codec::Path::root("OperationOutcome"),
-                    )
-                    .ok()
-                });
+                let resource = operations::outcome_resource(failure);
                 BundleEntry {
                     full_url,
                     resource,
