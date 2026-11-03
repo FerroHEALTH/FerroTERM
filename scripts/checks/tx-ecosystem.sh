@@ -118,9 +118,13 @@ if [[ -z "$server" ]]; then
   if [[ -n "$index" ]]; then
     export FERROTERM__TERMINOLOGY__INDEX="$index"
   fi
-  FERROTERM__USAGE_REPORT__ENABLED=false FERROTERM__SERVER__LISTEN=127.0.0.1:"$port" FERROTERM__TELEMETRY__FORMAT=json target/release/ferroterm > "$work/server.log" 2>&1 &
+  # `$closure` keeps its tables in the resource database, so the run gives the
+  # server a fresh one of its own and removes it at exit. The write routes it
+  # opens need [auth] or its explicit absence; the run is local to this host.
+  resources="$(mktemp -d "$work/resources.XXXXXX")"
+  FERROTERM__TERMINOLOGY__RESOURCES="$resources/resources.redb" FERROTERM__AUTH__ENABLED=false FERROTERM__USAGE_REPORT__ENABLED=false FERROTERM__SERVER__LISTEN=127.0.0.1:"$port" FERROTERM__TELEMETRY__FORMAT=json target/release/ferroterm > "$work/server.log" 2>&1 &
   started=$!
-  trap 'kill "$started" 2>/dev/null || true; wait "$started" 2>/dev/null || true' EXIT
+  trap 'kill "$started" 2>/dev/null || true; wait "$started" 2>/dev/null || true; rm -rf "$resources"' EXIT
   ready=""
   # Reading an artifact takes as long as it takes: a LOINC release needs about
   # twenty seconds here, and a SNOMED edition more. The liveness check below is
