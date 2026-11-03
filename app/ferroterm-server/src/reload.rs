@@ -13,17 +13,22 @@ use ferrohealth_health::lifecycle::Lifecycle;
 use ferrohealth_health::registry::Registry;
 use ferrohealth_server::health::Health;
 use ferrohealth_telemetry::telemetry::Telemetry;
+use ferrohealth_usage_report::envelope::Product;
+use ferrohealth_usage_report::reporter::ProductSection;
 use std::sync::{Arc, Mutex, PoisonError, RwLock};
+use std::time::Instant;
 
 use axum::Router;
 use axum::extract::{FromRef, State};
 use axum::response::{IntoResponse, Response};
 use axum::routing::post;
 use http::StatusCode;
+use tokio::task::JoinHandle;
 
 use crate::config::Config;
 use crate::metrics::{Metrics, Outcome};
 use crate::state::{AppState, LoadError};
+use crate::usage_report;
 
 /// The state every request resolves, and the configuration a reload reads
 /// again.
@@ -106,7 +111,7 @@ impl Serving {
                 config,
                 rebuilding: Mutex::new(()),
                 smart,
-                usage: Arc::new(crate::usage_report::window()),
+                usage: Arc::new(usage_report::window()),
                 health: Health::new(Registry::default(), lifecycle),
                 telemetry,
                 metrics,
@@ -143,6 +148,28 @@ impl Serving {
     #[must_use]
     pub fn usage_window(&self) -> Arc<ferrohealth_usage_report::window::Window> {
         Arc::clone(&self.inner.usage)
+    }
+
+    /// Logs the usage report's boot line and, when the report runs, starts
+    /// its detached task.
+    ///
+    /// `ci` is the CI variable `ferrohealth_usage_report::section::ci_of`
+    /// found in the process environment, if any.
+    pub async fn start_usage_report(
+        &self,
+        started: Instant,
+        ci: Option<&'static str>,
+    ) -> Option<JoinHandle<()>> {
+        ferrohealth_usage_report::reporter::start(
+            &self.config().usage_report,
+            &usage_report::NOTICE,
+            usage_report::identity(),
+            Arc::new(self.clone()),
+            self.usage_window(),
+            started,
+            ci,
+        )
+        .await
     }
 
     /// The set as of now.
@@ -220,6 +247,25 @@ impl Serving {
 impl FromRef<Serving> for Arc<AppState> {
     fn from_ref(serving: &Serving) -> Self {
         serving.current()
+    }
+}
+
+impl ProductSection for Serving {
+    type Status = usage_report::Status;
+
+    const PRODUCT: Product = Product::Term;
+
+    fn status(&self) -> impl Future<Output = usage_report::Status> + Send {
+        let state = self.current();
+        let families: Vec<usage_report::Family> = state
+            .origins()
+            .map(|(url, origin)| usage_report::Family::of(url, origin))
+            .collect();
+        std::future::ready(usage_report::Status::new(
+            !families.is_empty(),
+            families,
+            state.persists(),
+        ))
     }
 }
 

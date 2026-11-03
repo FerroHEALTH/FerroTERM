@@ -146,8 +146,8 @@ macro_rules! store {
             use crate::version::store::{Request, Surface};
             use crate::wire::Wire;
 
-            use super::metadata::FHIR_VERSION;
             use super::parameters;
+            use crate::served::$fhir::FHIR_VERSION;
 
             /// The codec of this version, for the shared implementation.
             fn surface() -> Surface {
@@ -155,7 +155,7 @@ macro_rules! store {
                     fhir_version: FHIR_VERSION,
                     segment: stringify!($fhir),
                     schemas: &fhir_types::$fhir::schema::SCHEMAS,
-                    round_trip: super::resources::round_trip,
+                    round_trip: crate::served::$fhir::round_trip,
                     render_value_set: |model, id| {
                         fhir_types::codec::Json::to_json(&value_set(model, id))
                             .map_err(|error| error.to_string())
@@ -410,7 +410,7 @@ macro_rules! store {
                             continue;
                         }
                     };
-                    let resource = super::resources::resource_of(&object)
+                    let resource = crate::served::$fhir::resource_of(&object)
                         .map_err(|reason| crate::version::store::rendering(&reason.to_string()))?;
                     entry.push(found(at(&record.id), resource));
                 }
@@ -543,10 +543,9 @@ macro_rules! store {
                 if let Some(record) = &version.record {
                     match (surface.round_trip)(&record.resource) {
                         Ok(object) => {
-                            resource =
-                                Some(super::resources::resource_of(&object).map_err(|reason| {
-                                    crate::version::store::rendering(&reason.to_string())
-                                })?);
+                            resource = Some(crate::served::$fhir::resource_of(&object).map_err(
+                                |reason| crate::version::store::rendering(&reason.to_string()),
+                            )?);
                         }
                         // NOTE: a `PUT` or `POST` entry SHALL carry its resource
                         // (<https://hl7.org/fhir/R4B/http.html#history>), so a version this release cannot read

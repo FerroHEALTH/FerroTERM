@@ -10,19 +10,13 @@
 //! names no code, no system or value set URL, no request path and no host.
 //! No FHIR or SNOMED CT specification governs any of this: our own design.
 
-use std::sync::Arc;
-use std::time::Instant;
-
 use ferrohealth_telemetry::request_log::RouteNamer;
-use ferrohealth_usage_report::envelope::{Key, LicenceGrant, Product, report_git_sha};
-use ferrohealth_usage_report::reporter::{Identity, Notice, ProductSection};
-use ferrohealth_usage_report::section::UsageReportSection;
+use ferrohealth_usage_report::envelope::{Key, LicenceGrant, report_git_sha};
+use ferrohealth_usage_report::reporter::{Identity, Notice};
 use ferrohealth_usage_report::window::Window;
 use http::Method;
 use serde::Serialize;
-use tokio::task::JoinHandle;
 
-use crate::reload::Serving;
 use crate::state::Origin;
 
 /// What the boot line says about the report.
@@ -57,48 +51,6 @@ pub fn identity() -> Identity {
 #[must_use]
 pub fn window() -> Window {
     Window::new(grouping)
-}
-
-/// Logs the boot line and, when the report runs, starts its detached task.
-///
-/// `ci` is the CI variable `ferrohealth_usage_report::section::ci_of` found
-/// in the process environment, if any.
-pub async fn start(
-    section: &UsageReportSection,
-    serving: &Serving,
-    started: Instant,
-    ci: Option<&'static str>,
-) -> Option<JoinHandle<()>> {
-    ferrohealth_usage_report::reporter::start(
-        section,
-        &NOTICE,
-        identity(),
-        Arc::new(serving.clone()),
-        serving.usage_window(),
-        started,
-        ci,
-    )
-    .await
-}
-
-impl ProductSection for Serving {
-    type Status = Status;
-
-    const PRODUCT: Product = Product::Term;
-
-    fn status(&self) -> impl Future<Output = Status> + Send {
-        std::future::ready(status_of(self))
-    }
-}
-
-/// The status of the served set as of now.
-fn status_of(serving: &Serving) -> Status {
-    let state = serving.current();
-    let families: Vec<Family> = state
-        .origins()
-        .map(|(url, origin)| Family::of(url, origin))
-        .collect();
-    Status::new(!families.is_empty(), families, state.persists())
 }
 
 /// A served FHIR version, by its path prefix.

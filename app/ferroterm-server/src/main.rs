@@ -24,7 +24,7 @@ use ferroterm_server::config::Config;
 use ferroterm_server::reload::Serving;
 use ferroterm_server::smart::Smart;
 use ferroterm_server::state::AppState;
-use ferroterm_server::{banner, reload, usage_report};
+use ferroterm_server::{banner, reload};
 use tokio::net::TcpListener;
 
 #[tokio::main]
@@ -188,7 +188,7 @@ async fn run(
     let _hangup = tokio::spawn(reload::on_hangup(serving.clone()));
     // The report never blocks boot: the task it starts is detached the same way.
     let ci = ferrohealth_usage_report::section::ci_of(|name| std::env::var(name).ok());
-    let _usage = usage_report::start(&serving.config().usage_report, &serving, started, ci).await;
+    let _usage = serving.start_usage_report(started, ci).await;
     let drained = ferroterm_server::serve(listener, admin, serving)
         .await
         .context("serving HTTP")?;

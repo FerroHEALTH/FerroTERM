@@ -12,11 +12,12 @@ macro_rules! resources {
 
             use fhir_types::$fhir::parameters::Parameters;
             use fhir_types::$fhir::resource::Resource;
-            use fhir_terminology::{conceptmap, fhir_codesystem, valueset};
             use http::StatusCode;
 
+            use crate::artefact::{Loaded, TX_RESOURCE, Unusable};
             use crate::outcome::Failure;
-            use crate::scope::{Loaded, TX_RESOURCE, UUID, Unusable};
+            use crate::scope::UUID;
+            use crate::served::$fhir::{loaded, served, unsupported};
 
             /// Splits the `tx-resource` parameters off `parameters` and converts
             /// each carried resource; a `uuid` parameter is dropped.
@@ -79,7 +80,10 @@ macro_rules! resources {
                 if let Some(fhir_types::codec::Value::Array(sent)) = object.get("parameter") {
                     let mut own = Vec::with_capacity(sent.len());
                     for parameter in sent {
-                        match parameter.get("name").and_then(fhir_types::codec::Value::as_str) {
+                        match parameter
+                            .get("name")
+                            .and_then(fhir_types::codec::Value::as_str)
+                        {
                             Some(UUID) => {}
                             Some(TX_RESOURCE) => resources.push(supplied(parameter)?),
                             _ => own.push(parameter.clone()),
@@ -96,10 +100,16 @@ macro_rules! resources {
                     if kept.is_empty() {
                         object.remove("parameter");
                     } else {
-                        object.insert("parameter".to_owned(), fhir_types::codec::Value::Array(kept));
+                        object.insert(
+                            "parameter".to_owned(),
+                            fhir_types::codec::Value::Array(kept),
+                        );
                     }
                 }
-                Ok((super::parameters::parameters_from_object(&object)?, resources))
+                Ok((
+                    super::parameters::parameters_from_object(&object)?,
+                    resources,
+                ))
             }
 
             /// One `tx-resource` parameter read as the model it carries, or the
@@ -123,18 +133,19 @@ macro_rules! resources {
                 };
                 let root = stated("resourceType").unwrap_or_else(|| "Resource".to_owned());
                 let mut path = fhir_types::codec::Path::lenient(&root);
-                let read = match <Resource as fhir_types::codec::Json>::from_json(carried, &mut path) {
-                    // A resource of a type the server never serves is a defect in the
-                    // request itself, so it is refused where it is stated.
-                    Ok(resource) if !served(&resource) => return Err(unsupported(&resource)),
-                    Ok(resource) => loaded(resource),
-                    Err(error) => Err(Failure::new(
-                        StatusCode::BAD_REQUEST,
-                        "invalid",
-                        format!("a `{TX_RESOURCE}` cannot be read: {error}"),
-                    )
-                    .kind("invalid-data")),
-                };
+                let read =
+                    match <Resource as fhir_types::codec::Json>::from_json(carried, &mut path) {
+                        // A resource of a type the server never serves is a defect in the
+                        // request itself, so it is refused where it is stated.
+                        Ok(resource) if !served(&resource) => return Err(unsupported(&resource)),
+                        Ok(resource) => loaded(resource),
+                        Err(error) => Err(Failure::new(
+                            StatusCode::BAD_REQUEST,
+                            "invalid",
+                            format!("a `{TX_RESOURCE}` cannot be read: {error}"),
+                        )
+                        .kind("invalid-data")),
+                    };
                 Ok(match read {
                     Ok(loaded) => loaded,
                     Err(failure) => Loaded::Unusable(Unusable {
@@ -142,134 +153,6 @@ macro_rules! resources {
                         failure,
                     }),
                 })
-            }
-
-            /// The model of a resource given as a JSON object of this version.
-            ///
-            /// # Errors
-            ///
-            /// Returns the codec's refusal with its element path, or what the
-            /// conversion refused, as text.
-            pub fn model_of(
-                object: &fhir_types::codec::Object,
-            ) -> Result<Loaded, crate::version::ReadError> {
-                let resource = resource_of(object).map_err(crate::version::ReadError::Decode)?;
-                loaded(resource).map_err(|failure| crate::version::ReadError::Convert(failure.diagnostics))
-            }
-
-            /// `object` read as a resource of this version and written back.
-            ///
-            /// # Errors
-            ///
-            /// Returns what the codec refused, as text: a resource stored in
-            /// another FHIR version can carry an element this one does not define.
-            pub fn round_trip(
-                object: &fhir_types::codec::Object,
-            ) -> Result<fhir_types::codec::Object, String> {
-                let resource = resource_of(object).map_err(|error| error.to_string())?;
-                fhir_types::codec::Json::to_json(&resource).map_err(|error| error.to_string())
-            }
-
-            /// `object` read as a resource of this version.
-            ///
-            /// # Errors
-            ///
-            /// Returns what the codec refused, with the element path.
-            pub fn resource_of(
-                object: &fhir_types::codec::Object,
-            ) -> Result<Resource, fhir_types::codec::DecodeError> {
-                // The path names the resource type the object states, so an
-                // `expression` reads `CodeSystem.date`, not the enum's `Resource`.
-                let root = object
-                    .get("resourceType")
-                    .and_then(fhir_types::codec::Value::as_str)
-                    .unwrap_or("Resource");
-                let mut path = fhir_types::codec::Path::root(root);
-                fhir_types::codec::Json::from_json(object, &mut path)
-            }
-
-            fn loaded(resource: Resource) -> Result<Loaded, Failure> {
-                match resource {
-                    Resource::CodeSystem(code_system) => {
-                        fhir_codesystem::convert::$fhir::convert(&code_system)
-                            .map(Loaded::CodeSystem)
-                            .map_err(invalid)
-                    }
-                    Resource::ValueSet(value_set) => valueset::convert::$fhir::convert(&value_set)
-                        .map(Loaded::ValueSet)
-                        .map_err(value_set_refusal),
-                    Resource::ConceptMap(concept_map) => {
-                        conceptmap::convert::$fhir::convert(&concept_map)
-                            .map(Loaded::ConceptMap)
-                            .map_err(invalid)
-                    }
-                    ref other => Err(unsupported(other)),
-                }
-            }
-
-            /// Whether the server serves resources of this type at all.
-            fn served(resource: &Resource) -> bool {
-                matches!(
-                    resource,
-                    Resource::CodeSystem(_) | Resource::ValueSet(_) | Resource::ConceptMap(_)
-                )
-            }
-
-            /// What a `tx-resource` of a type the server never serves answers with.
-            fn unsupported(resource: &Resource) -> Failure {
-                Failure::new(
-                    StatusCode::BAD_REQUEST,
-                    "not-supported",
-                    format!(
-                        "`{TX_RESOURCE}` carries a {}; only CodeSystem, ValueSet, and ConceptMap resources are accepted",
-                        resource_type(resource)
-                    ),
-                )
-            }
-
-            /// What a `ValueSet` the model cannot represent answers with.
-            ///
-            /// A filter with no value leaves the value set undefined, which the
-            /// ecosystem classifies `vs-invalid`
-            /// (<https://build.fhir.org/ig/FHIR/fhir-tools-ig/CodeSystem-tx-issue-type.html>);
-            /// `422` is the status for a resource that breaks the server's rules
-            /// (<https://hl7.org/fhir/R4B/http.html#status-codes>).
-            fn value_set_refusal(error: valueset::model::ModelError) -> Failure {
-                match error {
-                    valueset::model::ModelError::FilterValue { ref expression, .. } => {
-                        let expression = expression.clone();
-                        Failure::new(
-                            StatusCode::UNPROCESSABLE_ENTITY,
-                            "invalid",
-                            error.to_string(),
-                        )
-                        .kind("vs-invalid")
-                        .at(expression)
-                    }
-                    other => invalid(other),
-                }
-            }
-
-            fn invalid(error: impl std::fmt::Display) -> Failure {
-                Failure::new(
-                    StatusCode::BAD_REQUEST,
-                    "invalid",
-                    format!("a `{TX_RESOURCE}` cannot be served: {error}"),
-                )
-            }
-
-            fn resource_type(resource: &Resource) -> &'static str {
-                match resource {
-                    Resource::Bundle(_) => "Bundle",
-                    Resource::CapabilityStatement(_) => "CapabilityStatement",
-                    Resource::CodeSystem(_) => "CodeSystem",
-                    Resource::ConceptMap(_) => "ConceptMap",
-                    Resource::OperationOutcome(_) => "OperationOutcome",
-                    Resource::Parameters(_) => "Parameters",
-                    Resource::TerminologyCapabilities(_) => "TerminologyCapabilities",
-                    Resource::ValueSet(_) => "ValueSet",
-                    Resource::Unknown(_) => "resource of another type",
-                }
             }
         }
     };

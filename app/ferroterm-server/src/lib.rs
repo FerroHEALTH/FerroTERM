@@ -12,11 +12,12 @@
 //! `server.shutdown_timeout_ms`. `main.rs` only reads the configuration and
 //! calls in.
 //!
-//! Every served FHIR version has its own path prefix (`/r4`, `/r4b`, `/r5`), and within it
+//! Every served FHIR version has its own path prefix (`/r4`, `/r4b`, `/r5`, `/r6`), and within it
 //! the resource and operation URLs the FHIR REST API defines
 //! (<https://hl7.org/fhir/R4B/http.html>, <https://hl7.org/fhir/R4B/operations.html>).
 #![doc(test(attr(deny(warnings))))]
 
+pub mod artefact;
 pub mod banner;
 pub mod cli;
 pub mod config;
@@ -25,10 +26,6 @@ pub mod metrics;
 pub mod outcome;
 pub mod persistence;
 pub mod problem;
-pub mod r4;
-pub mod r4b;
-pub mod r5;
-pub mod r6;
 pub mod reload;
 // The build script is the only caller: it `include!`s this source rather than
 // linking the library it builds, so the module is compiled here for its tests.
@@ -36,6 +33,7 @@ pub mod reload;
 mod release_date;
 pub mod request_fields;
 pub mod scope;
+pub mod served;
 pub mod smart;
 pub mod state;
 pub mod usage_report;
@@ -97,10 +95,10 @@ pub fn routes(serving: Serving) -> Router {
     let [r4, r4b, r5, r6] = FHIR_BASES;
     let telemetry = std::sync::Arc::clone(serving.telemetry());
     Router::new()
-        .nest(r4, gated(r4::router(), r4))
-        .nest(r4b, gated(r4b::router(), r4b))
-        .nest(r5, gated(r5::router(), r5))
-        .nest(r6, gated(r6::router(), r6))
+        .nest(r4, gated(version::r4::router(), r4))
+        .nest(r4b, gated(version::r4b::router(), r4b))
+        .nest(r5, gated(version::r5::router(), r5))
+        .nest(r6, gated(version::r6::router(), r6))
         .route(
             "/metrics",
             ferrohealth_telemetry::telemetry::prometheus_route(telemetry),
@@ -117,7 +115,7 @@ pub fn routes(serving: Serving) -> Router {
 /// `not-found` under a FHIR base, a problem elsewhere.
 async fn unmatched(uri: http::Uri, headers: http::HeaderMap) -> axum::response::Response {
     if problem::is_fhir(uri.path()) {
-        outcome::not_found(&headers)
+        wire::not_found(&headers)
     } else {
         ferroterm_problem::blank(
             http::StatusCode::NOT_FOUND,
