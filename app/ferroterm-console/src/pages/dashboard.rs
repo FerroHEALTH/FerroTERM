@@ -112,21 +112,26 @@ fn grouped(locale: &Locale, count: usize) -> String {
     ferrohealth_ui::i18n::number::grouped(locale, u64::try_from(count).unwrap_or(u64::MAX))
 }
 
-/// The dashboard drawn from `reads`.
-fn dashboard(request: &Request, reads: &Reads) -> Html {
-    let locale = &request.locale;
+/// The read the dashboard draws in place of itself: a root that gave no
+/// answer to its capabilities, or a listing that did not decode at its
+/// release, which is a defect the page draws rather than a dashboard missing
+/// that listing.
+fn unanswered(reads: &Reads) -> Option<&FhirError> {
     if let Err(error) = &reads.capabilities
         && error.status().is_none()
     {
-        return unreachable(request, error);
+        return Some(error);
     }
-    // A listing that does not decode at its release is a defect, so the page
-    // draws it rather than a dashboard missing that listing.
-    if let Some(error) = [&reads.systems, &reads.value_sets, &reads.concept_maps]
+    [&reads.systems, &reads.value_sets, &reads.concept_maps]
         .into_iter()
-        .find_map(|read| read.as_ref().err())
-        .filter(|error| matches!(error, FhirError::Decode { .. }))
-    {
+        .filter_map(|read| read.as_ref().err())
+        .find(|error| matches!(error, FhirError::Decode { .. }))
+}
+
+/// The dashboard drawn from `reads`.
+fn dashboard(request: &Request, reads: &Reads) -> Html {
+    let locale = &request.locale;
+    if let Some(error) = unanswered(reads) {
         return unreachable(request, error);
     }
     let version = request.version;

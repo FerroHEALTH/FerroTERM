@@ -96,7 +96,6 @@ pub(crate) fn hierarchy_word(locale: &Locale, card: &SystemCard) -> String {
 
 /// Code systems.
 pub(crate) async fn page(request: Request) -> Html {
-    let locale = &request.locale;
     let capabilities = request
         .client
         .terminology_capabilities(request.version)
