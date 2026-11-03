@@ -20,8 +20,13 @@ async fn terminology() -> MockServer {
         .and(path_regex(r"^/[^/]+/metadata$"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "resourceType": "CapabilityStatement",
+            "status": "active",
+            "date": "2026-01-01",
+            "kind": "instance",
             "fhirVersion": "4.0.1",
+            "format": ["json"],
             "rest": [{
+                "mode": "server",
                 "resource": [{
                     "type": "CodeSystem",
                     "operation": [{ "name": "lookup", "definition": "http://hl7.org/fhir/OperationDefinition/CodeSystem-lookup" }]

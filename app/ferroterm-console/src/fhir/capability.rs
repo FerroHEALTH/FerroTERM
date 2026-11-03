@@ -1,9 +1,10 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The part of a `CapabilityStatement` the shell renders.
+//! What the shell and the Server screen read of a root's
+//! `CapabilityStatement`, decoded at the release that served it.
 
-use serde::{Deserialize, Serialize};
+use crate::fhir::release::Reads;
 
 /// The canonical a root declares an operation's invocation levels under.
 ///
@@ -19,105 +20,33 @@ const OPERATION_LEVEL: &str = "https://ferroterm.eu/fhir/StructureDefinition/ope
 /// What `GET [base]/metadata` tells the viewer about a served root.
 ///
 /// The FHIR RESTful API defines `metadata` as the capabilities interaction
-/// (<https://hl7.org/fhir/R4B/http.html#capabilities>), and the viewer reads
-/// only the elements it draws. Every field is optional here so a server that
-/// omits one still renders.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
-pub(crate) struct CapabilityStatement {
+/// (<https://hl7.org/fhir/R4B/http.html#capabilities>); the statement
+/// decodes through `fhir-types` at its release, and this is what the
+/// screens draw of it.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct Capabilities {
     /// `CapabilityStatement.fhirVersion`, the release this root speaks.
-    #[serde(rename = "fhirVersion")]
     pub(crate) fhir_version: Option<String>,
     /// `CapabilityStatement.software`, which names the running server.
     pub(crate) software: Option<Software>,
     /// `CapabilityStatement.description`, where a root states what it serves.
     pub(crate) description: Option<String>,
-    /// `CapabilityStatement.rest`, which says what each resource type answers.
-    #[serde(default)]
-    rest: Vec<Rest>,
+    /// Every operation the root declares, the whole-root ones first, in the
+    /// document's order.
+    declared: Vec<OperationDeclaration>,
+    /// Each `rest.resource`, with what it declares.
+    resources: Vec<Served>,
 }
 
-/// One `CapabilityStatement.rest`.
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-struct Rest {
-    /// `rest.resource`, one per resource type this root serves.
-    #[serde(default)]
-    resource: Vec<RestResource>,
-    /// `rest.operation`, the operations this root answers at its own root.
-    #[serde(default)]
-    operation: Vec<RestOperation>,
-    /// `rest.security`, where a root names the authentication in front of it.
-    security: Option<Security>,
-}
-
-/// `CapabilityStatement.rest.security`.
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-struct Security {
-    /// `security.service`, as codes of the FHIR `restful-security-service`
-    /// value set (<https://hl7.org/fhir/R4B/valueset-restful-security-service.html>).
-    #[serde(default)]
-    service: Vec<SecurityService>,
-}
-
-/// One `security.service`, read for the codes it carries.
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-struct SecurityService {
-    /// The codings that name the service.
-    #[serde(default)]
-    coding: Vec<ServiceCoding>,
-}
-
-/// One coding of `security.service`.
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-struct ServiceCoding {
-    /// The code itself.
-    code: Option<String>,
-}
-
-/// One `CapabilityStatement.rest.resource`.
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-struct RestResource {
-    /// `resource.type`, the resource type it describes.
-    r#type: Option<String>,
-    /// `resource.interaction`, the RESTful interactions this root answers.
-    ///
-    /// Only the editors read it, to offer a write the server answers.
-    #[serde(default)]
-    interaction: Vec<RestInteraction>,
-    /// `resource.operation`, the operations this root answers on that type.
-    #[serde(default)]
-    operation: Vec<RestOperation>,
-}
-
-/// One `CapabilityStatement.rest.resource.interaction`.
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-struct RestInteraction {
-    /// `interaction.code`, a code of the type-restful-interaction value set
-    /// (<https://hl7.org/fhir/R4B/capabilitystatement.html>).
-    code: Option<String>,
-}
-
-/// One `CapabilityStatement.rest.resource.operation`.
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-struct RestOperation {
-    /// `operation.name`, as the statement wrote it.
-    name: Option<String>,
-    /// `operation.definition`, the `OperationDefinition` it points at.
-    definition: Option<String>,
-    /// `operation.documentation`, what this root adds beyond that definition.
-    documentation: Option<String>,
-    /// The extensions the root declared on the operation.
-    #[serde(default)]
-    extension: Vec<Extension>,
-}
-
-/// One `Extension`, read only for the invocation levels it may carry.
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-struct Extension {
-    /// The canonical that says what the extension means.
-    url: Option<String>,
-    /// `valueCode`, the one value type read here.
-    #[serde(rename = "valueCode")]
-    value_code: Option<String>,
+/// One `CapabilityStatement.rest.resource`, as the editors read it.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct Served {
+    /// `resource.type`.
+    resource_type: String,
+    /// The `resource.interaction` codes.
+    interactions: Vec<String>,
+    /// The `resource.operation` names, as the statement wrote them.
+    operations: Vec<String>,
 }
 
 /// One operation a root declares, as the statement wrote it.
@@ -136,7 +65,7 @@ pub(crate) struct OperationDeclaration {
 }
 
 /// `CapabilityStatement.software`.
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct Software {
     /// The software's own name.
     pub(crate) name: Option<String>,
@@ -144,7 +73,7 @@ pub(crate) struct Software {
     pub(crate) version: Option<String>,
 }
 
-impl CapabilityStatement {
+impl Capabilities {
     /// The name of the running software, with its version where it gave one.
     pub(crate) fn software_line(&self) -> Option<String> {
         let software = self.software.as_ref()?;
@@ -161,24 +90,7 @@ impl CapabilityStatement {
     /// The order is the document's own, so a screen that draws them shows what
     /// the root sent rather than an order of its own.
     pub(crate) fn declarations(&self) -> Vec<OperationDeclaration> {
-        let mut declared = Vec::new();
-        for rest in &self.rest {
-            declared.extend(
-                rest.operation
-                    .iter()
-                    .map(|operation| operation.read(String::new())),
-            );
-            for resource in &rest.resource {
-                let of = resource.r#type.clone().unwrap_or_default();
-                declared.extend(
-                    resource
-                        .operation
-                        .iter()
-                        .map(|operation| operation.read(of.clone())),
-                );
-            }
-        }
-        declared
+        self.declared.clone()
     }
 
     /// Whether this root declares `operation` on `resource_type`.
@@ -191,12 +103,8 @@ impl CapabilityStatement {
     /// a statement that writes `$translate` means the same operation.
     pub(crate) fn declares_operation(&self, resource_type: &str, operation: &str) -> bool {
         let wanted = operation.trim_start_matches('$');
-        self.rest
-            .iter()
-            .flat_map(|rest| rest.resource.iter())
-            .filter(|resource| resource.r#type.as_deref() == Some(resource_type))
-            .flat_map(|resource| resource.operation.iter())
-            .filter_map(|declared| declared.name.as_deref())
+        self.served(resource_type)
+            .flat_map(|served| served.operations.iter())
             .any(|name| name.trim_start_matches('$') == wanted)
     }
 
@@ -209,57 +117,126 @@ impl CapabilityStatement {
     /// it, so a root that counts versions one way and a root that counts them
     /// another are both read for what they say they answer.
     pub(crate) fn declares_interaction(&self, resource_type: &str, interaction: &str) -> bool {
-        self.rest
-            .iter()
-            .flat_map(|rest| rest.resource.iter())
-            .filter(|resource| resource.r#type.as_deref() == Some(resource_type))
-            .flat_map(|resource| resource.interaction.iter())
-            .filter_map(|declared| declared.code.as_deref())
+        self.served(resource_type)
+            .flat_map(|served| served.interactions.iter())
             .any(|code| code == interaction)
+    }
+
+    /// The `rest.resource` entries declared for `resource_type`.
+    fn served<'a>(&'a self, resource_type: &'a str) -> impl Iterator<Item = &'a Served> + 'a {
+        self.resources
+            .iter()
+            .filter(move |served| served.resource_type == resource_type)
     }
 }
 
-impl RestOperation {
-    /// This operation as the comparison reads it, declared on `resource`.
-    ///
-    /// The `$` is trimmed from the code: R4B's own example instances write the
-    /// bare name (<https://hl7.org/fhir/R4B/capabilitystatement-example.json.html>)
-    /// and a statement that writes `$translate` names the same operation.
-    fn read(&self, resource: String) -> OperationDeclaration {
-        OperationDeclaration {
-            resource,
-            code: self
-                .name
-                .as_deref()
-                .unwrap_or_default()
-                .trim_start_matches('$')
-                .to_owned(),
-            definition: self.definition.clone(),
-            documentation: self.documentation.clone(),
-            levels: self
-                .extension
-                .iter()
-                .filter(|extension| extension.url.as_deref() == Some(OPERATION_LEVEL))
-                .filter_map(|extension| extension.value_code.clone())
-                .collect(),
-        }
-    }
+/// The code an operation is compared by: its name without the `$` a URL
+/// spells it with. R4B's own example instances write the bare name
+/// (<https://hl7.org/fhir/R4B/capabilitystatement-example.json.html>) and a
+/// statement that writes `$translate` names the same operation.
+fn code_of(name: Option<&str>) -> String {
+    name.unwrap_or_default().trim_start_matches('$').to_owned()
 }
+
+/// Reads the `CapabilityStatement` of the `fhir-types` module `$module`,
+/// whose shape is the same at every release the server mounts.
+macro_rules! reads_capabilities {
+    ($module:ident) => {
+        impl Reads<Capabilities> for fhir_types::$module::capability_statement::CapabilityStatement {
+            fn read(&self) -> Capabilities {
+                use fhir_types::$module::capability_statement::CapabilityStatementRestResourceOperation;
+                use fhir_types::$module::extension::ExtensionValue;
+                let declaration = |operation: &CapabilityStatementRestResourceOperation, resource: &str| {
+                    OperationDeclaration {
+                        resource: resource.to_owned(),
+                        code: code_of(operation.name.value.as_deref()),
+                        definition: operation.definition.value.clone(),
+                        documentation: operation
+                            .documentation
+                            .as_ref()
+                            .and_then(|text| text.value.clone()),
+                        levels: operation
+                            .extension
+                            .iter()
+                            .filter(|extension| extension.url == OPERATION_LEVEL)
+                            .filter_map(|extension| match &extension.value {
+                                Some(ExtensionValue::Code(code)) => code.value.clone(),
+                                _ => None,
+                            })
+                            .collect(),
+                    }
+                };
+                let mut declared = Vec::new();
+                let mut resources = Vec::new();
+                for rest in &self.rest {
+                    declared.extend(rest.operation.iter().map(|operation| declaration(operation, "")));
+                    for resource in &rest.resource {
+                        let of = resource.r#type.value.clone().unwrap_or_default();
+                        declared.extend(resource.operation.iter().map(|operation| declaration(operation, &of)));
+                        resources.push(Served {
+                            interactions: resource
+                                .interaction
+                                .iter()
+                                .filter_map(|interaction| interaction.code.value.clone())
+                                .collect(),
+                            operations: resource
+                                .operation
+                                .iter()
+                                .filter_map(|operation| operation.name.value.clone())
+                                .collect(),
+                            resource_type: of,
+                        });
+                    }
+                }
+                Capabilities {
+                    fhir_version: self.fhir_version.value.clone(),
+                    software: self.software.as_ref().map(|software| Software {
+                        name: software.name.value.clone(),
+                        version: software.version.as_ref().and_then(|version| version.value.clone()),
+                    }),
+                    description: self.description.as_ref().and_then(|text| text.value.clone()),
+                    declared,
+                    resources,
+                }
+            }
+        }
+    };
+}
+
+reads_capabilities!(r4);
+reads_capabilities!(r4b);
+reads_capabilities!(r5);
+reads_capabilities!(r6);
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn parse(json: &str) -> CapabilityStatement {
-        serde_json::from_str(json).expect("the fixture is valid JSON")
+    use crate::fhir::version::FhirVersion;
+
+    /// An otherwise minimal R4B statement whose `rest` is `rest`, or one
+    /// with no `rest` for the empty string.
+    fn parse(rest: &str) -> Capabilities {
+        let rest = if rest.is_empty() {
+            String::new()
+        } else {
+            format!(r#","rest":{rest}"#)
+        };
+        let json = format!(
+            r#"{{"resourceType":"CapabilityStatement","status":"active","date":"2026-01-01",
+                "kind":"instance","fhirVersion":"4.3.0","format":["json"]{rest}}}"#
+        );
+        FhirVersion::R4B
+            .decode(&json)
+            .expect("the fixture is a valid R4B statement")
     }
 
     #[test]
     fn an_interaction_is_declared_only_where_the_statement_declares_it() {
         let statement = parse(
-            r#"{"resourceType":"CapabilityStatement","rest":[{"resource":[
+            r#"[{"mode":"server","resource":[
                  {"type":"CodeSystem","interaction":[{"code":"read"},{"code":"vread"}]},
-                 {"type":"ValueSet","interaction":[{"code":"read"}]}]}]}"#,
+                 {"type":"ValueSet","interaction":[{"code":"read"}]}]}]"#,
         );
         assert!(statement.declares_interaction("CodeSystem", "vread"));
         assert!(
@@ -276,9 +253,9 @@ mod tests {
     #[test]
     fn an_operation_is_declared_only_where_the_statement_names_it() {
         let statement = parse(
-            r#"{"resourceType":"CapabilityStatement","rest":[{"mode":"server","resource":[
-                {"type":"ConceptMap","operation":[{"name":"translate"}]},
-                {"type":"ValueSet","operation":[{"name":"expand"}]}]}]}"#,
+            r#"[{"mode":"server","resource":[
+                {"type":"ConceptMap","operation":[{"name":"translate","definition":"http://hl7.org/fhir/OperationDefinition/x"}]},
+                {"type":"ValueSet","operation":[{"name":"expand","definition":"http://hl7.org/fhir/OperationDefinition/x"}]}]}]"#,
         );
         assert!(statement.declares_operation("ConceptMap", "translate"));
         assert!(
@@ -295,7 +272,7 @@ mod tests {
     #[test]
     fn a_statement_that_declares_no_rest_offers_no_operation() {
         assert!(
-            !parse(r#"{"fhirVersion":"4.3.0"}"#).declares_operation("ConceptMap", "translate"),
+            !parse("").declares_operation("ConceptMap", "translate"),
             "the screen then says the root does not declare the operation"
         );
     }
@@ -303,14 +280,14 @@ mod tests {
     #[test]
     fn a_declaration_carries_the_levels_and_the_note_the_root_wrote() {
         let statement = parse(
-            r#"{"resourceType":"CapabilityStatement","rest":[{"mode":"server","resource":[
+            r#"[{"mode":"server","resource":[
                 {"type":"CodeSystem","operation":[{"name":"lookup",
                   "definition":"http://hl7.org/fhir/OperationDefinition/CodeSystem-lookup",
                   "documentation":"the root says what it adds",
                   "extension":[
                     {"url":"https://ferroterm.eu/fhir/StructureDefinition/operation-level","valueCode":"type"},
                     {"url":"https://example.org/other","valueCode":"ignored"},
-                    {"url":"https://ferroterm.eu/fhir/StructureDefinition/operation-level","valueCode":"instance"}]}]}]}]}"#,
+                    {"url":"https://ferroterm.eu/fhir/StructureDefinition/operation-level","valueCode":"instance"}]}]}]}]"#,
         );
         let declared = statement.declarations();
         assert_eq!(declared.len(), 1, "{declared:?}");
@@ -331,9 +308,9 @@ mod tests {
     #[test]
     fn an_operation_the_root_answers_on_itself_names_no_resource_type() {
         let statement = parse(
-            r#"{"resourceType":"CapabilityStatement","rest":[{"mode":"server",
-                "operation":[{"name":"$closure"}],
-                "resource":[{"type":"ValueSet","operation":[{"name":"expand"}]}]}]}"#,
+            r#"[{"mode":"server",
+                "operation":[{"name":"$closure","definition":"http://hl7.org/fhir/OperationDefinition/x"}],
+                "resource":[{"type":"ValueSet","operation":[{"name":"expand","definition":"http://hl7.org/fhir/OperationDefinition/x"}]}]}]"#,
         );
         let declared = statement.declarations();
         let named: Vec<(&str, &str)> = declared
@@ -349,5 +326,32 @@ mod tests {
             declared[0].levels.is_empty(),
             "a root that states no level has none read into it"
         );
+    }
+}
+
+#[cfg(test)]
+mod strict {
+    use crate::fhir::capability::Capabilities;
+    use crate::fhir::version::FhirVersion;
+
+    #[test]
+    fn a_statement_that_lacks_a_required_element_is_refused_by_its_path() {
+        let error = FhirVersion::R4
+            .decode::<Capabilities>(
+                r#"{"resourceType":"CapabilityStatement","fhirVersion":"4.0.1"}"#,
+            )
+            .expect_err("status, date, kind and format are required");
+        assert!(error.to_string().contains("CapabilityStatement"), "{error}");
+    }
+
+    #[test]
+    fn a_member_the_release_does_not_define_is_refused() {
+        let error = FhirVersion::R4
+            .decode::<Capabilities>(
+                r#"{"resourceType":"CapabilityStatement","status":"active","date":"2026-01-01",
+                    "kind":"instance","fhirVersion":"4.0.1","format":["json"],"x-extra":[1]}"#,
+            )
+            .expect_err("an unknown member is a defect");
+        assert!(error.to_string().contains("x-extra"), "{error}");
     }
 }

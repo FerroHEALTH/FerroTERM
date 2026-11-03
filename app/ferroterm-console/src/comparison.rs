@@ -11,7 +11,7 @@
 
 use http::StatusCode;
 
-use crate::fhir::capability::CapabilityStatement;
+use crate::fhir::capability::Capabilities;
 use crate::fhir::capability::OperationDeclaration;
 use crate::fhir::error::FhirError;
 use crate::fhir::version::FhirVersion;
@@ -21,7 +21,7 @@ use crate::locale::{Msg, tr, tr_with};
 #[derive(Clone, Debug)]
 pub(crate) enum RootAnswer {
     /// The root answered, and this is what it declares.
-    Declared(Box<CapabilityStatement>),
+    Declared(Box<Capabilities>),
     /// The deployment does not serve this root.
     Absent,
     /// The root answered a failure, which the screen renders as it arrived.
@@ -36,7 +36,7 @@ impl RootAnswer {
     /// (<https://hl7.org/fhir/R4B/http.html#read>). That is an ordinary state
     /// of a deployment rather than a failure, so it reads as absent and the
     /// other three roots still compare.
-    pub(crate) fn read(answered: Result<CapabilityStatement, FhirError>) -> Self {
+    pub(crate) fn read(answered: Result<Capabilities, FhirError>) -> Self {
         match answered {
             Ok(statement) => Self::Declared(Box::new(statement)),
             Err(error) if error.status() == Some(StatusCode::NOT_FOUND) => Self::Absent,
@@ -45,7 +45,7 @@ impl RootAnswer {
     }
 
     /// The statement this root sent, when it sent one.
-    fn statement(&self) -> Option<&CapabilityStatement> {
+    fn statement(&self) -> Option<&Capabilities> {
         match self {
             Self::Declared(statement) => Some(statement),
             Self::Absent | Self::Refused(_) => None,
@@ -144,7 +144,7 @@ pub(crate) fn compare(
 
 /// What each root says about itself, one row per fact.
 fn facts(locale: &ferrohealth_ui::i18n::Locale, answers: &[(FhirVersion, RootAnswer)]) -> Vec<Row> {
-    let row = |label: &str, of: &dyn Fn(&CapabilityStatement) -> Option<String>| Row {
+    let row = |label: &str, of: &dyn Fn(&Capabilities) -> Option<String>| Row {
         label: label.to_owned(),
         cells: answers
             .iter()
@@ -155,10 +155,7 @@ fn facts(locale: &ferrohealth_ui::i18n::Locale, answers: &[(FhirVersion, RootAns
             .collect(),
     };
     vec![
-        row(
-            &tr(locale, Msg::Software),
-            &CapabilityStatement::software_line,
-        ),
+        row(&tr(locale, Msg::Software), &Capabilities::software_line),
         row(&tr(locale, Msg::WhatRootSaysServes), &|statement| {
             statement.description.clone()
         }),
@@ -179,7 +176,7 @@ fn operations(
         .map(|(_, answer)| {
             answer
                 .statement()
-                .map(CapabilityStatement::declarations)
+                .map(Capabilities::declarations)
                 .unwrap_or_default()
         })
         .collect();
@@ -271,7 +268,7 @@ pub(crate) fn state_sentence(
 pub(crate) fn notes(answer: &RootAnswer) -> Vec<(String, String)> {
     answer
         .statement()
-        .map(CapabilityStatement::declarations)
+        .map(Capabilities::declarations)
         .unwrap_or_default()
         .into_iter()
         .filter_map(|operation| {
@@ -315,8 +312,9 @@ mod tests {
         RECORDED
             .into_iter()
             .map(|(version, body)| {
-                let statement: CapabilityStatement =
-                    serde_json::from_str(body).expect("the recorded answer parses");
+                let statement: Capabilities = version
+                    .decode(body)
+                    .expect("the recorded answer is a valid statement at its version");
                 (version, RootAnswer::read(Ok(statement)))
             })
             .collect()
@@ -482,9 +480,12 @@ mod tests {
 
     #[test]
     fn a_root_that_declares_nothing_still_gets_its_column() {
-        let empty: CapabilityStatement =
-            serde_json::from_str(r#"{"resourceType":"CapabilityStatement"}"#)
-                .expect("the answer parses");
+        let empty: Capabilities = FhirVersion::R4B
+            .decode(
+                r#"{"resourceType":"CapabilityStatement","status":"active","date":"2026-01-01",
+                    "kind":"instance","fhirVersion":"4.3.0","format":["json"]}"#,
+            )
+            .expect("a statement that declares nothing is still a valid one");
         let answers = vec![(FhirVersion::R4B, RootAnswer::read(Ok(empty)))];
         let comparison = compare(&english(), &answers);
         assert_eq!(comparison.columns.len(), 1);
@@ -494,8 +495,9 @@ mod tests {
             "there is nothing to compare, and the screen says so"
         );
         assert_eq!(
-            comparison.columns[0].fhir_version, None,
-            "the column states no release, because the root declared none"
+            comparison.columns[0].fhir_version.as_deref(),
+            Some("4.3.0"),
+            "the column states the release the root declared, the one element it must"
         );
         assert_eq!(
             row(&comparison.facts, "Software").cells,
