@@ -15,9 +15,11 @@ use serde::de::DeserializeOwned;
 
 use crate::fhir::capability::Capabilities;
 use crate::fhir::compose::stored::StoredValueSet;
+use crate::fhir::concept_map::PublishedConceptMap;
 use crate::fhir::expansion::ExpandedValueSet;
 use crate::fhir::searchset::Found;
 use crate::fhir::terminology::TerminologyCapabilities;
+use crate::fhir::translate::TranslateAnswer;
 use crate::fhir::value_set::PublishedValueSet;
 use crate::fhir::version::FhirVersion;
 
@@ -34,7 +36,13 @@ pub(crate) trait Release {
         + Reads<ExpandedValueSet>
         + Reads<StoredValueSet>;
     /// The release's `Bundle`, read for the resources a `searchset` carries.
-    type Bundle: DeserializeOwned + Reads<Found<PublishedValueSet>>;
+    type Bundle: DeserializeOwned
+        + Reads<Found<PublishedValueSet>>
+        + Reads<Found<PublishedConceptMap>>;
+    /// The release's `ConceptMap`.
+    type ConceptMap: DeserializeOwned + Reads<PublishedConceptMap>;
+    /// The release's `Parameters`, read as `$translate` answered them.
+    type Parameters: DeserializeOwned + Reads<TranslateAnswer>;
 }
 
 /// A resource of one release, read into what a page draws of it.
@@ -90,6 +98,24 @@ impl Decodes for Found<PublishedValueSet> {
     }
 }
 
+impl Decodes for PublishedConceptMap {
+    fn decode<R: Release>(body: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str::<R::ConceptMap>(body).map(|map| map.read())
+    }
+}
+
+impl Decodes for TranslateAnswer {
+    fn decode<R: Release>(body: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str::<R::Parameters>(body).map(|parameters| parameters.read())
+    }
+}
+
+impl Decodes for Found<PublishedConceptMap> {
+    fn decode<R: Release>(body: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str::<R::Bundle>(body).map(|bundle| bundle.read())
+    }
+}
+
 /// FHIR 4.0.1.
 #[derive(Debug)]
 pub(crate) struct R4;
@@ -117,6 +143,8 @@ macro_rules! release {
                 fhir_types::$module::terminology_capabilities::TerminologyCapabilities;
             type ValueSet = fhir_types::$module::value_set::ValueSet;
             type Bundle = fhir_types::$module::bundle::Bundle;
+            type ConceptMap = fhir_types::$module::concept_map::ConceptMap;
+            type Parameters = fhir_types::$module::parameters::Parameters;
         }
     };
 }

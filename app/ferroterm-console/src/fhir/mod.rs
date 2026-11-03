@@ -55,8 +55,8 @@ use crate::fhir::expansion::ExpandedValueSet;
 use crate::fhir::named::NamedSearch;
 use crate::fhir::outcome::OperationOutcome;
 use crate::fhir::release::Decodes;
+use crate::fhir::searchset::Found;
 use crate::fhir::searchset::SearchFilter;
-use crate::fhir::searchset::{Found, SearchSet};
 use crate::fhir::terminology::TerminologyCapabilities;
 use crate::fhir::translate::TranslateAnswer;
 use crate::fhir::translate::TranslateRequest;
@@ -515,8 +515,8 @@ impl FhirClient {
         &self,
         version: FhirVersion,
         filter: &SearchFilter,
-    ) -> Result<SearchSet<PublishedConceptMap>, FhirError> {
-        self.get_json(&self.search_url(version, CONCEPT_MAP, filter))
+    ) -> Result<Found<PublishedConceptMap>, FhirError> {
+        self.get_answer(version, &self.search_url(version, CONCEPT_MAP, filter))
             .await
     }
 
@@ -532,7 +532,7 @@ impl FhirClient {
         version: FhirVersion,
         id: &str,
     ) -> Result<Document<PublishedConceptMap>, FhirError> {
-        self.get_document(&self.resource_url(version, CONCEPT_MAP, id))
+        self.get_answer_document(version, &self.resource_url(version, CONCEPT_MAP, id))
             .await
     }
 
@@ -638,7 +638,7 @@ impl FhirClient {
         version: FhirVersion,
         request: &TranslateRequest,
     ) -> Result<Document<TranslateAnswer>, FhirError> {
-        self.get_document(&self.translate_url(version, request))
+        self.get_answer_document(version, &self.translate_url(version, request))
             .await
     }
 }

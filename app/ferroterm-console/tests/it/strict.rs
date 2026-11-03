@@ -103,3 +103,28 @@ async fn a_value_set_that_does_not_decode_at_its_release_draws_the_error_state()
         "the error names the version, the resource and the element it lacks: {page}"
     );
 }
+
+#[tokio::test]
+async fn a_concept_map_that_does_not_decode_at_its_release_draws_the_error_state() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/r5/ConceptMap/animals"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "resourceType": "ConceptMap",
+            "id": "animals",
+            "status": "active",
+            "sourceUri": "https://terminology.example/ValueSet/a"
+        })))
+        .mount(&server)
+        .await;
+    let state = console(
+        None,
+        &format!("[ferroterm]\nbase_url = \"{}/\"\n", server.uri()),
+    )
+    .await;
+    let page = text(send(&state, get("/conceptmaps/animals?fhir=r5", &[])).await).await;
+    assert!(
+        page.contains("FHIR R5: ") && page.contains("ConceptMap") && page.contains("sourceUri"),
+        "R5 renamed `sourceUri`, so the error names the member R5 does not define: {page}"
+    );
+}

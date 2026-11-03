@@ -17,8 +17,7 @@
 //! systems of values, so the reader below keeps them apart and never renders
 //! one as the other.
 
-use serde::{Deserialize, Serialize};
-
+use crate::fhir::release::Reads;
 use crate::fhir::version::FhirVersion;
 use crate::url::RequestUrl;
 
@@ -119,58 +118,24 @@ impl TranslateRequest {
     }
 }
 
-/// The `Parameters` answer of `$translate`, as the screen reads it.
-///
-/// The operation answers a `Parameters` resource
-/// (<https://hl7.org/fhir/R4B/conceptmap-operation-translate.html>), which is
-/// a list of named parameters with nested parts, so it is read by name here
-/// rather than modelled per version.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+/// What `$translate` answered, read from the `Parameters` its release
+/// decoded.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct TranslateAnswer {
-    /// `Parameters.parameter`, in the order the server sent it.
-    #[serde(default)]
-    parameter: Vec<WireParameter>,
-}
-
-/// One `Parameters.parameter`, with the `value[x]` shapes the answer uses.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-struct WireParameter {
-    /// `parameter.name`.
-    name: Option<String>,
-    /// `valueBoolean`.
-    #[serde(rename = "valueBoolean")]
-    boolean: Option<bool>,
-    /// `valueString`.
-    #[serde(rename = "valueString")]
-    string: Option<String>,
-    /// `valueCode`.
-    #[serde(rename = "valueCode")]
-    code: Option<String>,
-    /// `valueUri`.
-    #[serde(rename = "valueUri")]
-    uri: Option<String>,
-    /// `valueCanonical`.
-    #[serde(rename = "valueCanonical")]
-    canonical: Option<String>,
-    /// `valueId`.
-    #[serde(rename = "valueId")]
-    id: Option<String>,
-    /// `valueInteger`, which FHIR defines as 32-bit signed.
-    #[serde(rename = "valueInteger")]
-    integer: Option<i32>,
-    /// `valueDateTime`.
-    #[serde(rename = "valueDateTime")]
-    date_time: Option<String>,
-    /// `valueCoding`.
-    #[serde(rename = "valueCoding")]
-    coding: Option<WireCoding>,
-    /// `parameter.part`, the nested parameters of a `match`.
-    #[serde(default)]
-    part: Vec<WireParameter>,
+    /// `result`, whether the server found a translation.
+    result: Option<bool>,
+    /// `message`, the server's own words about the answer.
+    message: Option<String>,
+    /// Each `used-conceptmap`, in the server's order.
+    used_maps: Vec<String>,
+    /// Each `match`, in the server's order.
+    matches: Vec<TranslationMatch>,
 }
 
 /// A `Coding` as the screen draws one.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+///
+// TODO(#1031): drop the serde derives once `$validate-code` reads its answer through fhir-types.
+#[derive(Clone, Debug, Default, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub(crate) struct Coding {
     /// `Coding.system`.
     pub(crate) system: Option<String>,
@@ -181,9 +146,6 @@ pub(crate) struct Coding {
     /// `Coding.display`.
     pub(crate) display: Option<String>,
 }
-
-/// The wire shape of a `Coding`, which is the same shape the screen draws.
-type WireCoding = Coding;
 
 /// One `match` of a translation, with the elements the answer carried.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -223,63 +185,89 @@ pub(crate) struct NamedValue {
 }
 
 impl TranslateAnswer {
-    /// `result`, whether the server considers the code translated.
+    /// `result`, whether the server found a translation.
     pub(crate) fn result(&self) -> Option<bool> {
-        self.first("result").and_then(|parameter| parameter.boolean)
+        self.result
     }
 
-    /// `message`, the server's own sentence about the run.
+    /// `message`, the server's own words about the answer.
     pub(crate) fn message(&self) -> Option<String> {
-        self.first("message").and_then(WireParameter::text)
+        self.message.clone()
     }
 
-    /// `used-conceptmap`, the maps the server says it translated through.
+    /// Every `used-conceptmap` the server names.
     pub(crate) fn used_maps(&self) -> Vec<String> {
-        self.parameter
-            .iter()
-            .filter(|parameter| parameter.name.as_deref() == Some("used-conceptmap"))
-            .filter_map(WireParameter::text)
-            .collect()
+        self.used_maps.clone()
     }
 
-    /// The matches, in the order the server reported them.
-    ///
-    /// The order is the server's and is never re-sorted here: a reverse
-    /// translation reports its matches in the edition's own concept order, and
-    /// a client that re-ordered them would hide that.
+    /// Every `match`, in the server's order.
     pub(crate) fn matches(&self) -> Vec<TranslationMatch> {
-        self.parameter
-            .iter()
-            .filter(|parameter| parameter.name.as_deref() == Some("match"))
-            .map(read_match)
-            .collect()
-    }
-
-    /// The first parameter named `name`, when the answer carries one.
-    fn first(&self, name: &str) -> Option<&WireParameter> {
-        self.parameter
-            .iter()
-            .find(|parameter| parameter.name.as_deref() == Some(name))
+        self.matches.clone()
     }
 }
 
-impl TranslationMatch {}
+/// One parameter as the reader walks it: its name, its value as text, a
+/// flag or a coding, and its parts.
+struct Read {
+    /// `name`.
+    name: String,
+    /// A textual value: a string, a code, a URI, a canonical, an id or a
+    /// date and time.
+    text: Option<String>,
+    /// `valueBoolean`.
+    flag: Option<bool>,
+    /// `valueInteger`.
+    number: Option<i32>,
+    /// `valueCoding`.
+    coding: Option<Coding>,
+    /// `part`.
+    parts: Vec<Read>,
+}
 
-/// One `match` parameter, read into the elements the screen draws.
-fn read_match(parameter: &WireParameter) -> TranslationMatch {
+impl Read {
+    /// The value as a reader reads it, whichever type carried it.
+    fn rendered(&self) -> Option<String> {
+        self.text
+            .clone()
+            .or_else(|| self.flag.map(|flag| flag.to_string()))
+            .or_else(|| self.number.map(|number| number.to_string()))
+            .or_else(|| self.coding.as_ref().map(Coding::rendered))
+    }
+}
+
+/// The answer the top-level parameters `read` make.
+fn answer(read: &[Read]) -> TranslateAnswer {
+    let first = |name: &str| read.iter().find(|parameter| parameter.name == name);
+    TranslateAnswer {
+        result: first("result").and_then(|parameter| parameter.flag),
+        message: first("message").and_then(|parameter| parameter.text.clone()),
+        used_maps: read
+            .iter()
+            .filter(|parameter| parameter.name == "used-conceptmap")
+            .filter_map(|parameter| parameter.text.clone())
+            .collect(),
+        matches: read
+            .iter()
+            .filter(|parameter| parameter.name == "match")
+            .map(read_match)
+            .collect(),
+    }
+}
+
+fn read_match(parameter: &Read) -> TranslationMatch {
     let mut found = TranslationMatch::default();
-    for part in &parameter.part {
-        match part.name.as_deref().unwrap_or_default() {
-            "equivalence" => found.equivalence = part.text(),
-            "relationship" => found.relationship = part.text(),
-            "noMap" => found.no_map = part.boolean.unwrap_or_default(),
+    for part in &parameter.parts {
+        match part.name.as_str() {
+            "equivalence" => found.equivalence.clone_from(&part.text),
+            "relationship" => found.relationship.clone_from(&part.text),
+            "noMap" => found.no_map = part.flag.unwrap_or_default(),
             "concept" => found.target.clone_from(&part.coding),
             "sourceConcept" => found.source_concept.clone_from(&part.coding),
-            // R4 and R4B name it `source` and R5 renamed it `originMap`; both
-            // carry the canonical of the map the mapping came from.
-            "originMap" | "source" => found.origin_map = part.text(),
-            "sourceComment" => found.source_comment = part.text(),
-            "targetComment" => found.target_comment = part.text(),
+            // NOTE: <https://hl7.org/fhir/R5/conceptmap-operation-translate.html>: R4 and R4B
+            // name it `source` and R5 renamed it `originMap`, both the map's canonical.
+            "originMap" | "source" => found.origin_map.clone_from(&part.text),
+            "sourceComment" => found.source_comment.clone_from(&part.text),
+            "targetComment" => found.target_comment.clone_from(&part.text),
             "product" => found.products.push(read_named_value(part)),
             "dependsOn" => found.depends_on.push(read_named_value(part)),
             "property" => found.properties.push(read_named_value(part)),
@@ -289,17 +277,11 @@ fn read_match(parameter: &WireParameter) -> TranslationMatch {
     found
 }
 
-/// One `product`, `dependsOn`, or `property` part, as a name and a value.
-///
-/// R4 and R4B name the attribute `element` and carry the value as a `Coding`
-/// under `concept`; R5 and the R6 ballot name it `attribute` and carry a
-/// `value[x]`, and `property` names it `uri`. Every spelling is read, so the
-/// row is drawn whichever version answered.
-fn read_named_value(parameter: &WireParameter) -> NamedValue {
+fn read_named_value(parameter: &Read) -> NamedValue {
     let mut found = NamedValue::default();
-    for part in &parameter.part {
-        match part.name.as_deref().unwrap_or_default() {
-            "element" | "attribute" | "uri" => found.name = part.text().unwrap_or_default(),
+    for part in &parameter.parts {
+        match part.name.as_str() {
+            "element" | "attribute" | "uri" => found.name = part.text.clone().unwrap_or_default(),
             "concept" | "value" => found.value = part.rendered(),
             _other => {}
         }
@@ -307,29 +289,72 @@ fn read_named_value(parameter: &WireParameter) -> NamedValue {
     found
 }
 
-impl WireParameter {
-    /// The value as plain text, for the `value[x]` shapes that are one string.
-    fn text(&self) -> Option<String> {
-        self.string
-            .clone()
-            .or_else(|| self.code.clone())
-            .or_else(|| self.uri.clone())
-            .or_else(|| self.canonical.clone())
-            .or_else(|| self.id.clone())
-            .or_else(|| self.date_time.clone())
-    }
+/// Reads `$translate`'s answer, the `Parameters` of the `fhir-types` module
+/// `$module`.
+macro_rules! reads_translation {
+    ($module:ident) => {
+        mod $module {
+            use fhir_types::$module::parameters::{ParametersParameter, ParametersParameterValue};
 
-    /// The value as the text a reader is shown, `Coding`s included.
-    ///
-    /// A shape this viewer draws no text for reads as `None`, which the screen
-    /// states rather than rendering as an empty cell.
-    fn rendered(&self) -> Option<String> {
-        self.text()
-            .or_else(|| self.boolean.map(|flag| flag.to_string()))
-            .or_else(|| self.integer.map(|number| number.to_string()))
-            .or_else(|| self.coding.as_ref().map(Coding::rendered))
-    }
+            use super::{Coding, Read, Reads, TranslateAnswer, answer};
+
+            /// One parameter and its parts, as the reader walks them.
+            fn read(parameter: &ParametersParameter) -> Read {
+                let text = match &parameter.value {
+                    Some(ParametersParameterValue::String(value)) => value.value.clone(),
+                    Some(ParametersParameterValue::Code(value)) => value.value.clone(),
+                    Some(ParametersParameterValue::Uri(value)) => value.value.clone(),
+                    Some(ParametersParameterValue::Canonical(value)) => value.value.clone(),
+                    Some(ParametersParameterValue::Id(value)) => value.value.clone(),
+                    Some(ParametersParameterValue::DateTime(value)) => value.value.clone(),
+                    _ => None,
+                };
+                Read {
+                    name: parameter.name.value.clone().unwrap_or_default(),
+                    text,
+                    flag: match &parameter.value {
+                        Some(ParametersParameterValue::Boolean(value)) => value.value,
+                        _ => None,
+                    },
+                    number: match &parameter.value {
+                        Some(ParametersParameterValue::Integer(value)) => value.value,
+                        _ => None,
+                    },
+                    coding: match &parameter.value {
+                        Some(ParametersParameterValue::Coding(coding)) => Some(Coding {
+                            system: coding
+                                .system
+                                .as_ref()
+                                .and_then(|system| system.value.clone()),
+                            version: coding
+                                .version
+                                .as_ref()
+                                .and_then(|version| version.value.clone()),
+                            code: coding.code.as_ref().and_then(|code| code.value.clone()),
+                            display: coding
+                                .display
+                                .as_ref()
+                                .and_then(|display| display.value.clone()),
+                        }),
+                        _ => None,
+                    },
+                    parts: parameter.part.iter().map(read).collect(),
+                }
+            }
+
+            impl Reads<TranslateAnswer> for fhir_types::$module::parameters::Parameters {
+                fn read(&self) -> TranslateAnswer {
+                    answer(&self.parameter.iter().map(read).collect::<Vec<_>>())
+                }
+            }
+        }
+    };
 }
+
+reads_translation!(r4);
+reads_translation!(r4b);
+reads_translation!(r5);
+reads_translation!(r6);
 
 impl Coding {
     /// The coding as one line: the code, its system, and its display.
@@ -352,8 +377,23 @@ impl Coding {
 mod tests {
     use super::*;
 
+    /// `json`, decoded as the R4B `Parameters` it completes with its
+    /// `resourceType`.
     fn parse(json: &str) -> TranslateAnswer {
-        serde_json::from_str(json).expect("the fixture is valid JSON")
+        parse_at(FhirVersion::R4B, json)
+    }
+
+    /// `json`, decoded as the `Parameters` of `version` it completes with its
+    /// `resourceType`.
+    fn parse_at(version: FhirVersion, json: &str) -> TranslateAnswer {
+        let mut document: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_str(json).expect("the fixture is a JSON object");
+        document
+            .entry("resourceType")
+            .or_insert_with(|| serde_json::Value::from("Parameters"));
+        version
+            .decode(&serde_json::Value::Object(document).to_string())
+            .expect("the fixture is a valid Parameters at its version")
     }
 
     fn request() -> TranslateRequest {
