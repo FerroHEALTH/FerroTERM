@@ -1,0 +1,1 @@
+- The ISO 3166 code system refuses to load when the vendored CLDR data lacks its version, its territory names or its code mappings, instead of serving the version `unknown` or an empty table.
