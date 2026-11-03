@@ -14,7 +14,8 @@
 #   - the `use` declarations: two files that import the same names carry no
 #     code twice, and an import list shrinks by itself when code moves;
 #   - a file from its first `#[cfg(test)]` line in column one to its end,
-#     the inline test module, and tests/, which no root reaches: a test
+#     the inline test module, the file of an out-of-line one
+#     (`#[cfg(test)] mod tests;`), and tests/, which no root reaches: a test
 #     spells out its own input so a failure reads in one place.
 #
 # Two files beside this one hold the ratchet. duplication.count is the total
@@ -133,6 +134,37 @@ detector_kind() {
   fi
 }
 
+# The jscpd --ignore globs of the out-of-line test modules under the roots
+# $2... of the tree $1, comma-separated: for `#[cfg(test)] mod NAME;` the
+# files NAME.rs and NAME/ beside a mod.rs, lib.rs or main.rs, and under the
+# module's own directory otherwise (The Rust Reference, Modules, Module
+# source filenames).
+test_module_globs() {
+  local tree="$1"
+  shift
+  (cd "$tree" && find "$@" -type f -name '*.rs' | sort | while IFS= read -r file; do
+    awk '
+      /^[ \t]*#\[cfg\(test\)\][ \t]*$/ { gate = 1; next }
+      gate && /^[ \t]*(pub(\([^)]*\))?[ \t]+)?mod[ \t]+[A-Za-z_][A-Za-z0-9_]*[ \t]*;/ {
+        name = $0
+        sub(/^[ \t]*(pub(\([^)]*\))?[ \t]+)?mod[ \t]+/, "", name)
+        sub(/[ \t]*;.*$/, "", name)
+        dir = FILENAME
+        sub(/[^\/]*$/, "", dir)
+        base = FILENAME
+        sub(/^.*\//, "", base)
+        if (base != "mod.rs" && base != "lib.rs" && base != "main.rs") {
+          sub(/\.rs$/, "", base)
+          dir = dir base "/"
+        }
+        print "**/" dir name ".rs"
+        print "**/" dir name "/**"
+      }
+      { gate = 0 }
+    ' "$file"
+  done) | paste -sd, -
+}
+
 # Runs the detector over the tree $1 and leaves its report in $2/report.json.
 # Prints the prefix the report's absolute paths carry.
 detect() {
@@ -160,6 +192,11 @@ detect() {
   esac
   flags=(--output "$seen" --format rust --min-tokens "$MIN_TOKENS" --min-lines "$MIN_LINES"
     --ignore-pattern "$IGNORED" --reporters json --absolute --no-tips --fail-on-empty)
+  local globs
+  globs="$(test_module_globs "$tree" "${roots[@]}")"
+  if [[ -n "$globs" ]]; then
+    flags+=(--ignore "$globs")
+  fi
   local status=0 copy root
   case "$kind" in
     docker | podman)
@@ -460,6 +497,11 @@ if [[ "${1:-}" == "--self-test" ]]; then
       "$name" >"$tree/crates/demo/src/$name.rs"
   done
   block sixth >"$tree/app/demo/tests/it.rs"
+  # An out-of-line test module: its file holds the block, and the scan
+  # leaves it out as it leaves out an inline one.
+  printf 'pub fn three() {}\n\n#[cfg(test)]\nmod tests;\n' >"$tree/crates/demo/src/three.rs"
+  mkdir -p "$tree/crates/demo/src/three"
+  block seventh >"$tree/crates/demo/src/three/tests.rs"
   count_file="$work/duplication.count"
   baseline="$work/baseline.txt"
 
