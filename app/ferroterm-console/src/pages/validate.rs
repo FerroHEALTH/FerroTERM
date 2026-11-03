@@ -23,6 +23,7 @@ use crate::fhir::{CODE_SYSTEM, VALUE_SET};
 use crate::locale::{Msg, tr, tr_with};
 use crate::markup::{code, p, strong};
 use crate::pages::lookup::CODE_PARAM;
+use crate::pages::operations::published;
 use crate::pages::operations::{
     Op, before, choices, frame, options, run, select, sent, text, verdict,
 };
@@ -48,11 +49,10 @@ const CODE_B_PARAM: &str = "codeB";
 /// The Check tab.
 pub(crate) async fn page(request: Request) -> Html {
     let relation = request.text(MODE_PARAM) == RELATION;
-    let systems_named = request
-        .client
-        .published_names(request.version, CODE_SYSTEM)
-        .await
-        .ok();
+    let systems_named = match published(&request, CODE_SYSTEM).await {
+        Ok(named) => named,
+        Err(error) => return failure(&request.locale, &error),
+    };
     let systems = choices(systems_named.as_ref());
     let system_names = systems_named
         .as_ref()
@@ -108,11 +108,10 @@ async fn membership_tab(
     system: String,
 ) -> (Html, Html) {
     let locale = &request.locale;
-    let sets_named = request
-        .client
-        .published_names(request.version, VALUE_SET)
-        .await
-        .ok();
+    let sets_named = match published(request, VALUE_SET).await {
+        Ok(named) => named,
+        Err(error) => return (mode, failure(locale, &error)),
+    };
     let sets = choices(sets_named.as_ref());
     let set_names = sets_named
         .as_ref()

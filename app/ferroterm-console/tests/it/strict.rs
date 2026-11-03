@@ -341,3 +341,44 @@ async fn a_code_system_that_does_not_decode_at_its_release_draws_the_error_state
         "no partial page draws the facts the answer named"
     );
 }
+
+#[tokio::test]
+async fn names_that_do_not_decode_at_their_release_draw_the_operation_page_s_error_state() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/r4b/metadata"))
+        .and(query_param("mode", "terminology"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(include_str!(
+            "../../fixtures/terminology-capabilities-r4b.json"
+        )))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/r4b/CodeSystem"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "resourceType": "Bundle",
+            "type": "searchset",
+            "entry": [{ "resource": {
+                "resourceType": "CodeSystem",
+                "url": "https://terminology.example/CodeSystem/offered",
+                "title": "Offered",
+                "status": "active"
+            } }]
+        })))
+        .mount(&server)
+        .await;
+    let state = console(
+        None,
+        &format!("[ferroterm]\nbase_url = \"{}/\"\n", server.uri()),
+    )
+    .await;
+    let page = text(send(&state, get("/lookup?fhir=r4b", &[])).await).await;
+    assert!(
+        page.contains("FHIR R4B: ") && page.contains("Bundle.entry[0]") && page.contains("content"),
+        "the error names the version, the resource and the element the entry lacks: {page}"
+    );
+    assert!(
+        !page.contains(">Offered<"),
+        "no picker offers what the answer named"
+    );
+}
