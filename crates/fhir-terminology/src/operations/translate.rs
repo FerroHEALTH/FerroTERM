@@ -10,17 +10,20 @@
 //! scopes fit `source` and `target` and whose groups map the code's system
 //! (to `targetsystem` when given). One of `code` with `system`, `coding`, or
 //! `codeableConcept` is the input; `reverse` reads the groups the other way.
-//! An element without a target, or an `unmapped` rule, still yields a match,
-//! so a client sees why nothing translated. `result` is true when a match has
+//! A map applies only to a code its source scope holds. An element
+//! without a target, or an `unmapped` rule, still yields a match, so a client
+//! sees why nothing translated. `result` is true when a match has
 //! a relationship other than `unmatched` or `disjoint`.
 
 use std::sync::Arc;
 
 use super::{CodeableConceptRef, CodingRef, OperationError, Sources};
+use crate::compose::ValueSetResolver;
 use crate::conceptmap::model::{
     ConceptMapModel, DependsOn, Element, Group, ModelError, Relationship, Target, UnmappedMode,
 };
 use crate::provider::MapSelection;
+use crate::valueset::store::Resolver;
 use crate::versioned::Versioned;
 
 /// How deep `unmapped.mode = other-map` may chain (our own guard).
@@ -145,7 +148,7 @@ pub fn translate(
     let target_system = input.target_system.as_deref();
     let subjects = subjects(input)?;
     let mut used = Vec::new();
-    let (mut matches, mapped) = translated(
+    let (mut matches, consulted) = translated(
         sources,
         &candidates,
         input,
@@ -166,7 +169,11 @@ pub fn translate(
     let result = matches.iter().any(translates);
     let message = if !matches.is_empty() {
         None
-    } else if mapped {
+    } else if let Some(subject) = subjects.first()
+        && !consulted.out_of_scope.is_empty()
+    {
+        Some(out_of_scope_message(subject, &consulted.out_of_scope))
+    } else if consulted.mapped {
         Some(String::from("No translations found"))
     } else {
         Some(no_map_message(subjects.first(), target_system, reverse))
@@ -189,8 +196,17 @@ fn translates(found: &Match) -> bool {
         )
 }
 
+/// Which maps a translation consulted.
+#[derive(Debug, Default)]
+struct Consulted {
+    /// Whether any map applied to a subject at all.
+    mapped: bool,
+    /// The canonicals of the maps whose source scope left a subject out.
+    out_of_scope: Vec<String>,
+}
+
 /// The matches every candidate map holds for every subject, each target
-/// reported once, and whether any map was consulted at all.
+/// reported once, and which maps were consulted.
 fn translated(
     sources: &Sources<'_>,
     candidates: &Candidates,
@@ -199,12 +215,25 @@ fn translated(
     target_system: Option<&str>,
     reverse: bool,
     used: &mut Vec<String>,
-) -> Result<(Vec<Match>, bool), OperationError> {
+) -> Result<(Vec<Match>, Consulted), OperationError> {
     let mut matches: Vec<Match> = Vec::new();
-    let mut mapped = false;
+    let mut consulted = Consulted::default();
     for subject in subjects {
-        let maps = maps_for(sources, candidates, input, subject, reverse)?;
-        mapped |= !maps.is_empty();
+        let mut maps = maps_for(sources, candidates, input, subject, reverse)?;
+        // The source scope limits the source codes, so a reverse read, whose
+        // subject is a target code, is not held to it.
+        if !reverse {
+            let mut applicable = Vec::with_capacity(maps.len());
+            for map in maps {
+                if in_source_scope(sources, &map, subject)? {
+                    applicable.push(map);
+                } else {
+                    consulted.out_of_scope.push(map.canonical());
+                }
+            }
+            maps = applicable;
+        }
+        consulted.mapped |= !maps.is_empty();
         for map in &maps {
             for found in matches_in(sources, map, subject, target_system, reverse, 0, used)? {
                 // NOTE: the same target reached through two maps is one match, the
@@ -215,7 +244,50 @@ fn translated(
             }
         }
     }
-    Ok((matches, mapped))
+    Ok((matches, consulted))
+}
+
+/// Whether `subject` is a member of the source scope of `map`, or `map`
+/// states none: R5 `ConceptMap.sourceScope[x]`
+/// (<https://hl7.org/fhir/R5/conceptmap-definitions.html#ConceptMap.sourceScope_x_>)
+/// and R4 and R4B `ConceptMap.source[x]`
+/// (<https://hl7.org/fhir/R4B/conceptmap-definitions.html#ConceptMap.source_x_>).
+///
+/// # Errors
+///
+/// Returns [`OperationError`] when the scope cannot be resolved or evaluated,
+/// naming the value set.
+fn in_source_scope(
+    sources: &Sources<'_>,
+    map: &ConceptMapModel,
+    subject: &Subject,
+) -> Result<bool, OperationError> {
+    let Some(scope) = map.source_scope.as_deref() else {
+        return Ok(true);
+    };
+    // NOTE: R5 `sourceScope[x]` "Limits the scope of the map to source codes ...
+    // that are members of this value set", the `unmapped` rule included (R5
+    // conceptmap-definitions.html#ConceptMap.sourceScope_x_).
+    let found = Resolver::new(sources.registry, sources.value_sets).contains(
+        scope,
+        &subject.system,
+        &subject.code,
+    )?;
+    Ok(found.is_some())
+}
+
+/// The message when every map that could translate `subject` leaves it out
+/// of its source scope (spec-silent wording, our own).
+fn out_of_scope_message(subject: &Subject, maps: &[String]) -> String {
+    format!(
+        "The code '{}' of '{}' is not in the source scope of the ConceptMaps {}",
+        subject.code,
+        subject.system,
+        maps.iter()
+            .map(|m| format!("'{m}'"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
 }
 
 /// Whether `found` names a target `matches` already reports.
@@ -717,6 +789,9 @@ fn unmapped_matches(
                 .concept_maps
                 .resolve(other, None)
                 .ok_or_else(|| OperationError::UnknownConceptMap(other.clone()))?;
+            if !in_source_scope(sources, &other_map, subject)? {
+                return Ok(Vec::new());
+            }
             let chained = matches_in(
                 sources,
                 &other_map,
