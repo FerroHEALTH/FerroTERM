@@ -120,6 +120,15 @@ fn dashboard(request: &Request, reads: &Reads) -> Html {
     {
         return unreachable(request, error);
     }
+    // A listing that does not decode at its release is a defect, so the page
+    // draws it rather than a dashboard missing that listing.
+    if let Some(error) = [&reads.systems, &reads.value_sets, &reads.concept_maps]
+        .into_iter()
+        .find_map(|read| read.as_ref().err())
+        .filter(|error| matches!(error, FhirError::Decode { .. }))
+    {
+        return unreachable(request, error);
+    }
     let version = request.version;
     let answered_at = jiff::Zoned::now().strftime("%H:%M").to_string();
     let subtitle = tr_with(

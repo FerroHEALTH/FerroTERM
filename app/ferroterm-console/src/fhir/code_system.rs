@@ -11,49 +11,18 @@
 //! screen reads both and keeps them apart. Reading lives here, outside every
 //! component, so the screen renders a value plain unit tests can pin.
 
-use serde::{Deserialize, Serialize};
-
-/// The resource type an entry must declare to be drawn as a code system.
-///
-/// `resourceType` is mandatory in FHIR JSON
-/// (<https://hl7.org/fhir/R4B/json.html>), so an entry that declares another
-/// type, or none, is something else the server put in the bundle.
-const CODE_SYSTEM: &str = "CodeSystem";
-
-/// What `GET [base]/CodeSystem?url=` answered.
-///
-/// Every field is optional so a server that omits one still renders. The
-/// viewer carries the elements it draws and nothing else: it never mirrors the
-/// whole resource.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
-pub(crate) struct CodeSystemSearch {
-    /// `Bundle.total`, the number of matches the server counted.
-    total: Option<u32>,
-    /// `Bundle.entry`, one per match.
-    #[serde(default)]
-    entry: Vec<SearchEntry>,
-}
-
-/// One `Bundle.entry`.
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-struct SearchEntry {
-    /// The resource the entry carries.
-    resource: Option<PublishedCodeSystem>,
-}
+use crate::fhir::release::Reads;
+use crate::fhir::searchset::Found;
 
 /// The `CodeSystem` a root publishes, as the detail screen draws it.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct PublishedCodeSystem {
-    /// `resourceType`, which says what the entry actually carries.
-    #[serde(rename = "resourceType")]
-    resource_type: Option<String>,
     /// `CodeSystem.id`, the id the read and the history address.
     id: Option<String>,
-    /// `meta`, whose `versionId` says the resource was written through the
+    /// `meta.versionId`, which says the resource was written through the
     /// API.
-    meta: Option<crate::fhir::named::Meta>,
+    version_id: Option<String>,
     /// `CodeSystem.property`, the properties the system declares.
-    #[serde(default)]
     property: Vec<DeclaredProperty>,
     /// `CodeSystem.url`, the canonical the search asked for.
     url: Option<String>,
@@ -74,15 +43,12 @@ pub(crate) struct PublishedCodeSystem {
     /// `CodeSystem.description`.
     description: Option<String>,
     /// `CodeSystem.caseSensitive`.
-    #[serde(rename = "caseSensitive")]
     case_sensitive: Option<bool>,
     /// `CodeSystem.hierarchyMeaning`, what a parent-child edge means here.
-    #[serde(rename = "hierarchyMeaning")]
     hierarchy_meaning: Option<String>,
     /// `CodeSystem.compositional`, whether the system has a grammar.
     compositional: Option<bool>,
     /// `CodeSystem.versionNeeded`, whether a code means nothing on its own.
-    #[serde(rename = "versionNeeded")]
     version_needed: Option<bool>,
     /// `CodeSystem.content`, how much of the system this resource carries.
     content: Option<String>,
@@ -94,37 +60,16 @@ pub(crate) struct PublishedCodeSystem {
 
 /// One `CodeSystem.property`: a property the system declares for its
 /// concepts.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct DeclaredProperty {
     /// `property.code`, how a concept names it.
     pub(crate) code: Option<String>,
     /// `property.type`, the type of its values.
-    #[serde(rename = "type")]
     pub(crate) kind: Option<String>,
     /// `property.description`, what it means.
     pub(crate) description: Option<String>,
     /// `property.uri`, the property it stands for.
     pub(crate) uri: Option<String>,
-}
-
-impl CodeSystemSearch {
-    /// The published code systems the answer carries, in the server's order.
-    ///
-    /// An entry carrying something other than a `CodeSystem` is passed over
-    /// rather than drawn as one: a `searchset` may also carry an
-    /// `OperationOutcome` describing the search itself
-    /// (<https://hl7.org/fhir/R4B/http.html#search>).
-    pub(crate) fn published(&self) -> Vec<PublishedCodeSystem> {
-        self.carried().cloned().collect()
-    }
-
-    /// The `CodeSystem` resources the entries carry, borrowed.
-    fn carried(&self) -> impl Iterator<Item = &PublishedCodeSystem> {
-        self.entry
-            .iter()
-            .filter_map(|entry| entry.resource.as_ref())
-            .filter(|resource| resource.resource_type.as_deref() == Some(CODE_SYSTEM))
-    }
 }
 
 impl PublishedCodeSystem {
@@ -146,9 +91,7 @@ impl PublishedCodeSystem {
     /// The version the server holds of a resource written through the API;
     /// `None` for one the deployment loaded, which has no write path.
     pub(crate) fn stored(&self) -> Option<&str> {
-        self.meta
-            .as_ref()
-            .and_then(crate::fhir::named::Meta::stored)
+        named(self.version_id.as_deref())
     }
 
     /// The properties the system declares for its concepts.
@@ -227,6 +170,79 @@ fn named(text: Option<&str>) -> Option<&str> {
     text.map(str::trim).filter(|trimmed| !trimmed.is_empty())
 }
 
+/// Reads the `CodeSystem` of the `fhir-types` module `$module` as the detail
+/// screen draws it.
+macro_rules! reads_code_system {
+    ($module:ident) => {
+        mod $module {
+            use fhir_types::$module::code_system::CodeSystem;
+
+            use super::{DeclaredProperty, Found, PublishedCodeSystem, Reads};
+
+            impl Reads<PublishedCodeSystem> for CodeSystem {
+                fn read(&self) -> PublishedCodeSystem {
+                    let text = |value: Option<&fhir_types::$module::primitives::String>| {
+                        value.and_then(|value| value.value.clone())
+                    };
+                    let flag = |value: Option<&fhir_types::$module::primitives::Boolean>| {
+                        value.and_then(|value| value.value)
+                    };
+                    PublishedCodeSystem {
+                        id: self.id.clone(),
+                        version_id: self
+                            .meta
+                            .as_ref()
+                            .and_then(|meta| meta.version_id.as_ref())
+                            .and_then(|id| id.value.clone()),
+                        property: self
+                            .property
+                            .iter()
+                            .map(|property| DeclaredProperty {
+                                code: property.code.value.clone(),
+                                kind: property.r#type.value.clone(),
+                                description: text(property.description.as_ref()),
+                                uri: property.uri.as_ref().and_then(|uri| uri.value.clone()),
+                            })
+                            .collect(),
+                        url: self.url.as_ref().and_then(|url| url.value.clone()),
+                        version: text(self.version.as_ref()),
+                        name: text(self.name.as_ref()),
+                        title: text(self.title.as_ref()),
+                        status: self.status.value.clone(),
+                        experimental: flag(self.experimental.as_ref()),
+                        date: self.date.as_ref().and_then(|date| date.value.clone()),
+                        publisher: text(self.publisher.as_ref()),
+                        description: self
+                            .description
+                            .as_ref()
+                            .and_then(|description| description.value.clone()),
+                        case_sensitive: flag(self.case_sensitive.as_ref()),
+                        hierarchy_meaning: self
+                            .hierarchy_meaning
+                            .as_ref()
+                            .and_then(|meaning| meaning.value.clone()),
+                        compositional: flag(self.compositional.as_ref()),
+                        version_needed: flag(self.version_needed.as_ref()),
+                        content: self.content.value.clone(),
+                        supplements: self
+                            .supplements
+                            .as_ref()
+                            .and_then(|supplements| supplements.value.clone()),
+                        count: self.count.as_ref().and_then(|count| count.value),
+                    }
+                }
+            }
+
+            crate::fhir::searchset::carries!($module, CodeSystem, PublishedCodeSystem);
+        }
+    };
+}
+
+reads_code_system!(r4);
+reads_code_system!(r4b);
+reads_code_system!(r5);
+reads_code_system!(r6);
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -258,8 +274,38 @@ mod tests {
         }
     }
 
-    fn parse(json: &str) -> CodeSystemSearch {
-        serde_json::from_str(json).expect("the fixture is valid JSON")
+    /// `json`, a `searchset` written with only what a test is about,
+    /// completed with the members its definition requires and decoded at
+    /// R4B.
+    fn parse(json: &str) -> Found<PublishedCodeSystem> {
+        let mut bundle: serde_json::Value =
+            serde_json::from_str(json).expect("the fixture is JSON");
+        if let Some(object) = bundle.as_object_mut() {
+            object
+                .entry("resourceType")
+                .or_insert_with(|| "Bundle".into());
+            object.entry("type").or_insert_with(|| "searchset".into());
+        }
+        for entry in bundle
+            .get_mut("entry")
+            .and_then(serde_json::Value::as_array_mut)
+            .into_iter()
+            .flatten()
+        {
+            if let Some(resource) = entry
+                .get_mut("resource")
+                .and_then(serde_json::Value::as_object_mut)
+                .filter(|resource| resource.get("resourceType") == Some(&"CodeSystem".into()))
+            {
+                resource.entry("status").or_insert_with(|| "active".into());
+                resource
+                    .entry("content")
+                    .or_insert_with(|| "complete".into());
+            }
+        }
+        crate::fhir::version::FhirVersion::R4B
+            .decode(&bundle.to_string())
+            .expect("the fixture is a searchset at R4B")
     }
 
     /// A `searchset` shaped the way the server answers one.
@@ -277,7 +323,7 @@ mod tests {
     fn a_published_resource_is_read_from_the_searchset_entry() {
         let search = parse(ONE_MATCH);
         assert_eq!(search.total, Some(1));
-        let published = search.published();
+        let published = search.found();
         let resource = published.first().expect("the bundle carries one match");
         assert_eq!(
             resource.url.as_deref(),
@@ -288,7 +334,8 @@ mod tests {
 
     #[test]
     fn every_fact_the_screen_names_is_read_from_the_resource() {
-        let published = parse(ONE_MATCH).published();
+        let search = parse(ONE_MATCH);
+        let published = search.found();
         let resource = published.first().expect("the bundle carries one match");
         assert_eq!(
             value_of(resource, "Title"),
@@ -315,7 +362,7 @@ mod tests {
             r#"{"entry":[{"resource":{"resourceType":"CodeSystem",
                 "url":"https://terminology.example/bare","status":"active"}}]}"#,
         );
-        let published = search.published();
+        let published = search.found();
         let resource = published.first().expect("the bundle carries one match");
         assert_eq!(
             value_of(resource, "Compositional grammar"),
@@ -335,7 +382,7 @@ mod tests {
                     "issue":[{"severity":"warning","code":"processing"}]}}]}"#,
         );
         assert!(
-            search.published().is_empty(),
+            search.found().is_empty(),
             "the screen then states that the root publishes no resource"
         );
         assert_eq!(search.total, Some(0));
@@ -345,8 +392,8 @@ mod tests {
     fn the_count_the_live_region_reads_is_the_number_of_resources_drawn() {
         let search = parse(ONE_MATCH);
         assert_eq!(
-            search.published().len(),
-            search.published().len(),
+            search.found().len(),
+            search.found().len(),
             "the announced count and the drawn blocks are the same answer"
         );
     }
@@ -354,7 +401,7 @@ mod tests {
     #[test]
     fn an_empty_searchset_reads_as_no_published_resource() {
         let search = parse(r#"{"resourceType":"Bundle","type":"searchset","total":0}"#);
-        assert_eq!(search.published(), Vec::<PublishedCodeSystem>::new());
+        assert_eq!(search.found(), Vec::<&PublishedCodeSystem>::new());
         assert_eq!(search.total, Some(0));
     }
 
@@ -369,7 +416,7 @@ mod tests {
             search.total, None,
             "the screen states the absence rather than inventing a count"
         );
-        assert_eq!(search.published().len(), 1);
+        assert_eq!(search.found().len(), 1);
     }
 
     #[test]
@@ -378,7 +425,7 @@ mod tests {
             r#"{"entry":[{"resource":{"resourceType":"CodeSystem",
                 "url":"https://terminology.example/w","version":"  "}}]}"#,
         );
-        let published = search.published();
+        let published = search.found();
         let resource = published.first().expect("the bundle carries one match");
         assert_eq!(
             resource.version(),
@@ -397,7 +444,7 @@ mod tests {
                   "content":"fragment","hierarchyMeaning":"grouped-by",
                   "supplements":"https://terminology.example/base"}}]}"#,
         );
-        let published = search.published();
+        let published = search.found();
         let resource = published.first().expect("the bundle carries one match");
         assert_eq!(value_of(resource, "Status"), Some("draft".into()));
         assert_eq!(
@@ -420,7 +467,7 @@ mod tests {
                 "property":[{"code":"p","type":"code"}],
                 "filter":[{"code":"concept","operator":["is-a"],"value":"a code"}]}}]}"#,
         );
-        let published = search.published();
+        let published = search.found();
         let resource = published.first().expect("the bundle carries one match");
         assert_eq!(
             resource.url.as_deref(),
@@ -443,7 +490,7 @@ mod tests {
                 "property":[{"code":"hue","type":"string","description":"The hue.",
                   "uri":"https://terminology.example/hue"}]}}]}"#,
         );
-        let published = search.published();
+        let published = search.found();
         let resource = published.first().expect("the bundle carries one match");
         assert_eq!(Some("colours"), resource.id());
         assert_eq!(Some("Colours"), resource.name());
@@ -474,10 +521,10 @@ mod tests {
     #[test]
     fn a_loaded_system_has_no_stored_version_and_blank_facts_read_as_absent() {
         let search = parse(
-            r#"{"entry":[{"resource":{"resourceType":"CodeSystem","id":" ",
-                "url":"https://terminology.example/loaded","name":" ","date":""}}]}"#,
+            r#"{"entry":[{"resource":{"resourceType":"CodeSystem",
+                "url":"https://terminology.example/loaded","name":" "}}]}"#,
         );
-        let published = search.published();
+        let published = search.found();
         let resource = published.first().expect("the bundle carries one match");
         assert_eq!(None, resource.stored());
         assert_eq!(None, resource.id());

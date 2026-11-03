@@ -16,57 +16,16 @@
 
 use std::collections::BTreeMap;
 
-use serde::{Deserialize, Serialize};
+use crate::fhir::release::Reads;
+use crate::fhir::write::Stamp;
 
-/// What the narrowed search answered.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+/// What the narrowed search answered: the stamp of each published resource
+/// it carried, read from the `Bundle` its release decoded.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct NamedSearch {
-    /// `Bundle.entry`, one per match.
-    #[serde(default)]
-    entry: Vec<NamedEntry>,
-}
-
-/// One `Bundle.entry`.
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-struct NamedEntry {
-    /// The resource the entry carries.
-    resource: Option<Named>,
-}
-
-/// One published resource, as little of it as a name needs.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
-struct Named {
-    /// The logical id.
-    id: Option<String>,
-    /// The publication status.
-    status: Option<String>,
-    /// The record's metadata: a resource written through the API carries
-    /// the version the server holds.
-    meta: Option<Meta>,
-    /// The canonical a request carries.
-    url: Option<String>,
-    /// The computer-friendly name.
-    name: Option<String>,
-    /// The name written for a person.
-    title: Option<String>,
-    /// The business version of this resource.
-    version: Option<String>,
-}
-
-/// `Resource.meta`, as much of it as a listing reads.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
-pub(crate) struct Meta {
-    /// `meta.versionId`, which a resource written through the API carries
-    /// and one the deployment loaded does not.
-    #[serde(rename = "versionId")]
-    version_id: Option<String>,
-}
-
-impl Meta {
-    /// The version the server holds of a resource written through the API.
-    pub(crate) fn stored(&self) -> Option<&str> {
-        named(self.version_id.as_deref())
-    }
+    /// Each `CodeSystem`, `ValueSet` or `ConceptMap` the entries carry, in
+    /// the server's order.
+    published: Vec<Stamp>,
 }
 
 /// One published resource as a listing shows it.
@@ -184,11 +143,7 @@ impl NamedSearch {
                     url,
                     version: named(published.version.as_deref()).map(str::to_owned),
                     status: named(published.status.as_deref()).map(str::to_owned),
-                    stored: published
-                        .meta
-                        .as_ref()
-                        .and_then(|meta| named(meta.version_id.as_deref()))
-                        .map(str::to_owned),
+                    stored: named(published.version_id.as_deref()).map(str::to_owned),
                 }
             })
             .collect();
@@ -202,10 +157,8 @@ impl NamedSearch {
     }
 
     /// The resources the answer carried.
-    fn published(&self) -> impl Iterator<Item = &Named> {
-        self.entry
-            .iter()
-            .filter_map(|entry| entry.resource.as_ref())
+    fn published(&self) -> impl Iterator<Item = &Stamp> {
+        self.published.iter()
     }
 }
 
@@ -214,6 +167,35 @@ fn named(value: Option<&str>) -> Option<&str> {
     value.map(str::trim).filter(|name| !name.is_empty())
 }
 
+/// Reads the narrowed `searchset` `Bundle` of the `fhir-types` module
+/// `$module`.
+///
+/// An entry that carries no `CodeSystem`, `ValueSet` or `ConceptMap`, such as
+/// the `OperationOutcome` a `searchset` may carry about the search itself
+/// (<https://hl7.org/fhir/R4B/http.html#search>), names no resource.
+macro_rules! reads_named {
+    ($module:ident) => {
+        impl Reads<NamedSearch> for fhir_types::$module::bundle::Bundle {
+            fn read(&self) -> NamedSearch {
+                NamedSearch {
+                    published: self
+                        .entry
+                        .iter()
+                        .filter_map(|entry| entry.resource.as_ref())
+                        .map(Reads::<Stamp>::read)
+                        .filter(|stamp| stamp.resource_type.is_some())
+                        .collect(),
+                }
+            }
+        }
+    };
+}
+
+reads_named!(r4);
+reads_named!(r4b);
+reads_named!(r5);
+reads_named!(r6);
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -221,18 +203,14 @@ mod tests {
     /// One answer, built the way a server writes it.
     fn answered(rows: &[(&str, Option<&str>, Option<&str>)]) -> NamedSearch {
         NamedSearch {
-            entry: rows
+            published: rows
                 .iter()
-                .map(|(url, name, title)| NamedEntry {
-                    resource: Some(Named {
-                        id: None,
-                        status: None,
-                        meta: None,
-                        url: Some((*url).to_owned()),
-                        name: name.map(str::to_owned),
-                        title: title.map(str::to_owned),
-                        version: None,
-                    }),
+                .map(|(url, name, title)| Stamp {
+                    resource_type: Some("ValueSet".to_owned()),
+                    url: Some((*url).to_owned()),
+                    name: name.map(str::to_owned),
+                    title: title.map(str::to_owned),
+                    ..Stamp::default()
                 })
                 .collect(),
         }
@@ -241,18 +219,13 @@ mod tests {
     /// One answer carrying a version per entry.
     fn versioned(rows: &[(&str, &str)]) -> NamedSearch {
         NamedSearch {
-            entry: rows
+            published: rows
                 .iter()
-                .map(|(url, version)| NamedEntry {
-                    resource: Some(Named {
-                        id: None,
-                        status: None,
-                        meta: None,
-                        url: Some((*url).to_owned()),
-                        name: None,
-                        title: None,
-                        version: Some((*version).to_owned()),
-                    }),
+                .map(|(url, version)| Stamp {
+                    resource_type: Some("ValueSet".to_owned()),
+                    url: Some((*url).to_owned()),
+                    version: Some((*version).to_owned()),
+                    ..Stamp::default()
                 })
                 .collect(),
         }
@@ -319,16 +292,10 @@ mod tests {
     #[test]
     fn a_resource_the_answer_carried_without_a_canonical_is_not_offered() {
         let search = NamedSearch {
-            entry: vec![NamedEntry {
-                resource: Some(Named {
-                    id: None,
-                    status: None,
-                    meta: None,
-                    url: None,
-                    name: Some("Nameless".to_owned()),
-                    title: None,
-                    version: None,
-                }),
+            published: vec![Stamp {
+                resource_type: Some("ValueSet".to_owned()),
+                name: Some("Nameless".to_owned()),
+                ..Stamp::default()
             }],
         };
         assert!(
@@ -379,12 +346,20 @@ mod tests {
         {"resource":{"resourceType":"ValueSet","id":"a","url":"https://terminology.example/a",
           "title":"  ","name":"alpha","version":" 1.0 ","status":"draft"}},
         {"resource":{"resourceType":"ValueSet","id":"c","url":"https://terminology.example/c",
-          "meta":{"versionId":" "}}},
-        {"search":{"mode":"outcome"}}]}"#;
+          "status":"active"}},
+        {"search":{"mode":"outcome"},"resource":{"resourceType":"OperationOutcome",
+          "issue":[{"severity":"information","code":"informational"}]}}]}"#;
+
+    /// `LISTING`, decoded at R4B.
+    fn listing() -> NamedSearch {
+        crate::fhir::version::FhirVersion::R4B
+            .decode(LISTING)
+            .expect("the server's own answer decodes at R4B")
+    }
 
     #[test]
     fn a_listing_names_each_resource_by_title_else_name_else_canonical_in_folded_order() {
-        let search: NamedSearch = serde_json::from_str(LISTING).expect("a searchset");
+        let search = listing();
         let listed = search.listed();
         assert_eq!(
             vec!["alpha", "Bravo", "https://terminology.example/c"],
@@ -409,20 +384,37 @@ mod tests {
 
     #[test]
     fn only_a_resource_written_through_the_api_lists_a_stored_version() {
-        let search: NamedSearch = serde_json::from_str(LISTING).expect("a searchset");
+        let search = listing();
         let stored: Vec<Option<String>> =
             search.listed().into_iter().map(|row| row.stored).collect();
         assert_eq!(
             vec![None, Some(String::from("3")), None],
             stored,
-            "a blank versionId is no version"
+            "a resource the deployment loaded states no version"
         );
     }
 
     #[test]
     fn meta_names_the_stored_version_only_when_it_carries_one() {
-        let written: Meta = serde_json::from_str(r#"{"versionId":"7"}"#).expect("meta");
-        assert_eq!(Some("7"), written.stored());
-        assert_eq!(None, Meta::default().stored());
+        let stored = |version_id: Option<&str>| {
+            NamedSearch {
+                published: vec![Stamp {
+                    resource_type: Some("ValueSet".to_owned()),
+                    version_id: version_id.map(str::to_owned),
+                    ..Stamp::default()
+                }],
+            }
+            .listed()
+            .into_iter()
+            .map(|row| row.stored)
+            .collect::<Vec<_>>()
+        };
+        assert_eq!(stored(Some("7")), vec![Some(String::from("7"))]);
+        assert_eq!(
+            stored(Some(" ")),
+            vec![None],
+            "a blank versionId is no version"
+        );
+        assert_eq!(stored(None), vec![None]);
     }
 }

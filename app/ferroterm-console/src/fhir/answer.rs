@@ -43,21 +43,6 @@ impl FhirClient {
             .map_err(|error| transport(url, &error))
     }
 
-    /// Sends a FHIR JSON `GET` and keeps both the elements a screen reads and
-    /// the document as the server sent it, which a screen shows as JSON.
-    pub(super) async fn get_document<T: DeserializeOwned>(
-        &self,
-        version: FhirVersion,
-        url: &str,
-    ) -> Result<Document<T>, FhirError> {
-        let answer = self.send(Method::Get, url, FHIR_JSON).await?;
-        let value = read_json(&self.locale, version, &answer, url)?;
-        Ok(Document {
-            value,
-            text: pretty(&answer.body),
-        })
-    }
-
     /// Sends a FHIR JSON `GET` and decodes the resource it answers.
     pub(super) async fn get_json<T: DeserializeOwned>(
         &self,
