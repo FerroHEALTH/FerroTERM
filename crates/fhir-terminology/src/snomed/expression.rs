@@ -188,7 +188,7 @@ impl Subject {
 
 /// Whether a rendering carries the edition's terms, and in which language.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Terms<'a> {
+pub(super) enum Terms<'a> {
     /// Concept identifiers alone, the form `normalFormTerse` asks for.
     None,
     /// The edition's terms, in `language` or in the edition's default.
@@ -623,20 +623,7 @@ impl SnomedProvider {
     ) -> Result<Option<String>, ProviderError> {
         let language = if terms { Terms::In(None) } else { Terms::None };
         let minimal = self.minimal_focus(&record.term.focus);
-        let mut focus = Vec::with_capacity(minimal.len());
-        for ordinal in &minimal {
-            let Some(code) = self
-                .stored()
-                .store
-                .code(Ordinal::new(*ordinal))
-                .map_err(storage)?
-                .map(ToOwned::to_owned)
-            else {
-                continue;
-            };
-            let term = self.term_of(&code, language)?;
-            focus.push(reference(&code, term));
-        }
+        let focus = self.references(minimal.iter().copied(), language)?;
         if focus.is_empty() {
             return Ok(None);
         }
@@ -663,9 +650,26 @@ impl SnomedProvider {
         .render())
     }
 
+    /// The references to the concepts at `ordinals`, with their terms when
+    /// `language` asks; an ordinal the store holds no code for is left out.
+    pub(super) fn references(
+        &self,
+        ordinals: impl IntoIterator<Item = u32>,
+        language: Terms<'_>,
+    ) -> Result<Vec<normal_form::Reference>, ProviderError> {
+        let store = &self.stored().store;
+        let mut out = Vec::new();
+        for ordinal in ordinals {
+            if let Some(code) = store.code(Ordinal::new(ordinal)).map_err(storage)? {
+                out.push(reference(code, self.term_of(code, language)?));
+            }
+        }
+        Ok(out)
+    }
+
     /// The inferred attributes of one concept, with its groups renumbered
     /// above `offset` so two concepts never share a group.
-    fn inferred_attributes(
+    pub(super) fn inferred_attributes(
         &self,
         ordinal: Ordinal,
         offset: u32,

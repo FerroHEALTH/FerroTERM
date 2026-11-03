@@ -3,7 +3,7 @@
 [package]
 name = "labcodeset"
 description = "Nederlandse Labcodeset publication (labconcepts XML) reader"
-version = "0.1.132"
+version = "0.1.133"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

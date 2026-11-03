@@ -131,6 +131,28 @@ struct Cluster {
     joined: Vec<(usize, Bound)>,
 }
 
+impl Cluster {
+    /// Each member as written: its stem, and the values written after it,
+    /// which a member read as a value of an earlier stem has none of.
+    fn written(&self) -> impl Iterator<Item = (u32, Vec<u32>)> + '_ {
+        self.members.iter().enumerate().map(|(position, member)| {
+            let own = !self.joined.iter().any(|(p, _)| *p == position);
+            let values = member
+                .values
+                .iter()
+                .filter(|bound| {
+                    own && !self
+                        .joined
+                        .iter()
+                        .any(|(_, b)| b.value == bound.value && b.text == bound.text)
+                })
+                .map(|bound| bound.value)
+                .collect();
+            (member.stem, values)
+        })
+    }
+}
+
 /// What ICD-11 decides: the entity URIs, the short codes, the
 /// postcoordination scales, and the expressions it validates.
 pub struct Icd11 {
@@ -490,22 +512,12 @@ impl Icd11Provider {
         language: Option<&str>,
     ) -> Result<String, ProviderError> {
         let mut parts = Vec::new();
-        for (position, member) in cluster.members.iter().enumerate() {
-            let mut part = self.title(member.stem, language)?.unwrap_or_default();
-            let own = cluster.joined.iter().any(|(p, _)| *p == position);
-            if !own {
-                for bound in &member.values {
-                    if cluster
-                        .joined
-                        .iter()
-                        .any(|(_, b)| b.value == bound.value && b.text == bound.text)
-                    {
-                        continue;
-                    }
-                    part.push_str(" [");
-                    part.push_str(&self.title(bound.value, language)?.unwrap_or_default());
-                    part.push(']');
-                }
+        for (stem, values) in cluster.written() {
+            let mut part = self.title(stem, language)?.unwrap_or_default();
+            for value in values {
+                part.push_str(" [");
+                part.push_str(&self.title(value, language)?.unwrap_or_default());
+                part.push(']');
             }
             parts.push(part);
         }
@@ -514,56 +526,34 @@ impl Icd11Provider {
 
     /// The short-code form of an expression.
     fn cluster_code(&self, cluster: &Cluster) -> String {
-        cluster
-            .members
-            .iter()
-            .enumerate()
-            .map(|(position, member)| {
-                let mut text = self.code_or_uri(member.stem);
-                if !cluster.joined.iter().any(|(p, _)| *p == position) {
-                    for bound in &member.values {
-                        if cluster
-                            .joined
-                            .iter()
-                            .any(|(_, b)| b.value == bound.value && b.text == bound.text)
-                        {
-                            continue;
-                        }
-                        text.push('&');
-                        text.push_str(&self.code_or_uri(bound.value));
-                    }
-                }
-                text
-            })
-            .collect::<Vec<_>>()
-            .join("/")
+        Self::cluster_text(cluster, |ordinal| self.code_or_uri(ordinal), "&", "/")
     }
 
     /// The URI form of an expression: the members' URIs, values joined with ` & `.
     fn cluster_uri(&self, cluster: &Cluster) -> String {
+        Self::cluster_text(cluster, |ordinal| self.uri(ordinal), " & ", " / ")
+    }
+
+    /// An expression written out with `spell`: each stem followed by its own
+    /// values after `and`, the members joined by `then`.
+    fn cluster_text(
+        cluster: &Cluster,
+        spell: impl Fn(u32) -> String,
+        and: &str,
+        then: &str,
+    ) -> String {
         cluster
-            .members
-            .iter()
-            .enumerate()
-            .map(|(position, member)| {
-                let mut text = self.uri(member.stem);
-                if !cluster.joined.iter().any(|(p, _)| *p == position) {
-                    for bound in &member.values {
-                        if cluster
-                            .joined
-                            .iter()
-                            .any(|(_, b)| b.value == bound.value && b.text == bound.text)
-                        {
-                            continue;
-                        }
-                        text.push_str(" & ");
-                        text.push_str(&self.uri(bound.value));
-                    }
+            .written()
+            .map(|(stem, values)| {
+                let mut text = spell(stem);
+                for value in values {
+                    text.push_str(and);
+                    text.push_str(&spell(value));
                 }
                 text
             })
             .collect::<Vec<_>>()
-            .join(" / ")
+            .join(then)
     }
 
     fn cluster_properties(
