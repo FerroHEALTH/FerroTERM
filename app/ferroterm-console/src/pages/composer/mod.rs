@@ -17,34 +17,31 @@ use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::view::coding::{Coding, Layout, coding};
-use ferrohealth_ui::view::form::{FORM, Field, SELECT, field_flow};
+use ferrohealth_ui::view::form::{Field, SELECT, field_flow};
 use ferrohealth_ui::view::kbd::{aria_keys, kbd};
 use ferrohealth_ui::view::layout::main_aside;
 use ferrohealth_ui::view::layout::{Gap, stack_at};
-use ferrohealth_ui::view::load_report::{Arrival, LoadReport, Outcome, load_report};
 use ferrohealth_ui::view::surface::{
     SectionHead, card_action, panel_section, panel_sections_card, section_intro,
 };
 use ferrohealth_ui::view::transform::transform_quiet;
 
-use crate::auth::scopes::Letter;
-use crate::fhir::compose::{Draft, Preview, STATUSES};
+use crate::fhir::compose::{Draft, Preview};
 use crate::fhir::version::FhirVersion;
+use crate::fhir::write::Written;
 use crate::fhir::{CODE_SYSTEM, VALUE_SET};
 use crate::locale::{Msg, tr, tr_with};
 use crate::pages::detail::Kind;
 use crate::pages::editor::{
-    DISCARD, OPENED, OPENED_AT, SAVE, SAVED_PARAM, Standing, dock, field, form, heading,
-    opened_line, percent, refused, rows, text_field,
+    self, Guard, OPENED, OPENED_AT, SAVE, Standing, apply_metadata, dock, field, form, heading,
+    metadata_section, opened_line, rows, shown, status_options, target, text_field,
 };
 use crate::pages::operations::{choices, option};
 use crate::pages::parts::{failure, name_of};
 use crate::pages::shortcuts::RUN_KEYS;
 use crate::posted::Posted;
 use crate::request::Request;
-use crate::routes::{
-    COMPOSE_ROUTE, COMPOSER_ID_PARAM, VALUE_SETS_PATH, resource_link, sign_in_link, ui_link,
-};
+use crate::routes::{COMPOSE_ROUTE, COMPOSER_ID_PARAM, VALUE_SETS_PATH, resource_link};
 
 mod clauses;
 
@@ -85,56 +82,36 @@ const OPERATORS: [&str; 10] = [
 
 /// The value set composer.
 pub(crate) async fn page(request: Request) -> Html {
-    let locale = &request.locale;
-    let posted = request.posted.clone();
-    let letter = if request.text(COMPOSER_ID_PARAM).is_empty() {
-        Letter::Create
-    } else {
-        Letter::Update
-    };
-    if !request.can(VALUE_SET, letter) {
-        if request.session.who().is_none() && request.sign_in {
-            request.answering.redirect(&sign_in_link(&request.back()));
-        }
-        return crate::pages::errors::forbidden_page(
-            &request,
-            Msg::EditorForbiddenValueSet,
-            "user/ValueSet.cu",
-            (
-                tr(locale, Msg::ShellValueSets),
-                ui_link(VALUE_SETS_PATH, request.version),
-            ),
-        );
-    }
-    edited(&request, posted.as_ref()).await
+    editor::guarded(&request, &GUARD, edited).await
 }
 
-/// The composer's address: the value set it edits, on the reader's version.
-fn address(request: &Request, id: &str) -> String {
-    let base = format!("{COMPOSE_ROUTE}?fhir={}", request.version.segment());
-    if id.is_empty() {
-        base
-    } else {
-        format!("{base}&{COMPOSER_ID_PARAM}={}", percent(id))
-    }
-}
+/// Who may open the value set composer.
+const GUARD: Guard = Guard {
+    route: COMPOSE_ROUTE,
+    resource_type: VALUE_SET,
+    param: COMPOSER_ID_PARAM,
+    forbidden: Msg::EditorForbiddenValueSet,
+    scope: "user/ValueSet.cu",
+    back: (Msg::ShellValueSets, VALUE_SETS_PATH),
+};
+
+editor::metadata!(Draft);
 
 /// The page, after whatever the reader `posted`.
 async fn edited(request: &Request, posted: Option<&Posted>) -> Html {
     let locale = &request.locale;
     let id = request.text(COMPOSER_ID_PARAM);
-    let here = address(request, &id);
-    if posted.is_some_and(|form| form.intent() == DISCARD) {
-        request.answering.redirect(&here);
-        return Html::empty();
+    let here = editor::address(request, &GUARD, &id);
+    if let Some(page) = editor::discarded(request, posted, &here) {
+        return page;
     }
-    let opened = match open(request, &id).await {
+    let opened = match open(request, &id)
+        .await
+        .and_then(|opened| editor::unless_saved(request, opened, saved_page))
+    {
         Ok(opened) => opened,
         Err(page) => return page,
     };
-    if let Some(saved) = request.param(SAVED_PARAM) {
-        return saved_page(request, &opened, &saved);
-    }
     let (systems, names) = systems_of(request).await;
     let cards = request
         .client
@@ -142,22 +119,20 @@ async fn edited(request: &Request, posted: Option<&Posted>) -> Html {
         .await
         .map(|capabilities| capabilities.cards())
         .unwrap_or_default();
-    let mut draft = opened.clone();
-    let mut opened_version = opened.version_id.clone();
-    let mut opened_at = jiff::Timestamp::now().to_string();
+    let (mut draft, opened_version, opened_at) = editor::reopened(posted, &opened);
     let mut answer = None;
     let mut preview = None;
     if let Some(form) = posted {
-        opened_version = form.text(OPENED);
-        opened_at = form.text(OPENED_AT);
         apply(form, &mut draft);
         if form.intent() == PREVIEW && draft.broken().is_empty() {
             preview = Some(run_preview(request, &draft).await);
         }
         if form.intent() == SAVE && draft.savable() {
-            match save(request, &draft, &opened_version, &here).await {
-                Ok(()) => return Html::empty(),
-                Err(refusal) => answer = Some(*refusal),
+            let sent = (VALUE_SET, draft.id.as_str(), draft.body(request.version));
+            let stored_as = |written: &Written| stored_at(request, &draft, written);
+            let stamps = (opened_version.as_str(), here.as_str());
+            if editor::saved(request, sent, stamps, stored_as, &mut answer).await {
+                return Html::empty();
             }
         }
     }
@@ -252,39 +227,15 @@ async fn run_preview(
         .await
 }
 
-/// Saves `draft` over the version `opened` and redirects to what the
-/// server holds now, or answers the refusal over the draft at `here`.
-async fn save(
-    request: &Request,
-    draft: &Draft,
-    opened: &str,
-    here: &str,
-) -> Result<(), Box<(Html, Standing)>> {
-    let sent = match draft.body(request.version) {
-        Ok(body) => crate::pages::editor::send(request, VALUE_SET, &draft.id, &body, opened).await,
-        Err(error) => Err(crate::fhir::error::FhirError::undecoded(
-            here,
-            request.version,
-            &error,
-        )),
-    };
-    match sent {
-        Ok(written) => {
-            let saved_id = written
-                .resource
-                .as_ref()
-                .and_then(|resource| resource.id.clone())
-                .unwrap_or_else(|| draft.id.clone());
-            let version = written.version_id().unwrap_or_default().to_owned();
-            request.answering.redirect(&format!(
-                "{}&{SAVED_PARAM}={}",
-                address(request, &saved_id),
-                percent(&version)
-            ));
-            Ok(())
-        }
-        Err(error) => Err(Box::new(refused(request, &error, here))),
-    }
+/// The composer's address of the value set `written` stored `draft` as: the
+/// id the server echoed, else the draft's own.
+fn stored_at(request: &Request, draft: &Draft, written: &Written) -> String {
+    let saved_id = written
+        .resource
+        .as_ref()
+        .and_then(|resource| resource.id.clone())
+        .unwrap_or_else(|| draft.id.clone());
+    editor::address(request, &GUARD, &saved_id)
 }
 
 /// The draft of the value set `id` names, a new one for none, or the page
@@ -298,7 +249,7 @@ async fn open(request: &Request, id: &str) -> Result<Draft, Html> {
             if stored.writable() {
                 Ok(stored.draft(&resource))
             } else {
-                Err(crate::pages::editor::unmanaged(
+                Err(editor::unmanaged(
                     request,
                     Kind::ValueSet,
                     resource_link(VALUE_SETS_PATH, id, request.version),
@@ -323,24 +274,11 @@ fn standing(locale: &Locale, version: FhirVersion, opened: &Draft, draft: &Draft
 /// The trail's step to the value set `opened` read, once it is stored.
 fn crumb(request: &Request, opened: &Draft) -> Option<(String, String)> {
     (!opened.id.is_empty()).then(|| {
-        let shown = if opened.title.is_empty() {
-            opened.url.clone()
-        } else {
-            opened.title.clone()
-        };
         (
-            shown,
+            shown(&opened.title, &opened.url),
             resource_link(VALUE_SETS_PATH, &opened.id, request.version),
         )
     })
-}
-
-/// The clause key an intent such as `add-filter:3` names, when it names
-/// `action`.
-fn target<'a>(intent: &'a str, action: &str) -> Option<&'a str> {
-    intent
-        .strip_prefix(action)
-        .and_then(|rest| rest.strip_prefix(':'))
 }
 
 /// The fields of each row of `rows` that belongs to the clause `key` and
@@ -362,11 +300,7 @@ fn kept<'a>(
 /// and the row an Add asks for added.
 fn apply(form: &Posted, draft: &mut Draft) {
     let intent = form.intent();
-    draft.url = form.text("url");
-    draft.title = form.text("title");
-    draft.name = form.text("name");
-    draft.version = form.text("version");
-    draft.status = form.text("status");
+    apply_metadata(form, draft);
     draft.inactive = match form.text("inactive").as_str() {
         "true" => Some(true),
         "false" => Some(false),
@@ -430,13 +364,7 @@ fn apply(form: &Posted, draft: &mut Draft) {
 
 /// The metadata section.
 fn metadata(locale: &Locale, draft: &Draft) -> Html {
-    let statuses = Html::join(STATUSES.iter().map(|status| {
-        option(
-            status,
-            &status_words(locale, status),
-            *status == draft.status,
-        )
-    }));
+    let statuses = status_options(locale, &draft.status);
     let picked = match draft.inactive {
         Some(true) => "true",
         Some(false) => "false",
@@ -451,15 +379,9 @@ fn metadata(locale: &Locale, draft: &Draft) -> Html {
         .into_iter()
         .map(|(value, words)| option(value, &tr(locale, words), value == picked)),
     );
-    panel_section(
+    metadata_section(
         locale,
-        Some(SectionHead {
-            title: tr(locale, Msg::EditorMetadata),
-            count: None,
-            actions: None,
-        }),
-        Html::raw(format!(
-            r#"<div class="{FORM}">{}{}{}</div>"#,
+        &Html::join([
             text_field(
                 "vs-url",
                 "url",
@@ -498,20 +420,7 @@ fn metadata(locale: &Locale, draft: &Draft) -> Html {
                     r#"<select id="vs-status" name="status" class="{SELECT}">{statuses}</select>"#
                 ))),
             ])),
-        )),
-    )
-}
-
-/// The words of a publication status.
-fn status_words(locale: &Locale, status: &str) -> String {
-    tr(
-        locale,
-        match status {
-            "active" => Msg::StatusActive,
-            "retired" => Msg::StatusRetired,
-            "unknown" => Msg::StatusUnknown,
-            _ => Msg::StatusDraft,
-        },
+        ]),
     )
 }
 
@@ -596,38 +505,10 @@ fn preview_card(
 /// The page after a save: the version the server now holds, and the way to
 /// the value set.
 fn saved_page(request: &Request, opened: &Draft, saved: &str) -> Html {
-    let locale = &request.locale;
     let href = resource_link(VALUE_SETS_PATH, &opened.id, request.version);
-    let open = card_action(href.clone(), tr(locale, Msg::EditorOpenValueSet));
-    let shown = if opened.title.is_empty() {
-        opened.url.clone()
-    } else {
-        opened.title.clone()
-    };
-    Html::join([
-        heading(
-            request,
-            Kind::ValueSet,
-            Some((shown, href)),
-            tr(locale, Msg::EditorSavedTitle),
-            tr_with(
-                locale,
-                Msg::EditorVersion,
-                &[("version", saved.to_owned().into())],
-            ),
-        ),
-        load_report(LoadReport {
-            outcome: Outcome::Ok,
-            arrival: Arrival::AfterAction,
-            title: Html::text(tr_with(
-                locale,
-                Msg::EditorSaved,
-                &[("version", saved.to_owned().into())],
-            )),
-            counts: Vec::new(),
-            action: Some(open),
-        }),
-    ])
+    let open = card_action(href.clone(), tr(&request.locale, Msg::EditorOpenValueSet));
+    let resource = Some((shown(&opened.title, &opened.url), href));
+    editor::saved_page(request, Kind::ValueSet, resource, open, saved)
 }
 
 #[cfg(test)]
