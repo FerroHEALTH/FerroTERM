@@ -630,6 +630,7 @@ history-differ = { $count ->
    *[other] { $count } elements differ between revision { $from } and revision { $to }, leaving out the revision id and time the server sets on every write.
 }
 history-what-changed = What changed
+history-path = Path
 history-compare-title = Compare two revisions
 
 ## The operations

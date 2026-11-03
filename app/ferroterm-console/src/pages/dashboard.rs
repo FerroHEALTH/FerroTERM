@@ -10,15 +10,14 @@ use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
+    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::button::label;
+use ferrohealth_ui::view::layout::{Arrangement, Gap, stack_at};
 use ferrohealth_ui::view::status::badge;
-use ferrohealth_ui::view::surface::{
-    Stat, card_action, definitions, disclosure, grid_start, stack, stat_card_marked, stat_grid,
-};
+use ferrohealth_ui::view::surface::{Stat, card_action, definitions, disclosure, stat_card_marked};
 use ferrohealth_ui::view::template::list::HeadingCount;
 use ferrohealth_ui::view::template::list::{ListCard, list_card, list_empty};
 
@@ -137,7 +136,7 @@ fn dashboard(request: &Request, reads: &Reads) -> Html {
         tr(locale, Msg::ShellDashboard),
         Some(subtitle),
         Vec::new(),
-        ActionGroup::none(),
+        ActionGroup::default(),
     );
     let cards = reads
         .capabilities
@@ -177,7 +176,7 @@ fn dashboard(request: &Request, reads: &Reads) -> Html {
             .filter(|resource| Source::of_resource(resource) == Source::Stored)
             .count()
     };
-    let stats = stat_grid(Html::join([
+    let stats = Arrangement::StatGrid.wrap(Html::join([
         counted_stat(
             locale,
             Glyph::BOOK_OPEN,
@@ -205,14 +204,11 @@ fn dashboard(request: &Request, reads: &Reads) -> Html {
         writes_stat(locale, &reads.activity),
     ]));
     let recent = recent_card(locale, &reads.activity, version);
-    let preview = systems_card(request, &reads.capabilities, &systems);
-    Html::join([
-        header,
-        stack(Html::join([
-            stats,
-            grid_start(Html::join([recent, preview])),
-        ])),
-    ])
+    let cards = Arrangement::GridStart.wrap(Html::join([
+        recent,
+        systems_card(request, &reads.capabilities, &systems),
+    ]));
+    Html::join([header, stack_at(Gap::Loose, Html::join([stats, cards]))])
 }
 
 /// A stat card of `count` items, marked with how many of them are `stored`.
@@ -311,7 +307,7 @@ fn change_row(
     let [_, change_column, when_column] = columns;
     h(format!(
         "<tr>{}{}{}</tr>",
-        title_cell(Some(&href), t(named), Some(t(sub))),
+        title_cell(None, Some(&href), t(named), Some(t(sub))),
         cell(change_column, t(interaction)),
         cell(when_column, when.unwrap_or_default()),
     ))
@@ -342,6 +338,7 @@ fn recent_card(
                     .map(|change| change_row(locale, change, &columns, version)),
             );
             let table = data_table(DataTable {
+                shape: Shape::Stacked,
                 caption: &caption,
                 columns: &columns,
                 sorting: Sorting::default(),
@@ -418,12 +415,13 @@ fn systems_card(
                 let href = system_link(&card.url, request.version);
                 h(format!(
                     "<tr>{}{}{}</tr>",
-                    title_cell(Some(&href), t(name), None),
+                    title_cell(None, Some(&href), t(name), None),
                     cell(source_column, Source::of_system(card, listed).tag(locale)),
                     cell(versions_column, t(versions_word(locale, &versions))),
                 ))
             }));
             let table = data_table(DataTable {
+                shape: Shape::Stacked,
                 caption: &caption,
                 columns: &columns,
                 sorting: Sorting::default(),
@@ -469,7 +467,7 @@ fn unreachable(request: &Request, error: &FhirError) -> Html {
             ],
         )),
         Vec::new(),
-        ActionGroup::none(),
+        ActionGroup::default(),
     );
     let detail = definitions(vec![
         (tr(locale, Msg::DashboardFailure), t(error.to_string())),
@@ -477,18 +475,21 @@ fn unreachable(request: &Request, error: &FhirError) -> Html {
     ]);
     Html::join([
         header,
-        stack(Html::join([
-            failure(locale, error),
-            h(format!(
-                r#"<p><a href="{}" class="fui-button fui-button-primary">{}</a></p>"#,
-                t(request.back()),
-                label(Some(Glyph::REFRESH_CW), tr(locale, Msg::DashboardTryAgain))
-            )),
-            h(format!(
-                r#"<p class="fui-small fui-muted">{}</p>"#,
-                t(tr(locale, Msg::DashboardKeepsNoCopy))
-            )),
-            disclosure(tr(locale, Msg::DashboardTechnicalDetail), detail),
-        ])),
+        stack_at(
+            Gap::Loose,
+            Html::join([
+                failure(locale, error),
+                h(format!(
+                    r#"<p><a href="{}" class="fui-button fui-button-primary">{}</a></p>"#,
+                    t(request.back()),
+                    label(Some(Glyph::REFRESH_CW), tr(locale, Msg::DashboardTryAgain))
+                )),
+                h(format!(
+                    r#"<p class="fui-small fui-muted">{}</p>"#,
+                    t(tr(locale, Msg::DashboardKeepsNoCopy))
+                )),
+                disclosure(tr(locale, Msg::DashboardTechnicalDetail), detail),
+            ]),
+        ),
     ])
 }

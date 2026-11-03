@@ -16,7 +16,7 @@ use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::action_menu::{Act, Action, Item, Menu};
-use ferrohealth_ui::view::dialog::{Explanation, info_dialog};
+use ferrohealth_ui::view::dialog::{Explanation, Width, info_dialog};
 use ferrohealth_ui::view::secret::{SecretState, secret_state};
 use ferrohealth_ui::view::status::badge;
 use ferrohealth_ui::view::surface::Header;
@@ -431,7 +431,7 @@ fn sign_in(locale: &Locale, settings: &Shown) -> Vec<Setting> {
                 locale,
                 Msg::ConfigSecret,
                 Msg::ConfigSecretLine,
-                secret_state(locale, &secret),
+                secret_state(locale, &secret, None),
                 "oidc.client_secret_file",
             ),
             row(
@@ -512,7 +512,7 @@ fn listener(locale: &Locale, settings: &Shown) -> Vec<Setting> {
 /// file named.
 fn more(locale: &Locale, file: Option<&std::path::Path>) -> ActionGroup {
     let Some(file) = file else {
-        return ActionGroup::none();
+        return ActionGroup::default();
     };
     let path = file.display().to_string();
     ActionGroup::more_only(Menu::new(
@@ -618,6 +618,7 @@ pub(crate) fn page(request: &Request) -> Html {
             p(t(tr(locale, Msg::ConfigHowChange))),
             p(t(tr(locale, Msg::ConfigHowShown))),
         ]),
+        Width::Wide,
     );
     Html::join([page, how])
 }
@@ -636,11 +637,11 @@ mod tests {
     #[test]
     fn more_copies_the_path_of_the_file_named() {
         assert!(
-            more(&Locale::english(), None).is_empty(),
+            more(&Locale::default(), None).is_empty(),
             "with no file named there is no path to copy"
         );
         let group = more(
-            &Locale::english(),
+            &Locale::default(),
             Some(Path::new("/etc/ferroterm/console.toml")),
         );
         let menu = group
@@ -670,16 +671,16 @@ mod tests {
     fn a_duration_reads_in_its_largest_whole_unit() {
         assert_eq!(
             "30 s",
-            duration(&Locale::english(), Duration::from_secs(30))
+            duration(&Locale::default(), Duration::from_secs(30))
         );
         assert_eq!(
             "30 min",
-            duration(&Locale::english(), Duration::from_mins(30))
+            duration(&Locale::default(), Duration::from_mins(30))
         );
-        assert_eq!("8 h", duration(&Locale::english(), Duration::from_hours(8)));
+        assert_eq!("8 h", duration(&Locale::default(), Duration::from_hours(8)));
         assert_eq!(
             "1,500 ms",
-            duration(&Locale::english(), Duration::from_millis(1_500))
+            duration(&Locale::default(), Duration::from_millis(1_500))
         );
     }
 }

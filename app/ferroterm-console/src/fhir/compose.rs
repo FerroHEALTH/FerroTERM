@@ -422,7 +422,7 @@ impl Draft {
         body.insert(
             String::from("resourceType"),
             Value::String(tr(
-                &ferrohealth_ui::i18n::Locale::english(),
+                &ferrohealth_ui::i18n::Locale::default(),
                 Msg::Parameters,
             )),
         );
@@ -905,7 +905,7 @@ mod tests {
             .clauses
             .iter()
             .find(|clause| clause.key == key)
-            .map(|clause| clause.rule(&ferrohealth_ui::i18n::Locale::english()))
+            .map(|clause| clause.rule(&ferrohealth_ui::i18n::Locale::default()))
             .unwrap_or_default();
         assert!(
             rule.contains("is in the value set named here")
@@ -925,7 +925,7 @@ mod tests {
             .clauses
             .iter()
             .find(|clause| clause.key == key)
-            .map(|clause| clause.rule(&ferrohealth_ui::i18n::Locale::english()))
+            .map(|clause| clause.rule(&ferrohealth_ui::i18n::Locale::default()))
             .unwrap_or_default();
         assert!(
             rule.contains("is in every one of the 2 value sets named here"),
@@ -942,7 +942,7 @@ mod tests {
             .clauses
             .iter()
             .find(|clause| clause.key == key)
-            .map(|clause| clause.rule(&ferrohealth_ui::i18n::Locale::english()))
+            .map(|clause| clause.rule(&ferrohealth_ui::i18n::Locale::default()))
             .unwrap_or_default();
         assert!(
             rule.starts_with("This clause takes back out"),

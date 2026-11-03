@@ -340,7 +340,7 @@ mod tests {
     fn every_offer_carries_the_subject_into_the_address() {
         for typed in ["http://snomed.info/sct", "404684003", "clinical finding"] {
             let subject = Subject::of(typed).expect("the case types something");
-            let found = offers(&Locale::english(), &subject, &everything(), FhirVersion::R5);
+            let found = offers(&Locale::default(), &subject, &everything(), FhirVersion::R5);
             assert!(!found.is_empty(), "`{typed}` reaches no screen at all");
             for offer in found {
                 assert!(
@@ -361,7 +361,7 @@ mod tests {
     fn an_operation_this_root_does_not_declare_is_not_offered() {
         let code = Subject::of("404684003").expect("the case types a code");
         let nothing = offers(
-            &Locale::english(),
+            &Locale::default(),
             &code,
             &Declared::default(),
             FhirVersion::R4B,
@@ -380,7 +380,7 @@ mod tests {
     fn a_canonical_is_offered_as_both_a_code_system_and_a_value_set() {
         let canonical = Subject::of("http://snomed.info/sct").expect("the case types a canonical");
         let found = offers(
-            &Locale::english(),
+            &Locale::default(),
             &canonical,
             &everything(),
             FhirVersion::R5,

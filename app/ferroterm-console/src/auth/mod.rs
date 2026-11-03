@@ -131,7 +131,7 @@ mod tests {
         assert_eq!(
             "May edit CodeSystem, ValueSet and ConceptMap",
             standing(
-                &Locale::english(),
+                &Locale::default(),
                 &granted(&[
                     "user/CodeSystem.cud",
                     "user/ValueSet.cud",
@@ -142,17 +142,17 @@ mod tests {
         assert_eq!(
             "May edit ValueSet",
             standing(
-                &Locale::english(),
+                &Locale::default(),
                 &granted(&["openid", "system/ValueSet.u"])
             )
         );
         assert_eq!(
-            read_only(&Locale::english()),
-            standing(&Locale::english(), &granted(&["openid", "fhirUser"]))
+            read_only(&Locale::default()),
+            standing(&Locale::default(), &granted(&["openid", "fhirUser"]))
         );
         assert_eq!(
-            read_only(&Locale::english()),
-            standing(&Locale::english(), &granted(&["user/CodeSystem.rs"]))
+            read_only(&Locale::default()),
+            standing(&Locale::default(), &granted(&["user/CodeSystem.rs"]))
         );
     }
 

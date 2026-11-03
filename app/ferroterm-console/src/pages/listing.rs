@@ -15,10 +15,9 @@
 use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
-use ferrohealth_ui::table::filter::{FilterChoice, FilterMenu, MenuForm, filter_menu};
-use ferrohealth_ui::table::model::{
-    Direction, ORDER_KEY, PAGE_KEY, Paging, SIZE_KEY, SORT_KEY, Sort, Window,
-};
+use ferrohealth_ui::query::{ORDER_KEY, PAGE_KEY, SIZE_KEY, SORT_KEY};
+use ferrohealth_ui::table::model::{Direction, Paging, Sort, Window};
+use ferrohealth_ui::view::filter_menu::{FilterChoice, FilterMenu, MenuForm, filter_menu};
 use ferrohealth_ui::view::state::{Mark, state};
 use ferrohealth_ui::view::template::list::HeadingCount;
 use ferrohealth_ui::view::template::list::{ActiveFilters, FilterChip};
@@ -441,7 +440,7 @@ mod tests {
     fn the_source_filter_offers_a_checkbox_per_source_that_holds_a_row() {
         let counts = [(Source::Stored, 2), (Source::Index, 0), (Source::Loaded, 3)];
         let html = state("", &[Source::Loaded], Direction::Ascending)
-            .source_filter(&ferrohealth_ui::i18n::Locale::english(), &counts);
+            .source_filter(&ferrohealth_ui::i18n::Locale::default(), &counts);
         let html = html.as_str();
         assert_eq!(2, html.matches("type=\"checkbox\"").count(), "{html}");
         assert!(html.contains("value=\"loaded\" checked"), "{html}");

@@ -22,17 +22,17 @@ use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
+    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::{ActionGroup, action_button};
 use ferrohealth_ui::view::action_menu::{Act, Action, Item, Menu};
 use ferrohealth_ui::view::button::Variant;
-use ferrohealth_ui::view::dialog::{Confirmation, confirm_dialog};
+use ferrohealth_ui::view::dialog::{Confirmation, Stakes, confirm_dialog};
 use ferrohealth_ui::view::notice::{Announce, notice};
 use ferrohealth_ui::view::state::{Mark, state};
 use ferrohealth_ui::view::surface::{
-    Crumb, Header, SectionHead, definitions, panel_section, panel_sections, section_intro,
+    Container, Crumb, Header, SectionHead, definitions, panel_section, section_intro,
 };
 use ferrohealth_ui::view::tabs::{Tab, binder};
 use ferrohealth_ui::view::template::list::HeadingCount;
@@ -200,7 +200,7 @@ pub(crate) async fn page(request: Request) -> Html {
         confirmations(locale),
         posted_failure(locale, refused.as_ref()),
         ran_notice(&request).unwrap_or_default(),
-        panel_sections(body),
+        Container::PanelSections.wrap(body),
     ])
 }
 
@@ -246,6 +246,8 @@ fn confirmations(locale: &Locale) -> Html {
                 title: tr(locale, question).into(),
                 message: tr(locale, message).into(),
             },
+            Stakes::Plain,
+            None,
             confirm,
         )
     };
@@ -313,7 +315,7 @@ fn runs_section(locale: &Locale, runs: &[RunSummary]) -> Html {
         let href = run_link(&run.id, false);
         h(format!(
             "<tr>{}{}{}{}{}</tr>",
-            title_cell(Some(&href), timestamp(locale, &run.started), None),
+            title_cell(None, Some(&href), timestamp(locale, &run.started), None),
             cell(trigger, t(trigger_words(locale, &run.trigger))),
             cell(outcome, outcome_view(locale, run.outcome)),
             cell(what, t(did(locale, run))),
@@ -341,6 +343,7 @@ fn runs_section(locale: &Locale, runs: &[RunSummary]) -> Html {
             actions: None,
         }),
         data_table(DataTable {
+            shape: Shape::Stacked,
             caption: &caption,
             columns: &columns,
             sorting: Sorting::default(),
@@ -379,7 +382,7 @@ pub(crate) async fn run_page(request: Request) -> Html {
                     tr_with(locale, Msg::SyncRunTitle, &[("when", id.clone().into())]),
                     None,
                     vec![crumb(locale)],
-                    ActionGroup::none(),
+                    ActionGroup::default(),
                 ),
                 if not_found {
                     notice(
@@ -439,7 +442,7 @@ fn run_screen(
             mono: false,
             badge: Some(outcome_view(locale, record.outcome)),
         },
-        ActionGroup::none(),
+        ActionGroup::default(),
     );
     let tabs = vec![
         Tab::new(
@@ -466,7 +469,7 @@ fn run_screen(
             tr(locale, Msg::SyncTabs),
             tabs,
             if findings { "findings" } else { "summary" },
-            panel_sections(panel),
+            Container::PanelSections.wrap(panel),
         ),
     ])
 }
@@ -775,7 +778,7 @@ fn findings_section(
         let href = finding_link(request, finding, ids);
         h(format!(
             "<tr>{}{}{}{}</tr>",
-            title_cell(href.as_deref(), t(&finding.resource), None),
+            title_cell(None, href.as_deref(), t(&finding.resource), None),
             cell(
                 code_column,
                 h(format!(
@@ -810,6 +813,7 @@ fn findings_section(
         Html::join([
             section_intro(tr(locale, Msg::SyncEffectIntro)),
             data_table(DataTable {
+                shape: Shape::Stacked,
                 caption: &caption,
                 columns: &columns,
                 sorting: Sorting::default(),
@@ -820,120 +824,4 @@ fn findings_section(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// The English locale the tests read the words in.
-    fn english() -> Locale {
-        Locale::english()
-    }
-
-    #[test]
-    fn a_duration_reads_in_minutes_and_seconds() {
-        assert_eq!(duration(&english(), 252_000), "4 min 12 s");
-        assert_eq!(duration(&english(), 9_400), "9 s");
-        assert_eq!(duration(&english(), 0), "0 s");
-    }
-
-    #[test]
-    fn a_run_says_what_it_did_or_why_it_failed() {
-        let quiet = RunSummary {
-            outcome: RunOutcome::Ok,
-            ..RunSummary::default()
-        };
-        assert_eq!(did(&english(), &quiet), "Nothing new");
-        let took = RunSummary {
-            outcome: RunOutcome::Ok,
-            entries_taken: 2,
-            activated: 1,
-            ..RunSummary::default()
-        };
-        assert_eq!(did(&english(), &took), "2 releases taken, 1 activated");
-        let failed = RunSummary {
-            outcome: RunOutcome::Failed,
-            errors: vec![String::from("the feed answered 503")],
-            ..RunSummary::default()
-        };
-        assert_eq!(did(&english(), &failed), "the feed answered 503");
-    }
-
-    #[test]
-    fn every_kind_the_service_records_reads_as_a_sentence() {
-        assert_eq!(
-            kind_words(&english(), "inactive"),
-            "The release made this code inactive"
-        );
-        assert_eq!(
-            kind_words(&english(), "absent"),
-            "The release no longer carries this code"
-        );
-        assert_eq!(
-            kind_words(&english(), "outside-value-set"),
-            "The code no longer falls inside the value set it was included through"
-        );
-        assert_eq!(
-            kind_words(&english(), "something-new"),
-            "something-new",
-            "a kind this console predates is shown as the service wrote it"
-        );
-    }
-
-    #[test]
-    fn a_record_reads_as_its_summary_lines() {
-        let record: RunRecord = serde_json::from_str(
-            r#"{"sources":[{"source":"nts","entries_seen":412,"fhir_api_url":"https://api.example",
-                "api_entries_seen":1920,"taken":[{"title":"Findings","version":"2026-10"},
-                {"title":"Labs","version":"7","error":"the digest did not match"}],
-                "skipped":[{},{}],"not_subscribed":[{"entries":388},{"entries":1}]}],
-                "activation":{"activated":[{}],"staged":0,"reloads":[{"status":200}]},
-                "revalidation":{"resources":12,"checked":214,"statement":"1 finding"}}"#,
-        )
-        .expect("the record parses");
-        assert_eq!(
-            source_lines(&english(), &record),
-            ["nts: the feed offered 412 entries, and its FHIR API listed 1,920 resources"]
-        );
-        assert_eq!(
-            taken_lines(&english(), &record),
-            ["Findings 2026-10", "Labs 7: the digest did not match"]
-        );
-        assert_eq!(
-            left_line(&english(), &record),
-            "2 entries for another reason, 389 outside your subscription"
-        );
-        assert_eq!(
-            activation_line(&english(), &record),
-            "1 activated, 0 still staged, 1 reloads asked of the server"
-        );
-        assert_eq!(
-            revalidation_line(&english(), &record),
-            "12 locally written resources read, 214 codes checked: 1 finding"
-        );
-    }
-
-    #[test]
-    fn a_failed_activation_and_a_skipped_revalidation_say_why() {
-        let record: RunRecord = serde_json::from_str(
-            r#"{"activation":{"activated":[],"error":"the server refused the reload"},
-                "revalidation":{"skipped":"no resource store"}}"#,
-        )
-        .expect("the record parses");
-        assert_eq!(
-            activation_line(&english(), &record),
-            "0 activated, then it failed: the server refused the reload"
-        );
-        assert_eq!(
-            revalidation_line(&english(), &record),
-            "Not run: no resource store"
-        );
-    }
-
-    #[test]
-    fn a_run_id_is_one_path_segment() {
-        assert_eq!(
-            run_link("20261021T030000Z", false),
-            "/sync/20261021T030000Z"
-        );
-        assert_eq!(run_link("a/b", true), "/sync/a%2Fb/findings");
-    }
-}
+mod tests;

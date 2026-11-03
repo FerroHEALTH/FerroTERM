@@ -10,12 +10,12 @@ use std::collections::BTreeMap;
 use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
+use ferrohealth_ui::table::mapping::{Relationship, relation};
 use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
+    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::view::coding::{Coding, Layout, coding};
 use ferrohealth_ui::view::load_report::Outcome;
-use ferrohealth_ui::view::mapping::{Relationship, relation};
 use ferrohealth_ui::view::surface::{SectionHead, panel_section};
 use ferrohealth_ui::view::template::list::HeadingCount;
 
@@ -258,7 +258,7 @@ fn table(
         );
         h(format!(
             "<tr>{}{}</tr>",
-            title_cell(None, target, None),
+            title_cell(None, None, target, None),
             cell(related_column, relation(locale, related(version, found))),
         ))
     }));
@@ -273,6 +273,7 @@ fn table(
             actions: None,
         }),
         data_table(DataTable {
+            shape: Shape::Stacked,
             caption: &caption,
             columns: &columns,
             sorting: Sorting::default(),
@@ -304,7 +305,7 @@ fn comments(locale: &Locale, matches: &[TranslationMatch]) -> Option<Html> {
 
 #[cfg(test)]
 mod tests {
-    use ferrohealth_ui::view::mapping::Relationship;
+    use ferrohealth_ui::table::mapping::Relationship;
 
     use super::related;
     use crate::fhir::translate::{Coding, TranslationMatch};

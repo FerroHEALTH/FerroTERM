@@ -612,7 +612,7 @@ mod tests {
                      "code":"invalid-display"}],"text":"Wrong display name"},
                    "expression":["Coding.display"]}]}}]}"#,
         );
-        let read = answer.validation(&ferrohealth_ui::i18n::Locale::english());
+        let read = answer.validation(&ferrohealth_ui::i18n::Locale::default());
         assert_eq!(read.result, Some(false));
         assert_eq!(
             read.display.as_deref(),
@@ -645,7 +645,7 @@ mod tests {
                 {"name":"status","valueCode":"retired"},
                 {"name":"message","valueString":"The concept is retired."}]}"#,
         )
-        .validation(&ferrohealth_ui::i18n::Locale::english());
+        .validation(&ferrohealth_ui::i18n::Locale::default());
         assert_eq!(read.result, Some(true));
         assert_eq!(read.inactive, Some(true));
         assert_eq!(read.status.as_deref(), Some("retired"));
@@ -659,7 +659,7 @@ mod tests {
                 {"name":"x-unknown-system","valueCanonical":"https://b.example"},
                 {"name":"x-caused-by-unknown-system","valueCanonical":"https://c.example"}]}"#,
         )
-        .validation(&ferrohealth_ui::i18n::Locale::english());
+        .validation(&ferrohealth_ui::i18n::Locale::default());
         assert_eq!(
             read.unknown_systems,
             vec![
@@ -680,7 +680,7 @@ mod tests {
                    "coding":[{"system":"https://terminology.example/animals","version":"2.0",
                               "code":"cat","display":"Cat"}]}}]}"#,
         )
-        .validation(&ferrohealth_ui::i18n::Locale::english());
+        .validation(&ferrohealth_ui::i18n::Locale::default());
         let concept = read.concept.expect("the answer echoed the concept");
         assert_eq!(concept.text.as_deref(), Some("a cat"));
         assert_eq!(
@@ -700,14 +700,14 @@ mod tests {
     #[test]
     fn an_answer_with_no_issues_reads_as_an_empty_list_rather_than_a_failure() {
         let read = parse(r#"{"parameter":[{"name":"result","valueBoolean":true}]}"#)
-            .validation(&ferrohealth_ui::i18n::Locale::english());
+            .validation(&ferrohealth_ui::i18n::Locale::default());
         assert_eq!(read.issues, Vec::<ValidationIssue>::new());
     }
 
     #[test]
     fn an_answer_the_viewer_cannot_read_states_that_rather_than_inventing_one() {
         let read = parse(r#"{"resourceType":"Parameters"}"#)
-            .validation(&ferrohealth_ui::i18n::Locale::english());
+            .validation(&ferrohealth_ui::i18n::Locale::default());
         assert_eq!(read, Validation::default());
     }
 
@@ -716,7 +716,7 @@ mod tests {
         let read = parse(
             r#"{"parameter":[{"name":"issues","resource":{"issue":[{"code":"processing"}]}}]}"#,
         )
-        .validation(&ferrohealth_ui::i18n::Locale::english());
+        .validation(&ferrohealth_ui::i18n::Locale::default());
         assert_eq!(
             read.issues,
             vec![ValidationIssue {
@@ -734,7 +734,7 @@ mod tests {
     fn every_subsumption_outcome_is_a_sentence_as_well_as_a_code() {
         assert_eq!(
             subsumption_sentence(
-                &ferrohealth_ui::i18n::Locale::english(),
+                &ferrohealth_ui::i18n::Locale::default(),
                 "equivalent",
                 "a",
                 "b"
@@ -743,7 +743,7 @@ mod tests {
         );
         assert_eq!(
             subsumption_sentence(
-                &ferrohealth_ui::i18n::Locale::english(),
+                &ferrohealth_ui::i18n::Locale::default(),
                 "subsumes",
                 "a",
                 "b"
@@ -752,7 +752,7 @@ mod tests {
         );
         assert_eq!(
             subsumption_sentence(
-                &ferrohealth_ui::i18n::Locale::english(),
+                &ferrohealth_ui::i18n::Locale::default(),
                 "subsumed-by",
                 "a",
                 "b"
@@ -761,7 +761,7 @@ mod tests {
         );
         assert_eq!(
             subsumption_sentence(
-                &ferrohealth_ui::i18n::Locale::english(),
+                &ferrohealth_ui::i18n::Locale::default(),
                 "not-subsumed",
                 "a",
                 "b"
@@ -770,7 +770,7 @@ mod tests {
         );
         assert_eq!(
             subsumption_sentence(
-                &ferrohealth_ui::i18n::Locale::english(),
+                &ferrohealth_ui::i18n::Locale::default(),
                 "mystery",
                 "a",
                 "b"

@@ -106,7 +106,7 @@ pub(crate) fn frame(request: &Request, op: Op, form: Html, answer: Html) -> Html
             tr(locale, Msg::OpsTitle),
             Some(tr(locale, Msg::OpsSubtitle)),
             Vec::new(),
-            ActionGroup::none(),
+            ActionGroup::default(),
         ),
         binder(locale, tr(locale, Msg::OpsTabs), tabs, op.path(), panel),
     ])
@@ -289,7 +289,7 @@ mod tests {
     #[test]
     fn run_announces_ctrl_enter_for_the_keys_module() {
         let html = run(
-            &Locale::english(),
+            &Locale::default(),
             "lookup-run",
             String::from("Look up"),
             Glyph::PLAY,

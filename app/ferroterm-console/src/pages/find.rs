@@ -15,9 +15,9 @@ use ferrohealth_ui::html::Html;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
+use ferrohealth_ui::view::layout::{Gap, stack_at};
 use ferrohealth_ui::view::notice::{Announce, notice};
 use ferrohealth_ui::view::search::{Hit, HitGroup, Mark, SearchAnswer, find_results};
-use ferrohealth_ui::view::surface::stack;
 use serde::Deserialize;
 
 use crate::fhir::capability::CapabilityStatement;
@@ -271,7 +271,7 @@ pub(crate) async fn page(request: Request) -> Html {
         tr(locale, Msg::TitleFind),
         Some(tr(locale, Msg::FindSubtitle)),
         Vec::new(),
-        ActionGroup::none(),
+        ActionGroup::default(),
     );
     let Some(subject) = Subject::of(&typed) else {
         return Html::join([
@@ -311,7 +311,10 @@ pub(crate) async fn page(request: Request) -> Html {
     let results = find_results(locale, &found.answer(&request, &subject));
     Html::join([
         head,
-        stack(Html::join([read_as.unwrap_or_default(), results])),
+        stack_at(
+            Gap::Loose,
+            Html::join([read_as.unwrap_or_default(), results]),
+        ),
     ])
 }
 
