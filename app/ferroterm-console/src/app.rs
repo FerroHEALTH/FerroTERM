@@ -23,7 +23,6 @@ use http::header::{CACHE_CONTROL, LOCATION};
 use http::{HeaderValue, StatusCode};
 
 use crate::locale::Msg;
-use crate::markup::{h, t};
 use crate::request::Request;
 use crate::shell::PRODUCT;
 
@@ -47,9 +46,9 @@ pub(crate) fn title(text: Option<&str>) -> String {
 pub(crate) fn page_document(request: &Request, body: Html) -> Html {
     let said = request.answering.said();
     let description = request.tr(Msg::Description);
-    let head = h(format!(
+    let head = Html::raw(format!(
         r#"<meta name="color-scheme" content="light dark"><meta name="description" content="{}"><link rel="icon" href="{FAVICON}" type="image/svg+xml">"#,
-        t(description)
+        Html::text(description)
     ));
     document(Document {
         locale: request.locale.clone(),

@@ -21,7 +21,7 @@ use crate::fhir::CODE_SYSTEM;
 use crate::fhir::concept::{Concept, LookupRequest};
 use crate::fhir::terminology::SystemCard;
 use crate::locale::{Msg, tr, tr_with};
-use crate::markup::{code, h, join, p, strong, t};
+use crate::markup::{code, p, strong};
 use crate::pages::operations::{
     Op, before, choices, frame, options, run, select, sent, text, verdict,
 };
@@ -260,12 +260,12 @@ fn found(locale: &Locale, concept: &Concept, code: &str, system: &str) -> Html {
             &[("system", system.to_owned().into())],
         ),
     };
-    h(format!(
+    Html::raw(format!(
         "{} {} · {} {}",
-        t(tr(locale, Msg::LookupFound)),
+        Html::text(tr(locale, Msg::LookupFound)),
         strong(display),
         crate::markup::code(code),
-        t(place)
+        Html::text(place)
     ))
 }
 
@@ -278,7 +278,7 @@ fn concept_sections(locale: &Locale, concept: &Concept) -> Html {
             count: None,
             actions: None,
         }),
-        p(t(concept.display.clone().unwrap_or_default())),
+        p(Html::text(concept.display.clone().unwrap_or_default())),
     );
     let designations = (!concept.designations.is_empty()).then(|| {
         let columns = [
@@ -287,12 +287,15 @@ fn concept_sections(locale: &Locale, concept: &Concept) -> Html {
             Column::text("use", tr(locale, Msg::LookupUse)),
         ];
         let [_, language, usage] = &columns;
-        let rows = join(concept.designations.iter().map(|row| {
-            h(format!(
+        let rows = Html::join(concept.designations.iter().map(|row| {
+            Html::raw(format!(
                 "<tr>{}{}{}</tr>",
-                title_cell(None, None, t(&row.value), None),
-                cell(language, t(row.language.clone().unwrap_or_default())),
-                cell(usage, t(row.usage.clone().unwrap_or_default())),
+                title_cell(None, None, Html::text(&row.value), None),
+                cell(
+                    language,
+                    Html::text(row.language.clone().unwrap_or_default())
+                ),
+                cell(usage, Html::text(row.usage.clone().unwrap_or_default())),
             ))
         }));
         let caption = tr(locale, Msg::LookupDesignations);
@@ -320,11 +323,16 @@ fn concept_sections(locale: &Locale, concept: &Concept) -> Html {
             Column::text("value", tr(locale, Msg::LookupValue)),
         ];
         let [_, value] = &columns;
-        let rows = join(concept.properties.iter().map(|row| {
-            h(format!(
+        let rows = Html::join(concept.properties.iter().map(|row| {
+            Html::raw(format!(
                 "<tr>{}{}</tr>",
-                title_cell(None, None, code(&row.code), row.description.as_ref().map(t)),
-                cell(value, t(row.value.clone().unwrap_or_default())),
+                title_cell(
+                    None,
+                    None,
+                    code(&row.code),
+                    row.description.as_ref().map(Html::text)
+                ),
+                cell(value, Html::text(row.value.clone().unwrap_or_default())),
             ))
         }));
         let caption = tr(locale, Msg::LookupProperties);

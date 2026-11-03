@@ -50,10 +50,10 @@ const PROPERTY_OUTPUT: &str = "property";
 /// `parent` and `child` are the standard concept properties any code system
 /// may declare (<http://hl7.org/fhir/concept-properties>), so reading them is
 /// reading the specification rather than knowing a system.
-const PARENT_PROPERTY: &str = "parent";
+pub(crate) const PARENT_PROPERTY: &str = "parent";
 
 /// The concept property naming a direct child of a concept.
-const CHILD_PROPERTY: &str = "child";
+pub(crate) const CHILD_PROPERTY: &str = "child";
 
 /// The filter operator that selects the direct children of one code.
 ///
@@ -457,18 +457,8 @@ impl LookupAnswer {
 }
 
 impl Concept {
-    /// The codes this concept declares as its direct parents.
-    pub(crate) fn parents(&self) -> Vec<String> {
-        self.property_values(PARENT_PROPERTY)
-    }
-
-    /// The codes this concept declares as its direct children.
-    pub(crate) fn children(&self) -> Vec<String> {
-        self.property_values(CHILD_PROPERTY)
-    }
-
     /// Every value the server answered for the property `code`.
-    fn property_values(&self, code: &str) -> Vec<String> {
+    pub(crate) fn property_values(&self, code: &str) -> Vec<String> {
         self.properties
             .iter()
             .filter(|property| property.code == code)
@@ -741,7 +731,7 @@ mod tests {
             display_language: Some(String::from("nl-NL")),
         };
         assert_eq!(
-            request.append(RequestUrl::new()).render(""),
+            request.append(RequestUrl::default()).render(""),
             "?system=https%3A%2F%2Fterminology.example%2Fx%3Fedition%3D2031&code=m%2Fs2\
              &version=2.0&displayLanguage=nl-NL",
             "a code carrying a separator stays inside the parameter it belongs to"
@@ -756,7 +746,7 @@ mod tests {
             ..LookupRequest::default()
         };
         assert_eq!(
-            request.append(RequestUrl::new()).render(""),
+            request.append(RequestUrl::default()).render(""),
             "?system=https%3A%2F%2Fterminology.example%2Fx&code=a",
             "an unset parameter leaves the server's own default in force"
         );
@@ -888,11 +878,14 @@ mod tests {
         )
         .concept();
         assert_eq!(
-            concept.parents(),
+            concept.property_values(PARENT_PROPERTY),
             vec![String::from("a"), String::from("b")],
             "a concept with two parents keeps both, because a hierarchy may be a graph"
         );
-        assert_eq!(concept.children(), vec![String::from("c")]);
+        assert_eq!(
+            concept.property_values(CHILD_PROPERTY),
+            vec![String::from("c")]
+        );
     }
 
     #[test]
@@ -900,7 +893,7 @@ mod tests {
         let concept = answer(r#"{"resourceType":"Parameters"}"#).concept();
         assert_eq!(concept, Concept::default());
         assert!(
-            concept.parents().is_empty(),
+            concept.property_values(PARENT_PROPERTY).is_empty(),
             "the screen states the absence"
         );
     }

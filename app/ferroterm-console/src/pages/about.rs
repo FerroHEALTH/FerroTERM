@@ -12,7 +12,6 @@ use ferrohealth_ui::view::template::about::{Link, Manufacturer, SelfDescription,
 use crate::fhir::capability::CapabilityStatement;
 use crate::fhir::version::FhirVersion;
 use crate::locale::{Msg, tr, tr_with};
-use crate::markup::t;
 use crate::request::Request;
 use crate::shell::{PRODUCT, VERSION};
 
@@ -77,9 +76,9 @@ pub(crate) async fn page(request: Request) -> Html {
             },
             release: format!("{PRODUCT} {VERSION}"),
             versions: vec![
-                (tr(locale, Msg::AboutServer), t(server)),
-                (tr(locale, Msg::AboutFhirRoots), t(roots())),
-                (tr(locale, Msg::AboutFerroui), t(FERROUI)),
+                (tr(locale, Msg::AboutServer), Html::text(server)),
+                (tr(locale, Msg::AboutFhirRoots), Html::text(roots())),
+                (tr(locale, Msg::AboutFerroui), Html::text(FERROUI)),
             ],
             manufacturer: Manufacturer {
                 licence: tr(locale, Msg::AboutLicence),

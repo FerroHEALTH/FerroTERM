@@ -34,14 +34,15 @@ use ferrohealth_ui::view::tree::path::path_key;
 use ferrohealth_ui::view::tree::{Tree, TreeKind, TreeNode, TreeWords, tree_view};
 
 use crate::fhir::concept::{
-    CHILD_OF_OPERATOR, ChildOf, Concept, ConceptQuery, Hierarchy, LookupRequest, chosen_version,
+    CHILD_OF_OPERATOR, CHILD_PROPERTY, ChildOf, Concept, ConceptQuery, Hierarchy, LookupRequest,
+    PARENT_PROPERTY, chosen_version,
 };
 use crate::fhir::expansion::ConceptRow;
 use crate::fhir::terminology::SystemCard;
 use crate::fhir::version::FhirVersion;
 use crate::fhir::{CODE_SYSTEM, FhirClient};
 use crate::locale::{Msg, tr, tr_with};
-use crate::markup::{code, h, join, t};
+use crate::markup::code;
 use crate::pages::lookup::CODE_PARAM;
 use crate::pages::operations::{choices, hidden_field, select};
 use crate::pages::parts::{failure, heading};
@@ -212,9 +213,9 @@ pub(crate) async fn page(request: Request) -> Html {
             Vec::new(),
             ActionGroup::default(),
         ),
-        h(format!(
+        Html::raw(format!(
             r#"<section class="fui-card fui-panel" aria-label="{}">{options}{body}</section>"#,
-            t(tr(locale, Msg::BrowseTitle))
+            Html::text(tr(locale, Msg::BrowseTitle))
         )),
     ])
 }
@@ -328,17 +329,17 @@ fn picker(
             Some(tr(locale, Msg::LookupServerLanguage)),
         ),
     ]);
-    let open = h(format!(
+    let open = Html::raw(format!(
         r#"<button type="submit" class="{}">{}</button>"#,
         ferrohealth_ui::view::button::Variant::Secondary.class(),
-        t(tr(locale, Msg::BrowseOpen))
+        Html::text(tr(locale, Msg::BrowseOpen))
     ));
-    h(format!(
+    Html::raw(format!(
         r#"<form method="get" action="/{BROWSE_PATH}">{}</form>"#,
         transform_options(
             Density::Plain,
             fields,
-            h(format!(r#"<div class="fui-transform-run">{open}</div>"#)),
+            Html::raw(format!(r#"<div class="fui-transform-run">{open}</div>"#)),
         )
     ))
 }
@@ -506,7 +507,7 @@ async fn ancestors(
     concept: &Concept,
 ) -> Vec<(String, Option<String>)> {
     let mut path: Vec<(String, Option<String>)> = Vec::new();
-    let mut parent = concept.parents().into_iter().next();
+    let mut parent = concept.property_values(PARENT_PROPERTY).into_iter().next();
     while let Some(code) = parent.take() {
         if path.len() >= DEPTH || path.iter().any(|(seen, _)| *seen == code) || code == state.code {
             break;
@@ -524,7 +525,7 @@ async fn ancestors(
             .map(|document| document.value.concept());
         parent = read
             .as_ref()
-            .and_then(|read| read.parents().into_iter().next());
+            .and_then(|read| read.property_values(PARENT_PROPERTY).into_iter().next());
         path.push((code, read.and_then(|read| read.display)));
     }
     path.reverse();
@@ -561,7 +562,7 @@ async fn tree_pane(
         state,
         property,
         opened: &opened,
-        leaf: concept.children().is_empty(),
+        leaf: concept.property_values(CHILD_PROPERTY).is_empty(),
     };
     let node = Box::pin(level(&walk, &top, &mut keys, &[])).await;
     let mut chain: Vec<&str> = path.iter().map(|(code, _)| code.as_str()).collect();
@@ -592,7 +593,7 @@ async fn tree_pane(
     BrowserPane::new(
         title,
         Html::join([
-            h(format!(
+            Html::raw(format!(
                 r#"<div class="fui-browser-body">{}</div>"#,
                 tree_view(&tree)
             )),
@@ -695,20 +696,28 @@ fn concept_pane(
         Some(Ok(concept)) => {
             let link = |each: &String| {
                 let href = state.selecting(each).href(request.version);
-                h(format!(
+                Html::raw(format!(
                     r#"<span class="fui-browser-rel-item"><a href="{}">{}</a></span>"#,
-                    t(href),
+                    Html::text(href),
                     code(each)
                 ))
             };
-            let parents: Vec<Html> = concept.parents().iter().map(link).collect();
-            let children: Vec<Html> = concept.children().iter().map(link).collect();
+            let parents: Vec<Html> = concept
+                .property_values(PARENT_PROPERTY)
+                .iter()
+                .map(link)
+                .collect();
+            let children: Vec<Html> = concept
+                .property_values(CHILD_PROPERTY)
+                .iter()
+                .map(link)
+                .collect();
             let mut related = Vec::new();
             if !parents.is_empty() {
-                related.push((tr(locale, Msg::BrowseParent), join(parents)));
+                related.push((tr(locale, Msg::BrowseParent), Html::join(parents)));
             }
             if !children.is_empty() {
-                related.push((tr(locale, Msg::BrowseChildren), join(children)));
+                related.push((tr(locale, Msg::BrowseChildren), Html::join(children)));
             }
             let read_from = concept
                 .version
@@ -720,14 +729,16 @@ fn concept_pane(
                         &[("version", version.clone().into())],
                     )
                 });
-            let head = h(format!(
+            let head = Html::raw(format!(
                 r#"<h3 class="fui-concept-title">{}</h3><p class="fui-small fui-muted">{} {}</p><div class="fui-browser-rel">{}</div>"#,
-                t(concept
-                    .display
-                    .clone()
-                    .unwrap_or_else(|| state.code.clone())),
+                Html::text(
+                    concept
+                        .display
+                        .clone()
+                        .unwrap_or_else(|| state.code.clone())
+                ),
                 code(&state.code),
-                t(read_from),
+                Html::text(read_from),
                 definitions(related),
             ));
             BrowserPane::new(
@@ -754,12 +765,15 @@ fn designations(locale: &Locale, concept: &Concept) -> Option<Html> {
         Column::text("use", tr(locale, Msg::LookupUse)),
     ];
     let [_, language, usage] = &columns;
-    let rows = join(concept.designations.iter().map(|row| {
-        h(format!(
+    let rows = Html::join(concept.designations.iter().map(|row| {
+        Html::raw(format!(
             "<tr>{}{}{}</tr>",
-            title_cell(None, None, t(&row.value), None),
-            cell(language, t(row.language.clone().unwrap_or_default())),
-            cell(usage, t(row.usage.clone().unwrap_or_default())),
+            title_cell(None, None, Html::text(&row.value), None),
+            cell(
+                language,
+                Html::text(row.language.clone().unwrap_or_default())
+            ),
+            cell(usage, Html::text(row.usage.clone().unwrap_or_default())),
         ))
     }));
     let caption = tr(locale, Msg::LookupDesignations);
@@ -792,11 +806,16 @@ fn properties(locale: &Locale, concept: &Concept) -> Option<Html> {
         Column::text("value", tr(locale, Msg::LookupValue)),
     ];
     let [_, value] = &columns;
-    let rows = join(concept.properties.iter().map(|row| {
-        h(format!(
+    let rows = Html::join(concept.properties.iter().map(|row| {
+        Html::raw(format!(
             "<tr>{}{}</tr>",
-            title_cell(None, None, code(&row.code), row.description.as_ref().map(t)),
-            cell(value, t(row.value.clone().unwrap_or_default())),
+            title_cell(
+                None,
+                None,
+                code(&row.code),
+                row.description.as_ref().map(Html::text)
+            ),
+            cell(value, Html::text(row.value.clone().unwrap_or_default())),
         ))
     }));
     let caption = tr(locale, Msg::LookupProperties);

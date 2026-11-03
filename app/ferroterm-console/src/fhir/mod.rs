@@ -139,7 +139,7 @@ impl FhirClient {
 
     /// The FHIR base of one served version, as a reader would type it.
     pub(crate) fn version_base(&self, version: FhirVersion) -> String {
-        RequestUrl::new()
+        RequestUrl::default()
             .segment(version.segment())
             .render(&self.root)
     }
@@ -154,7 +154,7 @@ impl FhirClient {
     /// Returns [`FhirError::Transport`] when the browser could not reach the
     /// server, and [`FhirError::Status`] when it answered a failure.
     pub(crate) async fn health(&self) -> Result<StatusCode, FhirError> {
-        let url = RequestUrl::new().segment("health").render(&self.root);
+        let url = RequestUrl::default().segment("health").render(&self.root);
         let answer = self.send(Method::Get, &url, PLAIN_JSON).await?;
         let status = status_of(&self.locale, &answer, &url)?;
         if status.is_success() {
@@ -178,7 +178,7 @@ impl FhirClient {
     /// switched off does
     /// (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
     pub(crate) async fn serves_without_sign_in(&self, version: FhirVersion) -> bool {
-        let url = RequestUrl::new()
+        let url = RequestUrl::default()
             .segment(version.segment())
             .segment(".well-known")
             .segment("smart-configuration")
@@ -194,7 +194,7 @@ impl FhirClient {
     /// Every read has a paired builder, so a screen can disclose the exact
     /// request it issued without rebuilding the URL from parts of its own.
     pub(crate) fn metadata_url(&self, version: FhirVersion) -> String {
-        RequestUrl::new()
+        RequestUrl::default()
             .segment(version.segment())
             .segment("metadata")
             .render(&self.root)
@@ -206,7 +206,7 @@ impl FhirClient {
     /// `metadata` interaction
     /// (<https://hl7.org/fhir/R4B/terminologycapabilities.html>).
     pub(crate) fn terminology_metadata_url(&self, version: FhirVersion) -> String {
-        RequestUrl::new()
+        RequestUrl::default()
             .segment(version.segment())
             .segment("metadata")
             .query("mode", "terminology")
@@ -222,7 +222,7 @@ impl FhirClient {
     /// percent-encoded into the query, which matters because a code system URI
     /// can carry its own query string.
     pub(crate) fn code_system_search_url(&self, version: FhirVersion, system: &str) -> String {
-        RequestUrl::new()
+        RequestUrl::default()
             .segment(version.segment())
             .segment("CodeSystem")
             .query("url", system)
@@ -233,7 +233,7 @@ impl FhirClient {
     /// canonical, read with `_summary=true`: a large system's concepts are
     /// left out (<https://hl7.org/fhir/R4B/search.html#summary>).
     pub(crate) fn code_system_summary_url(&self, version: FhirVersion, system: &str) -> String {
-        RequestUrl::new()
+        RequestUrl::default()
             .segment(version.segment())
             .segment("CodeSystem")
             .query("url", system)
@@ -264,7 +264,7 @@ impl FhirClient {
     /// search is a quarter of a megabyte where this is four kilobytes
     /// (<https://hl7.org/fhir/R5/search.html#elements>).
     pub(crate) fn published_names_url(&self, version: FhirVersion, resource_type: &str) -> String {
-        RequestUrl::new()
+        RequestUrl::default()
             .segment(version.segment())
             .segment(resource_type)
             .query("_elements", "url,name,title,version,status,meta")
@@ -345,7 +345,7 @@ impl FhirClient {
     pub(crate) fn expand_url(&self, version: FhirVersion, request: &ExpandRequest) -> String {
         request
             .append(
-                RequestUrl::new()
+                RequestUrl::default()
                     .segment(version.segment())
                     .segment("ValueSet")
                     .segment("$expand"),
@@ -382,7 +382,7 @@ impl FhirClient {
         resource_type: &str,
         filter: &SearchFilter,
     ) -> String {
-        let mut url = RequestUrl::new()
+        let mut url = RequestUrl::default()
             .segment(version.segment())
             .segment(resource_type);
         if !filter.url.is_empty() {
@@ -405,7 +405,7 @@ impl FhirClient {
         resource_type: &str,
         id: &str,
     ) -> String {
-        RequestUrl::new()
+        RequestUrl::default()
             .segment(version.segment())
             .segment(resource_type)
             .segment(id)
@@ -421,7 +421,7 @@ impl FhirClient {
     pub(crate) fn lookup_url(&self, version: FhirVersion, request: &LookupRequest) -> String {
         request
             .append(
-                RequestUrl::new()
+                RequestUrl::default()
                     .segment(version.segment())
                     .segment("CodeSystem")
                     .segment("$lookup"),
@@ -450,7 +450,7 @@ impl FhirClient {
     /// `Parameters` body (<https://hl7.org/fhir/R4B/operations.html#request>),
     /// so the address is the operation itself and nothing else.
     pub(crate) fn expand_post_url(&self, version: FhirVersion) -> String {
-        RequestUrl::new()
+        RequestUrl::default()
             .segment(version.segment())
             .segment("ValueSet")
             .segment("$expand")
@@ -545,7 +545,7 @@ impl FhirClient {
         version: FhirVersion,
         request: &ValidateRequest,
     ) -> String {
-        let mut url = RequestUrl::new()
+        let mut url = RequestUrl::default()
             .segment(version.segment())
             .segment(request.on.resource_type());
         if request.instance() {
@@ -578,7 +578,7 @@ impl FhirClient {
     /// `$subsumes` takes its parameters in the query of a `GET`
     /// (<https://hl7.org/fhir/R4B/codesystem-operation-subsumes.html>).
     pub(crate) fn subsumes_url(&self, version: FhirVersion, request: &SubsumesRequest) -> String {
-        let mut url = RequestUrl::new()
+        let mut url = RequestUrl::default()
             .segment(version.segment())
             .segment(CODE_SYSTEM);
         if request.instance() {
@@ -612,7 +612,7 @@ impl FhirClient {
     pub(crate) fn translate_url(&self, version: FhirVersion, request: &TranslateRequest) -> String {
         request
             .append(
-                RequestUrl::new()
+                RequestUrl::default()
                     .segment(version.segment())
                     .segment(CONCEPT_MAP)
                     .segment("$translate"),
@@ -691,7 +691,7 @@ impl FhirClient {
 impl FhirClient {
     /// The address a create posts to.
     pub(crate) fn create_url(&self, version: FhirVersion, resource_type: &str) -> String {
-        RequestUrl::new()
+        RequestUrl::default()
             .segment(version.segment())
             .segment(resource_type)
             .render(&self.root)
@@ -707,7 +707,7 @@ impl FhirClient {
         resource_type: &str,
         id: &str,
     ) -> String {
-        RequestUrl::new()
+        RequestUrl::default()
             .segment(version.segment())
             .segment(resource_type)
             .segment(id)
@@ -790,7 +790,7 @@ impl FhirClient {
     /// the type-level `_history`
     /// (<https://hl7.org/fhir/R4B/http.html#history>).
     pub(crate) fn type_history_url(&self, version: FhirVersion, resource_type: &str) -> String {
-        RequestUrl::new()
+        RequestUrl::default()
             .segment(version.segment())
             .segment(resource_type)
             .segment("_history")
@@ -911,7 +911,7 @@ impl FhirClient {
     ) -> Result<Option<serde_json::Value>, FhirError> {
         let url = self.code_system_search_url(version, system);
         let answer: authoring::AuthoredSearch = self.get_json(&url).await?;
-        Ok(answer.first())
+        Ok(answer.first_of(CODE_SYSTEM))
     }
 
     /// Reads the `ConceptMap` one root holds for a canonical, for authoring.
@@ -952,7 +952,7 @@ impl FhirClient {
         id: &str,
         version_id: &str,
     ) -> String {
-        RequestUrl::new()
+        RequestUrl::default()
             .segment(version.segment())
             .segment(resource_type)
             .segment(id)

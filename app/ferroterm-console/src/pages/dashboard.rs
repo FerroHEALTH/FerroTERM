@@ -28,7 +28,7 @@ use crate::fhir::terminology::TerminologyCapabilities;
 use crate::fhir::version::FhirVersion;
 use crate::fhir::{CODE_SYSTEM, CONCEPT_MAP, FhirClient, VALUE_SET};
 use crate::locale::{Msg, tr, tr_with};
-use crate::markup::{code, h, join, t};
+use crate::markup::code;
 use crate::pages::parts::{Source, failure, heading, relative, versions_word};
 use crate::request::Request;
 use crate::routes::{
@@ -243,9 +243,9 @@ fn writes_stat(locale: &Locale, activity: &Result<Vec<Change>, FhirError>) -> Ht
                     Msg::DashboardSince,
                     &[("day", day.to_owned().into())],
                 );
-                h(format!(
+                Html::raw(format!(
                     r#"<span class="fui-small fui-muted">{}</span>"#,
-                    t(line)
+                    Html::text(line)
                 ))
             });
             (grouped(locale, changes.len()), since)
@@ -305,10 +305,10 @@ fn change_row(
     let href = history_link(&change.resource_type, &change.id, version);
     let when = change.when.as_deref().map(|raw| relative(locale, raw, now));
     let [_, change_column, when_column] = columns;
-    h(format!(
+    Html::raw(format!(
         "<tr>{}{}{}</tr>",
-        title_cell(None, Some(&href), t(named), Some(t(sub))),
-        cell(change_column, t(interaction)),
+        title_cell(None, Some(&href), Html::text(named), Some(Html::text(sub))),
+        cell(change_column, Html::text(interaction)),
         cell(when_column, when.unwrap_or_default()),
     ))
 }
@@ -331,7 +331,7 @@ fn recent_card(
             Some(shown_of(0, 0)),
         ),
         Ok(changes) => {
-            let rows = join(
+            let rows = Html::join(
                 changes
                     .iter()
                     .take(ACTIVITY_SHOWN)
@@ -351,7 +351,7 @@ fn recent_card(
         }
         Err(error) => (failure(locale, error), None),
     };
-    h(format!(
+    Html::raw(format!(
         r#"<div id="recent-changes">{}</div>"#,
         list_card(
             locale,
@@ -403,7 +403,7 @@ fn systems_card(
                 .map(|resource| (resource.url.as_str(), resource.label.as_str()))
                 .collect();
             let [_, source_column, versions_column] = &columns;
-            let rows = join(cards.iter().take(PREVIEW_ROWS).map(|card| {
+            let rows = Html::join(cards.iter().take(PREVIEW_ROWS).map(|card| {
                 let name = names
                     .get(card.url.as_str())
                     .map_or_else(|| card.url.clone(), |name| (*name).to_owned());
@@ -413,11 +413,14 @@ fn systems_card(
                     .filter_map(|row| row.code.clone())
                     .collect();
                 let href = system_link(&card.url, request.version);
-                h(format!(
+                Html::raw(format!(
                     "<tr>{}{}{}</tr>",
-                    title_cell(None, Some(&href), t(name), None),
+                    title_cell(None, Some(&href), Html::text(name), None),
                     cell(source_column, Source::of_system(card, listed).tag(locale)),
-                    cell(versions_column, t(versions_word(locale, &versions))),
+                    cell(
+                        versions_column,
+                        Html::text(versions_word(locale, &versions))
+                    ),
                 ))
             }));
             let table = data_table(DataTable {
@@ -470,7 +473,10 @@ fn unreachable(request: &Request, error: &FhirError) -> Html {
         ActionGroup::default(),
     );
     let detail = definitions(vec![
-        (tr(locale, Msg::DashboardFailure), t(error.to_string())),
+        (
+            tr(locale, Msg::DashboardFailure),
+            Html::text(error.to_string()),
+        ),
         (tr(locale, Msg::DashboardAddress), code(error.url())),
     ]);
     Html::join([
@@ -479,14 +485,14 @@ fn unreachable(request: &Request, error: &FhirError) -> Html {
             Gap::Loose,
             Html::join([
                 failure(locale, error),
-                h(format!(
+                Html::raw(format!(
                     r#"<p><a href="{}" class="fui-button fui-button-primary">{}</a></p>"#,
-                    t(request.back()),
+                    Html::text(request.back()),
                     label(Some(Glyph::REFRESH_CW), tr(locale, Msg::DashboardTryAgain))
                 )),
-                h(format!(
+                Html::raw(format!(
                     r#"<p class="fui-small fui-muted">{}</p>"#,
-                    t(tr(locale, Msg::DashboardKeepsNoCopy))
+                    Html::text(tr(locale, Msg::DashboardKeepsNoCopy))
                 )),
                 disclosure(tr(locale, Msg::DashboardTechnicalDetail), detail),
             ]),

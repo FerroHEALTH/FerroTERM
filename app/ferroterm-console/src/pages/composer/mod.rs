@@ -31,7 +31,6 @@ use crate::auth::scopes::Letter;
 use crate::fhir::compose::{Draft, Preview, STATUSES, StoredValueSet};
 use crate::fhir::{CODE_SYSTEM, VALUE_SET};
 use crate::locale::{Msg, tr, tr_with};
-use crate::markup::{h, join, t};
 use crate::pages::detail::Kind;
 use crate::pages::editor::{
     DISCARD, OPENED, OPENED_AT, SAVE, SAVED_PARAM, Standing, dock, field, form, heading,
@@ -424,7 +423,7 @@ fn apply(form: &Posted, draft: &mut Draft) {
 
 /// The metadata section.
 fn metadata(locale: &Locale, draft: &Draft) -> Html {
-    let statuses = join(STATUSES.iter().map(|status| {
+    let statuses = Html::join(STATUSES.iter().map(|status| {
         option(
             status,
             &status_words(locale, status),
@@ -436,7 +435,7 @@ fn metadata(locale: &Locale, draft: &Draft) -> Html {
         Some(false) => "false",
         None => "",
     };
-    let inactive = join(
+    let inactive = Html::join(
         [
             ("", Msg::EditorInactiveServer),
             ("true", Msg::EditorInactiveInclude),
@@ -452,7 +451,7 @@ fn metadata(locale: &Locale, draft: &Draft) -> Html {
             count: None,
             actions: None,
         }),
-        h(format!(
+        Html::raw(format!(
             r#"<div class="{FORM}">{}{}{}</div>"#,
             text_field(
                 "vs-url",
@@ -469,7 +468,7 @@ fn metadata(locale: &Locale, draft: &Draft) -> Html {
                     draft.title.clone(),
                     false,
                 ),
-                Field::new("vs-inactive", tr(locale, Msg::EditorInactiveCodes)).view(h(format!(
+                Field::new("vs-inactive", tr(locale, Msg::EditorInactiveCodes)).view(Html::raw(format!(
                     r#"<select id="vs-inactive" name="inactive" class="{SELECT}">{inactive}</select>"#
                 ))),
             ])),
@@ -488,7 +487,7 @@ fn metadata(locale: &Locale, draft: &Draft) -> Html {
                     draft.version.clone(),
                     false,
                 ),
-                Field::new("vs-status", tr(locale, Msg::EditorStatus)).view(h(format!(
+                Field::new("vs-status", tr(locale, Msg::EditorStatus)).view(Html::raw(format!(
                     r#"<select id="vs-status" name="status" class="{SELECT}">{statuses}</select>"#
                 ))),
             ])),
@@ -520,14 +519,14 @@ fn preview_card(
     names: &BTreeMap<String, String>,
 ) -> Html {
     let keys = aria_keys(RUN_KEYS)
-        .map(|keys| format!(r#" aria-keyshortcuts="{}""#, t(keys)))
+        .map(|keys| format!(r#" aria-keyshortcuts="{}""#, Html::text(keys)))
         .unwrap_or_default();
-    let run = h(format!(
+    let run = Html::raw(format!(
         r#"<button type="submit" class="{}" name="{}" value="{PREVIEW}"{keys}>{}{}{}</button>"#,
         ferrohealth_ui::view::button::Variant::Secondary.small(),
         crate::posted::INTENT,
         ferrohealth_ui::icon::icon(Glyph::PLAY, "14"),
-        t(tr(locale, Msg::EditorRunPreview)),
+        Html::text(tr(locale, Msg::EditorRunPreview)),
         kbd(RUN_KEYS),
     ));
     let body = match preview {
@@ -555,20 +554,20 @@ fn preview_card(
                         )
                     },
                 );
-                let rows = join(expansion.concepts.iter().map(|concept| {
+                let rows = Html::join(expansion.concepts.iter().map(|concept| {
                     let drawn = Coding::new(
                         concept.code.clone(),
                         concept.display.clone().unwrap_or_default(),
                     )
                     .system(name_of(names, &concept.system));
-                    h(format!(
+                    Html::raw(format!(
                         "<li>{}</li>",
                         coding(locale, drawn, Layout::Stacked)
                     ))
                 }));
                 Html::join([
                     section_intro(total),
-                    h(format!(r#"<ul class="fui-match-list">{rows}</ul>"#)),
+                    Html::raw(format!(r#"<ul class="fui-match-list">{rows}</ul>"#)),
                 ])
             }
         },
@@ -613,7 +612,7 @@ fn saved_page(request: &Request, opened: &Draft, saved: &str) -> Html {
         load_report(LoadReport {
             outcome: Outcome::Ok,
             arrival: Arrival::AfterAction,
-            title: t(tr_with(
+            title: Html::text(tr_with(
                 locale,
                 Msg::EditorSaved,
                 &[("version", saved.to_owned().into())],
