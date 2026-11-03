@@ -75,11 +75,6 @@ pub(crate) struct RequestUrl {
 }
 
 impl RequestUrl {
-    /// Starts an empty URL, which renders as the root itself.
-    pub(crate) fn new() -> Self {
-        Self::default()
-    }
-
     /// Appends one percent-encoded path segment.
     #[must_use]
     pub(crate) fn segment(mut self, segment: &str) -> Self {
@@ -195,7 +190,7 @@ mod tests {
     #[test]
     fn an_empty_url_renders_as_the_root() {
         assert_eq!(
-            RequestUrl::new().render("https://tx.example.org"),
+            RequestUrl::default().render("https://tx.example.org"),
             "https://tx.example.org",
             "no segments means no trailing slash"
         );
@@ -203,7 +198,7 @@ mod tests {
 
     #[test]
     fn segments_and_queries_render_in_the_order_they_were_added() {
-        let url = RequestUrl::new()
+        let url = RequestUrl::default()
             .segment("r4b")
             .segment("ValueSet")
             .segment("$expand")
@@ -219,7 +214,7 @@ mod tests {
     #[test]
     fn an_empty_root_renders_a_same_origin_relative_url() {
         assert_eq!(
-            RequestUrl::new().segment("health").render(""),
+            RequestUrl::default().segment("health").render(""),
             "/health",
             "a relative URL resolves against the page the bundle came from"
         );

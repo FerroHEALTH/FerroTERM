@@ -250,7 +250,7 @@ pub(crate) const SYSTEM_VERSION_PARAM: &str = "version";
 /// The base is more than one segment in the editor bundle, so it is never
 /// written as a single segment: that would escape the separator inside it.
 pub(crate) fn base_url() -> RequestUrl {
-    let mut url = RequestUrl::new();
+    let mut url = RequestUrl::default();
     for segment in UI_BASE.split('/').filter(|segment| !segment.is_empty()) {
         url = url.segment(segment);
     }

@@ -32,7 +32,7 @@ use crate::fhir::concept::{Hierarchy, chosen_version};
 use crate::fhir::terminology::{SystemCard, VersionRow};
 use crate::fhir::{CODE_SYSTEM, Document, resources_text};
 use crate::locale::{Msg, tr, tr_with};
-use crate::markup::{code, h, join, t};
+use crate::markup::code;
 use crate::pages::code_systems::content_word;
 use crate::pages::detail::{Head, Kind, Links, PANE_PARAM, Pane, header, line, tabbed};
 use crate::pages::parts::{Source, failure, heading};
@@ -155,14 +155,9 @@ fn undeclared(request: &Request, system: &str) -> Html {
             Tone::Neutral,
             Announce::Status,
             None,
-            t(tr(locale, Msg::RootSTerminologyCapabilitiesDoNot)),
+            Html::text(tr(locale, Msg::RootSTerminologyCapabilitiesDoNot)),
         ),
     ])
-}
-
-/// The version the root serves by default.
-fn served(card: &SystemCard) -> Option<VersionRow> {
-    chosen_version(card, None)
 }
 
 /// The title row's action group: Edit for a stored system the reader may
@@ -170,7 +165,7 @@ fn served(card: &SystemCard) -> Option<VersionRow> {
 fn actions(request: &Request, read: &Read, title: &str) -> ActionGroup {
     let locale = &request.locale;
     let url = &read.card.url;
-    let version = served(&read.card);
+    let version = chosen_version(&read.card, None);
     let code = version.as_ref().and_then(|row| row.code.clone());
     let walkable = version
         .as_ref()
@@ -248,7 +243,7 @@ fn screen(request: &Request, read: &Read, pane: Pane) -> Html {
         .as_ref()
         .and_then(PublishedCodeSystem::version)
         .map(str::to_owned)
-        .or_else(|| served(&read.card).and_then(|row| row.code));
+        .or_else(|| chosen_version(&read.card, None).and_then(|row| row.code));
     let head = header(
         request,
         Head {
@@ -284,8 +279,8 @@ fn screen(request: &Request, read: &Read, pane: Pane) -> Html {
 /// A declared boolean as its word.
 fn yes_no(locale: &Locale, value: Option<bool>) -> Html {
     match value {
-        Some(true) => t(tr(locale, Msg::DetailYes)),
-        Some(false) => t(tr(locale, Msg::DetailNo)),
+        Some(true) => Html::text(tr(locale, Msg::DetailYes)),
+        Some(false) => Html::text(tr(locale, Msg::DetailNo)),
         None => or_none(locale, String::new()),
     }
 }
@@ -305,7 +300,7 @@ fn read_only_note(locale: &Locale, source: Source) -> Option<Html> {
     Some(panel_section(
         locale,
         None,
-        notice(Tone::Neutral, Announce::Status, None, t(words)),
+        notice(Tone::Neutral, Announce::Status, None, Html::text(words)),
     ))
 }
 
@@ -359,7 +354,7 @@ fn overview(locale: &Locale, read: &Read) -> Html {
         (content, None) => content_word(locale, content),
     };
     let structure = definitions(vec![
-        (tr(locale, Msg::CodeSystemsContent), t(content)),
+        (tr(locale, Msg::CodeSystemsContent), Html::text(content)),
         (
             tr(locale, Msg::CodeSystemHierarchyMeaning),
             text(locale, published.hierarchy_meaning()),
@@ -417,8 +412,8 @@ fn declared_properties(locale: &Locale, published: &PublishedCodeSystem) -> Opti
             Column::text("meaning", tr(locale, Msg::CodeSystemPropertyMeaning)).role(Role::Quiet),
         ];
         let [_, kind, meaning] = &columns;
-        let rows = join(declared.iter().map(|property| {
-            h(format!(
+        let rows = Html::join(declared.iter().map(|property| {
+            Html::raw(format!(
                 "<tr>{}{}{}</tr>",
                 title_cell(
                     None,
@@ -426,14 +421,16 @@ fn declared_properties(locale: &Locale, published: &PublishedCodeSystem) -> Opti
                     code(property.code.clone().unwrap_or_default()),
                     None
                 ),
-                cell(kind, t(property.kind.clone().unwrap_or_default())),
+                cell(kind, Html::text(property.kind.clone().unwrap_or_default())),
                 cell(
                     meaning,
-                    t(property
-                        .description
-                        .clone()
-                        .or_else(|| property.uri.clone())
-                        .unwrap_or_default()),
+                    Html::text(
+                        property
+                            .description
+                            .clone()
+                            .or_else(|| property.uri.clone())
+                            .unwrap_or_default()
+                    ),
                 ),
             ))
         }));
@@ -474,7 +471,7 @@ fn version_title(locale: &Locale, row: &VersionRow) -> String {
 
 /// Codes in the code face, a space after each.
 fn codes(each: &[String]) -> Html {
-    join(each.iter().map(|one| h(format!("{} ", code(one)))))
+    Html::join(each.iter().map(|one| Html::raw(format!("{} ", code(one)))))
 }
 
 /// The filters one served version declares, as a table.
@@ -487,8 +484,8 @@ fn version_filters(locale: &Locale, row: &VersionRow, filters_title: &str) -> Ht
             Column::text("operators", tr(locale, Msg::CodeSystemOperators)),
         ];
         let [_, operators] = &columns;
-        let rows = join(row.filters.iter().map(|filter| {
-            h(format!(
+        let rows = Html::join(row.filters.iter().map(|filter| {
+            Html::raw(format!(
                 "<tr>{}{}</tr>",
                 title_cell(None, None, code(&filter.code), None),
                 cell(operators, codes(&filter.operators)),
@@ -506,7 +503,7 @@ fn version_filters(locale: &Locale, row: &VersionRow, filters_title: &str) -> Ht
 
 /// Versions: what the server declares it can do with each version.
 fn versions(locale: &Locale, read: &Read) -> Html {
-    let sections = join(read.card.versions.iter().map(|row| {
+    let sections = Html::join(read.card.versions.iter().map(|row| {
         let title = version_title(locale, row);
         let answers = if row.is_default {
             tr_with(
@@ -529,7 +526,7 @@ fn versions(locale: &Locale, read: &Read) -> Html {
         let languages = if row.languages.is_empty() {
             or_none(locale, String::new())
         } else {
-            t(row.languages.join(", "))
+            Html::text(row.languages.join(", "))
         };
         let properties = if row.properties.is_empty() {
             or_none(locale, String::new())
@@ -537,8 +534,14 @@ fn versions(locale: &Locale, read: &Read) -> Html {
             codes(&row.properties)
         };
         let mut facts = vec![
-            (tr(locale, Msg::CodeSystemAnswersRequests), t(answers)),
-            (tr(locale, Msg::CodeSystemSubsumption), t(subsumption)),
+            (
+                tr(locale, Msg::CodeSystemAnswersRequests),
+                Html::text(answers),
+            ),
+            (
+                tr(locale, Msg::CodeSystemSubsumption),
+                Html::text(subsumption),
+            ),
             (tr(locale, Msg::CodeSystemLanguages), languages),
             (tr(locale, Msg::CodeSystemLookUpReturns), properties),
         ];

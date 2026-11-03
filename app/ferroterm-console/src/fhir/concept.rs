@@ -49,10 +49,10 @@ const PROPERTY_OUTPUT: &str = "property";
 /// `parent` and `child` are the standard concept properties any code system
 /// may declare (<http://hl7.org/fhir/concept-properties>), so reading them is
 /// reading the specification rather than knowing a system.
-const PARENT_PROPERTY: &str = "parent";
+pub(crate) const PARENT_PROPERTY: &str = "parent";
 
 /// The concept property naming a direct child of a concept.
-const CHILD_PROPERTY: &str = "child";
+pub(crate) const CHILD_PROPERTY: &str = "child";
 
 /// The filter operator that selects the direct children of one code.
 ///
@@ -405,18 +405,8 @@ impl From<Vec<Parameter>> for Concept {
 }
 
 impl Concept {
-    /// The codes this concept declares as its direct parents.
-    pub(crate) fn parents(&self) -> Vec<String> {
-        self.property_values(PARENT_PROPERTY)
-    }
-
-    /// The codes this concept declares as its direct children.
-    pub(crate) fn children(&self) -> Vec<String> {
-        self.property_values(CHILD_PROPERTY)
-    }
-
     /// Every value the server answered for the property `code`.
-    fn property_values(&self, code: &str) -> Vec<String> {
+    pub(crate) fn property_values(&self, code: &str) -> Vec<String> {
         self.properties
             .iter()
             .filter(|property| property.code == code)

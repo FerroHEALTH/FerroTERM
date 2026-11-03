@@ -26,7 +26,6 @@ use ferrohealth_ui::view::transform::{
 
 use crate::fhir::named::NamedSearch;
 use crate::locale::{Msg, tr};
-use crate::markup::{h, join, t};
 use crate::pages::parts::heading;
 use crate::pages::shortcuts::RUN_KEYS;
 use crate::request::Request;
@@ -95,9 +94,9 @@ pub(crate) fn frame(request: &Request, op: Op, form: Html, answer: Html) -> Html
             )
         })
         .collect();
-    let panel = h(format!(
+    let panel = Html::raw(format!(
         r#"<form method="get" action="{}" class="fui-panel">{}</form>"#,
-        t(op.route()),
+        Html::text(op.route()),
         Html::join([form, answer])
     ));
     Html::join([
@@ -120,7 +119,7 @@ pub(crate) fn options(
     fields: Html,
     run: Html,
 ) -> Html {
-    let hidden = join(hidden.iter().map(|(name, value)| hidden_field(name, value)));
+    let hidden = Html::join(hidden.iter().map(|(name, value)| hidden_field(name, value)));
     transform_options(
         Density::Dense,
         Html::join([
@@ -134,10 +133,10 @@ pub(crate) fn options(
 
 /// A hidden field named `name` carrying `value`.
 pub(crate) fn hidden_field(name: &str, value: &str) -> Html {
-    h(format!(
+    Html::raw(format!(
         r#"<input type="hidden" name="{}" value="{}">"#,
-        t(name),
-        t(value)
+        Html::text(name),
+        Html::text(value)
     ))
 }
 
@@ -157,11 +156,11 @@ pub(crate) fn run(locale: &Locale, id: &str, label: String, glyph: Glyph, operat
 
 /// An `<option>` of `value` reading `words`, chosen when `selected`.
 pub(crate) fn option(value: &str, words: &str, selected: bool) -> Html {
-    h(format!(
+    Html::raw(format!(
         r#"<option value="{}"{}>{}</option>"#,
-        t(value),
+        Html::text(value),
         if selected { " selected" } else { "" },
-        t(words)
+        Html::text(words)
     ))
 }
 
@@ -180,12 +179,12 @@ pub(crate) fn select(
     let blank = blank.map(|words| option("", &words, picked.is_empty()));
     let kept = (!picked.is_empty() && !choices.iter().any(|(value, _)| value == picked))
         .then(|| option(picked, picked, true));
-    let offered = join(
+    let offered = Html::join(
         choices
             .iter()
             .map(|(value, words)| option(value, words, value == picked)),
     );
-    Field::new(id, label).view(h(format!(
+    Field::new(id, label).view(Html::raw(format!(
         r#"<select id="{id}" name="{name}" class="{SELECT}">{}{}{offered}</select>"#,
         blank.unwrap_or_default(),
         kept.unwrap_or_default(),
@@ -200,10 +199,10 @@ pub(crate) fn text(
     value: &str,
     placeholder: String,
 ) -> Html {
-    Field::new(id, label).view(h(format!(
+    Field::new(id, label).view(Html::raw(format!(
         r#"<input id="{id}" name="{name}" class="{INPUT}" value="{}" placeholder="{}" autocomplete="off">"#,
-        t(value),
-        t(placeholder)
+        Html::text(value),
+        Html::text(placeholder)
     )))
 }
 

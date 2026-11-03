@@ -667,7 +667,7 @@ mod tests {
     fn the_current_version_and_canonical_come_off_the_resource_the_server_holds() {
         let opened = Opened {
             current: Some(
-                crate::fhir::version::FhirVersion::R4B
+                FhirVersion::R4B
                     .decode(
                         r#"{"resourceType":"CodeSystem","id":"c","meta":{"versionId":"4"},
                             "url":"https://terminology.example/colours",

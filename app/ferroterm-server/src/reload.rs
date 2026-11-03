@@ -289,7 +289,13 @@ impl FromRef<Serving> for Option<Arc<crate::smart::Smart>> {
 pub fn router(serving: Serving) -> Router {
     let routes = Router::new()
         .route("/reload", post(reload))
-        .fallback(unknown);
+        // Anything else on the admin listener.
+        .fallback(|| async {
+            ferroterm_problem::blank(
+                StatusCode::NOT_FOUND,
+                "the admin listener answers POST /reload and the health routes alone",
+            )
+        });
     let routes = match serving.smart() {
         Some(smart) => crate::smart::guard::admin(routes, &smart),
         None => routes,
@@ -320,14 +326,6 @@ fn refused(reason: &str) -> Response {
     ferroterm_problem::respond(
         ferroterm_problem::Kind::problem(crate::problem::Kind::ReloadFailed, reason),
         None,
-    )
-}
-
-/// Anything else on the admin listener.
-async fn unknown() -> Response {
-    ferroterm_problem::blank(
-        StatusCode::NOT_FOUND,
-        "the admin listener answers POST /reload and the health routes alone",
     )
 }
 

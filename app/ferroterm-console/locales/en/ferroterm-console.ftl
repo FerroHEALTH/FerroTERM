@@ -377,6 +377,7 @@ errors-not-found-body = The console has no page at { $path }. The navigation lis
 errors-forbidden-body = You are signed in as { $who }, and this account may not do this: { $what }. You can still read everything and preview what you compose.
 errors-forbidden-scope = Needs the scope
 errors-sign-in-again = Sign in again
+session-ended-detail = The session has ended; sign in again.
 ## The keyboard shortcuts
 
 keys-title = Keyboard shortcuts

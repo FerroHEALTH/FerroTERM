@@ -23,6 +23,7 @@ use crate::outcome::Failure;
 
 /// The parameter that carries a request-scoped resource.
 pub const TX_RESOURCE: &str = "tx-resource";
+
 /// How long an unused cache lives. No spec fixes this: our own design.
 pub const CACHE_IDLE: Duration = Duration::from_mins(30);
 

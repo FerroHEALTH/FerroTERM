@@ -35,7 +35,7 @@ use http::StatusCode;
 use crate::fhir::error::FhirError;
 use crate::fhir::write::Written;
 use crate::locale::{Msg, tr, tr_with};
-use crate::markup::{h, join, p, t};
+use crate::markup::p;
 use crate::pages::detail::Kind;
 use crate::pages::operations::hidden_field;
 use crate::pages::parts::{ago, headed, refusal_of};
@@ -121,18 +121,18 @@ pub(crate) fn text_field(
     } else {
         INPUT.to_owned()
     };
-    Field::new(id, label).view(h(format!(
+    Field::new(id, label).view(Html::raw(format!(
         r#"<input id="{id}" name="{name}" class="{class}" value="{}">"#,
-        t(value)
+        Html::text(value)
     )))
 }
 
 /// The editor's form around `body`, posted to `action`.
 pub(crate) fn form(action: String, hidden: &[(&'static str, String)], body: Html) -> Html {
-    let hidden = join(hidden.iter().map(|(name, value)| hidden_field(name, value)));
-    h(format!(
+    let hidden = Html::join(hidden.iter().map(|(name, value)| hidden_field(name, value)));
+    Html::raw(format!(
         r#"<form id="{FORM_ID}" method="post" action="{}">{}</form>"#,
-        t(action),
+        Html::text(action),
         Html::join([hidden, body])
     ))
 }
@@ -307,7 +307,7 @@ pub(crate) fn refused(request: &Request, error: &FhirError, reload: &str) -> (Ht
                         Tone::Warn,
                         Announce::Alert,
                         None,
-                        t(tr(locale, Msg::EditorExpired)),
+                        Html::text(tr(locale, Msg::EditorExpired)),
                     ),
                     p(again),
                 ]),
@@ -363,7 +363,7 @@ pub(crate) fn unmanaged(request: &Request, kind: Kind, back: String) -> Html {
             Tone::Info,
             Announce::Status,
             None,
-            t(tr(locale, Msg::EditorUnmanaged)),
+            Html::text(tr(locale, Msg::EditorUnmanaged)),
         ),
         p(open),
     ])
@@ -374,13 +374,13 @@ pub(crate) fn unmanaged(request: &Request, kind: Kind, back: String) -> Html {
 /// row added.
 #[must_use]
 pub(crate) fn add_button(intent: String, words: String) -> Html {
-    h(format!(
+    Html::raw(format!(
         r#"<button type="submit" class="{}" name="{}" value="{}" formnovalidate>{}{}</button>"#,
         Variant::Ghost.small(),
         crate::posted::INTENT,
-        t(intent),
+        Html::text(intent),
         ferrohealth_ui::icon::icon(Glyph::PLUS, "16"),
-        t(words)
+        Html::text(words)
     ))
 }
 
@@ -388,12 +388,12 @@ pub(crate) fn add_button(intent: String, words: String) -> Html {
 /// `words`, such as the Remove of a clause.
 #[must_use]
 pub(crate) fn icon_submit(intent: String, glyph: Glyph, words: String) -> Html {
-    h(format!(
+    Html::raw(format!(
         r#"<button type="submit" class="fui-icon-button" name="{}" value="{}" formnovalidate aria-label="{words}" title="{words}">{}</button>"#,
         crate::posted::INTENT,
-        t(intent),
+        Html::text(intent),
         ferrohealth_ui::icon::icon(glyph, "16"),
-        words = t(words),
+        words = Html::text(words),
     ))
 }
 

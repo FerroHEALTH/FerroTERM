@@ -27,6 +27,7 @@ pub(super) struct Persisted {
     /// version defines.
     pub(super) served: BTreeMap<&'static str, Arc<Layer>>,
 }
+
 /// A failure to persist a client resource.
 #[derive(Debug, thiserror::Error)]
 pub enum PersistError {
@@ -87,6 +88,7 @@ pub enum PersistError {
         reason: String,
     },
 }
+
 /// What one rebuild of the served state produced.
 pub(super) struct Layers {
     /// The deployment's own layer with every persisted record over it.
@@ -95,6 +97,7 @@ pub(super) struct Layers {
     /// defines.
     served: BTreeMap<&'static str, Arc<Layer>>,
 }
+
 /// The loaded state with every persisted record applied over it, and the same
 /// layer per served version over the terminology that version defines.
 ///
@@ -126,6 +129,7 @@ pub(super) fn persisted_layers(
         .collect();
     Ok(Layers { layer, served })
 }
+
 /// Whether `record` carries the `url` and `version` of a resource in `core`.
 ///
 /// Such a record is kept out of every served layer, so the core resource of
@@ -141,6 +145,7 @@ pub(super) fn shadows_core(core: &CoreTerminology, record: &Record) -> bool {
     };
     core_holds(core, resource_type, url, record.version.as_deref())
 }
+
 /// Whether the terminology `core` carries a resource of `resource_type` with
 /// `url` and `version`.
 pub(super) fn core_holds(
@@ -165,6 +170,7 @@ pub(super) fn core_holds(
         ResourceType::ConceptMap => false,
     }
 }
+
 /// The id of the persisted record of `resource_type` with `url` and
 /// `version`, other than `id`, when there is one.
 pub(super) fn persisted_holder(
@@ -185,6 +191,7 @@ pub(super) fn persisted_holder(
         })
         .map(|((_, held), _)| held.clone())
 }
+
 /// The loaded state with every persisted record applied over it.
 pub(super) fn layered(
     base: &Layer,
@@ -214,6 +221,7 @@ pub(super) fn layered(
     }
     Ok(Arc::new(layer))
 }
+
 /// Writes `meta.versionId` and `meta.lastUpdated` into `resource`, keeping
 /// whatever else its `meta` carries
 /// (<https://hl7.org/fhir/R4B/resource.html#Meta>).
@@ -236,6 +244,7 @@ pub(super) fn stamp(
     );
     resource.insert(String::from("meta"), fhir_types::codec::Value::Object(meta));
 }
+
 /// The string value of `field`, when the object carries one.
 pub(super) fn text_of(object: &fhir_types::codec::Object, field: &str) -> Option<String> {
     object.get(field)?.as_str().map(str::to_owned)
@@ -287,6 +296,7 @@ impl AppState {
         };
         Ok(())
     }
+
     /// The canonical of the resource the deployment loaded under `id`, when it
     /// loaded one of `resource_type`.
     ///
@@ -318,6 +328,7 @@ impl AppState {
                 .map(|(url, version)| canonical(url, version.as_deref())),
         }
     }
+
     /// Every resource the deployment loaded, as its type, id, `url`, and
     /// `version`.
     pub(super) fn loaded_canonicals(&self) -> Vec<(ResourceType, &str, &str, Option<&str>)> {
@@ -361,6 +372,7 @@ impl AppState {
             )
             .collect()
     }
+
     /// The id of the resource of `resource_type` the deployment loaded with
     /// `url` and `version`, other than `id`, when there is one.
     pub(super) fn loaded_holder(
@@ -379,11 +391,13 @@ impl AppState {
             })
             .map(|(_, held, _, _)| held.to_owned())
     }
+
     /// Whether this deployment persists client resources.
     #[must_use]
     pub fn persists(&self) -> bool {
         self.store.is_some()
     }
+
     /// The persisted record of `resource_type` with `id`.
     #[must_use]
     pub fn persisted_record(&self, resource_type: ResourceType, id: &str) -> Option<Record> {
@@ -394,6 +408,7 @@ impl AppState {
             .get(&(resource_type, id.to_owned()))
             .cloned()
     }
+
     /// Every persisted record of `resource_type`, sorted by id.
     #[must_use]
     pub fn persisted_records(&self, resource_type: ResourceType) -> Vec<Record> {
@@ -406,6 +421,7 @@ impl AppState {
             .map(|(_, record)| record.clone())
             .collect()
     }
+
     /// The persisted record of `resource_type` with `id` as of `version_id`.
     ///
     /// # Errors
@@ -421,6 +437,7 @@ impl AppState {
         let store = self.store.as_ref().ok_or(PersistError::NotConfigured)?;
         Ok(store.version(resource_type, id, version_id)?)
     }
+
     /// Every version of the persisted resources of `resource_type`, or of the
     /// one with `id` when one is given, deletes included; empty when the
     /// deployment persists nothing.
@@ -438,6 +455,7 @@ impl AppState {
         };
         Ok(store.history(resource_type, id)?)
     }
+
     /// Whether version `version_id` of the persisted `resource_type` with `id`
     /// is a delete.
     ///
@@ -454,6 +472,7 @@ impl AppState {
         let store = self.store.as_ref().ok_or(PersistError::NotConfigured)?;
         Ok(store.is_delete(resource_type, id, version_id)?)
     }
+
     /// The closure table named `name`.
     ///
     /// # Errors
@@ -464,6 +483,7 @@ impl AppState {
         let store = self.store.as_ref().ok_or(PersistError::NotConfigured)?;
         Ok(store.closure(name)?)
     }
+
     /// Writes the closure table `closure`.
     ///
     /// # Errors
@@ -474,6 +494,7 @@ impl AppState {
         let store = self.store.as_ref().ok_or(PersistError::NotConfigured)?;
         Ok(store.put_closure(closure)?)
     }
+
     /// Persists `resource` as `resource_type` with `id`, raising
     /// `meta.versionId` and replacing the served layer.
     ///
@@ -563,6 +584,7 @@ impl AppState {
         };
         Ok(record)
     }
+
     /// Removes the persisted resource of `resource_type` with `id` and
     /// replaces the served layer; `false` when there was none.
     ///

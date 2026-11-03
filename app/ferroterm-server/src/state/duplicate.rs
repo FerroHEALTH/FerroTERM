@@ -14,10 +14,12 @@ use crate::state::ids::canonical;
 pub(super) fn same_canonical(left: (&str, Option<&str>), right: (&str, Option<&str>)) -> bool {
     left.0 == right.0 && present_version(left.1) == present_version(right.1)
 }
+
 /// `version`, when it is present and not empty.
 pub(super) fn present_version(version: Option<&str>) -> Option<&str> {
     version.filter(|version| !version.is_empty())
 }
+
 /// The persisted records in the order they were written, oldest first, so
 /// that of two records carrying one canonical the later write is layered last
 /// and answers.
@@ -40,6 +42,7 @@ pub(super) fn in_write_order(records: &BTreeMap<(ResourceType, String), Record>)
     });
     ordered.into_iter().map(|(_, record)| record).collect()
 }
+
 /// One canonical that more than one resource of a type carries, with every id
 /// that carries it and the one that answers for it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,6 +58,7 @@ pub(super) struct DuplicateCanonical {
     /// which the served layer applies over every other.
     pub(super) answering: String,
 }
+
 /// Every canonical that a persisted record shares with another persisted
 /// record or with a loaded resource of its type.
 pub(super) fn duplicate_canonicals(
@@ -96,6 +100,7 @@ pub(super) fn duplicate_canonicals(
         })
         .collect()
 }
+
 #[cfg(test)]
 mod duplicate_tests {
     use std::collections::BTreeMap;

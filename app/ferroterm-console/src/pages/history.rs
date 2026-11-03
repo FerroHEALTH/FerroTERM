@@ -36,7 +36,7 @@ use crate::authoring::history::{Comparison, Opened, Subject, Support, open, rest
 use crate::fhir::error::FhirError;
 use crate::fhir::write::{Stamp, Stored, Version};
 use crate::locale::{Msg, tr, tr_with};
-use crate::markup::{h, join, p, t};
+use crate::markup::p;
 use crate::pages::detail::{Head, Kind, Links, Pane, header, line, tabbed};
 use crate::pages::operations::{hidden_field, option};
 use crate::pages::parts::{Source, failure, heading, refusal_of, relative};
@@ -274,7 +274,7 @@ fn outcome(request: &Request, opened: &Opened, restored: Option<&Restored>) -> O
             Tone::Bad,
             Announce::Alert,
             None,
-            t(tr(locale, Msg::VersionCarriesNoResourcePutBack)),
+            Html::text(tr(locale, Msg::VersionCarriesNoResourcePutBack)),
         )),
         None => {
             let restored = request.param(RESTORED_PARAM)?;
@@ -289,7 +289,7 @@ fn restored_notice(locale: &Locale, revision: String, written: String) -> Html {
         Tone::Ok,
         Announce::Status,
         None,
-        t(tr_with(
+        Html::text(tr_with(
             locale,
             Msg::HistoryRestored,
             &[("revision", revision.into()), ("written", written.into())],
@@ -327,18 +327,18 @@ fn revisions(request: &Request, opened: &Opened, writable: bool) -> Html {
     let made = columns.get(2).cloned();
     let act = columns.get(3).cloned();
     let subject = &opened.subject;
-    let rows = join(opened.versions.iter().map(|version| {
+    let rows = Html::join(opened.versions.iter().map(|version| {
         let is_current = version.id == current;
         let mark = is_current.then(|| {
-            h(format!(
+            Html::raw(format!(
                 r#"<span class="{}">{}</span>"#,
                 Tone::Accent.badge(),
-                t(tr(locale, Msg::HistoryCurrent))
+                Html::text(tr(locale, Msg::HistoryCurrent))
             ))
         });
-        let name = h(format!(
+        let name = Html::raw(format!(
             "{} {}",
-            t(tr_with(
+            Html::text(tr_with(
                 locale,
                 Msg::HistoryRevisionN,
                 &[("revision", version.id.clone().into())],
@@ -351,7 +351,7 @@ fn revisions(request: &Request, opened: &Opened, writable: bool) -> Html {
             .map(|raw| relative(locale, raw, now));
         let restore = (!is_current && writable && version.resource.is_some())
             .then(|| restore_control(request, subject, version, &current));
-        h(format!(
+        Html::raw(format!(
             "<tr>{}{}{}{}</tr>",
             title_cell(None, None, name, None),
             changed
@@ -359,7 +359,7 @@ fn revisions(request: &Request, opened: &Opened, writable: bool) -> Html {
                 .map(|column| cell(column, when.unwrap_or_default()))
                 .unwrap_or_default(),
             made.as_ref()
-                .map(|column| cell(column, t(interaction(locale, version))))
+                .map(|column| cell(column, Html::text(interaction(locale, version))))
                 .unwrap_or_default(),
             act.as_ref()
                 .map(|column| cell(column, restore.unwrap_or_default()))
@@ -466,7 +466,7 @@ fn restore_control(request: &Request, subject: &Subject, version: &Version, curr
 /// The revisions as the options of a select, `picked` chosen and `current`
 /// named as the current one.
 fn revision_options(locale: &Locale, opened: &Opened, current: &str, picked: &str) -> Html {
-    join(opened.versions.iter().map(|version| {
+    Html::join(opened.versions.iter().map(|version| {
         let words = if version.id == current {
             tr_with(
                 locale,
@@ -508,25 +508,25 @@ fn comparison(request: &Request, opened: &Opened) -> Html {
     };
     let subject = &opened.subject;
     let fields = field_flow(Html::join([
-        Field::new("history-from", tr(locale, Msg::HistoryEarlier)).view(h(format!(
+        Field::new("history-from", tr(locale, Msg::HistoryEarlier)).view(Html::raw(format!(
             r#"<select id="history-from" name="{FROM_PARAM}" class="{SELECT}">{}</select>"#,
             revision_options(locale, opened, &current, &picked_from)
         ))),
-        Field::new("history-to", tr(locale, Msg::HistoryLater)).view(h(format!(
+        Field::new("history-to", tr(locale, Msg::HistoryLater)).view(Html::raw(format!(
             r#"<select id="history-to" name="{TO_PARAM}" class="{SELECT}">{}</select>"#,
             revision_options(locale, opened, &current, &picked_to)
         ))),
         action_field(
-            h(format!(
+            Html::raw(format!(
                 r#"<button type="submit" class="{}">{}{}</button>"#,
                 Variant::Secondary.class(),
                 ferrohealth_ui::icon::icon(Glyph::GIT_COMPARE, "16"),
-                t(tr(locale, Msg::HistoryCompare))
+                Html::text(tr(locale, Msg::HistoryCompare))
             )),
             Html::empty(),
         ),
     ]));
-    let choose = h(format!(
+    let choose = Html::raw(format!(
         r#"<form method="get" action="{HISTORY_ROUTE}">{}{}{}{fields}</form>"#,
         hidden_field(crate::routes::VERSION_PARAM, request.version.segment()),
         hidden_field(TYPE_PARAM, &subject.resource_type),

@@ -64,7 +64,6 @@ base64.workspace = true
 tracing.workspace = true
 axum.workspace = true
 clap.workspace = true
-cookie.workspace = true
 # The terminology server's FHIR API and the healthcheck job asking the
 # console beside it.
 reqwest.workspace = true
