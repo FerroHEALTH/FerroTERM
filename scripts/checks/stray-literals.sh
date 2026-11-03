@@ -6,7 +6,8 @@
 # design).
 #
 # It reads the hand-written .rs files under each ROOT, up to the file's
-# `#[cfg(test)]` module, and reports every string literal that reads as
+# `#[cfg(test)]` module and leaving out the file of an out-of-line one
+# (`#[cfg(test)] mod tests;`), and reports every string literal that reads as
 # words a reader sees:
 #
 #   1. the value of an attribute a reader sees or hears (`aria-label`,
@@ -77,8 +78,35 @@ if [[ "${#files[@]}" -eq 0 ]]; then
   exit 0
 fi
 
+# An out-of-line test module (`#[cfg(test)]` over `mod NAME;`) is skipped
+# like an inline one: its file is NAME.rs or NAME/ beside a mod.rs, lib.rs
+# or main.rs, and under the module's own directory otherwise (The Rust
+# Reference, Modules, Module source filenames).
+testmods="$(
+  awk '
+    FNR == 1 { gate = 0 }
+    /^[ \t]*#\[cfg\(test\)\][ \t]*$/ { gate = 1; next }
+    gate && /^[ \t]*(pub(\([^)]*\))?[ \t]+)?mod[ \t]+[A-Za-z_][A-Za-z0-9_]*[ \t]*;/ {
+      name = $0
+      sub(/^[ \t]*(pub(\([^)]*\))?[ \t]+)?mod[ \t]+/, "", name)
+      sub(/[ \t]*;.*$/, "", name)
+      dir = FILENAME
+      sub(/[^\/]*$/, "", dir)
+      base = FILENAME
+      sub(/^.*\//, "", base)
+      if (base != "mod.rs" && base != "lib.rs" && base != "main.rs") {
+        sub(/\.rs$/, "", base)
+        dir = dir base "/"
+      }
+      print dir name ".rs"
+      print dir name "/"
+    }
+    { gate = 0 }
+  ' ${files[@]+"${files[@]}"}
+)"
+
 found="$(
-  awk -v allowfile="$allow" '
+  testmods="$testmods" awk -v allowfile="$allow" '
     function wordy(t,    bare, n, i, toks, plain) {
       bare = t
       gsub(/\{[^{}]*\}/, "", bare)
@@ -115,11 +143,13 @@ found="$(
           exit 2
         }
       }
+      ntest = split(ENVIRON["testmods"], testmod, "\n")
       visible = "(^|[^A-Za-z-])(aria-label|title|placeholder|alt|data-label|aria-description|aria-roledescription|aria-valuetext|label)[ \t]*=[ \t]*$"
     }
     FNR == 1 {
       off = 0
       for (i = 1; i <= nskip; i++) if (index(FILENAME, skip[i]) == 1) off = 1
+      for (i = 1; i <= ntest; i++) if (testmod[i] != "" && index(FILENAME, testmod[i]) == 1) off = 1
       if ($0 ~ /@generated/) off = 1
     }
     off { next }
