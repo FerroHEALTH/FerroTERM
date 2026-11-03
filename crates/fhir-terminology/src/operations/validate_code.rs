@@ -233,10 +233,22 @@ pub fn validate_code(
                 "`coding.system` `{system}` does not match `url` `{url}`"
             )));
         }
-        let code = coding
-            .code
-            .as_deref()
-            .ok_or_else(|| OperationError::Required(String::from("`coding.code` is required")))?;
+        let Some(code) = coding.code.as_deref() else {
+            return Ok(incomplete(
+                coding.system.clone(),
+                vec![super::codeless(coding, "coding")],
+            ));
+        };
+        if url.is_none() && coding.system.is_none() && matches!(invocation, Invocation::Type) {
+            let mut outcome = incomplete(
+                None,
+                super::incomplete_coding(coding, "coding")
+                    .into_iter()
+                    .collect(),
+            );
+            outcome.code = Some(code.to_owned());
+            return Ok(outcome);
+        }
         let resolved = match resolve_for(
             registry,
             invocation,
@@ -262,6 +274,9 @@ pub fn validate_code(
             "provide one of `code`, `coding`, or `codeableConcept`",
         )));
     };
+    if let Some(outcome) = unidentified(invocation, url, concept) {
+        return Ok(outcome);
+    }
     let resolved = match resolve_for(registry, invocation, url, version, None, "codeableConcept")? {
         Ok(resolved) => resolved,
         Err(unserved) => return Ok(unserved),
@@ -269,6 +284,54 @@ pub fn validate_code(
     let mut outcome = check_codeable_concept(&resolved.provider, &concept.coding, language)?;
     outcome.codeable_concept = Some(concept.clone());
     Ok(outcome)
+}
+
+/// The answer for a `CodeableConcept` that identifies no code system to check:
+/// with no `url` and no instance, none of its codings names both a system and
+/// a code (<https://hl7.org/fhir/R4B/codesystem-operation-validate-code.html>).
+fn unidentified(
+    invocation: &Invocation,
+    url: Option<&str>,
+    concept: &CodeableConceptRef,
+) -> Option<ValidationOutcome> {
+    let identified = concept
+        .coding
+        .iter()
+        .any(|coding| coding.system.is_some() && coding.code.is_some());
+    if url.is_some() || !matches!(invocation, Invocation::Type) || identified {
+        return None;
+    }
+    let issues = concept
+        .coding
+        .iter()
+        .enumerate()
+        .filter_map(|(index, coding)| {
+            super::incomplete_coding(coding, &format!("CodeableConcept.coding[{index}]"))
+        })
+        .collect();
+    let mut outcome = incomplete(None, issues);
+    outcome.codeable_concept = Some(concept.clone());
+    Some(outcome)
+}
+
+/// A coding the operation cannot check, not a valid code, with the warnings
+/// that say why.
+fn incomplete(system: Option<String>, issues: Vec<Issue>) -> ValidationOutcome {
+    ValidationOutcome {
+        result: false,
+        message: issues.first().map(|issue| issue.text.clone()),
+        display: None,
+        code: None,
+        normalized_code: None,
+        system,
+        version: None,
+        issues,
+        unknown_systems: Vec::new(),
+        x_unknown_systems: Vec::new(),
+        codeable_concept: None,
+        inactive: None,
+        status: None,
+    }
 }
 
 /// Validates the codings of a `CodeableConcept` that name the system: the

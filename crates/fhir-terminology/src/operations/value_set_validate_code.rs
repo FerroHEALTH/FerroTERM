@@ -395,10 +395,13 @@ pub fn validate_code(
         return check(&subject);
     }
     if let Some(coding) = &input.coding {
-        let code = coding
-            .code
-            .as_deref()
-            .ok_or_else(|| OperationError::Required(String::from("`coding.code` is required")))?;
+        let Some(code) = coding.code.as_deref() else {
+            return Ok(refusal::failed(
+                coding.system.clone(),
+                None,
+                super::codeless(coding, "coding"),
+            ));
+        };
         let subject = Subject {
             system: coding.system.as_deref().or(input.system.as_deref()),
             version: coding
@@ -416,17 +419,14 @@ pub fn validate_code(
         .as_ref()
         .ok_or_else(|| OperationError::Invalid(String::from("no code input")))?;
     let codings = &concept.coding;
-    if codings.is_empty() {
-        return Err(OperationError::Required(String::from(
-            "`codeableConcept` carries no `coding`",
-        )));
-    }
     let mut judged = Vec::with_capacity(codings.len());
+    let mut codeless = Vec::new();
     for (index, coding) in codings.iter().enumerate() {
+        let base = format!("CodeableConcept.coding[{index}]");
         let Some(code) = coding.code.as_deref() else {
+            codeless.push(super::codeless(coding, &base));
             continue;
         };
-        let base = format!("CodeableConcept.coding[{index}]");
         let subject = Subject {
             system: coding.system.as_deref(),
             version: coding.version.as_deref(),
@@ -436,12 +436,18 @@ pub fn validate_code(
         };
         judged.push((coding, check(&subject)?));
     }
-    if judged.is_empty() {
-        return Err(OperationError::Required(String::from(
-            "`codeableConcept.coding.code` is required",
-        )));
+    // NOTE: a `CodeableConcept` with no coding to judge is a valid input that
+    // holds no valid code, so it fails against the value set rather than
+    // refusing the request (<https://hl7.org/fhir/R4B/datatypes.html#CodeableConcept>).
+    let mut validation = if judged.is_empty() {
+        combine::no_valid_coding(&model)
+    } else {
+        combine(&model, &judged)
+    };
+    if !codeless.is_empty() {
+        validation.issues.extend(codeless);
+        validation.message = message_of(&validation.issues);
     }
-    let mut validation = combine(&model, &judged);
     validation.codeable_concept = Some(concept.clone());
     Ok(validation)
 }
