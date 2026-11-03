@@ -533,7 +533,7 @@ dependencies = [
 
 [[package]]
 name = "fhir-types"
-version = "0.1.129"
+version = "0.1.128"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eab6cf450919fa8033d479209d0384dfd9dc9a7373aef7a9be66dab6f1db72b3"
 dependencies = [
@@ -1614,6 +1614,7 @@ dependencies = [
  "concept-graph",
  "logos",
  "roaring",
+ "sct-scg",
  "thiserror",
  "winnow",
 ]

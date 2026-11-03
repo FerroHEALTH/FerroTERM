@@ -9,7 +9,10 @@ license = "BUSL-1.1"
 
 # The crate is deliberately OUTSIDE the workspace (the root manifest excludes
 # it): cargo-fuzz builds with sanitizer flags that need a nightly toolchain,
-# and the product stays on the pinned stable one.
+# and the product stays on the pinned stable one. The empty table makes it
+# its own workspace root, so cargo never adopts it into a checkout above it.
+[workspace]
+
 [package.metadata]
 cargo-fuzz = true
 
