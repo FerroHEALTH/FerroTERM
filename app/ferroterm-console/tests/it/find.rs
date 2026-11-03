@@ -45,7 +45,8 @@ async fn terminology() -> MockServer {
                 "id": "respiratory",
                 "url": "https://terminology.example/CodeSystem/respiratory",
                 "title": "Synthetic respiratory findings",
-                "status": "active"
+                "status": "active",
+                "content": "complete"
             } }]
         })))
         .mount(&server)

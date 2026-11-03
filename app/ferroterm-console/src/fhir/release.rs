@@ -18,11 +18,13 @@ use serde_json::Value;
 use crate::authoring::code_system;
 use crate::authoring::concept_map::MapDraft;
 use crate::fhir::capability::Capabilities;
+use crate::fhir::code_system::PublishedCodeSystem;
 use crate::fhir::compose;
 use crate::fhir::compose::stored::StoredValueSet;
 use crate::fhir::concept::{Concept, ConceptQuery};
 use crate::fhir::concept_map::PublishedConceptMap;
 use crate::fhir::expansion::ExpandedValueSet;
+use crate::fhir::named::NamedSearch;
 use crate::fhir::outcome::Outcome;
 use crate::fhir::parameters::Parameter;
 use crate::fhir::searchset::Found;
@@ -54,7 +56,9 @@ pub(crate) trait Release {
         + Reads<Found<PublishedConceptMap>>
         + Reads<Found<code_system::Draft>>
         + Reads<Found<MapDraft>>
-        + Reads<History>;
+        + Reads<History>
+        + Reads<NamedSearch>
+        + Reads<Found<PublishedCodeSystem>>;
     /// Any resource of the release, read for the stamp a write answers and a
     /// read of one version carries.
     type Resource: DeserializeOwned + Serialize + Reads<Stamp>;
@@ -79,6 +83,7 @@ pub(crate) trait Release {
         + Serialize
         + Default
         + Reads<code_system::Draft>
+        + Reads<PublishedCodeSystem>
         + Rewrites<code_system::Draft>;
     /// The release's `OperationOutcome`, read as a refusal carries it.
     type OperationOutcome: DeserializeOwned + Reads<Outcome>;
@@ -256,6 +261,18 @@ impl Decodes for code_system::Draft {
 }
 
 impl Decodes for Found<code_system::Draft> {
+    fn decode<R: Release>(body: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str::<R::Bundle>(body).map(|bundle| bundle.read())
+    }
+}
+
+impl Decodes for NamedSearch {
+    fn decode<R: Release>(body: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str::<R::Bundle>(body).map(|bundle| bundle.read())
+    }
+}
+
+impl Decodes for Found<PublishedCodeSystem> {
     fn decode<R: Release>(body: &str) -> Result<Self, serde_json::Error> {
         serde_json::from_str::<R::Bundle>(body).map(|bundle| bundle.read())
     }

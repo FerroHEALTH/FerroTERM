@@ -25,6 +25,7 @@ use ferrohealth_ui::view::coding::canonical;
 use crate::auth::scopes::Letter;
 use crate::fhir::CODE_SYSTEM;
 use crate::fhir::concept::Hierarchy;
+use crate::fhir::error::FhirError;
 use crate::fhir::named::{Listed, NamedSearch};
 use crate::fhir::terminology::SystemCard;
 use crate::locale::{Msg, message, tr, tr_with};
@@ -95,30 +96,40 @@ pub(crate) fn hierarchy_word(locale: &Locale, card: &SystemCard) -> String {
 
 /// Code systems.
 pub(crate) async fn page(request: Request) -> Html {
-    let locale = &request.locale;
     let capabilities = request
         .client
         .terminology_capabilities(request.version)
         .await;
-    let listed = request
+    let listed = match request
         .client
         .published_names(request.version, CODE_SYSTEM)
         .await
-        .map(|named| NamedSearch::listed(&named))
-        .unwrap_or_default();
+    {
+        Ok(named) => NamedSearch::listed(&named),
+        // An answer that does not decode at its release is a defect, so the
+        // page draws its error state; a refused search leaves the listing to
+        // what the root declared.
+        Err(error @ FhirError::Decode { .. }) => return refused(&request, &error),
+        Err(_refused) => Vec::new(),
+    };
     match capabilities {
         Ok(capabilities) => listing(&request, rows(capabilities.cards(), &listed)),
-        Err(error) => Html::join([
-            heading(
-                &request,
-                tr(locale, Msg::ShellCodeSystems),
-                None,
-                Vec::new(),
-                ActionGroup::default(),
-            ),
-            failure(locale, &error),
-        ]),
+        Err(error) => refused(&request, &error),
     }
+}
+
+/// The page of a read that did not produce the listing.
+fn refused(request: &Request, error: &FhirError) -> Html {
+    Html::join([
+        heading(
+            request,
+            tr(&request.locale, Msg::ShellCodeSystems),
+            None,
+            Vec::new(),
+            ActionGroup::default(),
+        ),
+        failure(&request.locale, error),
+    ])
 }
 
 /// The listing of `all` the root serves, as the address filters it.

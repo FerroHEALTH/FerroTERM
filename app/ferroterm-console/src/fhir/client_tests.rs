@@ -136,7 +136,7 @@ async fn a_root_that_publishes_smart_discovery_asks_for_a_sign_in() {
 
 #[tokio::test]
 async fn a_code_system_summary_asks_without_concepts_and_keeps_the_document() {
-    let body = r#"{"resourceType":"Bundle","type":"searchset","total":1,"entry":[{"resource":{"resourceType":"CodeSystem","url":"https://terminology.example/x?e=1","name":"X"}}]}"#;
+    let body = r#"{"resourceType":"Bundle","type":"searchset","total":1,"entry":[{"resource":{"resourceType":"CodeSystem","url":"https://terminology.example/x?e=1","name":"X","status":"active","content":"not-present"}}]}"#;
     let server = answering("/r4b/CodeSystem", 200, body).await;
     let document = served(console_at(&server.uri()).await, None, |client| async move {
         client
@@ -157,7 +157,7 @@ async fn a_code_system_summary_asks_without_concepts_and_keeps_the_document() {
             .get(http::header::ACCEPT)
             .and_then(|value| value.to_str().ok())
     );
-    assert_eq!(1, document.value.published().len());
+    assert_eq!(1, document.value.found().len());
     assert!(
         document.text.contains("\n  \"resourceType\": \"Bundle\""),
         "the document is kept indented for a reader: {}",
@@ -167,7 +167,7 @@ async fn a_code_system_summary_asks_without_concepts_and_keeps_the_document() {
 
 #[tokio::test]
 async fn the_published_names_are_read_narrowed_to_what_a_picker_shows() {
-    let body = r#"{"resourceType":"Bundle","entry":[{"resource":{"resourceType":"ValueSet","url":"https://terminology.example/vs","title":"Colours"}}]}"#;
+    let body = r#"{"resourceType":"Bundle","type":"searchset","entry":[{"resource":{"resourceType":"ValueSet","url":"https://terminology.example/vs","title":"Colours","status":"active"}}]}"#;
     let server = answering("/r5/ValueSet", 200, body).await;
     let names = served(console_at(&server.uri()).await, None, |client| async move {
         client.published_names(FhirVersion::R5, "ValueSet").await

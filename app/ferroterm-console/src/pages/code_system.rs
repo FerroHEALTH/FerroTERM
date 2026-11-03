@@ -27,8 +27,9 @@ use ferrohealth_ui::view::surface::{
 use ferrohealth_ui::view::template::list::HeadingCount;
 
 use crate::auth::scopes::Letter;
-use crate::fhir::code_system::{CodeSystemSearch, PublishedCodeSystem};
+use crate::fhir::code_system::PublishedCodeSystem;
 use crate::fhir::concept::{Hierarchy, chosen_version};
+use crate::fhir::searchset::Found;
 use crate::fhir::terminology::{SystemCard, VersionRow};
 use crate::fhir::{CODE_SYSTEM, Document, resources_text};
 use crate::locale::{Msg, tr, tr_with};
@@ -75,7 +76,7 @@ pub(crate) async fn page(request: Request) -> Html {
         .versions
         .iter()
         .any(|version| version.artifact.is_some());
-    let search: Result<Document<CodeSystemSearch>, _> = if index {
+    let search: Result<Document<Found<PublishedCodeSystem>>, _> = if index {
         request
             .client
             .code_system_summary(request.version, &system)
@@ -88,9 +89,15 @@ pub(crate) async fn page(request: Request) -> Html {
     };
     let (published, text) = match search {
         Ok(document) => (
-            document.value.published().into_iter().next(),
+            document.value.found().first().copied().cloned(),
             Some(resources_text(&document.text)),
         ),
+        // An answer that does not decode at its release is a defect, so the
+        // page draws its error state; a refused search leaves the system to
+        // be drawn from what the root declared of it.
+        Err(error @ crate::fhir::error::FhirError::Decode { .. }) => {
+            return refused(&request, &system, &error);
+        }
         Err(_refused) => (None, None),
     };
     let source = if index {

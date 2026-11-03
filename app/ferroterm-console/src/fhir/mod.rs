@@ -36,7 +36,7 @@ use http::StatusCode;
 use serde::{Deserialize, Serialize};
 
 use crate::fhir::capability::Capabilities;
-use crate::fhir::code_system::CodeSystemSearch;
+use crate::fhir::code_system::PublishedCodeSystem;
 use crate::fhir::concept::Concept;
 use crate::fhir::concept::ConceptQuery;
 use crate::fhir::concept::LookupRequest;
@@ -245,8 +245,8 @@ impl FhirClient {
         &self,
         version: FhirVersion,
         system: &str,
-    ) -> Result<Document<CodeSystemSearch>, FhirError> {
-        self.get_document(version, &self.code_system_summary_url(version, system))
+    ) -> Result<Document<Found<PublishedCodeSystem>>, FhirError> {
+        self.get_answer_document(version, &self.code_system_summary_url(version, system))
             .await
     }
 
@@ -275,7 +275,7 @@ impl FhirClient {
         version: FhirVersion,
         resource_type: &str,
     ) -> Result<NamedSearch, FhirError> {
-        self.get_json(version, &self.published_names_url(version, resource_type))
+        self.get_answer(version, &self.published_names_url(version, resource_type))
             .await
     }
 
@@ -326,8 +326,8 @@ impl FhirClient {
         &self,
         version: FhirVersion,
         system: &str,
-    ) -> Result<Document<CodeSystemSearch>, FhirError> {
-        self.get_document(version, &self.code_system_search_url(version, system))
+    ) -> Result<Document<Found<PublishedCodeSystem>>, FhirError> {
+        self.get_answer_document(version, &self.code_system_search_url(version, system))
             .await
     }
 
