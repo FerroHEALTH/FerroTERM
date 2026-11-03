@@ -75,26 +75,28 @@ pub fn is_user_assigned(code: &str) -> bool {
 /// Returns [`DataError::Json`] when the vendored data does not parse, and
 /// [`DataError::Missing`] when it lacks the version, the names or the codes.
 pub fn code_system() -> Result<CodeSystemModel, DataError> {
-    from_json(CODE_MAPPINGS, TERRITORIES)
+    let mappings: serde_json::Value = serde_json::from_str(CODE_MAPPINGS)?;
+    let territories: serde_json::Value = serde_json::from_str(TERRITORIES)?;
+    from_json(&mappings, &territories)
 }
 
-/// The code system from the text of `codeMappings.json` and `territories.json`.
-fn from_json(code_mappings: &str, territories: &str) -> Result<CodeSystemModel, DataError> {
+/// The code system from the parsed `codeMappings.json` and `territories.json`.
+fn from_json(
+    mappings: &serde_json::Value,
+    territories: &serde_json::Value,
+) -> Result<CodeSystemModel, DataError> {
     const VERSION: &[&str] = &["supplemental", "version", "_cldrVersion"];
     const NAMES: &[&str] = &["main", "en", "localeDisplayNames", "territories"];
     const MAPPINGS: &[&str] = &["supplemental", "codeMappings"];
-    let mappings: serde_json::Value = serde_json::from_str(code_mappings)?;
-    let territories: serde_json::Value = serde_json::from_str(territories)?;
-    let version =
-        required(&mappings, VERSION, MAPPINGS_FILE, serde_json::Value::as_str)?.to_owned();
+    let version = required(mappings, VERSION, MAPPINGS_FILE, serde_json::Value::as_str)?.to_owned();
     let names = required(
-        &territories,
+        territories,
         NAMES,
         TERRITORIES_FILE,
         serde_json::Value::as_object,
     )?;
     let entries = required(
-        &mappings,
+        mappings,
         MAPPINGS,
         MAPPINGS_FILE,
         serde_json::Value::as_object,
@@ -248,8 +250,14 @@ mod tests {
     const NAMES: &str = r#"{"main": {"en": {"localeDisplayNames":
         {"territories": {"NL": "Netherlands"}}}}}"#;
 
+    fn read(mappings: &str, names: &str) -> Result<super::CodeSystemModel, DataError> {
+        let mappings = serde_json::from_str(mappings).expect("the mappings parse");
+        let names = serde_json::from_str(names).expect("the names parse");
+        from_json(&mappings, &names)
+    }
+
     fn missing(mappings: &str, names: &str) -> (&'static str, String) {
-        match from_json(mappings, names) {
+        match read(mappings, names) {
             Err(DataError::Missing { file, member }) => (file, member),
             other => panic!("expected a missing member, got {other:?}"),
         }
@@ -257,7 +265,7 @@ mod tests {
 
     #[test]
     fn a_whole_file_pair_reads_its_version_and_codes() {
-        let model = from_json(MAPPINGS, NAMES).expect("the synthetic data reads");
+        let model = read(MAPPINGS, NAMES).expect("the synthetic data reads");
         assert_eq!(model.version, "49");
         let codes: Vec<&str> = model.concepts.iter().map(|c| c.code.as_str()).collect();
         assert_eq!(codes, ["NL", "NLD", "528"]);
