@@ -14,7 +14,7 @@ use ferrohealth_ui::view::tag::Tag;
 
 use crate::fhir::error::FhirError;
 use crate::fhir::named::Listed;
-use crate::fhir::outcome::OperationOutcome;
+use crate::fhir::outcome::Outcome;
 use crate::fhir::problem::Problem;
 use crate::fhir::terminology::SystemCard;
 use crate::locale::{Msg, tr, tr_with};
@@ -263,7 +263,7 @@ fn severity(code: &str) -> Severity {
 
 /// The issues `outcome` carries, each with the text the server wrote and the
 /// codes that classify it.
-pub(crate) fn issues(locale: &Locale, outcome: &OperationOutcome) -> Vec<Issue> {
+pub(crate) fn issues(locale: &Locale, outcome: &Outcome) -> Vec<Issue> {
     outcome
         .lines(locale)
         .into_iter()
@@ -341,16 +341,18 @@ mod tests {
 
     use super::{Source, ago, refusal_of};
     use crate::fhir::error::FhirError;
-    use crate::fhir::outcome::OperationOutcome;
+    use crate::fhir::outcome::Outcome;
+    use crate::fhir::version::FhirVersion;
 
     #[test]
     fn a_refusal_keeps_the_status_and_every_issue_in_the_server_s_words() {
-        let outcome: OperationOutcome = serde_json::from_str(
-            r#"{"resourceType":"OperationOutcome","issue":[
+        let outcome: Outcome = FhirVersion::R4
+            .decode(
+                r#"{"resourceType":"OperationOutcome","issue":[
                 {"severity":"error","code":"not-found","diagnostics":"no such value set"},
                 {"severity":"warning","code":"informational","details":{"text":"a hint"}}]}"#,
-        )
-        .expect("an outcome");
+            )
+            .expect("an outcome");
         let refused = refusal_of(
             &Locale::default(),
             &FhirError::Refused {

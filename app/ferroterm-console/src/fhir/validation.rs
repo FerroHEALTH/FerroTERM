@@ -18,8 +18,6 @@
 //! Reading lives here, outside every component, so the screen renders values
 //! plain unit tests can pin.
 
-use serde::{Deserialize, Serialize};
-
 use crate::fhir::CODE_SYSTEM;
 use crate::fhir::VALUE_SET;
 use crate::fhir::concept::CODE_PARAMETER;
@@ -27,9 +25,9 @@ use crate::fhir::concept::SYSTEM_PARAMETER;
 use crate::fhir::concept::VERSION_PARAMETER;
 use crate::fhir::expansion::DISPLAY_LANGUAGE_PARAMETER;
 use crate::fhir::expansion::URL_PARAMETER;
-use crate::fhir::outcome::OperationOutcome;
-use crate::fhir::translate::Coding;
-use crate::locale::{Msg, tr, tr_with};
+use crate::fhir::outcome::{Classification, Outcome};
+use crate::fhir::parameters::{ConceptEcho, Parameter};
+use crate::locale::{Msg, tr_with};
 use crate::url::RequestUrl;
 
 /// The `$validate-code` parameter carrying the display the client asserts.
@@ -210,53 +208,23 @@ impl SubsumesRequest {
     }
 }
 
-/// The `Parameters` answer of one operation, as the screen reads it.
-///
-/// Both operations answer a `Parameters` resource, which is a list of named
-/// parameters (<https://hl7.org/fhir/R4B/operations.html#response>), so it is
-/// read by name here rather than modelled per version.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-pub(crate) struct ParametersAnswer {
-    /// `Parameters.parameter`, in the order the server sent it.
-    #[serde(default)]
-    parameter: Vec<WireParameter>,
+/// What `$validate-code` answered, read from the `Parameters` its release
+/// decoded: the answer, and the `issues` outcome a reader is shown in their
+/// own language.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct ValidationAnswer {
+    /// The answer, without its issues.
+    read: Validation,
+    /// The `issues` outcome, when the server sent one.
+    issues: Option<Outcome>,
 }
 
-/// One `Parameters.parameter`, with the shapes these two answers use.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-struct WireParameter {
-    /// `parameter.name`.
-    name: Option<String>,
-    /// `valueBoolean`.
-    #[serde(rename = "valueBoolean")]
-    boolean: Option<bool>,
-    /// `valueString`.
-    #[serde(rename = "valueString")]
-    string: Option<String>,
-    /// `valueCode`.
-    #[serde(rename = "valueCode")]
-    code: Option<String>,
-    /// `valueUri`.
-    #[serde(rename = "valueUri")]
-    uri: Option<String>,
-    /// `valueCanonical`.
-    #[serde(rename = "valueCanonical")]
-    canonical: Option<String>,
-    /// `valueCodeableConcept`, the concept a `codeableConcept` run echoes.
-    #[serde(rename = "valueCodeableConcept")]
-    concept: Option<WireConcept>,
-    /// `parameter.resource`, which carries the `issues` outcome.
-    resource: Option<OperationOutcome>,
-}
-
-/// The `CodeableConcept` an answer echoes, as the screen draws it.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
-pub(crate) struct WireConcept {
-    /// `CodeableConcept.coding`, each with the elements the answer carried.
-    #[serde(default)]
-    pub(crate) coding: Vec<Coding>,
-    /// `CodeableConcept.text`, the wording the client sent with the concept.
-    pub(crate) text: Option<String>,
+/// What `CodeSystem/$subsumes` answered, read from the `Parameters` its
+/// release decoded.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct SubsumesAnswer {
+    /// `outcome`, the relation the server found.
+    outcome: Option<String>,
 }
 
 /// One issue of the `issues` outcome, as the screen renders it.
@@ -278,15 +246,6 @@ pub(crate) struct ValidationIssue {
     pub(crate) text: String,
     /// `issue.expression`, the paths of the input the issue is about.
     pub(crate) expressions: Vec<String>,
-}
-
-/// One `issue.details.coding`: the classification, and what defines it.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub(crate) struct Classification {
-    /// The code, as the server wrote it.
-    pub(crate) code: String,
-    /// The system that defines the code.
-    pub(crate) system: String,
 }
 
 /// The answer of one `$validate-code` run, as the screen renders it.
@@ -313,56 +272,82 @@ pub(crate) struct Validation {
     /// The canonicals of the code systems the server does not hold.
     pub(crate) unknown_systems: Vec<String>,
     /// `codeableConcept`, the concept the run echoed back.
-    pub(crate) concept: Option<WireConcept>,
+    pub(crate) concept: Option<ConceptEcho>,
     /// The itemised issues of the `issues` outcome.
     pub(crate) issues: Vec<ValidationIssue>,
 }
 
-impl ParametersAnswer {
+impl From<Vec<Parameter>> for ValidationAnswer {
     /// The `$validate-code` answer, read in one pass over the parameters.
     ///
     /// A repeated parameter keeps its first value, except the two that are
     /// declared as repeating, which keep every one in the order they arrived.
-    pub(crate) fn validation(&self, locale: &ferrohealth_ui::i18n::Locale) -> Validation {
+    fn from(parameters: Vec<Parameter>) -> Self {
         let mut read = Validation::default();
-        for parameter in &self.parameter {
-            match parameter.name.as_deref().unwrap_or_default() {
-                "result" => set(&mut read.result, parameter.boolean),
-                "message" => set(&mut read.message, parameter.text()),
-                "display" => set(&mut read.display, parameter.text()),
-                "code" => set(&mut read.code, parameter.text()),
-                "normalized-code" => set(&mut read.normalized_code, parameter.text()),
-                "system" => set(&mut read.system, parameter.text()),
-                "version" => set(&mut read.version, parameter.text()),
-                "inactive" => set(&mut read.inactive, parameter.boolean),
-                "status" => set(&mut read.status, parameter.text()),
+        let mut issues = None;
+        for parameter in parameters {
+            match parameter.name.as_str() {
+                "result" => set(&mut read.result, parameter.flag),
+                "message" => set(&mut read.message, parameter.text),
+                "display" => set(&mut read.display, parameter.text),
+                "code" => set(&mut read.code, parameter.text),
+                "normalized-code" => set(&mut read.normalized_code, parameter.text),
+                "system" => set(&mut read.system, parameter.text),
+                "version" => set(&mut read.version, parameter.text),
+                "inactive" => set(&mut read.inactive, parameter.flag),
+                "status" => set(&mut read.status, parameter.text),
                 // Both name a code system the server does not hold: the first
                 // for the code that was checked, the second for a coding of a
                 // `codeableConcept` input. A reader needs the canonical either
                 // way, so the two lists render as one.
                 "x-caused-by-unknown-system" | "x-unknown-system" => {
-                    read.unknown_systems.extend(parameter.text());
+                    read.unknown_systems.extend(parameter.text);
                 }
-                "codeableConcept" => set(&mut read.concept, parameter.concept.clone()),
-                "issues" if read.issues.is_empty() => {
-                    read.issues = parameter
-                        .resource
-                        .as_ref()
-                        .map(|outcome| itemised(locale, outcome))
-                        .unwrap_or_default();
-                }
+                "codeableConcept" => set(&mut read.concept, parameter.concept),
+                "issues" => replace_empty(&mut issues, parameter.outcome),
                 _other => {}
             }
         }
-        read
+        Self { read, issues }
     }
+}
 
+impl ValidationAnswer {
+    /// The `$validate-code` answer, its issues worded for `locale`.
+    pub(crate) fn validation(&self, locale: &ferrohealth_ui::i18n::Locale) -> Validation {
+        Validation {
+            issues: self
+                .issues
+                .as_ref()
+                .map(|outcome| itemised(locale, outcome))
+                .unwrap_or_default(),
+            ..self.read.clone()
+        }
+    }
+}
+
+impl From<Vec<Parameter>> for SubsumesAnswer {
+    fn from(parameters: Vec<Parameter>) -> Self {
+        Self {
+            outcome: parameters
+                .into_iter()
+                .find(|parameter| parameter.name == "outcome")
+                .and_then(|parameter| parameter.text),
+        }
+    }
+}
+
+impl SubsumesAnswer {
     /// `outcome`, the `$subsumes` answer, when the server sent one.
     pub(crate) fn subsumption(&self) -> Option<String> {
-        self.parameter
-            .iter()
-            .find(|parameter| parameter.name.as_deref() == Some("outcome"))
-            .and_then(WireParameter::text)
+        self.outcome.clone()
+    }
+}
+
+/// Keeps the first `issues` outcome that carries an issue.
+fn replace_empty(slot: &mut Option<Outcome>, outcome: Option<Outcome>) {
+    if slot.as_ref().is_none_or(|held| held.issues().is_empty()) {
+        *slot = outcome;
     }
 }
 
@@ -374,53 +359,19 @@ fn set<T>(slot: &mut Option<T>, value: Option<T>) {
 }
 
 /// The issues of the `issues` outcome, in the order the server wrote them.
-fn itemised(
-    locale: &ferrohealth_ui::i18n::Locale,
-    outcome: &OperationOutcome,
-) -> Vec<ValidationIssue> {
+fn itemised(locale: &ferrohealth_ui::i18n::Locale, outcome: &Outcome) -> Vec<ValidationIssue> {
     outcome
-        .issue
+        .issues()
         .iter()
         .map(|issue| ValidationIssue {
-            severity: issue.severity.clone().unwrap_or_else(|| "error".to_owned()),
-            classifications: issue
-                .details
-                .as_ref()
-                .map(|details| {
-                    details
-                        .coding
-                        .iter()
-                        .map(|coding| Classification {
-                            code: coding.code.clone().unwrap_or_default(),
-                            system: coding.system.clone().unwrap_or_default(),
-                        })
-                        .collect()
-                })
-                .unwrap_or_default(),
+            severity: issue.severity_word(),
+            classifications: issue.classifications.clone(),
             issue_code: issue.code.clone().unwrap_or_else(|| "unknown".to_owned()),
-            text: issue
-                .details
-                .as_ref()
-                .and_then(|details| details.text.clone())
-                .or_else(|| issue.diagnostics.clone())
-                .unwrap_or_else(|| tr(locale, Msg::ServerSentNoDiagnostic).clone()),
-            expressions: issue.expression.clone(),
+            text: issue.text(locale),
+            expressions: issue.expressions.clone(),
         })
         .collect()
 }
-
-impl WireParameter {
-    /// The value as plain text, for the `value[x]` shapes that are one string.
-    fn text(&self) -> Option<String> {
-        self.string
-            .clone()
-            .or_else(|| self.code.clone())
-            .or_else(|| self.uri.clone())
-            .or_else(|| self.canonical.clone())
-    }
-}
-
-impl Validation {}
 
 /// What one `ConceptSubsumptionOutcome` code says about two codes.
 ///
@@ -479,8 +430,31 @@ pub(crate) fn subsumption_sentence(
 mod tests {
     use super::*;
 
-    fn parse(json: &str) -> ParametersAnswer {
-        serde_json::from_str(json).expect("the fixture is valid JSON")
+    use crate::fhir::parameters::Coding;
+    use crate::fhir::release::Decodes;
+    use crate::fhir::version::FhirVersion;
+
+    /// `json`, decoded as the R4B `Parameters` it completes with its
+    /// `resourceType`.
+    fn decoded<A: Decodes>(json: &str) -> A {
+        let mut document: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_str(json).expect("the fixture is a JSON object");
+        document
+            .entry("resourceType")
+            .or_insert_with(|| serde_json::Value::from("Parameters"));
+        FhirVersion::R4B
+            .decode(&serde_json::Value::Object(document).to_string())
+            .expect("the fixture is a valid Parameters at R4B")
+    }
+
+    /// `json`, read as the answer of `$validate-code`.
+    fn parse(json: &str) -> ValidationAnswer {
+        decoded(json)
+    }
+
+    /// `json`, read as the answer of `$subsumes`.
+    fn subsumed(json: &str) -> SubsumesAnswer {
+        decoded(json)
     }
 
     fn code_system_run() -> ValidateRequest {
@@ -684,12 +658,12 @@ mod tests {
         let concept = read.concept.expect("the answer echoed the concept");
         assert_eq!(concept.text.as_deref(), Some("a cat"));
         assert_eq!(
-            concept.coding.first().map(Coding::rendered),
+            concept.codings.first().map(Coding::rendered),
             Some("https://terminology.example/animals|cat (Cat)".to_owned())
         );
         assert_eq!(
             concept
-                .coding
+                .codings
                 .first()
                 .and_then(|coding| coding.version.clone()),
             Some("2.0".to_owned()),
@@ -714,7 +688,8 @@ mod tests {
     #[test]
     fn an_issue_with_no_wording_still_produces_a_line() {
         let read = parse(
-            r#"{"parameter":[{"name":"issues","resource":{"issue":[{"code":"processing"}]}}]}"#,
+            r#"{"parameter":[{"name":"issues","resource":{"resourceType":"OperationOutcome",
+                "issue":[{"severity":"error","code":"processing"}]}}]}"#,
         )
         .validation(&ferrohealth_ui::i18n::Locale::default());
         assert_eq!(
@@ -783,11 +758,11 @@ mod tests {
     #[test]
     fn the_subsumption_outcome_is_read_from_the_parameter_that_carries_it() {
         assert_eq!(
-            parse(r#"{"parameter":[{"name":"outcome","valueCode":"subsumes"}]}"#).subsumption(),
+            subsumed(r#"{"parameter":[{"name":"outcome","valueCode":"subsumes"}]}"#).subsumption(),
             Some("subsumes".to_owned())
         );
         assert_eq!(
-            parse(r#"{"parameter":[{"name":"result","valueBoolean":true}]}"#).subsumption(),
+            subsumed(r#"{"parameter":[{"name":"result","valueBoolean":true}]}"#).subsumption(),
             None,
             "an answer carrying no outcome is stated rather than read as one"
         );

@@ -308,7 +308,8 @@ mod tests {
     use ferrohealth_ui::table::mapping::Relationship;
 
     use super::related;
-    use crate::fhir::translate::{Coding, TranslationMatch};
+    use crate::fhir::parameters::Coding;
+    use crate::fhir::translate::TranslationMatch;
     use crate::fhir::version::FhirVersion;
 
     #[test]

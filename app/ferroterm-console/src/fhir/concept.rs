@@ -17,17 +17,16 @@
 //! plain unit tests can pin.
 
 use serde::{Deserialize, Serialize};
-use serde_json::Map;
-use serde_json::Number;
-use serde_json::Value;
 
 use crate::fhir::expansion::COUNT_PARAMETER;
 use crate::fhir::expansion::DISPLAY_LANGUAGE_PARAMETER;
 use crate::fhir::expansion::DesignationRow;
 use crate::fhir::expansion::FILTER_PARAMETER;
+use crate::fhir::parameters::Parameter;
+use crate::fhir::release::Writes;
 use crate::fhir::terminology::SystemCard;
 use crate::fhir::terminology::VersionRow;
-use crate::locale::{Msg, tr};
+use crate::fhir::version::FhirVersion;
 use crate::url::RequestUrl;
 
 /// The `$lookup` parameter naming the code system.
@@ -226,7 +225,7 @@ pub(crate) struct ConceptQuery {
     /// The BCP 47 tag displays are wanted in.
     pub(crate) display_language: Option<String>,
     /// How many concepts one answer may hold.
-    pub(crate) count: u32,
+    pub(crate) count: i32,
 }
 
 /// The direct children of one code, as a `compose.include.filter`.
@@ -239,165 +238,126 @@ pub(crate) struct ChildOf {
 }
 
 impl ConceptQuery {
-    /// The `Parameters` body this selection sends.
+    /// The `Parameters` body this selection sends, written as the
+    /// `Parameters` of `version`.
     ///
     /// `Parameters` is the body of an operation invoked by `POST`
     /// (<https://hl7.org/fhir/R4B/operations.html#request>), and the value set
     /// travels in it as a resource rather than as a canonical, so no code
     /// system's own implicit form is named.
-    pub(crate) fn body(&self) -> String {
-        let mut parameters = vec![resource_parameter(VALUE_SET_PARAMETER, self.value_set())];
-        if let Some(filter) = &self.filter {
-            parameters.push(value_parameter(
-                FILTER_PARAMETER,
-                "valueString",
-                Value::String(filter.clone()),
-            ));
-        }
-        parameters.push(value_parameter(
-            COUNT_PARAMETER,
-            "valueInteger",
-            Value::Number(Number::from(self.count)),
-        ));
-        parameters.push(value_parameter(
-            EXCLUDE_NESTED_PARAMETER,
-            "valueBoolean",
-            Value::Bool(true),
-        ));
-        if let Some(language) = &self.display_language {
-            parameters.push(value_parameter(
-                DISPLAY_LANGUAGE_PARAMETER,
-                "valueCode",
-                Value::String(language.clone()),
-            ));
-        }
-        let mut body = Map::new();
-        body.insert(
-            String::from("resourceType"),
-            Value::String(tr(
-                &ferrohealth_ui::i18n::Locale::default(),
-                Msg::Parameters,
-            )),
-        );
-        body.insert(String::from("parameter"), Value::Array(parameters));
-        Value::Object(body).to_string()
-    }
-
-    /// The value set this selection sends, as one include over one system.
-    fn value_set(&self) -> Value {
-        let mut include = Map::new();
-        include.insert(String::from("system"), Value::String(self.system.clone()));
-        if let Some(version) = &self.system_version {
-            include.insert(String::from("version"), Value::String(version.clone()));
-        }
-        if let Some(child) = &self.child_of {
-            include.insert(String::from("filter"), Value::Array(vec![child.clause()]));
-        }
-        let mut compose = Map::new();
-        compose.insert(
-            String::from("include"),
-            Value::Array(vec![Value::Object(include)]),
-        );
-        let mut value_set = Map::new();
-        value_set.insert(
-            String::from("resourceType"),
-            Value::String(String::from("ValueSet")),
-        );
-        // NOTE: `ValueSet.status` is 1..1, so the inline resource carries the
-        // one status a request-scoped value set can have
-        // (<https://hl7.org/fhir/R4B/valueset.html>).
-        value_set.insert(
-            String::from("status"),
-            Value::String(String::from("active")),
-        );
-        value_set.insert(String::from("compose"), Value::Object(compose));
-        Value::Object(value_set)
+    pub(crate) fn body(&self, version: FhirVersion) -> String {
+        version.encode(self)
     }
 }
 
-impl ChildOf {
-    /// This walk as one `compose.include.filter`.
-    fn clause(&self) -> Value {
-        let mut filter = Map::new();
-        filter.insert(
-            String::from("property"),
-            Value::String(self.property.clone()),
-        );
-        filter.insert(
-            String::from("op"),
-            Value::String(String::from(CHILD_OF_OPERATOR)),
-        );
-        filter.insert(String::from("value"), Value::String(self.code.clone()));
-        Value::Object(filter)
-    }
+/// Writes a selection as the `Parameters` of the `fhir-types` module
+/// `$module`.
+macro_rules! writes_query {
+    ($module:ident) => {
+        mod $module {
+            use fhir_types::$module::parameters::{
+                Parameters, ParametersParameter, ParametersParameterValue,
+            };
+            use fhir_types::$module::primitives;
+            use fhir_types::$module::resource::Resource;
+            use fhir_types::$module::value_set::{
+                ValueSet, ValueSetCompose, ValueSetComposeInclude, ValueSetComposeIncludeFilter,
+            };
+
+            use super::{
+                CHILD_OF_OPERATOR, COUNT_PARAMETER, ConceptQuery, DISPLAY_LANGUAGE_PARAMETER,
+                EXCLUDE_NESTED_PARAMETER, FILTER_PARAMETER, VALUE_SET_PARAMETER, Writes,
+            };
+
+            /// One parameter named `name` carrying `value`.
+            fn valued(name: &str, value: ParametersParameterValue) -> ParametersParameter {
+                ParametersParameter {
+                    name: name.into(),
+                    value: Some(value),
+                    ..ParametersParameter::default()
+                }
+            }
+
+            /// The value set `query` selects, as one include over one system.
+            fn value_set(query: &ConceptQuery) -> ValueSet {
+                let include = ValueSetComposeInclude {
+                    system: Some(query.system.as_str().into()),
+                    version: query
+                        .system_version
+                        .as_deref()
+                        .map(primitives::String::from),
+                    filter: query
+                        .child_of
+                        .iter()
+                        .map(|child| ValueSetComposeIncludeFilter {
+                            property: child.property.as_str().into(),
+                            op: CHILD_OF_OPERATOR.into(),
+                            value: From::from(primitives::String::from(child.code.as_str())),
+                            ..ValueSetComposeIncludeFilter::default()
+                        })
+                        .collect(),
+                    ..ValueSetComposeInclude::default()
+                };
+                ValueSet {
+                    // NOTE: `ValueSet.status` is 1..1, so the inline resource carries the
+                    // one status a request-scoped value set can have
+                    // (<https://hl7.org/fhir/R4B/valueset.html>).
+                    status: "active".into(),
+                    compose: Some(ValueSetCompose {
+                        include: vec![include],
+                        ..ValueSetCompose::default()
+                    }),
+                    ..ValueSet::default()
+                }
+            }
+
+            impl Writes<ConceptQuery> for Parameters {
+                fn written(query: &ConceptQuery) -> Self {
+                    let mut parameter = vec![ParametersParameter {
+                        name: VALUE_SET_PARAMETER.into(),
+                        resource: Some(Resource::ValueSet(Box::new(value_set(query)))),
+                        ..ParametersParameter::default()
+                    }];
+                    if let Some(filter) = &query.filter {
+                        parameter.push(valued(
+                            FILTER_PARAMETER,
+                            ParametersParameterValue::String(filter.as_str().into()),
+                        ));
+                    }
+                    parameter.push(valued(
+                        COUNT_PARAMETER,
+                        ParametersParameterValue::Integer(primitives::Integer {
+                            value: Some(query.count),
+                            ..primitives::Integer::default()
+                        }),
+                    ));
+                    parameter.push(valued(
+                        EXCLUDE_NESTED_PARAMETER,
+                        ParametersParameterValue::Boolean(primitives::Boolean {
+                            value: Some(true),
+                            ..primitives::Boolean::default()
+                        }),
+                    ));
+                    if let Some(language) = &query.display_language {
+                        parameter.push(valued(
+                            DISPLAY_LANGUAGE_PARAMETER,
+                            ParametersParameterValue::Code(language.as_str().into()),
+                        ));
+                    }
+                    Self {
+                        parameter,
+                        ..Self::default()
+                    }
+                }
+            }
+        }
+    };
 }
 
-/// One `Parameters.parameter` carrying a resource.
-pub(crate) fn resource_parameter(name: &str, resource: Value) -> Value {
-    let mut parameter = Map::new();
-    parameter.insert(String::from("name"), Value::String(name.to_owned()));
-    parameter.insert(String::from("resource"), resource);
-    Value::Object(parameter)
-}
-
-/// One `Parameters.parameter` carrying a primitive value.
-pub(crate) fn value_parameter(name: &str, value_name: &str, value: Value) -> Value {
-    let mut parameter = Map::new();
-    parameter.insert(String::from("name"), Value::String(name.to_owned()));
-    parameter.insert(value_name.to_owned(), value);
-    Value::Object(parameter)
-}
-
-/// The `Parameters` a `$lookup` answers, as the viewer reads it.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-pub(crate) struct LookupAnswer {
-    /// `Parameters.parameter`, one per answered output.
-    #[serde(default)]
-    parameter: Vec<WireParameter>,
-}
-
-/// One `Parameters.parameter`, with every `value[x]` the outputs use.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-struct WireParameter {
-    /// `parameter.name`.
-    name: Option<String>,
-    /// The parts of a multi-part parameter.
-    #[serde(default)]
-    part: Vec<WireParameter>,
-    /// `valueString`.
-    #[serde(rename = "valueString")]
-    value_string: Option<String>,
-    /// `valueCode`.
-    #[serde(rename = "valueCode")]
-    value_code: Option<String>,
-    /// `valueBoolean`.
-    #[serde(rename = "valueBoolean")]
-    value_boolean: Option<bool>,
-    /// `valueInteger`.
-    #[serde(rename = "valueInteger")]
-    value_integer: Option<i32>,
-    /// `valueDecimal`.
-    #[serde(rename = "valueDecimal")]
-    value_decimal: Option<Number>,
-    /// `valueDateTime`.
-    #[serde(rename = "valueDateTime")]
-    value_date_time: Option<String>,
-    /// `valueUri`.
-    #[serde(rename = "valueUri")]
-    value_uri: Option<String>,
-    /// `valueCoding`.
-    #[serde(rename = "valueCoding")]
-    value_coding: Option<WireCoding>,
-}
-
-/// The parts of a `Coding` a designation's `use` is drawn from.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
-struct WireCoding {
-    /// The code.
-    code: Option<String>,
-    /// The display the server sent for it.
-    display: Option<String>,
-}
+writes_query!(r4);
+writes_query!(r4b);
+writes_query!(r5);
+writes_query!(r6);
 
 /// One concept, as the browser draws it.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -425,34 +385,22 @@ pub(crate) struct PropertyRow {
     pub(crate) description: Option<String>,
 }
 
-impl LookupAnswer {
-    /// The concept the answer describes.
-    pub(crate) fn concept(&self) -> Concept {
-        Concept {
-            name: self.first("name"),
-            version: self.first(VERSION_PARAMETER),
-            display: self.first("display"),
-            designations: self
-                .named(DESIGNATION_OUTPUT)
-                .map(WireParameter::designation)
-                .collect(),
-            properties: self
-                .named(PROPERTY_OUTPUT)
-                .map(WireParameter::property)
-                .collect(),
+/// The concept `$lookup` answered, from the parameters its release decoded.
+impl From<Vec<Parameter>> for Concept {
+    fn from(parameters: Vec<Parameter>) -> Self {
+        let named = |name: &'static str| {
+            parameters
+                .iter()
+                .filter(move |parameter| parameter.name == name)
+        };
+        let first = |name: &'static str| named(name).find_map(value);
+        Self {
+            name: first("name"),
+            version: first(VERSION_PARAMETER),
+            display: first("display"),
+            designations: named(DESIGNATION_OUTPUT).map(designation).collect(),
+            properties: named(PROPERTY_OUTPUT).map(property).collect(),
         }
-    }
-
-    /// Every parameter the answer carries under `name`.
-    fn named<'a>(&'a self, name: &'a str) -> impl Iterator<Item = &'a WireParameter> {
-        self.parameter
-            .iter()
-            .filter(move |parameter| parameter.name.as_deref() == Some(name))
-    }
-
-    /// The value of the first parameter under `name` that carries one.
-    fn first(&self, name: &str) -> Option<String> {
-        self.named(name).find_map(WireParameter::value)
     }
 }
 
@@ -467,51 +415,47 @@ impl Concept {
     }
 }
 
-impl WireParameter {
-    /// The value, from whichever `value[x]` the server used.
-    fn value(&self) -> Option<String> {
-        self.value_string
-            .clone()
-            .or_else(|| self.value_code.clone())
-            .or_else(|| self.value_uri.clone())
-            .or_else(|| self.value_date_time.clone())
-            .or_else(|| self.value_boolean.map(|flag| flag.to_string()))
-            .or_else(|| self.value_integer.map(|number| number.to_string()))
-            .or_else(|| self.value_decimal.as_ref().map(ToString::to_string))
-            .or_else(|| self.value_coding.as_ref().and_then(WireCoding::label))
-    }
+/// The value of `parameter`, from whichever `value[x]` the server used; a
+/// coding reads as its display, or as the bare code where it has none.
+fn value(parameter: &Parameter) -> Option<String> {
+    parameter
+        .text
+        .clone()
+        .or_else(|| parameter.flag.map(|flag| flag.to_string()))
+        .or_else(|| parameter.number.map(|number| number.to_string()))
+        .or_else(|| parameter.decimal.clone())
+        .or_else(|| {
+            parameter
+                .coding
+                .as_ref()
+                .and_then(|coding| coding.display.clone().or_else(|| coding.code.clone()))
+        })
+}
 
-    /// The value of the part named `name`, when the parameter carried one.
-    fn part(&self, name: &str) -> Option<String> {
-        self.part
-            .iter()
-            .filter(|part| part.name.as_deref() == Some(name))
-            .find_map(WireParameter::value)
-    }
+/// The value of the part of `parameter` named `name`, when it carried one.
+fn part(parameter: &Parameter, name: &str) -> Option<String> {
+    parameter
+        .parts
+        .iter()
+        .filter(|part| part.name == name)
+        .find_map(value)
+}
 
-    /// This parameter as a designation line.
-    fn designation(&self) -> DesignationRow {
-        DesignationRow {
-            language: self.part("language"),
-            usage: self.part("use"),
-            value: self.part("value").unwrap_or_default(),
-        }
-    }
-
-    /// This parameter as a property line.
-    fn property(&self) -> PropertyRow {
-        PropertyRow {
-            code: self.part("code").unwrap_or_default(),
-            value: self.part("value"),
-            description: self.part("description"),
-        }
+/// `parameter` as a designation line.
+fn designation(parameter: &Parameter) -> DesignationRow {
+    DesignationRow {
+        language: part(parameter, "language"),
+        usage: part(parameter, "use"),
+        value: part(parameter, "value").unwrap_or_default(),
     }
 }
 
-impl WireCoding {
-    /// The display the server sent, or the bare code when it sent none.
-    fn label(&self) -> Option<String> {
-        self.display.clone().or_else(|| self.code.clone())
+/// `parameter` as a property line.
+fn property(parameter: &Parameter) -> PropertyRow {
+    PropertyRow {
+        code: part(parameter, "code").unwrap_or_default(),
+        value: part(parameter, "value"),
+        description: part(parameter, "description"),
     }
 }
 

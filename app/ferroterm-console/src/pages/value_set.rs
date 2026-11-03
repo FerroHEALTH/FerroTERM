@@ -163,7 +163,7 @@ async fn filter_displays(
             // NOTE: no specification governs this: our own design; a value that does
             // not look up is still stated by its code, so nothing is hidden.
             if let Ok(answer) = client.lookup(version, &request).await
-                && let Some(display) = answer.value.concept().display
+                && let Some(display) = answer.value.display
             {
                 displays.insert((system.clone(), value.clone()), display);
             }
