@@ -755,7 +755,7 @@ fn concept_pane(
 }
 
 /// The concept's designations.
-fn designations(locale: &Locale, concept: &Concept) -> Option<Html> {
+pub(crate) fn designations(locale: &Locale, concept: &Concept) -> Option<Html> {
     if concept.designations.is_empty() {
         return None;
     }
@@ -797,7 +797,7 @@ fn designations(locale: &Locale, concept: &Concept) -> Option<Html> {
 }
 
 /// The concept's properties.
-fn properties(locale: &Locale, concept: &Concept) -> Option<Html> {
+pub(crate) fn properties(locale: &Locale, concept: &Concept) -> Option<Html> {
     if concept.properties.is_empty() {
         return None;
     }

@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The shorthands the screens write their own markup with, beside the
-//! library's parts: markup made here from escaped parts, and text escaped
-//! for it.
+//! library's parts: a code, a paragraph, strong text and a link, each made
+//! from escaped parts.
 //!
-//! Every value a screen writes into its own markup goes through [`t`] (or a
+//! Every value a screen writes into its own markup goes through
+//! [`Html::text`] (or a
 //! library part, which escapes as it draws), so a code, a display or an
 //! address the server answered never reaches the page as markup. No
 //! specification governs this: our own design.
