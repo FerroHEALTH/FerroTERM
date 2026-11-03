@@ -27,7 +27,7 @@
 # names the new blocks by both places. A fall passes with a one-line note, so
 # a pull request that removes duplication touches neither file and conflicts
 # with no other one; the scheduled ratchet-tighten workflow runs --update on
-# main and opens the one pull request that lowers the count (#954). --update
+# main and pushes the one branch that lowers the count (#954, #971). --update
 # never raises the count: a rise that has to stay is a hand edit of
 # duplication.count in a change that says why.
 #

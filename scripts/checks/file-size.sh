@@ -14,8 +14,8 @@
 # A listed file shorter than its entry, within the budget or no longer
 # tracked passes with a one-line note, so a pull request that shortens a file
 # touches no list and conflicts with no other one; the scheduled
-# ratchet-tighten workflow runs --update on main and opens the one pull
-# request that lowers the entries (#954). --update lowers and removes
+# ratchet-tighten workflow runs --update on main and pushes the one branch
+# that lowers the entries (#954, #971). --update lowers and removes
 # entries. It never raises one and never adds a file: a file over the budget
 # is split, and a rise that has to stay is a hand edit of the list in a
 # change that says why.
