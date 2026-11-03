@@ -63,10 +63,10 @@ const LANGUAGE_PARAM: &str = "displayLanguage";
 const OPEN_PARAM: &str = "open";
 
 /// How many matches one search reads.
-const MATCHES: u32 = 25;
+const MATCHES: i32 = 25;
 
 /// How many children one level of the tree reads.
-const LEVEL: u32 = 100;
+const LEVEL: i32 = 100;
 
 /// How far the path above a concept is walked before it stops.
 const DEPTH: usize = 16;
@@ -385,7 +385,7 @@ async fn read(
         client
             .lookup(fhir, &asked)
             .await
-            .map(|document| document.value.concept()),
+            .map(|document| document.value),
     )
 }
 
@@ -522,7 +522,7 @@ async fn ancestors(
             .lookup(fhir, &asked)
             .await
             .ok()
-            .map(|document| document.value.concept());
+            .map(|document| document.value);
         parent = read
             .as_ref()
             .and_then(|read| read.property_values(PARENT_PROPERTY).into_iter().next());

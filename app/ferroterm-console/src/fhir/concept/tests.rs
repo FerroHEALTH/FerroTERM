@@ -26,7 +26,7 @@ const RECORDED: [(&str, &str); 4] = [
 
 /// `json`, the document the root `root` answered, decoded at its version.
 fn capabilities(root: &str, json: &str) -> crate::fhir::terminology::TerminologyCapabilities {
-    root.parse::<crate::fhir::version::FhirVersion>()
+    root.parse::<FhirVersion>()
         .expect("a root the server mounts")
         .decode(json)
         .expect("the fixture is a valid document at its version")
@@ -40,8 +40,11 @@ fn hierarchy_of(root: &str, document: &str, system: &str) -> Hierarchy {
     Hierarchy::of(&row)
 }
 
-fn answer(json: &str) -> LookupAnswer {
-    serde_json::from_str(json).expect("the fixture is valid JSON")
+/// `json`, decoded as the R4B `Parameters` `$lookup` answers.
+fn answer(json: &str) -> Concept {
+    FhirVersion::R4B
+        .decode(json)
+        .expect("the fixture is a valid Parameters at R4B")
 }
 
 /// The roots whose `filter-operator` value set defines `child-of`.
@@ -254,7 +257,7 @@ fn a_search_body_sends_the_system_as_an_inline_value_set() {
         count: 20,
     };
     assert_eq!(
-        query.body(),
+        query.body(FhirVersion::R4B),
         r#"{"parameter":[{"name":"valueSet","resource":{"compose":{"include":[{"system":"https://terminology.example/x","version":"2.0"}]},"resourceType":"ValueSet","status":"active"}},{"name":"filter","valueString":"fever"},{"name":"count","valueInteger":20},{"name":"excludeNested","valueBoolean":true},{"name":"displayLanguage","valueCode":"nl"}],"resourceType":"Parameters"}"#,
         "the selection names the system and no value set canonical"
     );
@@ -273,10 +276,10 @@ fn a_child_body_sends_the_declared_property_and_the_child_operator() {
     };
     assert!(
         query
-            .body()
+            .body(FhirVersion::R4B)
             .contains(r#""filter":[{"op":"child-of","property":"concept","value":"root"}]"#),
         "the walk sends the property the version declared: {}",
-        query.body()
+        query.body(FhirVersion::R4B)
     );
 }
 
@@ -292,8 +295,7 @@ fn a_lookup_answer_reads_the_display_and_the_designations() {
                 {"name":"use","valueCoding":{"code":"900000000000013009","display":"Synonym"}},
                 {"name":"value","valueString":"Kat"}]},
             {"name":"designation","part":[{"name":"value","valueString":"Cat"}]}]}"#,
-    )
-    .concept();
+    );
     assert_eq!(concept.name.as_deref(), Some("Animals"));
     assert_eq!(concept.version.as_deref(), Some("2.0"));
     assert_eq!(concept.display.as_deref(), Some("Kat"));
@@ -333,8 +335,7 @@ fn a_lookup_answer_reads_every_value_type_a_property_carries() {
             {"name":"property","part":[
                 {"name":"code","valueCode":"parent"},
                 {"name":"value","valueCode":"mammal"}]}]}"#,
-    )
-    .concept();
+    );
     assert_eq!(
         concept
             .properties
@@ -366,8 +367,7 @@ fn the_hierarchy_links_are_read_from_the_standard_concept_properties() {
                 {"name":"value","valueCode":"b"}]},
             {"name":"property","part":[{"name":"code","valueCode":"child"},
                 {"name":"value","valueCode":"c"}]}]}"#,
-    )
-    .concept();
+    );
     assert_eq!(
         concept.property_values(PARENT_PROPERTY),
         vec![String::from("a"), String::from("b")],
@@ -381,7 +381,7 @@ fn the_hierarchy_links_are_read_from_the_standard_concept_properties() {
 
 #[test]
 fn an_answer_that_carries_nothing_reads_as_a_concept_that_declares_nothing() {
-    let concept = answer(r#"{"resourceType":"Parameters"}"#).concept();
+    let concept = answer(r#"{"resourceType":"Parameters"}"#);
     assert_eq!(concept, Concept::default());
     assert!(
         concept.property_values(PARENT_PROPERTY).is_empty(),

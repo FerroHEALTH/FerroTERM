@@ -11,15 +11,20 @@
 //! version; a [`Decodes`] is what a page reads of one of them, the same for
 //! every version. No specification governs this split: our own design.
 
+use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::fhir::capability::Capabilities;
 use crate::fhir::compose::stored::StoredValueSet;
+use crate::fhir::concept::{Concept, ConceptQuery};
 use crate::fhir::concept_map::PublishedConceptMap;
 use crate::fhir::expansion::ExpandedValueSet;
+use crate::fhir::outcome::Outcome;
+use crate::fhir::parameters::Parameter;
 use crate::fhir::searchset::Found;
 use crate::fhir::terminology::TerminologyCapabilities;
 use crate::fhir::translate::TranslateAnswer;
+use crate::fhir::validation::{SubsumesAnswer, ValidationAnswer};
 use crate::fhir::value_set::PublishedValueSet;
 use crate::fhir::version::FhirVersion;
 
@@ -41,14 +46,23 @@ pub(crate) trait Release {
         + Reads<Found<PublishedConceptMap>>;
     /// The release's `ConceptMap`.
     type ConceptMap: DeserializeOwned + Reads<PublishedConceptMap>;
-    /// The release's `Parameters`, read as `$translate` answered them.
-    type Parameters: DeserializeOwned + Reads<TranslateAnswer>;
+    /// The release's `Parameters`, walked as an operation answered them and
+    /// written as the concept browser's inline `$expand` sends them.
+    type Parameters: DeserializeOwned + Serialize + Reads<Vec<Parameter>> + Writes<ConceptQuery>;
+    /// The release's `OperationOutcome`, read as a refusal carries it.
+    type OperationOutcome: DeserializeOwned + Reads<Outcome>;
 }
 
 /// A resource of one release, read into what a page draws of it.
 pub(crate) trait Reads<V> {
     /// What a page draws of this resource.
     fn read(&self) -> V;
+}
+
+/// A resource of one release, written from what a page sends.
+pub(crate) trait Writes<V> {
+    /// `value`, as this resource.
+    fn written(value: &V) -> Self;
 }
 
 /// What a page reads of one resource, decoded at the release that served it.
@@ -104,11 +118,29 @@ impl Decodes for PublishedConceptMap {
     }
 }
 
-impl Decodes for TranslateAnswer {
+impl Decodes for Outcome {
     fn decode<R: Release>(body: &str) -> Result<Self, serde_json::Error> {
-        serde_json::from_str::<R::Parameters>(body).map(|parameters| parameters.read())
+        serde_json::from_str::<R::OperationOutcome>(body).map(|outcome| outcome.read())
     }
 }
+
+/// Implements [`Decodes`] for `$answer`, an operation's answer read from the
+/// parameters of the release's `Parameters`.
+macro_rules! decodes_parameters {
+    ($answer:ty) => {
+        impl Decodes for $answer {
+            fn decode<R: Release>(body: &str) -> Result<Self, serde_json::Error> {
+                serde_json::from_str::<R::Parameters>(body)
+                    .map(|parameters| Self::from(parameters.read()))
+            }
+        }
+    };
+}
+
+decodes_parameters!(TranslateAnswer);
+decodes_parameters!(Concept);
+decodes_parameters!(ValidationAnswer);
+decodes_parameters!(SubsumesAnswer);
 
 impl Decodes for Found<PublishedConceptMap> {
     fn decode<R: Release>(body: &str) -> Result<Self, serde_json::Error> {
@@ -145,6 +177,7 @@ macro_rules! release {
             type Bundle = fhir_types::$module::bundle::Bundle;
             type ConceptMap = fhir_types::$module::concept_map::ConceptMap;
             type Parameters = fhir_types::$module::parameters::Parameters;
+            type OperationOutcome = fhir_types::$module::operation_outcome::OperationOutcome;
         }
     };
 }
@@ -168,6 +201,27 @@ impl FhirVersion {
             Self::R6 => A::decode::<R6>(body),
         }
     }
+
+    /// `query`, written as the `Parameters` of this version.
+    pub(crate) fn encode(self, query: &ConceptQuery) -> String {
+        match self {
+            Self::R4 => encoded::<R4>(query),
+            Self::R4B => encoded::<R4B>(query),
+            Self::R5 => encoded::<R5>(query),
+            Self::R6 => encoded::<R6>(query),
+        }
+    }
+}
+
+/// `query`, written as the `Parameters` of the release `R`.
+#[expect(
+    clippy::expect_used,
+    reason = "fhir_types::codec::EncodeError names a decimal with no JSON form and an unknown \
+              resource; the selection's Parameters hold neither, and its map keys are strings"
+)]
+fn encoded<R: Release>(query: &ConceptQuery) -> String {
+    serde_json::to_string(&R::Parameters::written(query))
+        .expect("a selection's Parameters should always have a JSON form")
 }
 
 /// What the readers' tests share: a fixture written with only the elements

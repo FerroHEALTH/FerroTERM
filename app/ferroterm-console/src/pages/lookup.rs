@@ -197,7 +197,7 @@ async fn answer(request: &Request, asked: &LookupRequest, name: Option<String>) 
             sent(locale, &url, None),
         ]),
         Ok(document) => {
-            let concept = document.value.concept();
+            let concept = document.value;
             let system = name
                 .or_else(|| concept.name.clone())
                 .unwrap_or_else(|| asked.system.clone());
