@@ -72,6 +72,7 @@ fn includes_union_criteria_intersect_and_excludes_subtract() {
             ..Include::default()
         }],
         inactive: None,
+        property: Vec::new(),
     };
     let expansion = expander
         .expand(&compose, &Options::default())
@@ -122,6 +123,7 @@ fn a_system_without_criteria_is_every_code_regardless_of_status() {
     // compose.inactive = false is a floor the request cannot lift.
     let floor = Compose {
         inactive: Some(false),
+        property: Vec::new(),
         ..compose.clone()
     };
     assert_eq!(

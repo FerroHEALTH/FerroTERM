@@ -284,6 +284,7 @@ impl Negotiation {
             include: compose.include.iter().map(pin).collect(),
             exclude: compose.exclude.iter().map(pin).collect(),
             inactive: compose.inactive,
+            property: compose.property.clone(),
         }
     }
 }
