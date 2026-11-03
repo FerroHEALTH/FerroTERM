@@ -15,6 +15,10 @@ another (#972). The detector is FerroEHR's (FerroHEALTH/FerroEHR#4663).
   guard together, and the baseline is measured again in the same change.
 - **Source text only.** It depends on no workspace crate, so it builds in
   seconds and measures any tree `--root` names.
+- **Macro bodies where they read as items.** A `macro_rules!` arm whose
+  body parses as an item list, with `$name` read as a name and `$crate` as
+  `crate`, is visited as a module named `<macro>!`; any other arm (an
+  expression, a `$(..)` repetition) is passed over.
 - **Deterministic.** Directories are walked in sorted order and the output
   is sorted, so the same tree yields the same lines.
 - **Strict in CI, lenient per edit.** A file that does not parse fails a

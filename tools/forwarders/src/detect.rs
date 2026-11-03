@@ -85,6 +85,21 @@ fn visit(items: &[Item], path: &mut Vec<String>, report: &mut FileReport) {
                     }
                 }
             }
+            // A `macro_rules!` arm whose body reads as items is scanned as a
+            // module named after the macro, its metavariables read as names.
+            Item::Macro(declared) if declared.mac.path.is_ident("macro_rules") => {
+                let name = declared
+                    .ident
+                    .as_ref()
+                    .map_or_else(|| String::from("macro_rules"), ToString::to_string);
+                path.push(format!("{name}!"));
+                for body in arm_bodies(declared.mac.tokens.clone()) {
+                    if let Some(items) = items_of(body) {
+                        visit(&items, path, report);
+                    }
+                }
+                path.pop();
+            }
             Item::Mod(module) => {
                 path.push(module.ident.to_string());
                 if is_test(&module.attrs) {
@@ -115,6 +130,69 @@ fn visit(items: &[Item], path: &mut Vec<String>, report: &mut FileReport) {
             });
         }
     }
+}
+
+/// The body of each arm of a `macro_rules!` definition: the brace, bracket
+/// or parenthesis group after each `=>`.
+fn arm_bodies(tokens: TokenStream) -> Vec<TokenStream> {
+    let mut bodies = Vec::new();
+    let mut arrow = false;
+    let mut previous_eq = false;
+    for token in tokens {
+        match token {
+            TokenTree::Punct(punct) if punct.as_char() == '=' => previous_eq = true,
+            TokenTree::Punct(punct) if punct.as_char() == '>' && previous_eq => {
+                arrow = true;
+                previous_eq = false;
+            }
+            TokenTree::Group(group) if arrow => {
+                bodies.push(group.stream());
+                arrow = false;
+            }
+            _ => previous_eq = false,
+        }
+    }
+    bodies
+}
+
+/// `body` read as a list of items, each metavariable (`$name`) read as the
+/// name it stands for and `$crate` as `crate`; `None` when it does not parse,
+/// as a body of expressions or of repetitions does not.
+fn items_of(body: TokenStream) -> Option<Vec<Item>> {
+    let parser = |input: syn::parse::ParseStream<'_>| {
+        let mut items = Vec::new();
+        while !input.is_empty() {
+            items.push(input.parse::<Item>()?);
+        }
+        Ok(items)
+    };
+    // NOTE: a body that does not read as items is no function this rule can
+    // measure, so it is passed over rather than refused.
+    syn::parse::Parser::parse2(parser, unescape(body)).ok()
+}
+
+/// `tokens` with each `$name` replaced by `name` and `$crate` by `crate`.
+fn unescape(tokens: TokenStream) -> TokenStream {
+    let mut out = Vec::new();
+    let mut tokens = tokens.into_iter().peekable();
+    while let Some(token) = tokens.next() {
+        match token {
+            TokenTree::Punct(punct) if punct.as_char() == '$' => {
+                if let Some(TokenTree::Ident(_)) = tokens.peek() {
+                    continue;
+                }
+                out.push(TokenTree::Punct(punct));
+            }
+            TokenTree::Group(group) => {
+                let mut inner =
+                    proc_macro2::Group::new(group.delimiter(), unescape(group.stream()));
+                inner.set_span(group.span());
+                out.push(TokenTree::Group(inner));
+            }
+            other => out.push(other),
+        }
+    }
+    out.into_iter().collect()
 }
 
 fn owner(path: &[String], ty: Option<&str>, sig: &Signature) -> String {
@@ -564,6 +642,29 @@ mod tests {
         );
         let owners: Vec<&str> = report.forwarders.iter().map(|f| f.owner.as_str()).collect();
         assert_eq!(owners, ["inner::Store::put", "shared::kept"]);
+    }
+
+    #[test]
+    fn a_macro_rules_body_of_items_is_scanned_as_a_module() {
+        let source = r"
+            macro_rules! surface {
+                ($fhir:ident) => {
+                    pub mod parameters {
+                        use fhir_types::$fhir::Parameters;
+                        pub fn respond(p: &Parameters, wire: Wire) -> Response {
+                            respond_resource(p, wire)
+                        }
+                        pub fn kept(p: &Parameters) -> u32 { p.len() + 1 }
+                    }
+                };
+                (@expr $value:expr) => { $value + 1 };
+                ($($name:ident),*) => { $( fn $name() {} )* };
+            }
+        ";
+        assert_eq!(
+            found(source),
+            ["surface!::parameters::respond -> respond_resource(p, wire)"]
+        );
     }
 
     #[test]

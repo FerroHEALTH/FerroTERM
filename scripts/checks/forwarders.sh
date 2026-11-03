@@ -15,7 +15,10 @@
 # comment cites the `.adoc` specification page that defines it, a
 # constructor that fixes an argument, the `#[cfg]` arms of one function, a
 # file that opens with `// @generated`, anything under `#[cfg(test)]`, and
-# tests/.
+# tests/. A `macro_rules!` arm whose body reads as items is scanned as a
+# module named after the macro, each `$name` read as a name; an arm that
+# does not read as items (an expression, a `$(..)` repetition) is passed
+# over, so the guard cannot see a forwarder written there.
 #
 # Two files beside this one hold the ratchet. forwarders.count is the total
 # the tree may carry, and forwarders-baseline.txt holds the key of every
@@ -322,6 +325,29 @@ EOF
     fail "a forwarder under addons/ was not named: $(cat "$work/answer")"
   rm "$tree/addons/demo/src/lib.rs"
 
+  # A macro_rules! arm that reads as items is scanned under the macro's name;
+  # an arm that does not read as items is passed over.
+  cat >"$tree/app/demo/src/surface.rs" <<'EOF'
+macro_rules! surface {
+    ($fhir:ident) => {
+        pub mod parameters {
+            pub fn respond(p: &$fhir::Parameters, wire: Wire) -> Response {
+                respond_resource(p, wire)
+            }
+        }
+    };
+    (@plus $value:expr) => { $value + 1 };
+    ($($name:ident),*) => { $( fn $name(x: u32) -> u32 { other(x) } )* };
+}
+EOF
+  [[ "$(run check)" == 1 ]] || fail "a forwarder inside a macro_rules! body passed: $(cat "$work/answer")"
+  grep -Fq 'app/demo/src/surface.rs: surface!::parameters::respond -> respond_resource(p, wire)' "$work/answer" ||
+    fail "a forwarder inside a macro_rules! body was not named: $(cat "$work/answer")"
+  if grep -Fq 'other(x)' "$work/answer"; then
+    fail "an arm that does not read as items was scanned: $(cat "$work/answer")"
+  fi
+  rm "$tree/app/demo/src/surface.rs"
+
   # --files: a named file with a new forwarder fails, one the baseline carries passes.
   answer=0
   files_check "$tree" "$baseline" "$tree/app/demo/src/store.rs" >"$work/answer" 2>&1 || answer=$?
@@ -354,7 +380,7 @@ EOF
   [[ "$(committed_count "$count_file")" == 0 ]] || fail "--update did not record the lower count"
   [[ "$(run check)" == 0 ]] || fail "the lowered count was refused: $(cat "$work/answer")"
 
-  echo "forwarders: self-test OK (the exceptions, a move, a rise, the add-ons, --files, a kept reason, a fall)."
+  echo "forwarders: self-test OK (the exceptions, a move, a rise, the add-ons, a macro body, --files, a kept reason, a fall)."
 }
 
 case "${1:-}" in
