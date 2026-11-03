@@ -4,8 +4,6 @@
 //! The version-neutral `ConceptMap` (<https://hl7.org/fhir/R4B/conceptmap.html>,
 //! <https://hl7.org/fhir/R5/conceptmap.html>).
 
-use crate::versioned::Versioned;
-
 /// How a target relates to its source concept.
 ///
 /// The variants are R4's `equivalence` codes; R5's `relationship` codes map
@@ -251,16 +249,6 @@ pub struct ConceptMapModel {
     pub target_scope: Option<String>,
     /// `group`.
     pub groups: Vec<Group>,
-}
-
-impl Versioned for ConceptMapModel {
-    fn url(&self) -> &str {
-        &self.url
-    }
-
-    fn version(&self) -> Option<&str> {
-        self.version.as_deref()
-    }
 }
 
 /// A `ConceptMap` the model cannot represent.

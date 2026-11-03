@@ -241,8 +241,8 @@ macro_rules! render_value_set {
                 ValueSetExpansionParameterValue,
             };
 
-            use crate::compose::{Compose, Include};
-            use crate::operations::expand::{Contains, ExpansionOutcome, ParameterValue};
+            use crate::provider::compose::{Compose, Include};
+            use crate::valueset::expansion::{Contains, ExpansionOutcome, ParameterValue};
             use crate::valueset::model::ValueSetModel;
 
             render_value_set!(@helpers $properties, $module);

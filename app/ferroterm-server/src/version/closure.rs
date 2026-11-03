@@ -314,7 +314,7 @@ macro_rules! closure {
                     source: member(&edge.source),
                     target: member(&edge.target),
                     relationship:
-                        fhir_terminology::conceptmap::model::Relationship::from_equivalence(
+                        fhir_terminology::provider::concept_map::Relationship::from_equivalence(
                             &edge.relationship,
                         )?,
                 })

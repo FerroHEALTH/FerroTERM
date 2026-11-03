@@ -8,8 +8,9 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::model::ValueSetModel;
-use super::negotiation::Negotiation;
-use crate::compose::{Compose, ComposeError, Expander, Expansion, Item, Options, ValueSetResolver};
+use crate::compose::negotiation::Negotiation;
+use crate::compose::{ComposeError, Expander, Expansion, Item, Options, ValueSetResolver};
+use crate::provider::compose::Compose;
 use crate::registry::Registry;
 use crate::versioned::VersionedStore;
 

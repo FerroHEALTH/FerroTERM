@@ -11,11 +11,10 @@
 //! standard concept properties (`inactive`, `status`, `deprecated`,
 //! `notSelectable`, `parent`, `child`, <https://hl7.org/fhir/R4B/codesystem-concept-properties.html>),
 //! and the generic filter operators. A resource of any served FHIR version
-//! converts into one [`model::CodeSystemModel`], and one [`provider::FhirCodeSystem`]
-//! serves it through the seam.
+//! converts into one [`crate::provider::code_system::CodeSystemModel`], and
+//! one [`provider::FhirCodeSystem`] serves it through the seam.
 
 pub mod convert;
 pub mod load;
-pub mod model;
 pub mod provider;
 pub mod render;

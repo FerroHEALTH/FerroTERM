@@ -7,10 +7,10 @@
 //! (<https://hl7.org/fhir/R5/conceptmap-operation-translate.html>).
 
 use super::{Match, MatchOrigin, Product, Subject, in_source_scope};
-use crate::conceptmap::model::{
+use crate::operations::{CodingRef, OperationError, Sources};
+use crate::provider::concept_map::{
     ConceptMapModel, DependsOn, Element, Group, Relationship, Target, Unmapped, UnmappedMode,
 };
-use crate::operations::{CodingRef, OperationError, Sources};
 use crate::versioned::Versioned;
 
 /// How deep `unmapped.mode = other-map` may chain (our own guard).

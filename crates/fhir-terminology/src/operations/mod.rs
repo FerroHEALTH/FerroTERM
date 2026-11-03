@@ -73,8 +73,8 @@ pub enum OperationError {
     #[error("{0}")]
     Invalid(String),
     /// A `displayLanguage` that is not a valid BCP 47 language range list.
-    #[error("Invalid displayLanguage: '{0}'")]
-    InvalidLanguage(String),
+    #[error(transparent)]
+    InvalidLanguage(#[from] crate::language::InvalidLanguage),
     /// A `check-system-version` parameter forbids the version a value set
     /// uses (the ecosystem's `version-error`, an `exception`).
     #[error("{0}")]
@@ -190,7 +190,7 @@ pub struct Refused {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RefusedInput {
     /// A filter value of the inline `valueSet`'s compose.
-    Filter(crate::compose::FilterAt),
+    Filter(crate::provider::compose::FilterAt),
     /// The value set `url`.
     Url,
 }
@@ -236,7 +236,7 @@ impl OperationError {
     /// nowhere.
     pub(crate) fn of_compose(
         error: crate::compose::ComposeError,
-        inline: Option<&crate::compose::Compose>,
+        inline: Option<&crate::provider::compose::Compose>,
     ) -> Self {
         let refused = match (&error, inline) {
             (
@@ -558,13 +558,13 @@ impl From<crate::compose::ComposeError> for OperationError {
     }
 }
 
-impl From<crate::valueset::negotiation::NegotiationError> for OperationError {
-    fn from(error: crate::valueset::negotiation::NegotiationError) -> Self {
+impl From<crate::compose::negotiation::NegotiationError> for OperationError {
+    fn from(error: crate::compose::negotiation::NegotiationError) -> Self {
         match error {
-            crate::valueset::negotiation::NegotiationError::SystemVersion { .. } => {
+            crate::compose::negotiation::NegotiationError::SystemVersion { .. } => {
                 Self::VersionCheck(error.to_string())
             }
-            crate::valueset::negotiation::NegotiationError::ValueSetVersion { .. } => {
+            crate::compose::negotiation::NegotiationError::ValueSetVersion { .. } => {
                 Self::Invalid(error.to_string())
             }
         }

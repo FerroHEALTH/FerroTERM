@@ -20,9 +20,9 @@ use designation_index::index::Query;
 use regex::Regex;
 use serde::Deserialize;
 
-use crate::artifact::Source;
-use crate::compose::{Compose, ConceptRef, Include, SystemRef};
-use crate::filter::{Filter, FilterOperator};
+use crate::provider::compose::{Compose, ConceptRef, Include, SystemRef};
+use crate::provider::filter::{Filter, FilterOperator};
+use crate::provider::source::Source;
 use crate::provider::{
     Capability, Compositional, Concept, ConceptSet, ContentMode, Declaration, FilterDefinition,
     Hierarchy, HierarchyMeaning, Identity, ImplicitArgument, ImplicitForm, Located, Property,
@@ -575,7 +575,7 @@ impl LoincProvider {
             return Ok(ConceptSet::new());
         };
         if filter.op == FilterOperator::Exists {
-            let wanted = crate::filter::boolean(filter)?;
+            let wanted = crate::provider::filter::boolean(filter)?;
             let mut set = ConceptSet::new();
             for index in 0..self.stored().concepts {
                 let ordinal = Ordinal::new(index);

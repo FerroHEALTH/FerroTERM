@@ -9,8 +9,8 @@
 //! renders it into its generated type, and the R5-only `codeSystem.content`
 //! is a generated difference, not a hand-written conditional.
 
-use crate::artifact::Source;
-use crate::filter::FilterOperator;
+use crate::provider::filter::FilterOperator;
+use crate::provider::source::Source;
 use crate::provider::{Capability, ContentMode, Declaration, FilterDefinition, ImplicitForm};
 use crate::registry::Registry;
 
@@ -254,7 +254,8 @@ macro_rules! artifact_extension {
         mod $module {
             use fhir_types::$module::extension::{Extension, ExtensionValue};
 
-            use crate::artifact::{SOURCE_EXTENSION, SOURCE_NAME, SOURCE_RELEASE, Source};
+            use crate::artifact::{SOURCE_EXTENSION, SOURCE_NAME, SOURCE_RELEASE};
+            use crate::provider::source::Source;
 
             /// The artifact extension of `source`; nothing when the version was
             /// read from no artifact.

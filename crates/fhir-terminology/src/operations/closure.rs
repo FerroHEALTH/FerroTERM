@@ -13,7 +13,7 @@
 use concept_graph::subsumption::Outcome;
 
 use super::{Invocation, OperationError, locate, resolve};
-use crate::conceptmap::model::Relationship;
+use crate::provider::concept_map::Relationship;
 use crate::registry::Registry;
 
 /// One concept a closure table holds.

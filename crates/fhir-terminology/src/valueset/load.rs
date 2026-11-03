@@ -30,9 +30,10 @@ pub fn load_dir(dir: &Path, version: FhirVersion) -> Result<Vec<ValueSetModel>, 
                     resource_type: "ValueSet",
                     source,
                 },
-                Decoded::Model(source) => LoadError::ValueSet {
+                Decoded::Model(source) => LoadError::Model {
                     path: path.clone(),
-                    source,
+                    resource_type: "ValueSet",
+                    source: Box::new(source),
                 },
             })?,
         );

@@ -33,8 +33,8 @@ macro_rules! render_code_system {
             use fhir_types::$module::coding::Coding;
             use fhir_types::$module::extension::{Extension, ExtensionValue};
 
-            use crate::fhir_codesystem::model::{CodeSystemModel, ConceptEntry};
             use crate::fhir_codesystem::render::STANDARDS_STATUS;
+            use crate::provider::code_system::{CodeSystemModel, ConceptEntry};
             use crate::provider::{Designation, PropertyValue};
 
             /// The `CodeSystem` of `model`.

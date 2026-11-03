@@ -17,9 +17,9 @@ use concept_graph::ordinal::Ordinal;
 use concept_store::store::Store;
 use criterion::{Criterion, criterion_group, criterion_main};
 use fhir_terminology::compose::{Expander, Options};
-use fhir_terminology::filter::{Filter, FilterOperator};
 use fhir_terminology::operations::{Invocation, lookup, subsumes, validate_code};
 use fhir_terminology::provider::CodeSystemProvider;
+use fhir_terminology::provider::filter::{Filter, FilterOperator};
 use fhir_terminology::registry::Registry;
 use fhir_terminology::snomed::SnomedProvider;
 

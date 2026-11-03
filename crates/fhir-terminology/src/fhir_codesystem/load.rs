@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use fhir_types::codec::{DecodeError, Json, Path as ElementPath, expect_object};
 
 use super::convert;
-use super::model::{CodeSystemModel, ModelError};
+use crate::provider::code_system::{CodeSystemModel, ModelError};
 
 /// The FHIR version the JSON files are written in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,32 +74,16 @@ pub enum LoadError {
         #[source]
         source: DecodeError,
     },
-    /// A `CodeSystem` cannot be modelled.
-    #[error("{path}: cannot model the CodeSystem")]
+    /// A resource cannot be modelled.
+    #[error("{path}: cannot model the {resource_type}")]
     Model {
         /// The path.
         path: PathBuf,
-        /// The cause.
+        /// The resource type.
+        resource_type: &'static str,
+        /// The model's refusal.
         #[source]
-        source: ModelError,
-    },
-    /// A `ValueSet` cannot be modelled.
-    #[error("{path}: cannot model the ValueSet")]
-    ValueSet {
-        /// The path.
-        path: PathBuf,
-        /// The cause.
-        #[source]
-        source: crate::valueset::model::ModelError,
-    },
-    /// A `ConceptMap` cannot be modelled.
-    #[error("{path}: cannot model the ConceptMap")]
-    ConceptMap {
-        /// The path.
-        path: PathBuf,
-        /// The cause.
-        #[source]
-        source: crate::conceptmap::model::ModelError,
+        source: Box<dyn std::error::Error + Send + Sync>,
     },
 }
 
@@ -138,7 +122,8 @@ impl Decoded {
             },
             Self::Model(source) => LoadError::Model {
                 path: path.to_path_buf(),
-                source,
+                resource_type: "CodeSystem",
+                source: Box::new(source),
             },
         }
     }

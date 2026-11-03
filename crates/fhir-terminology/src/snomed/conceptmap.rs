@@ -25,7 +25,9 @@ use std::collections::btree_map::Entry;
 use concept_graph::ordinal::Ordinal;
 use concept_graph::refsets::{Table, ValueRef};
 
-use crate::conceptmap::model::{ConceptMapModel, DependsOn, Element, Group, Relationship, Target};
+use crate::provider::concept_map::{
+    ConceptMapModel, DependsOn, Element, Group, Relationship, Target,
+};
 use crate::provider::{CodeSystemProvider, Concept, MapSelection, ProviderError, Successor};
 use crate::snomed::{FHIR_CM, FHIR_VS, SYSTEM, SnomedProvider};
 

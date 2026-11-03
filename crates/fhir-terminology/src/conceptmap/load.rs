@@ -8,8 +8,8 @@ use std::path::Path;
 use fhir_types::codec::{Json, Path as ElementPath, expect_object};
 
 use super::convert;
-use super::model::ConceptMapModel;
 use crate::fhir_codesystem::load::{FhirVersion, LoadError, scan_json};
+use crate::provider::concept_map::ConceptMapModel;
 
 /// Loads every `ConceptMap` resource in a directory.
 ///
@@ -48,9 +48,10 @@ pub fn load_dir(dir: &Path, version: FhirVersion) -> Result<Vec<ConceptMapModel>
                     .map_err(decode)?,
             ),
         };
-        models.push(model.map_err(|source| LoadError::ConceptMap {
+        models.push(model.map_err(|source| LoadError::Model {
             path: path.clone(),
-            source,
+            resource_type: "ConceptMap",
+            source: Box::new(source),
         })?);
     }
     Ok(models)

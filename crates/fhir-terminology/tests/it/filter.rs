@@ -4,7 +4,7 @@
 //! Every `filter-operator` code through the generic evaluation
 //! (<https://hl7.org/fhir/R5/codesystem-filter-operator.html>).
 
-use fhir_terminology::filter::{Filter, FilterOperator};
+use fhir_terminology::provider::filter::{Filter, FilterOperator};
 use fhir_terminology::provider::{CodeSystemProvider, ProviderError};
 
 use crate::fixture::{Fixture, codes};

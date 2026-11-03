@@ -12,7 +12,6 @@
 //! The first range, by quality then by position, whose primary subtag a code
 //! system carries names the display language; `*` means the system's own.
 
-use crate::operations::OperationError;
 use crate::provider::CodeSystemProvider;
 use crate::registries::bcp47::Analysis;
 
@@ -102,22 +101,28 @@ pub fn accepts(requested: Option<&str>, tag: &str) -> bool {
         .is_none_or(|range| range.quality > 0.0)
 }
 
+/// A `displayLanguage` that is not a valid BCP 47 language range list: the
+/// whole value when it holds no range, else the first range refused.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("Invalid displayLanguage: '{0}'")]
+pub struct InvalidLanguage(pub String);
+
 /// Checks a `displayLanguage` (or `Accept-Language`) value: every range is
 /// `*` or a valid BCP 47 tag with registered subtags.
 ///
 /// # Errors
 ///
-/// Returns [`OperationError::InvalidLanguage`] naming the first range that is
+/// Returns [`InvalidLanguage`] naming the first range that is
 /// malformed or carries an unregistered subtag; a display language the
 /// server cannot interpret is refused, never guessed (the ecosystem's
 /// `lookup-bad-language` and `validation-wrong-de-en-bad` cases).
-pub fn check(requested: Option<&str>) -> Result<(), OperationError> {
+pub fn check(requested: Option<&str>) -> Result<(), InvalidLanguage> {
     let Some(text) = requested else {
         return Ok(());
     };
     let ranges = ranges(text);
     if ranges.is_empty() {
-        return Err(OperationError::InvalidLanguage(text.to_owned()));
+        return Err(InvalidLanguage(text.to_owned()));
     }
     for range in ranges {
         if range.tag == "*" {
@@ -129,7 +134,7 @@ pub fn check(requested: Option<&str>) -> Result<(), OperationError> {
         ) {
             Analysis::Valid(_) => {}
             Analysis::Malformed(_) | Analysis::WellFormed { .. } => {
-                return Err(OperationError::InvalidLanguage(range.tag));
+                return Err(InvalidLanguage(range.tag));
             }
         }
     }

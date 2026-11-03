@@ -7,8 +7,8 @@ use std::sync::Arc;
 
 use concept_graph::subsumption::Outcome;
 use fhir_terminology::capabilities::Summary;
-use fhir_terminology::filter::{Filter, FilterOperator};
 use fhir_terminology::operations::{Invocation, OperationError, lookup, validate_code};
+use fhir_terminology::provider::filter::{Filter, FilterOperator};
 use fhir_terminology::provider::{
     Capability, CodeSystemProvider, Compositional, Concept, PropertyValue, ProviderError,
 };

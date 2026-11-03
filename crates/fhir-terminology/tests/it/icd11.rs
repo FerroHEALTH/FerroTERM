@@ -5,8 +5,8 @@
 //! what the HL7 terminology ecosystem test cases for ICD-11 assert.
 
 use ferroterm_testkit::icd11::{BLOCK, CHOLERA, RELEASE, SEPSIS, VIBRIO, write_artifacts};
-use fhir_terminology::filter::{Filter, FilterOperator};
 use fhir_terminology::icd11::{Icd11Provider, OpenError};
+use fhir_terminology::provider::filter::{Filter, FilterOperator};
 use fhir_terminology::provider::{
     CodeSystemProvider, Compositional, Concept, HierarchyMeaning, PropertyValue, ProviderError,
 };
