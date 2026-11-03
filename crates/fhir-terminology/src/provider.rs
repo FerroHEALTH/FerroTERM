@@ -900,13 +900,7 @@ pub trait CodeSystemProvider: fmt::Debug + Send + Sync {
     /// Returns [`ProviderError::NotEnumerable`] when the system cannot
     /// enumerate, and [`ProviderError::Storage`] when the substrate fails.
     fn inactive(&self) -> Result<ConceptSet, ProviderError> {
-        let mut inactive = ConceptSet::new();
-        for index in self.all()? {
-            if !self.status(Concept::new(index))?.active {
-                inactive.insert(index);
-            }
-        }
-        Ok(inactive)
+        crate::filter::inactive_by_status(self)
     }
 
     /// The concepts an expansion for use outside a user interface leaves out:
@@ -1151,7 +1145,7 @@ pub trait CodeSystemProvider: fmt::Debug + Send + Sync {
     ///
     /// Returns the errors of [`CodeSystemProvider::filter`].
     fn filter_matches(&self, concept: Concept, filter: &Filter) -> Result<bool, ProviderError> {
-        Ok(self.filter(filter)?.contains(concept.index()))
+        crate::filter::selected_by(self, concept, filter)
     }
 
     /// The subsumption of `a` over `b` when the system decides it without a
