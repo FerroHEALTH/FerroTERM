@@ -728,6 +728,7 @@ async fn an_unknown_system_version_is_named_in_its_issue() {
         parameter(&body, "x-unknown-system").unwrap()["valueCanonical"],
         "http://example.org/fhir/CodeSystem/nowhere"
     );
+}
 
 // A `property` neither the specification nor the code system defines names
 // nothing to return, so `$lookup` answers the ones it can and no issue
