@@ -27,12 +27,14 @@ use roaring::RoaringBitmap;
 use serde::Deserialize;
 
 use crate::provider::compose::{Compose, Include, SystemRef};
+use crate::provider::declaration::{
+    Capability, Compositional, ContentMode, Declaration, FilterDefinition, ImplicitArgument,
+    ImplicitForm, PropertyDefinition, PropertyKind,
+};
 use crate::provider::filter::{Filter, FilterOperator};
 use crate::provider::source::Source;
 use crate::provider::{
-    Capability, Compositional, Concept, ConceptSet, ContentMode, Declaration, FilterDefinition,
-    Identity, ImplicitArgument, ImplicitForm, Located, Property, PropertyDefinition, PropertyKind,
-    PropertyValue, ProviderError, Status,
+    Concept, ConceptSet, Identity, Located, Property, PropertyValue, ProviderError, Status,
 };
 use crate::stored::artifact::{Artifact, Layout};
 use crate::stored::system::{StoredProvider, StoredSystem};

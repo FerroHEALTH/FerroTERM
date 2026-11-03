@@ -15,9 +15,10 @@ use std::fmt;
 use concept_graph::subsumption::Outcome;
 
 use super::interned::Interned;
+use crate::provider::declaration::Declaration;
 use crate::provider::filter::Filter;
 use crate::provider::{
-    CodeSystemProvider, Concept, ConceptSet, Declaration, Designation, Identity, Located, Property,
+    CodeSystemProvider, Concept, ConceptSet, Designation, Identity, Located, Property,
     ProviderError, Status,
 };
 

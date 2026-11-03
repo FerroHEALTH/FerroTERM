@@ -9,10 +9,10 @@
 //! cannot drift: `convert::r4b::convert(&resource)`.
 
 use crate::provider::code_system::{ModelError, PARENT, SUBSUMED_BY};
-use crate::provider::filter::FilterOperator;
-use crate::provider::{
+use crate::provider::declaration::{
     ContentMode, FilterDefinition, HierarchyMeaning, PropertyDefinition, PropertyKind,
 };
+use crate::provider::filter::FilterOperator;
 
 fn text<T: AsRef<str>>(value: Option<T>) -> Option<String> {
     value.map(|v| v.as_ref().to_owned())

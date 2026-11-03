@@ -77,7 +77,9 @@ macro_rules! render_code_system {
             }
 
             /// One `CodeSystem.filter`.
-            fn filter(declared: &crate::provider::FilterDefinition) -> CodeSystemFilter {
+            fn filter(
+                declared: &crate::provider::declaration::FilterDefinition,
+            ) -> CodeSystemFilter {
                 CodeSystemFilter {
                     code: declared.code.as_str().into(),
                     description: declared.description.as_deref().map(Into::into),
@@ -92,7 +94,9 @@ macro_rules! render_code_system {
             }
 
             /// One `CodeSystem.property`.
-            fn property(declared: &crate::provider::PropertyDefinition) -> CodeSystemProperty {
+            fn property(
+                declared: &crate::provider::declaration::PropertyDefinition,
+            ) -> CodeSystemProperty {
                 CodeSystemProperty {
                     code: declared.code.as_str().into(),
                     uri: declared.uri.as_deref().map(Into::into),

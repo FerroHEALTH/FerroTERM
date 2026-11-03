@@ -31,12 +31,15 @@ use concept_store::store::{Store, StoreError};
 use serde::Deserialize;
 
 use crate::provider::compose::{Compose, Include, SystemRef};
+use crate::provider::declaration::{
+    Capability, Compositional, ContentMode, Declaration, HierarchyMeaning, ImplicitArgument,
+    ImplicitForm, PropertyDefinition, PropertyKind,
+};
 use crate::provider::filter::{Filter, FilterOperator};
 use crate::provider::source::Source;
 use crate::provider::{
-    Capability, CodeSystemProvider, Compositional, Concept, ContentMode, Declaration, Hierarchy,
-    HierarchyMeaning, Identity, ImplicitArgument, ImplicitForm, Located, Property,
-    PropertyDefinition, PropertyKind, PropertyValue, ProviderError, Status, Subproperty,
+    CodeSystemProvider, Concept, Hierarchy, Identity, Located, Property, PropertyValue,
+    ProviderError, Status, Subproperty,
 };
 use crate::registries::interned::Interned;
 use crate::stored::artifact::{Artifact, Layout};

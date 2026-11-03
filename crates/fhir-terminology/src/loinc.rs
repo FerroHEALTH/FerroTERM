@@ -21,12 +21,14 @@ use regex::Regex;
 use serde::Deserialize;
 
 use crate::provider::compose::{Compose, ConceptRef, Include, SystemRef};
+use crate::provider::declaration::{
+    Capability, Compositional, ContentMode, Declaration, FilterDefinition, HierarchyMeaning,
+    ImplicitArgument, ImplicitForm, PropertyDefinition, PropertyKind,
+};
 use crate::provider::filter::{Filter, FilterOperator};
 use crate::provider::source::Source;
 use crate::provider::{
-    Capability, Compositional, Concept, ConceptSet, ContentMode, Declaration, FilterDefinition,
-    Hierarchy, HierarchyMeaning, Identity, ImplicitArgument, ImplicitForm, Located, Property,
-    PropertyDefinition, PropertyKind, ProviderError, Status,
+    Concept, ConceptSet, Hierarchy, Identity, Located, Property, ProviderError, Status,
 };
 use crate::stored::artifact::{Artifact, Layout};
 use crate::stored::system::{StoredProvider, StoredSystem};
