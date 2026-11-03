@@ -1,4 +1,3 @@
 - `ConceptMap/$translate` answers `result` false when every match is `unmatched`, `disjoint` (`not-related-to`) or an explicit `noMap`, as the R4B and R5 operation define `result`; it answered true for any match.
 - A code system property coded `notSelectable` under another URI than the standard `notSelectable` property no longer marks a concept abstract in an expansion or a validation.
 - The `status-check` note on a draft code system carries the message id `MSG_DRAFT_SRC_STATUS`, the one the terminology ecosystem test cases 1.10.0 name.
-- `CodeSystem/$lookup` answers the ecosystem's `abstract` output as false for a concept that states `notSelectable` false, and still leaves it out when the concept states nothing.

@@ -16,18 +16,17 @@ turns the lists and the total into the README's badges at site build time.
 
 ## What is committed, per mode
 
-The `general` rows were recorded on 2026-11-03 with validator 7.0.4 and suite
-`f158adedf67b280e2a596f805194489205bfe9bd` (test cases 1.10.0), on CI. Every
-mode run also carries the two mode-independent `metadata` cases, so a mode's
-count is two above the suite's own. The `snomed`, `icd-11`, `tx.fhir.org`,
-`mimetypes`, and `omop` rows were last measured on 2026-09-06, with validator
-6.10.4 and test cases 1.9.3, and are re-measured by hand on the new pins.
+Recorded on 2026-09-08 with validator 6.10.4 and suite
+`eaec771d82fba4eac596c14963546f39b4ecffe7` (tests v1.9.3). Every mode run also
+carries the two mode-independent `metadata` cases, so a mode's count is two
+above the suite's own. The `snomed`, `icd-11`, `tx.fhir.org`, `mimetypes`, and
+`omop` rows were last measured on 2026-09-06.
 
 | mode | surface | pass list | passed of ran | needs | open failures |
 |---|---|---|---|---|---|
-| `general` | `/r4b` | `passing.txt` | 637 of 764 | nothing | #995, #996, #998 |
-| `general` | `/r4` | `passing-r4.txt` | 649 of 764 | nothing | #995, #996, #998 |
-| `general` | `/r5` | `passing-r5.txt` | 650 of 764 | nothing | #995, #996, #998 |
+| `general` | `/r4b` | `passing.txt` | 637 of 764 | nothing | #353 |
+| `general` | `/r4` | `passing-r4.txt` | 649 of 764 | nothing | #353 |
+| `general` | `/r5` | `passing-r5.txt` | 637 of 764 | nothing | #353 |
 | `snomed` | `/r4b` | `passing-snomed.txt` | 2 of 170 | a SNOMED CT edition | #344, #352, #349 |
 | `icd-11` | `/r4b` | `passing-icd-11.txt` | 44 of 52 | the three ICD-11 artifacts | #350, #349, #117 |
 | `tx.fhir.org` | `/r4b` | `passing-tx.fhir.org.txt` | 57 of 227 | a LOINC release | #420, #421, #305, #349 |
@@ -245,12 +244,12 @@ collection of languages", so `zh` does not subsume `zh-min-nan`.
 
 ## What the `general` mode still holds open
 
-- **Some entries are skips, not failures: nine of the 764 on `/r4b`, five on
-  `/r4`.** `simple-expand-isa-o2`, `-c2`, and `-o2c2` declare `"mode":
-  "tx.fhir.org"`, so the general run lists them and runs none; eight
-  `translate`/`translate2` cases declare `"version"`, so the six `-r4` ones run
-  only on `/r4` and the two `r5+` ones only on `/r4b` and `/r5`. Each surface
-  therefore reports its own skip set and no case is silently lost.
+- **Nine of the 670 entries are skips, not failures.** `simple-expand-isa-o2`,
+  `-c2`, and `-o2c2` declare `"mode": "tx.fhir.org"`, so the general run lists
+  them and runs neither; the six `translate`/`translate2` cases declare
+  `"version"`, so the three `-r4` ones run only on `/r4` and the two `r5+` ones
+  only on `/r4b` and `/r5`. Each surface therefore reports its own skip set and
+  no case is silently lost.
 - **`$lookup` answers `definition` in the `property` group on `/r4b` and
   `/r4`, and the suite asks for a named parameter there.**
   `simple-lookup-1`, `simple-lookup-2`, and `parameters-lookup-supplement-none`
