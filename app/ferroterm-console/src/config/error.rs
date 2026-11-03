@@ -73,8 +73,8 @@ pub enum Error {
         /// The key.
         key: String,
     },
-    /// A secret set both inline and through its `_file` sibling, or whose
-    /// file cannot be read or is empty.
+    /// An `[oidc]` or a `[session]` `ferrohealth-session` refuses, a client
+    /// secret set both inline and through its file among them.
     #[error(transparent)]
-    Secret(#[from] ferrohealth_secret::file::SecretError),
+    SignIn(Box<ferrohealth_session::config::ConfigError>),
 }

@@ -12,8 +12,9 @@
 //! policy of a server-rendered console (`ConsoleHeaders::server_rendered`):
 //! scripts and styles from this origin alone, no nonce and no WebAssembly,
 //! as FerroUI's server-drawn pages need. A request that is not a safe
-//! method is taken only from the console's own pages, and a session's access
-//! token is refreshed before the request it arrives with is served.
+//! method is taken only from the console's own pages. The sign-in routes and
+//! the middleware that keeps a session fresh and hands every page what its
+//! request holds are `ferrohealth-session`'s (`ferrohealth_session::routes`).
 //! No specification governs the console's HTTP surface: our own design.
 
 use std::sync::Arc;
@@ -32,9 +33,13 @@ use ferrohealth_server::serve::Drained;
 use http::header::{CACHE_CONTROL, CONTENT_TYPE};
 use http::{HeaderValue, Method, StatusCode};
 
-use crate::config::settings::{OidcSettings, Settings};
+use ferrohealth_session::cookies::CookieNames;
+use ferrohealth_session::routes::{SignIn, keep_session};
+use ferrohealth_session::sessions::Sessions;
+
+use crate::auth::pages::ConsolePages;
+use crate::config::settings::Settings;
 use crate::screen::Page;
-use crate::session::Sessions;
 use crate::visit::Visit;
 
 /// The path of the console's health summary route.
@@ -77,55 +82,81 @@ const BRAND_FILES: [(&str, &[u8], &str); 4] = [
     ),
 ];
 
-/// An HTTP client that could not be built.
+/// The base name of the console's cookies.
+///
+/// Its session cookie is `ferroterm_console_session`, its pending sign-in
+/// cookie `ferroterm_console_sign_in` and a preference cookie
+/// `ferroterm_console_<key>`, each under the `__Host-` prefix when `Secure`.
+pub const COOKIES: &str = "ferroterm_console";
+
+/// Why the console could not start.
 #[derive(Debug, thiserror::Error)]
-#[error("the HTTP client of the console could not be built")]
-pub struct ClientError {
-    /// What the builder reported.
-    #[source]
-    source: reqwest::Error,
+pub enum StartError {
+    /// The HTTP client of the terminology server could not be built.
+    #[error("the HTTP client of the console could not be built")]
+    Client(#[source] reqwest::Error),
+    /// The OpenID Provider's relying party could not be built, its metadata
+    /// unread among the reasons.
+    #[error("the sign-in at the OpenID Provider could not be set up")]
+    Provider(#[source] Box<ferrohealth_session::config::ConfigError>),
 }
 
 /// What every request handler shares.
 #[derive(Debug, Clone)]
 pub struct ConsoleState {
     settings: Arc<Settings>,
-    sessions: Sessions,
+    sign_in: SignIn<ConsolePages>,
     upstream: reqwest::Client,
-    provider: reqwest::Client,
     health: Health,
 }
 
+/// The client of the terminology server and the sync service for
+/// `settings`, which `config check` builds with nothing else.
+///
+/// # Errors
+/// Returns [`StartError::Client`] when the client cannot be built.
+pub fn upstream_client(settings: &Settings) -> Result<reqwest::Client, StartError> {
+    // NOTE: no specification governs this: our own design; a redirect from
+    // the FHIR server is handed to the page as it came, never followed.
+    reqwest::Client::builder()
+        .timeout(settings.ferroterm.timeout)
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(StartError::Client)
+}
+
 impl ConsoleState {
-    /// The state for `settings`, with an empty session store.
+    /// The state for `settings`, with an empty session store and, when
+    /// `[oidc]` is set, the relying party at its provider, whose metadata is
+    /// read here for every endpoint `[oidc]` leaves out.
     ///
     /// # Errors
-    /// Returns the [`ClientError`] of the terminology server's client, or of
-    /// the OpenID Provider's, that cannot be built.
-    pub fn new(settings: Settings) -> Result<Self, ClientError> {
-        // NOTE: no specification governs this: our own design; a redirect from
-        // the FHIR server is handed to the page as it came, never followed.
-        let upstream = reqwest::Client::builder()
-            .timeout(settings.ferroterm.timeout)
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .map_err(|source| ClientError { source })?;
-        // NOTE: RFC 6749 §3.2: the token endpoint answers the request itself, so
-        // the provider's client follows no redirect.
-        let provider = reqwest::Client::builder()
-            .timeout(settings.ferroterm.timeout)
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .map_err(|source| ClientError { source })?;
-        // The settings are resolved and both clients built, so the console
-        // serves from here.
+    /// Returns [`StartError::Client`] when the terminology server's client
+    /// cannot be built and [`StartError::Provider`] when the relying party
+    /// cannot.
+    pub async fn new(settings: Settings) -> Result<Self, StartError> {
+        let upstream = upstream_client(&settings)?;
+        let party = match &settings.sign_in.provider {
+            Some(provider) => Some(
+                provider
+                    .relying_party()
+                    .await
+                    .map_err(|error| StartError::Provider(Box::new(error)))?,
+            ),
+            None => None,
+        };
+        let sessions = Sessions::new(
+            settings.sign_in.store.clone(),
+            CookieNames::for_console(COOKIES),
+        );
+        // The settings are resolved, the client and the relying party built,
+        // so the console serves from here.
         let lifecycle = Lifecycle::default();
         lifecycle.booted();
         Ok(Self {
-            sessions: Sessions::new(settings.session),
             settings: Arc::new(settings),
+            sign_in: SignIn::new(sessions, party, ConsolePages),
             upstream,
-            provider,
             health: Health::new(Registry::default(), lifecycle),
         })
     }
@@ -149,10 +180,27 @@ impl ConsoleState {
         &self.settings
     }
 
+    /// The sign-in: the session store and the relying party.
+    #[must_use]
+    pub fn sign_in(&self) -> &SignIn<ConsolePages> {
+        &self.sign_in
+    }
+
     /// The session store.
     #[must_use]
     pub fn sessions(&self) -> &Sessions {
-        &self.sessions
+        self.sign_in.sessions()
+    }
+
+    /// The name the cookie `base` takes on this console: under the
+    /// `__Host-` prefix when the cookies are `Secure`.
+    #[must_use]
+    pub fn cookie_name(&self, base: &str) -> String {
+        if self.settings.sign_in.store.secure_cookie() {
+            format!("{}{base}", ferrohealth_session::cookies::HOST_PREFIX)
+        } else {
+            base.to_owned()
+        }
     }
 
     /// The HTTP client of the terminology server and the sync service.
@@ -160,34 +208,18 @@ impl ConsoleState {
     pub fn upstream(&self) -> &reqwest::Client {
         &self.upstream
     }
-
-    /// The HTTP client of the OpenID Provider, which the sign-in exchanges
-    /// its code with and a session refreshes its access token with.
-    #[must_use]
-    pub fn provider(&self) -> &reqwest::Client {
-        &self.provider
-    }
 }
 
 /// Builds the console's whole HTTP service over `state`.
 pub fn router(state: ConsoleState) -> axum::Router {
-    let form_action = form_action(state.settings());
+    let form_action = form_action(&state);
+    let sign_in = state.sign_in().clone();
     let health = ferrohealth_server::health::routes(state.health().clone());
     let mut pages = axum::Router::new()
         .merge(health)
         .nest(
             ferrohealth_ui::serve::PREFIX,
             ferrohealth_ui::serve::axum_router::router(),
-        )
-        .route(crate::routes::LOGIN_ROUTE, get(crate::oidc::login))
-        .route(crate::oidc::CALLBACK, get(crate::oidc::callback))
-        .route(
-            crate::routes::SIGN_OUT_ROUTE,
-            post(crate::oidc::logout::logout),
-        )
-        .route(
-            crate::routes::SESSION_ROUTE,
-            get(crate::session::watch::status).post(crate::session::watch::status),
         )
         .route(
             crate::routes::PREFERENCE_ROUTE,
@@ -216,9 +248,11 @@ pub fn router(state: ConsoleState) -> axum::Router {
     let headers = ConsoleHeaders::server_rendered(form_action);
     pages
         .fallback(page)
-        .layer(axum::middleware::from_fn(
-            crate::oidc::refresh::refresh_session,
+        .layer(axum::middleware::from_fn_with_state(
+            sign_in.clone(),
+            keep_session::<ConsolePages>,
         ))
+        .merge(ferrohealth_session::routes::router(sign_in))
         .layer(axum::middleware::from_fn(same_origin_only))
         .layer(Extension(state))
         .layer(axum::middleware::from_fn(move |request, next| {
@@ -299,8 +333,8 @@ async fn same_origin_only(
     if request.method().is_safe() {
         return next.run(request).await;
     }
-    let origin = state.settings().oidc.as_ref().map(OidcSettings::origin);
-    if same_origin(request.headers(), origin.as_deref()) {
+    let origin = state.settings().sign_in.origin.as_deref();
+    if same_origin(request.headers(), origin) {
         return next.run(request).await;
     }
     tracing::warn!(
@@ -353,7 +387,7 @@ pub fn same_origin(headers: &http::HeaderMap, origin: Option<&str>) -> bool {
 }
 
 /// The sources of the policy's `form-action`: the console itself, and the
-/// origin of the provider's end-session endpoint when one is configured.
+/// origin of the provider's end-session endpoint when it has one.
 ///
 /// A browser holds every redirect a form submission follows to
 /// `form-action` (Content Security Policy Level 3, `form-action`), and the
@@ -361,11 +395,11 @@ pub fn same_origin(headers: &http::HeaderMap, origin: Option<&str>) -> bool {
 /// Connect RP-Initiated Logout 1.0 §2), so without its origin the browser
 /// blocks the sign-out on its way to the provider.
 #[must_use]
-pub fn form_action(settings: &Settings) -> String {
-    let end_session = settings
-        .oidc
-        .as_ref()
-        .and_then(|oidc| oidc.end_session_endpoint.as_ref())
+pub fn form_action(state: &ConsoleState) -> String {
+    let end_session = state
+        .sign_in()
+        .party()
+        .and_then(|party| party.provider().end_session_endpoint())
         .map(url::Url::origin)
         .filter(url::Origin::is_tuple);
     match end_session {

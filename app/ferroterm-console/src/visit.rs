@@ -12,6 +12,7 @@
 //! the reader chose and never the session id. No specification governs
 //! this: our own design.
 
+use ferrohealth_session::record::Held;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::view::session::Left;
 
@@ -86,7 +87,10 @@ impl Visit {
     /// `state`.
     #[must_use]
     pub(crate) fn read(state: &ConsoleState, parts: &http::request::Parts) -> Self {
-        let prefix = state.sessions().cookie_name(crate::prefs::PREFIX);
+        let prefix = state.cookie_name(crate::prefs::PREFIX);
+        // NOTE: no specification governs this: our own design; a request the session
+        // middleware did not see, such as a test's, holds no session.
+        let held = parts.extensions.get::<Held>().unwrap_or(&Held::Absent);
         let cookies = preference_cookies(&parts.headers, &prefix);
         let prefs = crate::prefs::Prefs::read(&cookies, &prefix);
         let settings = state.settings();
@@ -101,8 +105,11 @@ impl Visit {
             browser,
             cookies,
             prefix,
-            operator: crate::session::request::operator(state, &parts.headers),
-            left: crate::session::request::left(state, &parts.headers),
+            operator: Operator::of(held),
+            left: match held {
+                Held::SignedIn(session) => Some(session.left()),
+                Held::TokenExpired | Held::Ended | Held::Absent => None,
+            },
             issuer: settings.oidc.as_ref().map(|oidc| oidc.issuer.clone()),
             listeners: Listeners {
                 sync: settings.ferroterm.sync.is_some(),
@@ -111,7 +118,7 @@ impl Visit {
             root: settings.ferroterm.shown_root(),
             posted: None,
             state: Some(state.clone()),
-            upstream: Some(Upstream::of(state, &parts.headers)),
+            upstream: Some(Upstream::of(state, held)),
         }
     }
 }

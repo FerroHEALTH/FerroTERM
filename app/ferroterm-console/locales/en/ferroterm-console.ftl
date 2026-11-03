@@ -366,6 +366,10 @@ sign-in-rejected = The sign-in could not be completed: the provider's answer did
 sign-in-unreachable = The console could not reach the identity provider. Try again in a moment; it may be down.
 sign-in-unavailable = This console has no sign-in configured. Every screen is open to read.
 sign-in-unavailable-detail = No [oidc] section.
+sign-in-no-pending = no sign-in is pending
+sign-in-state-mismatch = the sign-in state does not match this session
+sign-in-no-code = the redirect carries no code
+sign-in-not-begun = a sign-in session could not be begun
 
 ## The error pages
 
@@ -374,7 +378,6 @@ errors-not-found-body = The console has no page at { $path }. The navigation lis
 errors-forbidden-body = You are signed in as { $who }, and this account may not do this: { $what }. You can still read everything and preview what you compose.
 errors-forbidden-scope = Needs the scope
 errors-sign-in-again = Sign in again
-session-ended-detail = The session has ended; sign in again.
 ## The keyboard shortcuts
 
 keys-title = Keyboard shortcuts

@@ -211,7 +211,7 @@ pub async fn sign_in(journey: &Journey, deployment: &SignedIn) -> String {
         });
     journey
         .press(
-            By::Css("a[href^='/auth/login']"),
+            By::Css("a[href^='/login']"),
             "the sign-in page's way to the identity provider",
         )
         .await

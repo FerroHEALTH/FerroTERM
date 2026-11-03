@@ -243,7 +243,7 @@ systems, and report on possible unauthorised access"
 - **Evidence:** `app/ferroterm-server/src/smart/`;
   [authentication](../operate/configuration.md#authentication);
   [validating tokens in the server](../operate/reverse-proxy.md#validating-tokens-in-the-server);
-  `app/ferroterm-console/src/oidc/`.
+  `app/ferroterm-console/src/auth/` over `ferrohealth-session`.
 - **Status:** met for writes and the admin listener. Reporting is the request
   log and `http_server_request_duration_seconds` by status code; there is no separate
   security event record.

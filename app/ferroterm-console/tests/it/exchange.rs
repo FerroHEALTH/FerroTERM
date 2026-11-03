@@ -3,19 +3,17 @@
 
 //! The code exchange at the token endpoint (RFC 6749 §4.1.3, RFC 7636 §4.5)
 //! and the check of the ID Token it answers with (OpenID Connect Core 1.0
-//! §3.1.3.7), and the refresh grant (RFC 6749 §6).
+//! §3.1.3.7), and the refresh grant (RFC 6749 §6), as the relying party the
+//! console signs in through runs them for the console's `[oidc]`.
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
-use ferroterm_console::config::Oidc;
-use ferroterm_console::config::settings::OidcSettings;
-use ferroterm_console::oidc::exchange::{ExchangeError, exchange};
-use ferroterm_console::oidc::refresh::refresh;
-use ferroterm_console::session::{PendingSignIn, SignedIn};
+use ferrohealth_secret::secret::Secret;
+use ferrohealth_session::config::OidcSection;
+use ferrohealth_smart::oidc::{Callback, OidcError, PendingSignIn, RelyingParty, SignedIn};
 use http::StatusCode;
 use http::header::AUTHORIZATION;
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
-use secrecy::{ExposeSecret, SecretString};
 use serde_json::{Value, json};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
@@ -25,18 +23,28 @@ use crate::provider::{
     form, token_answer,
 };
 
-/// The resolved settings of `oidc`.
-fn settings(oidc: Oidc) -> OidcSettings {
+/// The relying party of the console configured with `oidc`.
+async fn party(oidc: OidcSection) -> RelyingParty {
     console(Some(oidc), "")
-        .settings()
-        .oidc
-        .clone()
+        .await
+        .sign_in()
+        .party()
+        .cloned()
         .expect("sign-in is configured")
 }
 
-/// A pending sign-in, as `GET /auth/login` mints one.
+/// A pending sign-in, as `GET /login` mints one.
 fn pending() -> PendingSignIn {
     PendingSignIn::mint().expect("the random source works")
+}
+
+/// Exchanges the code `c1` the provider sent back for `pending` at the
+/// relying party of `oidc`.
+async fn exchange(oidc: OidcSection, pending: &PendingSignIn) -> Result<SignedIn, OidcError> {
+    party(oidc)
+        .await
+        .exchange(pending, &Callback::granted("c1", pending.state()))
+        .await
 }
 
 /// Exchanges a code at `provider` after it answers `status` with `body`.
@@ -45,15 +53,9 @@ async fn exchanged(
     pending: &PendingSignIn,
     status: u16,
     body: &Value,
-) -> Result<SignedIn, ExchangeError> {
+) -> Result<SignedIn, OidcError> {
     provider.answer_tokens(status, body).await;
-    exchange(
-        &reqwest::Client::new(),
-        &settings(provider.oidc()),
-        pending,
-        "c1",
-    )
-    .await
+    exchange(provider.oidc(), pending).await
 }
 
 /// Exchanges a code at `provider` for a token answer carrying the ID Token
@@ -64,7 +66,7 @@ async fn with_id_token(
     key: &EncodingKey,
     header: &Header,
     claims: &Value,
-) -> Result<SignedIn, ExchangeError> {
+) -> Result<SignedIn, OidcError> {
     let id_token = jsonwebtoken::encode(header, claims, key).expect("signed");
     exchanged(provider, pending, 200, &token_answer(&id_token)).await
 }
@@ -75,7 +77,7 @@ async fn with_claims(
     provider: &Provider,
     pending: &PendingSignIn,
     claims: &Value,
-) -> Result<SignedIn, ExchangeError> {
+) -> Result<SignedIn, OidcError> {
     with_id_token(
         provider,
         pending,
@@ -104,23 +106,21 @@ async fn a_valid_answer_signs_the_operator_in_with_its_tokens() {
     let signed_in = with_claims(&provider, &pending, &provider.claims(pending.nonce()))
         .await
         .expect("the exchange succeeds");
-    assert_eq!(
-        "synthetic-access-token",
-        signed_in.access_token.expose_secret()
-    );
+    assert_eq!("synthetic-access-token", signed_in.access_token.expose());
     assert_eq!(
         Some("synthetic-refresh-token"),
-        signed_in
-            .refresh_token
-            .as_ref()
-            .map(ExposeSecret::expose_secret)
+        signed_in.refresh_token.as_ref().map(Secret::expose)
     );
     assert_eq!(
         Some(std::time::Duration::from_secs(3600)),
         signed_in.expires_in
     );
-    assert_eq!(Some(String::from("Synthetic Operator")), signed_in.operator);
-    assert!(signed_in.id_token.is_some(), "kept as the sign-out hint");
+    assert_eq!(Some("Synthetic Operator"), signed_in.claims.display_name());
+    assert_eq!(
+        3,
+        signed_in.id_token.expose().split('.').count(),
+        "kept as the sign-out hint"
+    );
 }
 
 #[tokio::test]
@@ -157,20 +157,20 @@ async fn the_operator_is_named_by_preferred_username_when_name_is_blank() {
     let signed_in = with_claims(&provider, &pending, &claims)
         .await
         .expect("valid");
-    assert_eq!(Some(String::from("operator.one")), signed_in.operator);
+    assert_eq!(Some("operator.one"), signed_in.claims.display_name());
 }
 
 #[tokio::test]
 async fn a_confidential_client_authenticates_with_basic_and_names_no_client_id_in_the_form() {
     let provider = Provider::start().await;
     let pending = pending();
-    let oidc = Oidc {
-        client_secret: Some(ferrohealth_secret::secret::Secret::new("s3cr:t&+")),
+    let oidc = OidcSection {
+        client_secret: Some(Secret::new("s3cr:t&+")),
         ..provider.oidc()
     };
     let id_token = provider.id_token(&provider.claims(pending.nonce()));
     provider.answer_tokens(200, &token_answer(&id_token)).await;
-    exchange(&reqwest::Client::new(), &settings(oidc), &pending, "c1")
+    exchange(oidc, &pending)
         .await
         .expect("the exchange succeeds");
     let requests = provider.requests_at(TOKEN_PATH).await;
@@ -195,7 +195,7 @@ async fn a_confidential_client_authenticates_with_basic_and_names_no_client_id_i
     assert_eq!("authorization_code", fields["grant_type"]);
     assert_eq!("c1", fields["code"]);
     assert_eq!(REDIRECT_URI, fields["redirect_uri"]);
-    assert_eq!(pending.verifier().expose_secret(), fields["code_verifier"]);
+    assert_eq!(pending.verifier().expose(), fields["code_verifier"]);
 }
 
 #[tokio::test]
@@ -225,15 +225,11 @@ async fn a_refusal_keeps_its_status_and_rfc_6749_error_code() {
     )
     .await
     .expect_err("refused");
-    let ExchangeError::Refused {
-        status,
-        error: code,
-    } = &error
-    else {
+    let OidcError::Refused { status, .. } = &error else {
         panic!("{error:?}");
     };
     assert_eq!(StatusCode::BAD_REQUEST, *status);
-    assert_eq!(Some("invalid_grant"), code.as_deref());
+    assert_eq!(Some("invalid_grant"), error.oauth_error());
     assert!(error.is_answered_refusal());
     assert!(!error.refuses_the_operator());
 }
@@ -246,18 +242,13 @@ async fn a_refusal_whose_body_names_no_error_code_is_still_a_refusal() {
         .respond_with(ResponseTemplate::new(401).set_body_string("<html>denied</html>"))
         .mount(&provider.server)
         .await;
-    let error = exchange(
-        &reqwest::Client::new(),
-        &settings(provider.oidc()),
-        &pending(),
-        "c1",
-    )
-    .await
-    .expect_err("refused");
+    let error = exchange(provider.oidc(), &pending())
+        .await
+        .expect_err("refused");
     assert!(
         matches!(
             error,
-            ExchangeError::Refused {
+            OidcError::Refused {
                 status: StatusCode::UNAUTHORIZED,
                 error: None
             }
@@ -272,7 +263,7 @@ async fn a_server_error_is_a_refusal_the_operator_can_retry() {
     let error = exchanged(&provider, &pending(), 503, &json!({}))
         .await
         .expect_err("refused");
-    assert!(matches!(error, ExchangeError::Refused { .. }), "{error:?}");
+    assert!(matches!(error, OidcError::Refused { .. }), "{error:?}");
     assert!(!error.is_answered_refusal());
 }
 
@@ -282,7 +273,7 @@ async fn an_answer_that_is_no_token_response_is_refused() {
     let error = exchanged(&provider, &pending(), 200, &json!({"token": "x"}))
         .await
         .expect_err("refused");
-    assert!(matches!(error, ExchangeError::Body { .. }), "{error:?}");
+    assert!(matches!(error, OidcError::Malformed { .. }), "{error:?}");
     assert!(error.is_answered_refusal());
 }
 
@@ -297,7 +288,7 @@ async fn an_access_token_that_is_not_a_bearer_token_is_refused() {
     )
     .await
     .expect_err("refused");
-    assert!(matches!(error, ExchangeError::TokenType), "{error:?}");
+    assert!(matches!(error, OidcError::TokenType { .. }), "{error:?}");
 }
 
 #[tokio::test]
@@ -311,7 +302,7 @@ async fn an_answer_without_an_id_token_is_refused() {
     )
     .await
     .expect_err("refused");
-    assert!(matches!(error, ExchangeError::NoIdToken), "{error:?}");
+    assert!(matches!(error, OidcError::NoIdToken), "{error:?}");
     assert!(error.is_answered_refusal());
     assert!(!error.refuses_the_operator());
 }
@@ -319,17 +310,12 @@ async fn an_answer_without_an_id_token_is_refused() {
 #[tokio::test]
 async fn an_unreachable_token_endpoint_is_a_transport_failure() {
     let provider = Provider::start().await;
-    let oidc = Oidc {
-        token_endpoint: String::from("http://127.0.0.1:9/token"),
+    let oidc = OidcSection {
+        token_endpoint: Some(String::from("http://127.0.0.1:9/token")),
         ..provider.oidc()
     };
-    let error = exchange(&reqwest::Client::new(), &settings(oidc), &pending(), "c1")
-        .await
-        .expect_err("unreachable");
-    assert!(
-        matches!(error, ExchangeError::Transport { .. }),
-        "{error:?}"
-    );
+    let error = exchange(oidc, &pending()).await.expect_err("unreachable");
+    assert!(matches!(error, OidcError::Discovery(_)), "{error:?}");
     assert!(!error.is_answered_refusal());
 }
 
@@ -348,7 +334,7 @@ async fn a_key_set_that_answers_other_than_200_is_refused() {
     assert!(
         matches!(
             error,
-            ExchangeError::KeySetRefused {
+            OidcError::KeySet {
                 status: StatusCode::NOT_FOUND
             }
         ),
@@ -369,29 +355,21 @@ async fn a_key_set_that_does_not_read_is_refused() {
     let error = with_claims(&provider, &pending, &provider.claims(pending.nonce()))
         .await
         .expect_err("refused");
-    assert!(
-        matches!(error, ExchangeError::KeySetBody { .. }),
-        "{error:?}"
-    );
+    assert!(matches!(error, OidcError::KeySetBody { .. }), "{error:?}");
 }
 
 #[tokio::test]
 async fn an_unreachable_key_set_is_a_transport_failure() {
     let provider = Provider::bare().await;
     let pending = pending();
-    let oidc = Oidc {
-        jwks_uri: String::from("http://127.0.0.1:9/jwks.json"),
+    let oidc = OidcSection {
+        jwks_uri: Some(String::from("http://127.0.0.1:9/jwks.json")),
         ..provider.oidc()
     };
     let id_token = provider.id_token(&provider.claims(pending.nonce()));
     provider.answer_tokens(200, &token_answer(&id_token)).await;
-    let error = exchange(&reqwest::Client::new(), &settings(oidc), &pending, "c1")
-        .await
-        .expect_err("unreachable");
-    assert!(
-        matches!(error, ExchangeError::KeySetTransport { .. }),
-        "{error:?}"
-    );
+    let error = exchange(oidc, &pending).await.expect_err("unreachable");
+    assert!(matches!(error, OidcError::Discovery(_)), "{error:?}");
 }
 
 #[tokio::test]
@@ -408,7 +386,7 @@ async fn an_id_token_signed_by_another_key_under_the_published_kid_does_not_veri
     )
     .await
     .expect_err("refused");
-    assert!(matches!(error, ExchangeError::IdToken { .. }), "{error:?}");
+    assert!(matches!(error, OidcError::IdToken { .. }), "{error:?}");
     assert!(error.refuses_the_operator());
 }
 
@@ -425,7 +403,7 @@ async fn an_id_token_naming_a_kid_the_key_set_does_not_hold_is_refused() {
     )
     .await
     .expect_err("refused");
-    assert!(matches!(error, ExchangeError::Key), "{error:?}");
+    assert!(matches!(error, OidcError::Key), "{error:?}");
     assert!(error.refuses_the_operator());
 }
 
@@ -461,7 +439,7 @@ async fn an_id_token_without_a_kid_is_refused_when_the_key_set_holds_several() {
     )
     .await
     .expect_err("refused");
-    assert!(matches!(error, ExchangeError::Key), "{error:?}");
+    assert!(matches!(error, OidcError::Key), "{error:?}");
 }
 
 #[tokio::test]
@@ -479,7 +457,7 @@ async fn an_id_token_signed_with_a_shared_secret_is_refused() {
     )
     .await
     .expect_err("refused");
-    assert!(matches!(error, ExchangeError::Key), "{error:?}");
+    assert!(matches!(error, OidcError::Key), "{error:?}");
 }
 
 #[tokio::test]
@@ -488,13 +466,13 @@ async fn an_id_token_that_is_no_jwt_is_refused() {
     let error = exchanged(&provider, &pending(), 200, &token_answer("not-a-jwt"))
         .await
         .expect_err("refused");
-    assert!(matches!(error, ExchangeError::Key), "{error:?}");
+    assert!(matches!(error, OidcError::Key), "{error:?}");
     assert!(error.refuses_the_operator());
 }
 
 /// The error of an exchange whose ID Token carries `claims` changed by
 /// `change`.
-async fn refused_for(change: impl FnOnce(&mut Value)) -> ExchangeError {
+async fn refused_for(change: impl FnOnce(&mut Value)) -> OidcError {
     let provider = Provider::start().await;
     let pending = pending();
     let claims = claims_with(&provider, &pending, change);
@@ -506,19 +484,19 @@ async fn refused_for(change: impl FnOnce(&mut Value)) -> ExchangeError {
 #[tokio::test]
 async fn an_id_token_from_another_issuer_does_not_verify() {
     let error = refused_for(|claims| claims["iss"] = json!("https://another.example")).await;
-    assert!(matches!(error, ExchangeError::IdToken { .. }), "{error:?}");
+    assert!(matches!(error, OidcError::IdToken { .. }), "{error:?}");
 }
 
 #[tokio::test]
 async fn an_id_token_for_another_audience_does_not_verify() {
     let error = refused_for(|claims| claims["aud"] = json!("another-client")).await;
-    assert!(matches!(error, ExchangeError::IdToken { .. }), "{error:?}");
+    assert!(matches!(error, OidcError::IdToken { .. }), "{error:?}");
 }
 
 #[tokio::test]
 async fn an_id_token_naming_an_audience_beyond_this_console_is_refused() {
     let error = refused_for(|claims| claims["aud"] = json!([CLIENT_ID, "another-client"])).await;
-    assert!(matches!(error, ExchangeError::Audience), "{error:?}");
+    assert!(matches!(error, OidcError::Audience), "{error:?}");
     assert!(error.refuses_the_operator());
 }
 
@@ -535,7 +513,7 @@ async fn an_id_token_whose_audience_is_this_console_alone_in_an_array_verifies()
 #[tokio::test]
 async fn an_id_token_issued_to_another_client_is_refused() {
     let error = refused_for(|claims| claims["azp"] = json!("another-client")).await;
-    assert!(matches!(error, ExchangeError::AuthorizedParty), "{error:?}");
+    assert!(matches!(error, OidcError::AuthorizedParty), "{error:?}");
     assert!(error.refuses_the_operator());
 }
 
@@ -556,7 +534,7 @@ async fn an_expired_id_token_does_not_verify() {
         claims["exp"] = json!(now - 3600);
     })
     .await;
-    assert!(matches!(error, ExchangeError::IdToken { .. }), "{error:?}");
+    assert!(matches!(error, OidcError::IdToken { .. }), "{error:?}");
 }
 
 #[tokio::test]
@@ -575,7 +553,7 @@ async fn an_id_token_without_a_subject_does_not_verify() {
         claims.as_object_mut().expect("an object").remove("sub");
     })
     .await;
-    assert!(matches!(error, ExchangeError::IdToken { .. }), "{error:?}");
+    assert!(matches!(error, OidcError::IdToken { .. }), "{error:?}");
 }
 
 #[tokio::test]
@@ -584,7 +562,7 @@ async fn an_id_token_without_a_nonce_is_refused() {
         claims.as_object_mut().expect("an object").remove("nonce");
     })
     .await;
-    assert!(matches!(error, ExchangeError::Nonce), "{error:?}");
+    assert!(matches!(error, OidcError::Nonce), "{error:?}");
     assert!(error.refuses_the_operator());
 }
 
@@ -592,7 +570,7 @@ async fn an_id_token_without_a_nonce_is_refused() {
 async fn an_id_token_with_another_sign_ins_nonce_is_refused() {
     let other = pending();
     let error = refused_for(|claims| claims["nonce"] = json!(other.nonce())).await;
-    assert!(matches!(error, ExchangeError::Nonce), "{error:?}");
+    assert!(matches!(error, OidcError::Nonce), "{error:?}");
 }
 
 #[tokio::test]
@@ -611,20 +589,15 @@ async fn a_refresh_sends_the_refresh_grant_and_reads_the_rotated_tokens() {
             }),
         )
         .await;
-    let refreshed = refresh(
-        &reqwest::Client::new(),
-        &settings(provider.oidc()),
-        &SecretString::from("synthetic-refresh-1"),
-    )
-    .await
-    .expect("the refresh succeeds");
-    assert_eq!("synthetic-access-2", refreshed.access_token.expose_secret());
+    let refreshed = party(provider.oidc())
+        .await
+        .refresh(&Secret::new("synthetic-refresh-1"))
+        .await
+        .expect("the refresh succeeds");
+    assert_eq!("synthetic-access-2", refreshed.access_token.expose());
     assert_eq!(
         Some("synthetic-refresh-2"),
-        refreshed
-            .refresh_token
-            .as_ref()
-            .map(ExposeSecret::expose_secret)
+        refreshed.refresh_token.as_ref().map(Secret::expose)
     );
     assert_eq!(
         Some(std::time::Duration::from_secs(600)),
@@ -653,13 +626,11 @@ async fn a_refresh_answer_that_names_no_scope_leaves_the_scopes_unchanged() {
     provider
         .answer_tokens(200, &json!({"access_token": "a2", "token_type": "Bearer"}))
         .await;
-    let refreshed = refresh(
-        &reqwest::Client::new(),
-        &settings(provider.oidc()),
-        &SecretString::from("r1"),
-    )
-    .await
-    .expect("the refresh succeeds");
+    let refreshed = party(provider.oidc())
+        .await
+        .refresh(&Secret::new("r1"))
+        .await
+        .expect("the refresh succeeds");
     assert_eq!(None, refreshed.scopes);
     assert!(refreshed.refresh_token.is_none());
     assert_eq!(None, refreshed.expires_in);
@@ -671,12 +642,71 @@ async fn a_refused_refresh_is_an_answered_refusal() {
     provider
         .answer_tokens(400, &json!({"error": "invalid_grant"}))
         .await;
-    let error = refresh(
-        &reqwest::Client::new(),
-        &settings(provider.oidc()),
-        &SecretString::from("r1"),
-    )
-    .await
-    .expect_err("refused");
+    let error = party(provider.oidc())
+        .await
+        .refresh(&Secret::new("r1"))
+        .await
+        .expect_err("refused");
     assert!(error.is_answered_refusal(), "{error:?}");
+}
+
+/// The `Authorization` header of the one token request `provider` received
+/// for a sign-in of a console whose `[oidc]` is `oidc`.
+async fn client_authorization(provider: &Provider, oidc: OidcSection) -> Option<String> {
+    let pending = pending();
+    let id_token = provider.id_token(&provider.claims(pending.nonce()));
+    provider.answer_tokens(200, &token_answer(&id_token)).await;
+    exchange(oidc, &pending)
+        .await
+        .expect("the exchange succeeds");
+    let requests = provider.requests_at(TOKEN_PATH).await;
+    let [request] = requests.as_slice() else {
+        panic!("one token request");
+    };
+    request
+        .headers
+        .get(AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned)
+}
+
+#[tokio::test]
+async fn an_inline_secret_is_taken_as_it_stands() {
+    let provider = Provider::start().await;
+    let oidc = OidcSection {
+        client_secret: Some(Secret::new("inline-secret")),
+        ..provider.oidc()
+    };
+    assert_eq!(
+        Some(format!(
+            "Basic {}",
+            STANDARD.encode(format!("{CLIENT_ID}:inline-secret"))
+        )),
+        client_authorization(&provider, oidc).await
+    );
+}
+
+#[tokio::test]
+async fn a_secret_file_is_read_without_its_trailing_line_ending() {
+    let provider = Provider::start().await;
+    let dir = tempfile::tempdir().expect("a directory");
+    let path = dir.path().join("client_secret");
+    std::fs::write(&path, "file-secret\n").expect("the file is written");
+    let oidc = OidcSection {
+        client_secret_file: Some(path),
+        ..provider.oidc()
+    };
+    assert_eq!(
+        Some(format!(
+            "Basic {}",
+            STANDARD.encode(format!("{CLIENT_ID}:file-secret"))
+        )),
+        client_authorization(&provider, oidc).await
+    );
+}
+
+#[tokio::test]
+async fn no_secret_at_all_is_a_public_client() {
+    let provider = Provider::start().await;
+    assert_eq!(None, client_authorization(&provider, provider.oidc()).await);
 }

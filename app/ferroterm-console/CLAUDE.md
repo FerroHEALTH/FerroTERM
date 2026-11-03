@@ -38,7 +38,7 @@ Three properties decide most questions in this crate:
 |---|---|
 | `src/lib.rs`, `src/main.rs` | the library and the binary |
 | `src/server.rs`, `src/upstream.rs` | the HTTP service and its security headers; the client of the FHIR server |
-| `src/config/`, `src/session/`, `src/oidc/`, `src/cli.rs`, `src/command.rs` | the configuration, the sign-in and the binary |
+| `src/config/`, `src/auth/`, `src/cli.rs`, `src/command.rs` | the configuration, who is signed in and the sign-in's pages, and the binary |
 | `src/app.rs`, `src/shell.rs`, `src/screen.rs`, `src/pages/` | the document and the answer, the chrome around a page, the routes and the page each draws, and the screens |
 | `src/visit.rs`, `src/request.rs`, `src/prefs.rs`, `src/post.rs`, `src/posted.rs` | what the server read of the request, what a page reads of it, the preferences, the console's form routes, a posted form |
 | `src/markup.rs` | the shorthands a screen writes its own escaped markup with |

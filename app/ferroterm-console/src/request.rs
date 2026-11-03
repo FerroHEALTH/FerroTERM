@@ -251,32 +251,34 @@ pub(crate) fn params_in(query: &str, name: &str) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use secrecy::SecretString;
+    use ferrohealth_session::config::OidcSection;
 
     use super::{Request, param_in, params_in};
+    use crate::auth::Operator;
     use crate::auth::scopes::Letter;
-    use crate::config::{Config, Oidc};
+    use crate::config::Config;
     use crate::fhir::version::FhirVersion;
     use crate::server::ConsoleState;
-    use crate::session::SignedIn;
 
     /// The console's state, reached at `https://tx.example.org/`, with a
     /// sign-in configured when `sign_in`.
-    fn state(sign_in: bool) -> ConsoleState {
+    async fn state(sign_in: bool) -> ConsoleState {
         let mut config = Config::default();
         config.ferroterm.public_url = Some(String::from("https://tx.example.org/"));
         if sign_in {
-            config.oidc = Some(Oidc {
+            config.oidc = Some(OidcSection {
                 issuer: String::from("https://idp.example"),
-                authorization_endpoint: String::from("https://idp.example/authorize"),
-                token_endpoint: String::from("https://idp.example/token"),
-                jwks_uri: String::from("https://idp.example/jwks"),
+                authorization_endpoint: Some(String::from("https://idp.example/authorize")),
+                token_endpoint: Some(String::from("https://idp.example/token")),
+                jwks_uri: Some(String::from("https://idp.example/jwks")),
                 client_id: String::from("ferroterm-console"),
                 redirect_uri: String::from("http://127.0.0.1:3000/auth/callback"),
-                ..Oidc::default()
+                ..OidcSection::default()
             });
         }
-        ConsoleState::new(config.resolve().expect("the settings resolve")).expect("the clients")
+        ConsoleState::new(config.resolve().expect("the settings resolve"))
+            .await
+            .expect("the clients")
     }
 
     /// The request the server reads for `uri` carrying `cookies`, under
@@ -290,9 +292,9 @@ mod tests {
         Request::read(state, &parts)
     }
 
-    #[test]
-    fn the_page_is_read_from_the_address_and_returns_to_itself() {
-        let state = state(false);
+    #[tokio::test]
+    async fn the_page_is_read_from_the_address_and_returns_to_itself() {
+        let state = state(false).await;
         let page = read(&state, "/systems?q=%20colours%20&q=other", &[]);
         assert_eq!("/systems", page.path);
         assert_eq!("q=%20colours%20&q=other", page.query);
@@ -303,9 +305,9 @@ mod tests {
         assert_eq!("/about", read(&state, "/about", &[]).back());
     }
 
-    #[test]
-    fn the_address_names_the_fhir_version_before_any_preference() {
-        let state = state(false);
+    #[tokio::test]
+    async fn the_address_names_the_fhir_version_before_any_preference() {
+        let state = state(false).await;
         let page = read(
             &state,
             "/systems?fhir=r5",
@@ -315,9 +317,9 @@ mod tests {
         assert!(page.version_named);
     }
 
-    #[test]
-    fn the_session_s_version_wins_over_the_reader_s_default() {
-        let state = state(false);
+    #[tokio::test]
+    async fn the_session_s_version_wins_over_the_reader_s_default() {
+        let state = state(false).await;
         let page = read(
             &state,
             "/systems",
@@ -332,9 +334,9 @@ mod tests {
         assert_eq!(FhirVersion::R6, default_only.version);
     }
 
-    #[test]
-    fn a_preference_cookie_without_the_host_prefix_is_not_read_from_a_secure_console() {
-        let state = state(false);
+    #[tokio::test]
+    async fn a_preference_cookie_without_the_host_prefix_is_not_read_from_a_secure_console() {
+        let state = state(false).await;
         let page = read(&state, "/systems", &["ferroterm_console_fhir=r6"]);
         assert_eq!(
             read(&state, "/systems", &[]).version,
@@ -343,9 +345,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn the_root_and_the_client_are_the_address_readers_reach_the_server_at() {
-        let state = state(false);
+    #[tokio::test]
+    async fn the_root_and_the_client_are_the_address_readers_reach_the_server_at() {
+        let state = state(false).await;
         let page = read(&state, "/", &[]);
         assert_eq!("https://tx.example.org", page.root);
         assert_eq!(
@@ -354,28 +356,25 @@ mod tests {
         );
     }
 
-    #[test]
-    fn the_page_offers_a_sign_in_only_when_a_provider_is_configured() {
-        assert!(read(&state(true), "/", &[]).sign_in);
-        assert!(!read(&state(false), "/", &[]).sign_in);
+    #[tokio::test]
+    async fn the_page_offers_a_sign_in_only_when_a_provider_is_configured() {
+        assert!(read(&state(true).await, "/", &[]).sign_in);
+        assert!(!read(&state(false).await, "/", &[]).sign_in);
     }
 
-    #[test]
-    fn a_signed_in_reader_is_named_and_may_do_what_the_token_grants() {
-        let state = state(true);
-        let id = state
-            .sessions()
-            .establish(SignedIn {
-                access_token: SecretString::from("synthetic-access-token"),
-                expires_in: None,
-                refresh_token: None,
-                id_token: None,
-                operator: Some(String::from("Synthetic Operator")),
-                scopes: vec![String::from("user/CodeSystem.cu")],
-            })
-            .expect("room");
-        let cookie = format!("__Host-ferroterm_console_session={}", id.as_str());
-        let page = read(&state, "/", &[&cookie]);
+    #[tokio::test]
+    async fn a_signed_in_reader_is_named_and_may_do_what_the_token_grants() {
+        let state = state(true).await;
+        let (parts, ()) = http::Request::get("/")
+            .body(())
+            .expect("a request")
+            .into_parts();
+        let mut visit = crate::visit::Visit::read(&state, &parts);
+        visit.operator = Some(Operator {
+            name: Some(String::from("Synthetic Operator")),
+            scopes: vec![String::from("user/CodeSystem.cu")],
+        });
+        let page = Request::of(&visit, String::from("/"), String::new());
         assert_eq!(Some(String::from("Synthetic Operator")), page.session.who());
         assert!(page.can("CodeSystem", Letter::Update));
         assert!(!page.can("ValueSet", Letter::Update));
@@ -398,9 +397,9 @@ mod tests {
         assert!(!page.session.signed_in());
     }
 
-    #[test]
-    fn every_clone_of_a_request_says_into_one_answer() {
-        let state = state(false);
+    #[tokio::test]
+    async fn every_clone_of_a_request_says_into_one_answer() {
+        let state = state(false).await;
         let page = read(&state, "/expand?fhir=r4", &[]);
         assert_eq!("/expand", page.path);
         let drawn = page.clone();

@@ -14,7 +14,9 @@ use std::collections::BTreeMap;
 use aws_lc_rs::rand::SystemRandom;
 use aws_lc_rs::signature::{ECDSA_P256_SHA256_FIXED_SIGNING, EcdsaKeyPair};
 use axum::body::Body;
-use ferroterm_console::config::{Config, Oidc};
+use ferrohealth_session::config::OidcSection;
+use ferrohealth_session::record::Held;
+use ferroterm_console::config::Config;
 use ferroterm_console::server::{ConsoleState, router};
 use http::header::{COOKIE, LOCATION, SET_COOKIE};
 use http::{HeaderMap, Request, Response};
@@ -130,16 +132,16 @@ impl Provider {
 
     /// The `[oidc]` section of a console signed in at this provider, a public
     /// client with the end-session and revocation endpoints left out.
-    pub(crate) fn oidc(&self) -> Oidc {
-        Oidc {
+    pub(crate) fn oidc(&self) -> OidcSection {
+        OidcSection {
             issuer: self.issuer(),
-            authorization_endpoint: self.url("/authorize"),
-            token_endpoint: self.url(TOKEN_PATH),
-            jwks_uri: self.url(JWKS_PATH),
+            authorization_endpoint: Some(self.url("/authorize")),
+            token_endpoint: Some(self.url(TOKEN_PATH)),
+            jwks_uri: Some(self.url(JWKS_PATH)),
             client_id: String::from(CLIENT_ID),
             redirect_uri: String::from(REDIRECT_URI),
             scopes: vec![String::from("openid"), String::from("user/*.cruds")],
-            ..Oidc::default()
+            ..OidcSection::default()
         }
     }
 
@@ -204,11 +206,40 @@ pub(crate) fn token_answer(id_token: &str) -> Value {
 
 /// The console's state for `oidc`, or for no sign-in at all, with the
 /// session settings `session` writes as TOML.
-pub(crate) fn console(oidc: Option<Oidc>, session: &str) -> ConsoleState {
+pub(crate) async fn console(oidc: Option<OidcSection>, session: &str) -> ConsoleState {
     let mut config = Config::from_sources(Some(session), &BTreeMap::new()).expect("a config");
     config.oidc = oidc;
     let settings = config.resolve().expect("the settings resolve");
-    ConsoleState::new(settings).expect("the clients build")
+    ConsoleState::new(settings)
+        .await
+        .expect("the clients build")
+}
+
+/// What the request carrying the cookie `pair` holds, its activity counted.
+pub(crate) fn held(state: &ConsoleState, pair: &str) -> Held {
+    let mut headers = HeaderMap::new();
+    headers.insert(COOKIE, pair.parse().expect("a cookie header"));
+    state.sessions().held(&headers).expect("usable").value
+}
+
+/// How many sessions the console's memory store holds.
+pub(crate) fn sessions_held(state: &ConsoleState) -> usize {
+    state
+        .sessions()
+        .occupancy()
+        .expect("usable")
+        .expect("a memory store")
+        .sessions
+}
+
+/// How many pending sign-ins the console's memory store holds.
+pub(crate) fn sign_ins_held(state: &ConsoleState) -> usize {
+    state
+        .sessions()
+        .occupancy()
+        .expect("usable")
+        .expect("a memory store")
+        .sign_ins
 }
 
 /// Sends `request` through the console's whole router over `state`.

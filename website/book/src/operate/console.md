@@ -60,6 +60,7 @@ admin_url = "http://ferroterm:8081/"
 timeout_ms = 30000
 
 [session]
+store = "memory"
 secure_cookie = true
 idle_timeout_s = 1800
 absolute_timeout_s = 28800
@@ -67,17 +68,24 @@ max_sessions = 1000
 
 [oidc]
 issuer = "https://idp.example.org/realms/ferroterm"
-authorization_endpoint = "https://idp.example.org/realms/ferroterm/protocol/openid-connect/auth"
-token_endpoint = "https://idp.example.org/realms/ferroterm/protocol/openid-connect/token"
-jwks_uri = "https://idp.example.org/realms/ferroterm/protocol/openid-connect/certs"
 client_id = "ferroterm-console"
 client_secret_file = "/run/secrets/console-client-secret"
 redirect_uri = "https://console.example.org/auth/callback"
 scopes = ["openid", "fhirUser", "user/CodeSystem.cud", "user/ValueSet.cud", "user/ConceptMap.cud", "__ferroterm.sync", "__ferroterm.admin"]
-end_session_endpoint = "https://idp.example.org/realms/ferroterm/protocol/openid-connect/logout"
-revocation_endpoint = "https://idp.example.org/realms/ferroterm/protocol/openid-connect/revoke"
 post_logout_redirect_uri = "https://console.example.org/"
 ```
+
+The `[oidc]` and `[session]` sections are the ones every FerroHEALTH
+console reads (`ferrohealth-session`). The console reads the provider's
+endpoints from its metadata (`<issuer>/.well-known/openid-configuration`)
+when it starts; set `authorization_endpoint`, `token_endpoint`, `jwks_uri`,
+`end_session_endpoint` or `revocation_endpoint` to use another address, and
+`ca_file` to trust a private certificate authority. `config check` reads no
+provider, so it works offline. `[session] store = "memory"` keeps the
+sessions in the console's process; `"sealed"` keeps each in one encrypted
+cookie, for a console that runs as several instances, and needs `key` or
+`key_file` (base64 of at least 64 bytes, the same on every instance) and
+`offline_access` off.
 
 ## Signing in
 
@@ -98,6 +106,13 @@ the console presents. A provider that types its access tokens `JWT` rather
 than `at+jwt` (RFC 9068) needs `FERROTERM__AUTH__TOKEN_PROFILE=jwt`. A role that
 gets none of the three `user/` scopes reads the server and changes nothing;
 the menu under your name says what you may edit.
+
+The console signs you in at `/login`, the provider sends you back to
+`/auth/callback`, **Sign out** posts to `/logout`, and the page asks
+`/session` what your session has left. Releases up to 0.3.2 served these at
+`/auth/login`, `/auth/sign-out` and `/auth/session`; change any link or
+bookmark that names them. The redirect address registered at the provider
+stays `/auth/callback`.
 
 **Sign out** ends the session, revokes its token where the provider publishes
 a revocation endpoint (RFC 7009), and takes you to the provider's end-session
