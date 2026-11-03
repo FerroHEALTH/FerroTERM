@@ -25,9 +25,9 @@ count is two above the suite's own. The `snomed`, `icd-11`, `tx.fhir.org`,
 
 | mode | surface | pass list | passed of ran | needs | open failures |
 |---|---|---|---|---|---|
-| `general` | `/r4b` | `passing.txt` | 639 of 764 | nothing | #995, #998 |
-| `general` | `/r4` | `passing-r4.txt` | 651 of 764 | nothing | #995, #998 |
-| `general` | `/r5` | `passing-r5.txt` | 652 of 764 | nothing | #995, #998 |
+| `general` | `/r4b` | `passing.txt` | 639 of 764 | nothing | #995, #507, #1061 to #1070 |
+| `general` | `/r4` | `passing-r4.txt` | 651 of 764 | nothing | #995, #507, #1061 to #1070 |
+| `general` | `/r5` | `passing-r5.txt` | 652 of 764 | nothing | #995, #507, #1061 to #1070 |
 | `snomed` | `/r4b` | `passing-snomed.txt` | 2 of 170 | a SNOMED CT edition | #344, #352, #349 |
 | `icd-11` | `/r4b` | `passing-icd-11.txt` | 44 of 52 | the three ICD-11 artifacts | #350, #349, #117 |
 | `tx.fhir.org` | `/r4b` | `passing-tx.fhir.org.txt` | 57 of 227 | a LOINC release | #420, #421, #305, #349 |
@@ -289,12 +289,13 @@ collection of languages", so `zh` does not subsume `zh-min-nan`.
   either. The server keeps one entry per include, in include order, and the
   eight stay unpassed. #507 holds the upstream report: define `versionsMatch`,
   its default, and the member order in the IG, or drop the cases.
-- **Four `exclude` cases compare against an unsubstituted placeholder on
-  `/r4b`.** `exclude/exclude-gender`, `exclude-gender2`, `exclude-combo`, and
-  `include-combo` name `http://hl7.org/fhir/administrative-gender` and
+- **Seven cases compare against an unsubstituted placeholder on `/r4b`.**
+  `exclude/exclude-gender`, `exclude-gender2`, `exclude-combo`,
+  `include-combo`, `exclude-contained`, `exclude-valueset` and
+  `simple-cases/simple-expand-contained-nested` name `http://hl7.org/fhir/administrative-gender` and
   `http://hl7.org/fhir/ValueSet/administrative-gender`
   (<https://hl7.org/fhir/R4B/terminologies-systems.html>). #435 shipped those
-  systems, so all four pass on `/r4` and `/r5`. On `/r4b` each compares
+  systems, so all seven pass on `/r4` and `/r5`. On `/r4b` each compares
   `expansion.parameter[i].valueUri` against the literal `$version$`: the
   runner substitutes that placeholder on the two surfaces whose FHIR version
   it knows and leaves it as written on `/r4b`, where the server correctly
@@ -314,3 +315,49 @@ collection of languages", so `zh` does not subsume `zh-min-nan`.
   it and answer `invalid` with the `vs-invalid` classification, the
   `IssueType` reading of "content invalid against the specification"
   (`structure` stays for a body the server cannot parse at all).
+
+## The cases test cases 1.10.0 added, triaged
+
+The 1.10.0 suite fails 125 `general` cases on `/r4b`, 113 on `/r4` and 112
+on `/r5` (CI run 41696759891). Besides the families above, each cluster has
+its own issue, a server fix or the specification text that decides it:
+
+- **`extension-codes` (23) and `global-lang-pack` (10)** rest on
+  `codesystem-supplement-type`, `codesystem-supplement-global` and a
+  `default-display` sub-extension of `codesystem-reservedCodeSpace`, which the
+  FHIR Extensions Pack 5.4.0 does not define (#1067).
+- **`closure` (11).** The run now gives the server a resource database of its
+  own, which `$closure` needs for its tables. `closure-init` still fails, on
+  the `tx-resource` it carries (#1070) and on `reset`, which no `$closure`
+  `OperationDefinition` declares, as `dispose` is not either (#1068); the
+  nine `closure-add-*` and `closure-resync-*` cases need the table it creates.
+- **`validation` (17) and `batch/batch-validate-bad`**: incomplete codings and
+  codeable concepts, a request error here and a validation outcome in the
+  cases (#1063).
+- **`batch/cs-batch-validate`, `-bad` and `-codings`**: `CodeSystem/$batch-validate-code`
+  reads its `url` as a value set (#1061).
+- **`simple-lookup-unknown-property` and `-only-unknown-property`**: a
+  property the code system does not define is refused (#1062).
+- **Seven `$expand` cases** want the requested properties and the extensions
+  a supplement carries (#1064).
+- **`extensions/validate-supplement-nolang-*` and
+  `validate-supplements-grandchild-wrong-display`** send `useSupplement` on
+  `CodeSystem/$validate-code`, which no version declares (#1068).
+- **`simple-lookup-zxx`, `lookup-supplements-hierarchy-child`, `-grandchild`
+  and `parameters-lookup-supplement-good`** want `warning` and
+  `used-supplement` outputs no `$lookup` declares (#1069).
+- **`case-insensitive-code1-2`, `-code1-3` and
+  `version-simple-codeableconcept-bad-version2`**: the message leaves out the
+  version it is about (#1065).
+- **`vs-deprecation`, `deprecating-validate-2`, `vs-expand-v-mixed-force`,
+  `validation-simple-codeableconcept-unknown-system` and, on `/r4b`,
+  `validation-contained-nested`** each differ on one point (#1066).
+- **`simple-subsumes-no-system`, `-no-system-coding` and
+  `validation-missing-cs-code-no-url`** want `issue.code` `invalid` where the
+  server answers `required` for a missing input. The IG accepts more than one
+  `issue.type` (the `issue.code` family above), and `required`, "A required
+  element is missing", is a child of `invalid` in the code system
+  (<https://hl7.org/fhir/R4B/codesystem-issue-type.html>) and the closer
+  reading of a missing input; they stay unpassed, with #1063 holding the rest
+  of those cases.
+- **`translate-2b`, `translate-5` and `translate-5b`** are #995.
