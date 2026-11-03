@@ -189,7 +189,7 @@ macro_rules! surface {
                 )
                 .route(
                     "/CodeSystem/$batch-validate-code",
-                    post(operations::batch_validate_code_post),
+                    post(operations::code_system_batch_validate_code_post),
                 )
                 .route(
                     "/ConceptMap/$translate",

@@ -44,6 +44,7 @@ use crate::fhir::{CODE_SYSTEM, FhirClient};
 use crate::locale::{Msg, tr, tr_with};
 use crate::markup::code;
 use crate::pages::lookup::CODE_PARAM;
+use crate::pages::operations::published;
 use crate::pages::operations::{choices, hidden_field, select};
 use crate::pages::parts::{failure, heading};
 use crate::request::Request;
@@ -172,12 +173,10 @@ fn percent(value: &str) -> String {
 pub(crate) async fn page(request: Request) -> Html {
     let locale = &request.locale;
     let state = State::read(&request);
-    let named = request
-        .client
-        .published_names(request.version, CODE_SYSTEM)
-        .await
-        .ok();
-    let systems = choices(named.as_ref());
+    let systems = match published(&request, CODE_SYSTEM).await {
+        Ok(named) => choices(named.as_ref()),
+        Err(error) => return failure(locale, &error),
+    };
     let card = request
         .client
         .terminology_capabilities(request.version)

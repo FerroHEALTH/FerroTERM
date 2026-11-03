@@ -64,10 +64,12 @@ axum documentation of the pinned release.
   console's server (`crate::upstream::Upstream`). The console depends on
   **no** workspace crate, not `fhir-terminology`;
   `scripts/checks/console-boundary.sh` walks the resolved closure and fails
-  on an edge into the engine. Every answer decodes through the
-  `fhir-types` module of the release that served it (crates.io,
-  `crate::fhir::release`), and an answer that does not decode at its
-  release draws the console's error state, never a partial page.
+  on an edge into the engine. The FHIR model is `fhir-types` from
+  crates.io: every answer decodes through the module of the release that
+  served it, and every request body and every save is written through the
+  module of the release it is sent to (`crate::fhir::release`). An answer
+  that does not decode at its release draws the console's error state,
+  never a partial page or an empty picker.
 - **No code system is a special case.** Every screen renders from
   `TerminologyCapabilities` and the operations; the test
   `pages::tests::no_screen_names_a_code_system` refuses a canonical written

@@ -6,12 +6,12 @@
 //! <https://hl7.org/fhir/R4B/valueset-operation-validate-code.html>).
 
 use http::StatusCode;
-use serde_json::json;
+use serde_json::{Value, json};
 
-use crate::fixture::{Server, base_of};
+use crate::fixture::{Server, base_of, parameters};
 use ferroterm_testkit::fhir::{ANIMALS, VS_ALL, VS_PETS};
 
-fn param<'a>(body: &'a serde_json::Value, name: &str) -> Option<&'a serde_json::Value> {
+fn param<'a>(body: &'a Value, name: &str) -> Option<&'a Value> {
     body["parameter"]
         .as_array()?
         .iter()
@@ -454,14 +454,14 @@ const VERSIONS: [&str; 4] = ["r4", "r4b", "r5", "r6"];
 /// `operationoutcome-issue-line` and `-issue-col` extensions
 /// (<https://hl7.org/fhir/extensions/StructureDefinition-operationoutcome-issue-line.html>,
 /// <https://hl7.org/fhir/extensions/StructureDefinition-operationoutcome-issue-col.html>).
-fn line_and_column(issue: &serde_json::Value) -> (Option<i64>, Option<String>) {
+fn line_and_column(issue: &Value) -> (Option<i64>, Option<String>) {
     let extension = |url: &str| {
         issue
             .get("extension")
-            .and_then(serde_json::Value::as_array)
+            .and_then(Value::as_array)
             .into_iter()
             .flatten()
-            .find(|x| x.get("url").and_then(serde_json::Value::as_str) == Some(url))
+            .find(|x| x.get("url").and_then(Value::as_str) == Some(url))
             .cloned()
     };
     (
@@ -653,6 +653,59 @@ async fn validate_code_against_an_inline_value_set_states_the_filter_and_the_col
             "{version}: `OR` is the fourth character of `<< OR`: {body}"
         );
     }
+}
+
+// `ValueSet.compose.property` names the properties "to return in the
+// expansion, if the client doesn't ask for any particular properties"
+// (<https://hl7.org/fhir/R5/valueset-definitions.html#ValueSet.compose.property>);
+// a `property` the request names overrides it.
+#[tokio::test]
+async fn expand_returns_the_properties_compose_property_names() {
+    let server = Server::start_with_resources();
+    let value_set = |property: Value| {
+        json!({"resourceType": "ValueSet", "url": "http://example.org/fhir/ValueSet/legs", "status": "active",
+            "compose": {"property": property, "include": [{"system": ANIMALS, "concept": [{"code": "dog"}]}]}})
+    };
+    let legs = |body: &Value| -> Vec<Value> {
+        body.pointer("/expansion/contains/0/property")
+            .and_then(Value::as_array)
+            .map(|properties| {
+                properties
+                    .iter()
+                    .filter(|p| p.get("code") == Some(&json!("legs")))
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    for property in [json!(["legs"]), json!(["*"])] {
+        let (status, body) = server
+            .post(
+                "/r5/ValueSet/$expand",
+                &parameters(&[("valueSet", json!({"resource": value_set(property.clone())}))]),
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(
+            legs(&body),
+            [json!({"code": "legs", "valueInteger": 4})],
+            "{property}: {body}"
+        );
+    }
+    let (status, body) = server
+        .post(
+            "/r5/ValueSet/$expand",
+            &parameters(&[
+                ("valueSet", json!({"resource": value_set(json!(["legs"]))})),
+                ("property", json!({"valueString": "status"})),
+            ]),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(
+        legs(&body).is_empty(),
+        "the request's own property wins: {body}"
+    );
 }
 
 // A compose that names two versions of one system keeps `contains.version`

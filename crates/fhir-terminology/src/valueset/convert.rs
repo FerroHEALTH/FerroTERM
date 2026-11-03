@@ -53,7 +53,17 @@ macro_rules! convert_value_set {
     (@value optional, $f:ident) => {
         $f.value.as_ref().and_then(|v| v.value.as_deref())
     };
-    ($module:ident, $value:tt) => {
+    (@property with, $source:ident) => {
+        $source
+            .property
+            .iter()
+            .filter_map(|p| p.value.clone())
+            .collect()
+    };
+    (@property without, $source:ident) => {
+        Vec::new()
+    };
+    ($module:ident, $value:tt, $property:tt) => {
         /// The conversion for this FHIR version's `ValueSet`.
         pub mod $module {
             use fhir_types::$module::value_set::{ValueSet, ValueSetComposeInclude};
@@ -126,6 +136,28 @@ macro_rules! convert_value_set {
                 })
             }
 
+            /// The `compose` of a `ValueSet` of this FHIR version as the model.
+            fn compose_of(
+                source: &fhir_types::$module::value_set::ValueSetCompose,
+            ) -> Result<Compose, ModelError> {
+                let mut compose = Compose {
+                    inactive: source.inactive.as_ref().and_then(|b| b.value),
+                    property: convert_value_set!(@property $property, source),
+                    ..Compose::default()
+                };
+                for (index, i) in source.include.iter().enumerate() {
+                    compose
+                        .include
+                        .push(include(i, &format!("ValueSet.compose.include[{index}]"))?);
+                }
+                for (index, e) in source.exclude.iter().enumerate() {
+                    compose
+                        .exclude
+                        .push(include(e, &format!("ValueSet.compose.exclude[{index}]"))?);
+                }
+                Ok(compose)
+            }
+
             /// Reduces a `ValueSet` of this FHIR version to the model.
             ///
             /// # Errors
@@ -137,20 +169,10 @@ macro_rules! convert_value_set {
                 // an inline value set may have none, a stored one must (the loader checks).
                 let url = text(resource.url.as_ref().and_then(|u| u.value.as_deref()))
                     .unwrap_or_default();
-                let mut compose = Compose::default();
-                if let Some(source) = &resource.compose {
-                    compose.inactive = source.inactive.as_ref().and_then(|b| b.value);
-                    for (index, i) in source.include.iter().enumerate() {
-                        compose
-                            .include
-                            .push(include(i, &format!("ValueSet.compose.include[{index}]"))?);
-                    }
-                    for (index, e) in source.exclude.iter().enumerate() {
-                        compose
-                            .exclude
-                            .push(include(e, &format!("ValueSet.compose.exclude[{index}]"))?);
-                    }
-                }
+                let compose = match &resource.compose {
+                    Some(source) => compose_of(source)?,
+                    None => Compose::default(),
+                };
                 let string = |value: &Option<fhir_types::$module::primitives::String>| {
                     text(value.as_ref().and_then(|v| v.value.as_deref()))
                 };
@@ -248,7 +270,9 @@ macro_rules! convert_value_set {
     };
 }
 
-convert_value_set!(r4, required);
-convert_value_set!(r4b, required);
-convert_value_set!(r5, required);
-convert_value_set!(r6, optional);
+// NOTE: `ValueSet.compose.property` is an R5 element; R4 and R4B carry none
+// (<https://hl7.org/fhir/R5/valueset-definitions.html#ValueSet.compose.property>).
+convert_value_set!(r4, required, without);
+convert_value_set!(r4b, required, without);
+convert_value_set!(r5, required, with);
+convert_value_set!(r6, optional, with);

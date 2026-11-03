@@ -260,22 +260,25 @@ pub fn lookup(
     })
 }
 
-/// Refuses a `property` the code system does not define.
+/// Refuses a requested `property` the code system defines and this server
+/// does not generate.
 ///
-/// R5 and R6 bound the parameter's values: beside the ones the operation
-/// names itself, "any property codes defined by this specification or by the
-/// `CodeSystem` are allowed"
+/// The input is "A property that the client wishes to be returned in the
+/// output. If no properties are specified, the server chooses what to
+/// return", and R5 and R6 add that the codes defined by the specification or
+/// by the `CodeSystem` "are allowed, and these are returned in the out
+/// parameter `property`"
 /// (<https://hl7.org/fhir/R5/codesystem-operation-lookup.html>). A code
-/// outside that set is a client error, and one the code system defines but
-/// this server does not generate is `not-supported`; neither is dropped
-/// silently.
+/// neither defines names nothing the server could return, so it is left out
+/// with no issue, as the ecosystem's `simple-lookup-unknown-property` case
+/// asks. A property the code system defines and this server does not
+/// generate is content it has and cannot give, so that one is `not-supported`
+/// and never dropped silently.
 ///
 /// # Errors
 ///
 /// Returns [`OperationError::NotSupported`] for a property the code system
-/// defines and this server does not generate, and
-/// [`OperationError::Invalid`] for a code neither the specification nor the
-/// code system defines.
+/// defines and this server does not generate.
 fn check_properties(
     provider: &dyn CodeSystemProvider,
     properties: &[String],
@@ -297,10 +300,6 @@ fn check_properties(
                 provider.identity().url
             )));
         }
-        return Err(OperationError::Invalid(format!(
-            "code system `{}` defines no property `{name}`",
-            provider.identity().url
-        )));
     }
     Ok(())
 }
