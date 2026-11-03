@@ -19,7 +19,7 @@ macro_rules! operations {
 
             use axum::body::Bytes;
             use axum::extract::{Path as UrlPath, Query, RawQuery, State};
-            use axum::response::{IntoResponse, Response};
+            use axum::response::Response;
             use fhir_terminology::operations::{
                 Invocation, OperationError, expand, lookup, subsumes, translate, validate_code,
                 value_set_validate_code,

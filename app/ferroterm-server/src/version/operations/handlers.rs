@@ -46,14 +46,6 @@ macro_rules! handlers {
                 run_translate(&scope, Some(&bound), &parameters)
             }
 
-            /// The response of a handled invocation, a failure rendered in `wire`.
-            fn finish(handled: Handled, wire: Wire) -> Response {
-                match handled {
-                    Ok(answer) => answer.respond(wire),
-                    Err(failure) => failure.respond(wire),
-                }
-            }
-
             /// The response to one request: the format negotiated, `handle` run on the
             /// query less `_format`, and its answer or failure rendered in that format.
             /// A format the server does not speak is refused in JSON.
@@ -62,10 +54,9 @@ macro_rules! handlers {
                 query: &[(String, String)],
                 handle: impl FnOnce(&[(String, String)]) -> Handled,
             ) -> Response {
-                match Wire::negotiate(query, headers) {
-                    Ok(wire) => finish(handle(&without_format(query)), wire),
-                    Err(failure) => failure.into_response(),
-                }
+                parameters::respond_in(query, headers, |wire| {
+                    handle(&without_format(query)).map(|answer| answer.respond(wire))
+                })
             }
 
             $crate::version::operations::handlers::handler!(get
