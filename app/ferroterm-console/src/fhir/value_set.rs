@@ -10,30 +10,25 @@
 //! Reading lives here, outside every component, so the screen renders a value
 //! plain unit tests can pin.
 
-use serde::{Deserialize, Serialize};
-
 use crate::fhir::facts::Fact;
 use crate::fhir::facts::fact;
 use crate::fhir::facts::flag;
 use crate::fhir::facts::named;
-use crate::fhir::searchset::Published;
+use crate::fhir::release::Reads;
+use crate::fhir::searchset::{Found, carries};
 use crate::locale::Msg;
 
-/// The `ValueSet` a root publishes, as the screen draws it.
+/// The `ValueSet` a root publishes, as the screen draws it, read from the
+/// `ValueSet` its release decoded.
 ///
-/// Every field is optional so a server that omits one still renders. The
-/// viewer carries the elements it draws and nothing else: it never mirrors the
-/// whole resource, and it never expands one in the browser.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+/// The screen reads these elements and nothing else, and never expands a
+/// value set itself.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct PublishedValueSet {
-    /// `resourceType`, which says what the entry actually carries.
-    #[serde(rename = "resourceType")]
-    resource_type: Option<String>,
     /// `ValueSet.id`, the id the read interaction addresses.
     id: Option<String>,
-    /// `meta`, whose `versionId` says the resource was written through the
-    /// API.
-    meta: Option<crate::fhir::named::Meta>,
+    /// `meta.versionId`, which a resource written through the API carries.
+    version_id: Option<String>,
     /// `ValueSet.url`, the canonical the expansion runner takes.
     url: Option<String>,
     /// `ValueSet.version`, the business version of the resource.
@@ -56,62 +51,14 @@ pub(crate) struct PublishedValueSet {
     purpose: Option<String>,
     /// `ValueSet.immutable`, whether the content can never change.
     immutable: Option<bool>,
-    /// `ValueSet.compose`, the selection the definition makes.
-    compose: Option<Compose>,
-}
-
-/// `ValueSet.compose`.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
-struct Compose {
-    /// `compose.include`, the selections drawn in.
-    #[serde(default)]
-    include: Vec<ComposeSet>,
-    /// `compose.exclude`, the selections taken back out.
-    #[serde(default)]
-    exclude: Vec<ComposeSet>,
     /// `compose.inactive`, whether inactive codes are in the selection.
     inactive: Option<bool>,
     /// `compose.lockedDate`, the date the selection is fixed to.
-    #[serde(rename = "lockedDate")]
     locked_date: Option<String>,
-}
-
-/// One `compose.include` or `compose.exclude`.
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-struct ComposeSet {
-    /// `system`, the code system the codes come from.
-    system: Option<String>,
-    /// `version`, the code system version the selection is pinned to.
-    version: Option<String>,
-    /// `valueSet`, the value sets this clause draws in whole.
-    #[serde(default, rename = "valueSet")]
-    value_set: Vec<String>,
-    /// `concept`, the codes the clause names one by one.
-    #[serde(default)]
-    concept: Vec<ComposeConcept>,
-    /// `filter`, the filters the clause selects with.
-    #[serde(default)]
-    filter: Vec<ComposeFilter>,
-}
-
-/// One `compose.include.concept`, counted rather than listed.
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-struct ComposeConcept {
-    /// The code the clause names.
-    code: Option<String>,
-    /// The display the clause gives it, when it gives one.
-    display: Option<String>,
-}
-
-/// One `compose.include.filter`, as the screen states it.
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-struct ComposeFilter {
-    /// The property the filter is over.
-    property: Option<String>,
-    /// The operator, for example `is-a` or `in`.
-    op: Option<String>,
-    /// The value the operator is applied with.
-    value: Option<String>,
+    /// The clauses of `compose`, includes before excludes; empty for a value
+    /// set the server holds as a built selection, which carries no
+    /// `compose`.
+    clauses: Vec<ClauseRow>,
 }
 
 /// One clause of a value set's definition, as one line of the screen.
@@ -136,14 +83,6 @@ pub(crate) struct ClauseRow {
     pub(crate) filter_parts: Vec<(String, String, String)>,
 }
 
-impl Published for PublishedValueSet {
-    const RESOURCE_TYPE: &str = "ValueSet";
-
-    fn declared_type(&self) -> Option<&str> {
-        self.resource_type.as_deref()
-    }
-}
-
 impl PublishedValueSet {
     /// The id the read interaction addresses, when the resource carries one.
     pub(crate) fn id(&self) -> Option<&str> {
@@ -163,9 +102,7 @@ impl PublishedValueSet {
     /// The version the server holds of a resource written through the API;
     /// `None` for one the deployment loaded, which has no write path.
     pub(crate) fn stored(&self) -> Option<&str> {
-        self.meta
-            .as_ref()
-            .and_then(crate::fhir::named::Meta::stored)
+        named(self.version_id.as_deref())
     }
 
     /// The publication status, when it declared one.
@@ -189,7 +126,6 @@ impl PublishedValueSet {
     /// published resources render their terms in the same rows and a fact the
     /// server omitted still gets a row that states the absence.
     pub(crate) fn facts(&self) -> Vec<Fact> {
-        let compose = self.compose.clone().unwrap_or_default();
         vec![
             fact(Msg::Name, self.name.as_deref()),
             fact(Msg::Title, self.title.as_deref()),
@@ -201,8 +137,8 @@ impl PublishedValueSet {
             fact(Msg::Description2, self.description.as_deref()),
             fact(Msg::Purpose, self.purpose.as_deref()),
             fact(Msg::Immutable, flag(self.immutable)),
-            fact(Msg::InactiveCodesSelected, flag(compose.inactive)),
-            fact(Msg::LockedToDate, compose.locked_date.as_deref()),
+            fact(Msg::InactiveCodesSelected, flag(self.inactive)),
+            fact(Msg::LockedToDate, self.locked_date.as_deref()),
         ]
     }
 
@@ -211,77 +147,166 @@ impl PublishedValueSet {
     /// A value set the server holds as a built selection carries no `compose`
     /// at all, which is an ordinary answer rather than a missing one.
     pub(crate) fn clauses(&self) -> Vec<ClauseRow> {
-        let Some(compose) = self.compose.as_ref() else {
-            return Vec::new();
-        };
-        let read = |set: &ComposeSet, included: bool| ClauseRow {
-            included,
-            system: named(set.system.as_deref()).map(str::to_owned),
-            version: named(set.version.as_deref()).map(str::to_owned),
-            value_sets: set
-                .value_set
-                .iter()
-                .filter_map(|url| named(Some(url)))
-                .map(str::to_owned)
-                .collect(),
-            codes: u32::try_from(set.concept.iter().filter(|c| c.code.is_some()).count())
-                .unwrap_or(u32::MAX),
-            filters: set.filter.iter().map(filter_sentence).collect(),
-            concepts: set
-                .concept
-                .iter()
-                .filter_map(|concept| {
-                    let code = named(concept.code.as_deref())?;
-                    Some((
-                        code.to_owned(),
-                        named(concept.display.as_deref()).map(str::to_owned),
-                    ))
-                })
-                .collect(),
-            filter_parts: set
-                .filter
-                .iter()
-                .map(|filter| {
-                    let part = |value: Option<&str>| named(value).unwrap_or_default().to_owned();
-                    (
-                        part(filter.property.as_deref()),
-                        part(filter.op.as_deref()),
-                        part(filter.value.as_deref()),
-                    )
-                })
-                .collect(),
-        };
-        compose
-            .include
-            .iter()
-            .map(|set| read(set, true))
-            .chain(compose.exclude.iter().map(|set| read(set, false)))
-            .collect()
+        self.clauses.clone()
     }
 }
 
-/// One `compose` filter, as the sentence the screen shows.
-///
-/// The three parts are rendered as the publisher wrote them; a part the
-/// resource omits is stated rather than guessed, because a filter missing its
-/// operator selects nothing a reader can predict.
-fn filter_sentence(filter: &ComposeFilter) -> String {
-    let part = |value: Option<&str>| named(value).unwrap_or("?").to_owned();
-    format!(
-        "{} {} {}",
-        part(filter.property.as_deref()),
-        part(filter.op.as_deref()),
-        part(filter.value.as_deref())
-    )
+/// One clause read off `compose`: the parts of its filters, which a filter
+/// at R4 and R4B always states and one from R5 on may leave without a value.
+fn clause(
+    included: bool,
+    system: Option<&str>,
+    version: Option<&str>,
+    value_sets: &[String],
+    concepts: &[(Option<String>, Option<String>)],
+    filters: &[(Option<String>, Option<String>, Option<String>)],
+) -> ClauseRow {
+    let text = |value: &Option<String>| named(value.as_deref()).map(str::to_owned);
+    ClauseRow {
+        included,
+        system: named(system).map(str::to_owned),
+        version: named(version).map(str::to_owned),
+        value_sets: value_sets
+            .iter()
+            .filter_map(|url| named(Some(url)))
+            .map(str::to_owned)
+            .collect(),
+        codes: u32::try_from(concepts.iter().filter(|(code, _)| code.is_some()).count())
+            .unwrap_or(u32::MAX),
+        // NOTE: no specification governs this: our own design; a filter missing a
+        // part selects nothing a reader can predict, so the part is stated as `?`.
+        filters: filters
+            .iter()
+            .map(|(property, op, value)| {
+                let part =
+                    |value: &Option<String>| text(value).unwrap_or_else(|| String::from("?"));
+                format!("{} {} {}", part(property), part(op), part(value))
+            })
+            .collect(),
+        concepts: concepts
+            .iter()
+            .filter_map(|(code, display)| Some((text(code)?, text(display))))
+            .collect(),
+        filter_parts: filters
+            .iter()
+            .map(|(property, op, value)| {
+                let part = |value: &Option<String>| text(value).unwrap_or_default();
+                (part(property), part(op), part(value))
+            })
+            .collect(),
+    }
 }
+
+/// Reads the `ValueSet` of the `fhir-types` module `$module` as published;
+/// `$value` reads a filter's `value`, which R4 and R4B require and R5 and R6
+/// make optional.
+macro_rules! reads_value_set {
+    ($module:ident, $value:expr) => {
+        impl Reads<PublishedValueSet> for fhir_types::$module::value_set::ValueSet {
+            fn read(&self) -> PublishedValueSet {
+                use fhir_types::$module::value_set::{
+                    ValueSetComposeInclude, ValueSetComposeIncludeFilter,
+                };
+                let filter_value: fn(&ValueSetComposeIncludeFilter) -> Option<String> = $value;
+                let text = |value: Option<&fhir_types::$module::primitives::String>| {
+                    value.and_then(|value| value.value.clone())
+                };
+                let read = |set: &ValueSetComposeInclude, included: bool| {
+                    clause(
+                        included,
+                        set.system
+                            .as_ref()
+                            .and_then(|system| system.value.as_deref()),
+                        set.version
+                            .as_ref()
+                            .and_then(|version| version.value.as_deref()),
+                        &set.value_set
+                            .iter()
+                            .filter_map(|url| url.value.clone())
+                            .collect::<Vec<_>>(),
+                        &set.concept
+                            .iter()
+                            .map(|concept| {
+                                (concept.code.value.clone(), text(concept.display.as_ref()))
+                            })
+                            .collect::<Vec<_>>(),
+                        &set.filter
+                            .iter()
+                            .map(|filter| {
+                                (
+                                    filter.property.value.clone(),
+                                    filter.op.value.clone(),
+                                    filter_value(filter),
+                                )
+                            })
+                            .collect::<Vec<_>>(),
+                    )
+                };
+                let compose = self.compose.as_ref();
+                PublishedValueSet {
+                    id: self.id.clone(),
+                    version_id: self
+                        .meta
+                        .as_ref()
+                        .and_then(|meta| meta.version_id.as_ref())
+                        .and_then(|id| id.value.clone()),
+                    url: self.url.as_ref().and_then(|url| url.value.clone()),
+                    version: text(self.version.as_ref()),
+                    name: text(self.name.as_ref()),
+                    title: text(self.title.as_ref()),
+                    status: self.status.value.clone(),
+                    experimental: self.experimental.as_ref().and_then(|flag| flag.value),
+                    date: self.date.as_ref().and_then(|date| date.value.clone()),
+                    publisher: text(self.publisher.as_ref()),
+                    description: self
+                        .description
+                        .as_ref()
+                        .and_then(|text| text.value.clone()),
+                    purpose: self.purpose.as_ref().and_then(|text| text.value.clone()),
+                    immutable: self.immutable.as_ref().and_then(|flag| flag.value),
+                    inactive: compose
+                        .and_then(|compose| compose.inactive.as_ref())
+                        .and_then(|flag| flag.value),
+                    locked_date: compose
+                        .and_then(|compose| compose.locked_date.as_ref())
+                        .and_then(|date| date.value.clone()),
+                    clauses: compose
+                        .map(|compose| {
+                            compose
+                                .include
+                                .iter()
+                                .map(|set| read(set, true))
+                                .chain(compose.exclude.iter().map(|set| read(set, false)))
+                                .collect()
+                        })
+                        .unwrap_or_default(),
+                }
+            }
+        }
+
+        carries!($module, ValueSet, PublishedValueSet);
+    };
+}
+
+reads_value_set!(r4, |filter| filter.value.value.clone());
+reads_value_set!(r4b, |filter| filter.value.value.clone());
+reads_value_set!(r5, |filter| filter.value.value.clone());
+reads_value_set!(r6, |filter| filter
+    .value
+    .as_ref()
+    .and_then(|value| value.value.clone()));
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fhir::searchset::SearchSet;
+    use crate::fhir::release::fixture::completed;
+    use crate::fhir::version::FhirVersion;
 
+    /// `json`, decoded as the R4B `ValueSet` its required elements complete.
     fn parse(json: &str) -> PublishedValueSet {
-        serde_json::from_str(json).expect("the fixture is valid JSON")
+        FhirVersion::R4B
+            .decode(&completed("ValueSet", json))
+            .expect("the fixture is a valid R4B ValueSet")
     }
 
     fn value_of(resource: &PublishedValueSet, label: &str) -> Option<String> {
@@ -411,16 +436,19 @@ mod tests {
 
     #[test]
     fn a_filter_missing_a_part_says_so_rather_than_reading_as_complete() {
-        let resource = parse(
-            r#"{"resourceType":"ValueSet","compose":{"include":[
-                {"system":"https://x.example/s","filter":[{"property":"concept"}]}]}}"#,
-        );
+        let resource: PublishedValueSet = FhirVersion::R6
+            .decode(&completed(
+                "ValueSet",
+                r#"{"compose":{"include":[
+                    {"system":"https://x.example/s","filter":[{"property":"concept","op":"exists"}]}]}}"#,
+            ))
+            .expect("R6 lets a filter leave out its value");
         assert_eq!(
             resource
                 .clauses()
                 .first()
                 .map(|clause| clause.filters.clone()),
-            Some(vec!["concept ? ?".to_owned()]),
+            Some(vec!["concept exists ?".to_owned()]),
             "a filter with no operator selects nothing a reader can predict"
         );
     }
@@ -458,7 +486,7 @@ mod tests {
         let resource = parse(
             r#"{"resourceType":"ValueSet","url":"https://x.example/v","status":"active",
                 "expansion":{"total":9,"contains":[{"code":"a"}]},
-                "text":{"status":"generated","div":"<p/>"}}"#,
+                "text":{"status":"generated","div":"<div xmlns=\"http://www.w3.org/1999/xhtml\"><p/></div>"}}"#,
         );
         assert_eq!(value_of(&resource, "Status"), Some("active".into()));
         assert_eq!(
@@ -470,11 +498,12 @@ mod tests {
 
     #[test]
     fn a_searchset_of_value_sets_reads_through_the_shared_envelope() {
-        let found: SearchSet<PublishedValueSet> = serde_json::from_str(&format!(
-            r#"{{"resourceType":"Bundle","type":"searchset","total":1,
-                "entry":[{{"resource":{ONE}}}]}}"#
-        ))
-        .expect("the fixture is valid JSON");
+        let found: Found<PublishedValueSet> = FhirVersion::R4B
+            .decode(&format!(
+                r#"{{"resourceType":"Bundle","type":"searchset","total":1,
+                    "entry":[{{"resource":{ONE}}}]}}"#
+            ))
+            .expect("the fixture is a valid R4B searchset");
         assert_eq!(found.found().len(), 1);
         assert_eq!(
             found.found().first().and_then(|resource| resource.id()),

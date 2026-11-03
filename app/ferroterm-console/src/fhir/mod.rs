@@ -40,6 +40,7 @@ use crate::fhir::capability::Capabilities;
 use crate::fhir::code_system::CodeSystemSearch;
 use crate::fhir::compose::Draft;
 use crate::fhir::compose::Preview;
+use crate::fhir::compose::stored::StoredValueSet;
 use crate::fhir::concept::ConceptQuery;
 use crate::fhir::concept::LookupAnswer;
 use crate::fhir::concept::LookupRequest;
@@ -55,7 +56,7 @@ use crate::fhir::named::NamedSearch;
 use crate::fhir::outcome::OperationOutcome;
 use crate::fhir::release::Decodes;
 use crate::fhir::searchset::SearchFilter;
-use crate::fhir::searchset::SearchSet;
+use crate::fhir::searchset::{Found, SearchSet};
 use crate::fhir::terminology::TerminologyCapabilities;
 use crate::fhir::translate::TranslateAnswer;
 use crate::fhir::translate::TranslateRequest;
@@ -369,7 +370,8 @@ impl FhirClient {
         version: FhirVersion,
         request: &ExpandRequest,
     ) -> Result<ExpandedValueSet, FhirError> {
-        self.get_json(&self.expand_url(version, request)).await
+        self.get_answer(version, &self.expand_url(version, request))
+            .await
     }
 
     /// The address of a RESTful search over one resource type.
@@ -470,7 +472,7 @@ impl FhirClient {
         version: FhirVersion,
         query: &ConceptQuery,
     ) -> Result<ExpandedValueSet, FhirError> {
-        self.post_json(&self.expand_post_url(version), &query.body())
+        self.post_answer(version, &self.expand_post_url(version), &query.body())
             .await
     }
 
@@ -483,8 +485,8 @@ impl FhirClient {
         &self,
         version: FhirVersion,
         filter: &SearchFilter,
-    ) -> Result<SearchSet<PublishedValueSet>, FhirError> {
-        self.get_json(&self.search_url(version, VALUE_SET, filter))
+    ) -> Result<Found<PublishedValueSet>, FhirError> {
+        self.get_answer(version, &self.search_url(version, VALUE_SET, filter))
             .await
     }
 
@@ -500,7 +502,7 @@ impl FhirClient {
         version: FhirVersion,
         id: &str,
     ) -> Result<Document<PublishedValueSet>, FhirError> {
-        self.get_document(&self.resource_url(version, VALUE_SET, id))
+        self.get_answer_document(version, &self.resource_url(version, VALUE_SET, id))
             .await
     }
 
@@ -659,9 +661,15 @@ impl FhirClient {
         &self,
         version: FhirVersion,
         id: &str,
-    ) -> Result<serde_json::Value, FhirError> {
-        self.get_json(&self.resource_url(version, VALUE_SET, id))
-            .await
+    ) -> Result<(StoredValueSet, serde_json::Value), FhirError> {
+        let url = self.resource_url(version, VALUE_SET, id);
+        let answer = self.send(Method::Get, &url, FHIR_JSON).await?;
+        let stored = decoded(&self.locale, version, &answer, &url)?;
+        let document = serde_json::from_str(&answer.body).map_err(|error| FhirError::Decode {
+            url: url.clone(),
+            message: error.to_string(),
+        })?;
+        Ok((stored, document))
     }
 
     /// Expands a compose that has never been saved, one page at a time.
@@ -681,8 +689,12 @@ impl FhirClient {
         draft: &Draft,
         page: &Preview,
     ) -> Result<ExpandedValueSet, FhirError> {
-        self.post_json(&self.expand_post_url(version), &draft.preview_body(page))
-            .await
+        self.post_answer(
+            version,
+            &self.expand_post_url(version),
+            &draft.preview_body(page),
+        )
+        .await
     }
 }
 
@@ -1047,27 +1059,39 @@ impl FhirClient {
         url: &str,
     ) -> Result<A, FhirError> {
         let answer = self.send(Method::Get, url, FHIR_JSON).await?;
-        let status = status_of(&self.locale, &answer, url)?;
-        if !status.is_success() {
-            return Err(failure(&answer, status, url));
-        }
-        version
-            .decode(&answer.body)
-            .map_err(|error| FhirError::Decode {
-                url: url.to_owned(),
-                message: format!("FHIR {version}: {error}"),
-            })
+        decoded(&self.locale, version, &answer, url)
     }
 
-    /// Sends a FHIR JSON `POST` and decodes the resource it answers.
-    async fn post_json<T: DeserializeOwned>(&self, url: &str, body: &str) -> Result<T, FhirError> {
+    /// Sends a FHIR JSON `GET`, decodes the resource it answers at `version`,
+    /// and keeps the document as the server sent it.
+    async fn get_answer_document<A: Decodes>(
+        &self,
+        version: FhirVersion,
+        url: &str,
+    ) -> Result<Document<A>, FhirError> {
+        let answer = self.send(Method::Get, url, FHIR_JSON).await?;
+        let value = decoded(&self.locale, version, &answer, url)?;
+        Ok(Document {
+            value,
+            text: pretty(&answer.body),
+        })
+    }
+
+    /// Sends a FHIR JSON `POST` and decodes the resource it answers at
+    /// `version`, the release that serves it.
+    async fn post_answer<A: Decodes>(
+        &self,
+        version: FhirVersion,
+        url: &str,
+        body: &str,
+    ) -> Result<A, FhirError> {
         let exchange = Exchange::new(Method::Post, self.path_of(url)?, FHIR_JSON)
             .with_body(FHIR_JSON, body.to_owned());
         let answer = self
             .exchange(exchange)
             .await
             .map_err(|error| transport(url, &error))?;
-        read_json(&self.locale, &answer, url)
+        decoded(&self.locale, version, &answer, url)
     }
 }
 
@@ -1079,6 +1103,26 @@ fn pretty(body: &str) -> String {
         .ok()
         .and_then(|value| serde_json::to_string_pretty(&value).ok())
         .unwrap_or_else(|| body.to_owned())
+}
+
+/// Turns an answer into the resource `A` reads, decoded at `version`, the
+/// release that served it, or into the refusal.
+fn decoded<A: Decodes>(
+    locale: &ferrohealth_ui::i18n::Locale,
+    version: FhirVersion,
+    answer: &Answer,
+    url: &str,
+) -> Result<A, FhirError> {
+    let status = status_of(locale, answer, url)?;
+    if !status.is_success() {
+        return Err(failure(answer, status, url));
+    }
+    version
+        .decode(&answer.body)
+        .map_err(|error| FhirError::Decode {
+            url: url.to_owned(),
+            message: format!("FHIR {version}: {error}"),
+        })
 }
 
 fn read_json<T: DeserializeOwned>(
