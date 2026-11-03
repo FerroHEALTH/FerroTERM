@@ -109,7 +109,8 @@ impl Config {
     /// [`Error::Locale`] for a `server.locale` that is no language tag,
     /// [`Error::Missing`], [`Error::Url`] and [`Error::UrlShape`] for a URL
     /// that is absent, does not parse or is not one its key admits,
-    /// [`Error::Zero`] for a zero timeout, [`Error::SignIn`] for an `[oidc]`
+    /// [`Error::Zero`] for a zero timeout, [`Error::Scope`] for
+    /// `offline_access` listed in `oidc.scopes`, [`Error::SignIn`] for an `[oidc]`
     /// or a `[session]` `ferrohealth-session` refuses, the secret errors of
     /// `oidc.client_secret` among them, and [`Error::InsecureCookie`] for
     /// `session.secure_cookie = false` on a console that is not `http` on
@@ -149,6 +150,9 @@ impl Config {
             .transpose()?;
         let timeout = positive("ferroterm.timeout_ms", self.ferroterm.timeout_ms)
             .map(Duration::from_millis)?;
+        if let Some(oidc) = &self.oidc {
+            check_oidc(oidc)?;
+        }
         let refused = |error| Error::SignIn(Box::new(error));
         let provider = self
             .oidc
@@ -238,6 +242,75 @@ fn web_url(key: &str, text: &str) -> Result<Url, Error> {
         return Err(shape("must not carry userinfo"));
     }
     Ok(url)
+}
+
+/// The console's own checks of `[oidc]`, beside `ferrohealth-session`'s:
+/// every provider URL `https` unless its host is loopback, a redirect URI
+/// with no fragment, `openid` among the scopes and `offline_access` not,
+/// and a post-logout redirect only with an end-session endpoint.
+fn check_oidc(oidc: &OidcSection) -> Result<(), Error> {
+    provider_url("oidc.issuer", &oidc.issuer)?;
+    for (key, value) in [
+        ("oidc.authorization_endpoint", &oidc.authorization_endpoint),
+        ("oidc.token_endpoint", &oidc.token_endpoint),
+        ("oidc.jwks_uri", &oidc.jwks_uri),
+        ("oidc.end_session_endpoint", &oidc.end_session_endpoint),
+        ("oidc.revocation_endpoint", &oidc.revocation_endpoint),
+    ] {
+        if let Some(value) = value {
+            provider_url(key, value)?;
+        }
+    }
+    let redirect_uri = web_url("oidc.redirect_uri", &oidc.redirect_uri)?;
+    // NOTE: RFC 6749 §3.1.2: the redirection endpoint URI MUST NOT include a
+    // fragment component.
+    if redirect_uri.fragment().is_some() {
+        return Err(Error::UrlShape {
+            key: String::from("oidc.redirect_uri"),
+            reason: "must not carry a fragment",
+        });
+    }
+    // NOTE: OpenID Connect Core 1.0 §3.1.2.1: an OpenID Connect request MUST
+    // carry the `openid` scope value.
+    if !oidc.scopes.iter().any(|scope| scope == "openid") {
+        return Err(Error::Missing {
+            key: String::from("oidc.scopes (openid)"),
+        });
+    }
+    // NOTE: OpenID Connect Core 1.0 §11: `offline_access` goes with `prompt`
+    // `consent`, which the relying party sends only for `oidc.offline_access`.
+    if oidc.scopes.iter().any(|scope| scope == "offline_access") {
+        return Err(Error::Scope {
+            key: String::from("oidc.scopes"),
+            reason: "must not list offline_access; set oidc.offline_access = true",
+        });
+    }
+    if let Some(redirect) = &oidc.post_logout_redirect_uri {
+        web_url("oidc.post_logout_redirect_uri", redirect)?;
+        // NOTE: OpenID Connect RP-Initiated Logout 1.0 §3: the post-logout redirect
+        // is sent to the end-session endpoint, so one without the other is refused.
+        if oidc.end_session_endpoint.is_none() {
+            return Err(Error::Missing {
+                key: String::from("oidc.end_session_endpoint (for post_logout_redirect_uri)"),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Parses an OpenID Provider URL: `https`, or `http` on a loopback host.
+fn provider_url(key: &str, text: &str) -> Result<Url, Error> {
+    let url = web_url(key, text)?;
+    // NOTE: RFC 6749 §3.1: the authorization server MUST require TLS at its
+    // authorization endpoint, so plain `http` is admitted only on loopback.
+    if url.scheme() == "https" || is_loopback(&url) {
+        Ok(url)
+    } else {
+        Err(Error::UrlShape {
+            key: key.to_owned(),
+            reason: "must be an https URL unless its host is loopback",
+        })
+    }
 }
 
 /// Parses an `http` or `https` URL with a host, no userinfo, no query and no
@@ -483,6 +556,39 @@ mod tests {
         let shown = format!("{error} {error:?}");
         assert!(!shown.contains("inline-secret"), "{shown}");
         assert!(!shown.contains("file-secret"), "{shown}");
+    }
+
+    #[test]
+    fn the_console_s_own_oidc_checks_refuse_by_key() {
+        let refused = |change: fn(&mut OidcSection)| {
+            let mut config = oidc(None, None);
+            if let Some(section) = config.oidc.as_mut() {
+                change(section);
+            }
+            config.resolve().expect_err("refused")
+        };
+        let plain =
+            refused(|oidc| oidc.token_endpoint = Some(String::from("http://idp.example/t")));
+        assert!(
+            matches!(&plain, Error::UrlShape { key, .. } if key == "oidc.token_endpoint"),
+            "{plain:?}"
+        );
+        let offline = refused(|oidc| oidc.scopes.push(String::from("offline_access")));
+        assert!(
+            matches!(&offline, Error::Scope { key, .. } if key == "oidc.scopes"),
+            "{offline:?}"
+        );
+        let no_openid = refused(|oidc| oidc.scopes = vec![String::from("profile")]);
+        assert!(matches!(&no_openid, Error::Missing { .. }), "{no_openid:?}");
+        let fragment = refused(|oidc| oidc.redirect_uri.push_str("#x"));
+        assert!(
+            matches!(&fragment, Error::UrlShape { key, .. } if key == "oidc.redirect_uri"),
+            "{fragment:?}"
+        );
+        let logout = refused(|oidc| {
+            oidc.post_logout_redirect_uri = Some(String::from("https://console.example/"));
+        });
+        assert!(matches!(&logout, Error::Missing { .. }), "{logout:?}");
     }
 
     #[test]

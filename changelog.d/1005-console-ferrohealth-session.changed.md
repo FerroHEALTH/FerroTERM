@@ -9,10 +9,7 @@
   `revocation_endpoint`, which the console then reads from the provider's
   metadata when it starts (`config check` reads none and works offline), and
   gains `ca_file` and `timeout_s`; `[session]` gains `store` (`memory`, the
-  default, or `sealed` with `key` or `key_file`). The console no longer
-  refuses a provider URL that is `http` off loopback, `offline_access` in
-  `oidc.scopes`, or `post_logout_redirect_uri` without
-  `end_session_endpoint`, and `session.absolute_timeout_s` below
-  `session.idle_timeout_s` is now refused. Upgrade: change any link or
+  default, or `sealed` with `key` or `key_file`). `session.absolute_timeout_s`
+  below `session.idle_timeout_s` is now refused. Upgrade: change any link or
   bookmark to the old sign-in, sign-out or session paths; the configuration
   keys a deployment already sets keep their meaning.
