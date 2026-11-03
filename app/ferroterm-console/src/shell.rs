@@ -33,7 +33,6 @@ use http::StatusCode;
 
 use crate::fhir::version::FhirVersion;
 use crate::locale::{Msg, tr, tr_with};
-use crate::markup::{h, t};
 use crate::request::Request;
 use crate::routes;
 
@@ -388,9 +387,9 @@ fn end(request: &Request, probe: Probe, open: bool) -> Html {
     let select = version_select(locale, versions(request));
     let signed_in = request.session.signed_in();
     let sign_in = (!signed_in && request.sign_in).then(|| {
-        h(format!(
+        Html::raw(format!(
             r#"<a href="{}" class="{}">{}</a>"#,
-            t(routes::sign_in_link(&request.back())),
+            Html::text(routes::sign_in_link(&request.back())),
             Variant::Secondary.small(),
             label(Some(Glyph::LOG_IN), tr(locale, Msg::ShellSignIn)),
         ))

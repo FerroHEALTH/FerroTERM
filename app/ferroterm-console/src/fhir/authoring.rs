@@ -17,9 +17,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-/// The resource type an entry must declare to be read as a code system.
-const CODE_SYSTEM: &str = "CodeSystem";
-
 /// What `GET [base]/CodeSystem?url=` answered, read for authoring.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub(crate) struct AuthoredSearch {
@@ -41,15 +38,6 @@ struct SearchEntry {
 }
 
 impl AuthoredSearch {
-    /// The first `CodeSystem` the answer carries, in the server's own order.
-    ///
-    /// A `searchset` may also carry an `OperationOutcome` describing the search
-    /// (<https://hl7.org/fhir/R4B/http.html#search>), so an entry declaring
-    /// another type is passed over rather than read as a code system.
-    pub(crate) fn first(&self) -> Option<Value> {
-        self.first_of(CODE_SYSTEM)
-    }
-
     /// The first resource of `resource_type` the answer carries.
     ///
     /// The envelope is the same whatever was searched for, so one reader
@@ -406,6 +394,7 @@ fn first_stated(arms: [&Option<String>; 4]) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fhir::CODE_SYSTEM;
 
     #[test]
     fn a_stored_code_system_reads_the_elements_an_update_needs() {
@@ -422,8 +411,11 @@ mod tests {
                      "property":[{"code":"status","valueCode":"active"}]}]}}]}"#,
         )
         .expect("the server's own answer parses");
-        let stored =
-            StoredCodeSystem::of(&answer.first().expect("the bundle carries a code system"));
+        let stored = StoredCodeSystem::of(
+            &answer
+                .first_of(CODE_SYSTEM)
+                .expect("the bundle carries a code system"),
+        );
         assert_eq!(stored.id.as_deref(), Some("colours"));
         assert_eq!(
             stored.meta.and_then(|meta| meta.version_id).as_deref(),
@@ -441,8 +433,8 @@ mod tests {
             r#"{"resourceType":"Bundle","entry":[{"resource":{"resourceType":"OperationOutcome"}}]}"#,
         )
         .expect("the server's own answer parses");
-        assert_eq!(answer.first(), None);
-        assert_eq!(AuthoredSearch::default().first(), None);
+        assert_eq!(answer.first_of(CODE_SYSTEM), None);
+        assert_eq!(AuthoredSearch::default().first_of(CODE_SYSTEM), None);
     }
 
     /// Every arm of `property.value[x]` reads back as the text its control
@@ -482,7 +474,7 @@ mod tests {
             Some(String::from("m"))
         );
         assert_eq!(
-            answer.first(),
+            answer.first_of(CODE_SYSTEM),
             None,
             "a search for one type does not answer another"
         );

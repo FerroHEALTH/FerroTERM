@@ -19,7 +19,6 @@ use ferrohealth_ui::view::tabs::{Tab, binder};
 use crate::fhir::version::FhirVersion;
 use crate::fhir::{CODE_SYSTEM, CONCEPT_MAP, VALUE_SET};
 use crate::locale::{Msg, tr, tr_with};
-use crate::markup::{h, t};
 use crate::pages::listing::status_state;
 use crate::pages::parts::{Source, headed};
 use crate::request::Request;
@@ -162,7 +161,11 @@ pub(crate) fn header(request: &Request, head: Head) -> Html {
     let (subtitle, subtitle_view) = if head.canonical.is_empty() {
         (Some(head.line.into()), None)
     } else {
-        let drawn = h(format!("{} · {}", canonical(&head.canonical), t(head.line)));
+        let drawn = Html::raw(format!(
+            "{} · {}",
+            canonical(&head.canonical),
+            Html::text(head.line)
+        ));
         (None, Some(drawn))
     };
     headed(

@@ -37,7 +37,7 @@ use crate::fhir::problem::Problem;
 use crate::fhir::sync::Reloaded;
 use crate::fhir::version::FhirVersion;
 use crate::locale::{Msg, tr, tr_with};
-use crate::markup::{code, h, join, t};
+use crate::markup::code;
 use crate::pages::dashboard::host;
 use crate::pages::parts::{failure, heading};
 use crate::posted::INTENT;
@@ -226,7 +226,7 @@ fn reload_outcome(request: &Request, answered: Option<Result<Reloaded, FhirError
             Tone::Bad,
             Announce::Alert,
             None,
-            t(tr_with(
+            Html::text(tr_with(
                 locale,
                 Msg::ServerReloadRefused,
                 &[
@@ -249,7 +249,7 @@ fn reload_outcome(request: &Request, answered: Option<Result<Reloaded, FhirError
                     Tone::Ok,
                     Announce::Status,
                     None,
-                    t(tr_with(
+                    Html::text(tr_with(
                         locale,
                         Msg::ServerReloaded,
                         &[("status", status.into())],
@@ -296,9 +296,9 @@ async fn system_counts(
 /// A comparison cell in words, since a tint carries no meaning.
 fn cell_view(locale: &Locale, found: &Cell) -> Option<Html> {
     match found {
-        Cell::Stated(text) => Some(t(text)),
+        Cell::Stated(text) => Some(Html::text(text)),
         Cell::NotDeclared => None,
-        Cell::Unread => Some(t(tr(locale, Msg::ServerNoAnswer))),
+        Cell::Unread => Some(Html::text(tr(locale, Msg::ServerNoAnswer))),
     }
 }
 
@@ -310,7 +310,7 @@ fn matrix_rows(locale: &Locale, rows: &[Row]) -> Vec<MatrixRow> {
             let name = if row.label.contains('$') {
                 code(&row.label)
             } else {
-                t(&row.label)
+                Html::text(&row.label)
             };
             MatrixRow {
                 name,
@@ -355,16 +355,16 @@ fn roots_panel(
         load_report(LoadReport {
             outcome: Outcome::Bad,
             arrival: Arrival::WithPage,
-            title: t(tr_with(
+            title: Html::text(tr_with(
                 locale,
                 Msg::ServerRootsSilent,
                 &[("roots", silent.join(", ").into())],
             )),
             counts: Vec::new(),
-            action: Some(h(format!(
+            action: Some(Html::raw(format!(
                 r#"<a href="{}" class="fui-button fui-button-secondary fui-button-small">{}</a>"#,
-                t(request.back()),
-                t(tr(locale, Msg::ServerRetry))
+                Html::text(request.back()),
+                Html::text(tr(locale, Msg::ServerRetry))
             ))),
         })
     });
@@ -417,10 +417,10 @@ fn operations_rows(
         .zip(&comparison.operations)
         .for_each(|(row, operation)| {
             if own.iter().any(|(label, _)| *label == operation.label) {
-                row.name = h(format!(
+                row.name = Html::raw(format!(
                     r#"{} <span class="fui-small fui-muted">{}</span>"#,
                     code(&operation.label),
-                    t(tr(locale, Msg::ServerOwnOperation))
+                    Html::text(tr(locale, Msg::ServerOwnOperation))
                 ));
             }
         });
@@ -444,7 +444,7 @@ fn version_rows(
     rows.insert(
         1,
         MatrixRow {
-            name: t(tr(locale, Msg::ServerBaseAddress)),
+            name: Html::text(tr(locale, Msg::ServerBaseAddress)),
             cells: FhirVersion::ALL
                 .into_iter()
                 .map(|version| Some(code(request.client.version_base(version))))
@@ -454,12 +454,12 @@ fn version_rows(
     rows.insert(
         2,
         MatrixRow {
-            name: t(tr(locale, Msg::ServerCodeSystems)),
+            name: Html::text(tr(locale, Msg::ServerCodeSystems)),
             cells: counts
                 .iter()
                 .map(|count| {
                     count.map(|count| {
-                        t(ferrohealth_ui::i18n::number::grouped(
+                        Html::text(ferrohealth_ui::i18n::number::grouped(
                             locale,
                             u64::try_from(count).unwrap_or(u64::MAX),
                         ))
@@ -501,7 +501,7 @@ fn suite(locale: &Locale, conformance: Conformance) -> Html {
         Column::text("needs", tr(locale, Msg::ServerNeeds)),
     ];
     let [_, surface, passed, needs] = &columns;
-    let rows = join(conformance.modes.iter().map(|mode| {
+    let rows = Html::join(conformance.modes.iter().map(|mode| {
         let words = tr_with(
             locale,
             Msg::ServerPassedOf,
@@ -518,12 +518,12 @@ fn suite(locale: &Locale, conformance: Conformance) -> Html {
         } else {
             mode.needs.to_owned()
         };
-        h(format!(
+        Html::raw(format!(
             "<tr>{}{}{}{}</tr>",
             title_cell(None, None, code(mode.name), None),
             cell(surface, code(mode.surface)),
             cell(passed, counted),
-            cell(needs, t(content)),
+            cell(needs, Html::text(content)),
         ))
     }));
     let caption = tr(locale, Msg::ServerSuiteTitle);
@@ -558,14 +558,14 @@ fn latency(locale: &Locale, latency: Latency) -> Html {
     ];
     let [_, target, measured] = &columns;
     let micro = |value: u32| {
-        t(tr_with(
+        Html::text(tr_with(
             locale,
             Msg::ServerMicroseconds,
             &[("value", value.into())],
         ))
     };
-    let rows = join(latency.bars.iter().map(|bar| {
-        h(format!(
+    let rows = Html::join(latency.bars.iter().map(|bar| {
+        Html::raw(format!(
             "<tr>{}{}{}</tr>",
             title_cell(None, None, code(bar.bench), None),
             cell(target, micro(bar.max_us)),

@@ -31,7 +31,7 @@ use crate::authoring::code_system::{Concept, Declared, Draft, Lifecycle};
 use crate::fhir::CODE_SYSTEM;
 use crate::fhir::compose::STATUSES;
 use crate::locale::{Msg, tr, tr_with};
-use crate::markup::{code, h, join, t};
+use crate::markup::code;
 use crate::pages::detail::Kind;
 use crate::pages::editor::{
     DISCARD, OPENED, OPENED_AT, SAVE, SAVED_PARAM, Standing, add_button, dock, field, form,
@@ -376,14 +376,14 @@ fn apply(form: &Posted, opened: &Draft, draft: &mut Draft) {
 /// The metadata section: the canonical, the names, the version, the status,
 /// the content mode and case sensitivity.
 fn metadata(locale: &Locale, draft: &Draft) -> Html {
-    let statuses = join(STATUSES.iter().map(|status| {
+    let statuses = Html::join(STATUSES.iter().map(|status| {
         option(
             status,
             &status_words(locale, status),
             *status == draft.status,
         )
     }));
-    let modes = join(
+    let modes = Html::join(
         CONTENT_MODES
             .iter()
             .map(|mode| option(mode, &content_words(locale, mode), *mode == draft.content)),
@@ -395,11 +395,11 @@ fn metadata(locale: &Locale, draft: &Draft) -> Html {
             count: None,
             actions: None,
         }),
-        h(format!(
+        Html::raw(format!(
             r#"<div class="{FORM}">{}{}{}{}</div>"#,
-            Field::new("cs-url", tr(locale, Msg::EditorCanonical)).view(h(format!(
+            Field::new("cs-url", tr(locale, Msg::EditorCanonical)).view(Html::raw(format!(
                 r#"<input id="cs-url" name="url" class="{INPUT} fui-mono" value="{}" required>"#,
-                t(&draft.url)
+                Html::text(&draft.url)
             ))),
             field_flow(Html::join([
                 text_field(
@@ -423,12 +423,12 @@ fn metadata(locale: &Locale, draft: &Draft) -> Html {
                     draft.version.clone(),
                     false,
                 ),
-                Field::new("cs-status", tr(locale, Msg::EditorStatus)).view(h(format!(
+                Field::new("cs-status", tr(locale, Msg::EditorStatus)).view(Html::raw(format!(
                     r#"<select id="cs-status" name="status" class="{SELECT}">{statuses}</select>"#
                 ))),
             ])),
             field_flow(
-                Field::new("cs-content", tr(locale, Msg::ContentMode)).view(h(format!(
+                Field::new("cs-content", tr(locale, Msg::ContentMode)).view(Html::raw(format!(
                     r#"<select id="cs-content" name="content" class="{SELECT} {MEDIUM}">{modes}</select>"#
                 )))
             ),
@@ -451,21 +451,21 @@ fn property_row(locale: &Locale, key: &str, code: &str, kind: &str, end: RowEnd)
     let locked = matches!(end, RowEnd::Kept { .. });
     let code_id = format!("cs-property-{key}-code");
     let type_id = format!("cs-property-{key}-type");
-    let types = join(
+    let types = Html::join(
         PROPERTY_TYPES
             .iter()
             .map(|each| option(each, each, *each == kind)),
     );
     let fields = Html::join([
-        Field::new(code_id.clone(), tr(locale, Msg::EditorPropertyCode)).view(h(format!(
+        Field::new(code_id.clone(), tr(locale, Msg::EditorPropertyCode)).view(Html::raw(format!(
             r#"<input id="{code_id}" name="{}" class="{INPUT} fui-mono" value="{}"{}>"#,
-            t(name(PROPERTY, key, "code")),
-            t(code),
+            Html::text(name(PROPERTY, key, "code")),
+            Html::text(code),
             disabled(locked)
         ))),
-        Field::new(type_id.clone(), tr(locale, Msg::EditorPropertyType)).view(h(format!(
+        Field::new(type_id.clone(), tr(locale, Msg::EditorPropertyType)).view(Html::raw(format!(
             r#"<select id="{type_id}" name="{}" class="{SELECT}"{}>{types}</select>"#,
-            t(name(PROPERTY, key, "type")),
+            Html::text(name(PROPERTY, key, "type")),
             disabled(locked)
         ))),
     ]);
@@ -545,13 +545,13 @@ fn code_cell(locale: &Locale, concept: &Concept, key: &str, held: bool) -> Html 
             hidden_field(&name(CONCEPT, key, "code"), &concept.code),
         ])
     } else {
-        let remove = t(tr(locale, Msg::EditorRemoveConcept));
-        h(format!(
+        let remove = Html::text(tr(locale, Msg::EditorRemoveConcept));
+        Html::raw(format!(
             r#"<input name="{}" class="{INPUT} fui-mono" value="{}" aria-label="{}"><button type="submit" class="fui-icon-button" name="{REMOVE_CONCEPT}" value="{}" formnovalidate aria-label="{remove}" title="{remove}">{}</button>"#,
-            t(name(CONCEPT, key, "code")),
-            t(&concept.code),
-            t(tr(locale, Msg::EditorConceptCode)),
-            t(key),
+            Html::text(name(CONCEPT, key, "code")),
+            Html::text(&concept.code),
+            Html::text(tr(locale, Msg::EditorConceptCode)),
+            Html::text(key),
             ferrohealth_ui::icon::icon(Glyph::X, "16"),
         ))
     }
@@ -567,7 +567,7 @@ fn concepts(locale: &Locale, draft: &Draft, opened: &Draft) -> Html {
         Column::text("lifecycle", tr(locale, Msg::EditorConceptLifecycle)),
     ];
     let [code_column, display_column, parent_column, lifecycle_column] = &columns;
-    let rows = join(draft.concepts.iter().map(|concept| {
+    let rows = Html::join(draft.concepts.iter().map(|concept| {
         let key = format!("k{}", concept.key.0);
         let held = opened
             .concepts
@@ -579,11 +579,11 @@ fn concepts(locale: &Locale, draft: &Draft, opened: &Draft) -> Html {
             .iter()
             .find(|value| value.code == "parent")
             .map_or_else(
-                || t(tr(locale, Msg::EditorTopLevel)),
+                || Html::text(tr(locale, Msg::EditorTopLevel)),
                 |value| code(&value.text),
             );
         let status = concept.lifecycle.status();
-        let choices = join(
+        let choices = Html::join(
             LIFECYCLES
                 .iter()
                 .map(|each| option(each, &lifecycle_words(locale, each), *each == status)),
@@ -598,32 +598,32 @@ fn concepts(locale: &Locale, draft: &Draft, opened: &Draft) -> Html {
             Msg::EditorLifecycleOf,
             &[("code", concept.code.clone().into())],
         );
-        h(format!(
+        Html::raw(format!(
             "<tr>{}{}{}{}</tr>",
             cell(code_column, drawn_code),
             cell(
                 display_column,
-                h(format!(
+                Html::raw(format!(
                     r#"<input name="{}" class="{INPUT}" value="{}" aria-label="{}">"#,
-                    t(name(CONCEPT, &key, "display")),
-                    t(&concept.display),
-                    t(display_label)
+                    Html::text(name(CONCEPT, &key, "display")),
+                    Html::text(&concept.display),
+                    Html::text(display_label)
                 )),
             ),
             cell(parent_column, parent),
             cell(
                 lifecycle_column,
-                h(format!(
+                Html::raw(format!(
                     r#"<select name="{}" class="{SELECT}" aria-label="{}">{choices}</select>"#,
-                    t(name(CONCEPT, &key, "lifecycle")),
-                    t(lifecycle_label)
+                    Html::text(name(CONCEPT, &key, "lifecycle")),
+                    Html::text(lifecycle_label)
                 )),
             ),
         ))
     }));
     let caption = tr(locale, Msg::EditorConcepts);
     let count = u64::try_from(draft.concepts.len()).unwrap_or(u64::MAX);
-    let add = h(format!(
+    let add = Html::raw(format!(
         r#"<div class="fui-add-row">{}</div>"#,
         add_button(ADD_CONCEPT.to_owned(), tr(locale, Msg::EditorAddConcept))
     ));
@@ -677,7 +677,7 @@ fn saved_page(request: &Request, opened: &Draft, saved: &str) -> Html {
         load_report(LoadReport {
             outcome: Outcome::Ok,
             arrival: Arrival::AfterAction,
-            title: t(tr_with(
+            title: Html::text(tr_with(
                 locale,
                 Msg::EditorSaved,
                 &[("version", saved.to_owned().into())],

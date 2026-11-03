@@ -31,7 +31,9 @@ use fhir_terminology::valueset::store::ValueSetStore;
 use crate::artefact::Caches;
 use crate::config::Config;
 use crate::persistence::{ResourceStore, ResourceType};
-use crate::state::ids::{canonical, check_distinct_ids, registered_id, split_canonical, unique_id};
+use crate::state::ids::{
+    canonical, check_distinct_ids, registered_id, split_canonical, unique_id_of,
+};
 use crate::state::layer::Layer;
 use crate::state::persisted::Persisted;
 use crate::state::{AppState, LoadError, Origin, instance_id};
@@ -58,11 +60,13 @@ pub(super) fn core_terminology() -> Result<BTreeMap<&'static str, CoreTerminolog
     }
     Ok(CACHE.get_or_init(|| built).clone())
 }
+
 /// A provider before registration, with where it came from.
 pub(super) struct Loaded {
     path: PathBuf,
     provider: Arc<dyn CodeSystemProvider>,
 }
+
 /// What a rebuilt state takes over from the state it replaces.
 ///
 /// The write store and the `$cache-control` caches outlive one served set:
@@ -75,6 +79,7 @@ pub(super) struct Carried {
     /// The caches `$cache-control` started.
     caches: Option<Arc<Caches>>,
 }
+
 /// Loads the `CodeSystem`, `ValueSet`, and `ConceptMap` resources in `path`:
 /// complete systems become providers, supplements are collected for
 /// dormant registration, value sets and concept maps go to their stores.
@@ -127,10 +132,7 @@ pub(super) fn load_code_systems(
     }
     Ok(())
 }
-/// The supplement a `CodeSystem` resource describes.
-pub(crate) fn supplement_of(model: &CodeSystemModel) -> Supplement {
-    Supplement::from_code_system(model)
-}
+
 /// Every supplement names a loaded system (`CodeSystem.supplements`, a `url`
 /// or `url|version` canonical,
 /// <https://hl7.org/fhir/R4B/codesystem-definitions.html#CodeSystem.supplements>).
@@ -153,6 +155,7 @@ pub(super) fn check_supplement_targets(
     }
     Ok(())
 }
+
 /// The artifact directories the configured index paths name.
 ///
 /// A path holding a manifest is one artifact, and so is a path that is no
@@ -181,6 +184,7 @@ pub(super) fn artifact_paths(index: &[PathBuf]) -> Result<Vec<PathBuf>, LoadErro
     }
     Ok(out)
 }
+
 /// The child directories of `root` that hold a manifest, sorted by path.
 ///
 /// # Errors
@@ -209,6 +213,7 @@ pub(super) fn artifacts_under(root: &Path) -> Result<Vec<PathBuf>, LoadError> {
     out.sort();
     Ok(out)
 }
+
 /// Opens the artifact directory `path` with the provider its manifest calls
 /// for: SNOMED CT, LOINC, and `RxNorm` by system, a classification by kind.
 ///
@@ -285,6 +290,7 @@ impl AppState {
     pub fn load(config: &Config) -> Result<Self, LoadError> {
         Self::build(config, Carried::default())
     }
+
     /// The same configuration read again into a fresh state, carrying this
     /// state's write store and caches.
     ///
@@ -304,6 +310,7 @@ impl AppState {
             },
         )
     }
+
     /// The state `config` names, built over what `carried` hands on.
     pub(super) fn build(config: &Config, carried: Carried) -> Result<Self, LoadError> {
         let mut loaded = Vec::new();
@@ -373,7 +380,7 @@ impl AppState {
         // (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
         for (target, model) in &supplements {
             origins.insert(model.url.clone(), Origin::CodeSystems);
-            registry.register_supplement(target.clone(), supplement_of(model));
+            registry.register_supplement(target.clone(), Supplement::from_code_system(model));
         }
         let mut state = Self::from_registry(registry);
         if let Some(caches) = carried.caches {
@@ -406,6 +413,7 @@ impl AppState {
         state.check_persisted_ids()?;
         Ok(state)
     }
+
     /// Names every loaded supplement by the `id` its resource carries, else by
     /// the id minted from its canonical.
     ///
@@ -441,6 +449,7 @@ impl AppState {
         }
         Ok(())
     }
+
     /// Names every loaded value set and concept map: each by the `id` its
     /// resource carries, else by the id minted from its canonical.
     ///
@@ -477,6 +486,7 @@ impl AppState {
         }
         Ok(())
     }
+
     /// No loaded resource is addressed by an id a persisted record already
     /// answers on.
     ///
@@ -506,6 +516,7 @@ impl AppState {
         }
         Ok(())
     }
+
     /// Wraps an already-built registry (tests and embedders).
     ///
     /// The state holds no FHIR core terminology; add it with
@@ -523,14 +534,14 @@ impl AppState {
                 let served = (identity.url.clone(), identity.version.clone());
                 match provider.code_system().and_then(|model| model.id.clone()) {
                     Some(authored) => {
-                        instances.insert(unique_id(&instances, authored), served);
+                        instances.insert(unique_id_of(&instances, authored), served);
                     }
                     None => minting.push(served),
                 }
             }
         }
         for (url, version) in minting {
-            let id = unique_id(&instances, instance_id(&url, &version));
+            let id = unique_id_of(&instances, instance_id(&url, &version));
             instances.insert(id, (url, version));
         }
         let base = Layer {
@@ -559,6 +570,7 @@ impl AppState {
             base_url: None,
         }
     }
+
     /// This state holding the terminology every served FHIR version defines,
     /// under whatever the deployment loaded.
     ///

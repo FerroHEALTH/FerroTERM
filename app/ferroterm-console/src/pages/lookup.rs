@@ -7,21 +7,17 @@
 use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
-use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, title_cell,
-};
 use ferrohealth_ui::view::action::small_action_button;
 use ferrohealth_ui::view::action_menu::{Act, Action};
 use ferrohealth_ui::view::button::Variant;
 use ferrohealth_ui::view::load_report::Outcome;
 use ferrohealth_ui::view::surface::{SectionHead, panel_section};
-use ferrohealth_ui::view::template::list::HeadingCount;
 
 use crate::fhir::CODE_SYSTEM;
 use crate::fhir::concept::{Concept, LookupRequest};
 use crate::fhir::terminology::SystemCard;
 use crate::locale::{Msg, tr, tr_with};
-use crate::markup::{code, h, join, p, strong, t};
+use crate::markup::{p, strong};
 use crate::pages::operations::{
     Op, before, choices, frame, options, run, select, sent, text, verdict,
 };
@@ -260,12 +256,12 @@ fn found(locale: &Locale, concept: &Concept, code: &str, system: &str) -> Html {
             &[("system", system.to_owned().into())],
         ),
     };
-    h(format!(
+    Html::raw(format!(
         "{} {} · {} {}",
-        t(tr(locale, Msg::LookupFound)),
+        Html::text(tr(locale, Msg::LookupFound)),
         strong(display),
         crate::markup::code(code),
-        t(place)
+        Html::text(place)
     ))
 }
 
@@ -278,77 +274,11 @@ fn concept_sections(locale: &Locale, concept: &Concept) -> Html {
             count: None,
             actions: None,
         }),
-        p(t(concept.display.clone().unwrap_or_default())),
+        p(Html::text(concept.display.clone().unwrap_or_default())),
     );
-    let designations = (!concept.designations.is_empty()).then(|| {
-        let columns = [
-            Column::text("term", tr(locale, Msg::LookupTerm)).role(Role::Title),
-            Column::text("language", tr(locale, Msg::LookupTermLanguage)),
-            Column::text("use", tr(locale, Msg::LookupUse)),
-        ];
-        let [_, language, usage] = &columns;
-        let rows = join(concept.designations.iter().map(|row| {
-            h(format!(
-                "<tr>{}{}{}</tr>",
-                title_cell(None, None, t(&row.value), None),
-                cell(language, t(row.language.clone().unwrap_or_default())),
-                cell(usage, t(row.usage.clone().unwrap_or_default())),
-            ))
-        }));
-        let caption = tr(locale, Msg::LookupDesignations);
-        panel_section(
-            locale,
-            Some(SectionHead {
-                title: caption.clone(),
-                count: Some(HeadingCount::All(
-                    u64::try_from(concept.designations.len()).unwrap_or(u64::MAX),
-                )),
-                actions: None,
-            }),
-            data_table(DataTable {
-                shape: Shape::Stacked,
-                caption: &caption,
-                columns: &columns,
-                sorting: Sorting::default(),
-                body: Body::Rows(rows),
-            }),
-        )
-    });
-    let properties = (!concept.properties.is_empty()).then(|| {
-        let columns = [
-            Column::text("property", tr(locale, Msg::LookupProperty)).role(Role::Title),
-            Column::text("value", tr(locale, Msg::LookupValue)),
-        ];
-        let [_, value] = &columns;
-        let rows = join(concept.properties.iter().map(|row| {
-            h(format!(
-                "<tr>{}{}</tr>",
-                title_cell(None, None, code(&row.code), row.description.as_ref().map(t)),
-                cell(value, t(row.value.clone().unwrap_or_default())),
-            ))
-        }));
-        let caption = tr(locale, Msg::LookupProperties);
-        panel_section(
-            locale,
-            Some(SectionHead {
-                title: caption.clone(),
-                count: Some(HeadingCount::All(
-                    u64::try_from(concept.properties.len()).unwrap_or(u64::MAX),
-                )),
-                actions: None,
-            }),
-            data_table(DataTable {
-                shape: Shape::Stacked,
-                caption: &caption,
-                columns: &columns,
-                sorting: Sorting::default(),
-                body: Body::Rows(rows),
-            }),
-        )
-    });
     Html::join([
         display,
-        designations.unwrap_or_default(),
-        properties.unwrap_or_default(),
+        crate::pages::browse::designations(locale, concept).unwrap_or_default(),
+        crate::pages::browse::properties(locale, concept).unwrap_or_default(),
     ])
 }

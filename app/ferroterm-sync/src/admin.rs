@@ -72,7 +72,13 @@ pub fn routes(service: Arc<Service>) -> Router {
             ferrohealth_telemetry::telemetry::prometheus_route(Arc::clone(service.telemetry())),
         )
         .with_state(service)
-        .fallback(unknown)
+        // Anything else on the admin listener.
+        .fallback(|| async {
+            ferroterm_problem::blank(
+                StatusCode::NOT_FOUND,
+                "the admin listener answers POST /run, POST /activate, GET /runs, GET /runs/{id}, GET /metrics and the health routes",
+            )
+        })
 }
 
 /// `POST /run`: one run now, answered when it has finished.
@@ -116,14 +122,6 @@ fn not_a_run() -> Response {
     ferroterm_problem::respond(
         Kind::RunNotFound.problem("no run of this service has that id; GET /runs lists them"),
         None,
-    )
-}
-
-/// Anything else on the admin listener.
-async fn unknown() -> Response {
-    ferroterm_problem::blank(
-        StatusCode::NOT_FOUND,
-        "the admin listener answers POST /run, POST /activate, GET /runs, GET /runs/{id}, GET /metrics and the health routes",
     )
 }
 

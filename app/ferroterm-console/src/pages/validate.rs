@@ -21,7 +21,7 @@ use crate::fhir::validation::{
 };
 use crate::fhir::{CODE_SYSTEM, VALUE_SET};
 use crate::locale::{Msg, tr, tr_with};
-use crate::markup::{code, h, p, strong, t};
+use crate::markup::{code, p, strong};
 use crate::pages::lookup::CODE_PARAM;
 use crate::pages::operations::{
     Op, before, choices, frame, options, run, select, sent, text, verdict,
@@ -88,9 +88,9 @@ fn mode(request: &Request, relation: bool, system: &str) -> Html {
         ],
         usize::from(relation),
     );
-    h(format!(
+    Html::raw(format!(
         r#"<div class="fui-field"><span class="fui-label" aria-hidden="true">{}</span>{links}</div>"#,
-        t(tr(locale, Msg::CheckWhat))
+        Html::text(tr(locale, Msg::CheckWhat))
     ))
 }
 
@@ -221,29 +221,29 @@ fn membership_title(locale: &Locale, validation: &Validation, code_typed: &str, 
     let display = validation
         .display
         .as_ref()
-        .map(|display| h(format!("{} · ", strong(display))))
+        .map(|display| Html::raw(format!("{} · ", strong(display))))
         .unwrap_or_default();
     let typed = code(code_typed);
     match validation.result {
-        Some(true) => h(format!(
+        Some(true) => Html::raw(format!(
             "{} {display}{typed} {}",
-            t(tr(locale, Msg::CheckValid)),
-            t(tr_with(
+            Html::text(tr(locale, Msg::CheckValid)),
+            Html::text(tr_with(
                 locale,
                 Msg::CheckIsIn,
                 &[("set", set.to_owned().into())]
             ))
         )),
-        Some(false) => h(format!(
+        Some(false) => Html::raw(format!(
             "{} {display}{typed} {}",
-            t(tr(locale, Msg::CheckNotValid)),
-            t(tr_with(
+            Html::text(tr(locale, Msg::CheckNotValid)),
+            Html::text(tr_with(
                 locale,
                 Msg::CheckIsNotIn,
                 &[("set", set.to_owned().into())]
             ))
         )),
-        None => t(tr(locale, Msg::CheckNoResult)),
+        None => Html::text(tr(locale, Msg::CheckNoResult)),
     }
 }
 
@@ -272,7 +272,7 @@ fn concept(
         None => system,
     };
     let inactive = if validation.inactive == Some(true) {
-        format!(" {}", t(tr(locale, Msg::CheckInactive)))
+        format!(" {}", Html::text(tr(locale, Msg::CheckInactive)))
     } else {
         String::new()
     };
@@ -283,16 +283,16 @@ fn concept(
             count: None,
             actions: None,
         }),
-        h(format!(
+        Html::raw(format!(
             r#"{}<p class="fui-small fui-muted">{} {}{inactive}</p>"#,
-            p(t(display)),
+            p(Html::text(display)),
             code(
                 validation
                     .code
                     .clone()
                     .unwrap_or_else(|| code_typed.to_owned())
             ),
-            t(place),
+            Html::text(place),
         )),
     ))
 }
@@ -305,7 +305,7 @@ fn issues(locale: &Locale, validation: &Validation) -> Option<Html> {
     let message = validation
         .message
         .as_ref()
-        .map(|message| p(t(message)))
+        .map(|message| p(Html::text(message)))
         .unwrap_or_default();
     let listed: Vec<Issue> = validation
         .issues
@@ -409,7 +409,7 @@ async fn relation_tab(
                 |outcome| subsumption_sentence(locale, &outcome, &code_a, &code_b),
             );
             Html::join([
-                verdict(locale, Outcome::Ok, t(said), None),
+                verdict(locale, Outcome::Ok, Html::text(said), None),
                 sent(
                     locale,
                     &sent_url,

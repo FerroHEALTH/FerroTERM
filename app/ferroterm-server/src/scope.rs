@@ -19,6 +19,7 @@ use fhir_terminology::fhir_codesystem::provider::FhirCodeSystem;
 use fhir_terminology::operations::{OperationError, Sources};
 use fhir_terminology::provider::declaration::ContentMode;
 use fhir_terminology::registry::Registry;
+use fhir_terminology::supplement::Supplement;
 use fhir_terminology::valueset::store::ValueSetStore;
 use http::{HeaderMap, StatusCode};
 
@@ -26,7 +27,6 @@ use crate::artefact::{Loaded, TX_RESOURCE, Unusable};
 use crate::outcome::Failure;
 use crate::state::AppState;
 use crate::state::layer::Layer;
-use crate::state::load::supplement_of;
 
 /// The ecosystem runner's profile parameter naming the expansion identifier
 /// to use; not declared by any version, peeled off with the resources.
@@ -127,7 +127,7 @@ impl Scope {
             // NOTE: a supplied supplement is dormant like a loaded one: a request
             // applies it by naming it in `useSupplement`, or through the value set's
             // `valueset-supplement` (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
-            registry.register_supplement(target.clone(), supplement_of(model));
+            registry.register_supplement(target.clone(), Supplement::from_code_system(model));
         }
         Ok(Self {
             served,

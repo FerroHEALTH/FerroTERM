@@ -222,7 +222,7 @@ fn a_lookup_address_carries_the_code_and_the_system_encoded() {
         display_language: Some(String::from("nl-NL")),
     };
     assert_eq!(
-        request.append(RequestUrl::new()).render(""),
+        request.append(RequestUrl::default()).render(""),
         "?system=https%3A%2F%2Fterminology.example%2Fx%3Fedition%3D2031&code=m%2Fs2\
          &version=2.0&displayLanguage=nl-NL",
         "a code carrying a separator stays inside the parameter it belongs to"
@@ -237,7 +237,7 @@ fn a_lookup_address_sends_only_what_the_address_names() {
         ..LookupRequest::default()
     };
     assert_eq!(
-        request.append(RequestUrl::new()).render(""),
+        request.append(RequestUrl::default()).render(""),
         "?system=https%3A%2F%2Fterminology.example%2Fx&code=a",
         "an unset parameter leaves the server's own default in force"
     );
@@ -369,11 +369,14 @@ fn the_hierarchy_links_are_read_from_the_standard_concept_properties() {
     )
     .concept();
     assert_eq!(
-        concept.parents(),
+        concept.property_values(PARENT_PROPERTY),
         vec![String::from("a"), String::from("b")],
         "a concept with two parents keeps both, because a hierarchy may be a graph"
     );
-    assert_eq!(concept.children(), vec![String::from("c")]);
+    assert_eq!(
+        concept.property_values(CHILD_PROPERTY),
+        vec![String::from("c")]
+    );
 }
 
 #[test]
@@ -381,7 +384,7 @@ fn an_answer_that_carries_nothing_reads_as_a_concept_that_declares_nothing() {
     let concept = answer(r#"{"resourceType":"Parameters"}"#).concept();
     assert_eq!(concept, Concept::default());
     assert!(
-        concept.parents().is_empty(),
+        concept.property_values(PARENT_PROPERTY).is_empty(),
         "the screen states the absence"
     );
 }
