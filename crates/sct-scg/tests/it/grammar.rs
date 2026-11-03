@@ -6,8 +6,8 @@
 //!
 //! The identifiers are this project's own: a test ships no SNOMED CT content.
 
-use sct_scg::ParseError;
 use sct_scg::ast::{AttributeValue, DefinitionStatus};
+use sct_scg::front::ParseError;
 
 fn parsed(text: &str) -> sct_scg::ast::Expression {
     sct_scg::parse(text).unwrap_or_else(|e| panic!("{text}: {e}"))
@@ -215,8 +215,8 @@ fn a_syntax_error_points_at_the_byte_it_stopped_on() {
 fn nesting_past_the_limit_is_refused_rather_than_descended() {
     let deep = format!(
         "100000001 : 200000001 = {}300000001{}",
-        "(".repeat(sct_scg::NESTING_LIMIT + 1),
-        ")".repeat(sct_scg::NESTING_LIMIT + 1)
+        "(".repeat(sct_scg::front::NESTING_LIMIT + 1),
+        ")".repeat(sct_scg::front::NESTING_LIMIT + 1)
     );
     let error = sct_scg::parse(&deep).expect_err("refused");
     assert!(

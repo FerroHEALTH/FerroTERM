@@ -8,19 +8,20 @@ use winnow::combinator::{alt, cut_err, fail, opt, preceded, separated, terminate
 use winnow::prelude::*;
 
 use super::{
-    Expecting, PResult, Tokens, backtrack, bare_or_set, boolean, comparison, concept_reference,
-    equality, is_scheme_alias, keyword, kind, numeric_value, refset_field_name, refuse, sctid,
-    spaced_set, string_content, sub_expression_constraint, typed_search_terms,
+    bare_or_set, boolean, comparison, concept_reference, equality, is_scheme_alias, keyword,
+    numeric_value, refset_field_name, sctid, spaced_set, string_content, sub_expression_constraint,
+    typed_search_terms,
 };
 use crate::ast::{
     Acceptability, AcceptabilitySet, ActiveValue, ConceptFilter, ConceptReference, ConceptSet,
     DefinitionStatus, DescriptionFilter, DialectAlias, DialectIdValue, FieldValue,
     FilterConstraint, MemberFilter, TimeValue, TypeToken,
 };
-use crate::lexer::{Kind, Token};
+use crate::lexer::Kind;
+use sct_scg::front::{Expecting, PResult, Token, Tokens, backtrack, kind, refuse};
 
 /// `timevalue`: `""` or `"YYYYMMDD"`.
-fn time_value(i: &mut Tokens<'_>) -> PResult<TimeValue> {
+fn time_value(i: &mut Tokens<'_, Kind>) -> PResult<TimeValue> {
     let start = i.checkpoint();
     let text = string_content.parse_next(i)?;
     let in_range = |range: std::ops::Range<usize>, max: u8| {
@@ -43,9 +44,9 @@ fn time_value(i: &mut Tokens<'_>) -> PResult<TimeValue> {
 /// `activevalue`: `1`, `0`, `true`, `false`, or `*` (ECL 2.3).
 // NOTE: ECL 2.3 `activevalue` (ABNF and `ECL.g4`) admits a bare `*`; the
 // specification's filter examples quote it, which neither grammar admits.
-fn active_value(i: &mut Tokens<'_>) -> PResult<ActiveValue> {
+fn active_value(i: &mut Tokens<'_, Kind>) -> PResult<ActiveValue> {
     alt((
-        kind(Kind::Integer).verify_map(|t: &Token<'_>| match t.text {
+        kind(Kind::Integer).verify_map(|t: &Token<'_, Kind>| match t.text {
             "1" => Some(ActiveValue::Active),
             "0" => Some(ActiveValue::Inactive),
             _ => None,
@@ -68,7 +69,7 @@ fn active_value(i: &mut Tokens<'_>) -> PResult<ActiveValue> {
 /// The grammar lists the constraint first; a set of two or more references
 /// never parses as one, so trying the set first reads every valid input the
 /// same way and keeps the constraint's errors for the invalid ones.
-fn concept_set(i: &mut Tokens<'_>) -> PResult<ConceptSet> {
+fn concept_set(i: &mut Tokens<'_, Kind>) -> PResult<ConceptSet> {
     alt((
         spaced_set(concept_reference, 2, "two or more concept references").map(ConceptSet::Set),
         sub_expression_constraint.map(ConceptSet::Expression),
@@ -77,7 +78,7 @@ fn concept_set(i: &mut Tokens<'_>) -> PResult<ConceptSet> {
 }
 
 /// `acceptabilityset`.
-fn acceptability_set(i: &mut Tokens<'_>) -> PResult<AcceptabilitySet> {
+fn acceptability_set(i: &mut Tokens<'_, Kind>) -> PResult<AcceptabilitySet> {
     alt((
         spaced_set(concept_reference, 1, "acceptability concepts").map(AcceptabilitySet::Concepts),
         spaced_set(
@@ -96,7 +97,7 @@ fn acceptability_set(i: &mut Tokens<'_>) -> PResult<AcceptabilitySet> {
 /// `dialectidset`, kept only when it cannot also be read as a nested
 /// constraint (the grammar's first alternative for `( reference )`).
 fn dialect_id_set(
-    i: &mut Tokens<'_>,
+    i: &mut Tokens<'_, Kind>,
 ) -> PResult<Vec<(ConceptReference, Option<AcceptabilitySet>)>> {
     spaced_set(
         (concept_reference, opt(acceptability_set)),
@@ -112,18 +113,18 @@ fn dialect_id_set(
 }
 
 /// `dialectalias`: a letter, then letters, digits, and dashes.
-fn dialect_alias(i: &mut Tokens<'_>) -> PResult<String> {
+fn dialect_alias(i: &mut Tokens<'_, Kind>) -> PResult<String> {
     kind(Kind::Identifier)
-        .verify(|t: &Token<'_>| is_scheme_alias(t.text))
+        .verify(|t: &Token<'_, Kind>| is_scheme_alias(t.text))
         .map(|t| t.text.to_owned())
         .expecting("a dialect alias such as en-gb")
         .parse_next(i)
 }
 
 /// `languagecode`: two letters.
-fn language_code(i: &mut Tokens<'_>) -> PResult<String> {
+fn language_code(i: &mut Tokens<'_, Kind>) -> PResult<String> {
     kind(Kind::Identifier)
-        .verify(|t: &Token<'_>| {
+        .verify(|t: &Token<'_, Kind>| {
             t.text.len() == 2 && t.text.bytes().all(|b| b.is_ascii_alphabetic())
         })
         .map(|t| t.text.to_owned())
@@ -132,7 +133,7 @@ fn language_code(i: &mut Tokens<'_>) -> PResult<String> {
 }
 
 /// `typetoken`.
-fn type_token(i: &mut Tokens<'_>) -> PResult<TypeToken> {
+fn type_token(i: &mut Tokens<'_, Kind>) -> PResult<TypeToken> {
     alt((
         keyword("syn").value(TypeToken::Synonym),
         keyword("fsn").value(TypeToken::FullySpecifiedName),
@@ -142,7 +143,7 @@ fn type_token(i: &mut Tokens<'_>) -> PResult<TypeToken> {
 }
 
 /// `definitionstatustoken`.
-fn definition_status(i: &mut Tokens<'_>) -> PResult<DefinitionStatus> {
+fn definition_status(i: &mut Tokens<'_, Kind>) -> PResult<DefinitionStatus> {
     alt((
         keyword("primitive").value(DefinitionStatus::Primitive),
         keyword("defined").value(DefinitionStatus::Defined),
@@ -151,7 +152,7 @@ fn definition_status(i: &mut Tokens<'_>) -> PResult<DefinitionStatus> {
 }
 
 /// `dialectfilter`.
-fn dialect_filter(i: &mut Tokens<'_>) -> PResult<DescriptionFilter> {
+fn dialect_filter(i: &mut Tokens<'_, Kind>) -> PResult<DescriptionFilter> {
     if opt(keyword("dialectId")).parse_next(i)?.is_some() {
         let (operator, value, acceptability) = cut_err((
             equality,
@@ -200,7 +201,7 @@ fn dialect_filter(i: &mut Tokens<'_>) -> PResult<DescriptionFilter> {
 }
 
 /// `descriptionfilter`.
-fn description_filter(i: &mut Tokens<'_>) -> PResult<DescriptionFilter> {
+fn description_filter(i: &mut Tokens<'_, Kind>) -> PResult<DescriptionFilter> {
     alt((
         preceded(keyword("term"), cut_err((equality, typed_search_terms)))
             .map(|(operator, terms)| DescriptionFilter::Term { operator, terms }),
@@ -237,7 +238,7 @@ fn description_filter(i: &mut Tokens<'_>) -> PResult<DescriptionFilter> {
 }
 
 /// `conceptfilter`.
-fn concept_filter(i: &mut Tokens<'_>) -> PResult<ConceptFilter> {
+fn concept_filter(i: &mut Tokens<'_, Kind>) -> PResult<ConceptFilter> {
     alt((
         preceded(
             keyword("definitionStatusId"),
@@ -267,7 +268,7 @@ fn concept_filter(i: &mut Tokens<'_>) -> PResult<ConceptFilter> {
 }
 
 /// The value part of `memberfieldfilter`, in the grammar's alternative order.
-fn field_value(i: &mut Tokens<'_>) -> PResult<FieldValue> {
+fn field_value(i: &mut Tokens<'_, Kind>) -> PResult<FieldValue> {
     alt((
         (equality, sub_expression_constraint)
             .map(|(operator, value)| FieldValue::Expression { operator, value }),
@@ -288,7 +289,7 @@ fn field_value(i: &mut Tokens<'_>) -> PResult<FieldValue> {
 }
 
 /// `memberfilter`.
-fn member_filter(i: &mut Tokens<'_>) -> PResult<MemberFilter> {
+fn member_filter(i: &mut Tokens<'_, Kind>) -> PResult<MemberFilter> {
     alt((
         preceded(keyword("moduleId"), cut_err((equality, concept_set)))
             .map(|(operator, value)| MemberFilter::Module { operator, value }),
@@ -307,7 +308,7 @@ fn member_filter(i: &mut Tokens<'_>) -> PResult<MemberFilter> {
 }
 
 /// `{{ M filter, filter }}`.
-pub(super) fn member_filter_constraint(i: &mut Tokens<'_>) -> PResult<Vec<MemberFilter>> {
+pub(super) fn member_filter_constraint(i: &mut Tokens<'_, Kind>) -> PResult<Vec<MemberFilter>> {
     preceded(
         (kind(Kind::DoubleLeftBrace), keyword("M")),
         cut_err(terminated(
@@ -319,7 +320,7 @@ pub(super) fn member_filter_constraint(i: &mut Tokens<'_>) -> PResult<Vec<Member
 }
 
 /// `{{ C filter, filter }}`.
-pub(super) fn concept_filter_constraint(i: &mut Tokens<'_>) -> PResult<FilterConstraint> {
+pub(super) fn concept_filter_constraint(i: &mut Tokens<'_, Kind>) -> PResult<FilterConstraint> {
     preceded(
         (kind(Kind::DoubleLeftBrace), keyword("C")),
         cut_err(terminated(
@@ -333,7 +334,7 @@ pub(super) fn concept_filter_constraint(i: &mut Tokens<'_>) -> PResult<FilterCon
 
 /// `{{ [D] filter, filter }}`; a `{{` that opens a member filter, a concept
 /// filter, or a history supplement is left to those rules.
-pub(super) fn description_filter_constraint(i: &mut Tokens<'_>) -> PResult<FilterConstraint> {
+pub(super) fn description_filter_constraint(i: &mut Tokens<'_, Kind>) -> PResult<FilterConstraint> {
     kind(Kind::DoubleLeftBrace).parse_next(i)?;
     let starts_other = i.peek_token().is_some_and(|t| {
         t.kind == Kind::Plus

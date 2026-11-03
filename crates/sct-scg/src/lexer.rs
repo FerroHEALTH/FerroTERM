@@ -11,8 +11,6 @@
 //! keeps its byte span so the parser can require the grammar's adjacency
 //! (`sctId`, `numericValue`, and the `"#"` before one).
 
-use std::ops::Range;
-
 use logos::Logos;
 
 /// A token kind.
@@ -76,10 +74,8 @@ pub enum Kind {
     Period,
 }
 
-impl Kind {
-    /// The token class as an error message names it.
-    #[must_use]
-    pub const fn describe(self) -> &'static str {
+impl crate::front::Lexeme for Kind {
+    fn describe(self) -> &'static str {
         match self {
             Self::Term => "a term between pipes",
             Self::String => "a quoted string",
@@ -99,65 +95,23 @@ impl Kind {
             Self::Period => "'.'",
         }
     }
-}
 
-/// A token with its source text and byte span.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Token<'s> {
-    /// The kind.
-    pub kind: Kind,
-    /// The source text.
-    pub text: &'s str,
-    /// The byte span in the input.
-    pub span: Range<usize>,
-}
-
-impl PartialEq<Kind> for Token<'_> {
-    fn eq(&self, other: &Kind) -> bool {
-        self.kind == *other
+    fn nesting(self) -> crate::front::Nesting {
+        match self {
+            Self::LeftParen | Self::LeftBrace => crate::front::Nesting::Opens,
+            Self::RightParen | Self::RightBrace => crate::front::Nesting::Closes,
+            _ => crate::front::Nesting::Neither,
+        }
     }
-}
-
-/// A character no token starts with.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-#[error("unexpected character {found:?} at byte {offset}")]
-pub struct LexError {
-    /// The byte offset of the character.
-    pub offset: usize,
-    /// The character.
-    pub found: char,
-}
-
-/// Splits `input` into tokens, skipping whitespace.
-///
-/// # Errors
-///
-/// Returns [`LexError`] at the first character no token starts with (an
-/// unterminated term or string among them).
-pub fn lex(input: &str) -> Result<Vec<Token<'_>>, LexError> {
-    let mut lexer = Kind::lexer(input);
-    let mut tokens = Vec::new();
-    while let Some(kind) = lexer.next() {
-        let span = lexer.span();
-        let kind = kind.map_err(|()| LexError {
-            offset: span.start,
-            found: lexer.slice().chars().next().unwrap_or('\u{0}'),
-        })?;
-        tokens.push(Token {
-            kind,
-            text: lexer.slice(),
-            span,
-        });
-    }
-    Ok(tokens)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Kind, lex};
+    use super::Kind;
+    use crate::front::lex;
 
     fn kinds(input: &str) -> Vec<Kind> {
-        lex(input)
+        lex::<Kind>(input)
             .expect("lexes")
             .into_iter()
             .map(|t| t.kind)
@@ -205,14 +159,22 @@ mod tests {
     fn an_escape_the_grammar_does_not_define_does_not_continue_a_string() {
         // `escapedChar = BS QM / BS BS`, so a backslash before anything else
         // ends no escape and the quoted run is not a string token at all.
-        let error = lex(r#""a\nb" "#).expect_err("refused");
+        let error = lex::<Kind>(r#""a\nb" "#).expect_err("refused");
         assert_eq!(error.offset, 0);
         assert_eq!(error.found, '"');
     }
 
     #[test]
     fn an_unterminated_term_or_string_is_refused_at_its_opening() {
-        assert_eq!(lex("123456 |unterminated").expect_err("refused").offset, 7);
-        assert_eq!(lex("123456 = \"open").expect_err("refused").offset, 9);
+        assert_eq!(
+            lex::<Kind>("123456 |unterminated")
+                .expect_err("refused")
+                .offset,
+            7
+        );
+        assert_eq!(
+            lex::<Kind>("123456 = \"open").expect_err("refused").offset,
+            9
+        );
     }
 }

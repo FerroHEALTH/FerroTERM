@@ -55,7 +55,7 @@ pub enum ExpressionError {
     Syntax {
         /// The parser's failure, which carries the byte offset.
         #[source]
-        source: sct_scg::ParseError,
+        source: sct_scg::front::ParseError,
     },
     /// The expression names a concept the edition does not define.
     #[error("the expression names concept `{code}`, which this version does not define")]
@@ -904,7 +904,7 @@ impl SnomedProvider {
         requirement: &Term,
         depth: usize,
     ) -> Result<bool, ProviderError> {
-        if depth > sct_scg::NESTING_LIMIT {
+        if depth > sct_scg::front::NESTING_LIMIT {
             return Ok(false);
         }
         if !requirement

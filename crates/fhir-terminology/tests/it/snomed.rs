@@ -716,9 +716,9 @@ fn a_malformed_expression_constraint_states_where_the_parser_stopped() {
         "the parser stops at `OR`, byte 3"
     );
     let cause = std::error::Error::source(invalid.as_ref())
-        .and_then(|cause| cause.downcast_ref::<sct_ecl::ParseError>());
+        .and_then(|cause| cause.downcast_ref::<sct_scg::front::ParseError>());
     assert_eq!(
-        cause.map(sct_ecl::ParseError::offset),
+        cause.map(sct_scg::front::ParseError::offset),
         Some(3),
         "the parse error is the cause, not a copy of its text"
     );
@@ -735,7 +735,7 @@ fn a_malformed_expression_constraint_states_where_the_parser_stopped() {
     );
     assert!(
         std::error::Error::source(malformed.as_ref())
-            .is_some_and(<dyn std::error::Error>::is::<sct_ecl::ParseError>),
+            .is_some_and(<dyn std::error::Error>::is::<sct_scg::front::ParseError>),
         "the parse error is the cause"
     );
 }

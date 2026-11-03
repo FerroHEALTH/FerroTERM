@@ -45,7 +45,7 @@ target for a bounded time and uploads what it finds.
 `ecl_parse` found a stack overflow: the parser is recursive descent, so an
 expression of deeply nested brackets descended until the process aborted. A
 stack overflow is not a panic, so it takes the server with it rather than
-unwinding into a 500. `sct_ecl::NESTING_LIMIT` now bounds the nesting and the
+unwinding into a 500. `sct_scg::front::NESTING_LIMIT` now bounds the nesting and the
 parser refuses past it, which the server renders as an `OperationOutcome`
 (`crates/sct-ecl/tests/it/grammar.rs`,
 `app/ferroterm-server/tests/it/value_set.rs`).

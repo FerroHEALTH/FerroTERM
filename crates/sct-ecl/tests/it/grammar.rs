@@ -10,7 +10,8 @@ use sct_ecl::ast::{
     FieldValue, FilterConstraint, FocusConcept, HistorySupplement, MemberFilter, MemberOf,
     Refinement, RefsetFields, RefsetOperator, Sctid, SubAttributeSet, SubRefinement,
 };
-use sct_ecl::{ParseError, parse};
+use sct_ecl::parse;
+use sct_scg::front::ParseError;
 
 fn refused(input: &str) -> (usize, String) {
     match parse(input) {
@@ -502,22 +503,30 @@ fn errors_name_the_offset_and_what_was_expected() {
 #[test]
 fn nesting_past_the_limit_is_refused_rather_than_descended() {
     let nested = |depth: usize| format!("{}138875005{}", "(".repeat(depth), ")".repeat(depth));
-    let at_limit = nested(sct_ecl::NESTING_LIMIT);
+    let at_limit = nested(sct_scg::front::NESTING_LIMIT);
     assert!(
         parse(&at_limit).is_ok(),
         "an expression at the limit still parses"
     );
-    match parse(&nested(sct_ecl::NESTING_LIMIT + 1)) {
+    match parse(&nested(sct_scg::front::NESTING_LIMIT + 1)) {
         Err(ParseError::TooDeep {
             offset,
             depth,
             limit,
         }) => {
-            assert_eq!(limit, sct_ecl::NESTING_LIMIT, "the limit is reported");
-            assert_eq!(depth, sct_ecl::NESTING_LIMIT + 1, "the depth reached");
+            assert_eq!(
+                limit,
+                sct_scg::front::NESTING_LIMIT,
+                "the limit is reported"
+            );
+            assert_eq!(
+                depth,
+                sct_scg::front::NESTING_LIMIT + 1,
+                "the depth reached"
+            );
             assert_eq!(
                 offset,
-                sct_ecl::NESTING_LIMIT,
+                sct_scg::front::NESTING_LIMIT,
                 "the bracket that crossed it"
             );
         }
