@@ -298,6 +298,10 @@ jobs:
         run: |
           bash scripts/checks/usage-report-off.sh --self-test
           bash scripts/checks/usage-report-off.sh
+      # The weekly pin-freshness lane reads upstream; here only its readers
+      # run over fixtures and every pin row it reads is checked to exist.
+      - name: pin-freshness self-test
+        run: bash scripts/checks/pin-freshness.sh --self-test
 
   dockerfile-lint:
     name: hadolint
