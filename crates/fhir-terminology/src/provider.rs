@@ -549,11 +549,11 @@ pub trait CodeSystemProvider: fmt::Debug + Send + Sync {
 
     /// Whether `code` is written in the code system's compositional grammar.
     ///
-    /// A provider that declares [`Compositional::Defined`] recognises the shape
+    /// A provider that declares [`Compositional::Defined`](declaration::Compositional::Defined) recognises the shape
     /// of an expression it does not evaluate, so an operation refuses the code
     /// as a grammar this server does not serve rather than as a concept the
     /// code system does not have. Every other provider answers `false`: one
-    /// that declares [`Compositional::Supported`] locates such a code instead.
+    /// that declares [`Compositional::Supported`](declaration::Compositional::Supported) locates such a code instead.
     fn is_expression(&self, _code: &str) -> bool {
         false
     }

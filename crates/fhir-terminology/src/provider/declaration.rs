@@ -205,7 +205,7 @@ pub struct Declaration {
     /// The optional capabilities.
     pub capabilities: BTreeSet<Capability>,
     /// The implicit value set forms
-    /// [`CodeSystemProvider::implicit_value_set`] resolves, one per URL
+    /// [`super::CodeSystemProvider::implicit_value_set`] resolves, one per URL
     /// template the system's page defines; empty when it resolves none.
     pub implicit_forms: Vec<ImplicitForm>,
 }
