@@ -9,6 +9,12 @@
 //! operations need. Storage stays behind the provider; the compose layer,
 //! paging, and dedup live once above it.
 
+pub mod code_system;
+pub mod compose;
+pub mod concept_map;
+pub mod filter;
+pub mod source;
+
 use std::collections::BTreeSet;
 use std::fmt;
 
@@ -16,8 +22,8 @@ use roaring::RoaringBitmap;
 
 use concept_graph::subsumption::Outcome;
 
-use crate::compose::Compose;
-use crate::filter::{Filter, FilterOperator};
+use compose::Compose;
+use filter::{Filter, FilterOperator};
 
 /// An opaque handle to one concept of one code system version.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -484,47 +490,6 @@ impl Default for Property {
     }
 }
 
-/// The concept property codes the FHIR specification itself defines, in the
-/// `http://hl7.org/fhir/concept-properties` code system
-/// (<https://hl7.org/fhir/R5/codesystem.html#defined-props>; R6 adds
-/// `alternateCode`, `order`, `definition`, and the `lastVersion*` and
-/// `replacedBy*` pair).
-const SPECIFICATION_CONCEPT_PROPERTIES: [&str; 20] = [
-    "status",
-    "inactive",
-    "effectiveDate",
-    "deprecated",
-    "deprecationDate",
-    "retirementDate",
-    "notSelectable",
-    "parent",
-    "child",
-    "partOf",
-    "synonym",
-    "alternateCode",
-    "comment",
-    "itemWeight",
-    "order",
-    "definition",
-    "lastVersionActive",
-    "lastVersionPresent",
-    "replacedByCode",
-    "replacedByCoding",
-];
-
-/// The formal URI of `code` when the FHIR specification defines it as a
-/// concept property, else `None`.
-///
-/// A code system that declares the property itself states its own URI; this
-/// answers for the ones every system shares
-/// (<https://hl7.org/fhir/R5/codesystem.html#defined-props>).
-#[must_use]
-pub fn defined_property_uri(code: &str) -> Option<String> {
-    SPECIFICATION_CONCEPT_PROPERTIES
-        .contains(&code)
-        .then(|| format!("http://hl7.org/fhir/concept-properties#{code}"))
-}
-
 /// One part of a structured property value.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Subproperty {
@@ -548,7 +513,7 @@ pub struct Successor {
     /// Its display.
     pub display: Option<String>,
     /// The relationship the association asserts.
-    pub relationship: crate::conceptmap::model::Relationship,
+    pub relationship: concept_map::Relationship,
     /// The canonical of the implicit concept map the association forms.
     pub map: String,
 }
@@ -790,7 +755,7 @@ pub trait CodeSystemProvider: fmt::Debug + Send + Sync {
     /// A read of the instance renders this when it is `Some`, so a system
     /// whose `content` says its concepts are in the resource answers with
     /// them (<https://hl7.org/fhir/R4B/codesystem-content-mode.html>).
-    fn code_system(&self) -> Option<&crate::fhir_codesystem::model::CodeSystemModel> {
+    fn code_system(&self) -> Option<&code_system::CodeSystemModel> {
         None
     }
 
@@ -872,7 +837,7 @@ pub trait CodeSystemProvider: fmt::Debug + Send + Sync {
     /// A system posted as a `CodeSystem` resource and a registry the binary
     /// carries answer `None`, so the capability statement declares nothing for
     /// them rather than an invented artifact.
-    fn artifact(&self) -> Option<&crate::artifact::Source> {
+    fn artifact(&self) -> Option<&source::Source> {
         None
     }
 
@@ -900,7 +865,7 @@ pub trait CodeSystemProvider: fmt::Debug + Send + Sync {
     /// Returns [`ProviderError::NotEnumerable`] when the system cannot
     /// enumerate, and [`ProviderError::Storage`] when the substrate fails.
     fn inactive(&self) -> Result<ConceptSet, ProviderError> {
-        crate::filter::inactive_by_status(self)
+        filter::inactive_by_status(self)
     }
 
     /// The concepts an expansion for use outside a user interface leaves out:
@@ -1055,7 +1020,7 @@ pub trait CodeSystemProvider: fmt::Debug + Send + Sync {
         &self,
         _url: &str,
         _selection: MapSelection<'_>,
-    ) -> Option<Result<crate::conceptmap::model::ConceptMapModel, ProviderError>> {
+    ) -> Option<Result<concept_map::ConceptMapModel, ProviderError>> {
         None
     }
 
@@ -1071,7 +1036,7 @@ pub trait CodeSystemProvider: fmt::Debug + Send + Sync {
     /// Returns [`ProviderError::UnsupportedFilter`] for an operator or property
     /// the system does not answer, and the value errors of the operators.
     fn filter(&self, filter: &Filter) -> Result<ConceptSet, ProviderError> {
-        crate::filter::evaluate(self, filter)
+        filter::evaluate(self, filter)
     }
 
     /// The concepts every filter of one include selects, all of them.
@@ -1145,7 +1110,7 @@ pub trait CodeSystemProvider: fmt::Debug + Send + Sync {
     ///
     /// Returns the errors of [`CodeSystemProvider::filter`].
     fn filter_matches(&self, concept: Concept, filter: &Filter) -> Result<bool, ProviderError> {
-        crate::filter::selected_by(self, concept, filter)
+        filter::selected_by(self, concept, filter)
     }
 
     /// The subsumption of `a` over `b` when the system decides it without a
@@ -1163,32 +1128,7 @@ pub trait CodeSystemProvider: fmt::Debug + Send + Sync {
 
 #[cfg(test)]
 mod tests {
-    use super::{ContentMode, HierarchyMeaning, PropertyKind, defined_property_uri};
-
-    #[test]
-    fn a_specification_defined_property_carries_the_specifications_uri() {
-        // <https://hl7.org/fhir/R5/codesystem.html#defined-props>
-        assert_eq!(
-            defined_property_uri("status").as_deref(),
-            Some("http://hl7.org/fhir/concept-properties#status"),
-            "status is defined in the FHIR concept properties"
-        );
-        // <https://hl7.org/fhir/6.0.0-ballot5/codesystem.html#defined-props>
-        assert_eq!(
-            defined_property_uri("definition").as_deref(),
-            Some("http://hl7.org/fhir/concept-properties#definition"),
-            "definition is defined in the FHIR concept properties from R6"
-        );
-    }
-
-    #[test]
-    fn a_code_systems_own_property_takes_no_specification_uri() {
-        assert_eq!(
-            defined_property_uri("prop"),
-            None,
-            "a property the specification does not define states its own URI"
-        );
-    }
+    use super::{ContentMode, HierarchyMeaning, PropertyKind};
 
     // The three enums below cross the wire: `content` and `hierarchyMeaning`
     // on a CodeSystem, and `type` on a property definition. Each variant's code

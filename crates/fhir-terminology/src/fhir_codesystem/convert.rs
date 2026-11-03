@@ -8,8 +8,8 @@
 //! value. One macro produces a module per version so the four conversions
 //! cannot drift: `convert::r4b::convert(&resource)`.
 
-use super::model::{ModelError, PARENT, SUBSUMED_BY};
-use crate::filter::FilterOperator;
+use crate::provider::code_system::{ModelError, PARENT, SUBSUMED_BY};
+use crate::provider::filter::FilterOperator;
 use crate::provider::{
     ContentMode, FilterDefinition, HierarchyMeaning, PropertyDefinition, PropertyKind,
 };
@@ -93,7 +93,7 @@ macro_rules! convert_code_system {
                 CodeSystem, CodeSystemConcept, CodeSystemConceptPropertyValue,
             };
 
-            use super::super::model::{CodeSystemModel, ConceptEntry, ModelError, designation_use};
+            use crate::provider::code_system::{CodeSystemModel, ConceptEntry, ModelError, designation_use};
             use super::{PARENT, SUBSUMED_BY, note_parent, text};
             use crate::provider::{Designation, Property, PropertyValue};
 

@@ -7,7 +7,7 @@
 //! Reading is open, so the page always offers the way to read without
 //! signing in. The sign-in itself is the authorization code flow with PKCE
 //! at the configured OpenID Provider, which the console's server runs
-//! (`crate::oidc`); the reader returns to the page they came from.
+//! (`ferrohealth-session`); the reader returns to the page they came from.
 
 use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
@@ -16,12 +16,67 @@ use ferrohealth_ui::view::session::session_ended;
 use ferrohealth_ui::view::shell::{brand_mark, centred, lockup_plain};
 use ferrohealth_ui::view::sign_in::{Notice, Provider, Retry, SignIn, State, sign_in};
 
-use crate::auth::SignInState;
 use crate::locale::{Msg, tr};
 use crate::markup::{h, link, t};
 use crate::request::Request;
-use crate::routes::{BACK_PARAM, LOGIN_ROUTE, ui_path};
+use crate::routes::{BACK_PARAM, ui_path};
 use crate::shell::{MARK_DARK, MARK_LIGHT, footer};
+
+/// Why the sign-in page is shown, as its `state` parameter names it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SignInState {
+    /// The reader signed out of the console.
+    SignedOut,
+    /// The session ended after its idle timeout.
+    Expired,
+    /// The session ended at its absolute timeout.
+    ExpiredAbsolute,
+    /// The console holds as many sessions as it may.
+    Full,
+    /// The provider refused the sign-in.
+    Refused,
+    /// The provider's answer failed the console's checks.
+    Rejected,
+    /// The console could not reach the provider.
+    Unreachable,
+    /// The console offers no sign-in.
+    Unavailable,
+}
+
+impl SignInState {
+    /// Every state, in the order the page knows them.
+    pub(crate) const ALL: [Self; 8] = [
+        Self::SignedOut,
+        Self::Expired,
+        Self::ExpiredAbsolute,
+        Self::Full,
+        Self::Refused,
+        Self::Rejected,
+        Self::Unreachable,
+        Self::Unavailable,
+    ];
+
+    /// The `state` parameter that names it.
+    #[must_use]
+    pub(crate) const fn key(self) -> &'static str {
+        match self {
+            Self::SignedOut => "signed-out",
+            Self::Expired => "expired",
+            Self::ExpiredAbsolute => "expired-absolute",
+            Self::Full => "full",
+            Self::Refused => "refused",
+            Self::Rejected => "rejected",
+            Self::Unreachable => "unreachable",
+            Self::Unavailable => "unavailable",
+        }
+    }
+
+    /// The state `key` names, or `None` for one the page does not know.
+    #[must_use]
+    pub(crate) fn parse(key: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|state| state.key() == key)
+    }
+}
 
 /// Where the book documents the console.
 const DOCS: &str = "https://ferroterm.eu/docs/operate/console.html";
@@ -74,9 +129,10 @@ pub(crate) fn page(request: &Request) -> Html {
         .and_then(|back| crate::routes::return_path(&back).map(str::to_owned))
         .unwrap_or_else(|| ui_path(""));
     let login = format!(
-        "{LOGIN_ROUTE}?{}",
+        "{}?{}",
+        ferrohealth_session::paths::LOGIN,
         url::form_urlencoded::Serializer::new(String::new())
-            .append_pair(BACK_PARAM, &back)
+            .append_pair(ferrohealth_session::paths::RETURN, &back)
             .finish()
     );
     let named = request

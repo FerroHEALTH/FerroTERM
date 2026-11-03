@@ -516,15 +516,7 @@ impl Render for AdminRefusal {
         let (_, text) = diagnostics(refusal);
         let challenged = self.header.respond(refusal, Body::empty());
         let challenge = challenged.headers().get(http::header::WWW_AUTHENTICATE);
-        let problem = match refusal.status() {
-            StatusCode::UNAUTHORIZED => crate::problem::Kind::Unauthenticated.problem(text),
-            StatusCode::FORBIDDEN => crate::problem::Kind::NotPermitted.problem(text),
-            StatusCode::SERVICE_UNAVAILABLE => {
-                crate::problem::Kind::AuthorizationUnavailable.problem(text)
-            }
-            status => ferrohealth_server::problem::Problem::new(status).with_detail(text),
-        };
-        crate::problem::respond(problem, challenge)
+        ferroterm_problem::refused(refusal.status(), text, challenge)
     }
 }
 

@@ -3,7 +3,7 @@
 [package]
 name = "rxnorm-rrf"
 description = "RxNorm Rich Release Format reader and typed row model"
-version = "0.1.133"
+version = "0.1.135"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

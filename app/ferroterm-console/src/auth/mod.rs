@@ -3,14 +3,16 @@
 //! Who is signed in, as the page knows it.
 //!
 //! The console signs a reader in on its server, at an OpenID Provider, and
-//! keeps the session there (`crate::session`, `crate::oidc`): the browser
+//! keeps the session there (`ferrohealth-session`, [`pages`]): the browser
 //! holds one opaque `HttpOnly` cookie and never a token. What the page is
 //! given is an [`Operator`]: the reader's name and the scopes their token
 //! grants, so a control the server would refuse is never drawn. The server
 //! enforces the same scopes itself on every write.
 
+pub mod pages;
 pub(crate) mod scopes;
 
+use ferrohealth_session::record::Held;
 use serde::{Deserialize, Serialize};
 
 use ferrohealth_ui::i18n::Locale;
@@ -100,59 +102,19 @@ pub(crate) fn standing(locale: &Locale, granted: &[String]) -> String {
     }
 }
 
-/// Why the sign-in page is shown, as its `state` parameter names it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SignInState {
-    /// The reader signed out of the console.
-    SignedOut,
-    /// The session ended after its idle timeout.
-    Expired,
-    /// The session ended at its absolute timeout.
-    ExpiredAbsolute,
-    /// The console holds as many sessions as it may.
-    Full,
-    /// The provider refused the sign-in.
-    Refused,
-    /// The provider's answer failed the console's checks.
-    Rejected,
-    /// The console could not reach the provider.
-    Unreachable,
-    /// The console offers no sign-in.
-    Unavailable,
-}
-
-impl SignInState {
-    /// Every state, in the order the page knows them.
-    pub const ALL: [Self; 8] = [
-        Self::SignedOut,
-        Self::Expired,
-        Self::ExpiredAbsolute,
-        Self::Full,
-        Self::Refused,
-        Self::Rejected,
-        Self::Unreachable,
-        Self::Unavailable,
-    ];
-
-    /// The `state` parameter that names it.
+impl Operator {
+    /// The reader a request's session holds, as the page is told of them:
+    /// `None` for a visitor, for a cookie that names no live session and for
+    /// a session whose access token expired and is not yet renewed.
     #[must_use]
-    pub const fn key(self) -> &'static str {
-        match self {
-            Self::SignedOut => "signed-out",
-            Self::Expired => "expired",
-            Self::ExpiredAbsolute => "expired-absolute",
-            Self::Full => "full",
-            Self::Refused => "refused",
-            Self::Rejected => "rejected",
-            Self::Unreachable => "unreachable",
-            Self::Unavailable => "unavailable",
+    pub fn of(held: &Held) -> Option<Self> {
+        match held {
+            Held::SignedIn(session) => Some(Self {
+                name: session.operator().map(str::to_owned),
+                scopes: session.scopes().to_vec(),
+            }),
+            Held::TokenExpired | Held::Ended | Held::Absent => None,
         }
-    }
-
-    /// The state `key` names, or `None` for one the page does not know.
-    #[must_use]
-    pub fn parse(key: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|state| state.key() == key)
     }
 }
 

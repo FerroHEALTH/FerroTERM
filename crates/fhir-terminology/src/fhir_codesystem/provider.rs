@@ -10,11 +10,11 @@ use concept_graph::csr::Csr;
 use concept_graph::ordinal::Ordinal;
 use roaring::RoaringBitmap;
 
-use super::model::{
+use crate::provider::code_system::{
     CHILD, CodeSystemModel, ConceptEntry, DEPRECATED, DEPRECATION_DATE, INACTIVE, NOT_SELECTABLE,
     PARENT, RETIRED, RETIREMENT_DATE, STATUS,
 };
-use crate::filter::Filter;
+use crate::provider::filter::Filter;
 use crate::provider::{
     Capability, CodeSystemProvider, Compositional, Concept, ConceptSet, ContentMode, Declaration,
     Designation, Hierarchy, HierarchyMeaning, Identity, Located, Property, PropertyDefinition,

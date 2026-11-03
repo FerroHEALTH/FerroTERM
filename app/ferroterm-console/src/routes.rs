@@ -202,16 +202,6 @@ pub(crate) const FHIR_VERSION_ROUTE: &str = "/fhir-version";
 /// The sign-in page.
 pub(crate) const SIGN_IN_PAGE: &str = "/auth/sign-in";
 
-/// The route that starts a sign-in at the OpenID Provider.
-pub(crate) const LOGIN_ROUTE: &str = "/auth/login";
-
-/// The route Sign out posts to.
-pub(crate) const SIGN_OUT_ROUTE: &str = "/auth/sign-out";
-
-/// The route FerroUI's session watch asks what the reader's session has left
-/// (`crate::session::watch`).
-pub(crate) const SESSION_ROUTE: &str = "/auth/session";
-
 /// The query parameter that carries the page to return to.
 pub(crate) const BACK_PARAM: &str = "back";
 

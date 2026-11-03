@@ -133,9 +133,6 @@ pub enum ExchangeError {
         /// What the HTTP client reported.
         message: String,
     },
-    /// The console's session store could not be read.
-    #[error("the console cannot read its sessions")]
-    Sessions,
     /// The console could not serve the request: the client has no way to
     /// the server.
     #[error("the console could not serve this request")]

@@ -10,10 +10,10 @@ use designation_index::index::Query;
 
 use super::artifact::Artifact;
 use super::primary_subtag;
-use crate::artifact::Source;
-use crate::compose::Compose;
-use crate::conceptmap::model::ConceptMapModel;
-use crate::filter::Filter;
+use crate::provider::compose::Compose;
+use crate::provider::concept_map::ConceptMapModel;
+use crate::provider::filter::Filter;
+use crate::provider::source::Source;
 use crate::provider::{
     Capability, CodeSystemProvider, Concept, ConceptSet, Declaration, Designation, DesignationUse,
     Hierarchy, Identity, ImplicitMetadata, Located, MapSelection, Property, ProviderError, Status,
@@ -206,7 +206,7 @@ pub trait StoredSystem: fmt::Debug + Send + Sync + Sized {
     }
 
     /// The concepts a filter of the system's own selects; `None` leaves the
-    /// filter to [`crate::filter::evaluate`].
+    /// filter to [`crate::provider::filter::evaluate`].
     fn filter(
         _provider: &StoredProvider<Self>,
         _filter: &Filter,
@@ -215,7 +215,7 @@ pub trait StoredSystem: fmt::Debug + Send + Sync + Sized {
     }
 
     /// Whether `concept` passes `filter`, when the system decides it from the
-    /// concept; `None` leaves it to [`crate::filter::selected_by`].
+    /// concept; `None` leaves it to [`crate::provider::filter::selected_by`].
     fn filter_matches(
         _provider: &StoredProvider<Self>,
         _concept: Concept,
@@ -225,7 +225,7 @@ pub trait StoredSystem: fmt::Debug + Send + Sync + Sized {
     }
 
     /// Every inactive concept, when the system has a cheaper answer; `None`
-    /// leaves it to [`crate::filter::inactive_by_status`].
+    /// leaves it to [`crate::provider::filter::inactive_by_status`].
     fn inactive(_provider: &StoredProvider<Self>) -> Option<Result<ConceptSet, ProviderError>> {
         None
     }
@@ -333,7 +333,7 @@ impl<S: StoredSystem> CodeSystemProvider for StoredProvider<S> {
     }
 
     fn inactive(&self) -> Result<ConceptSet, ProviderError> {
-        S::inactive(self).unwrap_or_else(|| crate::filter::inactive_by_status(self))
+        S::inactive(self).unwrap_or_else(|| crate::provider::filter::inactive_by_status(self))
     }
 
     fn is_postcoordinated(&self, concept: Concept) -> bool {
@@ -426,7 +426,7 @@ impl<S: StoredSystem> CodeSystemProvider for StoredProvider<S> {
     }
 
     fn filter(&self, filter: &Filter) -> Result<ConceptSet, ProviderError> {
-        S::filter(self, filter).unwrap_or_else(|| crate::filter::evaluate(self, filter))
+        S::filter(self, filter).unwrap_or_else(|| crate::provider::filter::evaluate(self, filter))
     }
 
     fn unclosed(&self, filters: &[Filter]) -> bool {
@@ -435,7 +435,7 @@ impl<S: StoredSystem> CodeSystemProvider for StoredProvider<S> {
 
     fn filter_matches(&self, concept: Concept, filter: &Filter) -> Result<bool, ProviderError> {
         S::filter_matches(self, concept, filter)
-            .unwrap_or_else(|| crate::filter::selected_by(self, concept, filter))
+            .unwrap_or_else(|| crate::provider::filter::selected_by(self, concept, filter))
     }
 
     fn subsumes(&self, a: Concept, b: Concept) -> Result<Option<Outcome>, ProviderError> {

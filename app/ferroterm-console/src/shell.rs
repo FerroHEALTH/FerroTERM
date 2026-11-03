@@ -141,9 +141,9 @@ pub(crate) fn console_shell(request: &Request, reached: Reached, content: Html) 
     let watch = request.left.map(|left| {
         session_watch(&Watch::new(
             locale,
-            routes::SESSION_ROUTE,
+            ferrohealth_session::paths::SESSION,
             routes::SIGN_IN_PAGE,
-            routes::SIGN_OUT_ROUTE,
+            ferrohealth_session::paths::LOGOUT,
             left,
         ))
     });
@@ -422,7 +422,7 @@ fn menu_of(request: &Request, open: bool) -> UserMenu {
             theme,
             choices,
             shortcuts: Some(routes::ui_path(routes::SHORTCUTS_PATH)),
-            sign_out: Some(String::from(routes::SIGN_OUT_ROUTE)),
+            sign_out: Some(String::from(ferrohealth_session::paths::LOGOUT)),
             links: Vec::new(),
         }
     } else {

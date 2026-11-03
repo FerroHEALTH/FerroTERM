@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+[package]
+name = "ferroterm-problem"
+description = "The RFC 9457 problem document FerroTERM's services write outside the FHIR bases"
+version = "0.1.135"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+readme = "README.md"
+# NOTE: unpublished: the problem document belongs to the server and the sync
+# service of this workspace and no other project reads it as a crate
+# (.claude/rules/crates-publishing.md). `include` still names the packaged
+# content the lockstep bump rule watches.
+publish = false
+include = ["src/**", "README.md", "LICENSE"]
+
+[dependencies]
+axum.workspace = true
+ferrohealth-server.workspace = true
+http.workspace = true
+
+[lints]
+workspace = true

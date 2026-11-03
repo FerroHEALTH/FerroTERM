@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use fhir_terminology::filter::{Filter, FilterOperator};
+use fhir_terminology::provider::filter::{Filter, FilterOperator};
 use fhir_terminology::provider::{
     CodeSystemProvider, Designation, MapSelection, Property, PropertyValue, ProviderError,
 };

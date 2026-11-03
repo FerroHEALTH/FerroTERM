@@ -21,7 +21,6 @@ pub mod compose;
 pub mod conceptmap;
 pub mod fhir_codesystem;
 pub mod fhir_core;
-pub mod filter;
 pub mod icd11;
 pub mod language;
 pub mod loinc;

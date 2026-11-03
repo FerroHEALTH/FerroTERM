@@ -21,7 +21,7 @@ const SIGN_IN: &str = "//a[normalize-space()='Sign in']";
 const SIGN_OUT: &str = "//button[normalize-space()='Sign out']";
 
 /// The sign-in page's way to an identity provider.
-const TO_PROVIDER: &str = "a[href^='/auth/login']";
+const TO_PROVIDER: &str = "a[href^='/login']";
 
 /// The shell's own mark, which proves the bundle booted.
 const LOCKUP: &str = "header a.fui-lockup";
