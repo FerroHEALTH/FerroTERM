@@ -28,7 +28,8 @@ async fn capabilities_that_do_not_decode_at_their_release_draw_the_error_state()
     let state = console(
         None,
         &format!("[ferroterm]\nbase_url = \"{}/\"\n", server.uri()),
-    );
+    )
+    .await;
     let page = text(send(&state, get("/systems?fhir=r4b", &[])).await).await;
     assert!(
         page.contains("FHIR R4B: ")
@@ -44,7 +45,7 @@ async fn capabilities_that_do_not_decode_at_their_release_draw_the_error_state()
 
 /// The About page of a console whose server is reached at `base`.
 async fn about_at(base: &str) -> String {
-    let state = console(None, &format!("[ferroterm]\nbase_url = \"{base}/\"\n"));
+    let state = console(None, &format!("[ferroterm]\nbase_url = \"{base}/\"\n")).await;
     text(send(&state, get("/about?fhir=r4", &[])).await).await
 }
 
