@@ -271,12 +271,15 @@ async fn reload(State(serving): State<Serving>) -> Response {
 /// The answer to a reload that did not happen: the old set still answers,
 /// and the problem's detail says why, for the operator who asked.
 fn refused(reason: &str) -> Response {
-    crate::problem::respond(crate::problem::Kind::ReloadFailed.problem(reason), None)
+    ferroterm_problem::respond(
+        ferroterm_problem::Kind::problem(crate::problem::Kind::ReloadFailed, reason),
+        None,
+    )
 }
 
 /// Anything else on the admin listener.
 async fn unknown() -> Response {
-    crate::problem::blank(
+    ferroterm_problem::blank(
         StatusCode::NOT_FOUND,
         "the admin listener answers POST /reload and the health routes alone",
     )

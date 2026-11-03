@@ -119,7 +119,7 @@ async fn unmatched(uri: http::Uri, headers: http::HeaderMap) -> axum::response::
     if problem::is_fhir(uri.path()) {
         outcome::not_found(&headers)
     } else {
-        problem::blank(
+        ferroterm_problem::blank(
             http::StatusCode::NOT_FOUND,
             "nothing on this server answers this path; the FHIR bases are /r4, /r4b, /r5 and /r6",
         )
