@@ -32,8 +32,8 @@
 # more, and a file not named may hold none. A file below its count passes
 # with a one-line note, so a pull request that moves strings to the catalogs
 # touches no baseline and conflicts with no other one; the scheduled
-# ratchet-tighten workflow runs --update on main and opens the one pull
-# request that lowers the counts (#954). With --update the script rewrites
+# ratchet-tighten workflow runs --update on main and pushes the one branch
+# that lowers the counts (#954, #971). With --update the script rewrites
 # the baseline to the counts it finds.
 #
 # Usage:

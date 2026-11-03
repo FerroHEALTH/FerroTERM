@@ -1,29 +1,29 @@
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 
-# Ratchet tighten (#954, #950). No specification governs this: our own design.
+# Ratchet tighten (#954, #950, #971). No specification governs this: our own
+# design.
 #
 # The ratchet guards (scripts/checks/duplication.sh, file-size.sh and
 # stray-literals.sh) fail a rise and pass a fall with a note, so a pull
 # request that removes duplication, shortens a file or moves strings to the
 # catalogs touches none of the shared ratchet files and conflicts with no
 # other open pull request. This lane does the tightening instead: once a day
-# it runs each guard's --update on main and opens one pull request that holds
-# only the ratchet files, or moves its open one to the new counts. When
-# nothing fell it does nothing.
+# it runs each guard's --update on main and pushes one branch,
+# chore/ratchet-tighten, that holds only the ratchet files, or moves an open
+# pull request on it to the new counts. When nothing fell it does nothing.
 #
-# It is a pull request, never a push to main. The commit is made through the
-# Git Data REST API, so GitHub signs it and it shows Verified
-# (docs.github.com/en/rest/git/commits, "Signature verification").
+# It never pushes to main. The commit is made through the Git Data REST API,
+# so GitHub signs it and it shows Verified
+# (docs.github.com/en/rest/git/commits, "Signature verification"). Every
+# request body goes through a file with `gh api --input`: a ratchet file's
+# base64 content passed as one argument exceeds the kernel's limit
+# (FerroHEALTH/FerroEHR#4790).
 #
-# THE TOKEN. Events raised with GITHUB_TOKEN start no workflow run, so a pull
-# request opened with it arrives with no checks and the required
-# `conclusion` check never reports
-# (docs.github.com/en/actions/security-for-github-actions/security-guides/automatic-token-authentication).
-# A fine-grained PAT or GitHub App token with contents:write and
-# pull-requests:write in RATCHET_TIGHTEN_TOKEN avoids that. Without it the
-# lane still opens the pull request and says in its body to close and reopen
-# it.
+# THE HAND-OFF. The organisation keeps "Allow GitHub Actions to create and
+# approve pull requests" off and the lane carries no separate token, so it
+# ends with a notice once the branch is pushed and a maintainer opens the pull
+# request from it (FerroHEALTH/FerroEHR#4797).
 name: Ratchet tighten
 
 on:
@@ -49,7 +49,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write # create the blob, tree, commit and branch ref
-      pull-requests: write # open the pull request and arm its auto-merge
+      pull-requests: read # find an open pull request on the lane's branch
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -106,11 +106,10 @@ jobs:
             echo '```'
           } >>"$GITHUB_STEP_SUMMARY"
 
-      - name: Open or move the tightening pull request
+      - name: Push or move the tightening branch
         if: steps.update.outputs.changed == '1'
         env:
-          GH_TOKEN: ${{ secrets.RATCHET_TIGHTEN_TOKEN || github.token }}
-          HAVE_TOKEN: ${{ secrets.RATCHET_TIGHTEN_TOKEN != '' && '1' || '0' }}
+          GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           BASE_SHA: ${{ github.sha }}
           DUP_BEFORE: ${{ steps.update.outputs.duplication_before }}
@@ -118,60 +117,62 @@ jobs:
         run: |
           set -euo pipefail
           branch="chore/ratchet-tighten"
+          title="chore(checks): lower the ratchet counts"
 
           # The parent is the commit the counts were measured on, so the
           # lowered counts hold for it; CI on the pull request measures them
           # again against main as it is at merge time.
           base_tree=$(gh api "repos/${REPO}/git/commits/${BASE_SHA}" --jq .tree.sha)
-          tree_args=()
+          : >tree-entries.jsonl
           while IFS= read -r f; do
             [ -n "$f" ] || continue
-            blob=$(gh api "repos/${REPO}/git/blobs" \
-                     -f encoding=base64 -f content="$(base64 -w0 "$f")" --jq .sha)
-            tree_args+=( -f "tree[][path]=$f" -f "tree[][mode]=100644" \
-                         -f "tree[][type]=blob" -f "tree[][sha]=$blob" )
+            base64 -w0 "$f" | jq -Rs '{encoding: "base64", content: .}' >blob.json
+            blob=$(gh api "repos/${REPO}/git/blobs" --input blob.json --jq .sha)
+            jq -nc --arg path "$f" --arg sha "$blob" \
+              '{path: $path, mode: "100644", type: "blob", sha: $sha}' >>tree-entries.jsonl
             echo "staged $f ($blob)"
           done <changed-files.txt
-          tree=$(gh api "repos/${REPO}/git/trees" \
-                   -f "base_tree=${base_tree}" "${tree_args[@]}" --jq .sha)
-          commit=$(gh api "repos/${REPO}/git/commits" \
-                     -f "message=chore(checks): lower the ratchet counts" \
-                     -f "tree=${tree}" -f "parents[]=${BASE_SHA}" --jq .sha)
+          jq -s --arg base "$base_tree" '{base_tree: $base, tree: .}' tree-entries.jsonl >tree.json
+          tree=$(gh api "repos/${REPO}/git/trees" --input tree.json --jq .sha)
+          jq -n --arg message "$title" --arg tree "$tree" --arg parent "$BASE_SHA" \
+            '{message: $message, tree: $tree, parents: [$parent]}' >commit.json
+          commit=$(gh api "repos/${REPO}/git/commits" --input commit.json --jq .sha)
 
           # One pull request at a time: an open one moves to the new commit,
           # which is this lane's own branch and never main.
           open=$(gh pr list --repo "$REPO" --head "$branch" --state open --json number --jq '.[0].number // empty')
           if [ -n "$open" ]; then
-            gh api -X PATCH "repos/${REPO}/git/refs/heads/${branch}" \
-              -f "sha=${commit}" -F force=true --jq .ref
+            jq -n --arg sha "$commit" '{sha: $sha, force: true}' >ref.json
+            gh api -X PATCH "repos/${REPO}/git/refs/heads/${branch}" --input ref.json --jq .ref
             echo "::notice::Moved #${open} to ${commit}."
             exit 0
           fi
           if gh api "repos/${REPO}/git/ref/heads/${branch}" --silent 2>/dev/null; then
             gh api -X DELETE "repos/${REPO}/git/refs/heads/${branch}"
           fi
-          gh api "repos/${REPO}/git/refs" \
-            -f "ref=refs/heads/${branch}" -f "sha=${commit}" --jq .ref
+          jq -n --arg ref "refs/heads/${branch}" --arg sha "$commit" '{ref: $ref, sha: $sha}' >ref.json
+          gh api "repos/${REPO}/git/refs" --input ref.json --jq .ref
 
           {
             echo "The ratchet guards pass a fall and fail only a rise, so pull requests leave the ratchet files alone (#954, #950). This pull request records what fell on \`main\`, and carries only the ratchet files:"
             echo
-            while IFS= read -r f; do echo "- \`$f\`"; done <changed-files.txt
+            while IFS= read -r f; do echo "* \`$f\`"; done <changed-files.txt
             if [ -n "$DUP_BEFORE" ] && [ "$DUP_BEFORE" != "$DUP_AFTER" ]; then
               echo
-              echo "Duplicated lines: ${DUP_BEFORE} -> ${DUP_AFTER}."
+              echo "Duplicated lines: ${DUP_BEFORE} to ${DUP_AFTER}."
             fi
             echo
-            echo "Made by \`.github/workflows/ratchet-tighten.yml\` from each guard's \`--update\`. No user-visible change, so no changelog fragment."
-            if [ "$HAVE_TOKEN" != "1" ]; then
-              echo
-              echo "No \`RATCHET_TIGHTEN_TOKEN\` is configured, so this pull request was opened with the workflow token and its checks did not start. Close and reopen it to raise them."
-            fi
+            echo "Made by \`.github/workflows/ratchet-tighten.yml\` from each guard's \`--update\`. No user-visible change, so it carries the \`no-changelog\` label."
           } >pr-body.md
 
-          url=$(gh pr create --repo "$REPO" --base main --head "$branch" \
-                  --title "chore(checks): lower the ratchet counts" \
-                  --label no-changelog --body-file pr-body.md)
-          echo "::notice::Opened $url"
-          echo "$url" >>"$GITHUB_STEP_SUMMARY"
-          gh pr merge "$url" --repo "$REPO" --auto
+          # GitHub Actions may not open a pull request here, so the pushed
+          # branch is the hand-off and a maintainer opens it (#971).
+          echo "::notice::Pushed ${branch}; open its pull request by hand with the title \"${title}\", the label no-changelog and the body in the job summary."
+          {
+            echo
+            echo "### Pull request to open from \`${branch}\`"
+            echo
+            echo "Title: \`${title}\`"
+            echo
+            cat pr-body.md
+          } >>"$GITHUB_STEP_SUMMARY"
