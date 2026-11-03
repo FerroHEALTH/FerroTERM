@@ -722,7 +722,7 @@ pub struct InvalidValue {
     pub position: Option<usize>,
     /// The parser's error, when a parser refused the value.
     #[source]
-    pub source: Option<sct_ecl::ParseError>,
+    pub source: Option<sct_scg::front::ParseError>,
 }
 
 /// An implicit value set URI a system refuses, and where a parser stopped
@@ -739,7 +739,7 @@ pub struct MalformedValueSet {
     pub position: Option<usize>,
     /// The parser's error, when a parser refused the URI.
     #[source]
-    pub source: Option<sct_ecl::ParseError>,
+    pub source: Option<sct_scg::front::ParseError>,
 }
 
 /// The hierarchy of a system whose `hierarchyMeaning` is `is-a`.

@@ -863,7 +863,10 @@ impl SnomedProvider {
 
     /// The parsed form of an expression constraint, from the cache when it
     /// was parsed before (the cache is cleared when it holds 256 entries).
-    fn expression(&self, text: &str) -> Result<Arc<ExpressionConstraint>, sct_ecl::ParseError> {
+    fn expression(
+        &self,
+        text: &str,
+    ) -> Result<Arc<ExpressionConstraint>, sct_scg::front::ParseError> {
         if let Ok(cache) = self.expressions.lock()
             && let Some(parsed) = cache.get(text)
         {

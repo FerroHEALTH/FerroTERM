@@ -23,6 +23,7 @@ include = ["src/**", "README.md", "LICENSE"]
 concept-graph.workspace = true
 logos.workspace = true
 roaring.workspace = true
+sct-scg.workspace = true
 thiserror.workspace = true
 winnow.workspace = true
 

@@ -1,10 +1,11 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The front both SNOMED CT languages read through: the token with its span,
-//! the lexing loop, the parser's failure and its expectation, the nesting
-//! guard, and the parse driver that turns a `winnow` error into a
-//! [`ParseError`] with a byte offset.
+//! The front both SNOMED CT languages read through.
+//!
+//! It holds the token with its span, the lexing loop, the parser's failure
+//! and its expectation, the nesting guard, and the parse driver that turns a
+//! `winnow` error into a [`ParseError`] with a byte offset.
 //!
 //! No production lives here. The Compositional Grammar and the Expression
 //! Constraint Language each define their own token set and rules, and each
@@ -120,7 +121,7 @@ impl<I: Stream> ParserError<I> for Failure {
 pub type PResult<T> = ModalResult<T, Failure>;
 
 /// Names what a parser expected when it backtracks.
-pub trait Expecting<'i, K: 'i, O>:
+pub trait Expecting<'i, K: Lexeme + 'i, O>:
     Parser<Tokens<'i, K>, O, ErrMode<Failure>> + Sized
 {
     /// This parser, its backtrack naming `what`.
@@ -137,7 +138,10 @@ pub trait Expecting<'i, K: 'i, O>:
     }
 }
 
-impl<'i, K: 'i, O, P: Parser<Tokens<'i, K>, O, ErrMode<Failure>>> Expecting<'i, K, O> for P {}
+impl<'i, K: Lexeme + 'i, O, P: Parser<Tokens<'i, K>, O, ErrMode<Failure>>> Expecting<'i, K, O>
+    for P
+{
+}
 
 /// A backtrack that names nothing.
 ///
@@ -154,7 +158,7 @@ pub fn backtrack<T>() -> PResult<T> {
 /// # Errors
 ///
 /// Always: it is the refusal.
-pub fn refuse<'i, K, T>(
+pub fn refuse<'i, K: Lexeme, T>(
     i: &mut Tokens<'i, K>,
     start: &<Tokens<'i, K> as Stream>::Checkpoint,
     what: &'static str,
@@ -256,7 +260,7 @@ fn too_deep<K: Lexeme>(tokens: &[Token<'_, K>]) -> Option<(usize, usize)> {
 pub fn parse<'s, K, O>(
     input: &'s str,
     what: &'static str,
-    whole: impl for<'i> Fn(&mut Tokens<'i, K>) -> PResult<O>,
+    mut whole: impl for<'i> FnMut(&mut Tokens<'i, K>) -> PResult<O>,
 ) -> Result<O, ParseError>
 where
     K: Lexeme + Logos<'s, Source = str, Error = ()>,

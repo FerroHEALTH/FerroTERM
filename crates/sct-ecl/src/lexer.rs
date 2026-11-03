@@ -12,8 +12,6 @@
 //! byte span so the parser can require the grammar's mandatory whitespace
 //! (`mws`) and its adjacency (`sctid`, `numericvalue`, `cardinality`).
 
-use std::ops::Range;
-
 use logos::Logos;
 
 /// A token kind.
@@ -133,10 +131,8 @@ pub enum Kind {
     Dash,
 }
 
-impl Kind {
-    /// The token class as an error message names it.
-    #[must_use]
-    pub const fn describe(self) -> &'static str {
+impl sct_scg::front::Lexeme for Kind {
+    fn describe(self) -> &'static str {
         match self {
             Self::Term => "a term between pipes",
             Self::String => "a quoted string",
@@ -176,65 +172,27 @@ impl Kind {
             Self::Dash => "'-'",
         }
     }
-}
 
-/// A token with its source text and byte span.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Token<'s> {
-    /// The kind.
-    pub kind: Kind,
-    /// The source text.
-    pub text: &'s str,
-    /// The byte span in the input.
-    pub span: Range<usize>,
-}
-
-impl PartialEq<Kind> for Token<'_> {
-    fn eq(&self, other: &Kind) -> bool {
-        self.kind == *other
+    fn nesting(self) -> sct_scg::front::Nesting {
+        match self {
+            Self::LeftParen | Self::LeftBrace | Self::DoubleLeftBrace | Self::LeftBracket => {
+                sct_scg::front::Nesting::Opens
+            }
+            Self::RightParen | Self::RightBrace | Self::DoubleRightBrace | Self::RightBracket => {
+                sct_scg::front::Nesting::Closes
+            }
+            _ => sct_scg::front::Nesting::Neither,
+        }
     }
-}
-
-/// A character no token starts with.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-#[error("unexpected character {found:?} at byte {offset}")]
-pub struct LexError {
-    /// The byte offset of the character.
-    pub offset: usize,
-    /// The character.
-    pub found: char,
-}
-
-/// Splits `input` into tokens, skipping whitespace and comments.
-///
-/// # Errors
-///
-/// Returns [`LexError`] at the first character no token starts with (an
-/// unterminated term, string, or comment among them).
-pub fn lex(input: &str) -> Result<Vec<Token<'_>>, LexError> {
-    let mut lexer = Kind::lexer(input);
-    let mut tokens = Vec::new();
-    while let Some(kind) = lexer.next() {
-        let span = lexer.span();
-        let kind = kind.map_err(|()| LexError {
-            offset: span.start,
-            found: lexer.slice().chars().next().unwrap_or('\u{0}'),
-        })?;
-        tokens.push(Token {
-            kind,
-            text: lexer.slice(),
-            span,
-        });
-    }
-    Ok(tokens)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Kind, lex};
+    use super::Kind;
+    use sct_scg::front::lex;
 
     fn kinds(input: &str) -> Vec<Kind> {
-        lex(input)
+        lex::<Kind>(input)
             .expect("lexes")
             .into_iter()
             .map(|t| t.kind)
@@ -274,9 +232,9 @@ mod tests {
                 Kind::Integer
             ]
         );
-        let error = lex("< 123 |unterminated").expect_err("refused");
+        let error = lex::<Kind>("< 123 |unterminated").expect_err("refused");
         assert_eq!(error.offset, 6);
         assert_eq!(error.found, '|');
-        assert_eq!(lex("a /* open").expect_err("refused").offset, 2);
+        assert_eq!(lex::<Kind>("a /* open").expect_err("refused").offset, 2);
     }
 }

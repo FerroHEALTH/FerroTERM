@@ -13,10 +13,10 @@
 use winnow::combinator::{
     alt, cut_err, delimited, eof, fail, opt, peek, preceded, repeat, separated,
 };
-use winnow::error::{ErrMode, ParserError};
+use winnow::error::ErrMode;
 use winnow::prelude::*;
-use winnow::stream::{ContainsToken, Stream, TokenSlice};
-use winnow::token::{any, one_of};
+use winnow::stream::Stream;
+use winnow::token::any;
 
 use crate::ast::{
     AltIdentifier, Attribute, AttributeSet, AttributeValue, Cardinality, Comparison,
@@ -25,7 +25,10 @@ use crate::ast::{
     RefsetOperator, Sctid, SubAttributeSet, SubExpressionConstraint, SubRefinement,
     TypedSearchTerm,
 };
-use crate::lexer::{Kind, Token};
+use crate::lexer::Kind;
+use sct_scg::front::{
+    Expecting, Failure, PResult, Token, Tokens, backtrack, kind, one_of_kinds, refuse,
+};
 
 mod filter;
 
@@ -33,103 +36,31 @@ use self::filter::{
     concept_filter_constraint, description_filter_constraint, member_filter_constraint,
 };
 
-/// The token stream.
-pub type Tokens<'i> = TokenSlice<'i, Token<'i>>;
-/// A parser result.
-type PResult<T> = ModalResult<T, Failure>;
-
-/// Why a rule did not match: the token class it expected, when a rule said.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct Failure {
-    /// The token class expected where the parser stopped.
-    pub expected: Option<&'static str>,
-}
-
-impl<I: Stream> ParserError<I> for Failure {
-    type Inner = Self;
-
-    fn from_input(_: &I) -> Self {
-        Self::default()
-    }
-
-    fn into_inner(self) -> Result<Self::Inner, Self> {
-        Ok(self)
-    }
-}
-
-impl ContainsToken<&'_ Token<'_>> for Kind {
-    fn contains_token(&self, token: &Token<'_>) -> bool {
-        *self == token.kind
-    }
-}
-
-impl<const LEN: usize> ContainsToken<&'_ Token<'_>> for [Kind; LEN] {
-    fn contains_token(&self, token: &Token<'_>) -> bool {
-        self.contains(&token.kind)
-    }
-}
-
-/// Names what a parser expected when it backtracks; a cut error keeps the
-/// deeper rule's own expectation.
-trait Expecting<'i, O>: Parser<Tokens<'i>, O, ErrMode<Failure>> + Sized {
-    fn expecting(self, what: &'static str) -> impl Parser<Tokens<'i>, O, ErrMode<Failure>> {
-        let mut parser = self;
-        move |i: &mut Tokens<'i>| {
-            parser.parse_next(i).map_err(|error| match error {
-                ErrMode::Backtrack(_) => ErrMode::Backtrack(Failure {
-                    expected: Some(what),
-                }),
-                other => other,
-            })
-        }
-    }
-}
-
-impl<'i, O, P: Parser<Tokens<'i>, O, ErrMode<Failure>>> Expecting<'i, O> for P {}
-
-fn backtrack<T>() -> PResult<T> {
-    Err(ErrMode::Backtrack(Failure::default()))
-}
-
-/// Rewinds to `start` and refuses with `what`, so the error points at the
-/// token the rule read, not past it.
-fn refuse<'i, T>(
-    i: &mut Tokens<'i>,
-    start: &<Tokens<'i> as Stream>::Checkpoint,
-    what: &'static str,
-) -> PResult<T> {
-    i.reset(start);
-    Err(ErrMode::Cut(Failure {
-        expected: Some(what),
-    }))
-}
-
-/// One token of `kind`.
-fn kind<'i>(kind: Kind) -> impl Parser<Tokens<'i>, &'i Token<'i>, ErrMode<Failure>> {
-    one_of(kind).expecting(kind.describe())
-}
-
 /// A word, compared case-insensitively (every keyword of the grammar spells
 /// each letter as `(CAP_X | X)`).
-fn keyword<'i>(word: &'static str) -> impl Parser<Tokens<'i>, &'i Token<'i>, ErrMode<Failure>> {
-    any.verify(move |t: &Token<'i>| t.kind == Kind::Identifier && t.text.eq_ignore_ascii_case(word))
-        .expecting(word)
+fn keyword<'i>(
+    word: &'static str,
+) -> impl Parser<Tokens<'i, Kind>, &'i Token<'i, Kind>, ErrMode<Failure>> {
+    any.verify(move |t: &Token<'i, Kind>| {
+        t.kind == Kind::Identifier && t.text.eq_ignore_ascii_case(word)
+    })
+    .expecting(word)
 }
 
 /// Whether whitespace or a comment separates two tokens (`mws`).
-fn separated_by_space(previous: &Token<'_>, next: &Token<'_>) -> bool {
+fn separated_by_space(previous: &Token<'_, Kind>, next: &Token<'_, Kind>) -> bool {
     previous.span.end < next.span.start
 }
 
 /// Whether two tokens touch (no whitespace between them).
-fn adjacent(previous: &Token<'_>, next: &Token<'_>) -> bool {
+fn adjacent(previous: &Token<'_, Kind>, next: &Token<'_, Kind>) -> bool {
     previous.span.end == next.span.start
 }
 
 /// A junction word that the grammar follows with mandatory whitespace
 /// (`conjunction`, `disjunction`, `exclusion`).
-fn junction_word<'i>(word: &'static str) -> impl Parser<Tokens<'i>, (), ErrMode<Failure>> {
-    move |i: &mut Tokens<'i>| {
+fn junction_word<'i>(word: &'static str) -> impl Parser<Tokens<'i, Kind>, (), ErrMode<Failure>> {
+    move |i: &mut Tokens<'i, Kind>| {
         let word = keyword(word).parse_next(i)?;
         let next = cut_err(peek(any).expecting("whitespace after the junction")).parse_next(i)?;
         if !separated_by_space(word, next) {
@@ -142,23 +73,23 @@ fn junction_word<'i>(word: &'static str) -> impl Parser<Tokens<'i>, (), ErrMode<
 }
 
 /// `conjunction`: `AND` or `,`.
-fn conjunction(i: &mut Tokens<'_>) -> PResult<()> {
+fn conjunction(i: &mut Tokens<'_, Kind>) -> PResult<()> {
     alt((junction_word("AND"), kind(Kind::Comma).void())).parse_next(i)
 }
 
 /// `disjunction`: `OR`.
-fn disjunction(i: &mut Tokens<'_>) -> PResult<()> {
+fn disjunction(i: &mut Tokens<'_, Kind>) -> PResult<()> {
     junction_word("OR").parse_next(i)
 }
 
 /// `exclusion`: `MINUS`.
-fn exclusion(i: &mut Tokens<'_>) -> PResult<()> {
+fn exclusion(i: &mut Tokens<'_, Kind>) -> PResult<()> {
     junction_word("MINUS").parse_next(i)
 }
 
 /// The text between a token's delimiters (the pipes of a term, the quotes
 /// of a string).
-fn inner<'i>(token: &Token<'i>, delimiter: char) -> PResult<&'i str> {
+fn inner<'i>(token: &Token<'i, Kind>, delimiter: char) -> PResult<&'i str> {
     token
         .text
         .strip_prefix(delimiter)
@@ -169,11 +100,11 @@ fn inner<'i>(token: &Token<'i>, delimiter: char) -> PResult<&'i str> {
 /// `( item (mws item)* )`, at least `min` items, each separated from the
 /// previous one by whitespace.
 fn spaced_set<'i, T>(
-    mut item: impl Parser<Tokens<'i>, T, ErrMode<Failure>>,
+    mut item: impl Parser<Tokens<'i, Kind>, T, ErrMode<Failure>>,
     min: usize,
     what: &'static str,
-) -> impl Parser<Tokens<'i>, Vec<T>, ErrMode<Failure>> {
-    move |i: &mut Tokens<'i>| {
+) -> impl Parser<Tokens<'i, Kind>, Vec<T>, ErrMode<Failure>> {
+    move |i: &mut Tokens<'i, Kind>| {
         kind(Kind::LeftParen).parse_next(i)?;
         let mut items = vec![item.parse_next(i)?];
         loop {
@@ -206,10 +137,10 @@ fn spaced_set<'i, T>(
 
 /// One item bare, or a set of them.
 fn bare_or_set<'i, T>(
-    mut item: impl Parser<Tokens<'i>, T, ErrMode<Failure>>,
+    mut item: impl Parser<Tokens<'i, Kind>, T, ErrMode<Failure>>,
     what: &'static str,
-) -> impl Parser<Tokens<'i>, Vec<T>, ErrMode<Failure>> {
-    move |i: &mut Tokens<'i>| {
+) -> impl Parser<Tokens<'i, Kind>, Vec<T>, ErrMode<Failure>> {
+    move |i: &mut Tokens<'i, Kind>| {
         if i.peek_token().is_some_and(|t| t.kind == Kind::LeftParen) {
             return spaced_set(item.by_ref(), 1, what).parse_next(i);
         }
@@ -218,9 +149,9 @@ fn bare_or_set<'i, T>(
 }
 
 /// `sctid`: 6 to 18 digits, the first not zero.
-fn sctid(i: &mut Tokens<'_>) -> PResult<Sctid> {
+fn sctid(i: &mut Tokens<'_, Kind>) -> PResult<Sctid> {
     kind(Kind::Integer)
-        .verify_map(|t: &Token<'_>| sctid_text(t.text))
+        .verify_map(|t: &Token<'_, Kind>| sctid_text(t.text))
         .expecting("a SNOMED CT identifier")
         .parse_next(i)
 }
@@ -234,7 +165,7 @@ fn sctid_text(digits: &str) -> Option<Sctid> {
 
 /// `term`: the text between pipes, without its surrounding whitespace; one
 /// line, not empty.
-fn term(i: &mut Tokens<'_>) -> PResult<String> {
+fn term(i: &mut Tokens<'_, Kind>) -> PResult<String> {
     let start = i.checkpoint();
     let token = kind(Kind::Term).parse_next(i)?;
     let text = inner(token, '|')?.trim();
@@ -245,7 +176,7 @@ fn term(i: &mut Tokens<'_>) -> PResult<String> {
 }
 
 /// `eclconceptreference`.
-fn concept_reference(i: &mut Tokens<'_>) -> PResult<ConceptReference> {
+fn concept_reference(i: &mut Tokens<'_, Kind>) -> PResult<ConceptReference> {
     let id = sctid.parse_next(i)?;
     let term = opt(term).parse_next(i)?;
     Ok(ConceptReference { id, term })
@@ -259,8 +190,8 @@ fn is_scheme_alias(text: &str) -> bool {
 }
 
 /// `altidentifier`: `scheme#code` bare or in quotes, with an optional term.
-fn alt_identifier(i: &mut Tokens<'_>) -> PResult<AltIdentifier> {
-    let token = one_of([Kind::AltIdentifier, Kind::String]).parse_next(i)?;
+fn alt_identifier(i: &mut Tokens<'_, Kind>) -> PResult<AltIdentifier> {
+    let token = one_of_kinds([Kind::AltIdentifier, Kind::String]).parse_next(i)?;
     let text = if token.kind == Kind::String {
         inner(token, '"')?
     } else {
@@ -281,7 +212,7 @@ fn alt_identifier(i: &mut Tokens<'_>) -> PResult<AltIdentifier> {
 }
 
 /// `eclfocusconcept`, or the parenthesized nested constraint.
-fn focus(i: &mut Tokens<'_>) -> PResult<FocusConcept> {
+fn focus(i: &mut Tokens<'_, Kind>) -> PResult<FocusConcept> {
     alt((
         kind(Kind::Asterisk).value(FocusConcept::Wildcard),
         concept_reference.map(FocusConcept::Reference),
@@ -298,8 +229,8 @@ fn focus(i: &mut Tokens<'_>) -> PResult<FocusConcept> {
 }
 
 /// `constraintoperator`.
-fn constraint_operator(i: &mut Tokens<'_>) -> PResult<ConstraintOperator> {
-    any.verify_map(|t: &Token<'_>| match t.kind {
+fn constraint_operator(i: &mut Tokens<'_, Kind>) -> PResult<ConstraintOperator> {
+    any.verify_map(|t: &Token<'_, Kind>| match t.kind {
         Kind::LessThan => Some(ConstraintOperator::DescendantOf),
         Kind::DescendantOrSelfOf => Some(ConstraintOperator::DescendantOrSelfOf),
         Kind::ChildOf => Some(ConstraintOperator::ChildOf),
@@ -317,9 +248,9 @@ fn constraint_operator(i: &mut Tokens<'_>) -> PResult<ConstraintOperator> {
 }
 
 /// `refsetfieldname`: letters only.
-fn refset_field_name(i: &mut Tokens<'_>) -> PResult<String> {
+fn refset_field_name(i: &mut Tokens<'_, Kind>) -> PResult<String> {
     kind(Kind::Identifier)
-        .verify(|t: &Token<'_>| t.text.bytes().all(|b| b.is_ascii_alphabetic()))
+        .verify(|t: &Token<'_, Kind>| t.text.bytes().all(|b| b.is_ascii_alphabetic()))
         .map(|t| t.text.to_owned())
         .expecting("a reference set field name")
         .parse_next(i)
@@ -329,7 +260,7 @@ fn refset_field_name(i: &mut Tokens<'_>) -> PResult<String> {
 /// upper-case `R`) or `memberof`. With no whitespace before the focus, the
 /// lexer reads `^R73211009` as `^` and one word, so the identifier after the
 /// `R` comes back as the focus.
-fn refset_operator(i: &mut Tokens<'_>) -> PResult<(RefsetOperator, Option<FocusConcept>)> {
+fn refset_operator(i: &mut Tokens<'_, Kind>) -> PResult<(RefsetOperator, Option<FocusConcept>)> {
     let caret = kind(Kind::Caret).parse_next(i)?;
     let start = i.checkpoint();
     if let Some(word) = i
@@ -355,7 +286,7 @@ fn refset_operator(i: &mut Tokens<'_>) -> PResult<(RefsetOperator, Option<FocusC
 }
 
 /// `memberof` after its `^`: optionally `[ fields ]`.
-fn member_of_fields(i: &mut Tokens<'_>) -> PResult<MemberOf> {
+fn member_of_fields(i: &mut Tokens<'_, Kind>) -> PResult<MemberOf> {
     let fields = opt(delimited(
         kind(Kind::LeftBracket),
         cut_err(alt((
@@ -369,7 +300,7 @@ fn member_of_fields(i: &mut Tokens<'_>) -> PResult<MemberOf> {
 }
 
 /// `subexpressionconstraint`.
-fn sub_expression_constraint(i: &mut Tokens<'_>) -> PResult<SubExpressionConstraint> {
+fn sub_expression_constraint(i: &mut Tokens<'_, Kind>) -> PResult<SubExpressionConstraint> {
     let operator = opt(constraint_operator).parse_next(i)?;
     let (refset_operator, glued) = match opt(refset_operator).parse_next(i)? {
         Some((refset_operator, glued)) => (Some(refset_operator), glued),
@@ -385,7 +316,7 @@ fn sub_expression_constraint(i: &mut Tokens<'_>) -> PResult<SubExpressionConstra
 
 /// The filters and the history supplement after a sub-expression's focus.
 fn sub_expression_rest(
-    i: &mut Tokens<'_>,
+    i: &mut Tokens<'_, Kind>,
     operator: Option<ConstraintOperator>,
     refset_operator: Option<RefsetOperator>,
     focus: FocusConcept,
@@ -411,8 +342,8 @@ fn sub_expression_rest(
 /// `junction`.
 fn operands<'i>(
     first: SubExpressionConstraint,
-    junction: impl Parser<Tokens<'i>, (), ErrMode<Failure>>,
-    i: &mut Tokens<'i>,
+    junction: impl Parser<Tokens<'i, Kind>, (), ErrMode<Failure>>,
+    i: &mut Tokens<'i, Kind>,
 ) -> PResult<Option<Vec<SubExpressionConstraint>>> {
     let rest: Option<Vec<SubExpressionConstraint>> = opt(repeat(
         1..,
@@ -428,7 +359,7 @@ fn operands<'i>(
 
 /// `expressionconstraint`: a sub-expression, then what follows it decides
 /// the form (`:` refined, `.` dotted, a junction compound, else bare).
-fn expression_constraint(i: &mut Tokens<'_>) -> PResult<ExpressionConstraint> {
+fn expression_constraint(i: &mut Tokens<'_, Kind>) -> PResult<ExpressionConstraint> {
     let first = sub_expression_constraint.parse_next(i)?;
     if opt(kind(Kind::Colon)).parse_next(i)?.is_some() {
         let refinement = cut_err(refinement).parse_next(i)?;
@@ -463,21 +394,21 @@ fn expression_constraint(i: &mut Tokens<'_>) -> PResult<ExpressionConstraint> {
 }
 
 /// `nonnegativeintegervalue`: digits without a leading zero, or `0`.
-fn non_negative_integer(token: &Token<'_>) -> Option<u32> {
+fn non_negative_integer(token: &Token<'_, Kind>) -> Option<u32> {
     (token.text == "0" || !token.text.starts_with('0'))
         .then(|| token.text.parse().ok())
         .flatten()
 }
 
 /// `cardinality` between brackets: `[min..max]`, written without spaces.
-fn cardinality(i: &mut Tokens<'_>) -> PResult<Cardinality> {
+fn cardinality(i: &mut Tokens<'_, Kind>) -> PResult<Cardinality> {
     let start = i.checkpoint();
     let open = kind(Kind::LeftBracket).parse_next(i)?;
     let (min, to, max, close) = cut_err(
         (
             kind(Kind::Integer),
             kind(Kind::To),
-            one_of([Kind::Integer, Kind::Asterisk]),
+            one_of_kinds([Kind::Integer, Kind::Asterisk]),
             kind(Kind::RightBracket),
         )
             .expecting("a cardinality such as [1..*]"),
@@ -498,7 +429,7 @@ fn cardinality(i: &mut Tokens<'_>) -> PResult<Cardinality> {
 }
 
 /// `expressioncomparisonoperator` and the other `=` / `!=` operators.
-fn equality(i: &mut Tokens<'_>) -> PResult<Equality> {
+fn equality(i: &mut Tokens<'_, Kind>) -> PResult<Equality> {
     alt((
         kind(Kind::Equal).value(Equality::Equal),
         kind(Kind::NotEqual).value(Equality::NotEqual),
@@ -507,7 +438,7 @@ fn equality(i: &mut Tokens<'_>) -> PResult<Equality> {
 }
 
 /// `numericcomparisonoperator` and `timecomparisonoperator`.
-fn comparison(i: &mut Tokens<'_>) -> PResult<Comparison> {
+fn comparison(i: &mut Tokens<'_, Kind>) -> PResult<Comparison> {
     alt((
         kind(Kind::Equal).value(Comparison::Equal),
         kind(Kind::NotEqual).value(Comparison::NotEqual),
@@ -521,10 +452,10 @@ fn comparison(i: &mut Tokens<'_>) -> PResult<Comparison> {
 
 /// `HASH numericvalue`: `#`, an optional sign, digits, an optional fraction,
 /// all touching.
-fn numeric_value(i: &mut Tokens<'_>) -> PResult<NumericValue> {
+fn numeric_value(i: &mut Tokens<'_, Kind>) -> PResult<NumericValue> {
     let start = i.checkpoint();
     let hash = kind(Kind::Hash).parse_next(i)?;
-    let sign = opt(one_of([Kind::Dash, Kind::Plus])).parse_next(i)?;
+    let sign = opt(one_of_kinds([Kind::Dash, Kind::Plus])).parse_next(i)?;
     let integer = cut_err(kind(Kind::Integer)).parse_next(i)?;
     let fraction = opt((kind(Kind::Period), kind(Kind::Integer))).parse_next(i)?;
     let mut previous = hash;
@@ -547,12 +478,12 @@ fn numeric_value(i: &mut Tokens<'_>) -> PResult<NumericValue> {
 }
 
 /// `booleanvalue`.
-fn boolean(i: &mut Tokens<'_>) -> PResult<bool> {
+fn boolean(i: &mut Tokens<'_, Kind>) -> PResult<bool> {
     alt((keyword("true").value(true), keyword("false").value(false))).parse_next(i)
 }
 
 /// A quoted string's content.
-fn string_content<'i>(i: &mut Tokens<'i>) -> PResult<&'i str> {
+fn string_content<'i>(i: &mut Tokens<'i, Kind>) -> PResult<&'i str> {
     let token = kind(Kind::String).parse_next(i)?;
     inner(token, '"')
 }
@@ -604,7 +535,7 @@ fn match_words(text: &str) -> Option<Vec<String>> {
 }
 
 /// `typedsearchterm`: `wild:"pattern"`, or `[match:]"words"`.
-fn typed_search_term(i: &mut Tokens<'_>) -> PResult<TypedSearchTerm> {
+fn typed_search_term(i: &mut Tokens<'_, Kind>) -> PResult<TypedSearchTerm> {
     if opt((keyword("wild"), kind(Kind::Colon)))
         .parse_next(i)?
         .is_some()
@@ -633,7 +564,7 @@ fn typed_search_term(i: &mut Tokens<'_>) -> PResult<TypedSearchTerm> {
 
 /// `concretestring`: a quoted string of one or more characters whose only
 /// escapes are `\"`, `\\`, and `\*`, decoded.
-fn concrete_string(i: &mut Tokens<'_>) -> PResult<ConcreteString> {
+fn concrete_string(i: &mut Tokens<'_, Kind>) -> PResult<ConcreteString> {
     let start = i.checkpoint();
     let content = string_content.parse_next(i)?;
     if content.is_empty() || !escapes_only(content, &['"', '\\', '*']) {
@@ -651,17 +582,17 @@ fn concrete_string(i: &mut Tokens<'_>) -> PResult<ConcreteString> {
 }
 
 /// `concretestring | concretestringset`.
-fn concrete_strings(i: &mut Tokens<'_>) -> PResult<Vec<ConcreteString>> {
+fn concrete_strings(i: &mut Tokens<'_, Kind>) -> PResult<Vec<ConcreteString>> {
     bare_or_set(concrete_string, "a concrete string").parse_next(i)
 }
 
 /// `typedsearchterm | typedsearchtermset`.
-fn typed_search_terms(i: &mut Tokens<'_>) -> PResult<Vec<TypedSearchTerm>> {
+fn typed_search_terms(i: &mut Tokens<'_, Kind>) -> PResult<Vec<TypedSearchTerm>> {
     bare_or_set(typed_search_term, "a search term").parse_next(i)
 }
 
 /// `historysupplement`.
-fn history_supplement(i: &mut Tokens<'_>) -> PResult<HistorySupplement> {
+fn history_supplement(i: &mut Tokens<'_, Kind>) -> PResult<HistorySupplement> {
     (kind(Kind::DoubleLeftBrace), kind(Kind::Plus)).parse_next(i)?;
     let start = i.checkpoint();
     let word = cut_err(kind(Kind::Identifier).expecting("HISTORY")).parse_next(i)?;
@@ -697,7 +628,7 @@ fn history_supplement(i: &mut Tokens<'_>) -> PResult<HistorySupplement> {
 
 /// `eclattribute`. The cardinality is not committed to: a group starts the
 /// same way.
-fn attribute(i: &mut Tokens<'_>) -> PResult<Attribute> {
+fn attribute(i: &mut Tokens<'_, Kind>) -> PResult<Attribute> {
     let cardinality = opt(cardinality).parse_next(i)?;
     let (reverse, name) = if let Some(name) = glued_reverse(i)? {
         (true, name)
@@ -718,7 +649,7 @@ fn attribute(i: &mut Tokens<'_>) -> PResult<Attribute> {
 /// `reverseflag ws eclattributename` with the empty `ws`: the lexer reads
 /// `R363698007` as one word, so the identifier after the `R` (or `r`, the
 /// rule is `CAP_R | R`) comes back as the attribute name's focus.
-fn glued_reverse(i: &mut Tokens<'_>) -> PResult<Option<SubExpressionConstraint>> {
+fn glued_reverse(i: &mut Tokens<'_, Kind>) -> PResult<Option<SubExpressionConstraint>> {
     let Some(id) = i.peek_token().and_then(|t| {
         let rest = t.text.strip_prefix(['R', 'r'])?;
         (t.kind == Kind::Identifier && rest.bytes().all(|b| b.is_ascii_digit()))
@@ -734,7 +665,7 @@ fn glued_reverse(i: &mut Tokens<'_>) -> PResult<Option<SubExpressionConstraint>>
 }
 
 /// The comparison and value of `eclattribute`, in the grammar's order.
-fn attribute_value(i: &mut Tokens<'_>) -> PResult<AttributeValue> {
+fn attribute_value(i: &mut Tokens<'_, Kind>) -> PResult<AttributeValue> {
     alt((
         (equality, sub_expression_constraint)
             .map(|(operator, value)| AttributeValue::Expression { operator, value }),
@@ -753,7 +684,7 @@ fn attribute_value(i: &mut Tokens<'_>) -> PResult<AttributeValue> {
 }
 
 /// `subattributeset`.
-fn sub_attribute_set(i: &mut Tokens<'_>) -> PResult<SubAttributeSet> {
+fn sub_attribute_set(i: &mut Tokens<'_, Kind>) -> PResult<SubAttributeSet> {
     alt((
         attribute.map(|attribute| SubAttributeSet::Attribute(Box::new(attribute))),
         delimited(kind(Kind::LeftParen), attribute_set, kind(Kind::RightParen))
@@ -765,9 +696,9 @@ fn sub_attribute_set(i: &mut Tokens<'_>) -> PResult<SubAttributeSet> {
 /// The items after the first of a junction-joined set.
 fn joined<'i, T: Clone>(
     first: &T,
-    junction: impl Parser<Tokens<'i>, (), ErrMode<Failure>>,
-    item: impl Parser<Tokens<'i>, T, ErrMode<Failure>>,
-    i: &mut Tokens<'i>,
+    junction: impl Parser<Tokens<'i, Kind>, (), ErrMode<Failure>>,
+    item: impl Parser<Tokens<'i, Kind>, T, ErrMode<Failure>>,
+    i: &mut Tokens<'i, Kind>,
 ) -> PResult<Option<Vec<T>>> {
     let rest: Option<Vec<T>> = opt(repeat(1.., preceded(junction, item))).parse_next(i)?;
     Ok(rest.map(|rest| {
@@ -778,7 +709,7 @@ fn joined<'i, T: Clone>(
 }
 
 /// `eclattributeset`.
-fn attribute_set(i: &mut Tokens<'_>) -> PResult<AttributeSet> {
+fn attribute_set(i: &mut Tokens<'_, Kind>) -> PResult<AttributeSet> {
     let first = sub_attribute_set.parse_next(i)?;
     if let Some(all) = joined(&first, conjunction, sub_attribute_set, i)? {
         return Ok(AttributeSet::Conjunction(all));
@@ -790,7 +721,7 @@ fn attribute_set(i: &mut Tokens<'_>) -> PResult<AttributeSet> {
 }
 
 /// `eclattributegroup`.
-fn attribute_group(i: &mut Tokens<'_>) -> PResult<SubRefinement> {
+fn attribute_group(i: &mut Tokens<'_, Kind>) -> PResult<SubRefinement> {
     let cardinality = opt(cardinality).parse_next(i)?;
     kind(Kind::LeftBrace).parse_next(i)?;
     let attributes = cut_err(attribute_set).parse_next(i)?;
@@ -803,7 +734,7 @@ fn attribute_group(i: &mut Tokens<'_>) -> PResult<SubRefinement> {
 
 /// `subrefinement`, in the grammar's order: an attribute set, a group, a
 /// parenthesized refinement.
-fn sub_refinement(i: &mut Tokens<'_>) -> PResult<SubRefinement> {
+fn sub_refinement(i: &mut Tokens<'_, Kind>) -> PResult<SubRefinement> {
     alt((
         attribute_set.map(SubRefinement::AttributeSet),
         attribute_group,
@@ -819,7 +750,7 @@ fn sub_refinement(i: &mut Tokens<'_>) -> PResult<SubRefinement> {
 }
 
 /// `eclrefinement`.
-fn refinement(i: &mut Tokens<'_>) -> PResult<Refinement> {
+fn refinement(i: &mut Tokens<'_, Kind>) -> PResult<Refinement> {
     let first = sub_refinement.parse_next(i)?;
     if let Some(all) = joined(&first, conjunction, cut_err(sub_refinement), i)? {
         return Ok(Refinement::Conjunction(all));
@@ -836,7 +767,7 @@ fn refinement(i: &mut Tokens<'_>) -> PResult<Refinement> {
 ///
 /// Returns the failure at the first token the grammar does not admit, with
 /// the token class expected there when a rule names one.
-pub fn whole(i: &mut Tokens<'_>) -> PResult<ExpressionConstraint> {
+pub fn whole(i: &mut Tokens<'_, Kind>) -> PResult<ExpressionConstraint> {
     let constraint = expression_constraint
         .expecting("an expression constraint")
         .parse_next(i)?;
