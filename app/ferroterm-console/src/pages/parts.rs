@@ -155,15 +155,17 @@ impl Source {
 
 /// The name each code system the root publishes goes by, by canonical; a
 /// refused read names none, and a canonical then stands for itself.
+///
+/// # Errors
+///
+/// Returns the failure of an answer that does not decode at its release,
+/// which the page draws as its error state.
 pub(crate) async fn system_names(
-    client: &crate::fhir::FhirClient,
-    version: crate::fhir::version::FhirVersion,
-) -> std::collections::BTreeMap<String, String> {
-    client
-        .published_names(version, crate::fhir::CODE_SYSTEM)
+    request: &Request,
+) -> Result<std::collections::BTreeMap<String, String>, FhirError> {
+    crate::pages::operations::published(request, crate::fhir::CODE_SYSTEM)
         .await
-        .map(|named| named.names())
-        .unwrap_or_default()
+        .map(|named| named.map(|named| named.names()).unwrap_or_default())
 }
 
 /// The name `canonical` goes by in `names`, else the canonical itself.

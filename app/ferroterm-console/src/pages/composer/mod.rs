@@ -27,6 +27,7 @@ use ferrohealth_ui::view::surface::{
 use ferrohealth_ui::view::transform::transform_quiet;
 
 use crate::fhir::compose::{Draft, Preview};
+use crate::fhir::error::FhirError;
 use crate::fhir::version::FhirVersion;
 use crate::fhir::write::Written;
 use crate::fhir::{CODE_SYSTEM, VALUE_SET};
@@ -112,7 +113,10 @@ async fn edited(request: &Request, posted: Option<&Posted>) -> Html {
         Ok(opened) => opened,
         Err(page) => return page,
     };
-    let (systems, names) = systems_of(request).await;
+    let (systems, names) = match systems_of(request).await {
+        Ok(systems) => systems,
+        Err(error) => return failure(locale, &error),
+    };
     let cards = request
         .client
         .terminology_capabilities(request.version)
@@ -196,26 +200,27 @@ async fn edited(request: &Request, posted: Option<&Posted>) -> Html {
 
 /// The code systems the root publishes, each its canonical and its name,
 /// and the name each goes by.
+///
+/// # Errors
+///
+/// Returns the failure of an answer that does not decode at its release,
+/// which the page draws as its error state.
 pub(crate) async fn systems_of(
     request: &Request,
-) -> (Vec<(String, String)>, BTreeMap<String, String>) {
-    let published = request
-        .client
-        .published_names(request.version, CODE_SYSTEM)
-        .await
-        .ok();
+) -> Result<(Vec<(String, String)>, BTreeMap<String, String>), FhirError> {
+    let published = crate::pages::operations::published(request, CODE_SYSTEM).await?;
     let names = published
         .as_ref()
         .map(crate::fhir::named::NamedSearch::names)
         .unwrap_or_default();
-    (choices(published.as_ref()), names)
+    Ok((choices(published.as_ref()), names))
 }
 
 /// The first page of what `draft` selects, expanded by the server.
 async fn run_preview(
     request: &Request,
     draft: &Draft,
-) -> Result<crate::fhir::expansion::ExpandedValueSet, crate::fhir::error::FhirError> {
+) -> Result<crate::fhir::expansion::ExpandedValueSet, FhirError> {
     let page = Preview {
         filter: None,
         count: PREVIEW_COUNT,
@@ -429,9 +434,7 @@ fn metadata(locale: &Locale, draft: &Draft) -> Html {
 /// shortcuts"), and the first page of what the draft selects once it ran.
 fn preview_card(
     locale: &Locale,
-    preview: Option<
-        Result<crate::fhir::expansion::ExpandedValueSet, crate::fhir::error::FhirError>,
-    >,
+    preview: Option<Result<crate::fhir::expansion::ExpandedValueSet, FhirError>>,
     names: &BTreeMap<String, String>,
 ) -> Html {
     let keys = aria_keys(RUN_KEYS)

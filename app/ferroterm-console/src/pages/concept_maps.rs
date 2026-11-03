@@ -69,7 +69,10 @@ pub(crate) async fn page(request: Request) -> Html {
         .client
         .concept_map_search(request.version, &SearchFilter::default())
         .await;
-    let names = system_names(&request.client, request.version).await;
+    let names = match system_names(&request).await {
+        Ok(names) => names,
+        Err(error) => return failure(&request.locale, &error),
+    };
     match found {
         Ok(found) => listing(
             &request,

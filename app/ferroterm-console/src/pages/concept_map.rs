@@ -48,10 +48,10 @@ pub(crate) async fn page(request: Request) -> Html {
         return crate::pages::errors::not_found_page(&request);
     };
     match request.client.concept_map_read(request.version, &id).await {
-        Ok(document) => {
-            let names = system_names(&request.client, request.version).await;
-            screen(&request, &id, &document, &names, pane)
-        }
+        Ok(document) => match system_names(&request).await {
+            Ok(names) => screen(&request, &id, &document, &names, pane),
+            Err(error) => failure(&request.locale, &error),
+        },
         Err(error) => Html::join([
             heading(
                 &request,

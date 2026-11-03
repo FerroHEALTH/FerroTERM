@@ -109,7 +109,10 @@ pub(crate) async fn page(request: Request) -> Html {
             ]);
         }
     };
-    let names = system_names(&request.client, request.version).await;
+    let names = match system_names(&request).await {
+        Ok(names) => names,
+        Err(error) => return failure(&request.locale, &error),
+    };
     let displays =
         filter_displays(&request.client, request.version, &document.value.clauses()).await;
     let expansion = if pane == Pane::Second {

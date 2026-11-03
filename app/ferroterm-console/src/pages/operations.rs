@@ -24,6 +24,7 @@ use ferrohealth_ui::view::transform::{
     Density, Run, RunState, request, run_button, transform_options, transform_quiet,
 };
 
+use crate::fhir::error::FhirError;
 use crate::fhir::named::NamedSearch;
 use crate::locale::{Msg, tr};
 use crate::pages::parts::heading;
@@ -204,6 +205,28 @@ pub(crate) fn text(
         Html::text(value),
         Html::text(placeholder)
     )))
+}
+
+/// The resources of `resource_type` this root publishes, as a picker offers
+/// them: `None` for a refused search, whose picker then offers nothing.
+///
+/// # Errors
+///
+/// Returns the failure of an answer that does not decode at its release, a
+/// defect the page draws as its error state rather than an empty picker.
+pub(crate) async fn published(
+    request: &Request,
+    resource_type: &str,
+) -> Result<Option<NamedSearch>, FhirError> {
+    match request
+        .client
+        .published_names(request.version, resource_type)
+        .await
+    {
+        Ok(named) => Ok(Some(named)),
+        Err(error @ FhirError::Decode { .. }) => Err(error),
+        Err(_refused) => Ok(None),
+    }
 }
 
 /// The choices a picker of published resources offers: each canonical with
