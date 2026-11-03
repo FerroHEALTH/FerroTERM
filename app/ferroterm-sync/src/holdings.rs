@@ -35,7 +35,7 @@ pub const MANIFEST_FILE: &str = "manifest.json";
 /// replace rule compares.
 #[must_use]
 pub fn holdings(ledger: &[Held], index_root: &Path, resources: &Path) -> Holdings {
-    let mut holdings = Holdings::new();
+    let mut holdings = Holdings::default();
     for held in ledger {
         holdings.record(&held.canonical, &held.version, held.date);
     }

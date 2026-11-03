@@ -101,7 +101,7 @@ pub fn write(dir: &Path, concepts: u32) -> Result<(), FixtureError> {
     edition::write_property_keys(&mut builder)?;
     edition::write_designation_vocabularies(&mut builder, gb, nl)?;
 
-    let mut text = IndexBuilder::new();
+    let mut text = IndexBuilder::default();
     let mut edges = Vec::new();
     for ordinal in 0..concepts {
         let at = Ordinal::new(ordinal);
@@ -174,7 +174,7 @@ pub fn write(dir: &Path, concepts: u32) -> Result<(), FixtureError> {
     let map: u64 = ICD10_MAP_SCTID.parse().unwrap_or_default();
     let module_id: u64 = module.parse().unwrap_or_default();
     let members: Vec<u32> = (0..concepts).step_by(MEMBER_EVERY).collect();
-    let mut memberships = Memberships::new();
+    let mut memberships = Memberships::default();
     for member in &members {
         memberships.insert(set, Ordinal::new(*member));
     }
@@ -185,7 +185,7 @@ pub fn write(dir: &Path, concepts: u32) -> Result<(), FixtureError> {
     }
     edition::write_graph_part(dir, "refsets.bin", |bytes| memberships.write_to(bytes))?;
 
-    let mut tables = RefsetMembers::new();
+    let mut tables = RefsetMembers::default();
     tables
         .insert(
             set,

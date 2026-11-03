@@ -270,7 +270,7 @@ fn search_reads_the_designation_index() {
 #[test]
 fn a_registry_with_the_provider_renders_terminology_capabilities() {
     let (_dir, p) = provider();
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry.register(Arc::new(p)).expect("registers");
     let summary = Summary::of(&registry);
     let system = summary
@@ -500,7 +500,7 @@ fn a_language_reference_set_is_listed_and_its_member_forms_are_refused() {
 #[test]
 fn a_property_the_code_system_does_not_define_is_refused_rather_than_dropped() {
     let (_dir, p) = provider();
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry.register(Arc::new(p)).expect("registers");
     let ask = |property: &str| {
         lookup::lookup(
@@ -781,7 +781,7 @@ fn the_defined_grammar_and_the_supported_grammar_are_two_declarations() {
     // which this server does: an expression is a code it locates.
     assert!(p.declaration().compositional.supported());
     assert_eq!(p.declaration().compositional, Compositional::Supported);
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry.register(Arc::new(p)).expect("registers");
     let summary = Summary::of(&registry);
     let date = "2026-09-05T00:00:00Z";
@@ -827,7 +827,7 @@ fn the_defined_grammar_and_the_supported_grammar_are_two_declarations() {
 #[test]
 fn a_post_coordinated_expression_is_refused_for_the_grammar_not_as_an_unknown_concept() {
     let (_dir, p) = provider();
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry.register(Arc::new(p)).expect("registers");
     // NOTE: an expression is a valid code and "subject to the same rules as
     // precoordinated concepts" (<https://hl7.org/fhir/R4B/snomedct.html>,
@@ -923,7 +923,7 @@ fn a_selection_is_unclosed_unless_it_states_that_expressions_are_excluded() {
 fn a_display_in_the_editions_language_does_not_satisfy_a_request_for_another_one() {
     let (_dir, p) = provider();
     assert_eq!(p.language(), Some("en"));
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry.register(Arc::new(p)).expect("registers");
     let ask = |code: String, display: &str| {
         validate_code::validate_code(
@@ -1054,7 +1054,7 @@ fn the_root_of_the_hierarchy_has_no_normal_form() {
 #[test]
 fn the_normal_form_is_answered_only_where_a_request_asks_for_it() {
     let (_dir, p) = provider();
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry.register(Arc::new(p)).expect("registers");
     let ask = |properties: Vec<String>| {
         lookup::lookup(

@@ -123,7 +123,10 @@ pub fn check(requested: Option<&str>) -> Result<(), OperationError> {
         if range.tag == "*" {
             continue;
         }
-        match crate::registries::bcp47::analyze_tag(&range.tag) {
+        match crate::registries::bcp47::analyze(
+            &range.tag,
+            &crate::registries::subtags::REGISTRY_DATA,
+        ) {
             Analysis::Valid(_) => {}
             Analysis::Malformed(_) | Analysis::WellFormed { .. } => {
                 return Err(OperationError::InvalidLanguage(range.tag));

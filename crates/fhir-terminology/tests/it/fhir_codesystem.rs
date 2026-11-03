@@ -266,7 +266,7 @@ fn example_content_refuses_validation_and_enumeration() {
         Err(ProviderError::IncompleteContent { .. })
     ));
     assert!(matches!(sketch.all(), Err(ProviderError::NotEnumerable)));
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     let (_dir2, providers2) = load_all();
     for p in providers2 {
         registry.register(Arc::new(p)).expect("registers");
@@ -299,7 +299,7 @@ fn content_mode(url: &str, content: &str) -> (tempfile::TempDir, Registry) {
     std::fs::write(&path, resource.to_string()).expect("writes");
     let model = fhir_terminology::fhir_codesystem::load::load_file(&path, FhirVersion::R5)
         .expect("loads the resource");
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry
         .register(Arc::new(FhirCodeSystem::new(model).expect("builds")))
         .expect("registers");
@@ -399,7 +399,7 @@ fn a_supplement_layers_designations_and_properties_over_the_system() {
     );
     assert_eq!(supplemented.declaration().languages, ["de", "en", "nl"]);
 
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry
         .register(Arc::new(supplemented))
         .expect("registers");
@@ -422,7 +422,7 @@ fn take(providers: Vec<FhirCodeSystem>, url: &str) -> FhirCodeSystem {
 }
 
 fn registry_of(provider: FhirCodeSystem) -> Registry {
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry.register(Arc::new(provider)).expect("registers");
     registry
 }
@@ -541,7 +541,7 @@ fn lookup_name_is_the_code_system_name_then_the_title_then_the_url() {
 // (<https://hl7.org/fhir/R5/codesystem-operation-lookup.html>).
 #[test]
 fn lookup_carries_the_definition_when_the_system_states_one() {
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     let (_dir, providers) = load_all();
     for p in providers {
         registry.register(Arc::new(p)).expect("registers");
@@ -689,12 +689,12 @@ fn a_fragment_expansion_states_its_reason_and_names_its_used_fragment() {
     let (_dir, providers) = load_all();
     let mut model = find(&providers, COLOURS).model().clone();
     model.content = ContentMode::Fragment;
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry
         .register(Arc::new(FhirCodeSystem::new(model).expect("builds")))
         .expect("registers");
-    let value_sets = fhir_terminology::valueset::store::ValueSetStore::new();
-    let concept_maps = fhir_terminology::conceptmap::store::ConceptMapStore::new();
+    let value_sets = fhir_terminology::valueset::store::ValueSetStore::default();
+    let concept_maps = fhir_terminology::conceptmap::store::ConceptMapStore::default();
     let sources = fhir_terminology::operations::Sources {
         registry: &registry,
         value_sets: &value_sets,

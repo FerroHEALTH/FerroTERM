@@ -46,12 +46,6 @@ pub struct Memberships {
 }
 
 impl Memberships {
-    /// No reference sets.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Adds `concept` to the reference set `refset`.
     pub fn insert(&mut self, refset: u64, concept: Ordinal) {
         self.sets.entry(refset).or_default().insert(concept.index());
@@ -164,7 +158,7 @@ mod tests {
 
     #[test]
     fn memberships_round_trip_and_reject_foreign_bytes() {
-        let mut members = Memberships::new();
+        let mut members = Memberships::default();
         members.insert(31_000_147_101, Ordinal::new(2));
         members.insert(31_000_147_101, Ordinal::new(3));
         members.insert(900_000_000_000_497_000, Ordinal::new(3));

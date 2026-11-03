@@ -373,7 +373,7 @@ impl CodeSystemProvider for Fixture {
 
 /// A registry with the hierarchical system in two versions and the flat system.
 pub(crate) fn registry() -> Registry {
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry
         .register(Arc::new(Fixture::hierarchical("2024")))
         .expect("registers 2024");

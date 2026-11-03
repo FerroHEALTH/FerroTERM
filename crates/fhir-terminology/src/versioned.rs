@@ -63,12 +63,6 @@ impl<T> Clone for VersionedStore<T> {
 }
 
 impl<T: Versioned> VersionedStore<T> {
-    /// An empty store.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// This store with `beneath` under it.
     ///
     /// The layers resolve per `url` and `version`: a version this store holds

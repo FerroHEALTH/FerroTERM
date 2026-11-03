@@ -108,7 +108,7 @@ impl UcumProvider {
                     ),
                 ],
             },
-            interned: Interned::new(),
+            interned: Interned::default(),
             essence,
             reducer: Mutex::new(Reducer::new(essence)),
         }

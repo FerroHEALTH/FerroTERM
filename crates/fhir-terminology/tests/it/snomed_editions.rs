@@ -41,7 +41,7 @@ impl Editions {
         snomed::write(first.path()).expect("writes the first edition");
         let second = tempfile::tempdir().expect("tempdir");
         snomed::write_second(second.path()).expect("writes the second edition");
-        let mut registry = Registry::new();
+        let mut registry = Registry::default();
         for dir in [first.path(), second.path()] {
             registry
                 .register(Arc::new(SnomedProvider::open(dir, "en").expect("opens")))
@@ -54,8 +54,8 @@ impl Editions {
             _first: first,
             _second: second,
             registry,
-            value_sets: ValueSetStore::new(),
-            concept_maps: ConceptMapStore::new(),
+            value_sets: ValueSetStore::default(),
+            concept_maps: ConceptMapStore::default(),
         }
     }
 
@@ -273,7 +273,7 @@ fn an_edition_uri_without_a_date_names_the_greatest_release_of_that_edition() {
     snomed::write_later(later.path()).expect("writes the later release");
     let second = tempfile::tempdir().expect("tempdir");
     snomed::write_second(second.path()).expect("writes the second edition");
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     for dir in [first.path(), later.path(), second.path()] {
         registry
             .register(Arc::new(SnomedProvider::open(dir, "en").expect("opens")))

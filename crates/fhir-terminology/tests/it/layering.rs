@@ -32,7 +32,7 @@ const GENDER_VALUE_SET: &str = "http://hl7.org/fhir/ValueSet/administrative-gend
 
 /// The deployment's own registry holding `GENDER` at each of `versions`.
 fn deployment(versions: &[&str]) -> Registry {
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     for version in versions {
         registry
             .register(Arc::new(Fixture::flat_at(GENDER, version)))
@@ -125,7 +125,7 @@ fn a_configured_default_of_the_upper_layer_wins() {
 fn a_configured_default_beneath_survives_an_upper_version() {
     let mut beneath = registry();
     beneath.set_default(URL, "2024").expect("sets default");
-    let mut upper = Registry::new();
+    let mut upper = Registry::default();
     upper
         .register(Arc::new(Fixture::flat_at(URL, "2026")))
         .expect("registers");
@@ -165,7 +165,7 @@ fn a_layered_value_set_version_leaves_the_core_versions_answering() {
             .value_sets()
             .resolve(GENDER_VALUE_SET, None)
             .expect("the core value set resolves");
-        let mut upper = ValueSetStore::new();
+        let mut upper = ValueSetStore::default();
         for version in ["1.0.0", "local-1"] {
             let mut local = (*spec).clone();
             local.version = Some(version.to_owned());
@@ -200,7 +200,7 @@ fn a_lower_layered_value_set_version_leaves_the_core_default() {
             .expect("the core value set resolves");
         let mut local = (*spec).clone();
         local.version = Some(String::from("1.0.0"));
-        let mut upper = ValueSetStore::new();
+        let mut upper = ValueSetStore::default();
         upper.insert(local).expect("stores");
         let layered = upper.with_beneath(core.value_sets());
         let default = layered.resolve(GENDER_VALUE_SET, None).expect("resolves");

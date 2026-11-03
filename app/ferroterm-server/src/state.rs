@@ -269,9 +269,9 @@ impl Layer {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            registry: Registry::new(),
-            value_sets: ValueSetStore::new(),
-            concept_maps: ConceptMapStore::new(),
+            registry: Registry::default(),
+            value_sets: ValueSetStore::default(),
+            concept_maps: ConceptMapStore::default(),
         }
     }
 
@@ -618,8 +618,8 @@ impl AppState {
         // Everything pushed from here on came from a `CodeSystem` directory.
         let from_code_systems = loaded.len();
         let mut supplements = Vec::new();
-        let mut value_sets = ValueSetStore::new();
-        let mut concept_maps = ConceptMapStore::new();
+        let mut value_sets = ValueSetStore::default();
+        let mut concept_maps = ConceptMapStore::default();
         for path in &config.terminology.code_systems {
             load_code_systems(
                 path,
@@ -640,7 +640,7 @@ impl AppState {
                 ))
             }),
         )?;
-        let mut registry = Registry::new();
+        let mut registry = Registry::default();
         let mut paths = BTreeMap::new();
         let mut origins = BTreeMap::new();
         for (index, Loaded { path, provider }) in loaded.into_iter().enumerate() {
@@ -867,8 +867,8 @@ impl AppState {
         }
         let base = Layer {
             registry,
-            value_sets: ValueSetStore::new(),
-            concept_maps: ConceptMapStore::new(),
+            value_sets: ValueSetStore::default(),
+            concept_maps: ConceptMapStore::default(),
         };
         Self {
             persisted: RwLock::new(Persisted {

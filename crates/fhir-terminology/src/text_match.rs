@@ -6,13 +6,7 @@
 //! The fold and the word rules are `designation-index`'s, so a resource-backed
 //! system and an indexed edition answer a text filter alike.
 
-use designation_index::tokenize::{fold, prefixes};
-
-/// The folded, non-empty words of a query (`designation-index`'s rule).
-#[must_use]
-pub fn query_words(query: &str) -> Vec<String> {
-    prefixes(query)
-}
+use designation_index::tokenize::fold;
 
 /// Whether every query word is a prefix of some word of some term.
 #[must_use]
@@ -38,15 +32,17 @@ pub fn same_language(a: &str, b: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{matches_all, query_words, same_language};
+    use designation_index::tokenize::prefixes;
+
+    use super::{matches_all, same_language};
 
     #[test]
     fn prefixes_match_folded_words_in_any_order() {
-        let words = query_words("Fail HEART");
+        let words = prefixes("Fail HEART");
         assert!(matches_all(&words, &["Heart failure"]));
         assert!(!matches_all(&words, &["Heart"]));
-        assert!(matches_all(&query_words("meni"), &["Ménière's disease"]));
-        assert!(matches_all(&query_words(""), &[]));
+        assert!(matches_all(&prefixes("meni"), &["Ménière's disease"]));
+        assert!(matches_all(&prefixes(""), &[]));
         assert!(same_language("en-GB", "EN"));
         assert!(!same_language("nl", "en"));
     }

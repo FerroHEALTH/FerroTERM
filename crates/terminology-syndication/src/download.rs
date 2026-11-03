@@ -67,12 +67,14 @@ pub struct Fetched {
     pub checksum: Checksum,
 }
 
-/// Streams `request` to `destination` and verifies `expected` before returning.
+/// Streams `request` to `destination`, verifying `expected` when the source
+/// advertises a digest and computing the SHA-256 of what arrived when it does
+/// not (a FHIR API that serves a resource by its identifier).
 ///
-/// The bytes go to `<destination>.part` while they arrive. On a digest match
-/// that file is renamed onto `destination`; on a mismatch it is removed, so a
-/// refused download leaves nothing behind for a later run to mistake for
-/// content.
+/// The bytes go to `<destination>.part` while they arrive. On a digest match,
+/// or when nothing was expected, that file is renamed onto `destination`; on a
+/// mismatch it is removed, so a refused download leaves nothing behind for a
+/// later run to mistake for content.
 ///
 /// # Errors
 ///
@@ -80,35 +82,8 @@ pub struct Fetched {
 /// [`DownloadError::Status`] when the server answers with a status that is not
 /// a success, [`DownloadError::Write`] when the file cannot be written or
 /// moved, and [`DownloadError::ChecksumMismatch`] when the bytes that arrived
-/// do not carry the advertised digest.
+/// do not carry the expected digest.
 pub async fn to_file(
-    request: reqwest::RequestBuilder,
-    destination: &Path,
-    expected: &Checksum,
-) -> Result<Fetched, DownloadError> {
-    write(request, destination, Some(expected)).await
-}
-
-/// Streams `request` to `destination` and answers the SHA-256 of what arrived.
-///
-/// This is for a source that advertises no digest, such as a FHIR API that
-/// serves a resource by its identifier. The digest is computed rather than
-/// verified, so the caller can still record what it took.
-///
-/// # Errors
-///
-/// Returns [`DownloadError::Request`] when the request fails,
-/// [`DownloadError::Status`] when the server answers with a status that is not
-/// a success, and [`DownloadError::Write`] when the file cannot be written or
-/// moved.
-pub async fn to_file_unverified(
-    request: reqwest::RequestBuilder,
-    destination: &Path,
-) -> Result<Fetched, DownloadError> {
-    write(request, destination, None).await
-}
-
-async fn write(
     request: reqwest::RequestBuilder,
     destination: &Path,
     expected: Option<&Checksum>,

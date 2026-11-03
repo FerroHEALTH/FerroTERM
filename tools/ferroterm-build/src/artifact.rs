@@ -247,7 +247,7 @@ pub(crate) fn write_text_index(
     placed: &[Placed],
     language: LanguageKey,
 ) -> Result<usize, Error> {
-    let mut index = IndexBuilder::new();
+    let mut index = IndexBuilder::default();
     for p in placed {
         let tag = p.record.language.as_str();
         let tag = match language {

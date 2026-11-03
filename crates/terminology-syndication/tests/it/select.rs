@@ -21,7 +21,7 @@ fn feed() -> Feed {
 fn everything() -> Subscription {
     CategoryTerm::NAMED
         .into_iter()
-        .fold(Subscription::new(), Subscription::with_category)
+        .fold(Subscription::default(), Subscription::with_category)
 }
 
 fn reason_for(
@@ -52,7 +52,7 @@ fn an_unsubscribed_system_is_skipped_by_name() {
     let reason = reason_for(
         &feed(),
         &subscription,
-        &Holdings::new(),
+        &Holdings::default(),
         "Example Value Set",
     );
     assert_eq!(
@@ -67,18 +67,18 @@ fn an_unsubscribed_system_is_skipped_by_name() {
 fn a_subscribed_system_is_taken() {
     let subscription = everything().with_system(EDITION);
     assert_eq!(
-        taken_titles(&feed(), &subscription, &Holdings::new()),
+        taken_titles(&feed(), &subscription, &Holdings::default()),
         ["Example Edition 31 January 2026 (RF2 SNAPSHOT)"]
     );
 }
 
 #[test]
 fn an_unsubscribed_category_is_skipped_by_term() {
-    let subscription = Subscription::new().with_category(CategoryTerm::SnomedRf2Snapshot);
+    let subscription = Subscription::default().with_category(CategoryTerm::SnomedRf2Snapshot);
     let reason = reason_for(
         &feed(),
         &subscription,
-        &Holdings::new(),
+        &Holdings::default(),
         "Example Value Set",
     );
     assert_eq!(
@@ -94,7 +94,7 @@ fn a_delta_distribution_is_skipped_because_a_build_reads_the_snapshot() {
     let reason = reason_for(
         &feed(),
         &everything(),
-        &Holdings::new(),
+        &Holdings::default(),
         "Example Edition 31 January 2026 (RF2 DELTA)",
     );
     assert_eq!(
@@ -114,7 +114,7 @@ fn a_full_distribution_is_skipped_because_a_build_reads_the_snapshot() {
     let reason = reason_for(
         &feed(),
         &everything(),
-        &Holdings::new(),
+        &Holdings::default(),
         "Example Edition 31 January 2026 (RF2 FULL)",
     );
     assert_eq!(
@@ -129,7 +129,7 @@ fn a_full_distribution_is_skipped_because_a_build_reads_the_snapshot() {
 fn a_distribution_of_every_release_type_is_taken_because_it_carries_the_snapshot() {
     let subscription = everything().with_system(EXTENSION);
     assert_eq!(
-        taken_titles(&feed(), &subscription, &Holdings::new()),
+        taken_titles(&feed(), &subscription, &Holdings::default()),
         ["Example Extension 15 December 2025 v1.0"]
     );
 }
@@ -139,7 +139,7 @@ fn the_binary_index_is_refused_with_its_own_reason() {
     let reason = reason_for(
         &feed(),
         &everything(),
-        &Holdings::new(),
+        &Holdings::default(),
         "Example Binary Index 2.0.13",
     );
     assert_eq!(reason, SkipReason::BinaryIndex);
@@ -155,7 +155,7 @@ fn the_binary_index_is_refused_even_when_its_system_and_category_are_subscribed(
     let reason = reason_for(
         &feed(),
         &subscription,
-        &Holdings::new(),
+        &Holdings::default(),
         "Example Binary Index 2.0.13",
     );
     assert_eq!(
@@ -171,7 +171,7 @@ fn an_entry_with_no_content_link_is_skipped() {
     let reason = reason_for(
         &feed(),
         &subscription,
-        &Holdings::new(),
+        &Holdings::default(),
         "Example Entry Without A Content Link",
     );
     assert_eq!(reason, SkipReason::NoContentLink);
@@ -179,7 +179,7 @@ fn an_entry_with_no_content_link_is_skipped() {
 
 #[test]
 fn a_held_copy_at_the_same_date_is_not_replaced() {
-    let mut holdings = Holdings::new();
+    let mut holdings = Holdings::default();
     let offered: jiff::Timestamp = "2026-01-31T09:00:00Z".parse().expect("a fixed timestamp");
     holdings.record(EDITION, format!("{EDITION}/version/20260131"), offered);
     let subscription = everything().with_system(EDITION);
@@ -200,7 +200,7 @@ fn a_held_copy_at_the_same_date_is_not_replaced() {
 
 #[test]
 fn a_held_copy_at_a_later_date_is_not_replaced() {
-    let mut holdings = Holdings::new();
+    let mut holdings = Holdings::default();
     let held: jiff::Timestamp = "2026-02-01T09:00:00Z".parse().expect("a fixed timestamp");
     holdings.record(EDITION, format!("{EDITION}/version/20260131"), held);
     let subscription = everything().with_system(EDITION);
@@ -216,7 +216,7 @@ fn a_held_copy_at_a_later_date_is_not_replaced() {
 
 #[test]
 fn a_held_copy_at_an_earlier_date_is_replaced() {
-    let mut holdings = Holdings::new();
+    let mut holdings = Holdings::default();
     let held: jiff::Timestamp = "2026-01-01T09:00:00Z".parse().expect("a fixed timestamp");
     holdings.record(EDITION, format!("{EDITION}/version/20260131"), held);
     let subscription = everything().with_system(EDITION);
@@ -229,7 +229,7 @@ fn a_held_copy_at_an_earlier_date_is_replaced() {
 
 #[test]
 fn a_held_copy_of_another_version_does_not_block_a_new_version() {
-    let mut holdings = Holdings::new();
+    let mut holdings = Holdings::default();
     let held: jiff::Timestamp = "2026-02-01T09:00:00Z".parse().expect("a fixed timestamp");
     holdings.record(EDITION, format!("{EDITION}/version/20251231"), held);
     let subscription = everything().with_system(EDITION);
@@ -243,7 +243,7 @@ fn a_held_copy_of_another_version_does_not_block_a_new_version() {
 #[test]
 fn every_entry_of_the_feed_is_either_taken_or_named_as_skipped() {
     let feed = feed();
-    let selection = select::select(&feed, &everything(), &Holdings::new());
+    let selection = select::select(&feed, &everything(), &Holdings::default());
     assert_eq!(
         selection.taken.len() + selection.skipped.len(),
         feed.entries.len(),
@@ -253,16 +253,16 @@ fn every_entry_of_the_feed_is_either_taken_or_named_as_skipped() {
 
 #[test]
 fn a_subscription_with_no_system_filter_admits_every_system() {
-    assert_eq!(Subscription::new().systems, Systems::Any);
-    assert!(Subscription::new().systems.admits(VALUE_SET, ""));
-    let listed = Subscription::new().with_system(EDITION);
+    assert_eq!(Subscription::default().systems, Systems::Any);
+    assert!(Subscription::default().systems.admits(VALUE_SET, ""));
+    let listed = Subscription::default().with_system(EDITION);
     assert!(listed.systems.admits(EDITION, ""));
     assert!(!listed.systems.admits(VALUE_SET, ""));
 }
 
 #[test]
 fn a_listed_edition_admits_a_release_identified_by_the_bare_code_system() {
-    let listed = Subscription::new().with_system(EDITION);
+    let listed = Subscription::default().with_system(EDITION);
     let release = format!("{EDITION}/version/20260131");
     assert!(
         listed.systems.admits("http://snomed.info/sct", &release),
@@ -286,7 +286,7 @@ fn a_listed_edition_admits_a_release_identified_by_the_bare_code_system() {
 
 #[test]
 fn holdings_report_what_they_hold() {
-    let mut holdings = Holdings::new();
+    let mut holdings = Holdings::default();
     assert!(holdings.is_empty());
     let date: jiff::Timestamp = "2026-01-01T00:00:00Z".parse().expect("a fixed timestamp");
     holdings.record(VALUE_SET, "1.0.0", date);

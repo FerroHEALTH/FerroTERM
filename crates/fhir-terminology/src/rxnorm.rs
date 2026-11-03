@@ -209,7 +209,7 @@ impl RxNormProvider {
         let store = Store::open(&dir.join(&manifest.store))?;
         let read = |name: &str| {
             let path = dir.join(name);
-            crate::artifact::reader(&path).map_err(|source| OpenError::Io { path, source })
+            concept_graph::read::buffered(&path).map_err(|source| OpenError::Io { path, source })
         };
         let text = designation_index::persist::read_from(&mut read(&manifest.text)?)?;
         let relations = Relations::read_from(&mut read(&manifest.relations)?)?;

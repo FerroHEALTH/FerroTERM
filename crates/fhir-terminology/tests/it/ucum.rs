@@ -256,7 +256,7 @@ fn canonical_value_set(value: &str) -> ValueSet {
 
 #[test]
 fn ucum_answers_the_operations_the_ecosystem_suite_asks() {
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry
         .register(Arc::new(UcumProvider::new()))
         .expect("registers");
@@ -318,12 +318,12 @@ fn ucum_answers_the_operations_the_ecosystem_suite_asks() {
 
 #[test]
 fn ucum_validates_by_canonical_membership_and_refuses_expansion() {
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry
         .register(Arc::new(UcumProvider::new()))
         .expect("registers");
-    let value_sets = ValueSetStore::new();
-    let concept_maps = ConceptMapStore::new();
+    let value_sets = ValueSetStore::default();
+    let concept_maps = ConceptMapStore::default();
     let sources = Sources {
         registry: &registry,
         value_sets: &value_sets,
@@ -403,7 +403,7 @@ fn a_unit_name_in_english_does_not_satisfy_a_request_for_another_language() {
 
     let provider = UcumProvider::new();
     assert_eq!(provider.language(), Some("en"));
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry.register(Arc::new(provider)).expect("registers");
     let ask = |display: &str| {
         validate_code(

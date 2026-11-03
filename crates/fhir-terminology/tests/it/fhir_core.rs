@@ -83,7 +83,7 @@ fn the_gender_value_set_selects_from_the_gender_system() {
 #[test]
 fn a_deployment_registry_shadows_the_bundle() {
     let core = CoreTerminology::load(FhirVersion::R4B).expect("the bundle loads");
-    let layered = Registry::new().with_beneath(core.code_systems());
+    let layered = Registry::default().with_beneath(core.code_systems());
     assert!(
         layered.resolve(PUBLICATION_STATUS, None).is_ok(),
         "a system only the bundle holds resolves beneath"
@@ -104,7 +104,7 @@ fn a_deployment_registry_shadows_the_bundle() {
 #[test]
 fn a_deployment_store_shadows_the_bundle() {
     let core = CoreTerminology::load(FhirVersion::R4B).expect("the bundle loads");
-    let layered = ValueSetStore::new().with_beneath(core.value_sets());
+    let layered = ValueSetStore::default().with_beneath(core.value_sets());
     assert!(layered.resolve(GENDER_VALUE_SET, None).is_some());
     assert_eq!(layered.len(), 0);
 }

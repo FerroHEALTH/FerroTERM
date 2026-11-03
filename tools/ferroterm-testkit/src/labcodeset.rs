@@ -210,13 +210,9 @@ fn tables() -> String {
 pub fn write_publication(dir: &Path) -> std::io::Result<PathBuf> {
     let root = dir.join("Labcodeset v2026-01");
     std::fs::create_dir_all(&root)?;
-    let document = root.join(format!("labconcepts-{RELEASE}.xml"));
-    std::fs::write(&document, document_text())?;
-    Ok(document)
-}
-
-fn document_text() -> String {
-    document()
+    let path = root.join(format!("labconcepts-{RELEASE}.xml"));
+    std::fs::write(&path, document())?;
+    Ok(path)
 }
 
 /// Builds the publication into a FHIR resource directory under `dir`.

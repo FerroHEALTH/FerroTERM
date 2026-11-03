@@ -63,7 +63,7 @@ fn the_local_edition_indexes_and_answers_prefix_queries() {
     let release = Release::open(&root, ReleaseType::Snapshot).expect("release opens");
     let started = Instant::now();
     let (refset_ordinals, memberships) = memberships(&release);
-    let mut builder = IndexBuilder::new();
+    let mut builder = IndexBuilder::default();
     let mut concepts: BTreeMap<_, (Ordinal, u32)> = BTreeMap::new();
     let mut rows = 0_u64;
     for file in release.of_type(&ContentType::Description) {

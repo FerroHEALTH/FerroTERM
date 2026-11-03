@@ -562,7 +562,7 @@ fn subsumes_refusals_are_errors_never_not_subsumed() {
     });
     assert!(matches!(flat, OperationError::NotSupported(_)));
     assert_eq!(flat.status(), StatusCode::BAD_REQUEST);
-    let mut registry_without = Registry::new();
+    let mut registry_without = Registry::default();
     registry_without
         .register(Arc::new(crate::fixture::Fixture::flat()))
         .expect("registers");

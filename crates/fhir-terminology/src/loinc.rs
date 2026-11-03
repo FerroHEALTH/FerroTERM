@@ -270,7 +270,7 @@ impl LoincProvider {
         let store = Store::open(&dir.join(&manifest.store))?;
         let read = |name: &str| {
             let path = dir.join(name);
-            crate::artifact::reader(&path).map_err(|source| OpenError::Io { path, source })
+            concept_graph::read::buffered(&path).map_err(|source| OpenError::Io { path, source })
         };
         let graph = GraphHierarchy::read_from(&mut read(&manifest.hierarchy)?)?;
         let children = graph.is_a.transpose()?;

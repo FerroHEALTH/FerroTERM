@@ -275,7 +275,7 @@ pub trait Source: fmt::Debug + Send + Sync {
                     .get(&link.href)
                     .header(reqwest::header::ACCEPT, crate::fhir_api::FHIR_JSON),
             );
-            Ok(crate::download::to_file_unverified(request, destination).await?)
+            Ok(crate::download::to_file(request, destination, None).await?)
         })
     }
 
@@ -300,7 +300,7 @@ pub trait Source: fmt::Debug + Send + Sync {
             };
             let authorization = self.download_auth().await?;
             let request = authorization.apply(self.client().get(&link.href));
-            Ok(crate::download::to_file(request, destination, expected).await?)
+            Ok(crate::download::to_file(request, destination, Some(expected)).await?)
         })
     }
 }

@@ -153,7 +153,7 @@ fn a_declared_grammar_and_a_supported_grammar_are_two_different_statements() {
     assert!(ucum.declaration().compositional.defined());
     assert!(ucum.declaration().compositional.supported());
 
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry.register(Arc::new(grammar)).expect("registers");
     registry.register(Arc::new(ucum)).expect("registers");
     let summary = Summary::of(&registry);
@@ -199,7 +199,7 @@ fn served(dir: &std::path::Path) -> Registry {
         Some(snomed::DATE),
         "the provider carries the release the manifest recorded"
     );
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry.register(Arc::new(provider)).expect("registers");
     registry
         .register(Arc::new(UcumProvider::new()))
@@ -498,7 +498,7 @@ fn a_declared_code_filter_states_the_operators_the_engine_answers_on_it() {
     // `evaluate` reads `concept` and `code` as the code itself, so a system
     // declaring `code` answers the generic set there beside its own. ISO 3166-1
     // declares `code` with `regex`, `=`, and `in`.
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry
         .register(Arc::new(
             fhir_terminology::registries::iso3166::provider().expect("builds"),

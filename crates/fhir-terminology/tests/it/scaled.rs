@@ -77,7 +77,7 @@ fn the_root_subsumes_every_other_concept() {
 fn the_implicit_descendants_value_set_holds_the_whole_edition() {
     let (_dir, p) = provider();
     let root = scaled::code(scaled::ROOT);
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry.register(Arc::new(p)).expect("registers");
     let value_set = registry
         .implicit_value_set(&format!("{SYSTEM}?fhir_vs=isa/{root}"))

@@ -25,7 +25,7 @@ use fhir_types::r4b::value_set::{
 };
 
 fn registry() -> Registry {
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry
         .register(Arc::new(Bcp47Provider::new()))
         .expect("bcp47");
@@ -477,8 +477,8 @@ fn iso3166_is_a_case_insensitive_table_with_user_assigned_codes() {
 #[test]
 fn the_grammar_systems_refuse_expansion_and_validate_by_membership() {
     let registry = registry();
-    let value_sets = ValueSetStore::new();
-    let concept_maps = ConceptMapStore::new();
+    let value_sets = ValueSetStore::default();
+    let concept_maps = ConceptMapStore::default();
     let sources = Sources {
         registry: &registry,
         value_sets: &value_sets,
@@ -551,8 +551,8 @@ fn the_grammar_systems_refuse_expansion_and_validate_by_membership() {
 #[test]
 fn the_grammar_systems_validate_by_membership_and_decline_undetermined_subsumption() {
     let registry = registry();
-    let value_sets = ValueSetStore::new();
-    let concept_maps = ConceptMapStore::new();
+    let value_sets = ValueSetStore::default();
+    let concept_maps = ConceptMapStore::default();
     let sources = Sources {
         registry: &registry,
         value_sets: &value_sets,
@@ -629,8 +629,8 @@ fn the_grammar_systems_validate_by_membership_and_decline_undetermined_subsumpti
 #[test]
 fn a_filtered_media_type_expansion_is_unclosed_and_an_enumerated_one_is_not() {
     let registry = registry();
-    let value_sets = ValueSetStore::new();
-    let concept_maps = ConceptMapStore::new();
+    let value_sets = ValueSetStore::default();
+    let concept_maps = ConceptMapStore::default();
     let sources = Sources {
         registry: &registry,
         value_sets: &value_sets,
@@ -692,8 +692,8 @@ fn a_language_tag_selection_is_unclosed() {
 #[test]
 fn a_fixed_language_expands_to_the_registered_regions() {
     let registry = registry();
-    let value_sets = ValueSetStore::new();
-    let concept_maps = ConceptMapStore::new();
+    let value_sets = ValueSetStore::default();
+    let concept_maps = ConceptMapStore::default();
     let sources = Sources {
         registry: &registry,
         value_sets: &value_sets,
@@ -742,8 +742,8 @@ fn a_fixed_language_expands_to_the_registered_regions() {
 #[test]
 fn a_fixed_language_and_region_expand_to_the_registered_scripts() {
     let registry = registry();
-    let value_sets = ValueSetStore::new();
-    let concept_maps = ConceptMapStore::new();
+    let value_sets = ValueSetStore::default();
+    let concept_maps = ConceptMapStore::default();
     let sources = Sources {
         registry: &registry,
         value_sets: &value_sets,
@@ -778,8 +778,8 @@ fn a_fixed_language_and_region_expand_to_the_registered_scripts() {
 #[test]
 fn a_script_or_a_region_alone_leaves_the_language_open() {
     let registry = registry();
-    let value_sets = ValueSetStore::new();
-    let concept_maps = ConceptMapStore::new();
+    let value_sets = ValueSetStore::default();
+    let concept_maps = ConceptMapStore::default();
     let sources = Sources {
         registry: &registry,
         value_sets: &value_sets,
@@ -813,8 +813,8 @@ fn a_script_or_a_region_alone_leaves_the_language_open() {
 #[test]
 fn an_oversized_language_enumeration_is_too_costly() {
     let registry = registry();
-    let value_sets = ValueSetStore::new();
-    let concept_maps = ConceptMapStore::new();
+    let value_sets = ValueSetStore::default();
+    let concept_maps = ConceptMapStore::default();
     let sources = Sources {
         registry: &registry,
         value_sets: &value_sets,
@@ -864,8 +864,8 @@ fn an_oversized_language_enumeration_is_too_costly() {
 #[test]
 fn a_language_tag_expansion_states_why_it_is_unclosed() {
     let registry = registry();
-    let value_sets = ValueSetStore::new();
-    let concept_maps = ConceptMapStore::new();
+    let value_sets = ValueSetStore::default();
+    let concept_maps = ConceptMapStore::default();
     let sources = Sources {
         registry: &registry,
         value_sets: &value_sets,
@@ -915,8 +915,8 @@ fn a_language_tag_expansion_states_why_it_is_unclosed() {
 #[test]
 fn handle_unclosed_expansion_refuses_an_unclosed_expansion_only_when_it_is_false() {
     let registry = registry();
-    let value_sets = ValueSetStore::new();
-    let concept_maps = ConceptMapStore::new();
+    let value_sets = ValueSetStore::default();
+    let concept_maps = ConceptMapStore::default();
     let sources = Sources {
         registry: &registry,
         value_sets: &value_sets,

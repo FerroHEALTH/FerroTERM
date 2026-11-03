@@ -460,7 +460,7 @@ fn a_display_in_the_classifications_language_does_not_satisfy_a_request_for_anot
 
     let (_dir, p) = claml();
     assert_eq!(p.language(), Some("nl"));
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry.register(Arc::new(p)).expect("registers");
     let ask = |code: &str, display: &str| {
         validate_code(

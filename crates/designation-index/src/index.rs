@@ -67,12 +67,6 @@ pub struct IndexBuilder {
 }
 
 impl IndexBuilder {
-    /// An empty builder.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Adds a designation; the returned designation ordinal is its position.
     ///
     /// # Errors
@@ -428,7 +422,7 @@ mod tests {
     use concept_graph::ordinal::Ordinal;
 
     fn index() -> super::TextIndex {
-        let mut builder = IndexBuilder::new();
+        let mut builder = IndexBuilder::default();
         let rows = [
             (0, 0, "Heart failure", "en", 1, true, vec![0]),
             (0, 1, "Cardiac failure", "en", 1, true, vec![0, 1]),
