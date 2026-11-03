@@ -17,7 +17,7 @@ use ferrohealth_ui::view::shell::{brand_mark, centred, lockup_plain};
 use ferrohealth_ui::view::sign_in::{Notice, Provider, Retry, SignIn, State, sign_in};
 
 use crate::locale::{Msg, tr};
-use crate::markup::{h, link, t};
+use crate::markup::link;
 use crate::request::Request;
 use crate::routes::{BACK_PARAM, ui_path};
 use crate::shell::{MARK_DARK, MARK_LIGHT, footer};
@@ -165,19 +165,19 @@ pub(crate) fn page(request: &Request) -> Html {
         });
     let read = ui_path("");
     let line = if rejected || unavailable {
-        h(format!(
+        Html::raw(format!(
             r#"<a href="{}" class="fui-button fui-button-primary">{}</a>"#,
-            t(&read),
+            Html::text(&read),
             ferrohealth_ui::view::button::label(
                 Some(Glyph::ARROW_RIGHT),
                 tr(locale, Msg::SignInRead)
             )
         ))
     } else {
-        h(format!(
+        Html::raw(format!(
             r#"<p class="fui-small fui-sign-in-line">{}{}</p>"#,
-            link(&read, t(tr(locale, Msg::SignInRead))),
-            t(tr(locale, Msg::SignInReadLine))
+            link(&read, Html::text(tr(locale, Msg::SignInRead))),
+            Html::text(tr(locale, Msg::SignInReadLine))
         ))
     };
     let title = if unavailable {

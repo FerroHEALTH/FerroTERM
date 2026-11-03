@@ -42,7 +42,7 @@ use crate::fhir::error::FhirError;
 use crate::fhir::searchset::SearchFilter;
 use crate::fhir::sync::{Finding, RunOutcome, RunRecord, RunSummary, Subject};
 use crate::locale::{Msg, tr, tr_with};
-use crate::markup::{code, h, join, p, t};
+use crate::markup::{code, p};
 use crate::pages::parts::{failure, headed, heading};
 use crate::posted::INTENT;
 use crate::request::Request;
@@ -138,11 +138,6 @@ fn did(locale: &Locale, summary: &RunSummary) -> String {
     }
 }
 
-/// The not-found page, for a reader the screens are not drawn for.
-fn hidden(request: &Request) -> Html {
-    crate::pages::errors::not_found_page(request)
-}
-
 /// What a posted Run now or Activate came to, when one was refused.
 fn posted_failure(locale: &Locale, error: Option<&FhirError>) -> Html {
     error
@@ -154,7 +149,7 @@ fn posted_failure(locale: &Locale, error: Option<&FhirError>) -> Html {
 pub(crate) async fn page(request: Request) -> Html {
     let locale = &request.locale;
     if !request.reads_sync() {
-        return hidden(&request);
+        return crate::pages::errors::not_found_page(&request);
     }
     let form = request
         .posted
@@ -295,7 +290,7 @@ fn ran_notice(request: &Request) -> Option<Html> {
             tone,
             Announce::Status,
             None,
-            t(tr_with(locale, msg, &[("id", id.clone().into())])),
+            Html::text(tr_with(locale, msg, &[("id", id.clone().into())])),
         ),
         p(open),
     ]))
@@ -311,17 +306,17 @@ fn runs_section(locale: &Locale, runs: &[RunSummary]) -> Html {
         Column::text("findings", tr(locale, Msg::SyncColumnFindings)),
     ];
     let [_, trigger, outcome, what, findings] = &columns;
-    let rows = join(runs.iter().map(|run| {
+    let rows = Html::join(runs.iter().map(|run| {
         let href = run_link(&run.id, false);
-        h(format!(
+        Html::raw(format!(
             "<tr>{}{}{}{}{}</tr>",
             title_cell(None, Some(&href), timestamp(locale, &run.started), None),
-            cell(trigger, t(trigger_words(locale, &run.trigger))),
+            cell(trigger, Html::text(trigger_words(locale, &run.trigger))),
             cell(outcome, outcome_view(locale, run.outcome)),
-            cell(what, t(did(locale, run))),
+            cell(what, Html::text(did(locale, run))),
             cell(
                 findings,
-                t(tr_with(
+                Html::text(tr_with(
                     locale,
                     Msg::SyncFindingsCount,
                     &[("count", run.revalidation_findings.into())],
@@ -356,14 +351,14 @@ fn runs_section(locale: &Locale, runs: &[RunSummary]) -> Html {
 pub(crate) async fn run_page(request: Request) -> Html {
     let locale = &request.locale;
     if !request.reads_sync() {
-        return hidden(&request);
+        return crate::pages::errors::not_found_page(&request);
     }
     let (id, tab) = (request.segment(1), request.segment(2));
     let id = id.unwrap_or_default();
     let findings = match tab.as_deref() {
         None => false,
         Some("findings") => true,
-        Some(_) => return hidden(&request),
+        Some(_) => return crate::pages::errors::not_found_page(&request),
     };
     match request.client.run_record(&id).await {
         Ok(record) => {
@@ -389,7 +384,7 @@ pub(crate) async fn run_page(request: Request) -> Html {
                         Tone::Bad,
                         Announce::Alert,
                         None,
-                        t(tr_with(
+                        Html::text(tr_with(
                             locale,
                             Msg::SyncNotFound,
                             &[("id", id.clone().into())],
@@ -419,11 +414,11 @@ fn run_screen(
     let when = ferrohealth_ui::view::time::reading(locale, &record.started);
     let title = tr_with(locale, Msg::SyncRunTitle, &[("when", when.into())]);
     let encoded = base64::engine::general_purpose::STANDARD.encode(record.text.as_bytes());
-    let download = h(format!(
+    let download = Html::raw(format!(
         r#"<a class="fui-button fui-button-primary" href="data:application/json;base64,{encoded}" download="{}">{}{}</a>"#,
-        t(format!("run-{}.json", record.id)),
+        Html::text(format!("run-{}.json", record.id)),
         ferrohealth_ui::icon::icon(Glyph::DOWNLOAD, "16"),
-        t(tr(locale, Msg::SyncDownload)),
+        Html::text(tr(locale, Msg::SyncDownload)),
     ));
     let header = headed(
         request,
@@ -609,14 +604,14 @@ fn revalidation_line(locale: &Locale, record: &RunRecord) -> String {
 /// `items` as a list, or Nothing when there is none.
 fn list(locale: &Locale, items: Vec<String>) -> Html {
     if items.is_empty() {
-        t(tr(locale, Msg::SyncNothing))
+        Html::text(tr(locale, Msg::SyncNothing))
     } else {
-        h(format!(
+        Html::raw(format!(
             "<ul>{}</ul>",
-            join(
+            Html::join(
                 items
                     .into_iter()
-                    .map(|item| h(format!("<li>{}</li>", t(item))))
+                    .map(|item| Html::raw(format!("<li>{}</li>", Html::text(item))))
             )
         ))
     }
@@ -627,7 +622,7 @@ fn summary_section(locale: &Locale, record: &RunRecord) -> Html {
     let facts = definitions(vec![
         (
             tr(locale, Msg::SyncFactTrigger),
-            t(trigger_words(locale, &record.trigger)),
+            Html::text(trigger_words(locale, &record.trigger)),
         ),
         (
             tr(locale, Msg::SyncFactStarted),
@@ -645,14 +640,17 @@ fn summary_section(locale: &Locale, record: &RunRecord) -> Html {
             tr(locale, Msg::SyncFactTaken),
             list(locale, taken_lines(locale, record)),
         ),
-        (tr(locale, Msg::SyncFactLeft), t(left_line(locale, record))),
+        (
+            tr(locale, Msg::SyncFactLeft),
+            Html::text(left_line(locale, record)),
+        ),
         (
             tr(locale, Msg::SyncFactActivation),
-            t(activation_line(locale, record)),
+            Html::text(activation_line(locale, record)),
         ),
         (
             tr(locale, Msg::SyncFactRevalidation),
-            t(revalidation_line(locale, record)),
+            Html::text(revalidation_line(locale, record)),
         ),
         (
             tr(locale, Msg::SyncFactErrors),
@@ -774,26 +772,28 @@ fn findings_section(
         Column::text("release", tr(locale, Msg::SyncColumnRelease)),
     ];
     let [_, code_column, change, release] = &columns;
-    let rows = join(findings.iter().map(|finding| {
+    let rows = Html::join(findings.iter().map(|finding| {
         let href = finding_link(request, finding, ids);
-        h(format!(
+        Html::raw(format!(
             "<tr>{}{}{}{}</tr>",
-            title_cell(None, href.as_deref(), t(&finding.resource), None),
+            title_cell(None, href.as_deref(), Html::text(&finding.resource), None),
             cell(
                 code_column,
-                h(format!(
+                Html::raw(format!(
                     r#"{} <span class="fui-muted">{}</span>"#,
                     code(&finding.code),
-                    t(&finding.system)
+                    Html::text(&finding.system)
                 )),
             ),
-            cell(change, t(kind_words(locale, &finding.kind))),
+            cell(change, Html::text(kind_words(locale, &finding.kind))),
             cell(
                 release,
-                t(finding
-                    .release
-                    .clone()
-                    .unwrap_or_else(|| tr(locale, Msg::SyncReleaseNone))),
+                Html::text(
+                    finding
+                        .release
+                        .clone()
+                        .unwrap_or_else(|| tr(locale, Msg::SyncReleaseNone))
+                ),
             ),
         ))
     }));

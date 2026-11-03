@@ -33,7 +33,7 @@ use crate::fhir::concept_map::{MappingRow, PublishedConceptMap};
 use crate::fhir::version::FhirVersion;
 use crate::fhir::{CONCEPT_MAP, Document, resources_text};
 use crate::locale::{Msg, tr, tr_with};
-use crate::markup::{h, join, link, t};
+use crate::markup::link;
 use crate::pages::detail::{Head, Kind, Links, PANE_PARAM, Pane, header, line, tabbed};
 use crate::pages::parts::{Source, failure, heading, system_names};
 use crate::request::Request;
@@ -200,16 +200,17 @@ fn system(
             let href = system_link(canonical, version);
             // NOTE: #775: a system this server names nothing reads as its canonical,
             // which breaks after each slash so the table keeps inside its card.
-            let shown = names
-                .get(canonical)
-                .map_or_else(|| ferrohealth_ui::view::coding::canonical(canonical), t);
-            h(format!(
+            let shown = names.get(canonical).map_or_else(
+                || ferrohealth_ui::view::coding::canonical(canonical),
+                Html::text,
+            );
+            Html::raw(format!(
                 r#"<a href="{}" title="{}">{shown}</a>"#,
-                t(href),
-                t(canonical)
+                Html::text(href),
+                Html::text(canonical)
             ))
         }
-        None => t(tr(locale, Msg::ConceptMapNoSystem)),
+        None => Html::text(tr(locale, Msg::ConceptMapNoSystem)),
     }
 }
 
@@ -234,20 +235,20 @@ fn mappings(
             _ => groups.push((key, vec![row])),
         }
     }
-    let bodies = join(groups.into_iter().map(|((from, to), members)| {
-        let heading = h(format!(
+    let bodies = Html::join(groups.into_iter().map(|((from, to), members)| {
+        let heading = Html::raw(format!(
             "{} {} {} {}",
-            t(tr(locale, Msg::ClauseFrom)),
+            Html::text(tr(locale, Msg::ClauseFrom)),
             system(locale, version, names, from.as_deref()),
-            t(tr(locale, Msg::ConceptMapTo)),
+            Html::text(tr(locale, Msg::ConceptMapTo)),
             system(locale, version, names, to.as_deref()),
         ));
-        let drawn = join(
+        let drawn = Html::join(
             members
                 .into_iter()
                 .map(|row| mapping_row(locale, &columns, mapping(version, row))),
         );
-        h(format!(
+        Html::raw(format!(
             "<tbody>{}{drawn}</tbody>",
             group_row(&columns, heading)
         ))
@@ -289,9 +290,9 @@ fn scope(
         Some(url) => {
             let name = names.get(url).map(|name| {
                 let href = system_link(url, version);
-                h(format!("{} ", link(&href, t(name))))
+                Html::raw(format!("{} ", link(&href, Html::text(name))))
             });
-            h(format!("{}{}", name.unwrap_or_default(), canonical(url)))
+            Html::raw(format!("{}{}", name.unwrap_or_default(), canonical(url)))
         }
     }
 }
@@ -354,8 +355,11 @@ fn overview(
             tr(locale, Msg::TranslatesTo),
             scope(locale, request.version, names, to.as_deref()),
         ),
-        (tr(locale, Msg::Groups), t(groups.len().to_string())),
-        (tr(locale, Msg::ConceptMapCodesMapped), t(codes)),
+        (
+            tr(locale, Msg::Groups),
+            Html::text(groups.len().to_string()),
+        ),
+        (tr(locale, Msg::ConceptMapCodesMapped), Html::text(codes)),
     ];
     let note = (source == Source::Loaded).then(|| {
         panel_section(

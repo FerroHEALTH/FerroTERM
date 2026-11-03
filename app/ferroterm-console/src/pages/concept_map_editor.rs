@@ -36,7 +36,6 @@ use crate::fhir::CONCEPT_MAP;
 use crate::fhir::compose::STATUSES;
 use crate::fhir::version::FhirVersion;
 use crate::locale::{Msg, tr, tr_with};
-use crate::markup::{h, join, t};
 use crate::pages::detail::Kind;
 use crate::pages::editor::{
     DISCARD, OPENED, OPENED_AT, SAVE, SAVED_PARAM, Standing, add_button, dock, field, form,
@@ -242,16 +241,16 @@ async fn edited(request: &Request, posted: Option<&Posted>) -> Html {
 
 /// Every problem of the draft, listed in one notice.
 fn listed(locale: &Locale, problems: &[crate::authoring::concept_map::Problem]) -> Html {
-    let lines = join(
+    let lines = Html::join(
         problems
             .iter()
-            .map(|problem| h(format!("<li>{}</li>", t(problem.text(locale))))),
+            .map(|problem| Html::raw(format!("<li>{}</li>", Html::text(problem.text(locale))))),
     );
     notice(
         Tone::Warn,
         Announce::Status,
         None,
-        h(format!("<ul>{lines}</ul>")),
+        Html::raw(format!("<ul>{lines}</ul>")),
     )
 }
 
@@ -420,7 +419,7 @@ fn apply(form: &Posted, opened: &MapDraft, draft: &mut MapDraft) {
 
 /// The metadata section.
 fn metadata(locale: &Locale, draft: &MapDraft) -> Html {
-    let statuses = join(STATUSES.iter().map(|status| {
+    let statuses = Html::join(STATUSES.iter().map(|status| {
         let words = tr(
             locale,
             match *status {
@@ -439,7 +438,7 @@ fn metadata(locale: &Locale, draft: &MapDraft) -> Html {
             count: None,
             actions: None,
         }),
-        h(format!(
+        Html::raw(format!(
             r#"<div class="{FORM}">{}{}</div>"#,
             text_field(
                 "cm-url",
@@ -470,7 +469,7 @@ fn metadata(locale: &Locale, draft: &MapDraft) -> Html {
                     draft.version.clone(),
                     false,
                 ),
-                Field::new("cm-status", tr(locale, Msg::EditorStatus)).view(h(format!(
+                Field::new("cm-status", tr(locale, Msg::EditorStatus)).view(Html::raw(format!(
                     r#"<select id="cm-status" name="status" class="{SELECT}">{statuses}</select>"#
                 ))),
             ])),
@@ -489,16 +488,16 @@ fn system_select(
 ) -> Html {
     let offered = Html::join([
         option("", &tr(locale, Msg::BrowseChooseSystem), picked.is_empty()),
-        join(
+        Html::join(
             systems
                 .iter()
                 .map(|(value, words)| option(value, words, value == picked)),
         ),
     ]);
-    Field::new(id.clone(), label).view(h(format!(
+    Field::new(id.clone(), label).view(Html::raw(format!(
         r#"<select id="{}" name="{}" class="{SELECT}">{offered}</select>"#,
-        t(id),
-        t(field_name)
+        Html::text(id),
+        Html::text(field_name)
     )))
 }
 
@@ -518,7 +517,7 @@ fn groups(
 ) -> Html {
     let choices = relationship_choices(locale, version);
     let no_map = dialect(version).no_map;
-    let drawn = join(draft.groups.iter().zip(1_usize..).map(|(group, place)| {
+    let drawn = Html::join(draft.groups.iter().zip(1_usize..).map(|(group, place)| {
         let group_key = keyed("g", group.key);
         let source_name = if group.source.is_empty() {
             tr(locale, Msg::EditorNoSystemYet)
@@ -539,7 +538,7 @@ fn groups(
                 ("target", target_name.into()),
             ],
         );
-        let blocks = join(
+        let blocks = Html::join(
             group
                 .elements
                 .iter()
@@ -575,16 +574,16 @@ fn groups(
                         &group.target,
                     ),
                 ])),
-                h(format!(
+                Html::raw(format!(
                     r#"<p class="fui-label">{}</p>"#,
-                    t(tr_with(
+                    Html::text(tr_with(
                         locale,
                         Msg::EditorCodesCount,
                         &[("count", group.elements.len().into())]
                     ))
                 )),
                 map_elements(blocks),
-                h(format!(
+                Html::raw(format!(
                     r#"<div class="fui-add-row">{}</div>"#,
                     add_button(
                         format!("add-element:{group_key}"),
@@ -600,7 +599,7 @@ fn groups(
             locale,
             None,
             Html::join([
-                h(format!(
+                Html::raw(format!(
                     r#"<div class="fui-add-row">{}</div>"#,
                     add_button(String::from("add-group"), tr(locale, Msg::EditorAddGroup))
                 )),
@@ -625,7 +624,7 @@ fn target_row(
             &tr(locale, Msg::EditorChooseRelationship),
             each.relationship.is_empty(),
         ),
-        join(
+        Html::join(
             choices
                 .iter()
                 .map(|(code, words)| option(code, words, *code == each.relationship)),
@@ -634,27 +633,27 @@ fn target_row(
     let code_id = format!("cm-{target_key}-code");
     let relation_id = format!("cm-{target_key}-relationship");
     let comment_id = format!("cm-{target_key}-comment");
-    h(format!(
+    Html::raw(format!(
         r#"<div class="fui-clause-filter">{}{}{}{}{}{}</div>"#,
         hidden_field(&name(TARGET, &target_key, "element"), key),
         hidden_field(&name(TARGET, &target_key, "display"), &each.display),
-        Field::new(code_id.clone(), tr(locale, Msg::EditorTargetCode)).view(h(format!(
+        Field::new(code_id.clone(), tr(locale, Msg::EditorTargetCode)).view(Html::raw(format!(
             r#"<input id="{code_id}" name="{}" class="{INPUT} fui-mono" value="{}" placeholder="{}">"#,
-            t(name(TARGET, &target_key, "code")),
-            t(&each.code),
-            t(tr(locale, Msg::EditorNoTarget))
+            Html::text(name(TARGET, &target_key, "code")),
+            Html::text(&each.code),
+            Html::text(tr(locale, Msg::EditorNoTarget))
         ))),
-        Field::new(relation_id.clone(), tr(locale, Msg::TranslateRelationship)).view(h(
+        Field::new(relation_id.clone(), tr(locale, Msg::TranslateRelationship)).view(Html::raw(
             format!(
                 r#"<select id="{relation_id}" name="{}" class="{SELECT}">{relation}</select>"#,
-                t(name(TARGET, &target_key, "relationship"))
+                Html::text(name(TARGET, &target_key, "relationship"))
             )
         )),
-        Field::new(comment_id.clone(), tr(locale, Msg::TranslateComment)).view(h(format!(
+        Field::new(comment_id.clone(), tr(locale, Msg::TranslateComment)).view(Html::raw(format!(
             r#"<input id="{comment_id}" name="{}" class="{INPUT}" value="{}" placeholder="{}">"#,
-            t(name(TARGET, &target_key, "comment")),
-            t(&each.comment),
-            t(tr(locale, Msg::EditorOptional))
+            Html::text(name(TARGET, &target_key, "comment")),
+            Html::text(&each.comment),
+            Html::text(tr(locale, Msg::EditorOptional))
         ))),
         icon_submit(
             format!("remove-target:{target_key}"),
@@ -678,16 +677,20 @@ fn element_block(
     let head = Html::join([
         hidden_field(&name(ELEMENT, &key, "group"), group_key),
         field_flow(Html::join([
-            Field::new(code_id.clone(), tr(locale, Msg::EditorSourceCode)).view(h(format!(
-                r#"<input id="{code_id}" name="{}" class="{INPUT} fui-mono" value="{}">"#,
-                t(name(ELEMENT, &key, "code")),
-                t(&element.code)
-            ))),
-            Field::new(display_id.clone(), tr(locale, Msg::EditorConceptDisplay)).view(h(format!(
-                r#"<input id="{display_id}" name="{}" class="{INPUT}" value="{}">"#,
-                t(name(ELEMENT, &key, "display")),
-                t(&element.display)
-            ))),
+            Field::new(code_id.clone(), tr(locale, Msg::EditorSourceCode)).view(Html::raw(
+                format!(
+                    r#"<input id="{code_id}" name="{}" class="{INPUT} fui-mono" value="{}">"#,
+                    Html::text(name(ELEMENT, &key, "code")),
+                    Html::text(&element.code)
+                ),
+            )),
+            Field::new(display_id.clone(), tr(locale, Msg::EditorConceptDisplay)).view(Html::raw(
+                format!(
+                    r#"<input id="{display_id}" name="{}" class="{INPUT}" value="{}">"#,
+                    Html::text(name(ELEMENT, &key, "display")),
+                    Html::text(&element.display)
+                ),
+            )),
         ])),
         if no_map {
             let id = format!("cm-{key}-nomap");
@@ -701,7 +704,7 @@ fn element_block(
             Html::empty()
         },
     ]);
-    let rows = join(
+    let rows = Html::join(
         element
             .targets
             .iter()
@@ -762,7 +765,7 @@ fn saved_page(request: &Request, opened: &MapDraft, saved: &str) -> Html {
         load_report(LoadReport {
             outcome: Outcome::Ok,
             arrival: Arrival::AfterAction,
-            title: t(tr_with(
+            title: Html::text(tr_with(
                 locale,
                 Msg::EditorSaved,
                 &[("version", saved.to_owned().into())],

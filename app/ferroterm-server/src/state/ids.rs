@@ -16,10 +16,7 @@ pub(super) fn split_canonical(canonical: &str) -> (&str, Option<&str>) {
         None => (canonical, None),
     }
 }
-/// `wanted`, or `wanted` with a numeric suffix when the reduced id is taken.
-pub(super) fn unique_id(taken: &BTreeMap<String, (String, String)>, wanted: String) -> String {
-    unique_id_of(taken, wanted)
-}
+
 /// The `url|version` canonical of a resource, for a diagnostic.
 pub(super) fn canonical(url: &str, version: Option<&str>) -> String {
     match version.filter(|version| !version.is_empty()) {
@@ -27,6 +24,7 @@ pub(super) fn canonical(url: &str, version: Option<&str>) -> String {
         None => url.to_owned(),
     }
 }
+
 /// Every loaded resource of one type carries a distinct authored id.
 ///
 /// # Errors
@@ -52,6 +50,7 @@ pub(super) fn check_distinct_ids(
     }
     Ok(())
 }
+
 /// The id a loaded value set or concept map is registered under.
 ///
 /// The id the resource was authored with, so a client reads it at the id it
@@ -86,6 +85,7 @@ pub(super) fn registered_id(
     }
     Ok(authored.to_owned())
 }
+
 /// `wanted`, or `wanted` with a numeric suffix when the reduced id is a key
 /// of `taken`.
 pub(super) fn unique_id_of<V>(taken: &BTreeMap<String, V>, wanted: String) -> String {

@@ -354,16 +354,6 @@ impl ResourceStore {
         Ok(Some(record))
     }
 
-    /// Writes `record` as an update, replacing any record of the same type and
-    /// id and keeping the written version in the history.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`StoreError`] when the write does not commit.
-    pub fn put(&self, record: &Record) -> Result<(), StoreError> {
-        self.put_by(record, Method::Put)
-    }
-
     /// Writes `record` as the interaction `method` made it, replacing any
     /// record of the same type and id and keeping the written version and the
     /// interaction in the history.
@@ -700,8 +690,12 @@ mod tests {
         {
             let store = ResourceStore::open(&path).expect("opens");
             assert_eq!(store.all().expect("reads"), Vec::<Record>::new());
-            store.put(&record("pets", 1)).expect("writes");
-            store.put(&record("colours", 1)).expect("writes");
+            store
+                .put_by(&record("pets", 1), Method::Put)
+                .expect("writes");
+            store
+                .put_by(&record("colours", 1), Method::Put)
+                .expect("writes");
         }
         let store = ResourceStore::open(&path).expect("reopens");
         let all = store.all().expect("reads");
@@ -713,7 +707,9 @@ mod tests {
         assert_eq!(stored.version_id, 1);
         assert_eq!(stored.etag(), "W/\"1\"");
 
-        store.put(&record("pets", 2)).expect("updates");
+        store
+            .put_by(&record("pets", 2), Method::Put)
+            .expect("updates");
         let stored = store
             .get(ResourceType::ValueSet, "pets")
             .expect("reads")
@@ -763,8 +759,12 @@ mod tests {
         store
             .put_by(&record("pets", 1), Method::Post)
             .expect("writes");
-        store.put(&record("pets", 2)).expect("updates");
-        store.put(&record("pets-2", 1)).expect("writes another");
+        store
+            .put_by(&record("pets", 2), Method::Put)
+            .expect("updates");
+        store
+            .put_by(&record("pets-2", 1), Method::Put)
+            .expect("writes another");
         assert!(
             store
                 .delete(ResourceType::ValueSet, "pets")

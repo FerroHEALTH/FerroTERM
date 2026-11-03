@@ -23,7 +23,7 @@ use crate::fhir::translate::{TranslateRequest, TranslationMatch};
 use crate::fhir::version::FhirVersion;
 use crate::fhir::{CODE_SYSTEM, CONCEPT_MAP};
 use crate::locale::{Msg, tr, tr_with};
-use crate::markup::{code, h, join, p, strong, t};
+use crate::markup::{code, p, strong};
 use crate::pages::concept_map::relationship;
 use crate::pages::lookup::CODE_PARAM;
 use crate::pages::operations::{
@@ -161,11 +161,11 @@ async fn answer(
                 .iter()
                 .filter(|each| !each.no_map && each.target.is_some())
                 .count();
-            let title = h(format!(
+            let title = Html::raw(format!(
                 "{} {} {} {}",
-                t(tr(locale, Msg::TranslateTranslated)),
+                Html::text(tr(locale, Msg::TranslateTranslated)),
                 code(&asked.code),
-                t(tr_with(
+                Html::text(tr_with(
                     locale,
                     Msg::TranslateThrough,
                     &[("map", through.into())]
@@ -189,7 +189,7 @@ async fn answer(
                         count: None,
                         actions: None,
                     }),
-                    p(t(message)),
+                    p(Html::text(message)),
                 )
             });
             Html::join([
@@ -237,12 +237,12 @@ fn table(
         Column::text("relationship", tr(locale, Msg::TranslateRelationship)),
     ];
     let [_, related_column] = &columns;
-    let rows = join(matches.iter().map(|found| {
+    let rows = Html::join(matches.iter().map(|found| {
         let target = found.target.as_ref().map_or_else(
             || {
-                h(format!(
+                Html::raw(format!(
                     r#"<span class="fui-muted">{}</span>"#,
-                    t(tr(locale, Msg::TranslateNoTarget))
+                    Html::text(tr(locale, Msg::TranslateNoTarget))
                 ))
             },
             |target| {
@@ -256,7 +256,7 @@ fn table(
                 coding(locale, drawn, Layout::Stacked)
             },
         );
-        h(format!(
+        Html::raw(format!(
             "<tr>{}{}</tr>",
             title_cell(None, None, target, None),
             cell(related_column, relation(locale, related(version, found))),
@@ -290,7 +290,7 @@ fn comments(locale: &Locale, matches: &[TranslationMatch]) -> Option<Html> {
         .flatten()
         .collect();
     (!written.is_empty()).then(|| {
-        let lines = join(written.into_iter().map(|line| p(t(line))));
+        let lines = Html::join(written.into_iter().map(|line| p(Html::text(line))));
         panel_section(
             locale,
             Some(SectionHead {

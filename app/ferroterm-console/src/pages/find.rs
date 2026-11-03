@@ -27,7 +27,7 @@ use crate::find::{
     Declared, EXPAND, LOOKUP, Offer, QUERY_PARAM, Subject, TRANSLATE, VALIDATE_CODE, offers,
 };
 use crate::locale::{Msg, tr, tr_with};
-use crate::markup::{code, h, t};
+use crate::markup::code;
 use crate::pages::parts::{failure, heading};
 use crate::request::Request;
 use crate::routes::{CONCEPT_MAPS_PATH, VALUE_SETS_PATH, resource_link, system_link};
@@ -280,7 +280,7 @@ pub(crate) async fn page(request: Request) -> Html {
                 Tone::Info,
                 Announce::Status,
                 None,
-                t(tr(locale, Msg::NothingWasTyped)),
+                Html::text(tr(locale, Msg::NothingWasTyped)),
             ),
         ]);
     };
@@ -294,10 +294,10 @@ pub(crate) async fn page(request: Request) -> Html {
             Tone::Info,
             Announce::Status,
             None,
-            h(format!(
+            Html::raw(format!(
                 "{} {}",
                 code(subject.typed()),
-                t(tr_with(
+                Html::text(tr_with(
                     locale,
                     Msg::FindReadAs,
                     &[
