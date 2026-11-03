@@ -807,7 +807,7 @@ impl MessageId {
             Self::DeprecatedConceptFound => "DEPRECATED_CONCEPT_FOUND",
             Self::InactiveConceptFound => "INACTIVE_CONCEPT_FOUND",
             Self::InactiveDisplayFound => "INACTIVE_DISPLAY_FOUND",
-            Self::MsgDraft => "MSG_DRAFT",
+            Self::MsgDraft => "MSG_DRAFT_SRC_STATUS",
             Self::MsgDeprecated => "MSG_DEPRECATED",
             Self::MsgWithdrawn => "MSG_WITHDRAWN",
             Self::MsgExperimental => "MSG_EXPERIMENTAL",

@@ -157,14 +157,14 @@ pub fn translate(
     if matches.is_empty() && input.url.is_none() {
         matches = successors(sources, &subjects, target_system)?;
     }
-    // NOTE: every match is an answer, a `noMap` or `not-related-to` one too, so
-    // `result` is true whenever a match exists (the ecosystem's `translate-2b`
-    // and `translate-4` cases, <https://hl7.org/fhir/uv/tx-ecosystem/>).
     if input.target_input {
         report_source_to_target(&mut matches);
     }
-    let result = !matches.is_empty();
-    let message = if result {
+    // NOTE: R4B and R5 `$translate` `result`: true only if a returned match has
+    // an equivalence other than unmatched or disjoint (R5: `not-related-to`),
+    // <https://hl7.org/fhir/R4B/conceptmap-operation-translate.html>.
+    let result = matches.iter().any(translates);
+    let message = if !matches.is_empty() {
         None
     } else if mapped {
         Some(String::from("No translations found"))
@@ -177,6 +177,16 @@ pub fn translate(
         matches,
         used_concept_maps: used,
     })
+}
+
+/// Whether a match translates the concept: a target an element names, with
+/// a relationship that relates the two.
+fn translates(found: &Match) -> bool {
+    !found.origin.no_map
+        && !matches!(
+            found.relationship,
+            Relationship::Unmatched | Relationship::Disjoint
+        )
 }
 
 /// The matches every candidate map holds for every subject, each target
@@ -743,5 +753,34 @@ fn product_of(d: &DependsOn) -> Product {
             code: Some(d.value.clone()),
             display: d.display.clone(),
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Match, MatchOrigin, Relationship, translates};
+
+    fn found(relationship: Relationship, no_map: bool) -> Match {
+        Match {
+            relationship,
+            concept: None,
+            products: Vec::new(),
+            source: None,
+            origin: MatchOrigin {
+                no_map,
+                ..MatchOrigin::default()
+            },
+        }
+    }
+
+    /// R4B `$translate` `result`: only a match whose equivalence is neither
+    /// unmatched nor disjoint translates.
+    #[test]
+    fn only_a_relating_match_translates() {
+        assert!(translates(&found(Relationship::Equivalent, false)));
+        assert!(translates(&found(Relationship::RelatedTo, false)));
+        assert!(!translates(&found(Relationship::Disjoint, false)));
+        assert!(!translates(&found(Relationship::Unmatched, false)));
+        assert!(!translates(&found(Relationship::RelatedTo, true)));
     }
 }
