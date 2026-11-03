@@ -3,15 +3,56 @@
 
 //! The code system editor's tests.
 
-use super::*;
+use serde_json::json;
 
-/// The property codes and values one lifecycle writes, in order.
+use super::*;
+use crate::fhir::version::FhirVersion;
+
+/// The property values one concept in `lifecycle` reaches the wire with, in
+/// order, as the R4B `CodeSystem` a save writes them.
 fn written(lifecycle: &Lifecycle) -> Vec<String> {
-    lifecycle
-        .properties()
+    let mut draft = Draft::new();
+    draft.url = "https://terminology.example/x".to_owned();
+    draft.concepts = vec![Concept {
+        code: "c".to_owned(),
+        lifecycle: lifecycle.clone(),
+        ..Concept::default()
+    }];
+    body_of(&draft)["concept"][0]["property"]
+        .as_array()
+        .expect("every concept carries its lifecycle")
         .iter()
         .map(ToString::to_string)
         .collect()
+}
+
+/// The property value a concept writes for one row of a property declared
+/// with `kind`, holding `text`, as the R4B `CodeSystem` a save writes it.
+fn value_body(code: &str, kind: &str, text: &str) -> Value {
+    let mut draft = Draft::new();
+    draft.url = "https://terminology.example/x".to_owned();
+    draft.properties = vec![Declared {
+        code: code.to_owned(),
+        kind: kind.to_owned(),
+        ..Declared::default()
+    }];
+    draft.concepts = vec![Concept {
+        code: "c".to_owned(),
+        values: vec![Valued {
+            code: code.to_owned(),
+            text: text.to_owned(),
+            ..Valued::default()
+        }],
+        ..Concept::default()
+    }];
+    body_of(&draft)["concept"][0]["property"][1].clone()
+}
+
+/// `json`, a `CodeSystem` the server holds, opened at R4B.
+fn opened(json: &str) -> Draft {
+    FhirVersion::R4B
+        .decode(json)
+        .expect("the server's own answer decodes at R4B")
 }
 
 #[test]
@@ -98,11 +139,7 @@ fn a_transition_writes_only_the_properties_the_lifecycle_owns() {
             on: "2026-01-01".to_owned(),
         },
     ] {
-        for property in lifecycle.properties() {
-            let code = property
-                .get("code")
-                .and_then(Value::as_str)
-                .expect("every property names the code it sets");
+        for (code, _) in lifecycle.properties() {
             assert!(
                 Lifecycle::owned().contains(&code),
                 "{lifecycle:?} writes `{code}`, which is not a standard concept property"
@@ -115,14 +152,10 @@ fn a_transition_writes_only_the_properties_the_lifecycle_owns() {
 fn the_four_standard_properties_are_declared_with_their_own_identifiers() {
     let declared = Lifecycle::declarations();
     assert_eq!(declared.len(), Lifecycle::owned().len());
-    for property in &declared {
-        let code = property
-            .get("code")
-            .and_then(Value::as_str)
-            .unwrap_or_default();
+    for (code, uri, _) in &declared {
         assert_eq!(
-            property.get("uri").and_then(Value::as_str),
-            Some(format!("{CONCEPT_PROPERTIES}#{code}").as_str()),
+            uri,
+            &format!("{CONCEPT_PROPERTIES}#{code}"),
             "a standard property is identified by the system that defines it"
         );
     }
@@ -166,7 +199,12 @@ fn drafted() -> Draft {
 
 /// The body of a draft, as a `Value` to read fields out of.
 fn body_of(draft: &Draft) -> Value {
-    serde_json::from_str(&draft.body()).expect("the editor writes JSON")
+    serde_json::from_str(
+        &draft
+            .body(FhirVersion::R4B)
+            .expect("a draft no server holds writes a CodeSystem"),
+    )
+    .expect("the editor writes JSON")
 }
 
 #[test]
@@ -322,7 +360,7 @@ fn a_stored_code_system_round_trips_into_the_form_and_back_out() {
                 {"code":"retirementDate","valueDateTime":"2026-09-24"}]}]}"#,
     )
     .expect("the server's own answer parses");
-    let draft = Draft::of(&stored);
+    let draft = opened(&stored.to_string());
     assert_eq!(draft.id, "colours");
     assert_eq!(draft.version_id, "4");
     assert!(draft.managed());
@@ -377,7 +415,7 @@ fn a_save_carries_back_every_element_the_form_does_not_draw() {
               "concept":[{"code":"crimson","display":"Crimson"}]}]}"#,
     )
     .expect("the server's own answer parses");
-    let draft = Draft::of(&stored);
+    let draft = opened(&stored.to_string());
     let body = body_of(&draft);
 
     for element in [
@@ -421,7 +459,7 @@ fn a_form_that_empties_an_element_removes_it_rather_than_sending_it_empty() {
               "designation":[{"language":"nl-NL","value":"Rood"}]}]}"#,
     )
     .expect("the server's own answer parses");
-    let mut draft = Draft::of(&stored);
+    let mut draft = opened(&stored.to_string());
     draft.version = String::new();
     if let Some(concept) = draft.concepts.first_mut() {
         concept.display = String::new();
@@ -449,7 +487,7 @@ fn a_concept_with_no_status_reads_the_state_its_dates_imply() {
              {"code":"d","property":[{"code":"inactive","valueBoolean":true}]}]}"#,
     )
     .expect("the server's own answer parses");
-    let draft = Draft::of(&stored);
+    let draft = opened(&stored.to_string());
     let states: Vec<Lifecycle> = draft
         .concepts
         .iter()
@@ -493,4 +531,87 @@ fn a_draft_names_what_a_save_needs_before_it_is_savable() {
     assert!(draft.savable());
     draft.status = String::new();
     assert!(!draft.savable(), "status is mandatory on a CodeSystem");
+}
+
+/// A `searchset` of `entries`, decoded at R4B as the code systems it
+/// carries.
+fn searched(entries: &str) -> crate::fhir::searchset::Found<Draft> {
+    FhirVersion::R4B
+        .decode(&format!(
+            r#"{{"resourceType":"Bundle","type":"searchset","entry":[{entries}]}}"#
+        ))
+        .expect("the server's own answer decodes at R4B")
+}
+
+/// An entry the search carries beside its matches.
+const OUTCOME_ENTRY: &str = r#"{"resource":{"resourceType":"OperationOutcome",
+    "issue":[{"severity":"information","code":"informational"}]}}"#;
+
+#[test]
+fn a_stored_code_system_reads_the_elements_an_update_needs() {
+    let found = searched(&format!(
+        r#"{OUTCOME_ENTRY},
+        {{"resource":{{"resourceType":"CodeSystem","id":"colours",
+           "meta":{{"versionId":"4"}},
+           "url":"https://terminology.example/colours","version":"1.0.0",
+           "status":"draft","content":"complete","caseSensitive":true,
+           "property":[{{"code":"status","uri":"http://hl7.org/fhir/concept-properties#status","type":"code"}}],
+           "concept":[{{"code":"red","display":"Red","definition":"The colour red",
+             "designation":[{{"language":"nl-NL","use":{{"system":"https://terms.example/use","code":"syn"}},"value":"Rood"}}],
+             "property":[{{"code":"status","valueCode":"active"}}]}}]}}}}"#
+    ));
+    let stored = found
+        .found()
+        .first()
+        .copied()
+        .cloned()
+        .expect("the bundle carries a code system");
+    assert_eq!(stored.id, "colours");
+    assert_eq!(
+        stored.version_id, "4",
+        "the version an If-Match states comes off the resource"
+    );
+    assert!(stored.case_sensitive);
+    assert!(
+        stored.properties.is_empty(),
+        "the lifecycle's own declaration belongs to the lifecycle control"
+    );
+    assert_eq!(stored.concepts.len(), 1);
+    assert_eq!(
+        stored.concepts[0].designations[0].usage,
+        "https://terms.example/use|syn"
+    );
+}
+
+#[test]
+fn an_answer_carrying_no_code_system_reads_as_none() {
+    assert_eq!(searched(OUTCOME_ENTRY).found(), Vec::<&Draft>::new());
+    let empty: crate::fhir::searchset::Found<Draft> = FhirVersion::R4B
+        .decode(r#"{"resourceType":"Bundle","type":"searchset","total":0}"#)
+        .expect("the server's own answer decodes at R4B");
+    assert_eq!(empty.found(), Vec::<&Draft>::new());
+}
+
+/// Every arm of `property.value[x]` reads back as the text its control
+/// holds, so a value the editor did not write is not dropped on a save.
+#[test]
+fn every_property_value_type_reads_as_the_text_its_control_holds() {
+    for (value, expected) in [
+        (r#""valueCode":"active""#, "active"),
+        (
+            r#""valueCoding":{"system":"https://x.example/s","code":"c"}"#,
+            "https://x.example/s|c",
+        ),
+        (r#""valueString":"a phrase""#, "a phrase"),
+        (r#""valueInteger":-3"#, "-3"),
+        (r#""valueBoolean":true"#, "true"),
+        (r#""valueDateTime":"2026-09-24""#, "2026-09-24"),
+        (r#""valueDecimal":1.5"#, "1.5"),
+    ] {
+        let draft = opened(&format!(
+            r#"{{"resourceType":"CodeSystem","status":"active","content":"complete",
+                "concept":[{{"code":"c","property":[{{"code":"p",{value}}}]}}]}}"#
+        ));
+        assert_eq!(draft.concepts[0].values[0].text, expected, "{value}");
+    }
 }

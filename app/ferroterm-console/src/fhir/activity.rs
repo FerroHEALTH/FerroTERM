@@ -9,9 +9,8 @@
 //! the order is the server's `lastModified` and nothing else.
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
-use crate::fhir::write::{History, HistoryEntry};
+use crate::fhir::write::{History, HistoryEntry, Stamp};
 
 /// One write the dashboard lists.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
@@ -34,43 +33,32 @@ pub(crate) struct Change {
 impl Change {
     /// The write `entry` records, of the type `resource_type`.
     fn of(resource_type: &str, entry: &HistoryEntry) -> Option<Self> {
-        let resource = entry.resource.as_ref();
-        let text = |key: &str| {
-            resource
-                .and_then(|resource| resource.get(key))
-                .and_then(Value::as_str)
+        let stamp = entry.resource.as_ref().map(|stored| &stored.stamp);
+        let text = |of: fn(&Stamp) -> &Option<String>| {
+            stamp
+                .and_then(|stamp| of(stamp).clone())
                 .filter(|text| !text.is_empty())
-                .map(str::to_owned)
         };
-        let meta = |key: &str| {
-            resource
-                .and_then(|resource| resource.get("meta"))
-                .and_then(|meta| meta.get(key))
-                .and_then(Value::as_str)
-                .map(str::to_owned)
-        };
-        let request = entry.request.as_ref();
-        // NOTE: <https://hl7.org/fhir/R4B/http.html#history>: a delete carries
-        // no resource, so its id is the last segment its request names.
-        let id = text("id").or_else(|| {
-            request
-                .and_then(|request| request.url.as_deref())
+        let id = text(|stamp| &stamp.id).or_else(|| {
+            entry
+                .url
+                .as_deref()
                 .and_then(|url| url.split('?').next())
                 .and_then(|path| path.trim_end_matches('/').rsplit('/').next())
                 .map(str::to_owned)
         })?;
-        let response = entry.response.as_ref();
         Some(Self {
             resource_type: resource_type.to_owned(),
             id,
-            named: text("title")
-                .or_else(|| text("name"))
-                .or_else(|| text("url"))
+            named: text(|stamp| &stamp.title)
+                .or_else(|| text(|stamp| &stamp.name))
+                .or_else(|| text(|stamp| &stamp.url))
                 .unwrap_or_default(),
-            version_id: meta("versionId"),
-            method: request.and_then(|request| request.method.clone()),
-            when: meta("lastUpdated")
-                .or_else(|| response.and_then(|response| response.last_modified.clone())),
+            version_id: stamp.and_then(|stamp| stamp.version_id.clone()),
+            method: entry.method.clone(),
+            when: stamp
+                .and_then(|stamp| stamp.last_updated.clone())
+                .or_else(|| entry.last_modified.clone()),
         })
     }
 
@@ -107,24 +95,32 @@ mod tests {
     use super::recent;
     use crate::fhir::write::History;
 
-    fn history(value: serde_json::Value) -> History {
-        serde_json::from_value(value).expect("a history bundle")
+    /// `value`, a history `Bundle` the server answered, decoded at R4B.
+    fn history(value: &serde_json::Value) -> History {
+        crate::fhir::version::FhirVersion::R4B
+            .decode(&value.to_string())
+            .expect("the server's own history Bundle decodes at R4B")
     }
 
     #[test]
     fn the_writes_of_three_types_merge_newest_first_and_name_each_resource() {
-        let systems = history(json!({"entry": [
-            {"resource": {"resourceType": "CodeSystem", "id": "a", "title": "Colours",
-              "meta": {"versionId": "2", "lastUpdated": "2026-10-02T10:00:00Z"}},
-             "request": {"method": "PUT"}}
-        ]}));
-        let sets = history(json!({"entry": [
-            {"resource": {"resourceType": "ValueSet", "id": "b", "name": "Warm",
-              "meta": {"versionId": "1", "lastUpdated": "2026-10-03T09:00:00Z"}},
-             "request": {"method": "POST"}},
-            {"request": {"method": "DELETE", "url": "ValueSet/c"},
-             "response": {"lastModified": "2026-10-01T08:00:00Z"}}
-        ]}));
+        let systems = history(
+            &json!({"resourceType": "Bundle", "type": "history", "entry": [
+                {"resource": {"resourceType": "CodeSystem", "id": "a", "title": "Colours",
+                  "status": "active", "content": "complete",
+                  "meta": {"versionId": "2", "lastUpdated": "2026-10-02T10:00:00Z"}},
+                 "request": {"method": "PUT", "url": "CodeSystem/a"}}
+            ]}),
+        );
+        let sets = history(
+            &json!({"resourceType": "Bundle", "type": "history", "entry": [
+                {"resource": {"resourceType": "ValueSet", "id": "b", "name": "Warm", "status": "active",
+                  "meta": {"versionId": "1", "lastUpdated": "2026-10-03T09:00:00Z"}},
+                 "request": {"method": "POST", "url": "ValueSet"}},
+                {"request": {"method": "DELETE", "url": "ValueSet/c"},
+                 "response": {"status": "204", "lastModified": "2026-10-01T08:00:00Z"}}
+            ]}),
+        );
         let merged = recent(&[("CodeSystem", &systems), ("ValueSet", &sets)], 10);
         let ids: Vec<&str> = merged.iter().map(|change| change.id.as_str()).collect();
         assert_eq!(ids, ["b", "a", "c"]);

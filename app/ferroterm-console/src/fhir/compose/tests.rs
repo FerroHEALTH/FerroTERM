@@ -5,6 +5,29 @@
 
 use super::*;
 use crate::fhir::compose::stored::StoredValueSet;
+use crate::fhir::version::FhirVersion;
+
+/// The `ValueSet` a save of `draft` sends at R4B, as a JSON value.
+fn resource(draft: &Draft) -> Value {
+    serde_json::from_str(
+        &draft
+            .body(FhirVersion::R4B)
+            .expect("the draft's stored resource is a ValueSet at R4B"),
+    )
+    .expect("a save writes JSON")
+}
+
+/// The `Parameters` a preview of `page` of `draft` sends at R4B, written
+/// with its members in order.
+fn preview(draft: &Draft, page: &Preview) -> String {
+    serde_json::from_str::<Value>(
+        &draft
+            .preview_body(FhirVersion::R4B, page)
+            .expect("the draft's stored resource is a ValueSet at R4B"),
+    )
+    .expect("a preview writes JSON")
+    .to_string()
+}
 
 /// A draft with one include over `system`, and the key of that include.
 fn over(system: &str) -> (Draft, u32) {
@@ -161,7 +184,7 @@ fn the_resource_is_the_compose_the_server_reads() {
         row.value = String::from("root");
     }
     assert_eq!(
-        draft.resource().to_string(),
+        resource(&draft).to_string(),
         concat!(
             r#"{"compose":{"exclude":[{"filter":[{"op":"is-a","property":"concept","value":"root"}],"#,
             r#""system":"https://terminology.example/x"}],"inactive":false,"#,
@@ -192,7 +215,7 @@ fn an_exclude_carries_no_display_because_the_server_ignores_one() {
     {
         row.display = String::from("Something else");
     }
-    let written = draft.resource().to_string();
+    let written = resource(&draft).to_string();
     assert!(
         written.contains(r#""exclude":[{"concept":[{"code":"A"}]"#),
         "`Any display names specified for the codes are ignored` in an exclude: {written}"
@@ -219,7 +242,7 @@ fn an_update_carries_back_every_element_the_form_does_not_draw() {
     let stored: StoredValueSet = crate::fhir::version::FhirVersion::R4B
         .decode(&document.to_string())
         .expect("the elements the composer reads parse");
-    let written = stored.draft(&document).resource();
+    let written = resource(&stored.draft(&document));
     for (element, kept) in [
         ("description", "What this value set is for"),
         ("publisher", "A publisher"),
@@ -268,7 +291,7 @@ fn a_draft_composing_nothing_is_not_savable_and_sends_no_compose() {
         !draft.savable(),
         "a value set with no include is not offered for saving"
     );
-    let written = draft.resource();
+    let written = resource(&draft);
     assert!(
         written.get("compose").is_none(),
         "and sends no compose element at all: {written}"
@@ -295,11 +318,14 @@ fn an_exclude_alone_is_not_savable() {
 fn a_preview_sends_the_unsaved_compose_inline_and_its_page() {
     let (mut draft, key) = over("https://terminology.example/x");
     draft.add_concept(key, "A", "Alpha");
-    let body = draft.preview_body(&Preview {
-        filter: Some(String::from("alp")),
-        count: 20,
-        offset: 40,
-    });
+    let body = preview(
+        &draft,
+        &Preview {
+            filter: Some(String::from("alp")),
+            count: 20,
+            offset: 40,
+        },
+    );
     assert!(
         body.starts_with(r#"{"parameter":[{"name":"valueSet","resource":{"compose":"#),
         "the compose travels as a resource rather than as a canonical: {body}"
@@ -321,11 +347,14 @@ fn a_preview_sends_the_unsaved_compose_inline_and_its_page() {
 #[test]
 fn the_first_page_sends_no_offset() {
     let (draft, _key) = over("https://terminology.example/x");
-    let body = draft.preview_body(&Preview {
-        filter: None,
-        count: 20,
-        offset: 0,
-    });
+    let body = preview(
+        &draft,
+        &Preview {
+            filter: None,
+            count: 20,
+            offset: 0,
+        },
+    );
     assert!(
         !body.contains("offset"),
         "an unmoved page states no offset: {body}"
@@ -385,8 +414,8 @@ fn a_resource_read_back_round_trips_through_the_draft() {
     );
     assert!(!draft.clauses[2].included, "the exclude stays an exclude");
     assert_eq!(
-        draft.resource(),
-        stored.draft(&document).resource(),
+        resource(&draft),
+        resource(&stored.draft(&document)),
         "reading and writing back changes nothing"
     );
 }

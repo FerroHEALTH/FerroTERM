@@ -30,12 +30,11 @@ use ferrohealth_ui::view::notice::{Announce, notice};
 use ferrohealth_ui::view::refusal::refusal;
 use ferrohealth_ui::view::surface::{Container, SectionHead, panel_section, section_intro};
 use ferrohealth_ui::view::template::list::HeadingCount;
-use serde_json::Value;
 
 use crate::auth::scopes::Letter;
 use crate::authoring::history::{Comparison, Opened, Subject, Support, open, restore};
 use crate::fhir::error::FhirError;
-use crate::fhir::write::Version;
+use crate::fhir::write::{Stamp, Stored, Version};
 use crate::locale::{Msg, tr, tr_with};
 use crate::markup::p;
 use crate::pages::detail::{Head, Kind, Links, Pane, header, line, tabbed};
@@ -176,11 +175,10 @@ fn percent(value: &str) -> String {
     url::form_urlencoded::byte_serialize(value.as_bytes()).collect()
 }
 
-/// A string element of `resource`, when it states one.
-fn element<'a>(resource: Option<&'a Value>, name: &str) -> Option<&'a str> {
-    resource?
-        .get(name)?
-        .as_str()
+/// The element `of` names on the stamp of `stored`, where it states one.
+fn element(stored: Option<&Stored>, of: fn(&Stamp) -> &Option<String>) -> Option<&str> {
+    stored
+        .and_then(|stored| of(&stored.stamp).as_deref())
         .filter(|text| !text.is_empty())
 }
 
@@ -190,8 +188,8 @@ fn screen(request: &Request, kind: Kind, opened: &Opened, restored: Option<&Rest
     let current = opened.current.as_ref();
     let subject = &opened.subject;
     let canonical = opened.canonical();
-    let title = element(current, "title")
-        .or_else(|| element(current, "name"))
+    let title = element(current, |stamp| &stamp.title)
+        .or_else(|| element(current, |stamp| &stamp.name))
         .unwrap_or(&subject.id)
         .to_owned();
     let writable = request.can(&subject.resource_type, Letter::Update);
@@ -214,9 +212,13 @@ fn screen(request: &Request, kind: Kind, opened: &Opened, restored: Option<&Rest
         Head {
             kind,
             title,
-            status: element(current, "status").map(str::to_owned),
+            status: element(current, |stamp| &stamp.status).map(str::to_owned),
             canonical: canonical.clone(),
-            line: line(locale, element(current, "version"), Source::Stored),
+            line: line(
+                locale,
+                element(current, |stamp| &stamp.version),
+                Source::Stored,
+            ),
             actions,
         },
     );

@@ -29,6 +29,7 @@ use ferrohealth_ui::view::transform::transform_quiet;
 
 use crate::auth::scopes::Letter;
 use crate::fhir::compose::{Draft, Preview, STATUSES};
+use crate::fhir::version::FhirVersion;
 use crate::fhir::{CODE_SYSTEM, VALUE_SET};
 use crate::locale::{Msg, tr, tr_with};
 use crate::pages::detail::Kind;
@@ -65,7 +66,7 @@ const VALUE_SET_ROW: &str = "vs";
 const PREVIEW: &str = "preview";
 
 /// How many concepts the preview shows.
-const PREVIEW_COUNT: u32 = 10;
+const PREVIEW_COUNT: i32 = 10;
 
 /// The filter operators a composer offers
 /// (<https://hl7.org/fhir/R4B/valueset-filter-operator.html>).
@@ -162,7 +163,7 @@ async fn edited(request: &Request, posted: Option<&Posted>) -> Html {
     }
     let standing = match &answer {
         Some((_, standing)) => standing.clone(),
-        None => standing(locale, &opened, &draft),
+        None => standing(locale, request.version, &opened, &draft),
     };
     let bar = dock(
         locale,
@@ -259,8 +260,15 @@ async fn save(
     opened: &str,
     here: &str,
 ) -> Result<(), Box<(Html, Standing)>> {
-    let body = draft.resource().to_string();
-    match crate::pages::editor::send(request, VALUE_SET, &draft.id, &body, opened).await {
+    let sent = match draft.body(request.version) {
+        Ok(body) => crate::pages::editor::send(request, VALUE_SET, &draft.id, &body, opened).await,
+        Err(error) => Err(crate::fhir::error::FhirError::undecoded(
+            here,
+            request.version,
+            &error,
+        )),
+    };
+    match sent {
         Ok(written) => {
             let saved_id = written
                 .resource
@@ -302,10 +310,10 @@ async fn open(request: &Request, id: &str) -> Result<Draft, Html> {
 }
 
 /// Where `draft` stands against the value set `opened` read.
-fn standing(locale: &Locale, opened: &Draft, draft: &Draft) -> Standing {
+fn standing(locale: &Locale, version: FhirVersion, opened: &Draft, draft: &Draft) -> Standing {
     if !draft.savable() {
         Standing::Incomplete(tr(locale, Msg::EditorValueSetNeeds))
-    } else if draft.resource() == opened.resource() {
+    } else if draft.body(version).ok() == opened.body(version).ok() {
         Standing::Unchanged
     } else {
         Standing::Changed

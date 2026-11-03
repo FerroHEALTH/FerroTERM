@@ -1,7 +1,23 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
+use serde_json::Value;
+
 use super::*;
+
+/// The `ConceptMap` a save of `draft` writes at `version`.
+fn saved(draft: &MapDraft, version: FhirVersion) -> String {
+    draft
+        .body(version)
+        .expect("the draft's stored map is a ConceptMap at its release")
+}
+
+/// `held`, a `ConceptMap` the server holds, opened at `version`.
+fn opened(version: FhirVersion, held: &Value) -> MapDraft {
+    version
+        .decode(&held.to_string())
+        .expect("the server's own answer decodes at its release")
+}
 
 /// A draft with one group and one mapped code.
 fn one_mapping(relationship: &str) -> MapDraft {
@@ -127,7 +143,7 @@ fn no_map_and_a_target_are_exclusive_on_a_version_that_defines_no_map() {
 #[test]
 fn the_version_decides_which_element_a_relationship_is_written_under() {
     let draft = one_mapping("equivalent");
-    let r4b = draft.body(FhirVersion::R4B);
+    let r4b = saved(&draft, FhirVersion::R4B);
     assert!(
         r4b.contains(r#""equivalence":"equivalent""#),
         "R4B states a target's relation in `equivalence`: {r4b}"
@@ -136,7 +152,7 @@ fn the_version_decides_which_element_a_relationship_is_written_under() {
         !r4b.contains(r#""relationship""#),
         "and never in R5's element: {r4b}"
     );
-    let r5 = draft.body(FhirVersion::R5);
+    let r5 = saved(&draft, FhirVersion::R5);
     assert!(
         r5.contains(r#""relationship":"equivalent""#),
         "R5 states it in `relationship`: {r5}"
@@ -150,13 +166,13 @@ fn the_version_decides_which_element_a_relationship_is_written_under() {
 #[test]
 fn the_version_decides_which_element_scopes_the_map() {
     let draft = one_mapping("equivalent");
-    let r4b = draft.body(FhirVersion::R4B);
+    let r4b = saved(&draft, FhirVersion::R4B);
     assert!(
         r4b.contains(r#""sourceCanonical":"https://terminology.example/colours-vs""#),
         "R4B scopes a map with `source[x]`: {r4b}"
     );
     assert!(!r4b.contains("sourceScope"), "{r4b}");
-    let r6 = draft.body(FhirVersion::R6);
+    let r6 = saved(&draft, FhirVersion::R6);
     assert!(
         r6.contains(r#""sourceScopeCanonical":"https://terminology.example/colours-vs""#),
         "R6 scopes it with `sourceScope[x]`: {r6}"
@@ -167,13 +183,13 @@ fn the_version_decides_which_element_scopes_the_map() {
 #[test]
 fn a_group_s_system_version_is_an_element_on_r4b_and_a_canonical_on_r5() {
     let draft = one_mapping("equivalent");
-    let r4b = draft.body(FhirVersion::R4B);
+    let r4b = saved(&draft, FhirVersion::R4B);
     assert!(
         r4b.contains(r#""source":"https://terminology.example/colours""#)
             && r4b.contains(r#""sourceVersion":"1.0.0""#),
         "R4B states the system as a uri with its version beside it: {r4b}"
     );
-    let r5 = draft.body(FhirVersion::R5);
+    let r5 = saved(&draft, FhirVersion::R5);
     assert!(
         r5.contains(r#""source":"https://terminology.example/colours|1.0.0""#),
         "R5 states it as a canonical carrying its own version: {r5}"
@@ -193,9 +209,9 @@ fn no_map_is_written_only_on_a_version_that_defines_it() {
         .expect("the group carries one element");
     element.no_map = true;
     element.targets.clear();
-    let r5 = draft.body(FhirVersion::R5);
+    let r5 = saved(&draft, FhirVersion::R5);
     assert!(r5.contains(r#""noMap":true"#), "{r5}");
-    let r4b = draft.body(FhirVersion::R4B);
+    let r4b = saved(&draft, FhirVersion::R4B);
     assert!(
         !r4b.contains("noMap"),
         "R4B defines no such element, so writing one would be refused: {r4b}"
@@ -216,11 +232,11 @@ fn an_element_the_form_never_drew_survives_a_save() {
                 {"code":"vermilion","equivalence":"equivalent","comment":"kept"}]}]}]}"#,
     )
     .expect("the server's own answer parses");
-    let draft = MapDraft::of(&held);
+    let draft = opened(FhirVersion::R4B, &held);
     assert_eq!(draft.version_id, "3");
     assert_eq!(draft.source_scope, "https://terminology.example/colours-vs");
     assert!(draft.managed());
-    let saved = draft.body(FhirVersion::R4B);
+    let saved = saved(&draft, FhirVersion::R4B);
     assert!(saved.contains(r#""publisher":"Someone""#), "{saved}");
     assert!(saved.contains(r#""name":"ColourMap""#), "{saved}");
     assert!(saved.contains(r#""unmapped""#), "{saved}");
@@ -228,7 +244,7 @@ fn an_element_the_form_never_drew_survives_a_save() {
 }
 
 #[test]
-fn a_map_read_on_one_root_writes_the_other_root_s_own_elements() {
+fn a_map_read_on_one_root_reaches_no_other_root_with_its_elements() {
     let held: Value = serde_json::from_str(
         r#"{"resourceType":"ConceptMap","url":"https://terminology.example/m",
             "status":"active","sourceUri":"https://terminology.example/vs",
@@ -238,12 +254,13 @@ fn a_map_read_on_one_root_writes_the_other_root_s_own_elements() {
                 {"code":"y","equivalence":"wider"}]}]}]}"#,
     )
     .expect("the server's own answer parses");
-    let draft = MapDraft::of(&held);
-    let r5 = draft.body(FhirVersion::R5);
-    assert!(r5.contains(r#""relationship":"wider""#), "{r5}");
+    let draft = opened(FhirVersion::R4B, &held);
+    let refused = draft
+        .body(FhirVersion::R5)
+        .expect_err("R5 defines no `sourceUri`, so the R4B map is no R5 map");
     assert!(
-        !r5.contains("equivalence") && !r5.contains(r#""sourceUri""#),
-        "no element of the root it was read from survives into the one it is sent to: {r5}"
+        refused.to_string().contains("sourceUri"),
+        "no element of the root it was read from survives into the one it is sent to: {refused}"
     );
 }
 
@@ -254,7 +271,7 @@ fn an_unmanaged_resource_states_no_version_to_update_from() {
     )
     .expect("the server's own answer parses");
     assert!(
-        !MapDraft::of(&held).managed(),
+        !opened(FhirVersion::R4B, &held).managed(),
         "a resource the REST API never stamped has no version an update could state"
     );
 }
@@ -452,4 +469,81 @@ fn the_scope_refusal_names_the_scope_and_the_definition() {
         "{text}"
     );
     assert!(text.contains("ConceptMap.source[x]"), "{text}");
+}
+
+/// A `searchset` carrying an `OperationOutcome` and the concept map `m`.
+const SEARCHED: &str = r#"{"resourceType":"Bundle","type":"searchset","entry":[
+    {"resource":{"resourceType":"OperationOutcome",
+      "issue":[{"severity":"information","code":"informational"}]}},
+    {"resource":{"resourceType":"ConceptMap","id":"m","status":"active"}}]}"#;
+
+#[test]
+fn a_searchset_answers_the_first_resource_of_the_type_that_was_searched_for() {
+    let maps: crate::fhir::searchset::Found<MapDraft> = FhirVersion::R4B
+        .decode(SEARCHED)
+        .expect("the server's own answer decodes at R4B");
+    assert_eq!(maps.found().first().map(|map| map.id.as_str()), Some("m"));
+    let systems: crate::fhir::searchset::Found<crate::authoring::code_system::Draft> =
+        FhirVersion::R4B
+            .decode(SEARCHED)
+            .expect("the server's own answer decodes at R4B");
+    assert_eq!(
+        systems.found(),
+        Vec::<&crate::authoring::code_system::Draft>::new(),
+        "a search for one type does not answer another"
+    );
+}
+
+/// A map's scope is `source[x]` on R4 and R4B and `sourceScope[x]` on R5
+/// and R6 (<https://hl7.org/fhir/R4B/conceptmap.html>,
+/// <https://hl7.org/fhir/R5/conceptmap.html>), so each release's map is read
+/// in its own elements.
+#[test]
+fn a_stored_concept_map_reads_the_scope_under_each_release_s_spelling() {
+    let r4b = opened(
+        FhirVersion::R4B,
+        &serde_json::from_str(
+            r#"{"resourceType":"ConceptMap","id":"m","meta":{"versionId":"2"},
+                "url":"https://terminology.example/m","version":"1","status":"active",
+                "sourceUri":"https://terminology.example/vs-a",
+                "targetCanonical":"https://terminology.example/vs-b",
+                "group":[{"source":"https://terminology.example/a","sourceVersion":"1.0",
+                  "target":"https://terminology.example/b",
+                  "element":[{"code":"x","display":"Ex","target":[
+                    {"code":"y","display":"Why","equivalence":"wider","comment":"c"}]}]}]}"#,
+        )
+        .expect("the fixture is JSON"),
+    );
+    assert_eq!(r4b.version_id, "2");
+    assert_eq!(r4b.source_scope, "https://terminology.example/vs-a");
+    assert_eq!(r4b.target_scope, "https://terminology.example/vs-b");
+    let group = r4b.groups.first().expect("the map carries one group");
+    assert_eq!(group.source_version, "1.0");
+    let element = group.elements.first().expect("the group carries one code");
+    assert!(!element.no_map, "R4B defines no `noMap`");
+    let target = element
+        .targets
+        .first()
+        .expect("the code carries one target");
+    assert_eq!(target.relationship, "wider");
+
+    let r5 = opened(
+        FhirVersion::R5,
+        &serde_json::from_str(
+            r#"{"resourceType":"ConceptMap","url":"https://terminology.example/m","status":"draft",
+                "sourceScopeCanonical":"https://terminology.example/vs-a",
+                "group":[{"source":"https://terminology.example/a|1.0",
+                  "target":"https://terminology.example/b",
+                  "element":[{"code":"x","noMap":true}]}]}"#,
+        )
+        .expect("the fixture is JSON"),
+    );
+    assert_eq!(r5.source_scope, "https://terminology.example/vs-a");
+    assert_eq!(r5.target_scope, "");
+    let group = r5.groups.first().expect("the map carries one group");
+    assert_eq!(
+        group.source_version, "1.0",
+        "the version inside the canonical"
+    );
+    assert!(group.elements.first().is_some_and(|element| element.no_map));
 }

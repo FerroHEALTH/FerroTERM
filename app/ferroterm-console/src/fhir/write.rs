@@ -10,129 +10,182 @@
 //! editing the same resource cannot silently overwrite each other
 //! (<https://hl7.org/fhir/R4B/http.html#concurrency>).
 
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::fhir::release::{Reads, document};
 use crate::locale::{Msg, tr_with};
 
-/// The resource elements the viewer reads back off a write or a history read.
+/// What the console reads of one stored resource, from the one its release
+/// decoded: its type and logical id, its `meta`, and the names a screen
+/// draws it by.
 ///
-/// The viewer never mirrors a whole FHIR resource; these are the elements a
-/// screen shows and the one an update needs.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
-pub(crate) struct StoredResource {
-    /// `resourceType`, mandatory in FHIR JSON
-    /// (<https://hl7.org/fhir/R4B/json.html>).
-    #[serde(default)]
-    #[serde(rename = "resourceType")]
+/// The console writes `CodeSystem`, `ValueSet` and `ConceptMap`, so those
+/// are the resources a stamp is read off; any other resource stamps as none.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct Stamp {
+    /// The resource type.
     pub(crate) resource_type: Option<String>,
-    /// `id`, the logical id the server assigned.
-    #[serde(default)]
+    /// The logical id.
     pub(crate) id: Option<String>,
-    /// `meta`, which carries the version an update has to state.
-    #[serde(default)]
-    pub(crate) meta: Option<Meta>,
-    /// `url`, the canonical the resource was published under.
-    #[serde(default)]
-    pub(crate) url: Option<String>,
-    /// `name`, the computer-friendly name.
-    #[serde(default)]
-    pub(crate) name: Option<String>,
-    /// `title`, the name written for a person.
-    #[serde(default)]
-    pub(crate) title: Option<String>,
-}
-
-/// The `Resource.meta` elements the viewer reads.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
-pub(crate) struct Meta {
-    /// `meta.versionId`, the version an `If-Match` states
+    /// `meta.versionId`, the version an update states in `If-Match`
     /// (<https://hl7.org/fhir/R4B/http.html#concurrency>).
-    #[serde(default)]
-    #[serde(rename = "versionId")]
     pub(crate) version_id: Option<String>,
-    /// `meta.lastUpdated`, when the server last changed the resource.
-    #[serde(default)]
-    #[serde(rename = "lastUpdated")]
+    /// `meta.lastUpdated`.
     pub(crate) last_updated: Option<String>,
-    /// `meta.source`, where a server records where the content came from
-    /// (<https://hl7.org/fhir/R4B/resource.html#meta>). Most do not.
-    #[serde(default)]
+    /// `meta.source`.
     pub(crate) source: Option<String>,
+    /// The canonical URL.
+    pub(crate) url: Option<String>,
+    /// The business version.
+    pub(crate) version: Option<String>,
+    /// The computer-friendly name.
+    pub(crate) name: Option<String>,
+    /// The name written for a person.
+    pub(crate) title: Option<String>,
+    /// The publication status.
+    pub(crate) status: Option<String>,
 }
 
-impl StoredResource {
-    /// The version an update of this resource states in `If-Match`.
-    pub(crate) fn version_id(&self) -> Option<&str> {
-        self.meta.as_ref()?.version_id.as_deref()
-    }
-
-    /// The elements read here, taken out of a resource the server sent.
-    ///
-    /// Every field is optional, so any JSON object reads; a document that is
-    /// not an object reads as the empty resource.
-    pub(crate) fn of(resource: &Value) -> Self {
-        serde_json::from_value(resource.clone()).unwrap_or_default()
-    }
+/// One stored resource as a release decoded it: its stamp, and the document
+/// it is, which the history screen compares and a restore sends back.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct Stored {
+    /// What the console reads of it.
+    pub(crate) stamp: Stamp,
+    /// The resource, as the JSON document it is.
+    pub(crate) document: Value,
 }
 
-/// The `history` `Bundle` a `_history` read answers
-/// (<https://hl7.org/fhir/R4B/http.html#history>).
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
-#[serde(default)]
+/// The `history` `Bundle` the history interaction answers, read from the one
+/// its release decoded (<https://hl7.org/fhir/R4B/http.html#history>).
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct History {
-    /// `Bundle.total`, the number of versions the server counted.
-    pub(crate) total: Option<u32>,
-    /// `Bundle.entry`, one per version, most recent first.
+    /// Each entry, in the server's order.
     pub(crate) entry: Vec<HistoryEntry>,
 }
 
-/// One version in a history `Bundle`.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
-#[serde(default)]
+/// One entry of a history `Bundle`.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct HistoryEntry {
-    /// The resource as it stood at that version; absent for a delete
-    /// (<https://hl7.org/fhir/R4B/http.html#history>).
-    ///
-    /// It is kept as the server sent it, because a restore sends that whole
-    /// resource back and an element this viewer has never heard of cannot
-    /// survive a typed read.
-    pub(crate) resource: Option<Value>,
-    /// `entry.request`, which names the interaction that made the version.
-    pub(crate) request: Option<HistoryRequest>,
-    /// `entry.response`, which carries the version's `ETag` and when it was
-    /// written (<https://hl7.org/fhir/R4B/http.html#history>).
-    pub(crate) response: Option<HistoryResponse>,
-}
-
-/// The `entry.request` elements a history entry carries.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
-#[serde(default)]
-pub(crate) struct HistoryRequest {
-    /// `POST`, `PUT`, or `DELETE`.
+    /// The resource as it stood at that version, absent for a delete.
+    pub(crate) resource: Option<Stored>,
+    /// `request.method`, the interaction that made the version.
     pub(crate) method: Option<String>,
-    /// `entry.request.url`, the resource the interaction was made on, which
-    /// names a deleted resource that carries no body.
+    /// `request.url`, what the interaction addressed.
     pub(crate) url: Option<String>,
-}
-
-/// The `entry.response` elements a history entry carries.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
-#[serde(default)]
-pub(crate) struct HistoryResponse {
     /// `response.etag`, the version this entry is.
     pub(crate) etag: Option<String>,
     /// `response.lastModified`, when the server wrote it.
-    #[serde(rename = "lastModified")]
     pub(crate) last_modified: Option<String>,
 }
+
+impl Stored {
+    /// `resource`, a resource its release decoded, with its stamp.
+    pub(crate) fn of<T: Reads<Stamp> + serde::Serialize>(resource: &T) -> Self {
+        Self {
+            stamp: resource.read(),
+            document: document(resource),
+        }
+    }
+}
+
+/// The stamp of `$resource`, a resource of the type `$resource_type` of the
+/// `fhir-types` module `$module`, from its id, its `meta` and the elements it
+/// names itself by.
+macro_rules! stamp {
+    ($module:ident, $resource:expr, $resource_type:literal) => {{
+        let text = |value: Option<&fhir_types::$module::primitives::String>| {
+            value.and_then(|value| value.value.clone())
+        };
+        let meta: Option<&fhir_types::$module::meta::Meta> = $resource.meta.as_ref();
+        Stamp {
+            resource_type: Some($resource_type.to_owned()),
+            id: $resource.id.clone(),
+            version_id: meta
+                .and_then(|meta| meta.version_id.as_ref())
+                .and_then(|id| id.value.clone()),
+            last_updated: meta
+                .and_then(|meta| meta.last_updated.as_ref())
+                .and_then(|at| at.value.clone()),
+            source: meta
+                .and_then(|meta| meta.source.as_ref())
+                .and_then(|source| source.value.clone()),
+            url: $resource.url.as_ref().and_then(|url| url.value.clone()),
+            version: text($resource.version.as_ref()),
+            name: text($resource.name.as_ref()),
+            title: text($resource.title.as_ref()),
+            status: $resource.status.value.clone(),
+        }
+    }};
+}
+
+/// Reads the stamp of the three resources the console writes, and the
+/// history `Bundle`, of the `fhir-types` module `$module`.
+macro_rules! reads_stored {
+    ($module:ident) => {
+        mod $module {
+            use fhir_types::$module::bundle::Bundle;
+            use fhir_types::$module::resource::Resource;
+
+            use super::{History, HistoryEntry, Reads, Stamp, Stored};
+
+            impl Reads<Stamp> for Resource {
+                fn read(&self) -> Stamp {
+                    match self {
+                        Resource::CodeSystem(resource) => stamp!($module, resource, "CodeSystem"),
+                        Resource::ValueSet(resource) => stamp!($module, resource, "ValueSet"),
+                        Resource::ConceptMap(resource) => stamp!($module, resource, "ConceptMap"),
+                        _ => Stamp::default(),
+                    }
+                }
+            }
+
+            impl Reads<History> for Bundle {
+                fn read(&self) -> History {
+                    History {
+                        entry: self
+                            .entry
+                            .iter()
+                            .map(|entry| HistoryEntry {
+                                resource: entry.resource.as_ref().map(Stored::of),
+                                method: entry
+                                    .request
+                                    .as_ref()
+                                    .and_then(|request| request.method.value.clone()),
+                                url: entry
+                                    .request
+                                    .as_ref()
+                                    .and_then(|request| request.url.value.clone()),
+                                etag: entry
+                                    .response
+                                    .as_ref()
+                                    .and_then(|response| response.etag.as_ref())
+                                    .and_then(|etag| etag.value.clone()),
+                                last_modified: entry
+                                    .response
+                                    .as_ref()
+                                    .and_then(|response| response.last_modified.as_ref())
+                                    .and_then(|at| at.value.clone()),
+                            })
+                            .collect(),
+                    }
+                }
+            }
+        }
+    };
+}
+
+reads_stored!(r4);
+reads_stored!(r4b);
+reads_stored!(r5);
+reads_stored!(r6);
 
 /// One version of a resource, as a version list draws it.
 ///
 /// It is the same shape whichever interaction produced it, so a root that
 /// answers the history `Bundle` and one that answers only the version read
 /// draw the same table.
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct Version {
     /// `meta.versionId`, which is also the row's key.
     pub(crate) id: String,
@@ -158,20 +211,19 @@ impl Version {
     /// `position` names the row when the server stated no `meta.versionId`, so
     /// every row has an identifier for the pickers and the restore control to
     /// carry.
-    pub(crate) fn of(resource: Option<Value>, position: usize) -> Self {
-        let read = resource
+    pub(crate) fn of(resource: Option<Stored>, position: usize) -> Self {
+        let stamp = resource
             .as_ref()
-            .map(StoredResource::of)
+            .map(|stored| stored.stamp.clone())
             .unwrap_or_default();
-        let meta = read.meta.unwrap_or_default();
         Self {
-            id: meta
+            id: stamp
                 .version_id
                 .unwrap_or_else(|| format!("entry-{position}")),
-            last_updated: meta.last_updated,
+            last_updated: stamp.last_updated,
             method: None,
-            source: meta.source,
-            resource,
+            source: stamp.source,
+            resource: resource.map(|stored| stored.document),
         }
     }
 }
@@ -193,28 +245,19 @@ impl History {
                 let stated = entry
                     .resource
                     .as_ref()
-                    .map(StoredResource::of)
-                    .and_then(|read| read.meta)
-                    .and_then(|meta| meta.version_id);
+                    .and_then(|stored| stored.stamp.version_id.as_ref());
                 if stated.is_none()
                     && let Some(etag) = entry
-                        .response
-                        .as_ref()
-                        .and_then(|response| response.etag.as_deref())
+                        .etag
+                        .as_deref()
                         .map(strong_tag_of)
                         .filter(|tag| !tag.is_empty())
                 {
                     etag.clone_into(&mut version.id);
                 }
-                version.method = entry
-                    .request
-                    .as_ref()
-                    .and_then(|request| request.method.clone());
+                version.method.clone_from(&entry.method);
                 if version.last_updated.is_none() {
-                    version.last_updated = entry
-                        .response
-                        .as_ref()
-                        .and_then(|response| response.last_modified.clone());
+                    version.last_updated.clone_from(&entry.last_modified);
                 }
                 version
             })
@@ -225,8 +268,9 @@ impl History {
 /// What a write answered, beyond the resource itself.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct Written {
-    /// The resource the server echoed, when it echoed one.
-    pub(crate) resource: Option<StoredResource>,
+    /// What the console reads of the resource the server echoed, when it
+    /// echoed one.
+    pub(crate) resource: Option<Stamp>,
     /// The `ETag` the server answered, which is the version to state next
     /// (<https://hl7.org/fhir/R4B/http.html#concurrency>).
     pub(crate) etag: Option<String>,
@@ -240,10 +284,11 @@ impl Written {
     /// The `ETag` is preferred over `meta.versionId`, because it is what the
     /// server just committed to and what `If-Match` is compared against.
     pub(crate) fn version_id(&self) -> Option<&str> {
-        self.etag
-            .as_deref()
-            .map(strong_tag_of)
-            .or_else(|| self.resource.as_ref().and_then(StoredResource::version_id))
+        self.etag.as_deref().map(strong_tag_of).or_else(|| {
+            self.resource
+                .as_ref()
+                .and_then(|stamp| stamp.version_id.as_deref())
+        })
     }
 }
 
@@ -269,6 +314,14 @@ pub(crate) fn if_match(version_id: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fhir::version::FhirVersion;
+
+    /// `json`, decoded at R4B as what the console reads of it.
+    fn decoded<A: crate::fhir::release::Decodes>(json: &str) -> A {
+        FhirVersion::R4B
+            .decode(json)
+            .expect("the server's own answer decodes at R4B")
+    }
 
     #[test]
     fn the_if_match_header_is_the_weak_tag_fhir_states() {
@@ -278,13 +331,9 @@ mod tests {
     #[test]
     fn the_etag_the_server_answered_is_the_version_the_next_update_states() {
         let written = Written {
-            resource: Some(StoredResource {
-                meta: Some(Meta {
-                    version_id: Some(String::from("1")),
-                    last_updated: None,
-                    source: None,
-                }),
-                ..StoredResource::default()
+            resource: Some(Stamp {
+                version_id: Some(String::from("1")),
+                ..Stamp::default()
             }),
             etag: Some(String::from("W/\"2\"")),
             location: None,
@@ -299,13 +348,9 @@ mod tests {
     #[test]
     fn a_write_that_answered_no_etag_falls_back_to_the_resource() {
         let written = Written {
-            resource: Some(StoredResource {
-                meta: Some(Meta {
-                    version_id: Some(String::from("7")),
-                    last_updated: None,
-                    source: None,
-                }),
-                ..StoredResource::default()
+            resource: Some(Stamp {
+                version_id: Some(String::from("7")),
+                ..Stamp::default()
             }),
             etag: None,
             location: None,
@@ -323,16 +368,15 @@ mod tests {
 
     #[test]
     fn a_history_row_is_keyed_by_its_version_and_never_by_its_position() {
-        let history: History = serde_json::from_str(
+        let history: History = decoded(
             r#"{"resourceType":"Bundle","type":"history","total":2,"entry":[
-                 {"resource":{"resourceType":"CodeSystem","id":"colours",
+                 {"resource":{"resourceType":"CodeSystem","id":"colours","status":"active","content":"complete",
                    "meta":{"versionId":"2","lastUpdated":"2026-09-24T10:00:00Z","source":"https://sync.example/run/9"}},
                   "request":{"method":"PUT","url":"CodeSystem/colours"},
                   "response":{"status":"200","etag":"W/\"2\""}},
                  {"request":{"method":"DELETE","url":"CodeSystem/colours"},
                   "response":{"status":"204","lastModified":"2026-09-23T10:00:00Z"}}]}"#,
-        )
-        .expect("the server's own history Bundle parses");
+        );
         let versions = history.versions();
         let first = versions.first().expect("the bundle carries two entries");
         assert_eq!(first.id, "2");
@@ -355,18 +399,17 @@ mod tests {
 
     #[test]
     fn a_delete_in_a_history_is_keyed_by_the_version_its_etag_names() {
-        let history: History = serde_json::from_str(
+        let history: History = decoded(
             r#"{"resourceType":"Bundle","type":"history","total":2,"entry":[
                  {"fullUrl":"https://tx.example.org/r4b/CodeSystem/colours",
                   "request":{"method":"DELETE","url":"CodeSystem/colours"},
                   "response":{"status":"204 No Content","etag":"W/\"3\"","lastModified":"2026-09-24T11:00:00Z"}},
                  {"fullUrl":"https://tx.example.org/r4b/CodeSystem/colours",
-                  "resource":{"resourceType":"CodeSystem","id":"colours",
+                  "resource":{"resourceType":"CodeSystem","id":"colours","status":"active","content":"complete",
                    "meta":{"versionId":"2","lastUpdated":"2026-09-24T10:00:00Z"}},
                   "request":{"method":"PUT","url":"CodeSystem/colours"},
                   "response":{"status":"200 OK","etag":"W/\"2\"","lastModified":"2026-09-24T10:00:00Z"}}]}"#,
-        )
-        .expect("the server's own history Bundle parses");
+        );
         let ids: Vec<String> = history
             .versions()
             .into_iter()
@@ -377,11 +420,10 @@ mod tests {
 
     #[test]
     fn a_version_read_answers_the_same_row_a_history_entry_does() {
-        let resource: Value = serde_json::from_str(
-            r#"{"resourceType":"CodeSystem","id":"colours",
+        let resource: Stored = decoded(
+            r#"{"resourceType":"CodeSystem","id":"colours","status":"active","content":"complete",
                 "meta":{"versionId":"3","lastUpdated":"2026-09-24T11:00:00Z"}}"#,
-        )
-        .expect("the server's own answer parses");
+        );
         let version = Version::of(Some(resource), 0);
         assert_eq!(version.id, "3");
         assert_eq!(
@@ -397,11 +439,10 @@ mod tests {
 
     #[test]
     fn a_resource_the_server_echoed_states_the_version_to_send_back() {
-        let resource: StoredResource = serde_json::from_str(
-            r#"{"resourceType":"CodeSystem","id":"colours","meta":{"versionId":"4","lastUpdated":"2026-09-23T10:00:00Z"},"url":"https://terminology.example/colours"}"#,
-        )
-        .expect("the server's own answer parses");
-        assert_eq!(resource.version_id(), Some("4"));
+        let resource: Stamp = decoded(
+            r#"{"resourceType":"CodeSystem","id":"colours","status":"active","content":"complete","meta":{"versionId":"4","lastUpdated":"2026-09-23T10:00:00Z"},"url":"https://terminology.example/colours"}"#,
+        );
+        assert_eq!(resource.version_id.as_deref(), Some("4"));
         assert_eq!(resource.resource_type.as_deref(), Some("CodeSystem"));
         assert_eq!(resource.id.as_deref(), Some("colours"));
     }

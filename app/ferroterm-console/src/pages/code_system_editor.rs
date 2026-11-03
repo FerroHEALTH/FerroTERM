@@ -30,6 +30,7 @@ use crate::auth::scopes::Letter;
 use crate::authoring::code_system::{Concept, Declared, Draft, Lifecycle};
 use crate::fhir::CODE_SYSTEM;
 use crate::fhir::compose::STATUSES;
+use crate::fhir::error::FhirError;
 use crate::locale::{Msg, tr, tr_with};
 use crate::markup::code;
 use crate::pages::detail::Kind;
@@ -180,8 +181,9 @@ async fn edited(request: &Request, posted: Option<&Posted>) -> Html {
             Err(error) => return failure(&request.locale, &error),
         }
     };
-    let opened = stored.as_ref().map_or_else(Draft::new, Draft::of);
-    if stored.is_some() && !opened.managed() {
+    let held = stored.is_some();
+    let opened = stored.unwrap_or_else(Draft::new);
+    if held && !opened.managed() {
         return crate::pages::editor::unmanaged(
             request,
             Kind::CodeSystem,
@@ -200,10 +202,19 @@ async fn edited(request: &Request, posted: Option<&Posted>) -> Html {
         opened_at = form.text(OPENED_AT);
         apply(form, &opened, &mut draft);
         if form.intent() == SAVE && draft.savable() {
-            let body = draft.body();
-            let sent =
-                crate::pages::editor::send(request, CODE_SYSTEM, &draft.id, &body, &opened_version)
-                    .await;
+            let sent = match draft.body(request.version) {
+                Ok(body) => {
+                    crate::pages::editor::send(
+                        request,
+                        CODE_SYSTEM,
+                        &draft.id,
+                        &body,
+                        &opened_version,
+                    )
+                    .await
+                }
+                Err(error) => Err(FhirError::undecoded(&here, request.version, &error)),
+            };
             match sent {
                 Ok(written) => {
                     let version = written.version_id().unwrap_or_default().to_owned();
@@ -242,7 +253,9 @@ fn drawn(
     let standing = match &answer {
         Some((_, standing)) => standing.clone(),
         None if !draft.savable() => Standing::Incomplete(tr(locale, Msg::EditorCodeSystemNeeds)),
-        None if draft.body() == opened.body() => Standing::Unchanged,
+        None if draft.body(request.version).ok() == opened.body(request.version).ok() => {
+            Standing::Unchanged
+        }
         None => Standing::Changed,
     };
     let bar = dock(

@@ -28,7 +28,7 @@ use crate::fhir::FhirClient;
 use crate::fhir::capability::Capabilities;
 use crate::fhir::error::FhirError;
 use crate::fhir::version::FhirVersion;
-use crate::fhir::write::StoredResource;
+use crate::fhir::write::Stored;
 use crate::fhir::write::Version;
 use crate::locale::{Msg, tr, tr_with};
 
@@ -112,14 +112,14 @@ pub(crate) struct Subject {
 }
 
 /// One resource's history, as the screen draws it.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct Opened {
     /// The resource this answer was read for.
     pub(crate) subject: Subject,
     /// What the root declared about this type's versions.
     pub(crate) support: Support,
     /// The resource as the server holds it now.
-    pub(crate) current: Option<Value>,
+    pub(crate) current: Option<Stored>,
     /// Its versions, newest first.
     pub(crate) versions: Vec<Version>,
     /// Whether the list stopped short of the first version.
@@ -132,9 +132,7 @@ impl Opened {
     pub(crate) fn current_version_id(&self) -> String {
         self.current
             .as_ref()
-            .map(StoredResource::of)
-            .and_then(|read| read.meta)
-            .and_then(|meta| meta.version_id)
+            .and_then(|stored| stored.stamp.version_id.clone())
             .unwrap_or_default()
     }
 
@@ -142,8 +140,7 @@ impl Opened {
     pub(crate) fn canonical(&self) -> String {
         self.current
             .as_ref()
-            .map(StoredResource::of)
-            .and_then(|read| read.url)
+            .and_then(|stored| stored.stamp.url.clone())
             .unwrap_or_default()
     }
 
@@ -210,7 +207,7 @@ async fn version_reads(
     version: FhirVersion,
     resource_type: &str,
     id: &str,
-    current: &Value,
+    current: &Stored,
 ) -> Result<(Vec<Version>, bool), FhirError> {
     let newest = Version::of(Some(current.clone()), 0);
     let stated = newest.id.clone();
@@ -669,10 +666,15 @@ mod tests {
     #[test]
     fn the_current_version_and_canonical_come_off_the_resource_the_server_holds() {
         let opened = Opened {
-            current: Some(resource(
-                r#"{"resourceType":"CodeSystem","id":"c","meta":{"versionId":"4"},
-                    "url":"https://terminology.example/colours"}"#,
-            )),
+            current: Some(
+                FhirVersion::R4B
+                    .decode(
+                        r#"{"resourceType":"CodeSystem","id":"c","meta":{"versionId":"4"},
+                            "url":"https://terminology.example/colours",
+                            "status":"active","content":"complete"}"#,
+                    )
+                    .expect("the server's own answer decodes at R4B"),
+            ),
             ..Opened::default()
         };
         assert_eq!(opened.current_version_id(), "4");

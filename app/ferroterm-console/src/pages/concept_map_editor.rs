@@ -34,6 +34,7 @@ use crate::authoring::code_system::Key;
 use crate::authoring::concept_map::{MapDraft, MapElement, MapGroup, MapTarget, dialect};
 use crate::fhir::CONCEPT_MAP;
 use crate::fhir::compose::STATUSES;
+use crate::fhir::error::FhirError;
 use crate::fhir::version::FhirVersion;
 use crate::locale::{Msg, tr, tr_with};
 use crate::pages::detail::Kind;
@@ -181,7 +182,7 @@ async fn edited(request: &Request, posted: Option<&Posted>) -> Html {
     let standing = match (&answer, problems.first()) {
         (Some((_, standing)), _) => standing.clone(),
         (None, Some(problem)) => Standing::Incomplete(problem.text(locale)),
-        (None, None) if draft.body(request.version) == opened.body(request.version) => {
+        (None, None) if draft.body(request.version).ok() == opened.body(request.version).ok() => {
             Standing::Unchanged
         }
         (None, None) => Standing::Changed,
@@ -265,7 +266,7 @@ async fn open(request: &Request, canonical: &str) -> Result<MapDraft, Html> {
         .authored_map(request.version, canonical)
         .await
     {
-        Ok(Some(resource)) => MapDraft::of(&resource),
+        Ok(Some(opened)) => opened,
         Ok(None) => return Err(crate::pages::errors::not_found_page(request)),
         Err(error) => return Err(failure(&request.locale, &error)),
     };
@@ -288,8 +289,13 @@ async fn save(
     opened: &str,
     here: &str,
 ) -> Result<(), Box<(Html, Standing)>> {
-    let body = draft.body(request.version);
-    match crate::pages::editor::send(request, CONCEPT_MAP, &draft.id, &body, opened).await {
+    let sent = match draft.body(request.version) {
+        Ok(body) => {
+            crate::pages::editor::send(request, CONCEPT_MAP, &draft.id, &body, opened).await
+        }
+        Err(error) => Err(FhirError::undecoded(here, request.version, &error)),
+    };
+    match sent {
         Ok(written) => {
             let version = written.version_id().unwrap_or_default().to_owned();
             request.answering.redirect(&format!(
