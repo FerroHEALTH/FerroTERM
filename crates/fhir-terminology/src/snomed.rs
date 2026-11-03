@@ -22,7 +22,6 @@ mod conceptmap;
 mod ecl;
 pub mod expression;
 
-use concept_graph::attributes;
 use concept_graph::attributes::{Attributes, AttributesError};
 use concept_graph::identifiers::{Identifiers, IdentifiersError};
 use concept_graph::members::{MembersError, Memberships};
@@ -781,92 +780,16 @@ impl SnomedProvider {
         // NOTE: the term is the display this server would answer with, which
         // the grammar admits ("the term from any SNOMED CT description that is
         // associated with the concept", the Compositional Grammar §5).
-        let reference =
-            |ordinal: Ordinal| -> Result<Option<normal_form::Reference>, ProviderError> {
-                let Some(code) = self
-                    .stored()
-                    .store
-                    .codes([ordinal])
-                    .map_err(storage)?
-                    .into_iter()
-                    .flatten()
-                    .next()
-                else {
-                    return Ok(None);
-                };
-                let term = if terms {
-                    self.choose_display(ordinal, None)?
-                } else {
-                    None
-                };
-                Ok(Some(normal_form::Reference {
-                    // A term carrying the grammar's own delimiter cannot be
-                    // written and no escape exists, so the reference drops it.
-                    term: term.filter(|term| !term.contains('|')),
-                    code,
-                }))
-            };
-
-        let mut focus = Vec::new();
-        for parent in self
-            .stored()
-            .tree
-            .graph
-            .is_a
-            .neighbours(ordinal)
-            .iter()
-            .copied()
-        {
-            if let Some(found) = reference(Ordinal::new(parent))? {
-                focus.push(found);
-            }
-        }
-
-        let mut attributes = Vec::new();
-        for row in self.system().attributes.rows(ordinal) {
-            let index = usize::try_from(row.kind).unwrap_or(usize::MAX);
-            let Some(kind) = self
-                .system()
-                .attributes
-                .types()
-                .get(index)
-                .map(u64::to_string)
-            else {
-                continue;
-            };
-            let value = match row.value {
-                attributes::ValueRef::Concept(target) => match reference(target)? {
-                    Some(found) => normal_form::Value::Concept(found),
-                    None => continue,
-                },
-                attributes::ValueRef::Number(number) => {
-                    normal_form::Value::Number(number.to_owned())
-                }
-                attributes::ValueRef::String(text) => normal_form::Value::Text(text.to_owned()),
-            };
-            let kind = normal_form::Reference {
-                // An attribute type is a concept of the same system, so its
-                // term is read the way any other is, through the ordinal its
-                // identifier resolves to.
-                term: match self.stored().store.ordinal(&kind).map_err(storage)? {
-                    Some(ordinal) if terms => self
-                        .choose_display(ordinal, None)?
-                        .filter(|term| !term.contains('|')),
-                    _ => None,
-                },
-                code: kind,
-            };
-            attributes.push(normal_form::Attribute {
-                group: row.group,
-                kind,
-                value,
-            });
-        }
-
+        let language = if terms {
+            expression::Terms::In(None)
+        } else {
+            expression::Terms::None
+        };
+        let parents = self.stored().tree.graph.is_a.neighbours(ordinal);
         Ok(normal_form::Expression {
             defined: self.is_defined(ordinal)?,
-            focus,
-            attributes,
+            focus: self.references(parents.iter().copied(), language)?,
+            attributes: self.inferred_attributes(ordinal, 0, language)?,
         }
         .render())
     }
@@ -1309,11 +1232,8 @@ impl StoredSystem for Snomed {
         provider.expression_subsumes(a, b).map(Some)
     }
 
-    /// The implicit value sets of the FHIR SNOMED CT page
-    /// (<https://hl7.org/fhir/R4B/snomedct.html>, "Implicit Value Sets"):
-    /// `?fhir_vs`, `?fhir_vs=isa/[sctid]`, `?fhir_vs=refset`, and
-    /// `?fhir_vs=refset/[sctid]`, on the bare system URI or on this edition's
-    /// edition or version URI. `ecl/` waits for the evaluator.
+    /// The concepts this edition's historical association reference sets name
+    /// in place of an inactive one (<https://hl7.org/fhir/R4B/snomedct.html>).
     fn successors(
         provider: &SnomedProvider,
         concept: Concept,
@@ -1357,6 +1277,11 @@ impl StoredSystem for Snomed {
         ))
     }
 
+    /// The implicit value sets of the FHIR SNOMED CT page
+    /// (<https://hl7.org/fhir/R4B/snomedct.html>, "Implicit Value Sets"):
+    /// `?fhir_vs`, `?fhir_vs=isa/[sctid]`, `?fhir_vs=refset`,
+    /// `?fhir_vs=refset/[sctid]`, and `?fhir_vs=ecl/[ecl]`, on the bare system
+    /// URI or on this edition's edition or version URI.
     fn implicit_value_set(
         provider: &SnomedProvider,
         url: &str,
