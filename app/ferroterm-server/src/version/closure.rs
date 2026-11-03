@@ -55,10 +55,8 @@ macro_rules! closure {
                 headers: &HeaderMap,
                 body: &Bytes,
             ) -> Result<fhir_types::$fhir::concept_map::ConceptMap, Failure> {
-                // NOTE: the ecosystem supplies the code systems a request needs as
-                // `tx-resource` parameters on every operation
-                // (<https://build.fhir.org/ig/HL7/fhir-tx-ecosystem-ig/requirements.html>), so the
-                // closure is computed over the request's scope.
+                // NOTE: the ecosystem supplies a request's code systems as `tx-resource`s, so the closure
+                // is computed over the request's scope (<https://build.fhir.org/ig/HL7/fhir-tx-ecosystem-ig/requirements.html>).
                 let object = parameters::object_from_body(headers, body)?;
                 let (sent, resources) = split_supplied(object)?;
                 parameters::refuse_undeclared(&CONCEPT_MAP_CLOSURE, &[], &sent)?;
