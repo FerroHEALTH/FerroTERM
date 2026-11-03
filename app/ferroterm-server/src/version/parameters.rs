@@ -278,24 +278,33 @@ macro_rules! parameters {
                 wire.resource(StatusCode::OK, resource, &fhir_types::$fhir::schema::SCHEMAS)
             }
 
-            /// The answer to a request whose handler `run` returns one resource.
+            /// The answer to a request in the format it negotiates.
             ///
-            /// The format is negotiated from `query` and `headers` first, and the
-            /// resource or the failure `run` returns is rendered in it. A format the
-            /// server does not speak is refused in JSON.
-            pub fn respond_with<R: Json + serde::Serialize>(
+            /// The format is negotiated from `query` and `headers` first, then `run`
+            /// answers in it, and a failure `run` returns is rendered in it too. A
+            /// format the server does not speak is refused in JSON.
+            pub fn respond_in(
                 query: &[(String, String)],
                 headers: &HeaderMap,
-                run: impl FnOnce() -> Result<R, Failure>,
+                run: impl FnOnce(Wire) -> Result<Response, Failure>,
             ) -> Response {
                 let wire = match Wire::negotiate(query, headers) {
                     Ok(wire) => wire,
                     Err(failure) => return failure.into_response(),
                 };
-                match run().and_then(|resource| respond_resource(&resource, wire)) {
-                    Ok(response) => response,
-                    Err(failure) => failure.respond(wire),
-                }
+                run(wire).unwrap_or_else(|failure| failure.respond(wire))
+            }
+
+            /// The answer to a request whose handler `run` returns one resource,
+            /// rendered as [`respond_in`] renders.
+            pub fn respond_with<R: Json + serde::Serialize>(
+                query: &[(String, String)],
+                headers: &HeaderMap,
+                run: impl FnOnce() -> Result<R, Failure>,
+            ) -> Response {
+                respond_in(query, headers, |wire| {
+                    run().and_then(|resource| respond_resource(&resource, wire))
+                })
             }
         }
     };

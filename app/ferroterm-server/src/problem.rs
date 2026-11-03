@@ -18,8 +18,6 @@ use ferrohealth_server::request_id::RequestIds;
 use ferroterm_problem::Registry;
 use http::{StatusCode, Uri};
 
-use crate::FHIR_BASES;
-
 /// A problem type of the server.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Kind {
@@ -52,8 +50,8 @@ impl ferroterm_problem::Kind for Kind {
 /// the `OperationOutcome` FHIR prescribes.
 #[must_use]
 pub fn is_fhir(path: &str) -> bool {
-    FHIR_BASES.iter().any(|base| {
-        path.strip_prefix(base)
+    crate::served::BASES.iter().any(|base| {
+        path.strip_prefix(base.as_str())
             .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
     })
 }

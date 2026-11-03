@@ -9,6 +9,8 @@
 //! ([`read`]); the version surfaces read their `tx-resource` parameters the
 //! same way. No specification governs this layering: our own design.
 
+use std::sync::LazyLock;
+
 use fhir_terminology::fhir_codesystem::load::FhirVersion;
 
 use crate::artefact::{Loaded, ReadError};
@@ -20,6 +22,11 @@ use crate::artefact::{Loaded, ReadError};
 /// design; what it produces is one FHIR base per version
 /// (<https://hl7.org/fhir/R4B/http.html#root>).
 pub const SEGMENTS: [&str; 4] = ["r4", "r4b", "r5", "r6"];
+
+/// The base path of each served version, `/` and its segment: the crate
+/// router mounts each, and the boot lines name them.
+pub static BASES: LazyLock<[String; 4]> =
+    LazyLock::new(|| SEGMENTS.map(|segment| format!("/{segment}")));
 
 /// The terminology each served version defines, by the FHIR version its
 /// surface reports.

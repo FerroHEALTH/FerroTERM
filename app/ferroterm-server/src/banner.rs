@@ -41,9 +41,7 @@ pub const BUILD: BuildInfo = {
 /// The banner of `info`, or `None` unless the console renders `pretty`.
 #[must_use]
 pub fn render(info: &BuildInfo, rendering: Rendering) -> Option<String> {
-    let versions = crate::FHIR_BASES
-        .map(|base| base.trim_start_matches('/').to_uppercase())
-        .join(", ");
+    let versions = crate::served::SEGMENTS.map(str::to_uppercase).join(", ");
     build_info::banner(
         info,
         WORDMARK.trim_start_matches('\n'),

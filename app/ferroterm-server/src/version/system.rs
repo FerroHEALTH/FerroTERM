@@ -21,7 +21,7 @@ macro_rules! system {
 
             use axum::body::Bytes;
             use axum::extract::{Query, State};
-            use axum::response::{IntoResponse, Response};
+            use axum::response::Response;
             use fhir_types::$fhir::parameters::{Parameters, ParametersParameter, ParametersParameterValue};
             use http::{HeaderMap, StatusCode};
 
@@ -40,34 +40,17 @@ macro_rules! system {
             pub const VERSIONS_URL: &str =
                 "http://hl7.org/fhir/OperationDefinition/CapabilityStatement-versions";
 
-            fn finish(handled: Result<Response, Failure>, wire: Wire) -> Response {
-                match handled {
-                    Ok(response) => response,
-                    Err(failure) => failure.respond(wire),
-                }
-            }
-
-            /// The negotiated format of a request; a format the server does not speak
-            /// is refused (in JSON, at the call site).
-            fn negotiated(headers: &HeaderMap, query: &[(String, String)]) -> Result<Wire, Failure> {
-                Wire::negotiate(query, headers)
-            }
-
             /// `GET /$versions`: the FHIR versions this base serves, `MAJOR.MINOR`.
             pub async fn versions(
                 headers: HeaderMap,
                 Query(query): Query<Vec<(String, String)>>,
             ) -> Response {
-                let wire = match negotiated(&headers, &query) {
-                    Ok(wire) => wire,
-                    Err(failure) => return failure.into_response(),
-                };
                 let major_minor: String = FHIR_VERSION
                     .rsplitn(2, '.')
                     .last()
                     .unwrap_or(FHIR_VERSION)
                     .to_owned();
-                finish(parameters::respond(&Parameters {
+                parameters::respond_in(&query, &headers, |wire| parameters::respond(&Parameters {
                     parameter: vec![
                         ParametersParameter {
                             name: "version".into(),
@@ -81,7 +64,7 @@ macro_rules! system {
                         },
                     ],
                     ..Default::default()
-                }, wire), wire)
+                }, wire))
             }
 
             /// `POST /$cache-control?mode=start|end`.
@@ -91,11 +74,9 @@ macro_rules! system {
                 Query(query): Query<Vec<(String, String)>>,
                 body: Bytes,
             ) -> Response {
-                let wire = match negotiated(&headers, &query) {
-                    Ok(wire) => wire,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(run_cache_control(&state, &headers, &query, &body, wire), wire)
+                parameters::respond_in(&query, &headers, |wire| {
+                    run_cache_control(&state, &headers, &query, &body, wire)
+                })
             }
 
             fn run_cache_control(
