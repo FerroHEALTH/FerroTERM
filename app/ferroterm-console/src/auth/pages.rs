@@ -43,6 +43,15 @@ impl Pages for ConsolePages {
     fn home(&self) -> &'static str {
         "/"
     }
+
+    // NOTE: no specification governs this: our own design; the watch's fetch carries no
+    // page to draw in a locale, so the detail is in English, the console's fallback.
+    fn session_gone(&self, _parts: &Parts) -> String {
+        tr(
+            &ferrohealth_ui::i18n::Locale::default(),
+            Msg::SessionEndedDetail,
+        )
+    }
 }
 
 /// Where a sign-out lands when the provider has no end-session endpoint.

@@ -22,7 +22,7 @@ use serde::Deserialize;
 
 use crate::fhir::version::FhirVersion;
 use crate::locale::{Msg, tr};
-use crate::prefs::{PREFIX, SIDEBAR};
+use crate::prefs::SIDEBAR;
 use crate::routes::BACK_PARAM;
 use crate::routes::{SESSION_FHIR, return_path};
 use crate::server::ConsoleState;
@@ -156,24 +156,6 @@ pub(crate) async fn sidebar(
     redirect(&choice.back, cookie.map(|cookie| vec![cookie]))
 }
 
-/// The `Set-Cookie` value that keeps the preference `key` at `value` for the
-/// browser's session alone, with the attributes of every other cookie of the
-/// console: it carries no `Max-Age`, so the browser drops it when its session
-/// ends (RFC 6265bis §5.6.2).
-fn browser_session_cookie(
-    state: &ConsoleState,
-    key: &str,
-    value: &str,
-) -> Result<HeaderValue, SessionError> {
-    let cookie = cookie::Cookie::build((state.cookie_name(&format!("{PREFIX}{key}")), value))
-        .path("/")
-        .http_only(true)
-        .secure(state.settings().sign_in.store.secure_cookie())
-        .same_site(cookie::SameSite::Lax)
-        .build();
-    HeaderValue::from_str(&cookie.to_string()).map_err(|_invalid| SessionError::Header)
-}
-
 /// What the FHIR version select's link carries.
 #[derive(Debug, Deserialize)]
 pub(crate) struct VersionChoice {
@@ -192,7 +174,9 @@ pub(crate) async fn fhir_version(
     let Ok(version) = choice.fhir.parse::<FhirVersion>() else {
         return bad(Msg::PostVersion);
     };
-    let cookie = browser_session_cookie(&state, SESSION_FHIR, version.segment());
+    let cookie = state
+        .sessions()
+        .session_preference(SESSION_FHIR, version.segment());
     redirect(&choice.back, cookie.map(|cookie| vec![cookie]))
 }
 
