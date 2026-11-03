@@ -19,7 +19,7 @@ macro_rules! closure {
 
             use axum::body::Bytes;
             use axum::extract::{Query, State};
-            use axum::response::{IntoResponse, Response};
+            use axum::response::Response;
             use fhir_terminology::operations::closure::{Edge, Member, relate};
             use fhir_types::$fhir::operations::concept_map_closure::{
                 CONCEPT_MAP_CLOSURE, ConceptMapClosureRequest,
@@ -29,7 +29,6 @@ macro_rules! closure {
             use crate::outcome::Failure;
             use crate::persistence::{Closure, ClosureEdge, ClosureMember};
             use crate::state::AppState;
-            use crate::wire::Wire;
 
             use super::{map, parameters};
 
@@ -43,16 +42,7 @@ macro_rules! closure {
                 Query(query): Query<Vec<(String, String)>>,
                 body: Bytes,
             ) -> Response {
-                let wire = match Wire::negotiate(&query, &headers) {
-                    Ok(wire) => wire,
-                    Err(failure) => return failure.into_response(),
-                };
-                let handled = run(&state, &headers, &body)
-                    .and_then(|map| parameters::respond_resource(&map, wire));
-                match handled {
-                    Ok(response) => response,
-                    Err(failure) => failure.respond(wire),
-                }
+                parameters::respond_with(&query, &headers, || run(&state, &headers, &body))
             }
 
             /// The `ConceptMap` the call answers with.

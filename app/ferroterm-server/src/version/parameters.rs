@@ -16,7 +16,7 @@ macro_rules! parameters {
             //! in the format the request negotiated (`crate::wire`).
 
             use axum::body::Bytes;
-            use axum::response::Response;
+            use axum::response::{IntoResponse, Response};
             use fhir_types::codec::{Json, Path, expect_object};
             use fhir_types::operation::{Operation, ParameterUse, ParametersError};
             use fhir_types::$fhir::parameters::{Parameters, ParametersParameter, ParametersParameterValue};
@@ -276,6 +276,26 @@ macro_rules! parameters {
                 wire: Wire,
             ) -> Result<Response, Failure> {
                 wire.resource(StatusCode::OK, resource, &fhir_types::$fhir::schema::SCHEMAS)
+            }
+
+            /// The answer to a request whose handler `run` returns one resource.
+            ///
+            /// The format is negotiated from `query` and `headers` first, and the
+            /// resource or the failure `run` returns is rendered in it. A format the
+            /// server does not speak is refused in JSON.
+            pub fn respond_with<R: Json + serde::Serialize>(
+                query: &[(String, String)],
+                headers: &HeaderMap,
+                run: impl FnOnce() -> Result<R, Failure>,
+            ) -> Response {
+                let wire = match Wire::negotiate(query, headers) {
+                    Ok(wire) => wire,
+                    Err(failure) => return failure.into_response(),
+                };
+                match run().and_then(|resource| respond_resource(&resource, wire)) {
+                    Ok(response) => response,
+                    Err(failure) => failure.respond(wire),
+                }
             }
         }
     };
