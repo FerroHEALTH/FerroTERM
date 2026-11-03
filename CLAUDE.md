@@ -65,6 +65,10 @@ server. Every crate carries its own `CLAUDE.md` with crate-local discipline.
   with its NCTS extensions, entry selection, checksum-verified download, and
   the `Source` seam each service add-on implements. Country-neutral and
   code-system-neutral.
+- `crates/ferroterm-problem`: the RFC 9457 problem document the server and
+  the sync service write outside the FHIR bases: the problem type base, the
+  registry each service builds its own types into, the access refusals both
+  share, and the responses. Unpublished, like `terminology-syndication`.
 - `addons/*`: the source add-ons the sync service compiles in, one per national
   terminology service (`addons/nts`, the Nictiz Nationale Terminologieserver,
   is the first). Each depends on `crates/terminology-syndication` and the

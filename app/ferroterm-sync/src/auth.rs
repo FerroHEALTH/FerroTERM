@@ -22,7 +22,7 @@ use std::sync::Arc;
 use axum::Router;
 use axum::body::Body;
 use axum::http::request::Parts;
-use axum::http::{Extensions, Method, StatusCode, Uri};
+use axum::http::{Extensions, Method, Uri};
 use axum::response::Response;
 use ferrohealth_smart::config::{AuthSection, ConfigError};
 use ferrohealth_smart::extract::HeaderOnly;
@@ -30,8 +30,6 @@ use ferrohealth_smart::guard::{AuthLayer, Gate, Render, Requirement, Target};
 use ferrohealth_smart::refusal::Refusal;
 use ferrohealth_smart::resource::introspection::{IntrospectionError, Introspector};
 use ferrohealth_smart::resource::{IssuerSet, ResourceError, ResourceServer};
-
-use crate::problem::Kind;
 
 /// The product scope of a deployment whose `[auth] product_scope` names none.
 ///
@@ -234,13 +232,7 @@ impl Render for Refused {
         let challenge = challenged
             .headers()
             .get(axum::http::header::WWW_AUTHENTICATE);
-        let problem = match refusal.status() {
-            StatusCode::UNAUTHORIZED => Kind::Unauthenticated.problem(text),
-            StatusCode::FORBIDDEN => Kind::NotPermitted.problem(text),
-            StatusCode::SERVICE_UNAVAILABLE => Kind::AuthorizationUnavailable.problem(text),
-            status => ferrohealth_server::problem::Problem::new(status).with_detail(text),
-        };
-        crate::problem::respond(problem, challenge)
+        ferroterm_problem::refused(refusal.status(), text, challenge)
     }
 }
 
