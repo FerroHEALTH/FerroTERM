@@ -145,6 +145,15 @@ the new release counts differently.
 | `jscpd linux-x64` | `5f18a6b70b4210782fc3c401c780ba994a2777249cd44d97d6fa460f6fff4570` (`jscpd-linux-x64-musl.tar.gz`) | `scripts/checks/duplication.sh --install` |
 | `jscpd linux-arm64` | `3635d652ae08ae10bfbc6821bfa8ac14080101f317fb5f45f4b590d5d32b9339` (`jscpd-linux-arm64-musl.tar.gz`) | `scripts/checks/duplication.sh --install` |
 
+Trivy is the one CI tool pinned outside its workflow step: every workflow
+that scans (`release.yml`, `scan-and-tag.yml`, `image-scan.yml`) sets
+`TRIVY_VERSION`, and `scripts/release/install-trivy.sh` installs that
+version from the GitHub release tarball `trivy_<version>_Linux-64bit.tar.gz`,
+checked against the sha256 the script pins for it (#1089). The guard fails a
+`TRIVY_VERSION` the workflows disagree on, or one the script pins no sha256
+for; a bump adds the version's row to the script, read from the release's
+`trivy_<version>_checksums.txt`.
+
 ## GitHub Actions pins
 
 Every `uses:` in `.github/workflows/**` is pinned to a full commit SHA with a
