@@ -9,7 +9,7 @@ use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::view::error_page::{ErrorPage, Status, Way, error_page};
 
 use crate::locale::{Msg, tr, tr_with};
-use crate::markup::{code, h, t};
+use crate::markup::code;
 use crate::request::Request;
 use crate::routes::{VALUE_SETS_PATH, ui_path};
 
@@ -20,7 +20,7 @@ pub(crate) fn not_found_page(request: &Request) -> Html {
     request.answering.status(http::StatusCode::NOT_FOUND);
     let title = tr(locale, Msg::ErrorsNotFoundTitle);
     request.answering.title(&title);
-    let body = t(tr_with(
+    let body = Html::text(tr_with(
         locale,
         Msg::ErrorsNotFoundBody,
         &[("path", request.path.clone().into())],
@@ -65,14 +65,14 @@ pub(crate) fn forbidden_page(
         .unwrap_or_else(|| tr(locale, Msg::ShellNotSignedIn));
     let title = tr(locale, what);
     request.answering.title(&title);
-    let body = t(tr_with(
+    let body = Html::text(tr_with(
         locale,
         Msg::ErrorsForbiddenBody,
         &[("who", reader.into()), ("what", title.clone().into())],
     ));
-    let hint = h(format!(
+    let hint = Html::raw(format!(
         "{} {}",
-        t(tr(locale, Msg::ErrorsForbiddenScope)),
+        Html::text(tr(locale, Msg::ErrorsForbiddenScope)),
         code(scope)
     ));
     let (label, href) = back;

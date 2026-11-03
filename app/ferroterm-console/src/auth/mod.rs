@@ -71,15 +71,10 @@ impl Session {
     /// What the reader may change, as the line under their name says it.
     pub(crate) fn standing(&self, locale: &Locale) -> String {
         self.0.as_ref().map_or_else(
-            || read_only(locale),
+            || tr(locale, Msg::ReadOnlyAccountHasNoEditing),
             |operator| standing(locale, &operator.scopes),
         )
     }
-}
-
-/// The line under the name of a reader whose scopes open no write.
-fn read_only(locale: &Locale) -> String {
-    tr(locale, Msg::ReadOnlyAccountHasNoEditing)
 }
 
 /// What `granted` lets a reader change, as one line under their name: the
@@ -98,7 +93,7 @@ pub(crate) fn standing(locale: &Locale, granted: &[String]) -> String {
         (true, false, false) => tr(locale, Msg::MayEditCodesystem),
         (false, true, false) => tr(locale, Msg::MayEditValueset),
         (false, false, true) => tr(locale, Msg::MayEditConceptmap),
-        (false, false, false) => read_only(locale),
+        (false, false, false) => tr(locale, Msg::ReadOnlyAccountHasNoEditing),
     }
 }
 
@@ -122,8 +117,9 @@ impl Operator {
 mod tests {
     use ferrohealth_ui::i18n::Locale;
 
-    use super::{Operator, Session, read_only, standing};
+    use super::{Operator, Session, standing};
     use crate::auth::scopes::Letter;
+    use crate::locale::{Msg, tr};
 
     #[test]
     fn the_standing_names_what_the_scopes_open_and_says_read_only_otherwise() {
@@ -147,11 +143,11 @@ mod tests {
             )
         );
         assert_eq!(
-            read_only(&Locale::default()),
+            tr(&Locale::default(), Msg::ReadOnlyAccountHasNoEditing),
             standing(&Locale::default(), &granted(&["openid", "fhirUser"]))
         );
         assert_eq!(
-            read_only(&Locale::default()),
+            tr(&Locale::default(), Msg::ReadOnlyAccountHasNoEditing),
             standing(&Locale::default(), &granted(&["user/CodeSystem.rs"]))
         );
     }

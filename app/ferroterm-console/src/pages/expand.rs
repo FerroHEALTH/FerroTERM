@@ -26,7 +26,6 @@ use ferrohealth_ui::view::transform::field_checks;
 use crate::fhir::expansion::{ExpandRequest, Expansion};
 use crate::fhir::{CODE_SYSTEM, VALUE_SET};
 use crate::locale::{Msg, message, tr, tr_with};
-use crate::markup::{h, join, t};
 use crate::pages::operations::{
     Op, before, choices, frame, options, run, select, sent, text, verdict,
 };
@@ -120,7 +119,7 @@ impl Asked {
 
 /// A checkbox named `name` with the id `id`, sending `true` when ticked.
 pub(crate) fn checkbox(id: &str, name: &str, checked: bool) -> Html {
-    h(format!(
+    Html::raw(format!(
         r#"<input type="checkbox" id="{id}" name="{name}" value="true"{}>"#,
         if checked { " checked" } else { "" }
     ))
@@ -164,9 +163,9 @@ pub(crate) async fn page(request: Request) -> Html {
             &asked.filter,
             tr(locale, Msg::ExpandFilterHint),
         ),
-        Field::new("expand-count", tr(locale, Msg::ExpandPageSize)).view(h(format!(
+        Field::new("expand-count", tr(locale, Msg::ExpandPageSize)).view(Html::raw(format!(
             r#"<input id="expand-count" name="{COUNT_PARAM}" type="number" min="1" max="{MAX_COUNT}" class="{INPUT} {NARROW}" value="{}">"#,
-            t(count)
+            Html::text(count)
         ))),
         field_checks(Html::join([
             check(
@@ -216,7 +215,7 @@ async fn answer(request: &Request, asked: &Asked, set: &str) -> Html {
                 verdict(
                     locale,
                     Outcome::Warn,
-                    t(tr(locale, Msg::ValueSetNoExpansion)),
+                    Html::text(tr(locale, Msg::ValueSetNoExpansion)),
                     None,
                 ),
                 sent(locale, &url, None),
@@ -271,7 +270,7 @@ fn title(locale: &Locale, expansion: &Expansion, asked: &Asked, set: &str) -> Ht
             ],
         ),
     };
-    t(words)
+    Html::text(words)
 }
 
 /// The page of concepts, with the pager when the expansion has more.
@@ -288,7 +287,7 @@ fn concepts(
         Column::text("version", tr(locale, Msg::LookupVersion)).role(Role::Quiet),
     ];
     let [_, system, version] = &columns;
-    let rows = join(expansion.concepts.iter().map(|concept| {
+    let rows = Html::join(expansion.concepts.iter().map(|concept| {
         let mut drawn = Coding::new(
             concept.code.clone(),
             concept.display.clone().unwrap_or_default(),
@@ -298,13 +297,16 @@ fn concepts(
         }
         let system_name = names.get(&concept.system).map_or_else(
             || ferrohealth_ui::view::coding::canonical(&concept.system),
-            t,
+            Html::text,
         );
-        h(format!(
+        Html::raw(format!(
             "<tr>{}{}{}</tr>",
             title_cell(None, None, coding(locale, drawn, Layout::Inline), None),
             cell(system, system_name),
-            cell(version, t(concept.version.clone().unwrap_or_default())),
+            cell(
+                version,
+                Html::text(concept.version.clone().unwrap_or_default())
+            ),
         ))
     }));
     let caption = tr(locale, Msg::ExpandConcepts);
@@ -363,7 +365,7 @@ fn applied(locale: &Locale, expansion: &Expansion) -> Option<Html> {
     let rows = expansion
         .parameters
         .iter()
-        .map(|line| (line.name.clone(), t(&line.value)))
+        .map(|line| (line.name.clone(), Html::text(&line.value)))
         .collect::<Vec<_>>();
     Some(panel_section(
         locale,

@@ -18,7 +18,6 @@ use crate::fhir::outcome::OperationOutcome;
 use crate::fhir::problem::Problem;
 use crate::fhir::terminology::SystemCard;
 use crate::locale::{Msg, tr, tr_with};
-use crate::markup::{h, t};
 use crate::request::Request;
 
 /// The page's title in the browser tab, and its heading with `subtitle`,
@@ -200,14 +199,17 @@ pub(crate) fn versions_word(locale: &Locale, versions: &[String]) -> String {
 pub(crate) fn relative(locale: &Locale, raw: &str, now: jiff::Timestamp) -> Html {
     let reading = ferrohealth_ui::view::time::reading(locale, raw);
     let Ok(then) = raw.parse::<jiff::Timestamp>() else {
-        return h(format!(r#"<span class="fui-time">{}</span>"#, t(raw)));
+        return Html::raw(format!(
+            r#"<span class="fui-time">{}</span>"#,
+            Html::text(raw)
+        ));
     };
     let words = ago(locale, now.as_second().saturating_sub(then.as_second()));
-    h(format!(
+    Html::raw(format!(
         r#"<time class="fui-time" datetime="{}" title="{}">{}</time>"#,
-        t(raw),
-        t(reading),
-        t(words)
+        Html::text(raw),
+        Html::text(reading),
+        Html::text(words)
     ))
 }
 

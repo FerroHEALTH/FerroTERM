@@ -26,7 +26,7 @@ use ferrohealth_ui::view::template::settings::{
 };
 
 use crate::locale::{Msg, tr, tr_with};
-use crate::markup::{h, join, p, t};
+use crate::markup::p;
 use crate::request::Request;
 use crate::routes::{CONFIGURATION_PATH, ui_path};
 
@@ -347,9 +347,9 @@ fn marker(source: KeySource) -> Option<ValueSource> {
 /// The settings of the terminology server and the sync service.
 fn connection(locale: &Locale, settings: &Shown) -> Vec<Setting> {
     let not_set = || {
-        h(format!(
+        Html::raw(format!(
             r#"<span class="fui-muted">{}</span>"#,
-            t(tr(locale, Msg::ConfigNotSet))
+            Html::text(tr(locale, Msg::ConfigNotSet))
         ))
     };
     let sync = settings
@@ -393,7 +393,7 @@ fn connection(locale: &Locale, settings: &Shown) -> Vec<Setting> {
             locale,
             Msg::ConfigTimeout,
             Msg::ConfigTimeoutLine,
-            t(duration(locale, settings.timeout)),
+            Html::text(duration(locale, settings.timeout)),
             "ferroterm.timeout_ms",
         ),
     ]
@@ -452,7 +452,7 @@ fn sign_in(locale: &Locale, settings: &Shown) -> Vec<Setting> {
                 locale,
                 Msg::ConfigSignOut,
                 Msg::ConfigSignOutLine,
-                t(sign_out),
+                Html::text(sign_out),
                 "oidc.end_session_endpoint",
             ),
         ]
@@ -473,21 +473,21 @@ fn sessions(locale: &Locale, settings: &Shown) -> Vec<Setting> {
             locale,
             Msg::ConfigIdle,
             Msg::ConfigIdleLine,
-            t(duration(locale, settings.idle_timeout)),
+            Html::text(duration(locale, settings.idle_timeout)),
             "session.idle_timeout_s",
         ),
         row(
             locale,
             Msg::ConfigAbsolute,
             Msg::ConfigAbsoluteLine,
-            t(duration(locale, settings.absolute_timeout)),
+            Html::text(duration(locale, settings.absolute_timeout)),
             "session.absolute_timeout_s",
         ),
         row(
             locale,
             Msg::ConfigLimit,
             Msg::ConfigLimitLine,
-            t(ferrohealth_ui::i18n::number::grouped(
+            Html::text(ferrohealth_ui::i18n::number::grouped(
                 locale,
                 settings.max_sessions,
             )),
@@ -609,14 +609,14 @@ pub(crate) fn page(request: &Request) -> Html {
             id: HOW_DIALOG.into(),
             title: tr(locale, Msg::ConfigHow).into(),
         },
-        join([
-            p(t(tr_with(
+        Html::join([
+            p(Html::text(tr_with(
                 locale,
                 Msg::ConfigHowRead,
                 &[("file", shown_file.into())],
             ))),
-            p(t(tr(locale, Msg::ConfigHowChange))),
-            p(t(tr(locale, Msg::ConfigHowShown))),
+            p(Html::text(tr(locale, Msg::ConfigHowChange))),
+            p(Html::text(tr(locale, Msg::ConfigHowShown))),
         ]),
         Width::Wide,
     );

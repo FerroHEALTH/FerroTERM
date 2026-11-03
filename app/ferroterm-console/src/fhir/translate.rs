@@ -408,7 +408,7 @@ mod tests {
     }
 
     fn address(version: FhirVersion) -> String {
-        request().append(RequestUrl::new(), version).render("")
+        request().append(RequestUrl::default(), version).render("")
     }
 
     /// An R4 or R4B answer, as `map_r4` writes one.
@@ -480,7 +480,9 @@ mod tests {
             ..TranslateRequest::default()
         };
         assert_eq!(
-            sparse.append(RequestUrl::new(), FhirVersion::R5).render(""),
+            sparse
+                .append(RequestUrl::default(), FhirVersion::R5)
+                .render(""),
             "?system=https%3A%2F%2Fterminology.example%2Fa&sourceCode=x",
             "the server's own default applies to a parameter the reader did not set"
         );

@@ -10,7 +10,7 @@
 //! a `duplicate` issue (<https://hl7.org/fhir/R4B/valueset-issue-type.html>).
 
 use ferroterm_server::config::{Config, TerminologySection};
-use ferroterm_server::persistence::{Record, ResourceStore};
+use ferroterm_server::persistence::{Method, Record, ResourceStore};
 use http::StatusCode;
 use serde_json::{Value, json};
 
@@ -246,16 +246,19 @@ async fn a_stored_duplicate_answers_from_the_most_recent_write() {
             fhir_types::codec::Value::String(id.to_owned()),
         );
         store
-            .put(&Record {
-                resource_type: String::from("CodeSystem"),
-                id: id.to_owned(),
-                url: Some(url.to_owned()),
-                version: Some(String::from("1")),
-                fhir_version: String::from("4.3.0"),
-                version_id: 1,
-                last_modified: written.to_owned(),
-                resource,
-            })
+            .put_by(
+                &Record {
+                    resource_type: String::from("CodeSystem"),
+                    id: id.to_owned(),
+                    url: Some(url.to_owned()),
+                    version: Some(String::from("1")),
+                    fhir_version: String::from("4.3.0"),
+                    version_id: 1,
+                    last_modified: written.to_owned(),
+                    resource,
+                },
+                Method::Put,
+            )
             .expect("writes");
     }
     // `redb` holds the database file for as long as its handle lives
@@ -431,16 +434,19 @@ async fn a_stored_core_canonical_is_not_served_and_is_logged_at_startup() {
             fhir_types::codec::Value::String(id.clone()),
         );
         store
-            .put(&Record {
-                resource_type: String::from("CodeSystem"),
-                id,
-                url: Some(CORE_SYSTEM.to_owned()),
-                version: Some(core_version.to_owned()),
-                fhir_version: String::from("4.3.0"),
-                version_id: 1,
-                last_modified: String::from("2026-01-01T00:00:00Z"),
-                resource,
-            })
+            .put_by(
+                &Record {
+                    resource_type: String::from("CodeSystem"),
+                    id,
+                    url: Some(CORE_SYSTEM.to_owned()),
+                    version: Some(core_version.to_owned()),
+                    fhir_version: String::from("4.3.0"),
+                    version_id: 1,
+                    last_modified: String::from("2026-01-01T00:00:00Z"),
+                    resource,
+                },
+                Method::Put,
+            )
             .expect("writes");
     }
     // `redb` holds the database file for as long as its handle lives

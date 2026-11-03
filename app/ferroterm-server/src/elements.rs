@@ -99,19 +99,31 @@ impl Projection {
                 "data" => Summary::Data,
                 "count" if interaction == Interaction::Search => Summary::Count,
                 "count" => {
-                    return Err(invalid("`_summary=count` applies to a search, not a read"));
+                    return Err(Failure::new(
+                        StatusCode::BAD_REQUEST,
+                        "invalid",
+                        "`_summary=count` applies to a search, not a read",
+                    ));
                 }
                 "false" => Summary::False,
                 "true" => Summary::True,
                 other => {
-                    return Err(invalid(format!(
-                        "`_summary={other}` is not one of `true`, `text`, `data`, `count` or `false`"
-                    )));
+                    return Err(Failure::new(
+                        StatusCode::BAD_REQUEST,
+                        "invalid",
+                        format!(
+                            "`_summary={other}` is not one of `true`, `text`, `data`, `count` or `false`"
+                        ),
+                    ));
                 }
             };
             match summary {
                 Some(held) if held != named => {
-                    return Err(invalid("`_summary` names two different views"));
+                    return Err(Failure::new(
+                        StatusCode::BAD_REQUEST,
+                        "invalid",
+                        "`_summary` names two different views",
+                    ));
                 }
                 _ => summary = Some(named),
             }
@@ -170,11 +182,6 @@ impl Projection {
             *resource = projected;
         }
     }
-}
-
-/// The `400` of a `_summary` the specification does not define.
-fn invalid(diagnostics: impl Into<String>) -> Failure {
-    Failure::new(StatusCode::BAD_REQUEST, "invalid", diagnostics)
 }
 
 /// The `_summary=true` view of `resource`: `id`, `meta`, and the top-level
