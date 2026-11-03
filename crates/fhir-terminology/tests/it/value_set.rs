@@ -1502,7 +1502,7 @@ fn validate_code_speaks_the_ecosystems_words_for_codes_membership_abstract_and_c
     assert_eq!(
         cased.issues[0].text,
         format!(
-            "The code 'red' differs from the correct code 'RED' by case. Although the code system '{COLOURS}' is case insensitive, implementers are strongly encouraged to use the correct case anyway"
+            "The code 'red' differs from the correct code 'RED' by case. Although the code system '{COLOURS}' version '1' is case insensitive, implementers are strongly encouraged to use the correct case anyway"
         )
     );
 }

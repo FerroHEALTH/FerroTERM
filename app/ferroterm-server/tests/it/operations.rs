@@ -688,3 +688,44 @@ async fn an_instance_invocation_takes_the_instance_s_own_canonical_and_refuses_a
     assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
     assert_eq!(body["issue"][0]["code"], "invalid");
 }
+
+// A coding naming a version of a system the server serves no version of
+// names that version in its `not-found` issue, and the answer still reports
+// the system itself as unknown.
+#[tokio::test]
+async fn an_unknown_system_version_is_named_in_its_issue() {
+    let server = Server::start_with_resources();
+    let (status, body) = server
+        .post(
+            "/r4b/ValueSet/$validate-code",
+            &parameters(&[
+                ("url", json!({"valueUri": VS_PETS})),
+                (
+                    "codeableConcept",
+                    json!({"valueCodeableConcept": {"coding": [
+                        {"system": "http://example.org/fhir/CodeSystem/nowhere", "version": "9.9", "code": "x"}
+                    ]}}),
+                ),
+            ]),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let issues = body["parameter"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["name"] == "issues")
+        .expect("issues");
+    let not_found = issues["resource"]["issue"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["code"] == "not-found")
+        .expect("a not-found issue");
+    let text = not_found["details"]["text"].as_str().unwrap();
+    assert!(text.contains("nowhere") && text.contains("9.9"), "{text}");
+    assert_eq!(
+        parameter(&body, "x-unknown-system").unwrap()["valueCanonical"],
+        "http://example.org/fhir/CodeSystem/nowhere"
+    );
+}
