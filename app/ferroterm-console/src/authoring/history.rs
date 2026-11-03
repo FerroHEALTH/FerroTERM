@@ -25,7 +25,7 @@ use serde_json::Map;
 use serde_json::Value;
 
 use crate::fhir::FhirClient;
-use crate::fhir::capability::CapabilityStatement;
+use crate::fhir::capability::Capabilities;
 use crate::fhir::error::FhirError;
 use crate::fhir::version::FhirVersion;
 use crate::fhir::write::StoredResource;
@@ -76,7 +76,7 @@ pub(crate) enum Support {
 impl Support {
     /// What `statement` says this root does with the versions of
     /// `resource_type`.
-    pub(crate) fn of(statement: &CapabilityStatement, resource_type: &str) -> Self {
+    pub(crate) fn of(statement: &Capabilities, resource_type: &str) -> Self {
         if statement.declares_interaction(resource_type, "history-instance") {
             Self::History
         } else if statement.declares_interaction(resource_type, "vread") {

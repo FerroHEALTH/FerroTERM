@@ -20,7 +20,7 @@ use ferrohealth_ui::view::search::{Hit, HitGroup, Mark, SearchAnswer, find_resul
 use ferrohealth_ui::view::surface::stack;
 use serde::Deserialize;
 
-use crate::fhir::capability::CapabilityStatement;
+use crate::fhir::capability::Capabilities;
 use crate::fhir::named::Listed;
 use crate::fhir::{CODE_SYSTEM, CONCEPT_MAP, VALUE_SET};
 use crate::find::{
@@ -46,7 +46,7 @@ pub(crate) const GLYPHS: [Glyph; 4] = [
 ];
 
 /// What the root declares, as the offers read it.
-fn declared_by(statement: &CapabilityStatement) -> Declared {
+fn declared_by(statement: &Capabilities) -> Declared {
     let mut operations = Vec::new();
     if statement.declares_operation(CODE_SYSTEM, LOOKUP) {
         operations.push(LOOKUP);

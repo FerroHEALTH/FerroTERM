@@ -22,6 +22,7 @@ pub(crate) mod facts;
 pub(crate) mod named;
 pub(crate) mod outcome;
 pub(crate) mod problem;
+pub(crate) mod release;
 pub(crate) mod searchset;
 pub(crate) mod sync;
 pub(crate) mod terminology;
@@ -35,7 +36,7 @@ use http::StatusCode;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-use crate::fhir::capability::CapabilityStatement;
+use crate::fhir::capability::Capabilities;
 use crate::fhir::code_system::CodeSystemSearch;
 use crate::fhir::compose::Draft;
 use crate::fhir::compose::Preview;
@@ -52,6 +53,7 @@ use crate::fhir::expansion::ExpandRequest;
 use crate::fhir::expansion::ExpandedValueSet;
 use crate::fhir::named::NamedSearch;
 use crate::fhir::outcome::OperationOutcome;
+use crate::fhir::release::Decodes;
 use crate::fhir::searchset::SearchFilter;
 use crate::fhir::searchset::SearchSet;
 use crate::fhir::terminology::TerminologyCapabilities;
@@ -306,8 +308,8 @@ impl FhirClient {
     pub(crate) async fn capability_statement(
         &self,
         version: FhirVersion,
-    ) -> Result<CapabilityStatement, FhirError> {
-        self.get_json(&self.metadata_url(version)).await
+    ) -> Result<Capabilities, FhirError> {
+        self.get_answer(version, &self.metadata_url(version)).await
     }
 
     /// Reads the `TerminologyCapabilities` of one served FHIR version.
@@ -319,7 +321,8 @@ impl FhirClient {
         &self,
         version: FhirVersion,
     ) -> Result<TerminologyCapabilities, FhirError> {
-        self.get_json(&self.terminology_metadata_url(version)).await
+        self.get_answer(version, &self.terminology_metadata_url(version))
+            .await
     }
 
     /// Reads the `CodeSystem` resources one root publishes for a canonical.
@@ -1034,6 +1037,26 @@ impl FhirClient {
     async fn get_json<T: DeserializeOwned>(&self, url: &str) -> Result<T, FhirError> {
         let answer = self.send(Method::Get, url, FHIR_JSON).await?;
         read_json(&self.locale, &answer, url)
+    }
+
+    /// Sends a FHIR JSON `GET` and decodes the resource it answers through
+    /// the `fhir-types` module of `version`, the release that serves it.
+    async fn get_answer<A: Decodes>(
+        &self,
+        version: FhirVersion,
+        url: &str,
+    ) -> Result<A, FhirError> {
+        let answer = self.send(Method::Get, url, FHIR_JSON).await?;
+        let status = status_of(&self.locale, &answer, url)?;
+        if !status.is_success() {
+            return Err(failure(&answer, status, url));
+        }
+        version
+            .decode(&answer.body)
+            .map_err(|error| FhirError::Decode {
+                url: url.to_owned(),
+                message: format!("FHIR {version}: {error}"),
+            })
     }
 
     /// Sends a FHIR JSON `POST` and decodes the resource it answers.

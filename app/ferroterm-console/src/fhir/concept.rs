@@ -547,12 +547,16 @@ mod tests {
         ),
     ];
 
-    fn capabilities(json: &str) -> crate::fhir::terminology::TerminologyCapabilities {
-        serde_json::from_str(json).expect("the fixture is valid JSON")
+    /// `json`, the document the root `root` answered, decoded at its version.
+    fn capabilities(root: &str, json: &str) -> crate::fhir::terminology::TerminologyCapabilities {
+        root.parse::<crate::fhir::version::FhirVersion>()
+            .expect("a root the server mounts")
+            .decode(json)
+            .expect("the fixture is a valid document at its version")
     }
 
-    fn hierarchy_of(document: &str, system: &str) -> Hierarchy {
-        let card = capabilities(document)
+    fn hierarchy_of(root: &str, document: &str, system: &str) -> Hierarchy {
+        let card = capabilities(root, document)
             .card(system)
             .expect("the fixture declares this system");
         let row = chosen_version(&card, None).expect("the fixture serves a version");
@@ -576,7 +580,8 @@ mod tests {
     #[test]
     fn the_tree_is_walkable_exactly_where_the_root_can_express_a_direct_child_filter() {
         for (root, document) in RECORDED {
-            let hierarchy = hierarchy_of(document, "http://example.org/fhir/CodeSystem/animals");
+            let hierarchy =
+                hierarchy_of(root, document, "http://example.org/fhir/CodeSystem/animals");
             if ROOTS_DEFINING_CHILD_OF.contains(&root) {
                 assert_eq!(
                     hierarchy,
@@ -606,7 +611,7 @@ mod tests {
     fn a_version_declaring_no_hierarchy_operator_has_no_tree_on_every_root() {
         for (root, document) in RECORDED {
             assert_eq!(
-                hierarchy_of(document, "http://unitsofmeasure.org"),
+                hierarchy_of(root, document, "http://unitsofmeasure.org"),
                 Hierarchy::Absent,
                 "{root}: a grammar-defined system declares no hierarchy to walk"
             );
@@ -618,7 +623,7 @@ mod tests {
         // This system declares the `parent` and `child` concept properties and
         // no hierarchy filter operator, so the tree cannot select a level of it
         // and the screen says so rather than drawing an empty tree.
-        let card = capabilities(R5)
+        let card = capabilities("r5", R5)
             .card("urn:iso:std:iso:3166")
             .expect("the fixture declares this system");
         let row = chosen_version(&card, None).expect("the fixture serves a version");
@@ -635,7 +640,7 @@ mod tests {
 
     #[test]
     fn two_systems_with_different_shapes_both_draw_from_the_same_reading() {
-        let document = capabilities(R5);
+        let document = capabilities("r5", R5);
         let walked: Vec<Hierarchy> = ["http://loinc.org", "http://snomed.info/sct"]
             .into_iter()
             .map(|system| {
@@ -693,7 +698,7 @@ mod tests {
 
     #[test]
     fn the_address_names_the_version_it_reads() {
-        let card = capabilities(R5)
+        let card = capabilities("r5", R5)
             .card("http://example.org/fhir/CodeSystem/animals")
             .expect("the fixture declares this system");
         assert_eq!(

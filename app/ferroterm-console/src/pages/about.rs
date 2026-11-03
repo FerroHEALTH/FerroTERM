@@ -9,7 +9,7 @@ use ferrohealth_ui::html::Html;
 use ferrohealth_ui::view::surface::Header;
 use ferrohealth_ui::view::template::about::{Link, Manufacturer, SelfDescription, about_page};
 
-use crate::fhir::capability::CapabilityStatement;
+use crate::fhir::capability::Capabilities;
 use crate::fhir::version::FhirVersion;
 use crate::locale::{Msg, tr, tr_with};
 use crate::markup::t;
@@ -42,7 +42,7 @@ pub(crate) async fn page(request: Request) -> Html {
     let document = request.client.capability_document(version).await.ok();
     let server = statement
         .as_ref()
-        .and_then(CapabilityStatement::software_line)
+        .and_then(Capabilities::software_line)
         .unwrap_or_else(|| tr(locale, Msg::AboutServerUnanswered));
     let self_description = document.map(|document| SelfDescription {
         title: tr_with(

@@ -10,7 +10,7 @@
 
 use std::collections::BTreeMap;
 
-use serde::{Deserialize, Serialize};
+use crate::fhir::release::Reads;
 
 /// The canonical FerroTERM declares a served version's artifact under.
 ///
@@ -40,87 +40,15 @@ const IMPLICIT_PATTERN: &str = "pattern";
 /// The sub-extension carrying what the template's placeholders take.
 const IMPLICIT_ARGUMENT: &str = "argument";
 
-/// What `GET [base]/metadata?mode=terminology` declares about a served root.
+/// What `GET [base]/metadata?mode=terminology` declares about a served root,
+/// read from the `TerminologyCapabilities` its release decoded.
 ///
-/// Every field is optional so a server that omits one still renders. The
-/// viewer carries the elements it draws and nothing else: it never mirrors the
-/// whole resource.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+/// It carries the overview's cards, one per declared `codeSystem` in the
+/// order the server declared them.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct TerminologyCapabilities {
-    /// `TerminologyCapabilities.codeSystem`, one entry per served system.
-    #[serde(default, rename = "codeSystem")]
-    code_system: Vec<CodeSystem>,
-}
-
-/// One `TerminologyCapabilities.codeSystem`.
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-struct CodeSystem {
-    /// `codeSystem.uri`, the canonical of the system.
-    uri: Option<String>,
-    /// `codeSystem.content`, which R5 and R6 declare and R4 and R4B do not.
-    content: Option<String>,
-    /// `codeSystem.subsumption`, whether the server answers `$subsumes`.
-    subsumption: Option<bool>,
-    /// `codeSystem.version`, one entry per served version.
-    #[serde(default)]
-    version: Vec<Version>,
-}
-
-/// One `TerminologyCapabilities.codeSystem.version`.
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-struct Version {
-    /// `version.code` in R4, R4B, and R5.
-    code: Option<String>,
-    /// `version.value`, which is what the R6 ballot renamed `code` to.
-    value: Option<String>,
-    /// `version.isDefault`, the version an unversioned request resolves to.
-    #[serde(rename = "isDefault")]
-    is_default: Option<bool>,
-    /// `version.compositional`, whether the server reads the system's grammar.
-    compositional: Option<bool>,
-    /// `version.language`, the designation languages the server holds.
-    #[serde(default)]
-    language: Vec<String>,
-    /// `version.filter`, the filters `$expand` accepts for this version.
-    #[serde(default)]
-    filter: Vec<Filter>,
-    /// `version.property`, the properties `$lookup` answers for this version.
-    #[serde(default)]
-    property: Vec<String>,
-    /// The extensions the server declared on this version.
-    #[serde(default)]
-    extension: Vec<Extension>,
-}
-
-/// One `TerminologyCapabilities.codeSystem.version.filter`.
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-struct Filter {
-    /// The filter property.
-    code: Option<String>,
-    /// The operators the server answers for it.
-    #[serde(default)]
-    op: Vec<String>,
-}
-
-/// One `Extension`, read only for the artifact and implicit value set
-/// declarations.
-///
-/// A complex extension carries its parts as child extensions
-/// (<https://hl7.org/fhir/R4B/extensibility.html>); the parts read here carry
-/// a `valueString` or a `valueCode`.
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-struct Extension {
-    /// The canonical that says what the extension means.
-    url: Option<String>,
-    /// The parts of a complex extension.
-    #[serde(default, rename = "extension")]
-    parts: Vec<Extension>,
-    /// `valueString`.
-    #[serde(rename = "valueString")]
-    value_string: Option<String>,
-    /// `valueCode`.
-    #[serde(rename = "valueCode")]
-    value_code: Option<String>,
+    /// One card per `TerminologyCapabilities.codeSystem`, unmerged.
+    systems: Vec<SystemCard>,
 }
 
 /// One code system, as the overview draws it.
@@ -221,41 +149,6 @@ pub(crate) struct FilterRow {
     pub(crate) operators: Vec<String>,
 }
 
-impl Version {
-    /// The version identifier, from whichever element this FHIR version uses.
-    ///
-    /// R4, R4B, and R5 call it `code`; the R6 ballot renamed it `value`
-    /// (<https://hl7.org/fhir/6.0.0-ballot5/terminologycapabilities.html>). A
-    /// version declared as the empty string named nothing, so it reads as
-    /// absent.
-    fn identifier(&self) -> Option<String> {
-        named(self.code.as_deref()).or_else(|| named(self.value.as_deref()))
-    }
-}
-
-impl Extension {
-    /// The value of the sub-extension `url` names, when it declared one.
-    fn part(&self, url: &str) -> Option<String> {
-        self.parts
-            .iter()
-            .find(|part| part.url.as_deref() == Some(url))
-            .and_then(Extension::value)
-    }
-
-    /// The declared `valueString`, when the part carried one.
-    fn value(&self) -> Option<String> {
-        self.value_string.clone()
-    }
-
-    /// The declared `valueCode` of the sub-extension `url` names.
-    fn code_part(&self, url: &str) -> Option<&str> {
-        self.parts
-            .iter()
-            .find(|part| part.url.as_deref() == Some(url))
-            .and_then(|part| part.value_code.as_deref())
-    }
-}
-
 impl TerminologyCapabilities {
     /// The cards the overview renders, one per distinct code system canonical.
     ///
@@ -265,10 +158,13 @@ impl TerminologyCapabilities {
     /// keeps the first declaration of the system-level facts.
     pub(crate) fn cards(&self) -> Vec<SystemCard> {
         let mut cards: BTreeMap<&str, SystemCard> = BTreeMap::new();
-        for system in &self.code_system {
-            let url = system.uri.as_deref().unwrap_or_default();
-            let card = cards.entry(url).or_insert_with(|| opened(url, system));
-            add_versions(card, system);
+        for system in &self.systems {
+            merge(
+                cards
+                    .entry(system.url.as_str())
+                    .or_insert_with(|| opened(system)),
+                system,
+            );
         }
         cards.into_values().collect()
     }
@@ -281,48 +177,24 @@ impl TerminologyCapabilities {
     /// screen says so rather than failing.
     pub(crate) fn card(&self, url: &str) -> Option<SystemCard> {
         let mut found: Option<SystemCard> = None;
-        for system in self
-            .code_system
-            .iter()
-            .filter(|system| system.uri.as_deref().unwrap_or_default() == url)
-        {
-            add_versions(found.get_or_insert_with(|| opened(url, system)), system);
+        for system in self.systems.iter().filter(|system| system.url == url) {
+            merge(found.get_or_insert_with(|| opened(system)), system);
         }
         found
     }
 }
 
 /// A card carrying `system`'s system-level facts and no version yet.
-fn opened(url: &str, system: &CodeSystem) -> SystemCard {
+fn opened(system: &SystemCard) -> SystemCard {
     SystemCard {
-        url: url.to_owned(),
-        content: system.content.clone(),
-        subsumption: system.subsumption,
         versions: Vec::new(),
+        ..system.clone()
     }
 }
 
 /// Appends every version `system` declares to `card`, in declaration order.
-fn add_versions(card: &mut SystemCard, system: &CodeSystem) {
-    card.versions.extend(system.version.iter().map(|version| {
-        VersionRow {
-            code: version.identifier(),
-            is_default: version.is_default.unwrap_or_default(),
-            compositional: version.compositional,
-            languages: version.language.clone(),
-            filters: version
-                .filter
-                .iter()
-                .map(|filter| FilterRow {
-                    code: filter.code.clone().unwrap_or_default(),
-                    operators: filter.op.clone(),
-                })
-                .collect(),
-            properties: version.property.clone(),
-            artifact: artifact_of(&version.extension),
-            implicit_forms: implicit_forms_of(&version.extension),
-        }
-    }));
+fn merge(card: &mut SystemCard, system: &SystemCard) {
+    card.versions.extend(system.versions.iter().cloned());
 }
 
 /// The trimmed text, or `None` when it names nothing.
@@ -332,37 +204,128 @@ fn named(text: Option<&str>) -> Option<String> {
         .map(str::to_owned)
 }
 
-/// The artifact `extensions` declares, when the server declared one.
-fn artifact_of(extensions: &[Extension]) -> Option<Artifact> {
-    let declaration = extensions
-        .iter()
-        .find(|extension| extension.url.as_deref() == Some(ARTIFACT_EXTENSION))?;
-    Some(Artifact {
-        name: declaration.part(ARTIFACT_NAME),
-        release: declaration.part(ARTIFACT_RELEASE),
-    })
+/// Reads the `TerminologyCapabilities` of the `fhir-types` module `$module`:
+/// `$id` is the element a version names itself in, `code` up to R5 and
+/// `value` from the R6 ballot
+/// (<https://hl7.org/fhir/6.0.0-ballot5/terminologycapabilities.html>), and
+/// `$content` reads `codeSystem.content`, which R5 and R6 declare and R4 and
+/// R4B do not.
+macro_rules! reads_terminology {
+    ($module:ident, $id:ident, $content:expr) => {
+        impl Reads<TerminologyCapabilities>
+            for fhir_types::$module::terminology_capabilities::TerminologyCapabilities
+        {
+            fn read(&self) -> TerminologyCapabilities {
+                use fhir_types::$module::extension::{Extension, ExtensionValue};
+                use fhir_types::$module::terminology_capabilities::TerminologyCapabilitiesCodeSystem;
+                fn part<'a>(extension: &'a Extension, url: &str) -> Option<&'a ExtensionValue> {
+                    extension
+                        .extension
+                        .iter()
+                        .find(|part| part.url == url)
+                        .and_then(|part| part.value.as_ref())
+                }
+                let content: fn(&TerminologyCapabilitiesCodeSystem) -> Option<String> = $content;
+                let text = |extension: &Extension, url: &str| match part(extension, url) {
+                    Some(ExtensionValue::String(value)) => value.value.clone(),
+                    _ => None,
+                };
+                let code = |extension: &Extension, url: &str| match part(extension, url) {
+                    Some(ExtensionValue::Code(value)) => value.value.clone(),
+                    _ => None,
+                };
+                let systems = self
+                    .code_system
+                    .iter()
+                    .map(|system| SystemCard {
+                        url: system
+                            .uri
+                            .as_ref()
+                            .and_then(|uri| uri.value.clone())
+                            .unwrap_or_default(),
+                        content: content(system),
+                        subsumption: system.subsumption.as_ref().and_then(|flag| flag.value),
+                        versions: system
+                            .version
+                            .iter()
+                            .map(|version| VersionRow {
+                                code: named(
+                                    version.$id.as_ref().and_then(|id| id.value.as_deref()),
+                                ),
+                                is_default: version
+                                    .is_default
+                                    .as_ref()
+                                    .and_then(|flag| flag.value)
+                                    .unwrap_or_default(),
+                                compositional: version.compositional.as_ref().and_then(|flag| flag.value),
+                                languages: version
+                                    .language
+                                    .iter()
+                                    .filter_map(|language| language.value.clone())
+                                    .collect(),
+                                filters: version
+                                    .filter
+                                    .iter()
+                                    .map(|filter| FilterRow {
+                                        code: filter.code.value.clone().unwrap_or_default(),
+                                        operators: filter
+                                            .op
+                                            .iter()
+                                            .filter_map(|op| op.value.clone())
+                                            .collect(),
+                                    })
+                                    .collect(),
+                                properties: version
+                                    .property
+                                    .iter()
+                                    .filter_map(|property| property.value.clone())
+                                    .collect(),
+                                artifact: version
+                                    .extension
+                                    .iter()
+                                    .find(|extension| extension.url == ARTIFACT_EXTENSION)
+                                    .map(|declaration| Artifact {
+                                        name: text(declaration, ARTIFACT_NAME),
+                                        release: text(declaration, ARTIFACT_RELEASE),
+                                    }),
+                                // NOTE: no specification governs this: our own design; a form
+                                // with no template or an argument this viewer does not know offers
+                                // nothing it could fill, so it is left out.
+                                implicit_forms: version
+                                    .extension
+                                    .iter()
+                                    .filter(|extension| extension.url == IMPLICIT_EXTENSION)
+                                    .filter_map(|declaration| {
+                                        Some(ImplicitForm {
+                                            pattern: named(text(declaration, IMPLICIT_PATTERN).as_deref())?,
+                                            argument: ImplicitArgument::of(
+                                                &code(declaration, IMPLICIT_ARGUMENT)?,
+                                            )?,
+                                        })
+                                    })
+                                    .collect(),
+                            })
+                            .collect(),
+                    })
+                    .collect();
+                TerminologyCapabilities { systems }
+            }
+        }
+    };
 }
 
-/// The implicit value set forms `extensions` declares, in declaration order.
-///
-/// A declaration without a template, or with an argument code this viewer
-/// does not know, offers nothing it could fill, so it is left out.
-fn implicit_forms_of(extensions: &[Extension]) -> Vec<ImplicitForm> {
-    extensions
-        .iter()
-        .filter(|extension| extension.url.as_deref() == Some(IMPLICIT_EXTENSION))
-        .filter_map(|declaration| {
-            Some(ImplicitForm {
-                pattern: named(declaration.part(IMPLICIT_PATTERN).as_deref())?,
-                argument: ImplicitArgument::of(declaration.code_part(IMPLICIT_ARGUMENT)?)?,
-            })
-        })
-        .collect()
-}
+reads_terminology!(r4, code, |_system| None);
+reads_terminology!(r4b, code, |_system| None);
+reads_terminology!(r5, code, |system| system.content.value.clone());
+reads_terminology!(r6, value, |system| system
+    .content
+    .as_ref()
+    .and_then(|content| content.value.clone()));
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fhir::version::FhirVersion;
 
     /// The document `GET /r4/metadata?mode=terminology` answered.
     const R4: &str = include_str!("../../fixtures/terminology-capabilities-r4.json");
@@ -373,11 +336,37 @@ mod tests {
     /// The document `GET /r6/metadata?mode=terminology` answered.
     const R6: &str = include_str!("../../fixtures/terminology-capabilities-r6.json");
 
-    /// Every recorded document, named by the root that answered it.
-    const RECORDED: [(&str, &str); 4] = [("r4", R4), ("r4b", R4B), ("r5", R5), ("r6", R6)];
+    /// Every recorded document, with the version whose root answered it.
+    const RECORDED: [(FhirVersion, &str); 4] = [
+        (FhirVersion::R4, R4),
+        (FhirVersion::R4B, R4B),
+        (FhirVersion::R5, R5),
+        (FhirVersion::R6, R6),
+    ];
 
-    fn parse(json: &str) -> TerminologyCapabilities {
-        serde_json::from_str(json).expect("the fixture is valid JSON")
+    /// `json` decoded at `version`, as the client decodes an answer.
+    fn parse(version: FhirVersion, json: &str) -> TerminologyCapabilities {
+        version
+            .decode(json)
+            .expect("the fixture is a valid document at its version")
+    }
+
+    /// The members `json` names, in an otherwise minimal document of
+    /// `version`.
+    fn inline(version: FhirVersion, json: &str) -> TerminologyCapabilities {
+        let mut document: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_str(json).expect("the fixture is a JSON object");
+        for (member, value) in [
+            ("resourceType", "TerminologyCapabilities"),
+            ("status", "active"),
+            ("date", "2026-01-01"),
+            ("kind", "instance"),
+        ] {
+            document
+                .entry(member)
+                .or_insert_with(|| serde_json::Value::from(value));
+        }
+        parse(version, &serde_json::Value::Object(document).to_string())
     }
 
     fn card_of<'a>(cards: &'a [SystemCard], url: &str) -> &'a SystemCard {
@@ -389,9 +378,9 @@ mod tests {
 
     #[test]
     fn every_served_version_declares_the_same_systems() {
-        let mut seen: Vec<(&str, Vec<String>)> = Vec::new();
+        let mut seen: Vec<(FhirVersion, Vec<String>)> = Vec::new();
         for (root, document) in RECORDED {
-            let urls: Vec<String> = parse(document)
+            let urls: Vec<String> = parse(root, document)
                 .cards()
                 .into_iter()
                 .map(|card| card.url)
@@ -415,7 +404,7 @@ mod tests {
     #[test]
     fn the_cards_are_ordered_by_canonical_on_every_version() {
         for (root, document) in RECORDED {
-            let urls: Vec<String> = parse(document)
+            let urls: Vec<String> = parse(root, document)
                 .cards()
                 .into_iter()
                 .map(|card| card.url)
@@ -429,7 +418,7 @@ mod tests {
     #[test]
     fn the_r6_version_identifier_is_read_from_its_renamed_element() {
         for (root, document) in RECORDED {
-            let cards = parse(document).cards();
+            let cards = parse(root, document).cards();
             let versions: Vec<Option<String>> = cards
                 .iter()
                 .flat_map(|card| card.versions.iter().map(|version| version.code.clone()))
@@ -444,7 +433,7 @@ mod tests {
     #[test]
     fn the_default_version_is_marked() {
         for (root, document) in RECORDED {
-            let cards = parse(document).cards();
+            let cards = parse(root, document).cards();
             for card in &cards {
                 assert_eq!(
                     card.versions
@@ -461,12 +450,12 @@ mod tests {
 
     #[test]
     fn the_content_mode_is_declared_only_where_the_version_has_the_element() {
-        let r4b = parse(R4B).cards();
+        let r4b = parse(FhirVersion::R4B, R4B).cards();
         assert!(
             r4b.iter().all(|card| card.content.is_none()),
             "R4B has no codeSystem.content, so the screen states its absence"
         );
-        let r5 = parse(R5).cards();
+        let r5 = parse(FhirVersion::R5, R5).cards();
         assert!(
             r5.iter().all(|card| card.content.is_some()),
             "R5 declares a content mode for every system"
@@ -475,7 +464,7 @@ mod tests {
 
     #[test]
     fn subsumption_is_read_per_system_rather_than_assumed() {
-        let cards = parse(R5).cards();
+        let cards = parse(FhirVersion::R5, R5).cards();
         let declared: Vec<Option<bool>> = cards.iter().map(|card| card.subsumption).collect();
         assert!(
             declared.contains(&Some(true)) && declared.contains(&Some(false)),
@@ -485,7 +474,7 @@ mod tests {
 
     #[test]
     fn a_version_that_names_no_identifier_reads_as_absent() {
-        let cards = parse(R6).cards();
+        let cards = parse(FhirVersion::R6, R6).cards();
         let card = card_of(&cards, "urn:ietf:bcp:13");
         assert_eq!(
             card.versions
@@ -497,25 +486,20 @@ mod tests {
     }
 
     #[test]
-    fn an_empty_r6_code_element_does_not_hide_the_value_element() {
-        let cards = parse(
-            r#"{"codeSystem":[{"uri":"https://terminology.example/x",
-                "version":[{"code":"","value":"2.0"}]}]}"#,
-        )
-        .cards();
-        assert_eq!(
-            card_of(&cards, "https://terminology.example/x")
-                .versions
-                .first()
-                .and_then(|version| version.code.clone()),
-            Some("2.0".to_owned()),
-            "an element that names nothing does not shadow the one that does"
-        );
+    fn an_r6_version_that_names_itself_in_the_r5_element_is_refused() {
+        let error = FhirVersion::R6
+            .decode::<TerminologyCapabilities>(
+                r#"{"resourceType":"TerminologyCapabilities","status":"active",
+                    "date":"2026-01-01","kind":"instance","codeSystem":[{
+                    "uri":"https://terminology.example/x","version":[{"code":"2.0"}]}]}"#,
+            )
+            .expect_err("R6 renamed `code` to `value`, so `code` is a member R6 does not define");
+        assert!(error.to_string().contains("code"), "{error}");
     }
 
     #[test]
     fn a_version_that_declares_no_language_reads_as_an_empty_list() {
-        let cards = parse(R4B).cards();
+        let cards = parse(FhirVersion::R4B, R4B).cards();
         let card = card_of(&cards, "urn:ietf:bcp:47");
         assert_eq!(
             card.versions.first().map(|version| version.languages.len()),
@@ -526,7 +510,7 @@ mod tests {
 
     #[test]
     fn a_declared_filter_keeps_its_operators() {
-        let cards = parse(R5).cards();
+        let cards = parse(FhirVersion::R5, R5).cards();
         let card = card_of(&cards, "http://example.org/fhir/CodeSystem/animals");
         let filters = &card
             .versions
@@ -542,8 +526,9 @@ mod tests {
 
     #[test]
     fn an_invented_code_system_renders_with_no_change_here() {
-        let document = parse(
-            r#"{"resourceType":"TerminologyCapabilities","codeSystem":[
+        let document = inline(
+            FhirVersion::R5,
+            r#"{"codeSystem":[
                 {"uri":"https://terminology.example/invented","content":"fragment",
                  "subsumption":false,
                  "version":[{"code":"2031-02-01","isDefault":true,"compositional":true,
@@ -568,7 +553,11 @@ mod tests {
 
     #[test]
     fn a_system_that_declares_nothing_still_renders_a_card() {
-        let cards = parse(r#"{"codeSystem":[{"uri":"https://terminology.example/bare"}]}"#).cards();
+        let cards = inline(
+            FhirVersion::R4B,
+            r#"{"codeSystem":[{"uri":"https://terminology.example/bare"}]}"#,
+        )
+        .cards();
         let card = card_of(&cards, "https://terminology.example/bare");
         assert_eq!(card.content, None);
         assert_eq!(card.subsumption, None);
@@ -580,7 +569,11 @@ mod tests {
 
     #[test]
     fn a_system_without_a_canonical_is_kept_rather_than_dropped() {
-        let cards = parse(r#"{"codeSystem":[{"version":[{"code":"1"}]}]}"#).cards();
+        let cards = inline(
+            FhirVersion::R4B,
+            r#"{"codeSystem":[{"version":[{"code":"1"}]}]}"#,
+        )
+        .cards();
         assert_eq!(cards.len(), 1, "a card the reader can see beats a silence");
         assert_eq!(
             cards.first().map(|card| card.url.clone()),
@@ -591,7 +584,8 @@ mod tests {
 
     #[test]
     fn a_repeated_canonical_merges_into_one_card() {
-        let cards = parse(
+        let cards = inline(
+            FhirVersion::R4B,
             r#"{"codeSystem":[
                 {"uri":"https://terminology.example/twice","version":[{"code":"1"}]},
                 {"uri":"https://terminology.example/twice","version":[{"code":"2"}]}]}"#,
@@ -615,7 +609,7 @@ mod tests {
     #[test]
     fn every_version_read_from_an_artifact_names_it_on_every_fhir_version() {
         for (root, document) in RECORDED {
-            let cards = parse(document).cards();
+            let cards = parse(root, document).cards();
             let card = card_of(&cards, "http://loinc.org");
             let version = card.versions.first().expect("one version is served");
             let artifact = version
@@ -633,7 +627,7 @@ mod tests {
     #[test]
     fn a_system_that_came_from_no_artifact_declares_none() {
         for (root, document) in RECORDED {
-            let cards = parse(document).cards();
+            let cards = parse(root, document).cards();
             let card = card_of(&cards, "urn:iso:std:iso:3166");
             assert!(
                 card.versions
@@ -646,11 +640,14 @@ mod tests {
 
     #[test]
     fn an_artifact_that_names_no_directory_still_names_its_release() {
-        let cards = parse(&format!(
-            r#"{{"codeSystem":[{{"uri":"https://terminology.example/x","version":[{{"code":"1",
+        let cards = inline(
+            FhirVersion::R4B,
+            &format!(
+                r#"{{"codeSystem":[{{"uri":"https://terminology.example/x","version":[{{"code":"1",
                 "extension":[{{"url":"{ARTIFACT_EXTENSION}",
                   "extension":[{{"url":"{ARTIFACT_RELEASE}","valueString":"20260630"}}]}}]}}]}}]}}"#
-        ))
+            ),
+        )
         .cards();
         let artifact = card_of(&cards, "https://terminology.example/x")
             .versions
@@ -664,7 +661,7 @@ mod tests {
     #[test]
     fn the_lookup_properties_are_read_per_version_on_every_fhir_version() {
         for (root, document) in RECORDED {
-            let cards = parse(document).cards();
+            let cards = parse(root, document).cards();
             let card = card_of(&cards, "http://example.org/fhir/CodeSystem/animals");
             let version = card
                 .versions
@@ -679,7 +676,8 @@ mod tests {
 
     #[test]
     fn a_version_that_declares_no_property_reads_as_an_empty_list() {
-        let cards = parse(
+        let cards = inline(
+            FhirVersion::R4B,
             r#"{"codeSystem":[{"uri":"https://terminology.example/bare",
             "version":[{"code":"1"}]}]}"#,
         )
@@ -696,7 +694,7 @@ mod tests {
 
     #[test]
     fn a_canonical_the_document_names_is_found_as_one_card() {
-        let document = parse(R5);
+        let document = parse(FhirVersion::R5, R5);
         let found = document
             .card("http://example.org/fhir/CodeSystem/animals")
             .expect("the fixture declares this system");
@@ -706,11 +704,13 @@ mod tests {
 
     #[test]
     fn a_repeated_canonical_is_one_card_whether_it_is_looked_up_or_listed() {
-        let document = parse(
+        let document = inline(
+            FhirVersion::R5,
             r#"{"codeSystem":[
                 {"uri":"https://terminology.example/twice","content":"complete",
                  "version":[{"code":"1"}]},
-                {"uri":"https://terminology.example/twice","version":[{"code":"2"}]}]}"#,
+                {"uri":"https://terminology.example/twice","content":"complete",
+                 "version":[{"code":"2"}]}]}"#,
         );
         assert_eq!(
             document.card("https://terminology.example/twice"),
@@ -725,7 +725,7 @@ mod tests {
     #[test]
     fn a_canonical_the_document_does_not_name_is_absent_rather_than_an_error() {
         assert_eq!(
-            parse(R5).card("https://terminology.example/never-served"),
+            parse(FhirVersion::R5, R5).card("https://terminology.example/never-served"),
             None,
             "the screen states the absence, and does not render an error page"
         );
@@ -734,9 +734,7 @@ mod tests {
     #[test]
     fn a_document_with_no_code_system_reads_as_no_cards() {
         assert!(
-            parse(r#"{"resourceType":"TerminologyCapabilities","status":"active"}"#)
-                .cards()
-                .is_empty(),
+            inline(FhirVersion::R4B, "{}").cards().is_empty(),
             "the screen then says the server declared no code system"
         );
     }
@@ -751,7 +749,7 @@ mod tests {
     #[test]
     fn every_declared_implicit_form_is_read_on_every_fhir_version() {
         for (root, document) in RECORDED {
-            let cards = parse(document).cards();
+            let cards = parse(root, document).cards();
             let forms = &card_of(&cards, "http://unitsofmeasure.org")
                 .versions
                 .first()
@@ -774,7 +772,7 @@ mod tests {
     #[test]
     fn a_system_that_resolves_no_implicit_value_set_declares_no_form() {
         for (root, document) in RECORDED {
-            let cards = parse(document).cards();
+            let cards = parse(root, document).cards();
             let card = card_of(&cards, "urn:iso:std:iso:3166");
             assert!(
                 card.versions
@@ -787,7 +785,7 @@ mod tests {
 
     #[test]
     fn a_form_with_an_unknown_argument_or_no_pattern_is_left_out() {
-        let cards = parse(&format!(
+        let cards = inline(FhirVersion::R4B, &format!(
             r#"{{"codeSystem":[{{"uri":"https://terminology.example/x","version":[{{"code":"1",
                 "extension":[
                   {{"url":"{IMPLICIT_EXTENSION}","extension":[
