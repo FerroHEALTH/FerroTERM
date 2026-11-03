@@ -165,7 +165,15 @@ pub fn expand(
             expansion.total
         )));
     }
-    let contains = contains(sources, &expansion, input)?;
+    // NOTE: `compose.property` names the properties "to return in the
+    // expansion, if the client doesn't ask for any particular properties"
+    // (<https://hl7.org/fhir/R5/valueset-definitions.html#ValueSet.compose.property>).
+    let asked = if input.property.is_empty() {
+        &model.compose.property
+    } else {
+        &input.property
+    };
+    let contains = contains(sources, &expansion, input, asked)?;
     let properties = expansion_properties(sources, &contains)?;
     // The message says what is wrong; the conversion error adds nothing to it.
     let Ok(offset) = u64::try_from(expansion.offset) else {
@@ -335,6 +343,7 @@ fn pinned_compose(compose: &Compose, input: &ExpandInput, negotiation: &Negotiat
             .cloned()
             .collect(),
         inactive: compose.inactive,
+        property: compose.property.clone(),
     };
     negotiation.pin_lenient(&kept)
 }
@@ -446,6 +455,7 @@ fn contains(
     sources: &Sources<'_>,
     expansion: &Expansion,
     input: &ExpandInput,
+    property: &[String],
 ) -> Result<Vec<Contains>, OperationError> {
     let include_designations = input.include_designations.unwrap_or(false);
     let wanted: Vec<&str> = input.designation.iter().map(String::as_str).collect();
@@ -459,7 +469,7 @@ fn contains(
         // NOTE: an inactive concept carries its status property unasked, the
         // ecosystem's shape ("in expansions, the status property SHALL be populated",
         // <https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
-        let mut asked = input.property.clone();
+        let mut asked = property.to_vec();
         if item.inactive && !asked.iter().any(|p| p == "status" || p == "*") {
             asked.push(String::from("status"));
         }

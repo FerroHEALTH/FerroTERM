@@ -52,6 +52,10 @@ pub struct Compose {
     pub exclude: Vec<Include>,
     /// `compose.inactive`: `Some(false)` keeps inactive codes out of every expansion.
     pub inactive: Option<bool>,
+    /// `compose.property` (R5): the properties an expansion returns when the
+    /// client asks for none, `*` meaning every one the server knows
+    /// (<https://hl7.org/fhir/R5/valueset-definitions.html#ValueSet.compose.property>).
+    pub property: Vec<String>,
 }
 
 impl Compose {

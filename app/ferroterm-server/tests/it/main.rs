@@ -29,6 +29,7 @@ mod fixture;
 mod health;
 mod healthcheck;
 mod history;
+mod incomplete;
 mod logical_id;
 mod metadata;
 mod metrics;

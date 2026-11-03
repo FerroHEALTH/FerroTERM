@@ -634,6 +634,71 @@ pub fn unknown_system_version_none(
     )
 }
 
+/// The `issue.expression` of the element at `base` itself: a bare `coding`
+/// is the `Coding`, a coding inside a `CodeableConcept` is addressed by its
+/// index, and a bare parameter is named as itself.
+#[must_use]
+pub fn element(base: &str) -> String {
+    if base == "coding" {
+        String::from("Coding")
+    } else {
+        base.to_owned()
+    }
+}
+
+/// The warning that a coding cannot be validated because it states no code or
+/// no system, at the coding itself; `None` for a coding with both.
+///
+/// `Coding.system` and `Coding.code` are both 0..1
+/// (<https://hl7.org/fhir/R4B/datatypes.html#Coding>), so such a coding is a
+/// valid input, and the operation answers that it is not a valid code
+/// (`result` false) rather than refusing the request.
+#[must_use]
+pub fn incomplete_coding(coding: &CodingRef, base: &str) -> Option<Issue> {
+    match (&coding.system, &coding.code) {
+        (Some(_), Some(_)) => None,
+        (None, Some(_)) => Some(incomplete(
+            MessageId::CodingHasNoSystemCannotValidate,
+            NO_SYSTEM,
+            base,
+        )),
+        (_, None) => Some(codeless(coding, base)),
+    }
+}
+
+/// The warning for a coding that states no code, at the coding itself.
+#[must_use]
+pub fn codeless(coding: &CodingRef, base: &str) -> Issue {
+    if coding.system.is_some() {
+        incomplete(
+            MessageId::TxGeneralError,
+            "Coding has no code, so it cannot be validated",
+            base,
+        )
+    } else {
+        incomplete(
+            MessageId::CodingHasNoSystemCannotValidate,
+            "Coding has no system and no code, so it cannot be validated",
+            base,
+        )
+    }
+}
+
+/// An `invalid-data` warning at the element at `base`.
+fn incomplete(message: MessageId, text: &str, base: &str) -> Issue {
+    Issue {
+        severity: "warning",
+        code: "invalid",
+        kind: "invalid-data",
+        message,
+        text: text.to_owned(),
+        expression: Some(element(base)),
+    }
+}
+
+/// The text of the warning that a coding states no system.
+pub const NO_SYSTEM: &str = "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided";
+
 /// The `issue.expression` for `leaf` of the element at `base`.
 ///
 /// A coding inside a `CodeableConcept` is addressed by its index and the part
