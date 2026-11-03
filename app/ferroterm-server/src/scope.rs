@@ -19,9 +19,9 @@ use std::time::{Duration, Instant};
 
 use fhir_terminology::fhir_codesystem::provider::FhirCodeSystem;
 use fhir_terminology::operations::{OperationError, Sources};
-use fhir_terminology::provider::ContentMode;
 use fhir_terminology::provider::code_system::CodeSystemModel;
 use fhir_terminology::provider::concept_map::ConceptMapModel;
+use fhir_terminology::provider::declaration::ContentMode;
 use fhir_terminology::registry::Registry;
 use fhir_terminology::valueset::model::ValueSetModel;
 use fhir_terminology::valueset::store::ValueSetStore;

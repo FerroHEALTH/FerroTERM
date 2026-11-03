@@ -6,10 +6,9 @@
 
 use ferroterm_testkit::icd11::{BLOCK, CHOLERA, RELEASE, SEPSIS, VIBRIO, write_artifacts};
 use fhir_terminology::icd11::{Icd11Provider, OpenError};
+use fhir_terminology::provider::declaration::{Compositional, HierarchyMeaning};
 use fhir_terminology::provider::filter::{Filter, FilterOperator};
-use fhir_terminology::provider::{
-    CodeSystemProvider, Compositional, Concept, HierarchyMeaning, PropertyValue, ProviderError,
-};
+use fhir_terminology::provider::{CodeSystemProvider, Concept, PropertyValue, ProviderError};
 
 const MMS: &str = "http://id.who.int/icd/release/11/mms";
 

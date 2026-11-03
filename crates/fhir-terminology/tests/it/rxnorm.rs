@@ -8,10 +8,9 @@ use ferroterm_testkit::rxnorm::{
     ASPIRIN, ASPIRIN_SYNONYM_ATOM, ASPIRIN_TABLET, BRAND, BRANDED_TABLET, LABEL_ONLY, OLD_TABLET,
     ORAL_TABLET, VERSION, write_artifact,
 };
+use fhir_terminology::provider::declaration::{Capability, ContentMode};
 use fhir_terminology::provider::filter::{Filter, FilterOperator};
-use fhir_terminology::provider::{
-    Capability, CodeSystemProvider, Concept, ContentMode, ProviderError,
-};
+use fhir_terminology::provider::{CodeSystemProvider, Concept, ProviderError};
 use fhir_terminology::rxnorm::{OpenError, RxNormProvider, SYSTEM};
 
 fn provider() -> (tempfile::TempDir, RxNormProvider) {

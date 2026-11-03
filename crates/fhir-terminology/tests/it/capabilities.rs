@@ -11,7 +11,8 @@ use fhir_terminology::capabilities::{
 };
 use fhir_terminology::fhir_codesystem::load::{FhirVersion, load_file};
 use fhir_terminology::fhir_codesystem::provider::FhirCodeSystem;
-use fhir_terminology::provider::{CodeSystemProvider, Compositional};
+use fhir_terminology::provider::CodeSystemProvider;
+use fhir_terminology::provider::declaration::Compositional;
 use fhir_terminology::registries::ucum::provider::{URL as UCUM, UcumProvider};
 use fhir_terminology::registry::Registry;
 use fhir_terminology::snomed::{SYSTEM as SNOMED, SnomedProvider};
