@@ -5,20 +5,17 @@
 //! [`Config`] with every `_file` secret read.
 
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::time::Duration;
 
 use ferrohealth_config::loader::Loaded;
 use ferrohealth_config::provenance::{Provenance, Source};
-use ferrohealth_secret::file::read_secret;
-use ferrohealth_secret::secret::Secret;
+use ferrohealth_session::config::{OidcSection, OidcSettings, SessionSection, SessionSettings};
 use ferrohealth_telemetry::section::TelemetrySection;
 use ferrohealth_ui::i18n::Locale;
-use secrecy::SecretString;
 use url::Url;
 
+use crate::config::Config;
 use crate::config::error::Error;
-use crate::config::{Config, Oidc};
 
 /// The resolved configuration.
 #[derive(Debug, Clone)]
@@ -30,10 +27,13 @@ pub struct Settings {
     pub locale: Locale,
     /// The terminology server the console is a client of.
     pub ferroterm: FerrotermSettings,
-    /// The server-side sign-in sessions.
-    pub session: SessionSettings,
-    /// The OpenID Provider operators sign in with, when one is configured.
-    pub oidc: Option<OidcSettings>,
+    /// `[session]` as written, which the Configuration page shows.
+    pub session: SessionSection,
+    /// `[oidc]` as written, which the Configuration page shows; none when
+    /// the console offers no sign-in.
+    pub oidc: Option<OidcSection>,
+    /// The checked sign-in the session store and the relying party run on.
+    pub sign_in: SignInSettings,
     /// Where each key took its value from, and the configuration file the
     /// settings were read from, which the Configuration page names.
     pub provenance: Provenance,
@@ -88,68 +88,18 @@ impl FerrotermSettings {
     }
 }
 
-/// The resolved `[session]`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SessionSettings {
-    /// Whether the cookies carry `Secure`, and with it the `__Host-` prefix.
-    pub secure_cookie: bool,
-    /// How long a pending sign-in waits for the provider's redirect back.
-    pub sign_in_timeout: Duration,
-    /// How many pending sign-ins the console holds at once.
-    pub max_sign_ins: usize,
-    /// How long a signed-in session lives without a request.
-    pub idle_timeout: Duration,
-    /// How long a signed-in session lives at most.
-    pub absolute_timeout: Duration,
-    /// How many signed-in sessions the console holds at once.
-    pub max_sessions: usize,
-}
-
-/// The resolved `[oidc]`.
+/// The checked `[session]` and `[oidc]`.
 #[derive(Debug, Clone)]
-pub struct OidcSettings {
-    /// The provider's issuer identifier, exactly as written: an ID Token's
-    /// `iss` must equal it (OpenID Connect Core 1.0 §3.1.3.7).
-    pub issuer: String,
-    /// The provider's authorization endpoint.
-    pub authorization_endpoint: Url,
-    /// The provider's token endpoint.
-    pub token_endpoint: Url,
-    /// The provider's JWK Set location.
-    pub jwks_uri: Url,
-    /// The console's client identifier.
-    pub client_id: String,
-    /// The console's client secret, when it is a confidential client.
-    pub client_secret: Option<SecretString>,
-    /// The file the client secret was read from, when it was read from one,
-    /// which the Configuration page names in its place.
-    pub client_secret_file: Option<PathBuf>,
-    /// The console's redirection endpoint.
-    pub redirect_uri: Url,
-    /// The scopes requested, `openid` among them.
-    pub scopes: Vec<String>,
-    /// Whether the sign-in asks for `offline_access`.
-    pub offline_access: bool,
-    /// The provider's end-session endpoint, when it publishes one.
-    pub end_session_endpoint: Option<Url>,
-    /// Where the provider sends the operator after a sign-out.
-    pub post_logout_redirect_uri: Option<Url>,
-    /// The provider's token revocation endpoint, when it publishes one.
-    pub revocation_endpoint: Option<Url>,
-}
-
-impl OidcSettings {
+pub struct SignInSettings {
+    /// The session store's settings.
+    pub store: SessionSettings,
+    /// The OpenID Provider's, when one is configured.
+    pub provider: Option<OidcSettings>,
     /// The console's own origin, `scheme://host:port`: the origin of its
-    /// redirection endpoint, which an unsafe request must come from.
-    #[must_use]
-    pub fn origin(&self) -> String {
-        self.redirect_uri.origin().ascii_serialization()
-    }
+    /// redirection endpoint, which an unsafe request must come from; none
+    /// without a provider.
+    pub origin: Option<String>,
 }
-
-/// The scope value that asks for a refresh token that outlives the
-/// operator's session at the provider (OpenID Connect Core 1.0 §11).
-pub const OFFLINE_ACCESS: &str = "offline_access";
 
 impl Config {
     /// Checks every value and reads every `_file` secret.
@@ -159,10 +109,11 @@ impl Config {
     /// [`Error::Locale`] for a `server.locale` that is no language tag,
     /// [`Error::Missing`], [`Error::Url`] and [`Error::UrlShape`] for a URL
     /// that is absent, does not parse or is not one its key admits,
-    /// [`Error::Zero`] for a zero timeout or pool bound, [`Error::Scope`] for
-    /// `offline_access` listed in `oidc.scopes`, [`Error::InsecureCookie`]
-    /// for `session.secure_cookie = false` on a console that is not `http`
-    /// on loopback, and the secret errors of `oidc.client_secret`.
+    /// [`Error::Zero`] for a zero timeout, [`Error::SignIn`] for an `[oidc]`
+    /// or a `[session]` `ferrohealth-session` refuses, the secret errors of
+    /// `oidc.client_secret` among them, and [`Error::InsecureCookie`] for
+    /// `session.secure_cookie = false` on a console that is not `http` on
+    /// loopback.
     pub fn resolve(&self) -> Result<Settings, Error> {
         let listen = self
             .server
@@ -198,28 +149,36 @@ impl Config {
             .transpose()?;
         let timeout = positive("ferroterm.timeout_ms", self.ferroterm.timeout_ms)
             .map(Duration::from_millis)?;
-        let seconds = |key: &str, value: u64| positive(key, value).map(Duration::from_secs);
-        let session = &self.session;
-        let session = SessionSettings {
-            secure_cookie: session.secure_cookie,
-            sign_in_timeout: seconds("session.sign_in_timeout_s", session.sign_in_timeout_s)?,
-            max_sign_ins: bound("session.max_sign_ins", session.max_sign_ins)?,
-            idle_timeout: seconds("session.idle_timeout_s", session.idle_timeout_s)?,
-            absolute_timeout: seconds("session.absolute_timeout_s", session.absolute_timeout_s)?,
-            max_sessions: bound("session.max_sessions", session.max_sessions)?,
-        };
-        let oidc = self.oidc.as_ref().map(resolve_oidc).transpose()?;
+        let refused = |error| Error::SignIn(Box::new(error));
+        let provider = self
+            .oidc
+            .as_ref()
+            .map(OidcSection::check)
+            .transpose()
+            .map_err(refused)?;
+        let store = match &provider {
+            Some(provider) => self.session.check(provider),
+            None => self.session.check_with(false),
+        }
+        .map_err(refused)?;
+        // NOTE: `ferrohealth_session::config::OidcSection::check` parsed the
+        // redirect URI, so a URL that does not parse here names no origin.
+        let redirect = self
+            .oidc
+            .as_ref()
+            .and_then(|oidc| Url::parse(&oidc.redirect_uri).ok());
         // NOTE: RFC 6265bis §4.1.2.5: a cookie without `Secure` travels over plain
         // HTTP, so it is admitted only where the console itself is HTTP on loopback.
-        if !session.secure_cookie
-            && oidc.as_ref().is_some_and(|oidc| {
-                !(oidc.redirect_uri.scheme() == "http" && is_loopback(&oidc.redirect_uri))
-            })
+        if !store.secure_cookie()
+            && redirect
+                .as_ref()
+                .is_some_and(|redirect| !(redirect.scheme() == "http" && is_loopback(redirect)))
         {
             return Err(Error::InsecureCookie {
                 key: String::from("session.secure_cookie"),
             });
         }
+        let origin = redirect.map(|redirect| redirect.origin().ascii_serialization());
         Ok(Settings {
             listen,
             locale,
@@ -230,103 +189,21 @@ impl Config {
                 admin,
                 timeout,
             },
-            session,
-            oidc,
+            session: self.session.clone(),
+            oidc: self.oidc.clone(),
+            sign_in: SignInSettings {
+                store,
+                provider,
+                origin,
+            },
             provenance: Provenance::default(),
             telemetry: self.telemetry.clone(),
         })
     }
 }
 
-/// Resolves `[oidc]`, reading its client secret.
-fn resolve_oidc(oidc: &Oidc) -> Result<OidcSettings, Error> {
-    provider_url("oidc.issuer", &oidc.issuer)?;
-    let authorization_endpoint =
-        provider_url("oidc.authorization_endpoint", &oidc.authorization_endpoint)?;
-    let token_endpoint = provider_url("oidc.token_endpoint", &oidc.token_endpoint)?;
-    let jwks_uri = provider_url("oidc.jwks_uri", &oidc.jwks_uri)?;
-    let redirect_uri = web_url("oidc.redirect_uri", &oidc.redirect_uri)?;
-    // NOTE: RFC 6749 §3.1.2: the redirection endpoint URI MUST NOT include a
-    // fragment component.
-    if redirect_uri.fragment().is_some() {
-        return Err(Error::UrlShape {
-            key: String::from("oidc.redirect_uri"),
-            reason: "must not carry a fragment",
-        });
-    }
-    if oidc.client_id.trim().is_empty() {
-        return Err(Error::Missing {
-            key: String::from("oidc.client_id"),
-        });
-    }
-    // NOTE: OpenID Connect Core 1.0 §3.1.2.1: an OpenID Connect request MUST
-    // carry the `openid` scope value.
-    if !oidc.scopes.iter().any(|scope| scope == "openid") {
-        return Err(Error::Missing {
-            key: String::from("oidc.scopes (openid)"),
-        });
-    }
-    // NOTE: OpenID Connect Core 1.0 §11: `offline_access` goes with `prompt`
-    // `consent`, which the console sends only for `oidc.offline_access`.
-    if oidc.scopes.iter().any(|scope| scope == OFFLINE_ACCESS) {
-        return Err(Error::Scope {
-            key: String::from("oidc.scopes"),
-            reason: "must not list offline_access; set oidc.offline_access = true",
-        });
-    }
-    let end_session_endpoint = oidc
-        .end_session_endpoint
-        .as_deref()
-        .map(|text| provider_url("oidc.end_session_endpoint", text))
-        .transpose()?;
-    let post_logout_redirect_uri = oidc
-        .post_logout_redirect_uri
-        .as_deref()
-        .map(|text| web_url("oidc.post_logout_redirect_uri", text))
-        .transpose()?;
-    // NOTE: OpenID Connect RP-Initiated Logout 1.0 §3: the post-logout redirect
-    // is sent to the end-session endpoint, so one without the other is refused.
-    if post_logout_redirect_uri.is_some() && end_session_endpoint.is_none() {
-        return Err(Error::Missing {
-            key: String::from("oidc.end_session_endpoint (for post_logout_redirect_uri)"),
-        });
-    }
-    let revocation_endpoint = oidc
-        .revocation_endpoint
-        .as_deref()
-        .map(|text| provider_url("oidc.revocation_endpoint", text))
-        .transpose()?;
-    let client_secret = client_secret(oidc)?;
-    Ok(OidcSettings {
-        issuer: oidc.issuer.clone(),
-        authorization_endpoint,
-        token_endpoint,
-        jwks_uri,
-        client_id: oidc.client_id.clone(),
-        client_secret,
-        client_secret_file: oidc.client_secret_file.clone(),
-        redirect_uri,
-        scopes: oidc.scopes.clone(),
-        offline_access: oidc.offline_access,
-        end_session_endpoint,
-        post_logout_redirect_uri,
-        revocation_endpoint,
-    })
-}
-
 /// Returns `value`, refusing zero.
 fn positive(key: &str, value: u64) -> Result<u64, Error> {
-    if value == 0 {
-        Err(Error::Zero {
-            key: key.to_owned(),
-        })
-    } else {
-        Ok(value)
-    }
-}
-
-/// Returns the pool bound `value`, refusing zero.
-fn bound(key: &str, value: usize) -> Result<usize, Error> {
     if value == 0 {
         Err(Error::Zero {
             key: key.to_owned(),
@@ -363,21 +240,6 @@ fn web_url(key: &str, text: &str) -> Result<Url, Error> {
     Ok(url)
 }
 
-/// Parses an OpenID Provider URL: `https`, or `http` on a loopback host.
-fn provider_url(key: &str, text: &str) -> Result<Url, Error> {
-    let url = web_url(key, text)?;
-    // NOTE: RFC 6749 §3.1: the authorization server MUST require TLS at its
-    // authorization endpoint, so plain `http` is admitted only on loopback.
-    if url.scheme() == "https" || is_loopback(&url) {
-        Ok(url)
-    } else {
-        Err(Error::UrlShape {
-            key: key.to_owned(),
-            reason: "must be an https URL unless its host is loopback",
-        })
-    }
-}
-
 /// Parses an `http` or `https` URL with a host, no userinfo, no query and no
 /// fragment, and ends its path in `/`.
 fn base_url(key: &str, text: &str) -> Result<Url, Error> {
@@ -395,17 +257,6 @@ fn base_url(key: &str, text: &str) -> Result<Url, Error> {
         url.set_path(&path);
     }
     Ok(url)
-}
-
-/// The client secret `[oidc]` sets inline or through `client_secret_file`.
-fn client_secret(oidc: &Oidc) -> Result<Option<SecretString>, Error> {
-    Ok(read_secret(
-        "oidc.client_secret",
-        oidc.client_secret.clone(),
-        oidc.client_secret_file.as_deref(),
-    )?
-    .as_ref()
-    .map(Secret::to_secret_string))
 }
 
 /// Whether `url` names a loopback host: `localhost`, `127.0.0.0/8` or `::1`.
@@ -427,11 +278,11 @@ mod tests {
     use ferrohealth_config::provenance::Source;
     use ferrohealth_secret::file::SecretError;
     use ferrohealth_secret::secret::Secret;
-    use secrecy::ExposeSecret;
+    use ferrohealth_session::config::{ConfigError, OidcSection};
 
-    use super::{Settings, client_secret};
+    use super::Settings;
     use crate::config::error::Error;
-    use crate::config::{Config, Oidc, PREFIX};
+    use crate::config::{Config, PREFIX};
 
     /// A secret file holding `text` in a fresh directory.
     fn secret_file(text: &str) -> (tempfile::TempDir, std::path::PathBuf) {
@@ -441,16 +292,34 @@ mod tests {
         (dir, path)
     }
 
-    fn oidc(inline: Option<&str>, file: Option<&Path>) -> Oidc {
-        Oidc {
-            client_secret: inline.map(Secret::new),
-            client_secret_file: file.map(Path::to_path_buf),
-            ..Oidc::default()
+    /// A console signed in at a provider whose every endpoint `[oidc]`
+    /// names, with the client secret `inline` and the secret file `file`.
+    fn oidc(inline: Option<&str>, file: Option<&Path>) -> Config {
+        Config {
+            oidc: Some(OidcSection {
+                issuer: String::from("https://idp.example"),
+                authorization_endpoint: Some(String::from("https://idp.example/authorize")),
+                token_endpoint: Some(String::from("https://idp.example/token")),
+                jwks_uri: Some(String::from("https://idp.example/jwks")),
+                client_id: String::from("ferroterm-console"),
+                client_secret: inline.map(Secret::new),
+                client_secret_file: file.map(Path::to_path_buf),
+                redirect_uri: String::from("https://console.example/auth/callback"),
+                ..OidcSection::default()
+            }),
+            ..Config::default()
         }
     }
 
-    fn exposed(secret: Option<secrecy::SecretString>) -> Option<String> {
-        secret.map(|secret| secret.expose_secret().to_owned())
+    /// The secret error `config` is refused with.
+    fn refused(config: &Config) -> SecretError {
+        match config.resolve() {
+            Err(Error::SignIn(error)) => match *error {
+                ConfigError::Secret(error) => error,
+                other => panic!("a secret refusal, got {other:?}"),
+            },
+            other => panic!("a secret refusal, got {other:?}"),
+        }
     }
 
     #[test]
@@ -563,34 +432,23 @@ mod tests {
     }
 
     #[test]
-    fn an_inline_secret_is_taken_as_it_stands() {
-        let resolved = client_secret(&oidc(Some("inline-secret"), None)).expect("resolved");
-        assert_eq!(Some(String::from("inline-secret")), exposed(resolved));
-    }
-
-    #[test]
-    fn a_secret_file_is_read_without_its_trailing_line_ending() {
+    fn an_inline_secret_or_a_secret_file_or_none_at_all_resolves() {
         let (_dir, path) = secret_file("file-secret\n");
-        let resolved = client_secret(&oidc(None, Some(&path))).expect("resolved");
-        assert_eq!(Some(String::from("file-secret")), exposed(resolved));
-    }
-
-    #[test]
-    fn no_secret_at_all_is_none() {
-        assert!(
-            client_secret(&oidc(None, None))
-                .expect("resolved")
-                .is_none()
-        );
+        for config in [
+            oidc(Some("inline-secret"), None),
+            oidc(None, Some(&path)),
+            oidc(None, None),
+        ] {
+            config.resolve().expect("the secret resolves");
+        }
     }
 
     #[test]
     fn a_secret_set_both_inline_and_in_a_file_is_refused_by_its_key() {
         let (_dir, path) = secret_file("file-secret");
-        let error =
-            client_secret(&oidc(Some("inline-secret"), Some(&path))).expect_err("both are refused");
+        let error = refused(&oidc(Some("inline-secret"), Some(&path)));
         assert!(
-            matches!(&error, Error::Secret(SecretError::Both { key }) if key == "oidc.client_secret"),
+            matches!(&error, SecretError::Both { key } if key == "oidc.client_secret"),
             "{error:?}"
         );
     }
@@ -598,9 +456,9 @@ mod tests {
     #[test]
     fn a_secret_file_that_cannot_be_read_is_refused_by_its_key() {
         let missing = Path::new("/nonexistent/ferroterm-console/client_secret");
-        let error = client_secret(&oidc(None, Some(missing))).expect_err("refused");
+        let error = refused(&oidc(None, Some(missing)));
         assert!(
-            matches!(&error, Error::Secret(SecretError::Read { key, path, .. })
+            matches!(&error, SecretError::Read { key, path, .. }
                 if key == "oidc.client_secret" && path == missing),
             "{error:?}"
         );
@@ -609,9 +467,9 @@ mod tests {
     #[test]
     fn an_empty_secret_file_is_refused() {
         let (_dir, path) = secret_file("\n");
-        let error = client_secret(&oidc(None, Some(&path))).expect_err("refused");
+        let error = refused(&oidc(None, Some(&path)));
         assert!(
-            matches!(&error, Error::Secret(SecretError::Empty { key, .. }) if key == "oidc.client_secret"),
+            matches!(&error, SecretError::Empty { key, .. } if key == "oidc.client_secret"),
             "{error:?}"
         );
     }
@@ -619,11 +477,31 @@ mod tests {
     #[test]
     fn a_refusal_never_shows_the_secret() {
         let (_dir, path) = secret_file("file-secret");
-        let error =
-            client_secret(&oidc(Some("inline-secret"), Some(&path))).expect_err("both are refused");
+        let error = oidc(Some("inline-secret"), Some(&path))
+            .resolve()
+            .expect_err("both are refused");
         let shown = format!("{error} {error:?}");
         assert!(!shown.contains("inline-secret"), "{shown}");
         assert!(!shown.contains("file-secret"), "{shown}");
+    }
+
+    #[test]
+    fn cookies_without_secure_are_refused_off_loopback_and_kept_on_it() {
+        let mut config = oidc(None, None);
+        config.session.secure_cookie = false;
+        let error = config.resolve().expect_err("an https console");
+        assert!(
+            matches!(&error, Error::InsecureCookie { key } if key == "session.secure_cookie"),
+            "{error:?}"
+        );
+        if let Some(oidc) = config.oidc.as_mut() {
+            oidc.redirect_uri = String::from("http://127.0.0.1:3000/auth/callback");
+        }
+        let settings = config.resolve().expect("a console on loopback");
+        assert_eq!(
+            Some("http://127.0.0.1:3000"),
+            settings.sign_in.origin.as_deref()
+        );
     }
 
     #[test]

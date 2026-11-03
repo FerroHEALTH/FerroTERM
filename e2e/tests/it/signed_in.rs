@@ -279,7 +279,7 @@ async fn a_signed_in_page_leaves_for_the_sign_in_once_its_session_ends_elsewhere
                 .await;
             journey
                 .element(
-                    By::Css("a[href^='/auth/login']"),
+                    By::Css("a[href^='/login']"),
                     "the sign-in page's way in",
                 )
                 .await;

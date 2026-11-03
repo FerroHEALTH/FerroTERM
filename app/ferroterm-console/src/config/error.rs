@@ -58,14 +58,6 @@ pub enum Error {
         /// The key.
         key: String,
     },
-    /// A scope list names a value its key does not admit.
-    #[error("`{key}` {reason}")]
-    Scope {
-        /// The key.
-        key: String,
-        /// What the key requires.
-        reason: &'static str,
-    },
     /// Cookies without `Secure` on a console that is not plain HTTP on
     /// loopback, where they would travel in the clear.
     #[error("`{key}` may be false only for a console whose redirect_uri is http on loopback")]
@@ -73,8 +65,8 @@ pub enum Error {
         /// The key.
         key: String,
     },
-    /// A secret set both inline and through its `_file` sibling, or whose
-    /// file cannot be read or is empty.
+    /// An `[oidc]` or a `[session]` `ferrohealth-session` refuses, a client
+    /// secret set both inline and through its file among them.
     #[error(transparent)]
-    Secret(#[from] ferrohealth_secret::file::SecretError),
+    SignIn(Box<ferrohealth_session::config::ConfigError>),
 }

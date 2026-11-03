@@ -6,9 +6,9 @@
 //! answer compressed, and the same-origin rule for every unsafe request.
 
 use axum::body::Body;
+use ferrohealth_session::config::OidcSection;
 use ferrohealth_ui::serve::Assets;
 use ferrohealth_ui::style::Brand;
-use ferroterm_console::config::Oidc;
 use http::header::{
     ACCEPT_ENCODING, CACHE_CONTROL, CONTENT_ENCODING, CONTENT_SECURITY_POLICY, CONTENT_TYPE,
     ORIGIN, REFERER, REFERRER_POLICY, X_CONTENT_TYPE_OPTIONS, X_FRAME_OPTIONS,
@@ -44,7 +44,7 @@ fn preference_post(headers: &[(http::HeaderName, &str)]) -> Request<Body> {
 
 #[tokio::test]
 async fn the_liveness_route_answers_up() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let response = send(&state, get("/health", &[])).await;
     assert_eq!(StatusCode::OK, response.status());
     assert_eq!(r#"{"state":"up"}"#, text(response).await);
@@ -52,7 +52,7 @@ async fn the_liveness_route_answers_up() {
 
 #[tokio::test]
 async fn the_health_route_withdraws_readiness_once_the_console_drains() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     state.lifecycle().drain();
     let response = send(&state, get("/health", &[])).await;
     assert_eq!(StatusCode::SERVICE_UNAVAILABLE, response.status());
@@ -61,7 +61,7 @@ async fn the_health_route_withdraws_readiness_once_the_console_drains() {
 
 #[tokio::test]
 async fn every_response_carries_the_browser_security_headers() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let response = send(&state, get("/health", &[])).await;
     let headers = response.headers();
     assert_eq!(Some("nosniff"), header(headers, &X_CONTENT_TYPE_OPTIONS));
@@ -79,7 +79,7 @@ async fn every_response_carries_the_browser_security_headers() {
 
 #[tokio::test]
 async fn the_policy_takes_scripts_and_styles_from_the_console_alone_with_no_nonce() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     for path in ["/health", "/about"] {
         let response = send(&state, get(path, &[])).await;
         let policy = header(response.headers(), &CONTENT_SECURITY_POLICY).expect("a policy");
@@ -105,7 +105,7 @@ async fn the_policy_takes_scripts_and_styles_from_the_console_alone_with_no_nonc
 
 #[tokio::test]
 async fn a_page_loads_its_one_script_from_the_library_and_writes_none_inline() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let response = send(&state, get("/about", &[])).await;
     assert_eq!(StatusCode::OK, response.status());
     let html = text(response).await;
@@ -125,12 +125,13 @@ async fn a_page_loads_its_one_script_from_the_library_and_writes_none_inline() {
 async fn the_policy_admits_a_form_redirect_to_the_end_session_endpoint_s_origin() {
     let provider = Provider::start().await;
     let state = console(
-        Some(Oidc {
+        Some(OidcSection {
             end_session_endpoint: Some(String::from("https://idp.example:8443/logout?x=1")),
             ..provider.oidc()
         }),
         "",
-    );
+    )
+    .await;
     let response = send(&state, get("/health", &[])).await;
     let policy = header(response.headers(), &CONTENT_SECURITY_POLICY).expect("a policy");
     assert_eq!(
@@ -141,7 +142,7 @@ async fn the_policy_admits_a_form_redirect_to_the_end_session_endpoint_s_origin(
 
 #[tokio::test]
 async fn the_library_s_stylesheet_and_theme_are_served_as_css_for_a_year() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let assets = Assets::of(Brand::Term);
     for path in [assets.stylesheet(), assets.theme()] {
         let response = send(&state, get(&path, &[])).await;
@@ -164,7 +165,7 @@ async fn the_library_s_stylesheet_and_theme_are_served_as_css_for_a_year() {
 
 #[tokio::test]
 async fn an_asset_is_never_compressed() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let request = Request::get(Assets::of(Brand::Term).stylesheet())
         .header(ACCEPT_ENCODING, "br")
         .body(Body::empty())
@@ -176,7 +177,7 @@ async fn an_asset_is_never_compressed() {
 
 #[tokio::test]
 async fn a_document_is_never_compressed() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let request = Request::get("/about")
         .header(ACCEPT_ENCODING, "gzip, br")
         .body(Body::empty())
@@ -188,7 +189,7 @@ async fn a_document_is_never_compressed() {
 
 #[tokio::test]
 async fn an_unsafe_request_from_the_console_s_own_page_passes_by_fetch_metadata() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let response = send(
         &state,
         preference_post(&[(
@@ -202,7 +203,7 @@ async fn an_unsafe_request_from_the_console_s_own_page_passes_by_fetch_metadata(
 
 #[tokio::test]
 async fn an_unsafe_request_another_site_sent_is_refused() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     for site in ["cross-site", "same-site", "none"] {
         let response = send(
             &state,
@@ -220,7 +221,7 @@ async fn an_unsafe_request_another_site_sent_is_refused() {
 #[tokio::test]
 async fn without_fetch_metadata_the_origin_header_decides() {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "");
+    let state = console(Some(provider.oidc()), "").await;
     let own = send(
         &state,
         preference_post(&[(ORIGIN, "http://127.0.0.1:3000")]),
@@ -236,7 +237,7 @@ async fn without_fetch_metadata_the_origin_header_decides() {
 #[tokio::test]
 async fn without_fetch_metadata_or_origin_the_referer_s_origin_decides() {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "");
+    let state = console(Some(provider.oidc()), "").await;
     let own = send(
         &state,
         preference_post(&[(REFERER, "http://127.0.0.1:3000/preferences?x=1")]),
@@ -252,14 +253,14 @@ async fn without_fetch_metadata_or_origin_the_referer_s_origin_decides() {
 #[tokio::test]
 async fn an_unsafe_request_that_shows_no_origin_is_refused() {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "");
+    let state = console(Some(provider.oidc()), "").await;
     let response = send(&state, preference_post(&[])).await;
     assert_eq!(StatusCode::FORBIDDEN, response.status());
 }
 
 #[tokio::test]
 async fn a_console_with_no_known_origin_takes_no_unsafe_request_on_its_origin_header() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let response = send(
         &state,
         preference_post(&[(ORIGIN, "http://127.0.0.1:3000")]),
@@ -274,7 +275,7 @@ async fn a_console_with_no_known_origin_takes_no_unsafe_request_on_its_origin_he
 
 #[tokio::test]
 async fn a_posted_form_over_the_limit_is_refused_as_too_large() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let request = Request::post("/compose")
         .header("sec-fetch-site", "same-origin")
         .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
@@ -290,7 +291,7 @@ async fn a_posted_form_over_the_limit_is_refused_as_too_large() {
 
 #[tokio::test]
 async fn an_asset_the_library_does_not_ship_is_a_plain_not_found() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let path = format!(
         "{}/{}/scripts/no-such-module.js",
         ferrohealth_ui::serve::PREFIX,
@@ -311,7 +312,7 @@ async fn an_asset_the_library_does_not_ship_is_a_plain_not_found() {
 
 #[tokio::test]
 async fn a_brand_file_is_served_as_it_stands_and_revalidated() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let response = send(&state, get("/favicon.svg", &[])).await;
     assert_eq!(StatusCode::OK, response.status());
     assert_eq!(

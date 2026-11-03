@@ -10,9 +10,12 @@
 //! the page it came from, which it checks is one of the console's own. No
 //! specification governs these routes: our own design.
 
+use std::time::Duration;
+
 use axum::Extension;
 use axum::extract::{Form, Query};
 use axum::response::{IntoResponse, Response};
+use ferrohealth_session::sessions::SessionError;
 use http::header::{CACHE_CONTROL, LOCATION, SET_COOKIE};
 use http::{HeaderValue, StatusCode};
 use serde::Deserialize;
@@ -24,9 +27,20 @@ use crate::routes::BACK_PARAM;
 use crate::routes::{SESSION_FHIR, return_path};
 use crate::server::ConsoleState;
 
+/// How long a preference cookie is kept: one year (FerroUI's family rule 9).
+const YEAR: Duration = Duration::from_hours(365 * 24);
+
 /// The redirect to `back`, when it is one of the console's own pages, else
-/// to the dashboard, setting each of `cookies`.
-fn redirect(back: &str, cookies: &[String]) -> Response {
+/// to the dashboard, setting each of `cookies`, or the `500` of a cookie that
+/// could not be written.
+fn redirect(back: &str, cookies: Result<Vec<HeaderValue>, SessionError>) -> Response {
+    let cookies = match cookies {
+        Ok(cookies) => cookies,
+        Err(error) => {
+            tracing::error!(%error, "a preference cookie could not be written");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
     let page = return_path(back).unwrap_or("/");
     let Ok(location) = HeaderValue::from_str(page) else {
         return StatusCode::BAD_REQUEST.into_response();
@@ -36,12 +50,7 @@ fn redirect(back: &str, cookies: &[String]) -> Response {
     headers.insert(LOCATION, location);
     headers.insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
     for cookie in cookies {
-        match HeaderValue::from_str(cookie) {
-            Ok(value) => {
-                headers.append(SET_COOKIE, value);
-            }
-            Err(_invalid) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-        }
+        headers.append(SET_COOKIE, cookie);
     }
     response
 }
@@ -97,11 +106,11 @@ pub(crate) async fn preference(
     let Some(kept) = crate::prefs::kept(key, value, crate::locale::offered) else {
         return bad(Msg::PostNotOffered);
     };
-    let cookie = state
-        .sessions()
-        .preference_cookie(&format!("{PREFIX}{key}"), &kept)
-        .to_string();
-    redirect(&preference_return(back, key), &[cookie])
+    let cookie = state.sessions().preference(key, &kept, YEAR);
+    redirect(
+        &preference_return(back, key),
+        cookie.map(|cookie| vec![cookie]),
+    )
 }
 
 /// What Reset to defaults posts.
@@ -117,17 +126,12 @@ pub(crate) async fn reset(
     Extension(state): Extension<ConsoleState>,
     Form(reset): Form<Reset>,
 ) -> Response {
-    let cleared: Vec<String> = crate::prefs::every_key()
+    let cleared = crate::prefs::every_key()
         .into_iter()
         .chain([SESSION_FHIR])
-        .map(|key| {
-            state
-                .sessions()
-                .preference_cookie_removal(&format!("{PREFIX}{key}"))
-                .to_string()
-        })
+        .map(|key| state.sessions().preference_removal(key))
         .collect();
-    redirect(&reset.back, &cleared)
+    redirect(&reset.back, cleared)
 }
 
 /// What the navigation's Collapse or Expand posts.
@@ -148,11 +152,26 @@ pub(crate) async fn sidebar(
     if !matches!(choice.sidebar.as_str(), "rail" | "full") {
         return bad(Msg::PostSidebar);
     }
-    let cookie = state
-        .sessions()
-        .preference_cookie(&format!("{PREFIX}{SIDEBAR}"), &choice.sidebar)
-        .to_string();
-    redirect(&choice.back, &[cookie])
+    let cookie = state.sessions().preference(SIDEBAR, &choice.sidebar, YEAR);
+    redirect(&choice.back, cookie.map(|cookie| vec![cookie]))
+}
+
+/// The `Set-Cookie` value that keeps the preference `key` at `value` for the
+/// browser's session alone, with the attributes of every other cookie of the
+/// console: it carries no `Max-Age`, so the browser drops it when its session
+/// ends (RFC 6265bis §5.6.2).
+fn browser_session_cookie(
+    state: &ConsoleState,
+    key: &str,
+    value: &str,
+) -> Result<HeaderValue, SessionError> {
+    let cookie = cookie::Cookie::build((state.cookie_name(&format!("{PREFIX}{key}")), value))
+        .path("/")
+        .http_only(true)
+        .secure(state.settings().sign_in.store.secure_cookie())
+        .same_site(cookie::SameSite::Lax)
+        .build();
+    HeaderValue::from_str(&cookie.to_string()).map_err(|_invalid| SessionError::Header)
 }
 
 /// What the FHIR version select's link carries.
@@ -173,11 +192,8 @@ pub(crate) async fn fhir_version(
     let Ok(version) = choice.fhir.parse::<FhirVersion>() else {
         return bad(Msg::PostVersion);
     };
-    let cookie = state
-        .sessions()
-        .session_preference_cookie(&format!("{PREFIX}{SESSION_FHIR}"), version.segment())
-        .to_string();
-    redirect(&choice.back, &[cookie])
+    let cookie = browser_session_cookie(&state, SESSION_FHIR, version.segment());
+    redirect(&choice.back, cookie.map(|cookie| vec![cookie]))
 }
 
 #[cfg(test)]

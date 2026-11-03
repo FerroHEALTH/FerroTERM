@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! `GET /auth/login` and `GET /auth/callback`: the authorization request
+//! `GET /login` and `GET /auth/callback`: the authorization request
 //! with `state`, `nonce` and PKCE (RFC 6749 §4.1.1, RFC 7636 §4.3, OpenID
 //! Connect Core 1.0 §3.1.2.1), and the redirect back that is held to it
 //! (RFC 6749 §10.12) before a session is begun.
@@ -10,17 +10,17 @@ use std::collections::BTreeMap;
 
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use ferroterm_console::config::Oidc;
+use ferrohealth_secret::secret::Secret;
+use ferrohealth_session::config::OidcSection;
+use ferrohealth_session::record::{Credential, Held, SignedIn};
 use ferroterm_console::server::ConsoleState;
-use ferroterm_console::session::{SessionId, SignedIn};
-use http::StatusCode;
 use http::header::CACHE_CONTROL;
-use secrecy::{ExposeSecret as _, SecretString};
+use http::{HeaderMap, StatusCode};
 use serde_json::json;
 
 use crate::provider::{
-    CLIENT_ID, Provider, REDIRECT_URI, TOKEN_PATH, console, cookie_pair, form, get, location,
-    redirect_query, send, set_cookies, text, token_answer,
+    CLIENT_ID, Provider, REDIRECT_URI, TOKEN_PATH, console, cookie_pair, form, get, held, location,
+    redirect_query, send, sessions_held, set_cookies, sign_ins_held, text, token_answer,
 };
 
 /// The name of the pending sign-in's cookie.
@@ -29,7 +29,7 @@ pub(crate) const SIGN_IN: &str = "__Host-ferroterm_console_sign_in";
 /// The name of the session's cookie.
 pub(crate) const SESSION: &str = "__Host-ferroterm_console_session";
 
-/// What `GET /auth/login` left the browser: the `state` and the `nonce` it
+/// What `GET /login` left the browser: the `state` and the `nonce` it
 /// sent the provider, the PKCE challenge, and the sign-in cookie.
 pub(crate) struct Started {
     /// The authorization request's query.
@@ -74,12 +74,23 @@ pub(crate) fn callback(started: &Started, query: &str) -> http::Request<axum::bo
 /// Signs an operator in at `provider` and returns the session cookie's
 /// `name=value` pair.
 pub(crate) async fn signed_in(state: &ConsoleState, provider: &Provider) -> String {
-    let started = start(state, "/auth/login").await;
+    let started = start(state, "/login").await;
     let id_token = provider.id_token(&provider.claims(started.nonce()));
-    provider.answer_tokens(200, &token_answer(&id_token)).await;
+    signed_in_with(state, provider, &started, &token_answer(&id_token)).await
+}
+
+/// Completes the sign-in `started` at `provider`, whose token endpoint
+/// answers `answer`, and returns the session cookie's `name=value` pair.
+pub(crate) async fn signed_in_with(
+    state: &ConsoleState,
+    provider: &Provider,
+    started: &Started,
+    answer: &serde_json::Value,
+) -> String {
+    provider.answer_tokens(200, answer).await;
     let response = send(
         state,
-        callback(&started, &format!("code=c1&state={}", started.state())),
+        callback(started, &format!("code=c1&state={}", started.state())),
     )
     .await;
     assert_eq!(
@@ -90,25 +101,23 @@ pub(crate) async fn signed_in(state: &ConsoleState, provider: &Provider) -> Stri
     cookie_pair(response.headers(), SESSION).expect("a session cookie")
 }
 
-/// The session id a `name=value` cookie pair carries.
-pub(crate) fn session_id(pair: &str) -> SessionId {
-    SessionId::from_cookie(pair.split_once('=').expect("a pair").1)
-}
-
-/// The access token the session behind `pair` holds.
+/// The access token the live session behind `pair` holds, its activity
+/// counted.
 pub(crate) fn access_token(state: &ConsoleState, pair: &str) -> Option<String> {
-    state
-        .sessions()
-        .access_token(&session_id(pair))
-        .expect("usable")
-        .map(|token| token.expose_secret().to_owned())
+    match held(state, pair) {
+        Held::SignedIn(session) => match session.credential() {
+            Credential::Bearer(token) => Some(token.expose().to_owned()),
+            Credential::Basic { .. } => None,
+        },
+        Held::TokenExpired | Held::Ended | Held::Absent => None,
+    }
 }
 
 #[tokio::test]
 async fn login_redirects_to_the_authorization_endpoint_with_the_code_grant_and_pkce() {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "");
-    let response = send(&state, get("/auth/login", &[])).await;
+    let state = console(Some(provider.oidc()), "").await;
+    let response = send(&state, get("/login", &[])).await;
     assert_eq!(StatusCode::SEE_OTHER, response.status());
     assert_eq!(
         Some("no-store"),
@@ -141,8 +150,8 @@ async fn login_redirects_to_the_authorization_endpoint_with_the_code_grant_and_p
 #[tokio::test]
 async fn login_sets_a_host_bound_http_only_sign_in_cookie_that_expires() {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "");
-    let response = send(&state, get("/auth/login", &[])).await;
+    let state = console(Some(provider.oidc()), "").await;
+    let response = send(&state, get("/login", &[])).await;
     let cookie = set_cookies(response.headers())
         .into_iter()
         .find(|cookie| cookie.starts_with(SIGN_IN))
@@ -156,16 +165,16 @@ async fn login_sets_a_host_bound_http_only_sign_in_cookie_that_expires() {
     ] {
         assert!(cookie.contains(attribute), "{attribute} in {cookie}");
     }
-    assert_eq!(1, state.sessions().occupancy().expect("usable").sign_ins);
-    assert_eq!(0, state.sessions().occupancy().expect("usable").sessions);
+    assert_eq!(1, sign_ins_held(&state));
+    assert_eq!(0, sessions_held(&state));
 }
 
 #[tokio::test]
 async fn every_login_mints_its_own_state_and_nonce() {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "");
-    let first = start(&state, "/auth/login").await;
-    let second = start(&state, "/auth/login").await;
+    let state = console(Some(provider.oidc()), "").await;
+    let first = start(&state, "/login").await;
+    let second = start(&state, "/login").await;
     assert_ne!(first.state(), second.state());
     assert_ne!(first.nonce(), second.nonce());
     assert_ne!(
@@ -178,12 +187,12 @@ async fn every_login_mints_its_own_state_and_nonce() {
 #[tokio::test]
 async fn login_keeps_the_query_the_authorization_endpoint_already_carries() {
     let provider = Provider::start().await;
-    let oidc = Oidc {
-        authorization_endpoint: provider.url("/authorize?tenant=north"),
+    let oidc = OidcSection {
+        authorization_endpoint: Some(provider.url("/authorize?tenant=north")),
         ..provider.oidc()
     };
-    let state = console(Some(oidc), "");
-    let started = start(&state, "/auth/login").await;
+    let state = console(Some(oidc), "").await;
+    let started = start(&state, "/login").await;
     assert_eq!("north", started.query["tenant"]);
     assert_eq!("code", started.query["response_type"]);
 }
@@ -191,20 +200,20 @@ async fn login_keeps_the_query_the_authorization_endpoint_already_carries() {
 #[tokio::test]
 async fn login_with_offline_access_asks_for_it_with_prompt_consent() {
     let provider = Provider::start().await;
-    let oidc = Oidc {
+    let oidc = OidcSection {
         offline_access: true,
         ..provider.oidc()
     };
-    let state = console(Some(oidc), "");
-    let started = start(&state, "/auth/login").await;
+    let state = console(Some(oidc), "").await;
+    let started = start(&state, "/login").await;
     assert_eq!("openid user/*.cruds offline_access", started.query["scope"]);
     assert_eq!("consent", started.query["prompt"]);
 }
 
 #[tokio::test]
 async fn login_on_a_console_without_sign_in_shows_the_unavailable_sign_in_page() {
-    let state = console(None, "");
-    let response = send(&state, get("/auth/login", &[])).await;
+    let state = console(None, "").await;
+    let response = send(&state, get("/login", &[])).await;
     assert_eq!(StatusCode::SEE_OTHER, response.status());
     assert_eq!("/auth/sign-in?state=unavailable", location(&response));
     assert!(cookie_pair(response.headers(), SIGN_IN).is_none());
@@ -213,8 +222,8 @@ async fn login_on_a_console_without_sign_in_shows_the_unavailable_sign_in_page()
 #[tokio::test]
 async fn the_token_request_carries_the_verifier_whose_s256_challenge_the_login_sent() {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "");
-    let started = start(&state, "/auth/login").await;
+    let state = console(Some(provider.oidc()), "").await;
+    let started = start(&state, "/login").await;
     let id_token = provider.id_token(&provider.claims(started.nonce()));
     provider.answer_tokens(200, &token_answer(&id_token)).await;
     let response = send(
@@ -253,8 +262,8 @@ async fn the_token_request_carries_the_verifier_whose_s256_challenge_the_login_s
 #[tokio::test]
 async fn a_completed_callback_begins_a_session_and_returns_to_the_dashboard() {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "");
-    let started = start(&state, "/auth/login").await;
+    let state = console(Some(provider.oidc()), "").await;
+    let started = start(&state, "/login").await;
     let id_token = provider.id_token(&provider.claims(started.nonce()));
     provider.answer_tokens(200, &token_answer(&id_token)).await;
     let response = send(
@@ -277,24 +286,23 @@ async fn a_completed_callback_begins_a_session_and_returns_to_the_dashboard() {
         Some("synthetic-access-token"),
         access_token(&state, &session).as_deref()
     );
-    let id = session_id(&session);
+    let Held::SignedIn(held) = held(&state, &session) else {
+        panic!("a live session");
+    };
+    assert_eq!(Some("Synthetic Operator"), held.operator());
     assert_eq!(
-        Some(String::from("Synthetic Operator")),
-        state.sessions().operator(&id).expect("usable")
-    );
-    assert_eq!(
-        Some(vec![String::from("openid"), String::from("user/*.cruds")]),
-        state.sessions().scopes(&id).expect("usable"),
+        [String::from("openid"), String::from("user/*.cruds")],
+        held.scopes(),
         "an answer that names no scope granted the scopes requested"
     );
-    assert_eq!(0, state.sessions().occupancy().expect("usable").sign_ins);
+    assert_eq!(0, sign_ins_held(&state));
 }
 
 #[tokio::test]
 async fn a_completed_callback_returns_to_the_page_the_login_named() {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "");
-    let started = start(&state, "/auth/login?back=%2Fsystems%3Ffhir%3Dr4").await;
+    let state = console(Some(provider.oidc()), "").await;
+    let started = start(&state, "/login?return=%2Fsystems%3Ffhir%3Dr4").await;
     let id_token = provider.id_token(&provider.claims(started.nonce()));
     provider.answer_tokens(200, &token_answer(&id_token)).await;
     let response = send(
@@ -308,8 +316,8 @@ async fn a_completed_callback_returns_to_the_page_the_login_named() {
 #[tokio::test]
 async fn a_login_naming_a_page_off_the_console_returns_to_the_dashboard() {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "");
-    let started = start(&state, "/auth/login?back=%2F%2Fevil.example%2F").await;
+    let state = console(Some(provider.oidc()), "").await;
+    let started = start(&state, "/login?return=%2F%2Fevil.example%2F").await;
     let id_token = provider.id_token(&provider.claims(started.nonce()));
     provider.answer_tokens(200, &token_answer(&id_token)).await;
     let response = send(
@@ -323,7 +331,7 @@ async fn a_login_naming_a_page_off_the_console_returns_to_the_dashboard() {
 #[tokio::test]
 async fn a_callback_without_a_sign_in_cookie_is_refused() {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "");
+    let state = console(Some(provider.oidc()), "").await;
     let response = send(&state, get("/auth/callback?code=c1&state=s1", &[])).await;
     assert_eq!(StatusCode::BAD_REQUEST, response.status());
     assert_eq!("no sign-in is pending", text(response).await);
@@ -333,7 +341,7 @@ async fn a_callback_without_a_sign_in_cookie_is_refused() {
 #[tokio::test]
 async fn a_callback_naming_an_unknown_sign_in_is_refused() {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "");
+    let state = console(Some(provider.oidc()), "").await;
     let response = send(
         &state,
         get(
@@ -349,8 +357,8 @@ async fn a_callback_naming_an_unknown_sign_in_is_refused() {
 #[tokio::test]
 async fn a_callback_whose_state_is_not_the_sign_ins_is_refused_and_spends_it() {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "");
-    let started = start(&state, "/auth/login").await;
+    let state = console(Some(provider.oidc()), "").await;
+    let started = start(&state, "/login").await;
     let response = send(&state, callback(&started, "code=c1&state=forged")).await;
     assert_eq!(StatusCode::BAD_REQUEST, response.status());
     let cookies = set_cookies(response.headers());
@@ -383,8 +391,8 @@ async fn a_callback_whose_state_is_not_the_sign_ins_is_refused_and_spends_it() {
 #[tokio::test]
 async fn a_callback_without_a_state_is_refused() {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "");
-    let started = start(&state, "/auth/login").await;
+    let state = console(Some(provider.oidc()), "").await;
+    let started = start(&state, "/login").await;
     let response = send(&state, callback(&started, "code=c1")).await;
     assert_eq!(StatusCode::BAD_REQUEST, response.status());
     assert_eq!(
@@ -396,8 +404,8 @@ async fn a_callback_without_a_state_is_refused() {
 #[tokio::test]
 async fn a_provider_error_with_the_right_state_shows_the_refused_sign_in_page() {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "");
-    let started = start(&state, "/auth/login").await;
+    let state = console(Some(provider.oidc()), "").await;
+    let started = start(&state, "/login").await;
     let response = send(
         &state,
         callback(
@@ -414,8 +422,8 @@ async fn a_provider_error_with_the_right_state_shows_the_refused_sign_in_page() 
 #[tokio::test]
 async fn a_provider_error_with_a_forged_state_is_refused_before_it_is_read() {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "");
-    let started = start(&state, "/auth/login").await;
+    let state = console(Some(provider.oidc()), "").await;
+    let started = start(&state, "/login").await;
     let response = send(
         &state,
         callback(&started, "error=access_denied&state=forged"),
@@ -427,8 +435,8 @@ async fn a_provider_error_with_a_forged_state_is_refused_before_it_is_read() {
 #[tokio::test]
 async fn a_callback_without_a_code_is_refused() {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "");
-    let started = start(&state, "/auth/login").await;
+    let state = console(Some(provider.oidc()), "").await;
+    let started = start(&state, "/login").await;
     let response = send(
         &state,
         callback(&started, &format!("state={}", started.state())),
@@ -442,8 +450,8 @@ async fn a_callback_without_a_code_is_refused() {
 /// `status` with `body`.
 async fn landing_after_token_answer(status: u16, body: serde_json::Value) -> String {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "");
-    let started = start(&state, "/auth/login").await;
+    let state = console(Some(provider.oidc()), "").await;
+    let started = start(&state, "/login").await;
     provider.answer_tokens(status, &body).await;
     let response = send(
         &state,
@@ -459,11 +467,7 @@ async fn landing_after_token_answer(status: u16, body: serde_json::Value) -> Str
         cookie_pair(response.headers(), SESSION).is_none(),
         "no session is begun"
     );
-    assert_eq!(
-        0,
-        state.sessions().occupancy().expect("usable").sessions,
-        "no session is held"
-    );
+    assert_eq!(0, sessions_held(&state), "no session is held");
     location(&response)
 }
 
@@ -504,12 +508,12 @@ async fn a_token_endpoint_failing_on_its_side_shows_the_unreachable_sign_in_page
 #[tokio::test]
 async fn an_unreachable_token_endpoint_shows_the_unreachable_sign_in_page() {
     let provider = Provider::start().await;
-    let oidc = Oidc {
-        token_endpoint: String::from("http://127.0.0.1:9/token"),
+    let oidc = OidcSection {
+        token_endpoint: Some(String::from("http://127.0.0.1:9/token")),
         ..provider.oidc()
     };
-    let state = console(Some(oidc), "");
-    let started = start(&state, "/auth/login").await;
+    let state = console(Some(oidc), "").await;
+    let started = start(&state, "/login").await;
     let response = send(
         &state,
         callback(&started, &format!("code=c1&state={}", started.state())),
@@ -521,9 +525,9 @@ async fn an_unreachable_token_endpoint_shows_the_unreachable_sign_in_page() {
 #[tokio::test]
 async fn an_id_token_with_another_nonce_shows_the_rejected_sign_in_page() {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "");
-    let started = start(&state, "/auth/login").await;
-    let other = start(&state, "/auth/login").await;
+    let state = console(Some(provider.oidc()), "").await;
+    let started = start(&state, "/login").await;
+    let other = start(&state, "/login").await;
     let id_token = provider.id_token(&provider.claims(other.nonce()));
     provider.answer_tokens(200, &token_answer(&id_token)).await;
     let response = send(
@@ -534,16 +538,16 @@ async fn an_id_token_with_another_nonce_shows_the_rejected_sign_in_page() {
     assert_eq!(StatusCode::SEE_OTHER, response.status());
     assert_eq!("/auth/sign-in?state=rejected", location(&response));
     assert!(cookie_pair(response.headers(), SESSION).is_none());
-    assert_eq!(0, state.sessions().occupancy().expect("usable").sessions);
+    assert_eq!(0, sessions_held(&state));
 }
 
 #[tokio::test]
 async fn signing_in_again_ends_the_session_the_browser_held() {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "");
+    let state = console(Some(provider.oidc()), "").await;
     let first = signed_in(&state, &provider).await;
     provider.reset().await;
-    let started = start(&state, "/auth/login").await;
+    let started = start(&state, "/login").await;
     let id_token = provider.id_token(&provider.claims(started.nonce()));
     provider.answer_tokens(200, &token_answer(&id_token)).await;
     let response = send(
@@ -558,25 +562,21 @@ async fn signing_in_again_ends_the_session_the_browser_held() {
     assert_ne!(first, second);
     assert!(access_token(&state, &first).is_none());
     assert!(access_token(&state, &second).is_some());
-    assert_eq!(1, state.sessions().occupancy().expect("usable").sessions);
+    assert_eq!(1, sessions_held(&state));
 }
 
 #[tokio::test]
 async fn a_full_session_pool_shows_the_full_sign_in_page() {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "[session]\nmax_sessions = 1\n");
+    let state = console(Some(provider.oidc()), "[session]\nmax_sessions = 1\n").await;
     state
         .sessions()
-        .establish(SignedIn {
-            access_token: SecretString::from("another-operator"),
-            expires_in: None,
-            refresh_token: None,
-            id_token: None,
-            operator: None,
-            scopes: Vec::new(),
-        })
+        .establish(
+            &HeaderMap::new(),
+            SignedIn::basic("another-operator", Secret::new("synthetic-password")),
+        )
         .expect("room for one");
-    let started = start(&state, "/auth/login").await;
+    let started = start(&state, "/login").await;
     let id_token = provider.id_token(&provider.claims(started.nonce()));
     provider.answer_tokens(200, &token_answer(&id_token)).await;
     let response = send(
@@ -591,8 +591,8 @@ async fn a_full_session_pool_shows_the_full_sign_in_page() {
 #[tokio::test]
 async fn the_session_cookie_is_host_bound_http_only_lax_and_secure() {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "");
-    let started = start(&state, "/auth/login").await;
+    let state = console(Some(provider.oidc()), "").await;
+    let started = start(&state, "/login").await;
     let id_token = provider.id_token(&provider.claims(started.nonce()));
     provider.answer_tokens(200, &token_answer(&id_token)).await;
     let response = send(
@@ -607,4 +607,73 @@ async fn the_session_cookie_is_host_bound_http_only_lax_and_secure() {
     for attribute in ["HttpOnly", "SameSite=Lax", "Secure", "Path=/"] {
         assert!(cookie.contains(attribute), "{attribute} in {cookie}");
     }
+}
+
+#[tokio::test]
+async fn a_signed_in_reader_s_requests_carry_their_access_token_and_a_visitor_s_none() {
+    let provider = Provider::start().await;
+    let server = wiremock::MockServer::start().await;
+    let state = console(
+        Some(provider.oidc()),
+        &format!("[ferroterm]\nbase_url = \"{}/\"\n", server.uri()),
+    )
+    .await;
+    let session = signed_in(&state, &provider).await;
+    send(&state, get("/about", std::slice::from_ref(&session))).await;
+    let signed: Vec<Option<String>> = authorizations(&server).await;
+    assert!(!signed.is_empty(), "the page asked the server");
+    assert!(
+        signed
+            .iter()
+            .all(|value| value.as_deref() == Some("Bearer synthetic-access-token")),
+        "{signed:?}"
+    );
+    server.reset().await;
+    send(&state, get("/about", &[])).await;
+    let visitor = authorizations(&server).await;
+    assert!(!visitor.is_empty(), "the page asked the server");
+    assert!(visitor.iter().all(Option::is_none), "{visitor:?}");
+}
+
+/// The `Authorization` header of every request `server` received.
+async fn authorizations(server: &wiremock::MockServer) -> Vec<Option<String>> {
+    server
+        .received_requests()
+        .await
+        .unwrap_or_default()
+        .iter()
+        .map(|request| {
+            request
+                .headers
+                .get(http::header::AUTHORIZATION)
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_owned)
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn a_signed_in_page_names_the_reader_and_what_the_token_lets_them_change() {
+    let provider = Provider::start().await;
+    let oidc = OidcSection {
+        scopes: vec![String::from("openid"), String::from("user/CodeSystem.cu")],
+        ..provider.oidc()
+    };
+    let state = console(Some(oidc), "").await;
+    let session = signed_in(&state, &provider).await;
+    let page = text(send(&state, get("/about", std::slice::from_ref(&session))).await).await;
+    assert!(page.contains("Synthetic Operator"), "the reader is named");
+    assert!(
+        page.contains("May edit CodeSystem"),
+        "the standing follows the granted scopes"
+    );
+    assert!(
+        !page.contains("May edit CodeSystem and") && !page.contains("May edit CodeSystem,"),
+        "nothing else"
+    );
+    let visitor = text(send(&state, get("/about", &[])).await).await;
+    assert!(
+        !visitor.contains("Synthetic Operator"),
+        "a visitor is no one"
+    );
 }
