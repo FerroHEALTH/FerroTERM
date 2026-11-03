@@ -187,7 +187,7 @@ fn every_entry_is_subsetted(body: &Value) -> bool {
 #[tokio::test]
 async fn a_search_returns_the_elements_it_was_asked_for_on_every_served_version() {
     let server = Server::start_with_every_loader();
-    for version in ["r4", "r4b", "r5", "r6"] {
+    for (version, schemas) in VERSIONS {
         let (status, body) = server
             .get(&format!("/{version}/CodeSystem?_elements=url,title"))
             .await;
@@ -201,10 +201,12 @@ async fn a_search_returns_the_elements_it_was_asked_for_on_every_served_version(
             !names.is_empty(),
             "{version} answered a search with no resources in it: {body}"
         );
+        let mandatory = mandatory(schemas, "CodeSystem");
         for name in &names {
             assert!(
-                ["id", "meta", "resourceType", "title", "url"].contains(&name.as_str()),
-                "{version} returned `{name}`, which the search did not ask for"
+                ["id", "meta", "resourceType", "title", "url"].contains(&name.as_str())
+                    || mandatory.contains(&name.as_str()),
+                "{version} returned `{name}`, which the search did not ask for and the definition does not make mandatory"
             );
         }
         assert!(
@@ -236,6 +238,63 @@ async fn the_mandatory_elements_come_back_whether_they_were_asked_for_or_not() {
             names.contains(&mandatory.to_owned()),
             "the specification says a server returns mandatory elements whether they are requested or not, and `{mandatory}` is missing: {names:?}"
         );
+    }
+}
+
+// "Servers SHOULD always return mandatory elements whether they are requested
+// or not" (<https://hl7.org/fhir/R4/search.html#elements>): a `CodeSystem`
+// without `content`, or any resource without an element its definition
+// requires, is not a valid resource, and a client decoding it strictly refuses it.
+#[tokio::test]
+async fn every_mandatory_element_comes_back_from_an_elements_search_of_each_type() {
+    let server = Server::start_with_every_loader();
+    for (version, schemas) in VERSIONS {
+        for resource_type in TYPES {
+            let (status, body) = server
+                .get(&format!("/{version}/{resource_type}?_elements=url"))
+                .await;
+            assert_eq!(status, StatusCode::OK, "{version} {resource_type}: {body}");
+            let entries = body["entry"].as_array().cloned().unwrap_or_default();
+            assert!(
+                !entries.is_empty(),
+                "{version} serves no {resource_type} to project: {body}"
+            );
+            for entry in entries {
+                let resource = &entry["resource"];
+                for element in mandatory(schemas, resource_type) {
+                    assert!(
+                        resource.get(element).is_some(),
+                        "{version} {resource_type} `{}` lost the mandatory `{element}` to `_elements=url`: {resource}",
+                        resource["id"]
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn content_survives_the_elements_the_console_lists_code_systems_with() {
+    let server = Server::start_with_every_loader();
+    for (version, _) in VERSIONS {
+        let (status, body) = server
+            .get(&format!(
+                "/{version}/CodeSystem?_elements=url,name,title,version,status,meta"
+            ))
+            .await;
+        assert_eq!(status, StatusCode::OK, "{version}: {body}");
+        let entries = body["entry"].as_array().cloned().unwrap_or_default();
+        assert!(
+            !entries.is_empty(),
+            "{version} lists no code system: {body}"
+        );
+        for entry in entries {
+            assert!(
+                entry["resource"].get("content").is_some(),
+                "{version}: `CodeSystem.content` is 1..1, so a listing that did not name it still carries it: {}",
+                entry["resource"]
+            );
+        }
     }
 }
 
@@ -567,9 +626,11 @@ async fn summary_false_on_read_is_the_whole_resource() {
 #[tokio::test]
 async fn elements_on_read_projects_like_a_search_does() {
     let server = persisting_with_narratives().await;
-    for (version, _) in VERSIONS {
+    for (version, schemas) in VERSIONS {
         for resource_type in TYPES {
-            let uri = format!("/{version}/{resource_type}/summary-{version}?_elements=url,title");
+            let whole_uri = format!("/{version}/{resource_type}/summary-{version}");
+            let (_, whole) = server.get(&whole_uri).await;
+            let uri = format!("{whole_uri}?_elements=url,title");
             let (status, body) = server.get(&uri).await;
             assert_eq!(status, StatusCode::OK, "{uri}: {body}");
             let mut names: Vec<&str> = body
@@ -579,11 +640,18 @@ async fn elements_on_read_projects_like_a_search_does() {
                 .map(String::as_str)
                 .collect();
             names.sort_unstable();
-            assert_eq!(
-                names,
-                ["id", "meta", "resourceType", "title", "url"],
-                "{uri}"
-            );
+            // The mandatory elements come back too (<https://hl7.org/fhir/R4/search.html#elements>).
+            let mut expected: Vec<&str> = ["id", "meta", "resourceType", "title", "url"]
+                .into_iter()
+                .chain(
+                    mandatory(schemas, resource_type)
+                        .into_iter()
+                        .filter(|element| whole.get(*element).is_some()),
+                )
+                .collect();
+            expected.sort_unstable();
+            expected.dedup();
+            assert_eq!(names, expected, "{uri}");
             assert!(is_subsetted(&body), "{uri}: {body}");
         }
     }
