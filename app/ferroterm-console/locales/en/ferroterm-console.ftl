@@ -98,6 +98,8 @@ back-code-system = Back to the code system
 target-fhir-version-requires-comment-target = The target `{ $code }` of `{ $element }` is `{ $relationship }`, and this FHIR version requires a comment on a target that says so.
 target-states-no-relationship-source-which = The target `{ $code }` of `{ $element }` states no relationship to its source, which every served version makes mandatory.
 marked-mapping-nothing-carries-target-well = `{ $element }` is marked as mapping to nothing and carries a target as well. Untick that mark to see the target, or clear the mark.
+source-scope-names-code-system = The source scope `{ $scope }` names a code system this map maps from. FHIR defines a map's source scope as a value set (ConceptMap.source[x] in R4 and R4B, sourceScope[x] in R5), so name the value set that holds the codes, or leave the scope empty.
+target-scope-names-code-system = The target scope `{ $scope }` names a code system this map maps to. FHIR defines a map's target scope as a value set (ConceptMap.target[x] in R4 and R4B, targetScope[x] in R5), so name the value set that holds the codes, or leave the scope empty.
 elements-differ = { $more } elements differ.
 of-roots-answered = { $answered } of { $answers } roots answered
 
