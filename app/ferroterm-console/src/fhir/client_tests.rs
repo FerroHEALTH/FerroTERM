@@ -217,7 +217,7 @@ async fn a_lookup_reads_the_concept_the_server_answers() {
         Some("system=https%3A%2F%2Fterminology.example%2Fcolours&code=red"),
         the_request(&server).await.url.query()
     );
-    assert_eq!(Some(String::from("Red")), document.value.concept().display);
+    assert_eq!(Some(String::from("Red")), document.value.display);
 }
 
 #[tokio::test]
@@ -235,7 +235,10 @@ async fn a_refusal_with_an_operation_outcome_carries_it_to_the_reader() {
     .await
     .expect_err("refused");
     assert_eq!(Some(StatusCode::NOT_FOUND), error.status());
-    assert_eq!(1, error.outcome().map_or(0, |outcome| outcome.issue.len()));
+    assert_eq!(
+        1,
+        error.outcome().map_or(0, |outcome| outcome.issues().len())
+    );
 }
 
 #[tokio::test]

@@ -17,7 +17,7 @@
 //! systems of values, so the reader below keeps them apart and never renders
 //! one as the other.
 
-use crate::fhir::release::Reads;
+use crate::fhir::parameters::{Coding, Parameter};
 use crate::fhir::version::FhirVersion;
 use crate::url::RequestUrl;
 
@@ -132,21 +132,6 @@ pub(crate) struct TranslateAnswer {
     matches: Vec<TranslationMatch>,
 }
 
-/// A `Coding` as the screen draws one.
-///
-// TODO(#1031): drop the serde derives once `$validate-code` reads its answer through fhir-types.
-#[derive(Clone, Debug, Default, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
-pub(crate) struct Coding {
-    /// `Coding.system`.
-    pub(crate) system: Option<String>,
-    /// `Coding.version`.
-    pub(crate) version: Option<String>,
-    /// `Coding.code`.
-    pub(crate) code: Option<String>,
-    /// `Coding.display`.
-    pub(crate) display: Option<String>,
-}
-
 /// One `match` of a translation, with the elements the answer carried.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct TranslationMatch {
@@ -206,37 +191,8 @@ impl TranslateAnswer {
     }
 }
 
-/// One parameter as the reader walks it: its name, its value as text, a
-/// flag or a coding, and its parts.
-struct Read {
-    /// `name`.
-    name: String,
-    /// A textual value: a string, a code, a URI, a canonical, an id or a
-    /// date and time.
-    text: Option<String>,
-    /// `valueBoolean`.
-    flag: Option<bool>,
-    /// `valueInteger`.
-    number: Option<i32>,
-    /// `valueCoding`.
-    coding: Option<Coding>,
-    /// `part`.
-    parts: Vec<Read>,
-}
-
-impl Read {
-    /// The value as a reader reads it, whichever type carried it.
-    fn rendered(&self) -> Option<String> {
-        self.text
-            .clone()
-            .or_else(|| self.flag.map(|flag| flag.to_string()))
-            .or_else(|| self.number.map(|number| number.to_string()))
-            .or_else(|| self.coding.as_ref().map(Coding::rendered))
-    }
-}
-
 /// The answer the top-level parameters `read` make.
-fn answer(read: &[Read]) -> TranslateAnswer {
+fn answer(read: &[Parameter]) -> TranslateAnswer {
     let first = |name: &str| read.iter().find(|parameter| parameter.name == name);
     TranslateAnswer {
         result: first("result").and_then(|parameter| parameter.flag),
@@ -254,7 +210,7 @@ fn answer(read: &[Read]) -> TranslateAnswer {
     }
 }
 
-fn read_match(parameter: &Read) -> TranslationMatch {
+fn read_match(parameter: &Parameter) -> TranslationMatch {
     let mut found = TranslationMatch::default();
     for part in &parameter.parts {
         match part.name.as_str() {
@@ -277,7 +233,7 @@ fn read_match(parameter: &Read) -> TranslationMatch {
     found
 }
 
-fn read_named_value(parameter: &Read) -> NamedValue {
+fn read_named_value(parameter: &Parameter) -> NamedValue {
     let mut found = NamedValue::default();
     for part in &parameter.parts {
         match part.name.as_str() {
@@ -289,87 +245,9 @@ fn read_named_value(parameter: &Read) -> NamedValue {
     found
 }
 
-/// Reads `$translate`'s answer, the `Parameters` of the `fhir-types` module
-/// `$module`.
-macro_rules! reads_translation {
-    ($module:ident) => {
-        mod $module {
-            use fhir_types::$module::parameters::{ParametersParameter, ParametersParameterValue};
-
-            use super::{Coding, Read, Reads, TranslateAnswer, answer};
-
-            /// One parameter and its parts, as the reader walks them.
-            fn read(parameter: &ParametersParameter) -> Read {
-                let text = match &parameter.value {
-                    Some(ParametersParameterValue::String(value)) => value.value.clone(),
-                    Some(ParametersParameterValue::Code(value)) => value.value.clone(),
-                    Some(ParametersParameterValue::Uri(value)) => value.value.clone(),
-                    Some(ParametersParameterValue::Canonical(value)) => value.value.clone(),
-                    Some(ParametersParameterValue::Id(value)) => value.value.clone(),
-                    Some(ParametersParameterValue::DateTime(value)) => value.value.clone(),
-                    _ => None,
-                };
-                Read {
-                    name: parameter.name.value.clone().unwrap_or_default(),
-                    text,
-                    flag: match &parameter.value {
-                        Some(ParametersParameterValue::Boolean(value)) => value.value,
-                        _ => None,
-                    },
-                    number: match &parameter.value {
-                        Some(ParametersParameterValue::Integer(value)) => value.value,
-                        _ => None,
-                    },
-                    coding: match &parameter.value {
-                        Some(ParametersParameterValue::Coding(coding)) => Some(Coding {
-                            system: coding
-                                .system
-                                .as_ref()
-                                .and_then(|system| system.value.clone()),
-                            version: coding
-                                .version
-                                .as_ref()
-                                .and_then(|version| version.value.clone()),
-                            code: coding.code.as_ref().and_then(|code| code.value.clone()),
-                            display: coding
-                                .display
-                                .as_ref()
-                                .and_then(|display| display.value.clone()),
-                        }),
-                        _ => None,
-                    },
-                    parts: parameter.part.iter().map(read).collect(),
-                }
-            }
-
-            impl Reads<TranslateAnswer> for fhir_types::$module::parameters::Parameters {
-                fn read(&self) -> TranslateAnswer {
-                    answer(&self.parameter.iter().map(read).collect::<Vec<_>>())
-                }
-            }
-        }
-    };
-}
-
-reads_translation!(r4);
-reads_translation!(r4b);
-reads_translation!(r5);
-reads_translation!(r6);
-
-impl Coding {
-    /// The coding as one line: the code, its system, and its display.
-    pub(crate) fn rendered(&self) -> String {
-        let code = match (self.system.as_deref(), self.code.as_deref()) {
-            (Some(system), Some(code)) => format!("{system}|{code}"),
-            (None, Some(code)) => code.to_owned(),
-            (Some(system), None) => system.to_owned(),
-            (None, None) => String::new(),
-        };
-        match self.display.as_deref() {
-            Some(display) if code.is_empty() => display.to_owned(),
-            Some(display) => format!("{code} ({display})"),
-            None => code,
-        }
+impl From<Vec<Parameter>> for TranslateAnswer {
+    fn from(parameters: Vec<Parameter>) -> Self {
+        answer(&parameters)
     }
 }
 

@@ -21,6 +21,7 @@ pub(crate) mod expansion;
 pub(crate) mod facts;
 pub(crate) mod named;
 pub(crate) mod outcome;
+pub(crate) mod parameters;
 pub(crate) mod problem;
 pub(crate) mod release;
 pub(crate) mod searchset;
@@ -41,8 +42,8 @@ use crate::fhir::code_system::CodeSystemSearch;
 use crate::fhir::compose::Draft;
 use crate::fhir::compose::Preview;
 use crate::fhir::compose::stored::StoredValueSet;
+use crate::fhir::concept::Concept;
 use crate::fhir::concept::ConceptQuery;
-use crate::fhir::concept::LookupAnswer;
 use crate::fhir::concept::LookupRequest;
 use crate::fhir::concept_map::PublishedConceptMap;
 use crate::fhir::error::FhirError;
@@ -53,16 +54,17 @@ use crate::fhir::exchange::Method;
 use crate::fhir::expansion::ExpandRequest;
 use crate::fhir::expansion::ExpandedValueSet;
 use crate::fhir::named::NamedSearch;
-use crate::fhir::outcome::OperationOutcome;
+use crate::fhir::outcome::Outcome;
 use crate::fhir::release::Decodes;
 use crate::fhir::searchset::Found;
 use crate::fhir::searchset::SearchFilter;
 use crate::fhir::terminology::TerminologyCapabilities;
 use crate::fhir::translate::TranslateAnswer;
 use crate::fhir::translate::TranslateRequest;
-use crate::fhir::validation::ParametersAnswer;
+use crate::fhir::validation::SubsumesAnswer;
 use crate::fhir::validation::SubsumesRequest;
 use crate::fhir::validation::ValidateRequest;
+use crate::fhir::validation::ValidationAnswer;
 use crate::fhir::value_set::PublishedValueSet;
 use crate::fhir::version::FhirVersion;
 use crate::fhir::write::History;
@@ -163,7 +165,7 @@ impl FhirClient {
         if status.is_success() {
             Ok(status)
         } else {
-            Err(failure(&answer, status, &url))
+            Err(unexplained(&answer, status, &url))
         }
     }
 
@@ -255,7 +257,7 @@ impl FhirClient {
         version: FhirVersion,
         system: &str,
     ) -> Result<Document<CodeSystemSearch>, FhirError> {
-        self.get_document(&self.code_system_summary_url(version, system))
+        self.get_document(version, &self.code_system_summary_url(version, system))
             .await
     }
 
@@ -284,7 +286,7 @@ impl FhirClient {
         version: FhirVersion,
         resource_type: &str,
     ) -> Result<NamedSearch, FhirError> {
-        self.get_json(&self.published_names_url(version, resource_type))
+        self.get_json(version, &self.published_names_url(version, resource_type))
             .await
     }
 
@@ -298,7 +300,7 @@ impl FhirClient {
         &self,
         version: FhirVersion,
     ) -> Result<serde_json::Value, FhirError> {
-        self.get_json(&self.metadata_url(version)).await
+        self.get_json(version, &self.metadata_url(version)).await
     }
 
     /// Reads the `CapabilityStatement` of one served FHIR version.
@@ -336,7 +338,7 @@ impl FhirClient {
         version: FhirVersion,
         system: &str,
     ) -> Result<Document<CodeSystemSearch>, FhirError> {
-        self.get_document(&self.code_system_search_url(version, system))
+        self.get_document(version, &self.code_system_search_url(version, system))
             .await
     }
 
@@ -445,8 +447,9 @@ impl FhirClient {
         &self,
         version: FhirVersion,
         request: &LookupRequest,
-    ) -> Result<Document<LookupAnswer>, FhirError> {
-        self.get_document(&self.lookup_url(version, request)).await
+    ) -> Result<Document<Concept>, FhirError> {
+        self.get_answer_document(version, &self.lookup_url(version, request))
+            .await
     }
 
     /// The address a `ValueSet/$expand` sent as a `POST` is addressed to.
@@ -472,8 +475,12 @@ impl FhirClient {
         version: FhirVersion,
         query: &ConceptQuery,
     ) -> Result<ExpandedValueSet, FhirError> {
-        self.post_answer(version, &self.expand_post_url(version), &query.body())
-            .await
+        self.post_answer(
+            version,
+            &self.expand_post_url(version),
+            &query.body(version),
+        )
+        .await
     }
 
     /// Searches the `ValueSet` resources this root holds.
@@ -573,8 +580,8 @@ impl FhirClient {
         &self,
         version: FhirVersion,
         request: &ValidateRequest,
-    ) -> Result<Document<ParametersAnswer>, FhirError> {
-        self.get_document(&self.validate_code_url(version, request))
+    ) -> Result<Document<ValidationAnswer>, FhirError> {
+        self.get_answer_document(version, &self.validate_code_url(version, request))
             .await
     }
 
@@ -603,8 +610,8 @@ impl FhirClient {
         &self,
         version: FhirVersion,
         request: &SubsumesRequest,
-    ) -> Result<Document<ParametersAnswer>, FhirError> {
-        self.get_document(&self.subsumes_url(version, request))
+    ) -> Result<Document<SubsumesAnswer>, FhirError> {
+        self.get_answer_document(version, &self.subsumes_url(version, request))
             .await
     }
 
@@ -750,7 +757,7 @@ impl FhirClient {
         let url = self.create_url(version, resource_type);
         let exchange = Exchange::new(Method::Post, self.path_of(&url)?, FHIR_JSON)
             .with_body(FHIR_JSON, body.to_owned());
-        self.write(exchange, &url).await
+        self.write(version, exchange, &url).await
     }
 
     /// Updates a resource (<https://hl7.org/fhir/R4B/http.html#update>).
@@ -776,7 +783,7 @@ impl FhirClient {
         let exchange = Exchange::new(Method::Put, self.path_of(&url)?, FHIR_JSON)
             .with_body(FHIR_JSON, body.to_owned())
             .with_if_match(version_id.map(if_match));
-        self.write(exchange, &url).await
+        self.write(version, exchange, &url).await
     }
 
     /// Deletes a resource (<https://hl7.org/fhir/R4B/http.html#delete>).
@@ -797,7 +804,7 @@ impl FhirClient {
         if status.is_success() {
             Ok(())
         } else {
-            Err(failure(&answer, status, &url))
+            Err(failure(version, &answer, status, &url))
         }
     }
 
@@ -822,7 +829,7 @@ impl FhirClient {
         version: FhirVersion,
         resource_type: &str,
     ) -> Result<History, FhirError> {
-        self.get_json(&self.type_history_url(version, resource_type))
+        self.get_json(version, &self.type_history_url(version, resource_type))
             .await
     }
 
@@ -837,19 +844,24 @@ impl FhirClient {
         resource_type: &str,
         id: &str,
     ) -> Result<History, FhirError> {
-        self.get_json(&self.history_url(version, resource_type, id))
+        self.get_json(version, &self.history_url(version, resource_type, id))
             .await
     }
 
     /// Sends one write and reads what the server committed.
-    async fn write(&self, exchange: Exchange, url: &str) -> Result<Written, FhirError> {
+    async fn write(
+        &self,
+        version: FhirVersion,
+        exchange: Exchange,
+        url: &str,
+    ) -> Result<Written, FhirError> {
         let answer = self
             .exchange(exchange)
             .await
             .map_err(|error| transport(url, &error))?;
         let status = status_of(&self.locale, &answer, url)?;
         if !status.is_success() {
-            return Err(failure(&answer, status, url));
+            return Err(failure(version, &answer, status, url));
         }
         // A server asked for a minimal return answers no body, which is a
         // success and not a decode failure
@@ -925,7 +937,7 @@ impl FhirClient {
         system: &str,
     ) -> Result<Option<serde_json::Value>, FhirError> {
         let url = self.code_system_search_url(version, system);
-        let answer: authoring::AuthoredSearch = self.get_json(&url).await?;
+        let answer: authoring::AuthoredSearch = self.get_json(version, &url).await?;
         Ok(answer.first())
     }
 
@@ -951,7 +963,7 @@ impl FhirClient {
             version: String::new(),
         };
         let url = self.search_url(version, CONCEPT_MAP, &filter);
-        let answer: authoring::AuthoredSearch = self.get_json(&url).await?;
+        let answer: authoring::AuthoredSearch = self.get_json(version, &url).await?;
         Ok(answer.first_of(CONCEPT_MAP))
     }
 
@@ -991,7 +1003,7 @@ impl FhirClient {
         resource_type: &str,
         id: &str,
     ) -> Result<serde_json::Value, FhirError> {
-        self.get_json(&self.resource_url(version, resource_type, id))
+        self.get_json(version, &self.resource_url(version, resource_type, id))
             .await
     }
 
@@ -1007,8 +1019,11 @@ impl FhirClient {
         id: &str,
         version_id: &str,
     ) -> Result<serde_json::Value, FhirError> {
-        self.get_json(&self.version_read_url(version, resource_type, id, version_id))
-            .await
+        self.get_json(
+            version,
+            &self.version_read_url(version, resource_type, id, version_id),
+        )
+        .await
     }
 }
 
@@ -1036,9 +1051,13 @@ impl FhirClient {
 
     /// Sends a FHIR JSON `GET` and keeps both the elements a screen reads and
     /// the document as the server sent it, which a screen shows as JSON.
-    async fn get_document<T: DeserializeOwned>(&self, url: &str) -> Result<Document<T>, FhirError> {
+    async fn get_document<T: DeserializeOwned>(
+        &self,
+        version: FhirVersion,
+        url: &str,
+    ) -> Result<Document<T>, FhirError> {
         let answer = self.send(Method::Get, url, FHIR_JSON).await?;
-        let value = read_json(&self.locale, &answer, url)?;
+        let value = read_json(&self.locale, version, &answer, url)?;
         Ok(Document {
             value,
             text: pretty(&answer.body),
@@ -1046,9 +1065,13 @@ impl FhirClient {
     }
 
     /// Sends a FHIR JSON `GET` and decodes the resource it answers.
-    async fn get_json<T: DeserializeOwned>(&self, url: &str) -> Result<T, FhirError> {
+    async fn get_json<T: DeserializeOwned>(
+        &self,
+        version: FhirVersion,
+        url: &str,
+    ) -> Result<T, FhirError> {
         let answer = self.send(Method::Get, url, FHIR_JSON).await?;
-        read_json(&self.locale, &answer, url)
+        read_json(&self.locale, version, &answer, url)
     }
 
     /// Sends a FHIR JSON `GET` and decodes the resource it answers through
@@ -1115,7 +1138,7 @@ fn decoded<A: Decodes>(
 ) -> Result<A, FhirError> {
     let status = status_of(locale, answer, url)?;
     if !status.is_success() {
-        return Err(failure(answer, status, url));
+        return Err(failure(version, answer, status, url));
     }
     version
         .decode(&answer.body)
@@ -1127,12 +1150,13 @@ fn decoded<A: Decodes>(
 
 fn read_json<T: DeserializeOwned>(
     locale: &ferrohealth_ui::i18n::Locale,
+    version: FhirVersion,
     answer: &Answer,
     url: &str,
 ) -> Result<T, FhirError> {
     let status = status_of(locale, answer, url)?;
     if !status.is_success() {
-        return Err(failure(answer, status, url));
+        return Err(failure(version, answer, status, url));
     }
     serde_json::from_str(&answer.body).map_err(|error| FhirError::Decode {
         url: url.to_owned(),
@@ -1168,21 +1192,28 @@ fn status_of(
     })
 }
 
-/// Turns a non-success answer into the refusal the reader is shown.
-fn failure(answer: &Answer, status: StatusCode, url: &str) -> FhirError {
-    match serde_json::from_str::<OperationOutcome>(&answer.body) {
-        // A body that parses but carries no issue says nothing, so the body
-        // itself stays the evidence.
-        Ok(outcome) if !outcome.issue.is_empty() => FhirError::Refused {
+/// Turns a non-success answer into the refusal the reader is shown, its
+/// `OperationOutcome` decoded at `version`, the release that answered.
+fn failure(version: FhirVersion, answer: &Answer, status: StatusCode, url: &str) -> FhirError {
+    // A body that is no `OperationOutcome` at `version`, or one that carries
+    // no issue, says nothing, so the body itself stays the evidence.
+    match version.decode::<Outcome>(&answer.body) {
+        Ok(outcome) if !outcome.issues().is_empty() => FhirError::Refused {
             url: url.to_owned(),
             status,
             outcome,
         },
-        Ok(_) | Err(_) => FhirError::Status {
-            url: url.to_owned(),
-            status,
-            body: excerpt(&answer.body),
-        },
+        Ok(_) | Err(_) => unexplained(answer, status, url),
+    }
+}
+
+/// Turns a non-success answer that carries no refusal into a status, with
+/// the start of its body as the evidence.
+fn unexplained(answer: &Answer, status: StatusCode, url: &str) -> FhirError {
+    FhirError::Status {
+        url: url.to_owned(),
+        status,
+        body: excerpt(&answer.body),
     }
 }
 
@@ -1197,6 +1228,55 @@ fn excerpt(body: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A refusal answered `status` with `body`.
+    fn refused(status: u16, body: &str) -> Answer {
+        Answer {
+            status,
+            etag: None,
+            location: None,
+            body: body.to_owned(),
+        }
+    }
+
+    #[test]
+    fn a_refusal_that_decodes_at_its_release_carries_its_outcome() {
+        let error = failure(
+            FhirVersion::R4B,
+            &refused(
+                404,
+                r#"{"resourceType":"OperationOutcome","issue":[
+                    {"severity":"error","code":"not-found","diagnostics":"no such code"}]}"#,
+            ),
+            StatusCode::NOT_FOUND,
+            "/r4b/CodeSystem/$lookup",
+        );
+        assert_eq!(
+            error.outcome().map(|outcome| outcome.issues().len()),
+            Some(1),
+            "the server's own refusal travels with the error"
+        );
+    }
+
+    #[test]
+    fn a_malformed_refusal_keeps_its_status_and_its_body() {
+        for body in [
+            r#"{"resourceType":"OperationOutcome","id":"x","text":{"div":"<p/>"}}"#,
+            r#"{"resourceType":"OperationOutcome","issue":[{"code":"processing"}]}"#,
+        ] {
+            let error = failure(
+                FhirVersion::R4B,
+                &refused(422, body),
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "/r4b/ValueSet/$expand",
+            );
+            assert!(
+                matches!(&error, FhirError::Status { status, body: kept, .. }
+                    if *status == StatusCode::UNPROCESSABLE_ENTITY && kept == body),
+                "a malformed refusal must not hide the status behind a decode error: {error:?}"
+            );
+        }
+    }
 
     #[test]
     fn a_version_base_is_the_root_plus_the_version_segment() {

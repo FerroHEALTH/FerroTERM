@@ -128,3 +128,88 @@ async fn a_concept_map_that_does_not_decode_at_its_release_draws_the_error_state
         "R5 renamed `sourceUri`, so the error names the member R5 does not define: {page}"
     );
 }
+
+#[tokio::test]
+async fn a_lookup_answer_that_does_not_decode_at_its_release_draws_the_error_state() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/r5/CodeSystem/$lookup"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "resourceType": "Parameters",
+            "parameter": [{ "name": "display", "valueString": "Red", "colour": "red" }]
+        })))
+        .mount(&server)
+        .await;
+    let state = console(
+        None,
+        &format!("[ferroterm]\nbase_url = \"{}/\"\n", server.uri()),
+    )
+    .await;
+    let page = text(
+        send(
+            &state,
+            get(
+                "/lookup?fhir=r5&system=https%3A%2F%2Fterminology.example%2Fcolours&code=red",
+                &[],
+            ),
+        )
+        .await,
+    )
+    .await;
+    assert!(
+        page.contains("FHIR R5: ")
+            && page.contains("Parameters.parameter[0]")
+            && page.contains("colour"),
+        "the error names the version, the resource and the member R5 does not define: {page}"
+    );
+    assert!(
+        !page.contains(">Red<"),
+        "no partial page draws the display the answer named"
+    );
+}
+
+#[tokio::test]
+async fn a_validation_answer_that_does_not_decode_at_its_release_draws_the_error_state() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/r4/ValueSet/$validate-code"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "resourceType": "Parameters",
+            "parameter": [
+                { "name": "result", "valueBoolean": false },
+                { "name": "issues", "resource": {
+                    "resourceType": "OperationOutcome",
+                    "issue": [{ "code": "invalid", "diagnostics": "Wrong display" }]
+                } }
+            ]
+        })))
+        .mount(&server)
+        .await;
+    let state = console(
+        None,
+        &format!("[ferroterm]\nbase_url = \"{}/\"\n", server.uri()),
+    )
+    .await;
+    let page = text(
+        send(
+            &state,
+            get(
+                "/validate?fhir=r4&url=https%3A%2F%2Fterminology.example%2Fvs\
+                 &system=https%3A%2F%2Fterminology.example%2Fcolours&code=red",
+                &[],
+            ),
+        )
+        .await,
+    )
+    .await;
+    assert!(
+        page.contains("FHIR R4: ")
+            && page.contains("Parameters.parameter[1]")
+            && page.contains("severity"),
+        "the error names the version, the resource and the element the issue lacks: {page}"
+    );
+    assert!(
+        !page.contains("Wrong display"),
+        "no partial page draws the issue the answer carried"
+    );
+}

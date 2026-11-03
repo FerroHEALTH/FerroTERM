@@ -25,8 +25,6 @@ use serde_json::Number;
 use serde_json::Value;
 
 use crate::fhir::concept::VALUE_SET_PARAMETER;
-use crate::fhir::concept::resource_parameter;
-use crate::fhir::concept::value_parameter;
 use crate::fhir::expansion::COUNT_PARAMETER;
 use crate::fhir::expansion::FILTER_PARAMETER;
 use crate::fhir::expansion::OFFSET_PARAMETER;
@@ -633,6 +631,23 @@ impl ClauseFilter {
         );
         Value::Object(filter)
     }
+}
+
+// TODO(#1032): write the preview's `Parameters` through the release's `fhir-types` model.
+/// One `Parameters.parameter` carrying a resource.
+fn resource_parameter(name: &str, resource: Value) -> Value {
+    let mut parameter = Map::new();
+    parameter.insert(String::from("name"), Value::String(name.to_owned()));
+    parameter.insert(String::from("resource"), resource);
+    Value::Object(parameter)
+}
+
+/// One `Parameters.parameter` carrying a primitive value.
+fn value_parameter(name: &str, value_name: &str, value: Value) -> Value {
+    let mut parameter = Map::new();
+    parameter.insert(String::from("name"), Value::String(name.to_owned()));
+    parameter.insert(value_name.to_owned(), value);
+    Value::Object(parameter)
 }
 
 #[cfg(test)]
