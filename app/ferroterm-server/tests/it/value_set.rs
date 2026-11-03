@@ -717,11 +717,11 @@ async fn a_compose_naming_two_versions_keeps_contains_version_when_forced_to_one
     let server = Server::start();
     let system = "http://example.org/fhir/CodeSystem/versioned";
     let code_system = |version: &str| {
-        serde_json::json!({"resource": {"resourceType": "CodeSystem", "url": system, "version": version,
+        json!({"resource": {"resourceType": "CodeSystem", "url": system, "version": version,
             "status": "active", "content": "complete",
             "concept": [{"code": "one", "display": "One"}, {"code": "two", "display": "Two"}]}})
     };
-    let value_set = serde_json::json!({"resourceType": "ValueSet", "url": "http://example.org/fhir/ValueSet/mixed", "status": "active",
+    let value_set = json!({"resourceType": "ValueSet", "url": "http://example.org/fhir/ValueSet/mixed", "status": "active",
     "compose": {"include": [
         {"system": system, "version": "1.0.0", "concept": [{"code": "one"}]},
         {"system": system, "version": "1.2.0", "concept": [{"code": "two"}]}
@@ -729,13 +729,13 @@ async fn a_compose_naming_two_versions_keeps_contains_version_when_forced_to_one
     let (status, body) = server
         .post(
             "/r4b/ValueSet/$expand",
-            &crate::fixture::parameters(&[
-                ("valueSet", serde_json::json!({"resource": value_set})),
+            &parameters(&[
+                ("valueSet", json!({"resource": value_set})),
                 ("tx-resource", code_system("1.0.0")),
                 ("tx-resource", code_system("1.2.0")),
                 (
                     "force-system-version",
-                    serde_json::json!({"valueCanonical": format!("{system}|1.0.0")}),
+                    json!({"valueCanonical": format!("{system}|1.0.0")}),
                 ),
             ]),
         )
@@ -757,18 +757,18 @@ async fn a_compose_naming_two_versions_keeps_contains_version_when_forced_to_one
 #[tokio::test]
 async fn a_concept_the_value_set_marks_deprecated_by_standards_status_is_warned_of() {
     let server = Server::start_with_resources();
-    let value_set = serde_json::json!({"resourceType": "ValueSet", "url": "http://example.org/fhir/ValueSet/deprecating", "status": "active",
+    let value_set = json!({"resourceType": "ValueSet", "url": "http://example.org/fhir/ValueSet/deprecating", "status": "active",
     "compose": {"include": [{"system": ANIMALS, "concept": [{"code": "dog", "extension": [
         {"url": "http://hl7.org/fhir/StructureDefinition/structuredefinition-standards-status", "valueCode": "deprecated"}
     ]}]}]}});
     let (status, body) = server
         .post(
             "/r4b/ValueSet/$validate-code",
-            &crate::fixture::parameters(&[
-                ("valueSet", serde_json::json!({"resource": value_set})),
+            &parameters(&[
+                ("valueSet", json!({"resource": value_set})),
                 (
                     "coding",
-                    serde_json::json!({"valueCoding": {"system": ANIMALS, "code": "dog"}}),
+                    json!({"valueCoding": {"system": ANIMALS, "code": "dog"}}),
                 ),
             ]),
         )
