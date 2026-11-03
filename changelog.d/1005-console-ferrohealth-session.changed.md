@@ -10,6 +10,9 @@
   metadata when it starts (`config check` reads none and works offline), and
   gains `ca_file` and `timeout_s`; `[session]` gains `store` (`memory`, the
   default, or `sealed` with `key` or `key_file`). `session.absolute_timeout_s`
-  below `session.idle_timeout_s` is now refused. Upgrade: change any link or
-  bookmark to the old sign-in, sign-out or session paths; the configuration
-  keys a deployment already sets keep their meaning.
+  below `session.idle_timeout_s` is now refused. A sign-out on a console
+  with no `[oidc]` ends the local session and lands on the signed-out page,
+  where it answered `503`, since no provider session exists to end.
+  Upgrade: change any link or bookmark to the old sign-in, sign-out or
+  session paths; the configuration keys a deployment already sets keep
+  their meaning.
