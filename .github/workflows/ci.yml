@@ -279,7 +279,9 @@ jobs:
       - name: repo-map
         run: bash scripts/checks/repo-map.sh
       - name: claims
-        run: bash scripts/checks/claims.sh
+        run: |
+          bash scripts/checks/claims.sh --self-test
+          bash scripts/checks/claims.sh
       - name: extension-definitions
         run: bash scripts/checks/extension-definitions.sh
       # Every first-party file carries both SPDX lines, and every header
