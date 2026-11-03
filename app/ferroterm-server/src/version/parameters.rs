@@ -239,15 +239,6 @@ macro_rules! parameters {
                 Failure::new(StatusCode::BAD_REQUEST, code, error.to_string())
             }
 
-            /// A `200` response carrying `parameters` in `wire`.
-            ///
-            /// # Errors
-            ///
-            /// Returns a `500` failure when the resource cannot be encoded.
-            pub fn respond(parameters: &Parameters, wire: Wire) -> Result<Response, Failure> {
-                respond_resource(parameters, wire)
-            }
-
             /// The JSON object of a FHIR resource, for a response or a `Bundle` entry.
             ///
             /// # Errors
