@@ -13,7 +13,7 @@ use fhir_terminology::registry::Registry;
 use fhir_terminology::valueset::store::ValueSetStore;
 
 use crate::artefact;
-use crate::state::load::supplement_of;
+use fhir_terminology::supplement::Supplement;
 
 /// The code systems, value sets, and concept maps an operation resolves in.
 ///
@@ -26,6 +26,7 @@ pub struct Layer {
     pub(super) value_sets: ValueSetStore,
     pub(super) concept_maps: ConceptMapStore,
 }
+
 impl Layer {
     /// An empty layer.
     #[must_use]
@@ -98,7 +99,7 @@ impl Layer {
                     // NOTE: a persisted supplement stays dormant like a loaded one until a
                     // request names it (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
                     self.registry
-                        .register_supplement(target, supplement_of(model));
+                        .register_supplement(target, Supplement::from_code_system(model));
                     return Ok(());
                 }
                 let provider =
@@ -117,11 +118,13 @@ impl Layer {
         Ok(())
     }
 }
+
 impl Default for Layer {
     fn default() -> Self {
         Self::new()
     }
 }
+
 /// A resource that cannot be layered over the loaded state.
 #[derive(Debug, thiserror::Error)]
 pub enum LayerError {
