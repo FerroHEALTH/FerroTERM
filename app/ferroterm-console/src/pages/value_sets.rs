@@ -22,7 +22,6 @@ use crate::fhir::VALUE_SET;
 use crate::fhir::searchset::SearchFilter;
 use crate::fhir::value_set::{ClauseRow, PublishedValueSet};
 use crate::locale::{Msg, message, tr, tr_with};
-use crate::markup::{h, join, t};
 use crate::pages::listing::{Frame, ListState, NAME_COLUMN, counted, status_state};
 use crate::pages::parts::{Source, failure, heading, name_of, system_names};
 use crate::request::Request;
@@ -103,7 +102,7 @@ pub(crate) async fn page(request: Request) -> Html {
             ferrohealth_ui::tone::Tone::Ok,
             ferrohealth_ui::view::notice::Announce::Status,
             None,
-            t(tr_with(locale, Msg::ValueSetsDeleted, &[("id", id.into())])),
+            Html::text(tr_with(locale, Msg::ValueSetsDeleted, &[("id", id.into())])),
         )
     });
     match found {
@@ -188,7 +187,7 @@ fn listing(
             tr_with(locale, Msg::ValueSetsNoMatch, &[("count", total.into())]),
         )
     } else {
-        let drawn = join(
+        let drawn = Html::join(
             state
                 .window(kept.len())
                 .slice(&kept)
@@ -252,18 +251,21 @@ fn row(
             &[("version", code.to_owned().into())],
         )
     });
-    h(format!(
+    Html::raw(format!(
         "<tr>{}{}{}{}{}</tr>",
         title_cell(
             None,
             Some(&href),
-            t(label_of(value_set)),
+            Html::text(label_of(value_set)),
             Some(canonical(url))
         ),
         cell(source, source_of(value_set).tag(locale)),
-        cell(version, t(version_words.unwrap_or_default())),
+        cell(version, Html::text(version_words.unwrap_or_default())),
         cell(status, status_state(locale, value_set.status())),
-        cell(selection, t(selects(locale, &value_set.clauses(), names))),
+        cell(
+            selection,
+            Html::text(selects(locale, &value_set.clauses(), names))
+        ),
     ))
 }
 

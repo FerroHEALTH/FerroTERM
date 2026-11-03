@@ -471,7 +471,7 @@ mod tests {
     #[test]
     fn a_code_system_run_sends_the_names_that_operation_declares() {
         assert_eq!(
-            code_system_run().append(RequestUrl::new()).render(""),
+            code_system_run().append(RequestUrl::default()).render(""),
             "?url=https%3A%2F%2Fterminology.example%2Fanimals&version=2.0&code=cat&display=Dog",
             "the code system's own version travels as `version`"
         );
@@ -490,7 +490,7 @@ mod tests {
             ..ValidateRequest::default()
         };
         assert_eq!(
-            request.append(RequestUrl::new()).render(""),
+            request.append(RequestUrl::default()).render(""),
             "?url=https%3A%2F%2Fterminology.example%2Fvs&valueSetVersion=1.2\
              &system=https%3A%2F%2Fterminology.example%2Fanimals&systemVersion=2.0\
              &code=cat&displayLanguage=nl-NL",
@@ -506,7 +506,7 @@ mod tests {
         };
         assert!(request.instance());
         assert_eq!(
-            request.append(RequestUrl::new()).render(""),
+            request.append(RequestUrl::default()).render(""),
             "?version=2.0&code=cat&display=Dog",
             "the address names the resource, so naming it again in `url` would be a second claim"
         );
@@ -546,7 +546,7 @@ mod tests {
         };
         assert!(request.runnable());
         assert_eq!(
-            request.append(RequestUrl::new()).render(""),
+            request.append(RequestUrl::default()).render(""),
             "?system=https%3A%2F%2Fterminology.example%2Fanimals&version=2.0&codeA=cat&codeB=kitten"
         );
         assert!(
@@ -563,7 +563,7 @@ mod tests {
                 system: String::new(),
                 ..request
             }
-            .append(RequestUrl::new())
+            .append(RequestUrl::default())
             .render(""),
             "?version=2.0&codeA=cat&codeB=kitten",
             "an instance run takes the system from the address"

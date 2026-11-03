@@ -261,7 +261,7 @@ impl FhirClient {
     fn admin_url(&self, segments: &[&str]) -> String {
         segments
             .iter()
-            .fold(RequestUrl::new(), |url, segment| url.segment(segment))
+            .fold(RequestUrl::default(), |url, segment| url.segment(segment))
             .render(self.root.as_str())
     }
 

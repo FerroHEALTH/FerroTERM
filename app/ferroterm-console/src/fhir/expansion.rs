@@ -387,7 +387,7 @@ mod tests {
             ..ExpandRequest::default()
         };
         assert_eq!(
-            request.append(RequestUrl::new()).render(""),
+            request.append(RequestUrl::default()).render(""),
             "?url=https%3A%2F%2Fterminology.example%2FValueSet%2Fall&count=20",
             "an unset parameter leaves the server's own default in force"
         );
@@ -405,7 +405,7 @@ mod tests {
             include_designations: Some(false),
         };
         assert_eq!(
-            request.append(RequestUrl::new()).render(""),
+            request.append(RequestUrl::default()).render(""),
             "?url=https%3A%2F%2Fterminology.example%2FValueSet%2Fall&filter=fever&count=20\
              &offset=40&displayLanguage=nl-NL&activeOnly=true&includeDesignations=false",
             "the boolean parameters are sent as the FHIR literals"
@@ -421,7 +421,7 @@ mod tests {
             count: Some(20),
             ..ExpandRequest::default()
         };
-        let rendered = request.append(RequestUrl::new()).render("");
+        let rendered = request.append(RequestUrl::default()).render("");
         assert_eq!(
             rendered, "?url=http%3A%2F%2Fsnomed.info%2Fsct%3Ffhir_vs%3Disa%2F404684003&count=20",
             "the canonical's own query string is escaped into the value"
@@ -441,7 +441,7 @@ mod tests {
             ..ExpandRequest::default()
         };
         assert_eq!(
-            request.append(RequestUrl::new()).render(""),
+            request.append(RequestUrl::default()).render(""),
             "?url=https%3A%2F%2Fterminology.example%2FValueSet%2Fall&filter=a%26count%3D1",
             "a typed value cannot smuggle in a parameter of its own"
         );

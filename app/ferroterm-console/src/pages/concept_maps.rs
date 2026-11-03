@@ -23,7 +23,6 @@ use crate::fhir::CONCEPT_MAP;
 use crate::fhir::concept_map::PublishedConceptMap;
 use crate::fhir::searchset::SearchFilter;
 use crate::locale::{Msg, message, tr, tr_with};
-use crate::markup::{h, join, t};
 use crate::pages::listing::{Frame, ListState, NAME_COLUMN, counted, status_state};
 use crate::pages::parts::{Source, failure, heading, name_of, system_names};
 use crate::request::Request;
@@ -141,24 +140,28 @@ fn listing(
             tr_with(locale, Msg::ConceptMapsNoMatch, &[("count", total.into())]),
         )
     } else {
-        let drawn = join(state.window(kept.len()).slice(&kept).iter().map(|map| {
+        let drawn = Html::join(state.window(kept.len()).slice(&kept).iter().map(|map| {
             let href = resource_link(
                 CONCEPT_MAPS_PATH,
                 map.id().unwrap_or_default(),
                 request.version,
             );
             let url = map.url().unwrap_or_default();
-            let from_to = from_to(locale, map, names)
-                .map(|words| h(format!(r#"<span class="fui-row-sub">{}</span>"#, t(words))));
-            let sub = h(format!("{}{}", canonical(url), from_to.unwrap_or_default()));
+            let from_to = from_to(locale, map, names).map(|words| {
+                Html::raw(format!(
+                    r#"<span class="fui-row-sub">{}</span>"#,
+                    Html::text(words)
+                ))
+            });
+            let sub = Html::raw(format!("{}{}", canonical(url), from_to.unwrap_or_default()));
             let count = u32::try_from(map.mappings().len()).unwrap_or(u32::MAX);
-            h(format!(
+            Html::raw(format!(
                 "<tr>{}{}{}{}</tr>",
-                title_cell(None, Some(&href), t(label_of(map)), Some(sub)),
+                title_cell(None, Some(&href), Html::text(label_of(map)), Some(sub)),
                 cell(source, source_of(map).tag(locale)),
                 cell(
                     mappings,
-                    t(tr_with(
+                    Html::text(tr_with(
                         locale,
                         Msg::ConceptMapsMappingCount,
                         &[("count", count.into())]

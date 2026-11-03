@@ -28,7 +28,6 @@ use crate::fhir::concept::Hierarchy;
 use crate::fhir::named::{Listed, NamedSearch};
 use crate::fhir::terminology::SystemCard;
 use crate::locale::{Msg, message, tr, tr_with};
-use crate::markup::{h, join, t};
 use crate::pages::listing::{Frame, ListState, NAME_COLUMN, counted};
 use crate::pages::parts::{Source, failure, heading, versions_word};
 use crate::request::Request;
@@ -153,7 +152,7 @@ fn listing(request: &Request, all: Vec<SystemRow>) -> Html {
             tr_with(locale, Msg::CodeSystemsNoMatch, &[("count", total.into())]),
         )
     } else {
-        let drawn = join(state.window(kept.len()).slice(&kept).iter().map(|row| {
+        let drawn = Html::join(state.window(kept.len()).slice(&kept).iter().map(|row| {
             let href = system_link(&row.card.url, request.version);
             let codes: Vec<String> = row
                 .card
@@ -161,21 +160,21 @@ fn listing(request: &Request, all: Vec<SystemRow>) -> Html {
                 .iter()
                 .filter_map(|version| version.code.clone())
                 .collect();
-            h(format!(
+            Html::raw(format!(
                 "<tr>{}{}{}{}{}</tr>",
                 title_cell(
                     None,
                     Some(&href),
-                    t(&row.name),
+                    Html::text(&row.name),
                     Some(canonical(&row.card.url))
                 ),
                 cell(source, row.source.tag(locale)),
-                cell(versions, t(versions_word(locale, &codes))),
+                cell(versions, Html::text(versions_word(locale, &codes))),
                 cell(
                     content,
-                    t(content_word(locale, row.card.content.as_deref()))
+                    Html::text(content_word(locale, row.card.content.as_deref()))
                 ),
-                cell(hierarchy, t(hierarchy_word(locale, &row.card))),
+                cell(hierarchy, Html::text(hierarchy_word(locale, &row.card))),
             ))
         }));
         let fields = state.fields(request, &[]);

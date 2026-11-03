@@ -38,7 +38,7 @@ use crate::fhir::value_set::{ClauseRow, PublishedValueSet};
 use crate::fhir::version::FhirVersion;
 use crate::fhir::{Document, FhirClient, VALUE_SET, resources_text};
 use crate::locale::{Msg, tr, tr_with};
-use crate::markup::{code, h, join, link, t};
+use crate::markup::{code, link};
 use crate::pages::detail::{Head, Kind, Links, PANE_PARAM, Pane, header, line, tabbed};
 use crate::pages::parts::{Source, failure, heading, name_of, system_names};
 use crate::pages::value_sets::DELETED_PARAM;
@@ -365,7 +365,7 @@ fn filter_sentence(
 ) -> Html {
     let (property, op, value) = part;
     let named = match display {
-        Some(display) => h(format!("{} {}", code(value), t(display))),
+        Some(display) => Html::raw(format!("{} {}", code(value), Html::text(display))),
         None => code(value),
     };
     let msg = match op.as_str() {
@@ -376,7 +376,7 @@ fn filter_sentence(
         "generalizes" => Msg::FilterGeneralizes,
         "=" if property == "concept" => Msg::FilterEquals,
         _ => {
-            return t(tr_with(
+            return Html::text(tr_with(
                 locale,
                 Msg::FilterOther,
                 &[
@@ -388,7 +388,11 @@ fn filter_sentence(
         }
     };
     let (before, after) = split_sentence(&tr(locale, msg));
-    h(format!("{}{named}{}", t(before), t(after)))
+    Html::raw(format!(
+        "{}{named}{}",
+        Html::text(before),
+        Html::text(after)
+    ))
 }
 
 /// The words of a filter sentence before and after the concept it names,
@@ -404,7 +408,7 @@ fn split_sentence(sentence: &str) -> (String, String) {
 /// names, or the whole code system.
 fn clause_sentence(locale: &Locale, row: &ClauseRow, system: &str, read: &Read) -> Html {
     if !row.filter_parts.is_empty() {
-        join(row.filter_parts.iter().map(|part| {
+        Html::join(row.filter_parts.iter().map(|part| {
             filter_sentence(
                 locale,
                 part,
@@ -412,7 +416,7 @@ fn clause_sentence(locale: &Locale, row: &ClauseRow, system: &str, read: &Read) 
             )
         }))
     } else if !row.concepts.is_empty() {
-        t(tr_with(
+        Html::text(tr_with(
             locale,
             if row.included {
                 Msg::ClauseIncludesCodes
@@ -422,13 +426,13 @@ fn clause_sentence(locale: &Locale, row: &ClauseRow, system: &str, read: &Read) 
             &[("count", row.concepts.len().into())],
         ))
     } else if !row.value_sets.is_empty() {
-        t(tr_with(
+        Html::text(tr_with(
             locale,
             Msg::ClauseValueSets,
             &[("count", row.value_sets.len().into())],
         ))
     } else {
-        t(tr(locale, Msg::ClauseWholeSystem))
+        Html::text(tr(locale, Msg::ClauseWholeSystem))
     }
 }
 
@@ -438,7 +442,7 @@ fn clause_card(request: &Request, read: &Read, row: &ClauseRow) -> Html {
     let system = row.system.clone().unwrap_or_default();
     let named = name_of(&read.names, &system);
     let title = if system.is_empty() {
-        t(tr(locale, Msg::ClauseNoSystem))
+        Html::text(tr(locale, Msg::ClauseNoSystem))
     } else {
         let href = system_link(&system, request.version);
         let version = row.version.as_ref().map(|version| {
@@ -448,11 +452,11 @@ fn clause_card(request: &Request, read: &Read, row: &ClauseRow) -> Html {
                 &[("version", version.clone().into())],
             )
         });
-        h(format!(
+        Html::raw(format!(
             "{} {}{}",
-            t(tr(locale, Msg::ClauseFrom)),
-            link(&href, t(&named)),
-            t(version.unwrap_or_default())
+            Html::text(tr(locale, Msg::ClauseFrom)),
+            link(&href, Html::text(&named)),
+            Html::text(version.unwrap_or_default())
         ))
     };
     let sentence = clause_sentence(locale, row, &system, read);
@@ -499,7 +503,7 @@ fn definition(request: &Request, read: &Read, source: Source) -> Html {
     let locale = &request.locale;
     let value_set = &read.document.value;
     let rows = value_set.clauses();
-    let drawn = join(rows.iter().map(|row| clause_card(request, read, row)));
+    let drawn = Html::join(rows.iter().map(|row| clause_card(request, read, row)));
     let count = u64::try_from(rows.len()).unwrap_or(u64::MAX);
     let selects = if rows.is_empty() {
         section_intro(tr(locale, Msg::ValueSetNoCompose))
@@ -567,7 +571,7 @@ fn expansion_panel(
                 Column::text("system", tr(locale, Msg::ValueSetSystem)).role(Role::Quiet),
             ];
             let [_, system] = &columns;
-            let rows = join(expanded.concepts.iter().map(|concept| {
+            let rows = Html::join(expanded.concepts.iter().map(|concept| {
                 let mut drawn = Coding::new(
                     concept.code.clone(),
                     concept.display.clone().unwrap_or_default(),
@@ -575,7 +579,7 @@ fn expansion_panel(
                 if concept.inactive {
                     drawn = drawn.inactive();
                 }
-                h(format!(
+                Html::raw(format!(
                     "<tr>{}{}</tr>",
                     title_cell(None, None, coding(locale, drawn, Layout::Inline), None),
                     cell(

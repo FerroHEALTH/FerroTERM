@@ -705,7 +705,7 @@ fn target_of(target: &StoredMapTarget, keys: &mut Keys) -> MapTarget {
 /// One source code, as the resource carries it.
 fn element_body(group: &Map<String, Value>, element: &MapElement, dialect: Dialect) -> Value {
     let code = element.code.trim();
-    let mut written = held_element(group, code);
+    let mut written = held(group, "element", code);
     written.insert("code".to_owned(), json!(code));
     set(&mut written, "display", element.display.trim());
     let unmapped = dialect.no_map && element.no_map;
@@ -733,11 +733,6 @@ fn element_body(group: &Map<String, Value>, element: &MapElement, dialect: Diale
         written.insert("target".to_owned(), Value::Array(targets));
     }
     Value::Object(written)
-}
-
-/// The stored element of `group` that `code` names.
-fn held_element(group: &Map<String, Value>, code: &str) -> Map<String, Value> {
-    held(group, "element", code)
 }
 
 /// One target, as the resource carries it.

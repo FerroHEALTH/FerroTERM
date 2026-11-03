@@ -97,6 +97,18 @@ async fn a_session_that_is_gone_or_never_was_answers_401() {
             .and_then(|value| value.to_str().ok()),
         "no cache keeps the answer"
     );
+    assert_eq!(
+        Some("application/problem+json"),
+        none.headers()
+            .get(http::header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+    );
+    let problem: Value = serde_json::from_str(&text(none).await).expect("a problem document");
+    assert_eq!(
+        Some("The session has ended; sign in again."),
+        problem.get("detail").and_then(Value::as_str),
+        "the console words the detail"
+    );
     let session = signed_in(&state, &provider).await;
     let mut headers = HeaderMap::new();
     headers.insert(COOKIE, session.parse().expect("a cookie header"));
