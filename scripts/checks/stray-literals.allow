@@ -5,6 +5,7 @@
 # files it does not cover.
 
 skip app/ferroterm-console/src/locale.rs   # the catalog mechanism: message ids
+skip app/ferroterm-console/src/session/tests.rs   # the session store's test module, which the guard skips when it is inline
 
 allow ^(ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Home|End|Enter|Escape|Tab)$   # UI Events KeyboardEvent.key values
 allow ^Ferro(BRIDGE|FED|EHR|TERM|HEALTH)   # product names, the same in every language
