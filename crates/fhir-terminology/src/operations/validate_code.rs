@@ -11,7 +11,8 @@
 
 use super::{CodeableConceptRef, CodingRef, Invocation, Issue, OperationError, resolve};
 use crate::language;
-use crate::provider::{CodeSystemProvider, ContentMode};
+use crate::provider::CodeSystemProvider;
+use crate::provider::declaration::ContentMode;
 use crate::registry::Registry;
 
 /// The input of `CodeSystem/$validate-code`.

@@ -10,10 +10,9 @@ use ferroterm_testkit::fhir::{ANIMALS, ANIMALS_NL, COLOURS, SKETCH, write_code_s
 use fhir_terminology::fhir_codesystem::load::{FhirVersion, load_dir, package_version};
 use fhir_terminology::fhir_codesystem::provider::FhirCodeSystem;
 use fhir_terminology::operations::{Invocation, OperationError, lookup, validate_code};
+use fhir_terminology::provider::declaration::{Capability, ContentMode};
 use fhir_terminology::provider::filter::{Filter, FilterOperator};
-use fhir_terminology::provider::{
-    Capability, CodeSystemProvider, ContentMode, PropertyValue, ProviderError,
-};
+use fhir_terminology::provider::{CodeSystemProvider, PropertyValue, ProviderError};
 use fhir_terminology::registry::Registry;
 use fhir_terminology::supplement::{Additions, Supplement, Supplemented};
 

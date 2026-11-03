@@ -8,7 +8,7 @@ use std::sync::Arc;
 use fhir_terminology::conceptmap::store::ConceptMapStore;
 use fhir_terminology::fhir_codesystem::provider::{BuildError, FhirCodeSystem};
 use fhir_terminology::operations::Sources;
-use fhir_terminology::provider::ContentMode;
+use fhir_terminology::provider::declaration::ContentMode;
 use fhir_terminology::registry::Registry;
 use fhir_terminology::valueset::store::ValueSetStore;
 

@@ -14,11 +14,14 @@ use crate::provider::code_system::{
     CHILD, CodeSystemModel, ConceptEntry, DEPRECATED, DEPRECATION_DATE, INACTIVE, NOT_SELECTABLE,
     PARENT, RETIRED, RETIREMENT_DATE, STATUS,
 };
+use crate::provider::declaration::{
+    Capability, Compositional, ContentMode, Declaration, HierarchyMeaning, PropertyDefinition,
+    PropertyKind,
+};
 use crate::provider::filter::Filter;
 use crate::provider::{
-    Capability, CodeSystemProvider, Compositional, Concept, ConceptSet, ContentMode, Declaration,
-    Designation, Hierarchy, HierarchyMeaning, Identity, Located, Property, PropertyDefinition,
-    PropertyKind, PropertyValue, ProviderError, Status,
+    CodeSystemProvider, Concept, ConceptSet, Designation, Hierarchy, Identity, Located, Property,
+    PropertyValue, ProviderError, Status,
 };
 use crate::text_match;
 

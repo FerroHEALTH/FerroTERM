@@ -12,11 +12,14 @@ use super::canonical::{Canonical, Reducer};
 use super::essence::{ESSENCE_DATA, Essence};
 use super::grammar::{Atom, Expression, parse};
 use crate::provider::compose::{Compose, Include, SystemRef};
+use crate::provider::declaration::{
+    Compositional, ContentMode, Declaration, FilterDefinition, ImplicitArgument, ImplicitForm,
+    PropertyDefinition, PropertyKind,
+};
 use crate::provider::filter::{Filter, FilterOperator};
 use crate::provider::{
-    CodeSystemProvider, Compositional, Concept, ConceptSet, ContentMode, Declaration, Designation,
-    DesignationUse, FilterDefinition, Hierarchy, Identity, ImplicitArgument, ImplicitForm, Located,
-    Property, PropertyDefinition, PropertyKind, PropertyValue, ProviderError, Status,
+    CodeSystemProvider, Concept, ConceptSet, Designation, DesignationUse, Hierarchy, Identity,
+    Located, Property, PropertyValue, ProviderError, Status,
 };
 use crate::registries::interned::Interned;
 

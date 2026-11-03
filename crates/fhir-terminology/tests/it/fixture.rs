@@ -8,11 +8,14 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use fhir_terminology::provider::compose::{Compose, Include, SystemRef};
+use fhir_terminology::provider::declaration::{
+    Capability, Compositional, ContentMode, Declaration, HierarchyMeaning, PropertyDefinition,
+    PropertyKind,
+};
 use fhir_terminology::provider::filter::{Filter, FilterOperator};
 use fhir_terminology::provider::{
-    Capability, CodeSystemProvider, Compositional, Concept, ConceptSet, ContentMode, Declaration,
-    Designation, DesignationUse, Hierarchy, HierarchyMeaning, Identity, Located, Property,
-    PropertyDefinition, PropertyKind, PropertyValue, ProviderError, Status,
+    CodeSystemProvider, Concept, ConceptSet, Designation, DesignationUse, Hierarchy, Identity,
+    Located, Property, PropertyValue, ProviderError, Status,
 };
 use fhir_terminology::registry::Registry;
 

@@ -10,9 +10,10 @@ use std::sync::Arc;
 use concept_graph::subsumption::Outcome;
 
 use crate::provider::compose::Compose;
+use crate::provider::declaration::Declaration;
 use crate::provider::{
-    CodeSystemProvider, Concept, ConceptSet, Declaration, Designation, Hierarchy, Identity,
-    ImplicitMetadata, Located, MapSelection, Property, ProviderError, Standing, Status, Successor,
+    CodeSystemProvider, Concept, ConceptSet, Designation, Hierarchy, Identity, ImplicitMetadata,
+    Located, MapSelection, Property, ProviderError, Standing, Status, Successor,
 };
 
 /// What a supplement adds to one concept.

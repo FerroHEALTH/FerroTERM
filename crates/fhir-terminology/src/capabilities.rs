@@ -9,9 +9,11 @@
 //! renders it into its generated type, and the R5-only `codeSystem.content`
 //! is a generated difference, not a hand-written conditional.
 
+use crate::provider::declaration::{
+    Capability, ContentMode, Declaration, FilterDefinition, ImplicitForm,
+};
 use crate::provider::filter::FilterOperator;
 use crate::provider::source::Source;
-use crate::provider::{Capability, ContentMode, Declaration, FilterDefinition, ImplicitForm};
 use crate::registry::Registry;
 
 /// One filter a version supports.
@@ -299,7 +301,7 @@ macro_rules! implicit_extension {
             use fhir_types::$module::extension::{Extension, ExtensionValue};
 
             use super::super::{IMPLICIT_ARGUMENT, IMPLICIT_EXTENSION, IMPLICIT_PATTERN};
-            use crate::provider::ImplicitForm;
+            use crate::provider::declaration::ImplicitForm;
 
             /// One extension per form, in declaration order.
             pub(in crate::capabilities) fn declaration(forms: &[ImplicitForm]) -> Vec<Extension> {
