@@ -323,7 +323,31 @@ macro_rules! render_value_set {
             ///
             /// The definition (the compose when `includeDefinition` asked for it) and
             /// the `expansion` with its identifier, timestamp, total, offset, echoed
-            /// Every system and version the tree names, for `contains.version`.
+            /// The systems whose codes carry `contains.version`: those the tree
+            /// draws from several versions, and those the compose names several
+            /// versions of, which stay distinct when a request forces them to one.
+            fn versioned<'a>(
+                items: &'a [Contains],
+                compose: &'a crate::provider::compose::Compose,
+            ) -> std::collections::BTreeSet<&'a str> {
+                let mut drawn = std::collections::BTreeMap::new();
+                systems(items, &mut drawn);
+                let mut named: std::collections::BTreeMap<&str, std::collections::BTreeSet<&str>> =
+                    std::collections::BTreeMap::new();
+                for system in compose.include.iter().filter_map(|i| i.system.as_ref()) {
+                    if let Some(version) = system.version.as_deref() {
+                        named.entry(system.url.as_str()).or_default().insert(version);
+                    }
+                }
+                drawn
+                    .into_iter()
+                    .chain(named)
+                    .filter(|(_, versions)| versions.len() > 1)
+                    .map(|(system, _)| system)
+                    .collect()
+            }
+
+            /// Every system and version the tree names.
             fn systems<'a>(
                 items: &'a [Contains],
                 versions: &mut std::collections::BTreeMap<
@@ -343,20 +367,16 @@ macro_rules! render_value_set {
             /// One level of the expansion tree, with its children below it.
             fn entries(
                 items: &[Contains],
-                versions: &std::collections::BTreeMap<
-                    &str,
-                    std::collections::BTreeSet<&str>,
-                >,
+                versioned: &std::collections::BTreeSet<&str>,
             ) -> Vec<ValueSetExpansionContains> {
                 items
                 .iter()
                 .map(|item| {
                     let entry = ValueSetExpansionContains {
                         system: Some(item.system.as_str().into()),
-                        version: versions
-                            .get(item.system.as_str())
-                            .filter(|v| v.len() > 1)
-                            .map(|_| item.version.as_str().into()),
+                        version: versioned
+                            .contains(item.system.as_str())
+                            .then(|| item.version.as_str().into()),
                         r#abstract: item.abstract_concept.then_some(true.into()),
                         inactive: item.inactive.then_some(true.into()),
                         code: Some(item.code.as_str().into()),
@@ -376,7 +396,7 @@ macro_rules! render_value_set {
                                 ..Default::default()
                             })
                             .collect(),
-                        contains: entries(&item.contains, versions),
+                        contains: entries(&item.contains, versioned),
                         ..Default::default()
                     };
                     render_value_set!(@properties $properties, $module, entry, item)
@@ -413,13 +433,11 @@ macro_rules! render_value_set {
                         ..Default::default()
                     })
                     .collect();
-                // NOTE: `contains.version` is populated when the expansion draws one
-                // system from several versions, so the codes stay distinguishable
+                // NOTE: `contains.version` is populated where one system's codes may come
+                // from several versions, so the codes stay distinguishable
                 // (<https://hl7.org/fhir/R4B/valueset-definitions.html#ValueSet.expansion.contains.version>).
-                let mut versions: std::collections::BTreeMap<&str, std::collections::BTreeSet<&str>> =
-                    std::collections::BTreeMap::new();
-                systems(&outcome.contains, &mut versions);
-                let contains = entries(&outcome.contains, &versions);
+                let versioned = versioned(&outcome.contains, &outcome.model.compose);
+                let contains = entries(&outcome.contains, &versioned);
                 let expansion = ValueSetExpansion {
                     identifier: Some(outcome.identifier.as_str().into()),
                     timestamp: outcome.timestamp.as_str().into(),
