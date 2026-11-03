@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! `$batch-validate-code`: many validations against one value set, in one
+//! `$batch-validate-code`: many validations against one value set or one code system, in one
 //! request.
 //!
 //! No `OperationDefinition` declares the operation, in any core package or in
@@ -148,4 +148,52 @@ async fn the_operation_is_offered_on_post_alone() {
         .expect("request");
     let response = server.send(request).await;
     assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+}
+
+// `CodeSystem/$batch-validate-code` runs each validation as a
+// `CodeSystem/$validate-code`, so the shared `url` names a code system
+// (<https://hl7.org/fhir/R4B/codesystem-operation-validate-code.html>).
+#[tokio::test]
+async fn the_code_system_route_validates_against_the_code_system_the_url_names() {
+    let server = Server::start_with_resources();
+    let code = |code: &str| {
+        json!({"name": "validation", "resource": {"resourceType": "Parameters", "parameter": [
+            {"name": "code", "valueCode": code}
+        ]}})
+    };
+    let (status, body) = server
+        .post(
+            "/r4b/CodeSystem/$batch-validate-code",
+            &json!({"resourceType": "Parameters", "parameter": [
+                {"name": "url", "valueUri": ANIMALS},
+                code("dog"),
+                code("nothing-like-it"),
+                coding("kitten")
+            ]}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let answers = validations(&body);
+    assert_eq!(answers.len(), 3, "one answer per validation: {body}");
+    for answer in &answers {
+        assert_eq!(
+            answer["resourceType"], "Parameters",
+            "each slot is a code system validation, not a value set lookup: {body}"
+        );
+    }
+    assert_eq!(
+        output(answers[0], "result").expect("result")["valueBoolean"],
+        true,
+        "{body}"
+    );
+    assert_eq!(
+        output(answers[1], "result").expect("result")["valueBoolean"],
+        false,
+        "a code the code system does not define: {body}"
+    );
+    assert_eq!(
+        output(answers[2], "result").expect("result")["valueBoolean"],
+        true,
+        "a coding of the code system: {body}"
+    );
 }

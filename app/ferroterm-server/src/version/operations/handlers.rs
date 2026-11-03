@@ -194,14 +194,28 @@ macro_rules! handlers {
             });
 
             $crate::version::operations::handlers::handler!(post
-                /// `POST /ValueSet/$batch-validate-code` and `POST /CodeSystem/$batch-validate-code`.
+                /// `POST /ValueSet/$batch-validate-code`: each validation a
+                /// `ValueSet/$validate-code`.
                 ///
                 /// The operation changes nothing, but it carries its validations in a body,
                 /// so it is offered on `POST` alone
                 /// (<https://hl7.org/fhir/R4B/operations.html#executing>).
                 batch_validate_code_post, |state, headers, body| {
                 from_body_accepting(&state, &VALUE_SET_VALIDATE_CODE, &[VALIDATION], &headers, &body)
-                    .and_then(|(scope, p)| run_batch_validate(&scope, &p))
+                    .and_then(|(scope, p)| run_batch_validate(&scope, &p, &|scope, merged| {
+                        value_set_validation(scope, None, merged, &Origin::Unplaced)
+                    }))
+            });
+
+            $crate::version::operations::handlers::handler!(post
+                /// `POST /CodeSystem/$batch-validate-code`: each validation a
+                /// `CodeSystem/$validate-code`
+                /// (<https://hl7.org/fhir/R4B/codesystem-operation-validate-code.html>).
+                code_system_batch_validate_code_post, |state, headers, body| {
+                from_body_accepting(&state, &CODE_SYSTEM_VALIDATE_CODE, &[VALIDATION], &headers, &body)
+                    .and_then(|(scope, p)| run_batch_validate(&scope, &p, &|scope, merged| {
+                        code_system_validation(scope, &Invocation::Type, merged)
+                    }))
             });
 
             $crate::version::operations::handlers::handler!(get
