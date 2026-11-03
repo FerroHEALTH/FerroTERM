@@ -14,7 +14,11 @@
 use serde::de::DeserializeOwned;
 
 use crate::fhir::capability::Capabilities;
+use crate::fhir::compose::stored::StoredValueSet;
+use crate::fhir::expansion::ExpandedValueSet;
+use crate::fhir::searchset::Found;
 use crate::fhir::terminology::TerminologyCapabilities;
+use crate::fhir::value_set::PublishedValueSet;
 use crate::fhir::version::FhirVersion;
 
 /// The resources the console reads at one FHIR release.
@@ -23,6 +27,14 @@ pub(crate) trait Release {
     type CapabilityStatement: DeserializeOwned + Reads<Capabilities>;
     /// The release's `TerminologyCapabilities`.
     type TerminologyCapabilities: DeserializeOwned + Reads<TerminologyCapabilities>;
+    /// The release's `ValueSet`, read as published and as `$expand`
+    /// answered it.
+    type ValueSet: DeserializeOwned
+        + Reads<PublishedValueSet>
+        + Reads<ExpandedValueSet>
+        + Reads<StoredValueSet>;
+    /// The release's `Bundle`, read for the resources a `searchset` carries.
+    type Bundle: DeserializeOwned + Reads<Found<PublishedValueSet>>;
 }
 
 /// A resource of one release, read into what a page draws of it.
@@ -54,6 +66,30 @@ impl Decodes for TerminologyCapabilities {
     }
 }
 
+impl Decodes for PublishedValueSet {
+    fn decode<R: Release>(body: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str::<R::ValueSet>(body).map(|value_set| value_set.read())
+    }
+}
+
+impl Decodes for ExpandedValueSet {
+    fn decode<R: Release>(body: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str::<R::ValueSet>(body).map(|value_set| value_set.read())
+    }
+}
+
+impl Decodes for StoredValueSet {
+    fn decode<R: Release>(body: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str::<R::ValueSet>(body).map(|value_set| value_set.read())
+    }
+}
+
+impl Decodes for Found<PublishedValueSet> {
+    fn decode<R: Release>(body: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str::<R::Bundle>(body).map(|bundle| bundle.read())
+    }
+}
+
 /// FHIR 4.0.1.
 #[derive(Debug)]
 pub(crate) struct R4;
@@ -79,6 +115,8 @@ macro_rules! release {
                 fhir_types::$module::capability_statement::CapabilityStatement;
             type TerminologyCapabilities =
                 fhir_types::$module::terminology_capabilities::TerminologyCapabilities;
+            type ValueSet = fhir_types::$module::value_set::ValueSet;
+            type Bundle = fhir_types::$module::bundle::Bundle;
         }
     };
 }
@@ -101,5 +139,32 @@ impl FhirVersion {
             Self::R5 => A::decode::<R5>(body),
             Self::R6 => A::decode::<R6>(body),
         }
+    }
+}
+
+/// What the readers' tests share: a fixture written with only the elements
+/// a test is about, completed with the elements its resource requires.
+#[cfg(test)]
+pub(crate) mod fixture {
+    use serde_json::{Map, Value};
+
+    /// `json`, a `resource_type` written with only what a test is about,
+    /// completed with the `resourceType`, the `status` and an expansion's
+    /// `timestamp` its definition requires, as a document text.
+    pub(crate) fn completed(resource_type: &str, json: &str) -> String {
+        let mut document: Map<String, Value> =
+            serde_json::from_str(json).expect("the fixture is a JSON object");
+        document
+            .entry("resourceType")
+            .or_insert_with(|| Value::from(resource_type));
+        document
+            .entry("status")
+            .or_insert_with(|| Value::from("active"));
+        if let Some(Value::Object(expansion)) = document.get_mut("expansion") {
+            expansion
+                .entry("timestamp")
+                .or_insert_with(|| Value::from("2026-01-01T00:00:00Z"));
+        }
+        Value::Object(document).to_string()
     }
 }
