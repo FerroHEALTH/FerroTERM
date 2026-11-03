@@ -98,18 +98,23 @@ axum documentation of the pinned release.
   links to the console's routes (`crate::post`).
 - **A request that is not a safe method is taken only from the console's
   own pages** (`server::same_origin_only`, fetch metadata first).
-- **The reader's sign-in lives on the console's server** (`crate::session`,
-  `crate::oidc`): authorization code with PKCE at the configured OpenID
-  Provider, the session in memory behind one opaque `HttpOnly` cookie. The
-  page is told the reader's name and granted scopes (`auth::Operator`),
-  which decide whether an edit control is drawn. The terminology server
-  checks the token on every write. A sign-in's outcomes are the states of
-  the sign-in page (`/auth/sign-in?state=…`).
+- **The reader's sign-in lives on the console's server**, run by
+  `ferrohealth-session` (FerroHEALTH/FerroAUTH): authorization code with
+  PKCE at the configured OpenID Provider through `ferrohealth-smart`'s
+  relying party, the session behind one opaque `HttpOnly` cookie, and the
+  routes `/login`, `/auth/callback`, `/logout` and `/session`. Nothing of the
+  sign-in, the session store or its cookies is written here: a gap is filed
+  on FerroAUTH. Its middleware hands every page the request's
+  `record::Held`, which the visit reads; the page is told the reader's name
+  and granted scopes (`auth::Operator`), which decide whether an edit
+  control is drawn. The terminology server checks the token on every write.
+  A stopped sign-in lands on a state of the sign-in page
+  (`/auth/sign-in?state=…`, `auth::pages::ConsolePages`).
 - **A signed-in page watches its session** (FerroUI `docs/consoles.md`,
   "The session's end"): the shell draws `view::session::session_watch`
   from what the session had left as the server drew the page, the sign-in
   page of an ended session draws `view::session::session_ended`, and
-  `session::watch` answers the session route `/auth/session`, where `GET`
+  `ferrohealth-session` answers the session route `/session`, where `GET`
   extends nothing and `POST`, the reader's own activity, starts the idle
   timeout again.
 - **Reading is open.** A visitor reads every screen, as the server's read

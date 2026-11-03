@@ -106,7 +106,7 @@ fn a_healthcheck_of_a_serving_console_succeeds() {
         .block_on(tokio::net::TcpListener::bind("127.0.0.1:0"))
         .expect("a free port");
     let address = listener.local_addr().expect("an address");
-    let state = crate::provider::console(None, "");
+    let state = runtime.block_on(crate::provider::console(None, ""));
     let lifecycle = state.lifecycle().clone();
     let router = ferroterm_console::server::router(state);
     runtime.spawn(ferroterm_console::server::serve(

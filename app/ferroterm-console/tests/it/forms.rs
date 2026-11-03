@@ -30,7 +30,7 @@ fn preference_cookie(response: &http::Response<Body>, key: &str) -> Option<Strin
 
 #[tokio::test]
 async fn a_preference_is_kept_a_year_and_the_browser_returns_to_its_page() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let response = send(
         &state,
         post("/preference", "theme=dark&back=%2Fsystems%3Fq%3Da"),
@@ -55,7 +55,7 @@ async fn a_preference_is_kept_a_year_and_the_browser_returns_to_its_page() {
 
 #[tokio::test]
 async fn a_preference_kept_on_your_preferences_returns_saying_which() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let response = send(
         &state,
         post("/preference", "page-size=50&back=%2Fpreferences%2Freading"),
@@ -70,7 +70,7 @@ async fn a_preference_kept_on_your_preferences_returns_saying_which() {
 
 #[tokio::test]
 async fn the_typed_preferences_are_ferroui_s_bounded_fields_and_the_saved_one_is_marked() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let response = send(
         &state,
         get(
@@ -109,7 +109,7 @@ async fn the_typed_preferences_are_ferroui_s_bounded_fields_and_the_saved_one_is
 
 #[tokio::test]
 async fn a_switch_keeps_the_last_value_it_posts() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let response = send(
         &state,
         post("/preference", "theme=light&theme=dark&back=%2F"),
@@ -124,14 +124,14 @@ async fn a_switch_keeps_the_last_value_it_posts() {
 
 #[tokio::test]
 async fn a_preference_post_without_a_page_returns_to_the_dashboard() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let response = send(&state, post("/preference", "theme=dark")).await;
     assert_eq!("/", location(&response));
 }
 
 #[tokio::test]
 async fn a_preference_post_naming_a_page_off_the_console_returns_to_the_dashboard() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let response = send(
         &state,
         post(
@@ -145,7 +145,7 @@ async fn a_preference_post_naming_a_page_off_the_console_returns_to_the_dashboar
 
 #[tokio::test]
 async fn a_preference_post_naming_no_preference_is_refused() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let response = send(&state, post("/preference", "back=%2F")).await;
     assert_eq!(StatusCode::BAD_REQUEST, response.status());
     assert_eq!(Vec::<String>::new(), set_cookies(response.headers()));
@@ -154,7 +154,7 @@ async fn a_preference_post_naming_no_preference_is_refused() {
 
 #[tokio::test]
 async fn a_preference_post_naming_two_preferences_is_refused() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let response = send(&state, post("/preference", "theme=dark&page-size=50")).await;
     assert_eq!(StatusCode::BAD_REQUEST, response.status());
     assert_eq!("A post keeps one preference.", text(response).await);
@@ -162,7 +162,7 @@ async fn a_preference_post_naming_two_preferences_is_refused() {
 
 #[tokio::test]
 async fn a_preference_or_value_the_console_does_not_offer_is_refused() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     for body in [
         "theme=purple",
         "colour=red",
@@ -181,7 +181,7 @@ async fn a_preference_or_value_the_console_does_not_offer_is_refused() {
 
 #[tokio::test]
 async fn reset_clears_every_preference_cookie_the_session_version_among_them() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let response = send(&state, post("/preferences/reset", "back=%2Fpreferences")).await;
     assert_eq!(StatusCode::SEE_OTHER, response.status());
     assert_eq!("/preferences", location(&response));
@@ -210,7 +210,7 @@ async fn reset_clears_every_preference_cookie_the_session_version_among_them() {
 
 #[tokio::test]
 async fn a_reset_without_a_page_is_refused_as_a_malformed_form() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let response = send(&state, post("/preferences/reset", "")).await;
     assert_eq!(StatusCode::UNPROCESSABLE_ENTITY, response.status());
     assert_eq!(Vec::<String>::new(), set_cookies(response.headers()));
@@ -218,7 +218,7 @@ async fn a_reset_without_a_page_is_refused_as_a_malformed_form() {
 
 #[tokio::test]
 async fn the_navigation_is_folded_and_unfolded() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     for sidebar in ["rail", "full"] {
         let response = send(
             &state,
@@ -237,7 +237,7 @@ async fn the_navigation_is_folded_and_unfolded() {
 
 #[tokio::test]
 async fn a_navigation_state_that_is_neither_rail_nor_full_is_refused() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let response = send(&state, post("/sidebar", "sidebar=wide&back=%2F")).await;
     assert_eq!(StatusCode::BAD_REQUEST, response.status());
     assert_eq!(
@@ -248,7 +248,7 @@ async fn a_navigation_state_that_is_neither_rail_nor_full_is_refused() {
 
 #[tokio::test]
 async fn a_fhir_version_is_kept_for_the_session_and_the_page_read_through_it() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let response = send(
         &state,
         get("/fhir-version?fhir=r5&back=%2Fsystems%3Ffhir%3Dr5", &[]),
@@ -269,7 +269,7 @@ async fn a_fhir_version_is_kept_for_the_session_and_the_page_read_through_it() {
 
 #[tokio::test]
 async fn a_fhir_version_the_server_does_not_serve_is_refused() {
-    let state = console(None, "");
+    let state = console(None, "").await;
     let response = send(&state, get("/fhir-version?fhir=dstu2&back=%2F", &[])).await;
     assert_eq!(StatusCode::BAD_REQUEST, response.status());
     assert_eq!(Vec::<String>::new(), set_cookies(response.headers()));
@@ -281,7 +281,7 @@ async fn a_fhir_version_the_server_does_not_serve_is_refused() {
 
 #[tokio::test]
 async fn a_cookie_that_is_not_secure_carries_no_host_prefix() {
-    let state = console(None, "[session]\nsecure_cookie = false\n");
+    let state = console(None, "[session]\nsecure_cookie = false\n").await;
     let response = send(&state, post("/sidebar", "sidebar=rail&back=%2F")).await;
     let cookies = set_cookies(response.headers());
     assert!(

@@ -74,7 +74,7 @@ fn reaching(server: &MockServer) -> String {
 #[tokio::test]
 async fn the_answer_route_answers_the_matches_and_names_a_read_that_failed() {
     let server = terminology().await;
-    let state = console(None, &reaching(&server));
+    let state = console(None, &reaching(&server)).await;
     let response = send(&state, get("/find/answer?q=respir", &[])).await;
     assert_eq!(StatusCode::OK, response.status());
     let body = text(response).await;
@@ -99,7 +99,7 @@ async fn the_answer_route_answers_the_matches_and_names_a_read_that_failed() {
 #[tokio::test]
 async fn the_find_page_lists_every_match_in_the_page() {
     let server = terminology().await;
-    let state = console(None, &reaching(&server));
+    let state = console(None, &reaching(&server)).await;
     let response = send(&state, get("/find?q=respir", &[])).await;
     assert_eq!(StatusCode::OK, response.status());
     let page = text(response).await;
@@ -123,7 +123,7 @@ async fn the_find_page_lists_every_match_in_the_page() {
 #[tokio::test]
 async fn the_top_bar_search_asks_the_answer_route() {
     let server = terminology().await;
-    let state = console(None, &reaching(&server));
+    let state = console(None, &reaching(&server)).await;
     let page = text(send(&state, get("/find?q=respir", &[])).await).await;
     assert!(
         page.contains("id=\"find-panel\""),

@@ -35,6 +35,10 @@ serde_json.workspace = true
 ferrohealth-ui.workspace = true
 # The configuration loader and the `<key>_file` rule of its secrets.
 ferrohealth-config.workspace = true
+# The operator's sign-in at the OpenID Provider and the session: the
+# `[oidc]` and `[session]` sections, the store, and the four sign-in routes
+# with the middleware every page sits behind.
+ferrohealth-session.workspace = true
 ferrohealth-health.workspace = true
 ferrohealth-secret.workspace = true
 ferrohealth-server = { workspace = true, features = ["console"] }
@@ -58,22 +62,22 @@ url.workspace = true
 # A run's record offered as a download.
 base64.workspace = true
 tracing.workspace = true
-aws-lc-rs.workspace = true
 axum.workspace = true
 clap.workspace = true
 cookie.workspace = true
-# The ID Token of a sign-in, verified against the provider's JWK Set
-# (OpenID Connect Core 1.0 §3.1.3.7).
-jsonwebtoken.workspace = true
-# The terminology server's FHIR API, the OpenID Provider, and the
-# healthcheck job asking the console beside it.
+# The terminology server's FHIR API and the healthcheck job asking the
+# console beside it.
 reqwest.workspace = true
-secrecy.workspace = true
-# `sync` holds one refresh of a session's access token at a time.
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "signal", "sync", "time"] }
 toml.workspace = true
 
 [dev-dependencies]
+# The test provider's signing key.
+aws-lc-rs.workspace = true
+# The relying party the console signs in through, whose exchange and refresh
+# the tests drive, and the ID Tokens the test provider signs.
+ferrohealth-smart.workspace = true
+jsonwebtoken.workspace = true
 tempfile.workspace = true
 # The router driven in-process with `ServiceExt::oneshot`.
 tower = { workspace = true, features = ["util"] }

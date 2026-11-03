@@ -28,7 +28,9 @@ use ferrohealth_server::section::ServerSection;
 use ferrohealth_server::stack::{self, StackPolicy};
 use ferrohealth_telemetry::request_log::RequestLog;
 
-use crate::problem::{self, Kind};
+use ferroterm_problem::Kind as _;
+
+use crate::problem::Kind;
 use crate::record::RecordError;
 use crate::run::Service;
 
@@ -111,7 +113,7 @@ async fn one_run(State(service): State<Arc<Service>>, Path(id): Path<String>) ->
 
 /// The answer to a run id the service holds no record of.
 fn not_a_run() -> Response {
-    problem::respond(
+    ferroterm_problem::respond(
         Kind::RunNotFound.problem("no run of this service has that id; GET /runs lists them"),
         None,
     )
@@ -119,7 +121,7 @@ fn not_a_run() -> Response {
 
 /// Anything else on the admin listener.
 async fn unknown() -> Response {
-    problem::blank(
+    ferroterm_problem::blank(
         StatusCode::NOT_FOUND,
         "the admin listener answers POST /run, POST /activate, GET /runs, GET /runs/{id}, GET /metrics and the health routes",
     )
@@ -130,7 +132,7 @@ async fn unknown() -> Response {
 fn failed(error: &dyn core::error::Error) -> Response {
     let reason = crate::reason(error);
     tracing::error!(error = reason, "an admin request could not be served");
-    problem::respond(
+    ferroterm_problem::respond(
         Kind::RecordsUnreadable
             .problem("the run records could not be read; the service log names the cause"),
         None,

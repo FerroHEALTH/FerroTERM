@@ -16,8 +16,8 @@ app/ferroterm-console/src/pages/sync.rs: hidden -> crate::pages::errors::not_fou
 app/ferroterm-console/src/url.rs: RequestUrl::new -> Self::default()
 app/ferroterm-server/src/elements.rs: invalid -> Failure::new(StatusCode::BAD_REQUEST, "invalid", diagnostics)
 app/ferroterm-server/src/persistence.rs: ResourceStore::put -> self.put_by(record, Method::Put)
-app/ferroterm-server/src/reload.rs: unknown -> crate::problem::blank(StatusCode::NOT_FOUND, "the admin listener answers POST /reload and the health routes alone", )
+app/ferroterm-server/src/reload.rs: unknown -> ferroterm_problem::blank(StatusCode::NOT_FOUND, "the admin listener answers POST /reload and the health routes alone", )
 app/ferroterm-server/src/state.rs: supplement_of -> Supplement::from_code_system(model)
 app/ferroterm-server/src/state.rs: unique_id -> unique_id_of(taken, wanted)
-app/ferroterm-sync/src/admin.rs: unknown -> problem::blank(StatusCode::NOT_FOUND, "the admin listener answers POST /run, POST /activate, GET /runs, GET /runs/{id}, GET /metrics and the health routes", )
+app/ferroterm-sync/src/admin.rs: unknown -> ferroterm_problem::blank(StatusCode::NOT_FOUND, "the admin listener answers POST /run, POST /activate, GET /runs, GET /runs/{id}, GET /metrics and the health routes", )
 crates/fhir-terminology/src/clock.rs: now -> jiff::Timestamp::now()	the one wall-clock read: its NOTE records the panic decision every caller shares

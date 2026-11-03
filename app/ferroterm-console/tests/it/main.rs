@@ -23,6 +23,7 @@ mod logout;
 mod provider;
 mod refresh;
 mod service;
+mod sessions;
 mod sign_in;
 mod strict;
 mod watch;

@@ -67,7 +67,7 @@ where
         Common::Healthcheck => runtime_then(|| healthcheck(&settings)),
         Common::Config {
             command: ConfigCommand::Check,
-        } => config_check(settings),
+        } => config_check(&settings),
         Common::Serve => runtime_then(|| serve(settings)),
     }
 }
@@ -94,8 +94,9 @@ where
     }
 }
 
-/// Runs `config check`: the state the server would start with is built, and
-/// nothing is bound.
+/// Runs `config check`: the settings are resolved and the terminology
+/// server's client is built, and nothing is bound or asked, so the check
+/// works offline; the provider's metadata is read when the console starts.
 #[expect(
     clippy::print_stdout,
     reason = "the job's one answer goes to standard output"
@@ -104,9 +105,9 @@ where
     clippy::print_stderr,
     reason = "the job's refusal goes to standard error"
 )]
-fn config_check(settings: Settings) -> ExitCode {
-    match ConsoleState::new(settings) {
-        Ok(_state) => {
+fn config_check(settings: &Settings) -> ExitCode {
+    match crate::server::upstream_client(settings) {
+        Ok(_client) => {
             println!("ferroterm-console: the configuration is valid");
             ExitCode::SUCCESS
         }
@@ -161,7 +162,7 @@ async fn serve(settings: Settings) -> ExitCode {
     };
     ferrohealth_telemetry::panic::install_hook();
     let listen = settings.listen;
-    let state = match ConsoleState::new(settings) {
+    let state = match ConsoleState::new(settings).await {
         Ok(state) => state,
         Err(error) => {
             tracing::error!(error = %chain(&error), "cannot start");
