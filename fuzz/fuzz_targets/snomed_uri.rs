@@ -22,7 +22,7 @@ static EDITION: LazyLock<(tempfile::TempDir, Registry)> = LazyLock::new(|| {
     let dir = tempfile::tempdir().expect("tempdir");
     ferroterm_testkit::snomed::write(dir.path()).expect("writes the edition");
     let provider = SnomedProvider::open(dir.path(), "en").expect("opens");
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry.register(Arc::new(provider)).expect("registers");
     (dir, registry)
 });
