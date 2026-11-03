@@ -20,7 +20,9 @@ default-valueset-version/indirect-validation-two
 default-valueset-version/indirect-validation-zero
 default-valueset-version/indirect-validation-zero-pinned
 default-valueset-version/indirect-validation-zero-pinned-wrong
+deprecated/deprecating-validate
 deprecated/draft
+deprecated/draft-validate
 deprecated/experimental
 deprecated/experimental-validate
 deprecated/not-withdrawn
@@ -168,10 +170,12 @@ notSelectable/notSelectable-reprop-true
 notSelectable/notSelectable-reprop-true-false
 notSelectable/notSelectable-reprop-true-true
 notSelectable/notSelectable-reprop-true-unknown
+notSelectable/notSelectable-unprop-all
 notSelectable/notSelectable-unprop-false
 notSelectable/notSelectable-unprop-false-false
 notSelectable/notSelectable-unprop-false-true
 notSelectable/notSelectable-unprop-false-unknown
+notSelectable/notSelectable-unprop-true
 notSelectable/notSelectable-unprop-true-false
 notSelectable/notSelectable-unprop-true-true
 notSelectable/notSelectable-unprop-true-unknown
@@ -366,6 +370,7 @@ translate/translate-1-codeableconcept
 translate/translate-1-coding
 translate/translate-2
 translate/translate-3
+translate/translate-4
 translate2/translate-5a
 validation/validation-complex-codeableconcept-full
 validation/validation-complex-codeableconcept-vsonly

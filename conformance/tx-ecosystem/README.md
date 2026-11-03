@@ -24,8 +24,8 @@ above the suite's own. The `snomed`, `icd-11`, `tx.fhir.org`, `mimetypes`, and
 
 | mode | surface | pass list | passed of ran | needs | open failures |
 |---|---|---|---|---|---|
-| `general` | `/r4b` | `passing.txt` | 632 of 764 | nothing | #353 |
-| `general` | `/r4` | `passing-r4.txt` | 635 of 764 | nothing | #353 |
+| `general` | `/r4b` | `passing.txt` | 637 of 764 | nothing | #353 |
+| `general` | `/r4` | `passing-r4.txt` | 649 of 764 | nothing | #353 |
 | `general` | `/r5` | `passing-r5.txt` | 637 of 764 | nothing | #353 |
 | `snomed` | `/r4b` | `passing-snomed.txt` | 2 of 170 | a SNOMED CT edition | #344, #352, #349 |
 | `icd-11` | `/r4b` | `passing-icd-11.txt` | 44 of 52 | the three ICD-11 artifacts | #350, #349, #117 |
