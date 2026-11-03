@@ -173,6 +173,59 @@ fn member_of_reads_the_tables_and_selects_fields() {
     ));
 }
 
+/// ECL 2.3, "Refset Containing": `^R` is the reference sets with an active
+/// member whose referenced component is in the set.
+#[test]
+fn refset_containing_any_finds_the_reference_sets_of_the_members() {
+    let (_dir, p) = provider();
+    assert_eq!(
+        set(&p, &format!("^R {}", c(CAT))),
+        [PETS, CODES_MAP, ICD10_MAP]
+    );
+    assert_eq!(set(&p, &format!("^R{}", c(DOG))), [PETS, CODES_MAP]);
+    assert_eq!(
+        set(&p, &format!("^R ( {} OR {} )", c(CAT), c(DOG))),
+        [PETS, CODES_MAP, ICD10_MAP],
+        "a nested constraint: any of its concepts"
+    );
+    assert!(
+        set(&p, &format!("^R {}", c(ANIMAL))).is_empty(),
+        "a concept no reference set holds"
+    );
+    assert!(
+        set(&p, &format!("^R {}", c(FISH)))
+            .iter()
+            .all(|r| ![PETS, CODES_MAP, ICD10_MAP].contains(r)),
+        "the target of an association is not its referenced component"
+    );
+    let any = set(&p, "^R *");
+    assert!(
+        [PETS, CODES_MAP, ICD10_MAP].iter().all(|r| any.contains(r)),
+        "every reference set with a member"
+    );
+    assert_eq!(
+        set(
+            &p,
+            &format!("^R {} {{{{ M mapTarget = \"C01\" }}}}", c(CAT))
+        ),
+        [CODES_MAP, ICD10_MAP],
+        "a member filter picks the members that count"
+    );
+    assert!(
+        set(
+            &p,
+            &format!("^R {} {{{{ M mapTarget = \"C01\" }}}}", c(DOG))
+        )
+        .is_empty(),
+        "the member of the concept must pass the filter"
+    );
+    assert_eq!(
+        set(&p, &format!("^ ( ^R {} )", c(DOG))),
+        [CAT, DOG],
+        "the members of the reference sets that hold the dog"
+    );
+}
+
 #[test]
 fn compound_constraints_are_set_algebra() {
     let (_dir, p) = provider();
@@ -319,7 +372,7 @@ fn refinements_match_attribute_rows_with_their_cardinalities() {
 fn attribute_groups_hold_within_one_role_group() {
     let (_dir, p) = provider();
     let animals = c(ANIMAL);
-    // ECL 2.2, "Attribute groups": the attributes of a group must be in the
+    // ECL 2.3, "Attribute groups": the attributes of a group must be in the
     // same relationship group; the cat states both in group 1, the dog splits
     // them over two groups.
     assert_eq!(
@@ -744,6 +797,60 @@ fn member_filters_read_the_fields_of_the_rows() {
             EvalError::Unsupported(_)
         ),
         "the tables hold active members only"
+    );
+}
+
+/// ECL 2.3, the active filter's wildcard: `active = *` admits either status
+/// and `active != *` neither, in each of the three filters.
+#[test]
+fn the_active_wildcard_admits_either_status() {
+    let (_dir, p) = provider();
+    let animals = c(ANIMAL);
+    assert_eq!(
+        set(&p, "* {{ C active = * }}"),
+        set(&p, "*"),
+        "a concept filter on either status keeps every concept"
+    );
+    assert_eq!(
+        set(&p, "* {{ C active != * }}"),
+        Vec::<u32>::new(),
+        "no concept has neither status"
+    );
+    assert_eq!(
+        set(
+            &p,
+            &format!("< {animals} {{{{ term = \"moggy\", active = * }}}}")
+        ),
+        [CAT],
+        "an inactive description matches under either status"
+    );
+    assert_eq!(
+        set(
+            &p,
+            &format!("< {animals} {{{{ term = \"cat\", active = * }}}}")
+        ),
+        [CAT],
+        "an active one too"
+    );
+    assert_eq!(
+        set(
+            &p,
+            &format!("< {animals} {{{{ term = \"cat\", active != * }}}}")
+        ),
+        Vec::<u32>::new(),
+        "no description has neither status"
+    );
+    assert_eq!(
+        set(&p, &format!("^ {} {{{{ M active != * }}}}", c(PETS))),
+        Vec::<u32>::new(),
+        "no member has neither status"
+    );
+    assert!(
+        matches!(
+            refused(&p, &format!("^ {} {{{{ M active = * }}}}", c(PETS))),
+            EvalError::Unsupported(_)
+        ),
+        "either status needs the inactive members the tables do not hold"
     );
 }
 

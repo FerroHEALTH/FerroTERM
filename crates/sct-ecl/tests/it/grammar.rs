@@ -5,9 +5,10 @@
 //! (`vendor/syntax/ECL.g4`; the rule named in each test).
 
 use sct_ecl::ast::{
-    AttributeSet, AttributeValue, Cardinality, Comparison, ConstraintOperator, Equality,
-    ExpressionConstraint, FieldValue, FocusConcept, HistorySupplement, MemberFilter, Refinement,
-    RefsetFields, Sctid, SubAttributeSet, SubRefinement, TypedSearchTerm,
+    ActiveValue, AttributeSet, AttributeValue, Cardinality, Comparison, ConceptFilter,
+    ConcreteString, ConstraintOperator, DescriptionFilter, Equality, ExpressionConstraint,
+    FieldValue, FilterConstraint, FocusConcept, HistorySupplement, MemberFilter, MemberOf,
+    Refinement, RefsetFields, RefsetOperator, Sctid, SubAttributeSet, SubRefinement,
 };
 use sct_ecl::{ParseError, parse};
 
@@ -84,7 +85,10 @@ fn sctids_are_six_to_eighteen_digits_without_a_leading_zero() {
 
 #[test]
 fn member_of_with_its_field_selection() {
-    let fields = |input: &str| sub(input).member_of.expect("member of").fields;
+    let fields = |input: &str| match sub(input).refset_operator {
+        Some(RefsetOperator::MemberOf(MemberOf { fields })) => fields,
+        other => panic!("{input:?} has {other:?}"),
+    };
     assert_eq!(fields("^ 700043003"), None);
     assert_eq!(fields("^ [*] 700043003"), Some(RefsetFields::Any));
     assert_eq!(
@@ -287,11 +291,11 @@ fn concrete_values_follow_the_grammar_order() {
     ));
     assert!(matches!(
         value("< 111115 : 111116 = \"PANADOL\""),
-        AttributeValue::String { terms, .. } if terms == [TypedSearchTerm::Match(vec![String::from("PANADOL")])]
+        AttributeValue::String { values, .. } if values == [ConcreteString(String::from("PANADOL"))]
     ));
     assert!(matches!(
-        value("< 111115 : 111116 = (\"a\" wild:\"b*\")"),
-        AttributeValue::String { terms, .. } if terms.len() == 2
+        value("< 111115 : 111116 = (\"a\" \"b*\")"),
+        AttributeValue::String { values, .. } if values.len() == 2
     ));
     assert!(matches!(
         value("< 111115 : 111116 != TRUE"),
@@ -326,7 +330,7 @@ fn concrete_values_follow_the_grammar_order() {
     assert_eq!(
         refused("< 111115 : 111116 = \"\"").0,
         20,
-        "a search needs a word"
+        "a concrete string has a character"
     );
     assert_eq!(
         refused("< 111115 : 111116 = (\"a\"\"b\")").0,
@@ -531,4 +535,146 @@ fn nesting_past_the_limit_is_refused_rather_than_descended() {
 fn nesting_depth_counts_open_brackets_not_all_of_them() {
     let wide = format!("{} 138875005", "(138875005) OR ".repeat(200));
     assert!(parse(&wide).is_ok(), "200 closed groups nest one deep");
+}
+
+/// ECL 2.3 `refsetContainingAny`: `^R`, the caret touching an upper-case
+/// `R`, before a focus or a nested constraint, with member filters after it.
+#[test]
+fn refset_containing_any_is_the_caret_touching_an_upper_case_r() {
+    let containing = |input: &str| {
+        let sub = sub(input);
+        assert_eq!(
+            sub.refset_operator,
+            Some(RefsetOperator::ContainingAny),
+            "{input}"
+        );
+        sub
+    };
+    let diabetes = containing("^R 73211009 |Diabetes mellitus|");
+    assert!(matches!(
+        diabetes.focus,
+        FocusConcept::Reference(ref r) if r.id == Sctid(73_211_009) && r.term.as_deref() == Some("Diabetes mellitus")
+    ));
+    assert_eq!(
+        containing("^R73211009 |Diabetes mellitus|"),
+        diabetes,
+        "the whitespace before the focus is optional"
+    );
+    assert!(matches!(containing("^R *").focus, FocusConcept::Wildcard));
+    assert!(matches!(
+        containing("^R (< 404684003)").focus,
+        FocusConcept::Nested(_)
+    ));
+    assert_eq!(
+        containing("< ^R 404684003").operator,
+        Some(ConstraintOperator::DescendantOf)
+    );
+    assert_eq!(
+        containing("^R 404684003 {{ M active = 1 }}")
+            .member_filters
+            .len(),
+        1
+    );
+    assert_eq!(
+        parse("^R73211009").expect("parses").to_string(),
+        "^R 73211009",
+        "printed with the space"
+    );
+    assert_eq!(refused("^ R 404684003").0, 2, "the R touches the caret");
+    assert_eq!(refused("^r 404684003").0, 1, "an upper-case R only");
+    assert_eq!(refused("^R [*] 404684003").0, 3, "no field selection");
+    assert_eq!(
+        refused("^R0123456").0,
+        1,
+        "an identifier has no leading zero"
+    );
+}
+
+/// ECL 2.3 `concretestring`: a string value of an attribute is a quoted
+/// string with `\"`, `\\`, and `\*` as its escapes, without the search
+/// term keywords.
+#[test]
+fn a_concrete_string_is_a_quoted_string_without_search_keywords() {
+    let values = |input: &str| {
+        let ExpressionConstraint::Refined { refinement, .. } = parse(input).expect("parses") else {
+            panic!("refined");
+        };
+        let Refinement::Single(single) = *refinement else {
+            panic!("one attribute");
+        };
+        let SubRefinement::AttributeSet(AttributeSet::Single(single)) = *single else {
+            panic!("one attribute");
+        };
+        let SubAttributeSet::Attribute(attribute) = *single else {
+            panic!("one attribute");
+        };
+        match attribute.value {
+            AttributeValue::String { values, .. } => values,
+            other => panic!("{other:?}"),
+        }
+    };
+    assert_eq!(
+        values(r#"< 111115 : 111116 = "a \"b\" \\ \* c""#),
+        [ConcreteString(String::from(r#"a "b" \ * c"#))],
+        "the escapes decode"
+    );
+    assert_eq!(
+        values(r#"< 111115 : 111116 = "two words""#),
+        [ConcreteString(String::from("two words"))],
+        "one string, spaces kept"
+    );
+    assert_eq!(values(r#"< 111115 : 111116 != ("A" "B")"#).len(), 2);
+    let tree = parse(r#"< 111115 : 111116 = "a \"b\" \\ \* c""#).expect("parses");
+    assert_eq!(
+        parse(&tree.to_string()).expect("reparses"),
+        tree,
+        "printed with its escapes"
+    );
+    assert_eq!(
+        refused(r#"< 111115 : 111116 = wild:"b*""#).0,
+        20,
+        "wild: is a search term, not a concrete string"
+    );
+    assert_eq!(
+        refused(r#"< 111115 : 111116 = match:"b""#).0,
+        20,
+        "match: is a search term"
+    );
+    assert_eq!(
+        refused(r#"< 111115 : 111116 = "a\b""#).0,
+        20,
+        "an escape the grammar does not name"
+    );
+}
+
+/// ECL 2.3 `activevalue`: `*` admits either status, in the description,
+/// concept, and member filters alike.
+#[test]
+fn the_active_filter_takes_a_wildcard() {
+    let filters = |input: &str| sub(input).filters;
+    assert!(matches!(
+        filters("* {{ D active = * }}").as_slice(),
+        [FilterConstraint::Description(d)] if d == &[DescriptionFilter::Active { operator: Equality::Equal, value: ActiveValue::Any }]
+    ));
+    assert!(matches!(
+        filters("* {{ C active != * }}").as_slice(),
+        [FilterConstraint::Concept(c)] if c == &[ConceptFilter::Active { operator: Equality::NotEqual, value: ActiveValue::Any }]
+    ));
+    assert_eq!(
+        sub("^ 700043003 {{ M active = * }}").member_filters,
+        [[MemberFilter::Active {
+            operator: Equality::Equal,
+            value: ActiveValue::Any
+        }]]
+    );
+    assert!(matches!(
+        filters("* {{ active = 1 }} {{ active = false }}").as_slice(),
+        [FilterConstraint::Description(a), FilterConstraint::Description(b)]
+            if a == &[DescriptionFilter::Active { operator: Equality::Equal, value: ActiveValue::Active }]
+            && b == &[DescriptionFilter::Active { operator: Equality::Equal, value: ActiveValue::Inactive }]
+    ));
+    assert_eq!(
+        parse("* {{ D active = * }}").expect("parses").to_string(),
+        "* {{ D active = * }}"
+    );
 }

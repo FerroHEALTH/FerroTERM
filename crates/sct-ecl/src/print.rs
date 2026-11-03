@@ -7,12 +7,13 @@
 use std::fmt::{self, Display, Formatter};
 
 use crate::ast::{
-    Acceptability, AcceptabilitySet, AltIdentifier, Attribute, AttributeSet, AttributeValue,
-    Cardinality, Comparison, ConceptFilter, ConceptReference, ConceptSet, ConstraintOperator,
-    DefinitionStatus, DescriptionFilter, DialectAlias, DialectIdValue, Equality,
-    ExpressionConstraint, FieldValue, FilterConstraint, FocusConcept, HistorySupplement,
-    MemberFilter, MemberOf, NumericValue, Refinement, RefsetFields, Sctid, SubAttributeSet,
-    SubExpressionConstraint, SubRefinement, TimeValue, TypeToken, TypedSearchTerm,
+    Acceptability, AcceptabilitySet, ActiveValue, AltIdentifier, Attribute, AttributeSet,
+    AttributeValue, Cardinality, Comparison, ConceptFilter, ConceptReference, ConceptSet,
+    ConcreteString, ConstraintOperator, DefinitionStatus, DescriptionFilter, DialectAlias,
+    DialectIdValue, Equality, ExpressionConstraint, FieldValue, FilterConstraint, FocusConcept,
+    HistorySupplement, MemberFilter, MemberOf, NumericValue, Refinement, RefsetFields,
+    RefsetOperator, Sctid, SubAttributeSet, SubExpressionConstraint, SubRefinement, TimeValue,
+    TypeToken, TypedSearchTerm,
 };
 
 /// Writes `items` separated by `separator`.
@@ -120,13 +121,22 @@ impl Display for MemberOf {
     }
 }
 
+impl Display for RefsetOperator {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MemberOf(member_of) => write!(f, "{member_of}"),
+            Self::ContainingAny => f.write_str("^R"),
+        }
+    }
+}
+
 impl Display for SubExpressionConstraint {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         if let Some(operator) = self.operator {
             write!(f, "{operator} ")?;
         }
-        if let Some(member_of) = &self.member_of {
-            write!(f, "{member_of} ")?;
+        if let Some(refset_operator) = &self.refset_operator {
+            write!(f, "{refset_operator} ")?;
         }
         write!(f, "{}", self.focus)?;
         for filters in &self.member_filters {
@@ -244,12 +254,35 @@ impl Display for AttributeValue {
         match self {
             Self::Expression { operator, value } => write!(f, "{operator} {value}"),
             Self::Numeric { operator, value } => write!(f, "{operator} {value}"),
-            Self::String { operator, terms } => {
+            Self::String { operator, values } => {
                 write!(f, "{operator} ")?;
-                bare_or_set(f, terms)
+                bare_or_set(f, values)
             }
             Self::Boolean { operator, value } => write!(f, "{operator} {value}"),
         }
+    }
+}
+
+impl Display for ConcreteString {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str("\"")?;
+        for c in self.0.chars() {
+            if matches!(c, '"' | '\\') {
+                f.write_str("\\")?;
+            }
+            write!(f, "{c}")?;
+        }
+        f.write_str("\"")
+    }
+}
+
+impl Display for ActiveValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Active => "true",
+            Self::Inactive => "false",
+            Self::Any => "*",
+        })
     }
 }
 

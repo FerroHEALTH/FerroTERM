@@ -20,13 +20,19 @@ use concept_graph::ordinal::Ordinal;
 use concept_graph::refsets::{Table, ValueRef as FieldRef};
 use roaring::RoaringBitmap;
 
-use crate::ast::{
-    Acceptability, Attribute, AttributeSet, AttributeValue, Cardinality, Comparison, ConceptFilter,
-    ConceptSet, ConstraintOperator, DefinitionStatus, DescriptionFilter, DialectIdValue, Equality,
-    ExpressionConstraint, FieldValue, FilterConstraint, FocusConcept, HistorySupplement,
-    MemberFilter, Refinement, RefsetFields, Sctid, SubAttributeSet, SubExpressionConstraint,
-    SubRefinement, TimeValue, TypeToken, TypedSearchTerm,
+use self::matching::{
+    Activity, AttributeTest, CompiledItem, CompiledSet, Kinds, ValueTest, activity,
+    compare_numbers, relationship_groups, set_holds, times_match, within,
 };
+use crate::ast::{
+    Acceptability, ActiveValue, Attribute, AttributeSet, AttributeValue, Cardinality, Comparison,
+    ConceptFilter, ConceptSet, ConstraintOperator, DefinitionStatus, DescriptionFilter,
+    DialectIdValue, Equality, ExpressionConstraint, FieldValue, FilterConstraint, FocusConcept,
+    HistorySupplement, MemberFilter, Refinement, RefsetFields, RefsetOperator, Sctid,
+    SubAttributeSet, SubExpressionConstraint, SubRefinement, TypeToken, TypedSearchTerm,
+};
+
+mod matching;
 
 /// The historical association reference set root
 /// (`900000000000522004 |Historical association reference set|`).
@@ -146,8 +152,9 @@ pub enum DescriptionPredicate {
         /// `(language reference set SCTID, allowed acceptabilities)`.
         dialects: Vec<(u64, Vec<Acceptability>)>,
     },
-    /// The description is active (or, `false`, inactive).
-    Active(bool),
+    /// The description is active (`Some(true)`), inactive (`Some(false)`),
+    /// or either (`None`, `active = *`).
+    Active(Option<bool>),
     /// The description identifier is one of `ids`.
     Id {
         /// The operator.
@@ -258,96 +265,6 @@ impl<M: Model> fmt::Debug for Evaluator<'_, M> {
     }
 }
 
-/// The kinds of the attribute types a set of type concepts names, or every
-/// kind for `*`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum Kinds {
-    Any,
-    These(Vec<u32>),
-}
-
-impl Kinds {
-    fn contains(&self, kind: u32) -> bool {
-        match self {
-            Self::Any => true,
-            Self::These(kinds) => kinds.contains(&kind),
-        }
-    }
-
-    fn iter(&self, total: usize) -> Box<dyn Iterator<Item = u32> + '_> {
-        match self {
-            Self::Any => Box::new(0..u32::try_from(total).unwrap_or(u32::MAX)),
-            Self::These(kinds) => Box::new(kinds.iter().copied()),
-        }
-    }
-}
-
-/// What an attribute's value must satisfy.
-#[derive(Debug)]
-enum ValueTest {
-    /// The value is a concept in (or, negated, not in) the set; `None` is `*`.
-    Concept {
-        set: Option<RoaringBitmap>,
-        negated: bool,
-    },
-    Number(Comparison, f64),
-    Text(Equality, Vec<TypedSearchTerm>),
-    Boolean(Equality, bool),
-}
-
-impl ValueTest {
-    fn matches(&self, value: ValueRef<'_>) -> bool {
-        match (self, value) {
-            // NOTE: `= *` matches any value, a concrete one too; the specification
-            // spells the wildcard as any value and the reference servers agree.
-            (Self::Concept { set: None, negated }, _) => !*negated,
-            (
-                Self::Concept {
-                    set: Some(set),
-                    negated,
-                },
-                ValueRef::Concept(target),
-            ) => set.contains(target.index()) != *negated,
-            (Self::Number(operator, expected), ValueRef::Number(text)) => text
-                .parse::<f64>()
-                .is_ok_and(|actual| compare_numbers(*operator, actual, *expected)),
-            (Self::Text(operator, terms), ValueRef::String(text)) => {
-                let hit = terms.iter().any(|term| term_matches(term, text));
-                hit == (*operator == Equality::Equal)
-            }
-            (Self::Boolean(operator, expected), ValueRef::String(text)) => {
-                let actual = text.eq_ignore_ascii_case("true");
-                let boolean = actual || text.eq_ignore_ascii_case("false");
-                boolean && ((actual == *expected) == (*operator == Equality::Equal))
-            }
-            _ => false,
-        }
-    }
-}
-
-fn compare_numbers(operator: Comparison, actual: f64, expected: f64) -> bool {
-    match operator {
-        Comparison::Equal => (actual - expected).abs() < f64::EPSILON,
-        Comparison::NotEqual => (actual - expected).abs() >= f64::EPSILON,
-        Comparison::Less => actual < expected,
-        Comparison::LessOrEqual => actual <= expected,
-        Comparison::Greater => actual > expected,
-        Comparison::GreaterOrEqual => actual >= expected,
-    }
-}
-
-fn compare_times(operator: Comparison, actual: u32, expected: u32) -> bool {
-    match operator {
-        Comparison::Equal => actual == expected,
-        Comparison::NotEqual => actual != expected,
-        Comparison::Less => actual < expected,
-        Comparison::LessOrEqual => actual <= expected,
-        Comparison::Greater => actual > expected,
-        Comparison::GreaterOrEqual => actual >= expected,
-    }
-}
-
-/// Whether `pattern`, with `*` for any run of characters and `\*`, `\"`,
 /// `\\` for the literal characters, matches the whole of `text`
 /// (case-insensitively, as description matching is).
 #[must_use]
@@ -413,12 +330,6 @@ fn unescape(word: &str) -> String {
     out
 }
 
-/// Whether `count` satisfies a cardinality; `None` is the default `[1..*]`.
-fn within(cardinality: Option<Cardinality>, count: u32) -> bool {
-    let Cardinality { min, max } = cardinality.unwrap_or(Cardinality { min: 1, max: None });
-    count >= min && max.is_none_or(|max| count <= max)
-}
-
 impl<M: Model> Evaluator<'_, M> {
     fn expression(&self, constraint: &ExpressionConstraint) -> Result<RoaringBitmap, EvalError> {
         match constraint {
@@ -463,21 +374,29 @@ impl<M: Model> Evaluator<'_, M> {
     /// the filters and the history supplement.
     fn sub(&self, sub: &SubExpressionConstraint) -> Result<RoaringBitmap, EvalError> {
         let mut set = self.focus(&sub.focus)?;
-        if let Some(member_of) = &sub.member_of {
-            set = self.member_of(&set, member_of.fields.as_ref(), &sub.member_filters)?;
+        match &sub.refset_operator {
+            Some(RefsetOperator::MemberOf(member_of)) => {
+                set = self.member_of(&set, member_of.fields.as_ref(), &sub.member_filters)?;
+            }
+            Some(RefsetOperator::ContainingAny) => {
+                set = self.containing_any(&set, &sub.member_filters)?;
+            }
+            None => {}
         }
         if let Some(operator) = sub.operator {
             set = self.operate(operator, &set, matches!(sub.focus, FocusConcept::Wildcard));
         }
         for filter in &sub.filters {
             set = match filter {
-                FilterConstraint::Concept(filters) => {
-                    let predicates = self.concept_predicates(filters)?;
-                    self.model.filter_concepts(&set, &predicates)?
-                }
+                FilterConstraint::Concept(filters) => match self.concept_predicates(filters)? {
+                    Some(predicates) => self.model.filter_concepts(&set, &predicates)?,
+                    None => RoaringBitmap::new(),
+                },
                 FilterConstraint::Description(filters) => {
-                    let predicates = self.description_predicates(filters)?;
-                    self.model.filter_descriptions(&set, &predicates)?
+                    match self.description_predicates(filters)? {
+                        Some(predicates) => self.model.filter_descriptions(&set, &predicates)?,
+                        None => RoaringBitmap::new(),
+                    }
                 }
             };
         }
@@ -639,6 +558,40 @@ impl<M: Model> Evaluator<'_, M> {
         Ok(out)
     }
 
+    /// `^R`: the reference sets with an active member whose referenced
+    /// component is in `set` and that passes the member filters (ECL 2.3,
+    /// "Refset Containing").
+    fn containing_any(
+        &self,
+        set: &RoaringBitmap,
+        filter_groups: &[Vec<MemberFilter>],
+    ) -> Result<RoaringBitmap, EvalError> {
+        let members = self.model.members();
+        let mut out = RoaringBitmap::new();
+        for refset in members.refsets() {
+            let Some(table) = members.table(refset) else {
+                continue;
+            };
+            if table.members().is_disjoint(set) {
+                continue;
+            }
+            let mut contains = filter_groups.is_empty();
+            for row in 0..table.len() {
+                if contains {
+                    break;
+                }
+                let referenced = table.concept(row).is_some_and(|c| set.contains(c.index()));
+                contains = referenced && self.row_passes(table, row, filter_groups)?;
+            }
+            // NOTE: the answer is a set of the edition's concepts, so a reference
+            // set whose own concept the edition lacks cannot be in it.
+            if contains && let Some(ordinal) = self.model.concept(Sctid(refset))? {
+                out.insert(ordinal.index());
+            }
+        }
+        Ok(out)
+    }
+
     /// The concepts one reference set contributes: the selected columns of
     /// every row that passes the member filters.
     fn table_members(
@@ -724,14 +677,16 @@ impl<M: Model> Evaluator<'_, M> {
     ) -> Result<bool, EvalError> {
         for filter in filter_groups.iter().flatten() {
             let passes = match filter {
-                MemberFilter::Active { operator, value } => {
-                    if *value != (*operator == Equality::Equal) {
+                MemberFilter::Active { operator, value } => match (operator, value) {
+                    (Equality::Equal, ActiveValue::Active)
+                    | (Equality::NotEqual, ActiveValue::Inactive) => true,
+                    (Equality::NotEqual, ActiveValue::Any) => false,
+                    _ => {
                         return Err(EvalError::Unsupported(
                             "a member filter on inactive members: the tables hold active members",
                         ));
                     }
-                    true
-                }
+                },
                 MemberFilter::EffectiveTime { operator, values } => {
                     let actual = table.effective_time(row).unwrap_or_default();
                     times_match(*operator, values, actual)
@@ -803,7 +758,7 @@ impl<M: Model> Evaluator<'_, M> {
             ConceptSet::Set(references) => Ok(references.iter().map(|r| r.id.0).collect()),
             ConceptSet::Expression(sub)
                 if sub.operator.is_none()
-                    && sub.member_of.is_none()
+                    && sub.refset_operator.is_none()
                     && sub.filters.is_empty()
                     && sub.member_filters.is_empty()
                     && sub.history.is_none() =>
@@ -846,17 +801,20 @@ impl<M: Model> Evaluator<'_, M> {
         }
     }
 
-    /// The `{{ C ... }}` filters with their concept sets resolved.
+    /// The `{{ C ... }}` filters with their concept sets resolved; `None`
+    /// when one of them matches no concept (`active != *`).
     fn concept_predicates(
         &self,
         filters: &[ConceptFilter],
-    ) -> Result<Vec<ConceptPredicate>, EvalError> {
+    ) -> Result<Option<Vec<ConceptPredicate>>, EvalError> {
         let mut predicates = Vec::new();
         for filter in filters {
             predicates.push(match filter {
-                ConceptFilter::Active { operator, value } => {
-                    ConceptPredicate::Active(*value == (*operator == Equality::Equal))
-                }
+                ConceptFilter::Active { operator, value } => match activity(*operator, *value) {
+                    Activity::Is(active) => ConceptPredicate::Active(active),
+                    Activity::Either => continue,
+                    Activity::Neither => return Ok(None),
+                },
                 ConceptFilter::DefinitionStatus { operator, tokens } => {
                     let defined = tokens.contains(&DefinitionStatus::Defined);
                     let primitive = tokens.contains(&DefinitionStatus::Primitive);
@@ -889,27 +847,32 @@ impl<M: Model> Evaluator<'_, M> {
                 }
             });
         }
-        Ok(predicates)
+        Ok(Some(predicates))
     }
 
-    /// The `{{ D ... }}` filters with their concept sets and aliases resolved.
+    /// The `{{ D ... }}` filters with their concept sets and aliases resolved;
+    /// `None` when one of them matches no description (`active != *`).
     fn description_predicates(
         &self,
         filters: &[DescriptionFilter],
-    ) -> Result<Vec<DescriptionPredicate>, EvalError> {
+    ) -> Result<Option<Vec<DescriptionPredicate>>, EvalError> {
         let mut predicates = Vec::new();
         for filter in filters {
-            predicates.push(self.description_predicate(filter)?);
+            match self.description_predicate(filter)? {
+                Some(predicate) => predicates.push(predicate),
+                None => return Ok(None),
+            }
         }
-        Ok(predicates)
+        Ok(Some(predicates))
     }
 
-    /// One `{{ D ... }}` filter with its concept sets and aliases resolved.
+    /// One `{{ D ... }}` filter with its concept sets and aliases resolved;
+    /// `None` for a filter no description passes.
     fn description_predicate(
         &self,
         filter: &DescriptionFilter,
-    ) -> Result<DescriptionPredicate, EvalError> {
-        Ok(match filter {
+    ) -> Result<Option<DescriptionPredicate>, EvalError> {
+        Ok(Some(match filter {
             DescriptionFilter::Term { operator, terms } => DescriptionPredicate::Term {
                 operator: *operator,
                 terms: terms.clone(),
@@ -959,14 +922,16 @@ impl<M: Model> Evaluator<'_, M> {
                     "a description effective time filter: the store keeps no description time",
                 ));
             }
-            DescriptionFilter::Active { operator, value } => {
-                DescriptionPredicate::Active(*value == (*operator == Equality::Equal))
-            }
+            DescriptionFilter::Active { operator, value } => match activity(*operator, *value) {
+                Activity::Is(active) => DescriptionPredicate::Active(Some(active)),
+                Activity::Either => DescriptionPredicate::Active(None),
+                Activity::Neither => return Ok(None),
+            },
             DescriptionFilter::Id { operator, ids } => DescriptionPredicate::Id {
                 operator: *operator,
                 ids: ids.iter().map(|id| id.0).collect(),
             },
-        })
+        }))
     }
 
     /// The language reference sets a `dialectId` filter names, each with the
@@ -1360,7 +1325,7 @@ impl<M: Model> Evaluator<'_, M> {
                 let set = if matches!(value.focus, FocusConcept::Wildcard)
                     && value.operator.is_none()
                     && value.filters.is_empty()
-                    && value.member_of.is_none()
+                    && value.refset_operator.is_none()
                 {
                     None
                 } else {
@@ -1374,7 +1339,9 @@ impl<M: Model> Evaluator<'_, M> {
             AttributeValue::Numeric { operator, value } => {
                 ValueTest::Number(*operator, value.0.parse().unwrap_or(f64::NAN))
             }
-            AttributeValue::String { operator, terms } => ValueTest::Text(*operator, terms.clone()),
+            AttributeValue::String { operator, values } => {
+                ValueTest::Text(*operator, values.clone())
+            }
             AttributeValue::Boolean { operator, value } => ValueTest::Boolean(*operator, *value),
         };
         Ok(AttributeTest {
@@ -1382,118 +1349,5 @@ impl<M: Model> Evaluator<'_, M> {
             value,
             cardinality: attribute.cardinality,
         })
-    }
-}
-
-/// Whether `values` (one time or a set) match `actual` under `operator`.
-fn times_match(operator: Comparison, values: &[TimeValue], actual: u32) -> bool {
-    let expected = values
-        .iter()
-        .map(|v| v.0.parse::<u32>().unwrap_or_default());
-    match operator {
-        Comparison::NotEqual => expected.clone().all(|e| actual != e),
-        _ => expected
-            .into_iter()
-            .any(|e| compare_times(operator, actual, e)),
-    }
-}
-
-/// A compiled attribute: the type kinds, the value test, the cardinality.
-#[derive(Debug)]
-struct AttributeTest {
-    kinds: Kinds,
-    value: ValueTest,
-    cardinality: Option<Cardinality>,
-}
-
-impl AttributeTest {
-    fn matches(&self, row: &Row<'_>) -> bool {
-        self.kinds.contains(row.kind) && self.value.matches(row.value)
-    }
-}
-
-#[derive(Debug)]
-enum CompiledSet {
-    Single(Box<CompiledItem>),
-    Conjunction(Vec<CompiledItem>),
-    Disjunction(Vec<CompiledItem>),
-}
-
-#[derive(Debug)]
-enum CompiledItem {
-    Attribute(AttributeTest),
-    Nested(CompiledSet),
-}
-
-/// The relationship groups of one concept, in row order.
-fn relationship_groups<'row, 'graph>(rows: &'row [Row<'graph>]) -> Vec<Vec<&'row Row<'graph>>> {
-    let mut groups: Vec<Vec<&Row<'_>>> = Vec::new();
-    let mut current: Option<u32> = None;
-    for row in rows {
-        // NOTE: ECL treats each ungrouped relationship (group 0) as
-        // its own group; the rows arrive sorted by group.
-        if row.group == 0 || current != Some(row.group) {
-            groups.push(Vec::new());
-            current = Some(row.group);
-        }
-        if let Some(last) = groups.last_mut() {
-            last.push(row);
-        }
-    }
-    groups
-}
-
-/// Whether the rows of one group satisfy the set.
-fn set_holds(set: &CompiledSet, rows: &[&Row<'_>]) -> bool {
-    match set {
-        CompiledSet::Single(item) => item_holds(item, rows),
-        CompiledSet::Conjunction(items) => items.iter().all(|i| item_holds(i, rows)),
-        CompiledSet::Disjunction(items) => items.iter().any(|i| item_holds(i, rows)),
-    }
-}
-
-fn item_holds(item: &CompiledItem, rows: &[&Row<'_>]) -> bool {
-    match item {
-        CompiledItem::Nested(set) => set_holds(set, rows),
-        CompiledItem::Attribute(test) => {
-            let count = rows.iter().filter(|row| test.matches(row)).count();
-            within(test.cardinality, u32::try_from(count).unwrap_or(u32::MAX))
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{Cardinality, compare_numbers, term_matches, wild_matches, within};
-    use crate::ast::{Comparison, TypedSearchTerm};
-
-    #[test]
-    fn cardinalities_patterns_and_words_match_as_the_specification_says() {
-        assert!(within(None, 1) && within(None, 5) && !within(None, 0));
-        assert!(within(
-            Some(Cardinality {
-                min: 0,
-                max: Some(0)
-            }),
-            0
-        ));
-        assert!(!within(
-            Some(Cardinality {
-                min: 0,
-                max: Some(0)
-            }),
-            1
-        ));
-        assert!(within(Some(Cardinality { min: 2, max: None }), 2));
-        assert!(wild_matches("cardi*opathy", "Cardiomyopathy"));
-        assert!(!wild_matches("cardi*opathy", "Cardiomyopathy X"));
-        assert!(wild_matches("*itis", "Bronchitis"));
-        assert!(wild_matches("a\\*b", "A*B"));
-        assert!(!wild_matches("a\\*b", "AXB"));
-        let term = TypedSearchTerm::Match(vec![String::from("hea"), String::from("att")]);
-        assert!(term_matches(&term, "Heart attack"));
-        assert!(!term_matches(&term, "Heart"));
-        assert!(compare_numbers(Comparison::GreaterOrEqual, 500.0, 500.0));
-        assert!(!compare_numbers(Comparison::Less, 500.0, 500.0));
     }
 }

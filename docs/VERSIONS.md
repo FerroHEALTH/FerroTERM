@@ -70,7 +70,7 @@ in a change that moves the pin with it.
 
 | Item | Pin |
 |---|---|
-| ECL | 2.2 (the tag of the official grammar repository; `ECL.g4` and the example corpus vendored under `crates/sct-ecl/vendor/` by `scripts/vendor/ecl-grammar.sh`) |
+| ECL | 2.3 (the tag of the official grammar repository; `ECL.g4` and the example corpus vendored under `crates/sct-ecl/vendor/` by `scripts/vendor/ecl-grammar.sh`) |
 | SCG | 23d3812cf17ac8459fc9f1a0068041b95bacd3e1 (the commit of the official `IHTSDO/SNOMEDCT-Languages` repository, which publishes no tags; the normative Compositional Grammar ABNF and the example corpus vendored under `crates/sct-scg/vendor/` by `scripts/vendor/scg-grammar.sh`) |
 | SNOMED CT content | **not pinned in-repo**: licence-gated, bring-your-own RF2 (International edition); the loaded edition+version is a runtime/deployment fact (`.claude/rules/snomed-terminology.md`) |
 

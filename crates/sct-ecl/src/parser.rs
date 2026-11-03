@@ -11,7 +11,7 @@
 //! whitespace.
 
 use winnow::combinator::{
-    alt, cut_err, delimited, eof, fail, opt, peek, preceded, repeat, separated, terminated,
+    alt, cut_err, delimited, eof, fail, opt, peek, preceded, repeat, separated,
 };
 use winnow::error::{ErrMode, ParserError};
 use winnow::prelude::*;
@@ -19,14 +19,19 @@ use winnow::stream::{ContainsToken, Stream, TokenSlice};
 use winnow::token::{any, one_of};
 
 use crate::ast::{
-    Acceptability, AcceptabilitySet, AltIdentifier, Attribute, AttributeSet, AttributeValue,
-    Cardinality, Comparison, ConceptFilter, ConceptReference, ConceptSet, ConstraintOperator,
-    DefinitionStatus, DescriptionFilter, DialectAlias, DialectIdValue, Equality,
-    ExpressionConstraint, FieldValue, FilterConstraint, FocusConcept, HistorySupplement,
-    MemberFilter, MemberOf, NumericValue, Refinement, RefsetFields, Sctid, SubAttributeSet,
-    SubExpressionConstraint, SubRefinement, TimeValue, TypeToken, TypedSearchTerm,
+    AltIdentifier, Attribute, AttributeSet, AttributeValue, Cardinality, Comparison,
+    ConceptReference, ConcreteString, ConstraintOperator, Equality, ExpressionConstraint,
+    FocusConcept, HistorySupplement, MemberOf, NumericValue, Refinement, RefsetFields,
+    RefsetOperator, Sctid, SubAttributeSet, SubExpressionConstraint, SubRefinement,
+    TypedSearchTerm,
 };
 use crate::lexer::{Kind, Token};
+
+mod filter;
+
+use self::filter::{
+    concept_filter_constraint, description_filter_constraint, member_filter_constraint,
+};
 
 /// The token stream.
 pub type Tokens<'i> = TokenSlice<'i, Token<'i>>;
@@ -318,9 +323,40 @@ fn refset_field_name(i: &mut Tokens<'_>) -> PResult<String> {
         .parse_next(i)
 }
 
-/// `memberof`: `^`, optionally `[ fields ]`.
-fn member_of(i: &mut Tokens<'_>) -> PResult<MemberOf> {
-    kind(Kind::Caret).parse_next(i)?;
+/// `refsetOperator`: `^R` (`refsetContainingAny`, the caret touching an
+/// upper-case `R`) or `memberof`. With no whitespace before the focus, the
+/// lexer reads `^R73211009` as `^` and one word, so the identifier after the
+/// `R` comes back as the focus.
+fn refset_operator(i: &mut Tokens<'_>) -> PResult<(RefsetOperator, Option<FocusConcept>)> {
+    let caret = kind(Kind::Caret).parse_next(i)?;
+    let start = i.checkpoint();
+    if let Some(word) = i
+        .peek_token()
+        .filter(|t| t.kind == Kind::Identifier && adjacent(caret, t))
+        && let Some(rest) = word.text.strip_prefix('R')
+        && rest.bytes().all(|b| b.is_ascii_digit())
+    {
+        any.void().parse_next(i)?;
+        if rest.is_empty() {
+            return Ok((RefsetOperator::ContainingAny, None));
+        }
+        let Some(id) = ((6..=18).contains(&rest.len()) && !rest.starts_with('0'))
+            .then(|| rest.parse().ok().map(Sctid))
+            .flatten()
+        else {
+            return refuse(i, &start, "a SNOMED CT identifier");
+        };
+        let term = opt(term).parse_next(i)?;
+        let focus = FocusConcept::Reference(ConceptReference { id, term });
+        return Ok((RefsetOperator::ContainingAny, Some(focus)));
+    }
+    member_of_fields
+        .map(|member_of| (RefsetOperator::MemberOf(member_of), None))
+        .parse_next(i)
+}
+
+/// `memberof` after its `^`: optionally `[ fields ]`.
+fn member_of_fields(i: &mut Tokens<'_>) -> PResult<MemberOf> {
     let fields = opt(delimited(
         kind(Kind::LeftBracket),
         cut_err(alt((
@@ -336,11 +372,14 @@ fn member_of(i: &mut Tokens<'_>) -> PResult<MemberOf> {
 /// `subexpressionconstraint`.
 fn sub_expression_constraint(i: &mut Tokens<'_>) -> PResult<SubExpressionConstraint> {
     let operator = opt(constraint_operator).parse_next(i)?;
-    let member_of = opt(member_of).parse_next(i)?;
-    let focus = if operator.is_some() || member_of.is_some() {
-        cut_err(focus).parse_next(i)?
-    } else {
-        focus.parse_next(i)?
+    let (refset_operator, glued) = match opt(refset_operator).parse_next(i)? {
+        Some((refset_operator, glued)) => (Some(refset_operator), glued),
+        None => (None, None),
+    };
+    let focus = match glued {
+        Some(focus) => focus,
+        None if operator.is_some() || refset_operator.is_some() => cut_err(focus).parse_next(i)?,
+        None => focus.parse_next(i)?,
     };
     let member_filters = repeat(0.., member_filter_constraint).parse_next(i)?;
     let filters = repeat(
@@ -351,7 +390,7 @@ fn sub_expression_constraint(i: &mut Tokens<'_>) -> PResult<SubExpressionConstra
     let history = opt(history_supplement).parse_next(i)?;
     Ok(SubExpressionConstraint {
         operator,
-        member_of,
+        refset_operator,
         focus,
         member_filters,
         filters,
@@ -583,333 +622,33 @@ fn typed_search_term(i: &mut Tokens<'_>) -> PResult<TypedSearchTerm> {
     }
 }
 
+/// `concretestring`: a quoted string of one or more characters whose only
+/// escapes are `\"`, `\\`, and `\*`, decoded.
+fn concrete_string(i: &mut Tokens<'_>) -> PResult<ConcreteString> {
+    let start = i.checkpoint();
+    let content = string_content.parse_next(i)?;
+    if content.is_empty() || !escapes_only(content, &['"', '\\', '*']) {
+        return refuse(i, &start, "a concrete string");
+    }
+    let mut value = String::with_capacity(content.len());
+    let mut chars = content.chars();
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' => value.extend(chars.next()),
+            other => value.push(other),
+        }
+    }
+    Ok(ConcreteString(value))
+}
+
+/// `concretestring | concretestringset`.
+fn concrete_strings(i: &mut Tokens<'_>) -> PResult<Vec<ConcreteString>> {
+    bare_or_set(concrete_string, "a concrete string").parse_next(i)
+}
+
 /// `typedsearchterm | typedsearchtermset`.
 fn typed_search_terms(i: &mut Tokens<'_>) -> PResult<Vec<TypedSearchTerm>> {
     bare_or_set(typed_search_term, "a search term").parse_next(i)
-}
-
-/// `timevalue`: `""` or `"YYYYMMDD"`.
-fn time_value(i: &mut Tokens<'_>) -> PResult<TimeValue> {
-    let start = i.checkpoint();
-    let text = string_content.parse_next(i)?;
-    let in_range = |range: std::ops::Range<usize>, max: u8| {
-        text.get(range)
-            .and_then(|part| part.parse::<u8>().ok())
-            .is_some_and(|value| (1..=max).contains(&value))
-    };
-    let valid = text.is_empty()
-        || (text.len() == 8
-            && text.bytes().all(|b| b.is_ascii_digit())
-            && !text.starts_with('0')
-            && in_range(4..6, 12)
-            && in_range(6..8, 31));
-    if !valid {
-        return refuse(i, &start, "a time as \"YYYYMMDD\" or \"\"");
-    }
-    Ok(TimeValue(text.to_owned()))
-}
-
-/// `activevalue`: `1`, `0`, `true`, or `false`.
-fn active_value(i: &mut Tokens<'_>) -> PResult<bool> {
-    alt((
-        kind(Kind::Integer).verify_map(|t: &Token<'_>| match t.text {
-            "1" => Some(true),
-            "0" => Some(false),
-            _ => None,
-        }),
-        boolean,
-    ))
-    .expecting("1, 0, true, or false")
-    .parse_next(i)
-}
-
-/// `eclconceptreferenceset` (two or more) or a sub-expression constraint.
-///
-/// The grammar lists the constraint first; a set of two or more references
-/// never parses as one, so trying the set first reads every valid input the
-/// same way and keeps the constraint's errors for the invalid ones.
-fn concept_set(i: &mut Tokens<'_>) -> PResult<ConceptSet> {
-    alt((
-        spaced_set(concept_reference, 2, "two or more concept references").map(ConceptSet::Set),
-        sub_expression_constraint.map(ConceptSet::Expression),
-    ))
-    .parse_next(i)
-}
-
-/// `acceptabilityset`.
-fn acceptability_set(i: &mut Tokens<'_>) -> PResult<AcceptabilitySet> {
-    alt((
-        spaced_set(concept_reference, 1, "acceptability concepts").map(AcceptabilitySet::Concepts),
-        spaced_set(
-            alt((
-                keyword("accept").value(Acceptability::Acceptable),
-                keyword("prefer").value(Acceptability::Preferred),
-            )),
-            1,
-            "accept or prefer",
-        )
-        .map(AcceptabilitySet::Tokens),
-    ))
-    .parse_next(i)
-}
-
-/// `dialectidset`, kept only when it cannot also be read as a nested
-/// constraint (the grammar's first alternative for `( reference )`).
-fn dialect_id_set(
-    i: &mut Tokens<'_>,
-) -> PResult<Vec<(ConceptReference, Option<AcceptabilitySet>)>> {
-    spaced_set(
-        (concept_reference, opt(acceptability_set)),
-        1,
-        "dialect reference sets",
-    )
-    .verify(
-        |items: &Vec<(ConceptReference, Option<AcceptabilitySet>)>| {
-            items.len() >= 2 || items.iter().any(|(_, a)| a.is_some())
-        },
-    )
-    .parse_next(i)
-}
-
-/// `dialectalias`: a letter, then letters, digits, and dashes.
-fn dialect_alias(i: &mut Tokens<'_>) -> PResult<String> {
-    kind(Kind::Identifier)
-        .verify(|t: &Token<'_>| is_scheme_alias(t.text))
-        .map(|t| t.text.to_owned())
-        .expecting("a dialect alias such as en-gb")
-        .parse_next(i)
-}
-
-/// `languagecode`: two letters.
-fn language_code(i: &mut Tokens<'_>) -> PResult<String> {
-    kind(Kind::Identifier)
-        .verify(|t: &Token<'_>| {
-            t.text.len() == 2 && t.text.bytes().all(|b| b.is_ascii_alphabetic())
-        })
-        .map(|t| t.text.to_owned())
-        .expecting("a two-letter language code")
-        .parse_next(i)
-}
-
-/// `typetoken`.
-fn type_token(i: &mut Tokens<'_>) -> PResult<TypeToken> {
-    alt((
-        keyword("syn").value(TypeToken::Synonym),
-        keyword("fsn").value(TypeToken::FullySpecifiedName),
-        keyword("def").value(TypeToken::Definition),
-    ))
-    .parse_next(i)
-}
-
-/// `definitionstatustoken`.
-fn definition_status(i: &mut Tokens<'_>) -> PResult<DefinitionStatus> {
-    alt((
-        keyword("primitive").value(DefinitionStatus::Primitive),
-        keyword("defined").value(DefinitionStatus::Defined),
-    ))
-    .parse_next(i)
-}
-
-/// `dialectfilter`.
-fn dialect_filter(i: &mut Tokens<'_>) -> PResult<DescriptionFilter> {
-    if opt(keyword("dialectId")).parse_next(i)?.is_some() {
-        let (operator, value, acceptability) = cut_err((
-            equality,
-            alt((
-                dialect_id_set.map(DialectIdValue::Set),
-                sub_expression_constraint.map(DialectIdValue::Expression),
-            )),
-            opt(acceptability_set),
-        ))
-        .parse_next(i)?;
-        return Ok(DescriptionFilter::DialectId {
-            operator,
-            value,
-            acceptability,
-        });
-    }
-    keyword("dialect").parse_next(i)?;
-    let (operator, aliases, acceptability) = cut_err((
-        equality,
-        alt((
-            spaced_set(
-                (dialect_alias, opt(acceptability_set)).map(|(alias, acceptability)| {
-                    DialectAlias {
-                        alias,
-                        acceptability,
-                    }
-                }),
-                1,
-                "dialect aliases",
-            ),
-            dialect_alias.map(|alias| {
-                vec![DialectAlias {
-                    alias,
-                    acceptability: None,
-                }]
-            }),
-        )),
-        opt(acceptability_set),
-    ))
-    .parse_next(i)?;
-    Ok(DescriptionFilter::Dialect {
-        operator,
-        aliases,
-        acceptability,
-    })
-}
-
-/// `descriptionfilter`.
-fn description_filter(i: &mut Tokens<'_>) -> PResult<DescriptionFilter> {
-    alt((
-        preceded(keyword("term"), cut_err((equality, typed_search_terms)))
-            .map(|(operator, terms)| DescriptionFilter::Term { operator, terms }),
-        preceded(
-            keyword("language"),
-            cut_err((equality, bare_or_set(language_code, "language codes"))),
-        )
-        .map(|(operator, codes)| DescriptionFilter::Language { operator, codes }),
-        preceded(keyword("typeId"), cut_err((equality, concept_set)))
-            .map(|(operator, value)| DescriptionFilter::TypeId { operator, value }),
-        preceded(
-            keyword("type"),
-            cut_err((equality, bare_or_set(type_token, "type tokens"))),
-        )
-        .map(|(operator, tokens)| DescriptionFilter::Type { operator, tokens }),
-        dialect_filter,
-        preceded(keyword("moduleId"), cut_err((equality, concept_set)))
-            .map(|(operator, value)| DescriptionFilter::Module { operator, value }),
-        preceded(
-            keyword("effectiveTime"),
-            cut_err((comparison, bare_or_set(time_value, "times"))),
-        )
-        .map(|(operator, values)| DescriptionFilter::EffectiveTime { operator, values }),
-        preceded(keyword("active"), cut_err((equality, active_value)))
-            .map(|(operator, value)| DescriptionFilter::Active { operator, value }),
-        preceded(
-            keyword("id"),
-            cut_err((equality, bare_or_set(sctid, "description identifiers"))),
-        )
-        .map(|(operator, ids)| DescriptionFilter::Id { operator, ids }),
-    ))
-    .expecting("a description filter")
-    .parse_next(i)
-}
-
-/// `conceptfilter`.
-fn concept_filter(i: &mut Tokens<'_>) -> PResult<ConceptFilter> {
-    alt((
-        preceded(
-            keyword("definitionStatusId"),
-            cut_err((equality, concept_set)),
-        )
-        .map(|(operator, value)| ConceptFilter::DefinitionStatusId { operator, value }),
-        preceded(
-            keyword("definitionStatus"),
-            cut_err((
-                equality,
-                bare_or_set(definition_status, "definition status tokens"),
-            )),
-        )
-        .map(|(operator, tokens)| ConceptFilter::DefinitionStatus { operator, tokens }),
-        preceded(keyword("moduleId"), cut_err((equality, concept_set)))
-            .map(|(operator, value)| ConceptFilter::Module { operator, value }),
-        preceded(
-            keyword("effectiveTime"),
-            cut_err((comparison, bare_or_set(time_value, "times"))),
-        )
-        .map(|(operator, values)| ConceptFilter::EffectiveTime { operator, values }),
-        preceded(keyword("active"), cut_err((equality, active_value)))
-            .map(|(operator, value)| ConceptFilter::Active { operator, value }),
-    ))
-    .expecting("a concept filter")
-    .parse_next(i)
-}
-
-/// The value part of `memberfieldfilter`, in the grammar's alternative order.
-fn field_value(i: &mut Tokens<'_>) -> PResult<FieldValue> {
-    alt((
-        (equality, sub_expression_constraint)
-            .map(|(operator, value)| FieldValue::Expression { operator, value }),
-        (comparison, numeric_value)
-            .map(|(operator, value)| FieldValue::Numeric { operator, value }),
-        (equality, typed_search_terms)
-            .map(|(operator, terms)| FieldValue::String { operator, terms }),
-        (equality, boolean).map(|(operator, value)| FieldValue::Boolean { operator, value }),
-        (comparison, bare_or_set(time_value, "times"))
-            .map(|(operator, values)| FieldValue::Time { operator, values }),
-        preceded(
-            alt((equality.void(), comparison.void())),
-            cut_err(fail.expecting("a member field value")),
-        ),
-    ))
-    .expecting("a comparison operator")
-    .parse_next(i)
-}
-
-/// `memberfilter`.
-fn member_filter(i: &mut Tokens<'_>) -> PResult<MemberFilter> {
-    alt((
-        preceded(keyword("moduleId"), cut_err((equality, concept_set)))
-            .map(|(operator, value)| MemberFilter::Module { operator, value }),
-        preceded(
-            keyword("effectiveTime"),
-            cut_err((comparison, bare_or_set(time_value, "times"))),
-        )
-        .map(|(operator, values)| MemberFilter::EffectiveTime { operator, values }),
-        preceded(keyword("active"), cut_err((equality, active_value)))
-            .map(|(operator, value)| MemberFilter::Active { operator, value }),
-        (refset_field_name, cut_err(field_value))
-            .map(|(name, value)| MemberFilter::Field { name, value }),
-    ))
-    .expecting("a member filter")
-    .parse_next(i)
-}
-
-/// `{{ M filter, filter }}`.
-fn member_filter_constraint(i: &mut Tokens<'_>) -> PResult<Vec<MemberFilter>> {
-    preceded(
-        (kind(Kind::DoubleLeftBrace), keyword("M")),
-        cut_err(terminated(
-            separated(1.., member_filter, kind(Kind::Comma)),
-            kind(Kind::DoubleRightBrace),
-        )),
-    )
-    .parse_next(i)
-}
-
-/// `{{ C filter, filter }}`.
-fn concept_filter_constraint(i: &mut Tokens<'_>) -> PResult<FilterConstraint> {
-    preceded(
-        (kind(Kind::DoubleLeftBrace), keyword("C")),
-        cut_err(terminated(
-            separated(1.., concept_filter, kind(Kind::Comma)),
-            kind(Kind::DoubleRightBrace),
-        )),
-    )
-    .map(FilterConstraint::Concept)
-    .parse_next(i)
-}
-
-/// `{{ [D] filter, filter }}`; a `{{` that opens a member filter, a concept
-/// filter, or a history supplement is left to those rules.
-fn description_filter_constraint(i: &mut Tokens<'_>) -> PResult<FilterConstraint> {
-    kind(Kind::DoubleLeftBrace).parse_next(i)?;
-    let starts_other = i.peek_token().is_some_and(|t| {
-        t.kind == Kind::Plus
-            || (t.kind == Kind::Identifier
-                && (t.text.eq_ignore_ascii_case("M") || t.text.eq_ignore_ascii_case("C")))
-    });
-    if starts_other {
-        return backtrack();
-    }
-    opt(keyword("D")).parse_next(i)?;
-    cut_err(terminated(
-        separated(1.., description_filter, kind(Kind::Comma)),
-        kind(Kind::DoubleRightBrace),
-    ))
-    .map(FilterConstraint::Description)
-    .parse_next(i)
 }
 
 /// `historysupplement`.
@@ -973,8 +712,8 @@ fn attribute_value(i: &mut Tokens<'_>) -> PResult<AttributeValue> {
             .map(|(operator, value)| AttributeValue::Expression { operator, value }),
         (comparison, numeric_value)
             .map(|(operator, value)| AttributeValue::Numeric { operator, value }),
-        (equality, typed_search_terms)
-            .map(|(operator, terms)| AttributeValue::String { operator, terms }),
+        (equality, concrete_strings)
+            .map(|(operator, values)| AttributeValue::String { operator, values }),
         (equality, boolean).map(|(operator, value)| AttributeValue::Boolean { operator, value }),
         preceded(
             alt((equality.void(), comparison.void())),

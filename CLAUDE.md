@@ -268,7 +268,7 @@ apply always. Read the relevant one before working in that area.
   versioning, `$expand` paging, `OperationOutcome`, language), scoped to the wire
   crates.
 - `.claude/rules/snomed-terminology.md`: the SNOMED URI standard, implicit value
-  sets and concept maps, ECL 2.2, RF2 handling, scoped to the SNOMED crates.
+  sets and concept maps, ECL 2.3, RF2 handling, scoped to the SNOMED crates.
 - `.claude/rules/codegen.md`, `vendored-inputs.md`: how the generated
   `fhir-types` crate is consumed and the vendored-input /
   SNOMED-content-never-committed rules.
