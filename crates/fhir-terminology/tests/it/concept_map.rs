@@ -8,9 +8,9 @@ use ferroterm_testkit::fhir::{
     ANIMALS, CM_ANIMALS_COLOURS, CM_FALLBACK, COLOURS, VS_ALL, VS_COLOURS,
 };
 use fhir_terminology::conceptmap::convert;
-use fhir_terminology::conceptmap::model::Relationship;
 use fhir_terminology::operations::translate::{Match, TranslateInput, Translation, translate};
 use fhir_terminology::operations::{CodeableConceptRef, CodingRef, OperationError};
+use fhir_terminology::provider::concept_map::Relationship;
 use fhir_types::codec::Json;
 use fhir_types::r4b::concept_map::{
     ConceptMap, ConceptMapGroup, ConceptMapGroupElement, ConceptMapGroupElementTarget,

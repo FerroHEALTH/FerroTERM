@@ -72,7 +72,7 @@ pub enum CoreError {
         version: FhirVersion,
         /// The cause.
         #[source]
-        source: crate::fhir_codesystem::model::ModelError,
+        source: crate::provider::code_system::ModelError,
     },
     /// A `ValueSet` cannot be modelled.
     #[error("a {version:?} ValueSet in the bundle cannot be modelled")]

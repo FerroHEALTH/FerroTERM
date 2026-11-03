@@ -8,7 +8,7 @@
 //! `convert::r4b::convert(&resource)`.
 
 use super::model::ModelError;
-use crate::filter::{Filter, FilterOperator};
+use crate::provider::filter::{Filter, FilterOperator};
 
 fn text<T: AsRef<str>>(value: Option<T>) -> Option<String> {
     value.map(|v| v.as_ref().to_owned())
@@ -60,7 +60,7 @@ macro_rules! convert_value_set {
 
             use super::super::model::{ModelError, ValueSetModel};
             use super::text;
-            use crate::compose::{Compose, ConceptRef, Include, SystemRef};
+            use crate::provider::compose::{Compose, ConceptRef, Include, SystemRef};
 
             fn include(source: &ValueSetComposeInclude, at: &str) -> Result<Include, ModelError> {
                 let system = source.system.as_ref().and_then(|s| s.value.as_deref());

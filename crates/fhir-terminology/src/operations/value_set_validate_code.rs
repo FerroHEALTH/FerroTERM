@@ -18,10 +18,10 @@ use std::sync::Arc;
 
 use super::{CodeableConceptRef, CodingRef, Issue, OperationError, Sources};
 use crate::compose::Item;
+use crate::compose::negotiation::Negotiation;
 use crate::language;
 use crate::provider::{CodeSystemProvider, ContentMode, Located};
 use crate::valueset::model::{ModelError, ValueSetModel};
-use crate::valueset::negotiation::Negotiation;
 use crate::valueset::store::Resolver;
 use crate::versioned::Versioned;
 

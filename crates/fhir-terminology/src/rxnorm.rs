@@ -26,9 +26,9 @@ use concept_store::store::Store;
 use roaring::RoaringBitmap;
 use serde::Deserialize;
 
-use crate::artifact::Source;
-use crate::compose::{Compose, Include, SystemRef};
-use crate::filter::{Filter, FilterOperator};
+use crate::provider::compose::{Compose, Include, SystemRef};
+use crate::provider::filter::{Filter, FilterOperator};
+use crate::provider::source::Source;
 use crate::provider::{
     Capability, Compositional, Concept, ConceptSet, ContentMode, Declaration, FilterDefinition,
     Identity, ImplicitArgument, ImplicitForm, Located, Property, PropertyDefinition, PropertyKind,

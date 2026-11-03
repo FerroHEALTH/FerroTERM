@@ -8,8 +8,8 @@ use ferroterm_testkit::loinc::{
     ANSWER_LIST, CHEMISTRY_PART, GLUCOSE, GLUCOSE_PART, NO, OLD_GLUCOSE, SODIUM, SURVEY, VERSION,
     YES, code, write_artifact,
 };
-use fhir_terminology::filter::{Filter, FilterOperator};
 use fhir_terminology::loinc::{LoincProvider, OpenError, SYSTEM};
+use fhir_terminology::provider::filter::{Filter, FilterOperator};
 use fhir_terminology::provider::{CodeSystemProvider, Concept, ProviderError};
 
 fn provider() -> (tempfile::TempDir, LoincProvider) {

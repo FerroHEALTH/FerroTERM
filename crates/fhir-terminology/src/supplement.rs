@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use concept_graph::subsumption::Outcome;
 
-use crate::compose::Compose;
+use crate::provider::compose::Compose;
 use crate::provider::{
     CodeSystemProvider, Concept, ConceptSet, Declaration, Designation, Hierarchy, Identity,
     ImplicitMetadata, Located, MapSelection, Property, ProviderError, Standing, Status, Successor,
@@ -39,7 +39,7 @@ impl Supplement {
     /// The supplement a `CodeSystem` with `content = supplement` describes:
     /// its designations and properties keyed by the supplemented codes.
     #[must_use]
-    pub fn from_code_system(model: &crate::fhir_codesystem::model::CodeSystemModel) -> Self {
+    pub fn from_code_system(model: &crate::provider::code_system::CodeSystemModel) -> Self {
         let mut concepts = BTreeMap::new();
         for entry in &model.concepts {
             concepts.insert(
@@ -121,7 +121,7 @@ impl CodeSystemProvider for Supplemented {
         &self.declaration
     }
 
-    fn code_system(&self) -> Option<&crate::fhir_codesystem::model::CodeSystemModel> {
+    fn code_system(&self) -> Option<&crate::provider::code_system::CodeSystemModel> {
         self.inner.code_system()
     }
 
@@ -160,7 +160,7 @@ impl CodeSystemProvider for Supplemented {
         self.inner.rejection(code)
     }
 
-    fn admits_post_coordination(&self, filter: &crate::filter::Filter) -> bool {
+    fn admits_post_coordination(&self, filter: &crate::provider::filter::Filter) -> bool {
         self.inner.admits_post_coordination(filter)
     }
 
@@ -203,7 +203,7 @@ impl CodeSystemProvider for Supplemented {
         self.inner.language()
     }
 
-    fn artifact(&self) -> Option<&crate::artifact::Source> {
+    fn artifact(&self) -> Option<&crate::provider::source::Source> {
         self.inner.artifact()
     }
 
@@ -288,26 +288,32 @@ impl CodeSystemProvider for Supplemented {
         &self,
         url: &str,
         selection: MapSelection<'_>,
-    ) -> Option<Result<crate::conceptmap::model::ConceptMapModel, ProviderError>> {
+    ) -> Option<Result<crate::provider::concept_map::ConceptMapModel, ProviderError>> {
         self.inner.implicit_concept_map(url, selection)
     }
 
-    fn filter(&self, filter: &crate::filter::Filter) -> Result<ConceptSet, ProviderError> {
+    fn filter(
+        &self,
+        filter: &crate::provider::filter::Filter,
+    ) -> Result<ConceptSet, ProviderError> {
         self.inner.filter(filter)
     }
 
-    fn filter_all(&self, filters: &[crate::filter::Filter]) -> Result<ConceptSet, ProviderError> {
+    fn filter_all(
+        &self,
+        filters: &[crate::provider::filter::Filter],
+    ) -> Result<ConceptSet, ProviderError> {
         self.inner.filter_all(filters)
     }
 
     fn filter_ordered(
         &self,
-        filters: &[crate::filter::Filter],
+        filters: &[crate::provider::filter::Filter],
     ) -> Result<Option<Vec<u32>>, ProviderError> {
         self.inner.filter_ordered(filters)
     }
 
-    fn unclosed(&self, filters: &[crate::filter::Filter]) -> bool {
+    fn unclosed(&self, filters: &[crate::provider::filter::Filter]) -> bool {
         self.inner.unclosed(filters)
     }
 
@@ -318,7 +324,7 @@ impl CodeSystemProvider for Supplemented {
     fn filter_matches(
         &self,
         concept: Concept,
-        filter: &crate::filter::Filter,
+        filter: &crate::provider::filter::Filter,
     ) -> Result<bool, ProviderError> {
         self.inner.filter_matches(concept, filter)
     }

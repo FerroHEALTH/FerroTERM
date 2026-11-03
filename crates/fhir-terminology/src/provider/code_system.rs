@@ -10,6 +10,47 @@ use crate::provider::{
     PropertyDefinition, PropertyKind,
 };
 
+/// The concept property codes the FHIR specification itself defines, in the
+/// `http://hl7.org/fhir/concept-properties` code system
+/// (<https://hl7.org/fhir/R5/codesystem.html#defined-props>; R6 adds
+/// `alternateCode`, `order`, `definition`, and the `lastVersion*` and
+/// `replacedBy*` pair).
+const SPECIFICATION_CONCEPT_PROPERTIES: [&str; 20] = [
+    "status",
+    "inactive",
+    "effectiveDate",
+    "deprecated",
+    "deprecationDate",
+    "retirementDate",
+    "notSelectable",
+    "parent",
+    "child",
+    "partOf",
+    "synonym",
+    "alternateCode",
+    "comment",
+    "itemWeight",
+    "order",
+    "definition",
+    "lastVersionActive",
+    "lastVersionPresent",
+    "replacedByCode",
+    "replacedByCoding",
+];
+
+/// The formal URI of `code` when the FHIR specification defines it as a
+/// concept property, else `None`.
+///
+/// A code system that declares the property itself states its own URI; this
+/// answers for the ones every system shares
+/// (<https://hl7.org/fhir/R5/codesystem.html#defined-props>).
+#[must_use]
+pub fn defined_property_uri(code: &str) -> Option<String> {
+    SPECIFICATION_CONCEPT_PROPERTIES
+        .contains(&code)
+        .then(|| format!("http://hl7.org/fhir/concept-properties#{code}"))
+}
+
 /// One concept, flattened out of the resource's nesting.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConceptEntry {
@@ -292,4 +333,34 @@ pub fn described(
         || std::borrow::Cow::Owned(CodeSystemModel::of_provider(provider)),
         std::borrow::Cow::Borrowed,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::defined_property_uri;
+
+    #[test]
+    fn a_specification_defined_property_carries_the_specifications_uri() {
+        // <https://hl7.org/fhir/R5/codesystem.html#defined-props>
+        assert_eq!(
+            defined_property_uri("status").as_deref(),
+            Some("http://hl7.org/fhir/concept-properties#status"),
+            "status is defined in the FHIR concept properties"
+        );
+        // <https://hl7.org/fhir/6.0.0-ballot5/codesystem.html#defined-props>
+        assert_eq!(
+            defined_property_uri("definition").as_deref(),
+            Some("http://hl7.org/fhir/concept-properties#definition"),
+            "definition is defined in the FHIR concept properties from R6"
+        );
+    }
+
+    #[test]
+    fn a_code_systems_own_property_takes_no_specification_uri() {
+        assert_eq!(
+            defined_property_uri("prop"),
+            None,
+            "a property the specification does not define states its own URI"
+        );
+    }
 }

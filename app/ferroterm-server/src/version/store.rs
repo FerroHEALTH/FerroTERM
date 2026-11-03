@@ -17,9 +17,9 @@ use std::sync::Arc;
 
 use axum::body::Bytes;
 use axum::response::Response;
-use fhir_terminology::conceptmap::model::ConceptMapModel;
-use fhir_terminology::fhir_codesystem::model::CodeSystemModel;
 use fhir_terminology::provider::CodeSystemProvider;
+use fhir_terminology::provider::code_system::CodeSystemModel;
+use fhir_terminology::provider::concept_map::ConceptMapModel;
 use fhir_terminology::valueset::model::ValueSetModel;
 use fhir_types::codec::{Object, expect_object};
 use fhir_types::schema::Schemas;
@@ -179,8 +179,7 @@ fn loaded(request: &Request<'_>, id: &str) -> Result<Option<Object>, Failure> {
     match request.resource_type {
         ResourceType::CodeSystem => {
             if let Some(resolved) = request.state.instance(id) {
-                let model =
-                    fhir_terminology::fhir_codesystem::model::described(&*resolved.provider);
+                let model = fhir_terminology::provider::code_system::described(&*resolved.provider);
                 return (request.surface.render_code_system)(&model, id)
                     .map(Some)
                     .map_err(|reason| rendering(&reason));
@@ -1124,7 +1123,7 @@ macro_rules! store {
             /// A loaded code system as this version's `CodeSystem`, under the
             /// instance id the server addresses it by.
             fn code_system(
-                model: &fhir_terminology::fhir_codesystem::model::CodeSystemModel,
+                model: &fhir_terminology::provider::code_system::CodeSystemModel,
                 id: &str,
             ) -> fhir_types::$fhir::code_system::CodeSystem {
                 let mut resource =
@@ -1152,7 +1151,7 @@ macro_rules! store {
             /// A loaded concept map as this version's `ConceptMap`, under the
             /// instance id the server addresses it by.
             fn concept_map(
-                model: &fhir_terminology::conceptmap::model::ConceptMapModel,
+                model: &fhir_terminology::provider::concept_map::ConceptMapModel,
                 id: &str,
             ) -> fhir_types::$fhir::concept_map::ConceptMap {
                 let mut resource = fhir_terminology::conceptmap::render::$fhir::concept_map(model);
@@ -1286,7 +1285,7 @@ macro_rules! store {
                 if resource_type == ResourceType::CodeSystem {
                     for (id, provider) in crate::version::store::loaded_code_systems(state, query)?
                     {
-                        let model = fhir_terminology::fhir_codesystem::model::described(&*provider);
+                        let model = fhir_terminology::provider::code_system::described(&*provider);
                         entry.push(found(
                             at(&id),
                             Resource::CodeSystem(Box::new(code_system(&model, &id))),

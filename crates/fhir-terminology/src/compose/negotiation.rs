@@ -15,7 +15,7 @@
 //! negotiation applies to the value set named by the request, to every value
 //! set it imports, and to every system any of them selects from.
 
-use crate::compose::{Compose, Include};
+use crate::provider::compose::{Compose, Include};
 
 /// A version negotiation could not be honoured.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

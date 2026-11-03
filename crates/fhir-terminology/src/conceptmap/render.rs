@@ -23,7 +23,7 @@ const ELEMENT_COMMENT: &str =
 /// to state one; `unknown` is the `PublicationStatus` code for exactly that
 /// ("The resource status is undetermined",
 /// <https://hl7.org/fhir/R4B/codesystem-publication-status.html>).
-fn status(model: &crate::conceptmap::model::ConceptMapModel) -> &str {
+fn status(model: &crate::provider::concept_map::ConceptMapModel) -> &str {
     match model.status.as_str() {
         "" => "unknown",
         stated => stated,
@@ -79,7 +79,7 @@ macro_rules! render_concept_map {
                 ConceptMapTarget,
             };
 
-            use super::super::model::{
+            use crate::provider::concept_map::{
                 ConceptMapModel, DependsOn, Element, Group, Target, Unmapped, UnmappedMode,
             };
             use super::status;
@@ -208,7 +208,7 @@ macro_rules! render_concept_map {
                 ConceptMapSourceScope, ConceptMapTargetScope,
             };
 
-            use super::super::model::{
+            use crate::provider::concept_map::{
                 ConceptMapModel, DependsOn, Element, Group, Target, Unmapped, UnmappedMode,
             };
             use super::{canonical, status};
