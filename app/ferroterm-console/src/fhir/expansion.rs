@@ -9,7 +9,8 @@
 //! a value that plain unit tests can pin.
 
 use serde::{Deserialize, Serialize};
-use serde_json::Number;
+
+use crate::fhir::release::Reads;
 
 use crate::url::RequestUrl;
 
@@ -96,115 +97,12 @@ impl ExpandRequest {
     }
 }
 
-/// The `ValueSet` a `$expand` answers, as the viewer reads it.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+/// What `ValueSet/$expand` answered, read from the `ValueSet` its release
+/// decoded.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct ExpandedValueSet {
-    /// `ValueSet.expansion`, absent from a resource that carries none.
-    expansion: Option<WireExpansion>,
-}
-
-/// `ValueSet.expansion`, with the elements the runner draws.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-struct WireExpansion {
-    /// `expansion.total`, the size of the whole selection.
-    total: Option<i32>,
-    /// `expansion.offset`, where this page starts.
-    offset: Option<i32>,
-    /// `expansion.parameter`, the parameters the server says it applied.
-    #[serde(default)]
-    parameter: Vec<WireParameter>,
-    /// `expansion.contains`, the concepts of this page.
-    #[serde(default)]
-    contains: Vec<WireContains>,
-    /// The extensions the server declared on the expansion.
-    #[serde(default)]
-    extension: Vec<WireExtension>,
-}
-
-/// One `expansion.parameter`, with every `value[x]` the element allows.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-struct WireParameter {
-    /// `parameter.name`.
-    name: Option<String>,
-    /// `valueString`.
-    #[serde(rename = "valueString")]
-    value_string: Option<String>,
-    /// `valueBoolean`.
-    #[serde(rename = "valueBoolean")]
-    value_boolean: Option<bool>,
-    /// `valueInteger`.
-    #[serde(rename = "valueInteger")]
-    value_integer: Option<i32>,
-    /// `valueDecimal`.
-    #[serde(rename = "valueDecimal")]
-    value_decimal: Option<Number>,
-    /// `valueUri`.
-    #[serde(rename = "valueUri")]
-    value_uri: Option<String>,
-    /// `valueCode`.
-    #[serde(rename = "valueCode")]
-    value_code: Option<String>,
-    /// `valueDateTime`.
-    #[serde(rename = "valueDateTime")]
-    value_date_time: Option<String>,
-}
-
-/// One `expansion.contains`, which may itself carry nested entries.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-struct WireContains {
-    /// `contains.system`.
-    system: Option<String>,
-    /// `contains.version`, sent when one system answers from several versions.
-    version: Option<String>,
-    /// `contains.code`.
-    code: Option<String>,
-    /// `contains.display`.
-    display: Option<String>,
-    /// `contains.inactive`.
-    inactive: Option<bool>,
-    /// `contains.abstract`, whose wire name is a Rust keyword.
-    #[serde(rename = "abstract")]
-    abstract_concept: Option<bool>,
-    /// `contains.designation`.
-    #[serde(default)]
-    designation: Vec<WireDesignation>,
-    /// The entries nested under this one.
-    #[serde(default)]
-    contains: Vec<WireContains>,
-}
-
-/// One `contains.designation`.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-struct WireDesignation {
-    /// The BCP 47 tag of the term.
-    language: Option<String>,
-    /// What the term is for, as a `Coding`.
-    #[serde(rename = "use")]
-    usage: Option<WireCoding>,
-    /// The term itself.
-    value: Option<String>,
-}
-
-/// The parts of a `Coding` the runner renders.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-struct WireCoding {
-    /// The code.
-    code: Option<String>,
-    /// The display the server sent for it.
-    display: Option<String>,
-}
-
-/// One extension on the expansion, read for the unclosed mark and its reason.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-struct WireExtension {
-    /// The canonical that says what the extension means.
-    url: Option<String>,
-    /// `valueBoolean`, which is how the mark itself is carried.
-    #[serde(rename = "valueBoolean")]
-    value_boolean: Option<bool>,
-    /// `valueString`, which is how a reason is carried.
-    #[serde(rename = "valueString")]
-    value_string: Option<String>,
+    /// `ValueSet.expansion`, absent when the answer carried none.
+    expansion: Option<Expansion>,
 }
 
 /// One expansion, as the runner draws it.
@@ -284,120 +182,201 @@ pub(crate) struct DesignationRow {
 }
 
 impl ExpandedValueSet {
-    /// The expansion the answer carried, or `None` when it carried none.
-    ///
-    /// A `ValueSet` with no `expansion` is a legal resource and a useless
-    /// answer to `$expand`, so the screen states that rather than drawing an
-    /// empty table.
+    /// The expansion the answer carried.
     pub(crate) fn expansion(&self) -> Option<Expansion> {
-        let wire = self.expansion.as_ref()?;
-        Some(Expansion {
-            total: wire.total.and_then(|total| u32::try_from(total).ok()),
-            offset: wire.offset.and_then(|offset| u32::try_from(offset).ok()),
-            parameters: wire
-                .parameter
-                .iter()
-                .map(|parameter| ParameterLine {
-                    name: parameter.name.clone().unwrap_or_default(),
-                    value: parameter.value().unwrap_or_default(),
-                })
-                .collect(),
-            concepts: rows(&wire.contains),
-            unclosed: unclosed_of(&wire.extension),
-        })
+        self.expansion.clone()
     }
 }
 
-impl WireParameter {
-    /// The value, from whichever `value[x]` the server used.
-    fn value(&self) -> Option<String> {
-        self.value_string
-            .clone()
-            .or_else(|| self.value_uri.clone())
-            .or_else(|| self.value_code.clone())
-            .or_else(|| self.value_date_time.clone())
-            .or_else(|| self.value_boolean.map(|flag| flag.to_string()))
-            .or_else(|| self.value_integer.map(|number| number.to_string()))
-            .or_else(|| self.value_decimal.as_ref().map(ToString::to_string))
-    }
-}
-
-impl WireContains {
-    /// This entry as a row at `depth`, without its nested entries.
-    fn row(&self, depth: u32) -> ConceptRow {
-        ConceptRow {
-            system: self.system.clone().unwrap_or_default(),
-            version: self.version.clone(),
-            code: self.code.clone().unwrap_or_default(),
-            display: self.display.clone(),
-            inactive: self.inactive.unwrap_or_default(),
-            abstract_concept: self.abstract_concept.unwrap_or_default(),
-            designations: self
-                .designation
-                .iter()
-                .map(|designation| DesignationRow {
-                    language: designation.language.clone(),
-                    usage: designation.usage.as_ref().and_then(WireCoding::label),
-                    value: designation.value.clone().unwrap_or_default(),
-                })
-                .collect(),
-            depth,
-        }
-    }
-}
-
-impl WireCoding {
-    /// The display the server sent, or the bare code when it sent none.
-    fn label(&self) -> Option<String> {
-        self.display.clone().or_else(|| self.code.clone())
-    }
-}
-
-/// Every entry, nested ones included, in the order the server wrote them.
-///
-/// The walk carries its own stack rather than recursing, so a deeply nested
-/// answer cannot exhaust the browser's.
-fn rows(entries: &[WireContains]) -> Vec<ConceptRow> {
-    let mut rows = Vec::with_capacity(entries.len());
-    let mut pending: Vec<(&WireContains, u32)> =
-        entries.iter().rev().map(|entry| (entry, 0_u32)).collect();
-    while let Some((entry, depth)) = pending.pop() {
-        rows.push(entry.row(depth));
-        pending.extend(
-            entry
-                .contains
-                .iter()
-                .rev()
-                .map(|nested| (nested, depth.saturating_add(1))),
-        );
-    }
-    rows
-}
-
-/// The unclosed mark and its stated reasons, when the server sent the mark.
+/// The unclosed mark and its stated reasons, from `(url, valueBoolean,
+/// valueString)` of each extension, when the server sent the mark.
 ///
 /// A reason without the mark says nothing on its own, so the reasons are read
 /// only once the mark is there.
-fn unclosed_of(extensions: &[WireExtension]) -> Option<Unclosed> {
-    let marked = extensions.iter().any(|extension| {
-        extension.url.as_deref() == Some(UNCLOSED_EXTENSION)
-            && extension.value_boolean.unwrap_or_default()
-    });
+fn unclosed_of(extensions: &[(String, Option<bool>, Option<String>)]) -> Option<Unclosed> {
+    let marked = extensions
+        .iter()
+        .any(|(url, flag, _)| url == UNCLOSED_EXTENSION && flag.unwrap_or_default());
     marked.then(|| Unclosed {
         reasons: extensions
             .iter()
-            .filter(|extension| extension.url.as_deref() == Some(UNCLOSED_REASON_EXTENSION))
-            .filter_map(|extension| extension.value_string.clone())
+            .filter(|(url, _, _)| url == UNCLOSED_REASON_EXTENSION)
+            .filter_map(|(_, _, reason)| reason.clone())
             .collect(),
     })
 }
+
+/// Reads `$expand`'s answer, the `ValueSet` of the `fhir-types` module
+/// `$module`, whose expansion has the same shape at every release.
+macro_rules! reads_expansion {
+    ($module:ident) => {
+        mod $module {
+            use fhir_types::$module::extension::ExtensionValue;
+            use fhir_types::$module::value_set::{
+                ValueSetExpansion, ValueSetExpansionContains, ValueSetExpansionParameter,
+                ValueSetExpansionParameterValue,
+            };
+
+            use super::{
+                ConceptRow, DesignationRow, ExpandedValueSet, Expansion, ParameterLine, Reads,
+                unclosed_of,
+            };
+
+            /// One entry of `contains`, at `depth` below the top.
+            fn row(entry: &ValueSetExpansionContains, depth: u32) -> ConceptRow {
+                ConceptRow {
+                    system: entry
+                        .system
+                        .as_ref()
+                        .and_then(|system| system.value.clone())
+                        .unwrap_or_default(),
+                    version: entry
+                        .version
+                        .as_ref()
+                        .and_then(|version| version.value.clone()),
+                    code: entry
+                        .code
+                        .as_ref()
+                        .and_then(|code| code.value.clone())
+                        .unwrap_or_default(),
+                    display: entry
+                        .display
+                        .as_ref()
+                        .and_then(|display| display.value.clone()),
+                    inactive: entry
+                        .inactive
+                        .as_ref()
+                        .and_then(|flag| flag.value)
+                        .unwrap_or_default(),
+                    abstract_concept: entry
+                        .r#abstract
+                        .as_ref()
+                        .and_then(|flag| flag.value)
+                        .unwrap_or_default(),
+                    designations: entry
+                        .designation
+                        .iter()
+                        .map(|designation| DesignationRow {
+                            language: designation
+                                .language
+                                .as_ref()
+                                .and_then(|language| language.value.clone()),
+                            // NOTE: no specification governs this: our own design; a use with
+                            // no display is named by its code.
+                            usage: designation.r#use.as_ref().and_then(|usage| {
+                                usage
+                                    .display
+                                    .as_ref()
+                                    .and_then(|display| display.value.clone())
+                                    .or_else(|| {
+                                        usage.code.as_ref().and_then(|code| code.value.clone())
+                                    })
+                            }),
+                            value: designation.value.value.clone().unwrap_or_default(),
+                        })
+                        .collect(),
+                    depth,
+                }
+            }
+
+            /// Every entry, nested ones included, in the order the server wrote them.
+            fn rows(contains: &[ValueSetExpansionContains]) -> Vec<ConceptRow> {
+                // NOTE: no specification governs this: our own design; the walk keeps its
+                // own stack, so a deeply nested answer cannot exhaust the thread's.
+                let mut rows = Vec::with_capacity(contains.len());
+                let mut pending: Vec<(&ValueSetExpansionContains, u32)> =
+                    contains.iter().rev().map(|entry| (entry, 0_u32)).collect();
+                while let Some((entry, depth)) = pending.pop() {
+                    rows.push(row(entry, depth));
+                    pending.extend(
+                        entry
+                            .contains
+                            .iter()
+                            .rev()
+                            .map(|nested| (nested, depth.saturating_add(1))),
+                    );
+                }
+                rows
+            }
+
+            /// One echoed parameter, its value as text whichever type carried it.
+            fn parameter(parameter: &ValueSetExpansionParameter) -> ParameterLine {
+                let value = match &parameter.value {
+                    Some(ValueSetExpansionParameterValue::String(value)) => value.value.clone(),
+                    Some(ValueSetExpansionParameterValue::Uri(value)) => value.value.clone(),
+                    Some(ValueSetExpansionParameterValue::Code(value)) => value.value.clone(),
+                    Some(ValueSetExpansionParameterValue::DateTime(value)) => value.value.clone(),
+                    Some(ValueSetExpansionParameterValue::Decimal(value)) => value.value.clone(),
+                    Some(ValueSetExpansionParameterValue::Boolean(value)) => {
+                        value.value.map(|flag| flag.to_string())
+                    }
+                    Some(ValueSetExpansionParameterValue::Integer(value)) => {
+                        value.value.map(|number| number.to_string())
+                    }
+                    None => None,
+                };
+                ParameterLine {
+                    name: parameter.name.value.clone().unwrap_or_default(),
+                    value: value.unwrap_or_default(),
+                }
+            }
+
+            /// The expansion as a page draws it.
+            fn expansion(expansion: &ValueSetExpansion) -> Expansion {
+                let extensions: Vec<(String, Option<bool>, Option<String>)> = expansion
+                    .extension
+                    .iter()
+                    .map(|extension| match &extension.value {
+                        Some(ExtensionValue::Boolean(flag)) => {
+                            (extension.url.clone(), flag.value, None)
+                        }
+                        Some(ExtensionValue::String(text)) => {
+                            (extension.url.clone(), None, text.value.clone())
+                        }
+                        _ => (extension.url.clone(), None, None),
+                    })
+                    .collect();
+                Expansion {
+                    total: expansion
+                        .total
+                        .as_ref()
+                        .and_then(|total| total.value)
+                        .and_then(|total| u32::try_from(total).ok()),
+                    offset: expansion
+                        .offset
+                        .as_ref()
+                        .and_then(|offset| offset.value)
+                        .and_then(|offset| u32::try_from(offset).ok()),
+                    parameters: expansion.parameter.iter().map(parameter).collect(),
+                    concepts: rows(&expansion.contains),
+                    unclosed: unclosed_of(&extensions),
+                }
+            }
+
+            impl Reads<ExpandedValueSet> for fhir_types::$module::value_set::ValueSet {
+                fn read(&self) -> ExpandedValueSet {
+                    ExpandedValueSet {
+                        expansion: self.expansion.as_ref().map(expansion),
+                    }
+                }
+            }
+        }
+    };
+}
+
+reads_expansion!(r4);
+reads_expansion!(r4b);
+reads_expansion!(r5);
+reads_expansion!(r6);
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn parse(json: &str) -> ExpandedValueSet {
-        serde_json::from_str(json).expect("the fixture is valid JSON")
+        crate::fhir::version::FhirVersion::R4B
+            .decode(&crate::fhir::release::fixture::completed("ValueSet", json))
+            .expect("the fixture is a valid R4B ValueSet")
     }
 
     #[test]
@@ -700,18 +679,24 @@ mod tests {
     }
 
     #[test]
-    fn an_answer_with_unknown_elements_still_reads() {
-        let expansion = parse(
-            r#"{"resourceType":"ValueSet","id":"x","meta":{"lastUpdated":"2026-09-07"},
-                "expansion":{"identifier":"urn:uuid:2","timestamp":"2026-09-07T00:00:00Z",
-                "property":[{"code":"parent"}],"contains":[{"code":"a"}]}}"#,
-        )
-        .expansion()
-        .expect("the answer carries an expansion");
+    fn an_answer_with_elements_the_reader_does_not_draw_still_reads() {
+        let answer = r#"{"resourceType":"ValueSet","id":"x","status":"active",
+            "meta":{"lastUpdated":"2026-09-07T00:00:00Z"},
+            "expansion":{"identifier":"urn:uuid:2","timestamp":"2026-09-07T00:00:00Z",
+            "property":[{"code":"parent"}],"contains":[{"code":"a"}]}}"#;
+        let expansion = crate::fhir::version::FhirVersion::R5
+            .decode::<ExpandedValueSet>(answer)
+            .expect("R5 defines `expansion.property`")
+            .expansion()
+            .expect("the answer carries an expansion");
         assert_eq!(
             expansion.concepts.len(),
             1,
             "the reader ignores the elements it does not draw"
         );
+        let refused = crate::fhir::version::FhirVersion::R4B
+            .decode::<ExpandedValueSet>(answer)
+            .expect_err("R4B defines no `expansion.property`");
+        assert!(refused.to_string().contains("property"), "{refused}");
     }
 }

@@ -79,3 +79,27 @@ async fn the_about_page_draws_an_unreachable_server_as_its_refusal() {
         "the page names the cause and the address asked: {page}"
     );
 }
+
+#[tokio::test]
+async fn a_value_set_that_does_not_decode_at_its_release_draws_the_error_state() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/r4b/ValueSet/animals"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "resourceType": "ValueSet",
+            "id": "animals",
+            "url": "https://terminology.example/ValueSet/animals"
+        })))
+        .mount(&server)
+        .await;
+    let state = console(
+        None,
+        &format!("[ferroterm]\nbase_url = \"{}/\"\n", server.uri()),
+    )
+    .await;
+    let page = text(send(&state, get("/valuesets/animals?fhir=r4b", &[])).await).await;
+    assert!(
+        page.contains("FHIR R4B: ") && page.contains("ValueSet") && page.contains("status"),
+        "the error names the version, the resource and the element it lacks: {page}"
+    );
+}

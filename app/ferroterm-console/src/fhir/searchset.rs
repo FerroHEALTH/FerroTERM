@@ -89,6 +89,68 @@ impl<T: Published> SearchSet<T> {
     }
 }
 
+/// What a search answered, read from the `Bundle` its release decoded: what
+/// the server counted, and the resources of one type it carried, in the
+/// server's own order.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct Found<V> {
+    /// `Bundle.total`, the number of matches the server counted.
+    pub(crate) total: Option<u32>,
+    /// The resources of the type searched for. An entry carrying another
+    /// resource, such as the `OperationOutcome` a search may describe itself
+    /// with (<https://hl7.org/fhir/R4B/http.html#search>), is not a match.
+    found: Vec<V>,
+}
+
+impl<V> Found<V> {
+    /// What a search answered: the server's count, and the matches in its
+    /// order.
+    pub(crate) fn new(total: Option<u32>, found: Vec<V>) -> Self {
+        Self { total, found }
+    }
+
+    /// The resources the answer carries, in the server's own order, which a
+    /// client never re-sorts.
+    pub(crate) fn found(&self) -> Vec<&V> {
+        self.found.iter().collect()
+    }
+}
+
+impl<V> Default for Found<V> {
+    fn default() -> Self {
+        Self {
+            total: None,
+            found: Vec::new(),
+        }
+    }
+}
+
+/// Reads the `Bundle` of the `fhir-types` module `$module` into what a page
+/// reads of each `$variant` it carries, as `$view`.
+macro_rules! carries {
+    ($module:ident, $variant:ident, $view:ty) => {
+        impl crate::fhir::release::Reads<Found<$view>> for fhir_types::$module::bundle::Bundle {
+            fn read(&self) -> Found<$view> {
+                use fhir_types::$module::resource::Resource;
+                Found::new(
+                    self.total.as_ref().and_then(|total| total.value),
+                    self.entry
+                        .iter()
+                        .filter_map(|entry| match &entry.resource {
+                            Some(Resource::$variant(resource)) => Some(
+                                crate::fhir::release::Reads::<$view>::read(resource.as_ref()),
+                            ),
+                            _ => None,
+                        })
+                        .collect(),
+                )
+            }
+        }
+    };
+}
+
+pub(crate) use carries;
+
 #[cfg(test)]
 mod tests {
     use super::*;

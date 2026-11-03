@@ -28,7 +28,7 @@ use ferrohealth_ui::view::surface::{
 use ferrohealth_ui::view::transform::transform_quiet;
 
 use crate::auth::scopes::Letter;
-use crate::fhir::compose::{Draft, Preview, STATUSES, StoredValueSet};
+use crate::fhir::compose::{Draft, Preview, STATUSES};
 use crate::fhir::{CODE_SYSTEM, VALUE_SET};
 use crate::locale::{Msg, tr, tr_with};
 use crate::markup::{h, join, t};
@@ -287,8 +287,7 @@ async fn open(request: &Request, id: &str) -> Result<Draft, Html> {
         return Ok(Draft::new());
     }
     match request.client.value_set_stored(request.version, id).await {
-        Ok(resource) => {
-            let stored = StoredValueSet::of(&resource);
+        Ok((stored, resource)) => {
             if stored.writable() {
                 Ok(stored.draft(&resource))
             } else {
