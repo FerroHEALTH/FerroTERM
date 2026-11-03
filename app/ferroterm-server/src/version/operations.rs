@@ -73,7 +73,7 @@ macro_rules! operations {
                 pub(super) fn respond(&self, wire: Wire) -> Response {
                     match self {
                         Self::Parameters(parameters) => {
-                            parameters::respond(parameters.as_ref(), wire)
+                            parameters::respond_resource(parameters.as_ref(), wire)
                         }
                         Self::ValueSet(value_set) => {
                             parameters::respond_resource(value_set.as_ref(), wire)

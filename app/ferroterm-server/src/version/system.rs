@@ -50,7 +50,7 @@ macro_rules! system {
                     .last()
                     .unwrap_or(FHIR_VERSION)
                     .to_owned();
-                parameters::respond_in(&query, &headers, |wire| parameters::respond(&Parameters {
+                parameters::respond_in(&query, &headers, |wire| parameters::respond_resource(&Parameters {
                     parameter: vec![
                         ParametersParameter {
                             name: "version".into(),
@@ -105,7 +105,7 @@ macro_rules! system {
                 match mode {
                     "start" => {
                         let id = state.caches().start(resources);
-                        parameters::respond(&Parameters {
+                        parameters::respond_resource(&Parameters {
                             parameter: vec![ParametersParameter {
                                 name: "cache-id".into(),
                                 value: Some(ParametersParameterValue::Id(id.as_str().into())),
@@ -134,7 +134,7 @@ macro_rules! system {
                             ));
                         };
                         state.caches().end(&id)?;
-                        parameters::respond(&Parameters::default(), wire)
+                        parameters::respond_resource(&Parameters::default(), wire)
                     }
                     other => Err(Failure::new(
                         StatusCode::BAD_REQUEST,
