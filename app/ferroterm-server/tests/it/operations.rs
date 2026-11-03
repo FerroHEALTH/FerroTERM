@@ -688,3 +688,34 @@ async fn an_instance_invocation_takes_the_instance_s_own_canonical_and_refuses_a
     assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
     assert_eq!(body["issue"][0]["code"], "invalid");
 }
+
+// A `property` neither the specification nor the code system defines names
+// nothing to return, so `$lookup` answers the ones it can and no issue
+// (<https://hl7.org/fhir/R5/codesystem-operation-lookup.html>, `property`).
+#[tokio::test]
+async fn lookup_leaves_out_a_property_nothing_defines() {
+    let server = Server::start();
+    let cat = sctid(item(CAT));
+    for version in ["r4", "r4b", "r5"] {
+        let (status, body) = server
+            .post(
+                &format!("/{version}/CodeSystem/$lookup"),
+                &parameters(&[
+                    ("system", json!({"valueUri": SCT})),
+                    ("code", json!({"valueCode": cat})),
+                    ("property", json!({"valueCode": "sufficientlyDefined"})),
+                    ("property", json!({"valueCode": "x-unknown-property"})),
+                ]),
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK, "{version}: {body}");
+        let properties: Vec<&str> = body["parameter"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|p| p["name"] == "property")
+            .map(|p| p["part"][0]["valueCode"].as_str().unwrap())
+            .collect();
+        assert_eq!(properties, ["sufficientlyDefined"], "{version}: {body}");
+    }
+}
