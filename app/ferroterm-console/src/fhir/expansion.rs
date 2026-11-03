@@ -8,8 +8,6 @@
 //! answer lives here, outside every component, so the screen is a rendering of
 //! a value that plain unit tests can pin.
 
-use serde::{Deserialize, Serialize};
-
 use crate::fhir::release::Reads;
 
 use crate::url::RequestUrl;
@@ -150,7 +148,7 @@ pub(crate) struct ParameterLine {
 }
 
 /// One concept of an expansion, as a row.
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct ConceptRow {
     /// The system the code belongs to, empty when the server named none.
     pub(crate) system: String,
@@ -171,7 +169,7 @@ pub(crate) struct ConceptRow {
 }
 
 /// One designation of a concept, as a line.
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct DesignationRow {
     /// The BCP 47 tag, absent when the server sent none.
     pub(crate) language: Option<String>,
