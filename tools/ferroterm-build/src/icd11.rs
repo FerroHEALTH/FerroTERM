@@ -14,25 +14,19 @@
 //! `scales.json`. No FHIR specification governs the layout: our own design.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::io;
 use std::path::{Path, PathBuf};
 
 use ::icd11::Linearization;
 use ::icd11::cache::{self, CacheError, Cached};
-use concept_graph::closure::{Closure, ClosureError};
-use concept_graph::csr::{Csr, CsrError};
 use concept_graph::ordinal::Ordinal;
-use concept_graph::persist::Hierarchy;
-use concept_store::builder::{BuildError, PreferredRule, StoreBuilder};
-use concept_store::keys::{KeyTable, KeyTableError};
+use concept_store::builder::StoreBuilder;
 use concept_store::record::{Concept, Designation, PropertyValue};
-use concept_store::store::Vocabulary;
 use concept_store::tables;
-use designation_index::index::{IndexBuilder, Input};
 use serde::Serialize;
 use serde_json::json;
 
-use crate::pipeline::{HIERARCHY_FILE, MANIFEST_FILE, MANIFEST_VERSION, STORE_FILE, TEXT_FILE};
+use crate::artifact::{self, LanguageKey, Layout, Placed, PropertyKeys};
+use crate::pipeline::{HIERARCHY_FILE, MANIFEST_VERSION, STORE_FILE, TEXT_FILE};
 
 /// The manifest `kind` of an artifact this pipeline writes.
 pub const KIND: &str = "icd11";
@@ -96,74 +90,9 @@ pub enum Error {
     /// The cache names no release and none was given.
     #[error("the cache names no release for `{0}`; pass `--icd11-release`")]
     NoRelease(&'static str),
-    /// The store cannot be written.
+    /// A part of the artifact cannot be built or written.
     #[error(transparent)]
-    Store(#[from] BuildError),
-    /// The hierarchy cannot be built.
-    #[error(transparent)]
-    Csr(#[from] CsrError),
-    /// The hierarchy has a cycle.
-    #[error(transparent)]
-    Closure(#[from] ClosureError),
-    /// The hierarchy cannot be written.
-    #[error(transparent)]
-    Graph(#[from] concept_graph::persist::PersistError),
-    /// The key table cannot be written.
-    #[error(transparent)]
-    Keys(#[from] KeyTableError),
-    /// The text index cannot be built.
-    #[error(transparent)]
-    Text(#[from] designation_index::index::BuildError),
-    /// The text index cannot be written.
-    #[error(transparent)]
-    TextPersist(#[from] designation_index::persist::PersistError),
-    /// A file cannot be written.
-    #[error("cannot write {path}")]
-    Io {
-        /// The path.
-        path: PathBuf,
-        /// The cause.
-        #[source]
-        source: io::Error,
-    },
-    /// More concepts than an ordinal can number.
-    #[error("too many concepts")]
-    TooMany,
-}
-
-fn ordinal(index: usize) -> Result<Ordinal, Error> {
-    // A count past u32::MAX is the whole message; the conversion error adds nothing.
-    let Ok(index) = u32::try_from(index) else {
-        return Err(Error::TooMany);
-    };
-    Ok(Ordinal::new(index))
-}
-
-fn io_error(path: &Path) -> impl FnOnce(io::Error) -> Error + '_ {
-    move |source| Error::Io {
-        path: path.to_path_buf(),
-        source,
-    }
-}
-
-fn primary(language: &str) -> &str {
-    language.split(['-', '_']).next().unwrap_or(language)
-}
-
-/// One designation to write and index.
-struct Placed {
-    ordinal: Ordinal,
-    index: u32,
-    record: Designation,
-}
-
-/// The ordinal of the property key `name`.
-fn property_key(name: &str) -> Result<u32, Error> {
-    PROPERTY_KEYS
-        .iter()
-        .position(|k| *k == name)
-        .and_then(|i| u32::try_from(i).ok())
-        .ok_or(Error::TooMany)
+    Artifact(#[from] artifact::Error),
 }
 
 /// The designations of one entity: its titles, fully specified names,
@@ -219,23 +148,24 @@ fn entity_properties(
     id: &str,
     ordinal: Ordinal,
     linearization: Linearization,
-) -> Result<(), Error> {
+    keys: &PropertyKeys,
+) -> Result<(), artifact::Error> {
     builder.properties(
         ordinal,
-        property_key("id")?,
+        keys.key("id")?,
         &[PropertyValue::Code(linearization.uri(id))],
     )?;
     if let Some(kind) = &entity.class_kind {
         builder.properties(
             ordinal,
-            property_key("classKind")?,
+            keys.key("classKind")?,
             &[PropertyValue::Code(kind.clone())],
         )?;
     }
     if entity.code.is_none() {
         builder.properties(
             ordinal,
-            property_key("notSelectable")?,
+            keys.key("notSelectable")?,
             &[PropertyValue::Boolean(true)],
         )?;
     }
@@ -245,7 +175,7 @@ fn entity_properties(
             .iter()
             .map(|t| PropertyValue::String(t.value.clone()))
             .collect();
-        builder.properties(ordinal, property_key("definition")?, &values)?;
+        builder.properties(ordinal, keys.key("definition")?, &values)?;
     }
     if !entity.exclusions.is_empty() {
         let values: Vec<PropertyValue> = entity
@@ -253,19 +183,19 @@ fn entity_properties(
             .iter()
             .map(|t| PropertyValue::String(t.value.clone()))
             .collect();
-        builder.properties(ordinal, property_key("exclusion")?, &values)?;
+        builder.properties(ordinal, keys.key("exclusion")?, &values)?;
     }
     if let Some(source) = &entity.source {
         builder.properties(
             ordinal,
-            property_key("source")?,
+            keys.key("source")?,
             &[PropertyValue::Code(source.clone())],
         )?;
     }
     if let Some(url) = &entity.browser_url {
         builder.properties(
             ordinal,
-            property_key("browserUrl")?,
+            keys.key("browserUrl")?,
             &[PropertyValue::String(url.clone())],
         )?;
     }
@@ -302,40 +232,39 @@ fn entity_scales(
 ///
 /// Returns [`Error`] when no release is known, the hierarchy has a cycle,
 /// or an artifact cannot be written.
-#[expect(
-    clippy::too_many_lines,
-    reason = "one pass per artifact, read top to bottom"
-)]
 pub fn build(cached: &Cached, release: Option<&str>, out: &Path) -> Result<Report, Error> {
-    let linearization = cached.linearization;
     let release = release
         .map(str::to_owned)
         .or_else(|| cached.release.clone())
-        .ok_or(Error::NoRelease(linearization.name()))?;
-    std::fs::create_dir_all(out).map_err(io_error(out))?;
-    let mut ordinals: BTreeMap<&str, Ordinal> = BTreeMap::new();
-    for (i, id) in cached.entities.keys().enumerate() {
-        ordinals.insert(id, ordinal(i)?);
-    }
-    let store_path = out.join(STORE_FILE);
-    let mut builder = StoreBuilder::create(&store_path, linearization.system(), &release)?;
-    for (i, name) in DESIGNATION_KINDS.iter().enumerate() {
-        builder.vocabulary(Vocabulary::DesignationUses, ordinal(i)?.index(), name)?;
-    }
-    for (i, name) in PROPERTY_KEYS.iter().enumerate() {
-        builder.vocabulary(Vocabulary::PropertyKeys, ordinal(i)?.index(), name)?;
-    }
-    let mut placed: Vec<Placed> = Vec::new();
-    let mut keys: Vec<(u64, u32)> = Vec::new();
-    let mut edges: Vec<(Ordinal, Ordinal)> = Vec::new();
-    let mut scales: Vec<StoredScale> = Vec::new();
-    let mut languages: BTreeSet<String> = BTreeSet::new();
+        .ok_or(Error::NoRelease(cached.linearization.name()))?;
+    Ok(write(cached, release, out)?)
+}
+
+/// What the entity pass gathers for the parts beside the store.
+#[derive(Default)]
+struct Gathered {
+    placed: Vec<Placed>,
+    keys: Vec<(u64, u32)>,
+    edges: Vec<(Ordinal, Ordinal)>,
+    scales: Vec<StoredScale>,
+    languages: BTreeSet<String>,
+}
+
+/// Writes every entity into the store, gathering what the other parts hold.
+fn write_entities(
+    builder: &mut StoreBuilder,
+    cached: &Cached,
+    ordinals: &BTreeMap<&str, Ordinal>,
+    keys: &PropertyKeys,
+) -> Result<Gathered, artifact::Error> {
+    let linearization = cached.linearization;
+    let mut gathered = Gathered::default();
     for (id, entity) in &cached.entities {
         let Some(&ordinal) = ordinals.get(id.as_str()) else {
             continue;
         };
         if let Some(k) = Linearization::key_of(id) {
-            keys.push((k, ordinal.index()));
+            gathered.keys.push((k, ordinal.index()));
         }
         let code = entity.code.clone().unwrap_or_else(|| linearization.uri(id));
         builder.concept(
@@ -347,96 +276,79 @@ pub fn build(cached: &Cached, release: Option<&str>, out: &Path) -> Result<Repor
                 module: None,
             },
         )?;
-        entity_edges(entity, ordinal, &ordinals, &mut edges);
-        entity_designations(entity, ordinal, &mut placed, &mut languages);
-        entity_properties(&mut builder, entity, id, ordinal, linearization)?;
-        entity_scales(entity, ordinal, &ordinals, &mut scales);
+        entity_edges(entity, ordinal, ordinals, &mut gathered.edges);
+        entity_designations(
+            entity,
+            ordinal,
+            &mut gathered.placed,
+            &mut gathered.languages,
+        );
+        entity_properties(builder, entity, id, ordinal, linearization, keys)?;
+        entity_scales(entity, ordinal, ordinals, &mut gathered.scales);
     }
-    for p in &placed {
-        builder.designation(p.ordinal, p.index, &p.record)?;
+    Ok(gathered)
+}
+
+/// Writes the artifacts of `cached` under `out` as the release `release`.
+fn write(cached: &Cached, release: String, out: &Path) -> Result<Report, artifact::Error> {
+    let linearization = cached.linearization;
+    std::fs::create_dir_all(out).map_err(artifact::io_error(out))?;
+    let mut ordinals: BTreeMap<&str, Ordinal> = BTreeMap::new();
+    for (i, id) in cached.entities.keys().enumerate() {
+        ordinals.insert(id, artifact::ordinal(i)?);
     }
-    let count = ordinal(cached.entities.len())?.index();
-    let csr = Csr::build(count, edges)?;
-    let closure = Closure::compute(&csr)?;
-    let hierarchy = Hierarchy { is_a: csr, closure };
-    let hierarchy_path = out.join(HIERARCHY_FILE);
-    let mut graph_bytes = Vec::new();
-    hierarchy.write_to(&mut graph_bytes)?;
-    std::fs::write(&hierarchy_path, &graph_bytes).map_err(io_error(&hierarchy_path))?;
-    let mut index = IndexBuilder::new();
-    for p in &placed {
-        index.add(&Input {
-            concept: p.ordinal,
-            index: p.index,
-            term: &p.record.term,
-            language: primary(&p.record.language),
-            use_ordinal: p.record.use_ordinal,
-            active: true,
-            refsets: &[],
-        })?;
-    }
-    let index = index.build()?;
-    let mut text_bytes = Vec::new();
-    designation_index::persist::write_to(&index, &mut text_bytes)?;
-    let text_path = out.join(TEXT_FILE);
-    std::fs::write(&text_path, &text_bytes).map_err(io_error(&text_path))?;
-    let table = KeyTable::new(keys);
-    let mut key_bytes = Vec::new();
-    table.write_to(&mut key_bytes)?;
-    let keys_path = out.join(KEYS_FILE);
-    std::fs::write(&keys_path, &key_bytes).map_err(io_error(&keys_path))?;
-    let scales_path = out.join(SCALES_FILE);
-    let scales_text = serde_json::to_string(&scales).map_err(|source| Error::Io {
-        path: scales_path.clone(),
-        source: io::Error::other(source),
-    })?;
-    std::fs::write(&scales_path, scales_text).map_err(io_error(&scales_path))?;
-    builder.finish(&PreferredRule {
-        preferred: 0,
-        // Nothing reads a display column for this system; its provider
-        // chooses a display from the designations it already reads.
-        display_use: None,
-    })?;
+    let store_path = out.join(STORE_FILE);
+    let mut builder = artifact::open_store(
+        &store_path,
+        linearization.system(),
+        &release,
+        &DESIGNATION_KINDS,
+    )?;
+    let keys = PropertyKeys::write(&mut builder, &PROPERTY_KEYS)?;
+    let gathered = write_entities(&mut builder, cached, &ordinals, &keys)?;
+    artifact::write_designations(&mut builder, &gathered.placed)?;
+    artifact::write_hierarchy(out, cached.entities.len(), gathered.edges)?;
+    let words = artifact::write_text_index(out, &gathered.placed, LanguageKey::PrimarySubtag)?;
+    artifact::write_key_table(&out.join(KEYS_FILE), gathered.keys)?;
+    artifact::write_json(&out.join(SCALES_FILE), &gathered.scales, Layout::Compact)?;
+    artifact::finish(builder)?;
     let title = cached
         .titles
         .get("en")
         .or_else(|| cached.titles.values().next())
         .cloned();
-    let manifest = json!({
-        "manifest": MANIFEST_VERSION,
-        "kind": KIND,
-        "linearization": linearization.name(),
-        "system": linearization.system(),
-        "edition": linearization.system(),
-        "version": release,
-        "releaseDate": cached.release_date,
-        "title": title,
-        "titles": cached.titles,
-        "store": STORE_FILE,
-        "storeLayout": tables::LAYOUT_VERSION,
-        "hierarchy": HIERARCHY_FILE,
-        "text": TEXT_FILE,
-        "keys": KEYS_FILE,
-        "scales": SCALES_FILE,
-        "concepts": cached.entities.len(),
-        "designations": placed.len(),
-        "words": index.words(),
-        "languages": languages,
-    });
-    let manifest_path = out.join(MANIFEST_FILE);
-    let text = serde_json::to_string_pretty(&manifest).map_err(|source| Error::Io {
-        path: manifest_path.clone(),
-        source: io::Error::other(source),
-    })?;
-    std::fs::write(&manifest_path, format!("{text}\n")).map_err(io_error(&manifest_path))?;
+    artifact::write_manifest(
+        out,
+        &json!({
+            "manifest": MANIFEST_VERSION,
+            "kind": KIND,
+            "linearization": linearization.name(),
+            "system": linearization.system(),
+            "edition": linearization.system(),
+            "version": release,
+            "releaseDate": cached.release_date,
+            "title": title,
+            "titles": cached.titles,
+            "store": STORE_FILE,
+            "storeLayout": tables::LAYOUT_VERSION,
+            "hierarchy": HIERARCHY_FILE,
+            "text": TEXT_FILE,
+            "keys": KEYS_FILE,
+            "scales": SCALES_FILE,
+            "concepts": cached.entities.len(),
+            "designations": gathered.placed.len(),
+            "words": words,
+            "languages": gathered.languages,
+        }),
+    )?;
     Ok(Report {
         system: linearization.system().to_owned(),
         version: release,
         dir: out.to_path_buf(),
         concepts: u64::try_from(cached.entities.len()).unwrap_or(u64::MAX),
-        designations: u64::try_from(placed.len()).unwrap_or(u64::MAX),
-        scales: u64::try_from(scales.len()).unwrap_or(u64::MAX),
-        words: u64::try_from(index.words()).unwrap_or(u64::MAX),
+        designations: u64::try_from(gathered.placed.len()).unwrap_or(u64::MAX),
+        scales: u64::try_from(gathered.scales.len()).unwrap_or(u64::MAX),
+        words: u64::try_from(words).unwrap_or(u64::MAX),
     })
 }
 

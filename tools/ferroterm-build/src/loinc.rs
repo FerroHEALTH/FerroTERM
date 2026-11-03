@@ -14,23 +14,18 @@
 //! with the SNOMED CT build.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::io;
 use std::path::{Path, PathBuf};
 
 use ::loinc::release::{Release, ReleaseError};
 use ::loinc::{answer, part, term, variant};
-use concept_graph::closure::{Closure, ClosureError};
-use concept_graph::csr::{Csr, CsrError};
 use concept_graph::ordinal::Ordinal;
-use concept_graph::persist::Hierarchy;
-use concept_store::builder::{BuildError, PreferredRule, StoreBuilder};
+use concept_store::builder::StoreBuilder;
 use concept_store::record::{Concept, Designation, PropertyValue};
-use concept_store::store::Vocabulary;
 use concept_store::tables;
 use serde_json::json;
 
-use crate::common::{self, LanguageKey, PipelineError, Placed, PropertyKeys};
-use crate::pipeline::{HIERARCHY_FILE, MANIFEST_FILE, MANIFEST_VERSION, STORE_FILE, TEXT_FILE};
+use crate::artifact::{self, LanguageKey, Placed, PropertyKeys};
+use crate::pipeline::{HIERARCHY_FILE, MANIFEST_VERSION, STORE_FILE, TEXT_FILE};
 
 /// The system URI.
 pub const SYSTEM: &str = "http://loinc.org";
@@ -88,42 +83,9 @@ pub enum Error {
     /// The release names no version and none was given.
     #[error("the release names no version; pass `--loinc-version`")]
     NoVersion,
-    /// The store cannot be written.
+    /// A part of the artifact cannot be built or written.
     #[error(transparent)]
-    Store(#[from] BuildError),
-    /// The hierarchy cannot be built.
-    #[error(transparent)]
-    Csr(#[from] CsrError),
-    /// The hierarchy has a cycle.
-    #[error(transparent)]
-    Closure(#[from] ClosureError),
-    /// The hierarchy cannot be written.
-    #[error(transparent)]
-    Graph(#[from] concept_graph::persist::PersistError),
-    /// The text index cannot be built or written.
-    #[error(transparent)]
-    Text(#[from] designation_index::index::BuildError),
-    /// The text index cannot be written.
-    #[error(transparent)]
-    TextPersist(#[from] designation_index::persist::PersistError),
-    /// A file cannot be written.
-    #[error("cannot write {path}")]
-    Io {
-        /// The path.
-        path: PathBuf,
-        /// The cause.
-        #[source]
-        source: io::Error,
-    },
-    /// More concepts than an ordinal can number.
-    #[error("too many concepts")]
-    TooMany,
-    /// A property key the build asked for and never registered.
-    #[error("the property key `{key}` is not in the vocabulary")]
-    UnknownPropertyKey {
-        /// The key the build asked for.
-        key: String,
-    },
+    Artifact(#[from] artifact::Error),
 }
 
 /// The version in a release name such as `Loinc_2.82` or `Loinc_2.82.zip`.
@@ -134,35 +96,6 @@ pub fn version_from_name(path: &Path) -> Option<String> {
     let rest = rest.strip_suffix(".zip").unwrap_or(rest);
     (!rest.is_empty() && rest.bytes().all(|b| b.is_ascii_digit() || b == b'.'))
         .then(|| rest.to_owned())
-}
-
-impl PipelineError for Error {
-    fn too_many() -> Self {
-        Self::TooMany
-    }
-
-    fn io(path: &Path, source: io::Error) -> Self {
-        Self::Io {
-            path: path.to_path_buf(),
-            source,
-        }
-    }
-
-    fn unknown_property_key(key: &str) -> Self {
-        Self::UnknownPropertyKey {
-            key: key.to_owned(),
-        }
-    }
-}
-
-/// The ordinal of `index`, in this pipeline's error type.
-fn ordinal(index: usize) -> Result<Ordinal, Error> {
-    common::ordinal(index)
-}
-
-/// A closure naming `path` in this pipeline's I/O failure.
-fn io_error(path: &Path) -> impl FnOnce(io::Error) -> Error + '_ {
-    common::io_error(path)
 }
 
 /// The designations gathered while the concepts are written, numbered per
@@ -311,7 +244,7 @@ fn number(
         if ordinals.contains_key(&code) {
             continue;
         }
-        let ordinal = ordinal(concepts.len())?;
+        let ordinal = artifact::ordinal(concepts.len())?;
         ordinals.insert(code.to_ascii_uppercase(), ordinal);
         concepts.push((
             ordinal,
@@ -389,29 +322,16 @@ fn property_key_names(terms: &term::Terms, linked: &Linked<'_>) -> Vec<String> {
     names
 }
 
-/// Creates the store and writes the designation-use vocabulary.
-///
-/// # Errors
-///
-/// Returns [`Error`] when the store cannot be created or written.
-fn open_store(path: &Path, version: &str) -> Result<StoreBuilder, Error> {
-    let mut builder = StoreBuilder::create(path, SYSTEM, version)?;
-    for (i, name) in DESIGNATION_USES.iter().enumerate() {
-        builder.vocabulary(Vocabulary::DesignationUses, ordinal(i)?.index(), name)?;
-    }
-    Ok(builder)
-}
-
 /// Writes every concept with the kind of code it is.
 ///
 /// # Errors
 ///
-/// Returns [`Error`] when the store does not take a concept or its kind.
+/// Returns [`artifact::Error`] when the store does not take a concept or its kind.
 fn write_concepts(
     builder: &mut StoreBuilder,
     numbered: &Numbered,
-    keys: &PropertyKeys<Error>,
-) -> Result<(), Error> {
+    keys: &PropertyKeys,
+) -> Result<(), artifact::Error> {
     for (ordinal, concept, kind) in &numbered.concepts {
         builder.concept(*ordinal, concept)?;
         builder.properties(
@@ -435,7 +355,7 @@ fn write_terms(
     tables: &Tables,
     numbered: &Numbered,
     linked: &Linked<'_>,
-    keys: &PropertyKeys<Error>,
+    keys: &PropertyKeys,
     designations: &mut Designations,
 ) -> Result<(), Error> {
     let answer_lists_of = answer_lists_by_term(tables);
@@ -494,11 +414,11 @@ fn place_term_designations(
 /// part they name.
 fn write_term_axes(
     builder: &mut StoreBuilder,
-    keys: &PropertyKeys<Error>,
+    keys: &PropertyKeys,
     ordinal: Ordinal,
     term: &term::Term,
     term_links: Option<&BTreeMap<String, Vec<Ordinal>>>,
-) -> Result<(), Error> {
+) -> Result<(), artifact::Error> {
     let concepts = |parts: &Vec<Ordinal>| -> Vec<PropertyValue> {
         parts.iter().map(|p| PropertyValue::Concept(*p)).collect()
     };
@@ -524,11 +444,11 @@ fn write_term_axes(
 /// A term's copyright holder and the answer lists it uses.
 fn write_term_provenance(
     builder: &mut StoreBuilder,
-    keys: &PropertyKeys<Error>,
+    keys: &PropertyKeys,
     ordinal: Ordinal,
     term: &term::Term,
     answer_lists_of: &BTreeMap<&str, Vec<String>>,
-) -> Result<(), Error> {
+) -> Result<(), artifact::Error> {
     let copyright = if term.external_copyright.is_some() {
         "3rdParty"
     } else {
@@ -553,15 +473,15 @@ fn write_term_provenance(
 ///
 /// # Errors
 ///
-/// Returns [`Error`] when the store does not take a property or a key is
+/// Returns [`artifact::Error`] when the store does not take a property or a key is
 /// unknown.
 fn write_parts(
     builder: &mut StoreBuilder,
     parts: &[part::Part],
     numbered: &Numbered,
-    keys: &PropertyKeys<Error>,
+    keys: &PropertyKeys,
     designations: &mut Designations,
-) -> Result<(), Error> {
+) -> Result<(), artifact::Error> {
     for part in parts {
         let Some(&ordinal) = numbered.ordinals.get(&part.code.to_ascii_uppercase()) else {
             continue;
@@ -592,15 +512,15 @@ fn write_parts(
 ///
 /// # Errors
 ///
-/// Returns [`Error`] when the store does not take a property or a key is
+/// Returns [`artifact::Error`] when the store does not take a property or a key is
 /// unknown.
 fn write_class_parts(
     builder: &mut StoreBuilder,
     edges: &[part::Edge],
     numbered: &Numbered,
-    keys: &PropertyKeys<Error>,
+    keys: &PropertyKeys,
     designations: &mut Designations,
-) -> Result<(), Error> {
+) -> Result<(), artifact::Error> {
     let mut named: BTreeSet<&str> = BTreeSet::new();
     for edge in edges {
         if numbered.hierarchy_only.contains(&edge.code)
@@ -623,15 +543,15 @@ fn write_class_parts(
 ///
 /// # Errors
 ///
-/// Returns [`Error`] when the store does not take a property or a key is
+/// Returns [`artifact::Error`] when the store does not take a property or a key is
 /// unknown.
 fn write_answer_lists(
     builder: &mut StoreBuilder,
     lists: &BTreeMap<String, answer::AnswerList>,
     numbered: &Numbered,
-    keys: &PropertyKeys<Error>,
+    keys: &PropertyKeys,
     designations: &mut Designations,
-) -> Result<(), Error> {
+) -> Result<(), artifact::Error> {
     for list in lists.values() {
         let Some(&ordinal) = numbered.ordinals.get(&list.code.to_ascii_uppercase()) else {
             continue;
@@ -661,13 +581,8 @@ fn write_answer_lists(
     Ok(())
 }
 
-/// Builds the multiaxial hierarchy and writes it beside the store.
-///
-/// # Errors
-///
-/// Returns [`Error`] when the hierarchy has a cycle or cannot be written.
-fn write_hierarchy(out: &Path, numbered: &Numbered, edges: &[part::Edge]) -> Result<(), Error> {
-    let count = ordinal(numbered.concepts.len())?.index();
+/// The child-to-parent edges of the multiaxial hierarchy.
+fn hierarchy_edges(numbered: &Numbered, edges: &[part::Edge]) -> Vec<(Ordinal, Ordinal)> {
     let mut is_a = Vec::new();
     for edge in edges {
         if let (Some(child), Some(parent)) = (
@@ -679,51 +594,43 @@ fn write_hierarchy(out: &Path, numbered: &Numbered, edges: &[part::Edge]) -> Res
             is_a.push((*child, *parent));
         }
     }
-    let csr = Csr::build(count, is_a)?;
-    let closure = Closure::compute(&csr)?;
-    let hierarchy = Hierarchy { is_a: csr, closure };
-    let hierarchy_path = out.join(HIERARCHY_FILE);
-    let mut graph_bytes = Vec::new();
-    hierarchy.write_to(&mut graph_bytes)?;
-    std::fs::write(&hierarchy_path, &graph_bytes).map_err(io_error(&hierarchy_path))
+    is_a
 }
 
 /// Writes the manifest beside the store.
 ///
 /// # Errors
 ///
-/// Returns [`Error`] when the manifest cannot be rendered or written.
+/// Returns [`artifact::Error`] when the manifest cannot be rendered or
+/// written.
 fn write_manifest(
     out: &Path,
     version: &str,
     variants: &[variant::Variant],
     counts: &Counts,
-) -> Result<(), Error> {
+) -> Result<(), artifact::Error> {
     let mut languages: Vec<String> = variants.iter().map(|v| v.language.clone()).collect();
     languages.push(String::from(BASE_LANGUAGE));
     languages.sort();
     languages.dedup();
-    let manifest = json!({
-        "manifest": MANIFEST_VERSION,
-        "system": SYSTEM,
-        "edition": SYSTEM,
-        "version": version,
-        "language": BASE_LANGUAGE,
-        "store": STORE_FILE,
-        "storeLayout": tables::LAYOUT_VERSION,
-        "hierarchy": HIERARCHY_FILE,
-        "text": TEXT_FILE,
-        "concepts": counts.concepts,
-        "designations": counts.designations,
-        "words": counts.words,
-        "languages": languages,
-    });
-    let manifest_path = out.join(MANIFEST_FILE);
-    let text = serde_json::to_string_pretty(&manifest).map_err(|source| Error::Io {
-        path: manifest_path.clone(),
-        source: io::Error::other(source),
-    })?;
-    std::fs::write(&manifest_path, format!("{text}\n")).map_err(io_error(&manifest_path))
+    artifact::write_manifest(
+        out,
+        &json!({
+            "manifest": MANIFEST_VERSION,
+            "system": SYSTEM,
+            "edition": SYSTEM,
+            "version": version,
+            "language": BASE_LANGUAGE,
+            "store": STORE_FILE,
+            "storeLayout": tables::LAYOUT_VERSION,
+            "hierarchy": HIERARCHY_FILE,
+            "text": TEXT_FILE,
+            "concepts": counts.concepts,
+            "designations": counts.designations,
+            "words": counts.words,
+            "languages": languages,
+        }),
+    )
 }
 
 /// Builds the artifacts for the release under `root` into `out`.
@@ -735,13 +642,12 @@ fn write_manifest(
 pub fn build(root: &Path, version: Option<&str>, out: &Path) -> Result<Report, Error> {
     let tables = read_tables(root)?;
     let version = resolve_version(version, &tables.terms)?;
-    std::fs::create_dir_all(out).map_err(io_error(out))?;
+    std::fs::create_dir_all(out).map_err(artifact::io_error(out))?;
     let numbered = number(&tables.terms, &tables.parts, &tables.lists, &tables.edges)?;
     let store_path = out.join(STORE_FILE);
-    let mut builder = open_store(&store_path, &version)?;
+    let mut builder = artifact::open_store(&store_path, SYSTEM, &version, &DESIGNATION_USES)?;
     let linked = link_parts(&tables.links, &numbered);
-    let keys: PropertyKeys<Error> =
-        PropertyKeys::write(&mut builder, &property_key_names(&tables.terms, &linked))?;
+    let keys = PropertyKeys::write(&mut builder, &property_key_names(&tables.terms, &linked))?;
     let mut designations = Designations::default();
     write_concepts(&mut builder, &numbered, &keys)?;
     write_terms(
@@ -773,16 +679,14 @@ pub fn build(root: &Path, version: Option<&str>, out: &Path) -> Result<Report, E
         &keys,
         &mut designations,
     )?;
-    common::write_designations::<Error>(&mut builder, &designations.placed)?;
-    write_hierarchy(out, &numbered, &tables.edges)?;
-    let words =
-        common::write_text_index::<Error>(out, &designations.placed, LanguageKey::PrimarySubtag)?;
-    builder.finish(&PreferredRule {
-        preferred: 0,
-        // Nothing reads a display column for this system; its provider
-        // chooses a display from the designations it already reads.
-        display_use: None,
-    })?;
+    artifact::write_designations(&mut builder, &designations.placed)?;
+    artifact::write_hierarchy(
+        out,
+        numbered.concepts.len(),
+        hierarchy_edges(&numbered, &tables.edges),
+    )?;
+    let words = artifact::write_text_index(out, &designations.placed, LanguageKey::PrimarySubtag)?;
+    artifact::finish(builder)?;
     let counts = Counts {
         concepts: numbered.concepts.len(),
         designations: designations.placed.len(),
@@ -798,33 +702,4 @@ pub fn build(root: &Path, version: Option<&str>, out: &Path) -> Result<Report, E
         designations: u64::try_from(counts.designations).unwrap_or(u64::MAX),
         words: u64::try_from(counts.words).unwrap_or(u64::MAX),
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use concept_store::builder::StoreBuilder;
-
-    use super::{Error, PropertyKeys};
-
-    /// A key the vocabulary never received is a defect in the build, and says
-    /// so: it is not the capacity limit `TooMany` reports.
-    #[test]
-    fn an_unregistered_property_key_names_itself() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let mut builder =
-            StoreBuilder::create(&dir.path().join("store.redb"), super::SYSTEM, "2.83")
-                .expect("store");
-        let keys: PropertyKeys<Error> =
-            PropertyKeys::write(&mut builder, &[String::from("COMPONENT")]).expect("writes");
-        assert_eq!(keys.key("COMPONENT").expect("registered"), 0);
-        let error = keys.key("SCALE_TYP").expect_err("never registered");
-        assert!(
-            matches!(&error, Error::UnknownPropertyKey { key } if key == "SCALE_TYP"),
-            "the key is named: {error:?}"
-        );
-        assert_eq!(
-            error.to_string(),
-            "the property key `SCALE_TYP` is not in the vocabulary"
-        );
-    }
 }

@@ -12,6 +12,7 @@
 pub mod atc;
 pub mod classification;
 pub mod dhd;
+mod edition;
 pub mod fhir;
 pub mod gstandaard;
 pub mod icd11;

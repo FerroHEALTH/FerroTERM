@@ -11,20 +11,19 @@
 use std::path::Path;
 
 use concept_graph::attributes::{self, Attributes};
-use concept_graph::closure::Closure;
-use concept_graph::csr::Csr;
 use concept_graph::identifiers::Identifiers;
 use concept_graph::members::Memberships;
 use concept_graph::ordinal::Ordinal;
-use concept_graph::persist::Hierarchy;
 use concept_graph::refsets::{self, RefsetMembers};
-use concept_store::builder::{PreferredRule, StoreBuilder};
+use concept_store::builder::StoreBuilder;
 use concept_store::record::{Concept, Designation, PropertyValue};
 use concept_store::store::Vocabulary;
 use concept_store::tables;
 use designation_index::index::{IndexBuilder, Input};
 use rf2::constants;
 use rf2::id::with_check_digit;
+
+use crate::edition::{self, ord};
 
 const NAMESPACE: &str = "1234567";
 /// The edition URI of the synthetic edition.
@@ -152,11 +151,6 @@ struct Row {
     active: bool,
     defined: bool,
     designations: Vec<DesignationRow>,
-}
-
-/// A small index as a `u32` ordinal (the fixture has a handful of rows).
-fn ord(index: usize) -> u32 {
-    u32::try_from(index).unwrap_or(u32::MAX)
 }
 
 /// The code of `row`: the published one it names, else the invented SCTID.
@@ -695,9 +689,7 @@ fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureError> {
         "http://snomed.info/sct",
         shape.version,
     )?;
-    for (i, key) in ["parent", "definitionStatus", "module"].iter().enumerate() {
-        builder.vocabulary(Vocabulary::PropertyKeys, ord(i), key)?;
-    }
+    edition::write_property_keys(&mut builder)?;
     // Attribute types after the fixed keys, sorted by SCTID as the build does.
     let mut attribute_types = [(COVERING, sctid(item(COVERING))), (LEGS, sctid(item(LEGS)))];
     attribute_types.sort_by(|a, b| a.1.cmp(&b.1));
@@ -710,28 +702,7 @@ fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureError> {
             .position(|(o, _)| *o == ordinal)
             .unwrap_or_default())
     };
-    for (i, use_id) in [
-        constants::FULLY_SPECIFIED_NAME,
-        constants::SYNONYM,
-        constants::DEFINITION,
-    ]
-    .iter()
-    .enumerate()
-    {
-        builder.vocabulary(Vocabulary::DesignationUses, ord(i), &use_id.to_string())?;
-    }
-    builder.vocabulary(
-        Vocabulary::Acceptabilities,
-        0,
-        &constants::PREFERRED.to_string(),
-    )?;
-    builder.vocabulary(
-        Vocabulary::Acceptabilities,
-        1,
-        &constants::ACCEPTABLE.to_string(),
-    )?;
-    builder.vocabulary(Vocabulary::LanguageRefsets, gb, GB_REFSET)?;
-    builder.vocabulary(Vocabulary::LanguageRefsets, nl, NL_REFSET)?;
+    edition::write_designation_vocabularies(&mut builder, gb, nl)?;
 
     let mut text = IndexBuilder::new();
     write_concepts(&mut builder, &mut text, &rows, &is_a, &module)?;
@@ -749,7 +720,6 @@ fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureError> {
             &[PropertyValue::Decimal(String::from("4"))],
         )?;
     }
-    let graph_error = |e: &dyn std::fmt::Display| FixtureError::Graph(e.to_string());
     let attribute_types = {
         let mut types: Vec<u64> = [COVERING, LEGS]
             .iter()
@@ -792,33 +762,11 @@ fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureError> {
             edge(DOG, 2, LEGS, attributes::Value::Number(String::from("4"))),
         ],
     )
-    .map_err(|e| graph_error(&e))?;
-    let mut attribute_bytes = Vec::new();
-    attributes
-        .write_to(&mut attribute_bytes)
-        .map_err(|e| graph_error(&e))?;
-    std::fs::write(dir.join("attributes.bin"), &attribute_bytes)?;
-
-    let csr = Csr::build(
-        ord(rows.len()),
-        is_a.iter()
-            .map(|(c, p)| (Ordinal::new(*c), Ordinal::new(*p))),
-    )
     .map_err(|e| FixtureError::Graph(e.to_string()))?;
-    let closure = Closure::compute(&csr).map_err(|e| FixtureError::Graph(e.to_string()))?;
-    let hierarchy = Hierarchy { is_a: csr, closure };
-    let mut graph_bytes = Vec::new();
-    hierarchy
-        .write_to(&mut graph_bytes)
-        .map_err(|e| FixtureError::Graph(e.to_string()))?;
-    std::fs::write(dir.join("hierarchy.bin"), &graph_bytes)?;
-    let index = text
-        .build()
-        .map_err(|e| FixtureError::Text(e.to_string()))?;
-    let mut text_bytes = Vec::new();
-    designation_index::persist::write_to(&index, &mut text_bytes)
-        .map_err(|e| FixtureError::Text(e.to_string()))?;
-    std::fs::write(dir.join("text.bin"), &text_bytes)?;
+    edition::write_graph_part(dir, "attributes.bin", |bytes| attributes.write_to(bytes))?;
+
+    edition::write_hierarchy(dir, ord(rows.len()), is_a.iter().copied())?;
+    edition::write_text(dir, text)?;
     let mut memberships = Memberships::new();
     let refset_id = |ordinal: u32| -> Result<u64, FixtureError> {
         rows.iter()
@@ -860,7 +808,7 @@ fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureError> {
     }
     tables
         .insert(pets, &[], pet_rows)
-        .map_err(|e| graph_error(&e))?;
+        .map_err(|e| FixtureError::Graph(e.to_string()))?;
     // The Module Dependency reference set states which module an edition was
     // built on, in the columns RF2 gives it.
     tables
@@ -884,70 +832,26 @@ fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureError> {
                 ],
             )],
         )
-        .map_err(|e| graph_error(&e))?;
+        .map_err(|e| FixtureError::Graph(e.to_string()))?;
     tables
         .insert(
             codes_map,
-            &[
-                (String::from("mapGroup"), refsets::FieldKind::Integer),
-                (String::from("mapPriority"), refsets::FieldKind::Integer),
-                (String::from("mapRule"), refsets::FieldKind::String),
-                (String::from("mapAdvice"), refsets::FieldKind::String),
-                (String::from("mapTarget"), refsets::FieldKind::String),
-                (String::from("correlationId"), refsets::FieldKind::Component),
-            ],
+            &edition::extended_map_columns(),
             vec![
-                member(
-                    CAT,
-                    vec![
-                        refsets::FieldValue::Integer(1),
-                        refsets::FieldValue::Integer(1),
-                        refsets::FieldValue::String(String::from("TRUE")),
-                        refsets::FieldValue::String(String::from("ALWAYS C01")),
-                        refsets::FieldValue::String(String::from("C01")),
-                        refsets::FieldValue::Component(447_561_005),
-                    ],
-                ),
-                member(
-                    DOG,
-                    vec![
-                        refsets::FieldValue::Integer(1),
-                        refsets::FieldValue::Integer(1),
-                        refsets::FieldValue::String(String::from("TRUE")),
-                        refsets::FieldValue::String(String::from("ALWAYS D01")),
-                        refsets::FieldValue::String(String::from("D01")),
-                        refsets::FieldValue::Component(447_561_005),
-                    ],
-                ),
+                member(CAT, edition::extended_map_values("C01")),
+                member(DOG, edition::extended_map_values("D01")),
             ],
         )
-        .map_err(|e| graph_error(&e))?;
+        .map_err(|e| FixtureError::Graph(e.to_string()))?;
     // The ICD-10 extended map carries the same RF2 columns under a published
     // reference set id, so its targets are codes of a named code system.
     tables
         .insert(
             icd10_map,
-            &[
-                (String::from("mapGroup"), refsets::FieldKind::Integer),
-                (String::from("mapPriority"), refsets::FieldKind::Integer),
-                (String::from("mapRule"), refsets::FieldKind::String),
-                (String::from("mapAdvice"), refsets::FieldKind::String),
-                (String::from("mapTarget"), refsets::FieldKind::String),
-                (String::from("correlationId"), refsets::FieldKind::Component),
-            ],
-            vec![member(
-                CAT,
-                vec![
-                    refsets::FieldValue::Integer(1),
-                    refsets::FieldValue::Integer(1),
-                    refsets::FieldValue::String(String::from("TRUE")),
-                    refsets::FieldValue::String(String::from("ALWAYS C01")),
-                    refsets::FieldValue::String(String::from("C01")),
-                    refsets::FieldValue::Component(447_561_005),
-                ],
-            )],
+            &edition::extended_map_columns(),
+            vec![member(CAT, edition::extended_map_values("C01"))],
         )
-        .map_err(|e| graph_error(&e))?;
+        .map_err(|e| FixtureError::Graph(e.to_string()))?;
     let target_component = [(
         String::from("targetComponentId"),
         refsets::FieldKind::Component,
@@ -967,36 +871,21 @@ fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureError> {
                     vec![refsets::FieldValue::Concept(Ordinal::new(target))],
                 )],
             )
-            .map_err(|e| graph_error(&e))?;
+            .map_err(|e| FixtureError::Graph(e.to_string()))?;
     }
-    let mut table_bytes = Vec::new();
-    tables
-        .write_to(&mut table_bytes)
-        .map_err(|e| graph_error(&e))?;
-    std::fs::write(dir.join("members.bin"), &table_bytes)?;
+    edition::write_graph_part(dir, "members.bin", |bytes| tables.write_to(bytes))?;
     let scheme: u64 = sctid(item(SCHEME)).parse().unwrap_or_default();
     let identifiers = Identifiers::new(vec![
         (scheme, String::from("cat-1"), Ordinal::new(CAT)),
         (scheme, String::from("dog-1"), Ordinal::new(DOG)),
     ]);
-    let mut identifier_bytes = Vec::new();
-    identifiers
-        .write_to(&mut identifier_bytes)
-        .map_err(|e| graph_error(&e))?;
-    std::fs::write(dir.join("identifiers.bin"), &identifier_bytes)?;
-    let mut member_bytes = Vec::new();
-    memberships
-        .write_to(&mut member_bytes)
-        .map_err(|e| FixtureError::Graph(e.to_string()))?;
-    std::fs::write(dir.join("refsets.bin"), &member_bytes)?;
-    builder.finish(&PreferredRule {
-        preferred,
-        // The synonym, the second designation use written above: a SNOMED
-        // display is the preferred synonym of a language reference set.
-        display_use: Some(1),
-    })?;
+    edition::write_graph_part(dir, "identifiers.bin", |bytes| identifiers.write_to(bytes))?;
+    edition::write_graph_part(dir, "refsets.bin", |bytes| memberships.write_to(bytes))?;
+    edition::finish(builder, preferred)?;
 
-    let manifest = serde_json::json!({
+    edition::write_manifest(
+        dir,
+        &serde_json::json!({
         "manifest": 2,
         "system": "http://snomed.info/sct",
         "edition": shape.edition,
@@ -1012,11 +901,8 @@ fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureError> {
         "identifiers": "identifiers.bin",
         "concepts": rows.len(),
         "languages": ["en", "nl"],
-    });
-    let text = serde_json::to_string_pretty(&manifest)
-        .map_err(|e| FixtureError::Io(std::io::Error::other(e)))?;
-    std::fs::write(dir.join(concept_store::MANIFEST_FILE), text)?;
-    Ok(())
+        }),
+    )
 }
 /// The item number of the refset-only package's module concept.
 pub const PACKAGE_MODULE: u32 = 200;

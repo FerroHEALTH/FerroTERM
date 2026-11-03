@@ -14,13 +14,12 @@ use std::sync::LazyLock;
 
 use concept_graph::subsumption::Outcome;
 
+use super::grammar::{Grammar, GrammarProvider, Table, outcome};
 use super::interned::Interned;
-use crate::compose::Compose;
 use crate::filter::{Filter, FilterOperator};
 use crate::provider::{
-    CodeSystemProvider, Compositional, Concept, ConceptSet, ContentMode, Declaration, Designation,
-    FilterDefinition, Hierarchy, Identity, Located, Property, PropertyDefinition, PropertyKind,
-    PropertyValue, ProviderError, Status,
+    Compositional, Concept, ConceptSet, ContentMode, Declaration, FilterDefinition, Identity,
+    Property, PropertyDefinition, PropertyKind, PropertyValue, ProviderError, Status,
 };
 
 /// The system URI (<https://hl7.org/fhir/R4B/terminologies-systems.html>).
@@ -192,14 +191,14 @@ pub fn parse(text: &str) -> Option<MediaType> {
     })
 }
 
-/// The BCP 13 provider.
+/// The BCP 13 grammar: RFC 6838 media types over the IANA registry.
 #[derive(Debug)]
-pub struct Bcp13Provider {
-    identity: Identity,
-    declaration: Declaration,
-    interned: Interned,
+pub struct MediaTypes {
     registered: u32,
 }
+
+/// The BCP 13 provider.
+pub type Bcp13Provider = GrammarProvider<MediaTypes>;
 
 impl Default for Bcp13Provider {
     fn default() -> Self {
@@ -228,15 +227,15 @@ impl Bcp13Provider {
                 operators,
                 value: String::from("a value"),
             };
-        Self {
-            identity: Identity {
+        GrammarProvider::from_parts(
+            Identity {
                 url: URL.to_owned(),
                 version: String::new(),
                 title: Some(String::from("IETF BCP 13 media types")),
                 name: None,
                 version_needed: false,
             },
-            declaration: Declaration {
+            Declaration {
                 content: ContentMode::NotPresent,
                 case_sensitive: false,
                 hierarchy_meaning: None,
@@ -280,12 +279,14 @@ impl Bcp13Provider {
                 implicit_forms: Vec::new(),
             },
             interned,
-            registered,
-        }
+            MediaTypes { registered },
+        )
     }
+}
 
-    fn media_type(&self, concept: Concept) -> Option<MediaType> {
-        self.interned.code(concept).and_then(|code| parse(&code))
+impl MediaTypes {
+    fn media_type(table: &Table<'_>, concept: Concept) -> Option<MediaType> {
+        table.code(concept).and_then(|code| parse(&code))
     }
 
     fn is_registered(media: &MediaType) -> bool {
@@ -325,40 +326,20 @@ impl Bcp13Provider {
     }
 }
 
-impl CodeSystemProvider for Bcp13Provider {
-    fn identity(&self) -> &Identity {
-        &self.identity
-    }
-
-    fn declaration(&self) -> &Declaration {
-        &self.declaration
-    }
-
-    fn locate(&self, code: &str) -> Result<Option<Located>, ProviderError> {
-        let Some(media) = parse(code) else {
-            return Ok(None);
-        };
-        let canonical = media.canonical();
-        let concept = self.interned.intern(&canonical)?;
-        Ok(Some(Located {
-            concept,
-            code: canonical,
-        }))
-    }
-
-    fn code(&self, concept: Concept) -> Result<Option<String>, ProviderError> {
-        Ok(self.interned.code(concept))
+impl Grammar for MediaTypes {
+    fn canonical(&self, code: &str) -> Option<String> {
+        parse(code).map(|media| media.canonical())
     }
 
     fn display(
         &self,
+        table: &Table<'_>,
         concept: Concept,
-        _language: Option<&str>,
     ) -> Result<Option<String>, ProviderError> {
-        Ok(self.interned.code(concept))
+        Ok(table.code(concept))
     }
 
-    fn status(&self, _concept: Concept) -> Result<Status, ProviderError> {
+    fn status(&self, _table: &Table<'_>, _concept: Concept) -> Result<Status, ProviderError> {
         Ok(Status {
             standards_status: None,
             active: true,
@@ -368,16 +349,12 @@ impl CodeSystemProvider for Bcp13Provider {
         })
     }
 
-    fn designations(
+    fn properties(
         &self,
-        _concept: Concept,
-        _language: Option<&str>,
-    ) -> Result<Vec<Designation>, ProviderError> {
-        Ok(Vec::new())
-    }
-
-    fn properties(&self, concept: Concept) -> Result<Vec<Property>, ProviderError> {
-        let Some(media) = self.media_type(concept) else {
+        table: &Table<'_>,
+        concept: Concept,
+    ) -> Result<Vec<Property>, ProviderError> {
+        let Some(media) = Self::media_type(table, concept) else {
             return Ok(Vec::new());
         };
         Ok(vec![
@@ -399,50 +376,24 @@ impl CodeSystemProvider for Bcp13Provider {
         ])
     }
 
-    fn hierarchy(&self) -> Option<&dyn Hierarchy> {
-        None
-    }
-
-    fn implicit_value_set(&self, _url: &str) -> Option<Result<Compose, ProviderError>> {
-        None
-    }
-
-    fn all(&self) -> Result<ConceptSet, ProviderError> {
-        Err(ProviderError::NotEnumerable)
-    }
-
-    fn search(&self, _text: &str, _language: Option<&str>) -> Result<ConceptSet, ProviderError> {
-        Err(ProviderError::NotEnumerable)
-    }
-
-    fn filter(&self, filter: &Filter) -> Result<ConceptSet, ProviderError> {
-        self.filter_all(std::slice::from_ref(filter))
-    }
-
-    fn filter_all(&self, filters: &[Filter]) -> Result<ConceptSet, ProviderError> {
+    fn filter_all(
+        &self,
+        table: &Table<'_>,
+        filters: &[Filter],
+    ) -> Result<ConceptSet, ProviderError> {
         let bounded = filters.iter().any(|f| {
             f.property == "registered" && f.op == FilterOperator::Equal && f.value.trim() == "true"
         });
         if !bounded {
             for filter in filters {
-                if !self
-                    .declaration
-                    .filters
-                    .iter()
-                    .any(|f| f.code == filter.property)
-                {
-                    return Err(ProviderError::UnsupportedFilter {
-                        property: filter.property.clone(),
-                        operator: filter.op.code().to_owned(),
-                    });
-                }
+                table.declared(filter)?;
             }
             return Err(ProviderError::NotEnumerable);
         }
         let mut set = ConceptSet::new();
         for index in 0..self.registered {
             let concept = Concept::new(index);
-            let Some(media) = self.media_type(concept) else {
+            let Some(media) = Self::media_type(table, concept) else {
                 continue;
             };
             let mut keep = true;
@@ -459,16 +410,13 @@ impl CodeSystemProvider for Bcp13Provider {
         Ok(set)
     }
 
-    /// Every filtered selection of this system is incomplete: the registry is
-    /// finite, but each registered type also has the unboundedly many
-    /// parameterised forms the grammar builds on it (RFC 2045 §5.1), which no
-    /// enumeration carries.
-    fn unclosed(&self, _filters: &[Filter]) -> bool {
-        true
-    }
-
-    fn filter_matches(&self, concept: Concept, filter: &Filter) -> Result<bool, ProviderError> {
-        let Some(media) = self.media_type(concept) else {
+    fn filter_matches(
+        &self,
+        table: &Table<'_>,
+        concept: Concept,
+        filter: &Filter,
+    ) -> Result<bool, ProviderError> {
+        let Some(media) = Self::media_type(table, concept) else {
             return Ok(false);
         };
         Self::matches(&media, filter)
@@ -477,8 +425,13 @@ impl CodeSystemProvider for Bcp13Provider {
     /// Parameters narrow a media type: `a` subsumes `b` when `a`'s parameters
     /// are among `b`'s with the same values. A difference in a parameter the
     /// server does not know cannot be decided.
-    fn subsumes(&self, a: Concept, b: Concept) -> Result<Option<Outcome>, ProviderError> {
-        let (Some(a), Some(b)) = (self.media_type(a), self.media_type(b)) else {
+    fn subsumes(
+        &self,
+        table: &Table<'_>,
+        a: Concept,
+        b: Concept,
+    ) -> Result<Option<Outcome>, ProviderError> {
+        let (Some(a), Some(b)) = (Self::media_type(table, a), Self::media_type(table, b)) else {
             return Ok(None);
         };
         if a.base() != b.base() {
@@ -504,11 +457,6 @@ impl CodeSystemProvider for Bcp13Provider {
         }
         let a_in_b = pa.iter().all(|(n, v)| pb.get(n) == Some(v));
         let b_in_a = pb.iter().all(|(n, v)| pa.get(n) == Some(v));
-        Ok(Some(match (a_in_b, b_in_a) {
-            (true, true) => Outcome::Equivalent,
-            (true, false) => Outcome::Subsumes,
-            (false, true) => Outcome::SubsumedBy,
-            (false, false) => Outcome::NotSubsumed,
-        }))
+        Ok(Some(outcome(a_in_b, b_in_a)))
     }
 }
