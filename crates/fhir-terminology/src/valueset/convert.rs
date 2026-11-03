@@ -94,12 +94,8 @@ macro_rules! convert_value_set {
                         .map(|c| ConceptRef {
                             code: text(c.code.value.as_deref()).unwrap_or_default(),
                             display: text(c.display.as_ref().and_then(|d| d.value.as_deref())),
-                            // NOTE: `valueset-deprecated` marks a concept the value set
-                            // still lists but discourages
-                            // (<https://hl7.org/fhir/R4B/extension-valueset-deprecated.html>).
-                            // `structuredefinition-standards-status` = `deprecated` says the
-                            // same of a concept, whose context includes
-                            // `ValueSet.compose.include.concept`
+                            // NOTE: `valueset-deprecated` and a `deprecated` standards status both mark a
+                            // concept the value set still lists but discourages
                             // (<https://hl7.org/fhir/extensions/StructureDefinition-structuredefinition-standards-status.html>).
                             deprecated: c.extension.iter().any(|x| {
                                 match (x.url.as_str(), &x.value) {
