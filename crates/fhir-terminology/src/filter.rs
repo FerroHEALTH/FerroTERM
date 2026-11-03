@@ -112,6 +112,41 @@ pub struct Filter {
     pub value: String,
 }
 
+/// Every inactive concept of `provider`, by a scan of each concept's status:
+/// what [`CodeSystemProvider::inactive`] answers unless the provider has a
+/// cheaper answer.
+///
+/// # Errors
+///
+/// Returns [`ProviderError::NotEnumerable`] when the system cannot
+/// enumerate, and [`ProviderError::Storage`] when the substrate fails.
+pub fn inactive_by_status<P: CodeSystemProvider + ?Sized>(
+    provider: &P,
+) -> Result<ConceptSet, ProviderError> {
+    let mut inactive = ConceptSet::new();
+    for index in provider.all()? {
+        if !provider.status(Concept::new(index))?.active {
+            inactive.insert(index);
+        }
+    }
+    Ok(inactive)
+}
+
+/// Whether the set `filter` selects in `provider` holds `concept`: what
+/// [`CodeSystemProvider::filter_matches`] answers unless the provider decides
+/// from the concept alone.
+///
+/// # Errors
+///
+/// Returns the errors of [`CodeSystemProvider::filter`].
+pub fn selected_by<P: CodeSystemProvider + ?Sized>(
+    provider: &P,
+    concept: Concept,
+    filter: &Filter,
+) -> Result<bool, ProviderError> {
+    Ok(provider.filter(filter)?.contains(concept.index()))
+}
+
 /// The generic evaluation every provider gets by default.
 ///
 /// `concept` and `code` name the code itself; `parent` and `child` with `=`

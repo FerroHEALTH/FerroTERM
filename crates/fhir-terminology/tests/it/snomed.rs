@@ -14,6 +14,7 @@ use fhir_terminology::provider::{
 };
 use fhir_terminology::registry::Registry;
 use fhir_terminology::snomed::{OpenError, SYSTEM, SnomedProvider};
+use fhir_terminology::stored;
 
 use ferroterm_testkit::snomed;
 use ferroterm_testkit::snomed::{
@@ -300,7 +301,7 @@ fn a_foreign_or_broken_artifact_is_refused() {
     let dir = tempfile::tempdir().expect("tempdir");
     assert!(matches!(
         SnomedProvider::open(dir.path(), "en"),
-        Err(OpenError::Io { .. })
+        Err(OpenError::Artifact(stored::OpenError::Io { .. }))
     ));
     snomed::write(dir.path()).expect("writes the fixture");
     std::fs::write(
@@ -318,7 +319,7 @@ fn a_foreign_or_broken_artifact_is_refused() {
     .expect("writes");
     assert!(matches!(
         SnomedProvider::open(dir.path(), "en"),
-        Err(OpenError::ManifestVersion(1))
+        Err(OpenError::Artifact(stored::OpenError::ManifestVersion(1)))
     ));
 }
 

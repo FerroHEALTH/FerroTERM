@@ -11,17 +11,12 @@
 //! hierarchy, and the implicit value sets `http://loinc.org/vs`,
 //! `http://loinc.org/vs/[LL id]`, and `http://loinc.org/vs/[part code]`.
 
-use crate::artifact::MANIFEST_FILE;
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use concept_graph::csr::{Csr, CsrError};
 use concept_graph::ordinal::{Ordinal, to_usize};
-use concept_graph::persist::Hierarchy as GraphHierarchy;
 use concept_store::record;
-use concept_store::store::{Store, StoreError, Vocabulary};
-use concept_store::tables;
-use designation_index::index::{Query, TextIndex};
+use designation_index::index::Query;
 use regex::Regex;
 use serde::Deserialize;
 
@@ -29,17 +24,16 @@ use crate::artifact::Source;
 use crate::compose::{Compose, ConceptRef, Include, SystemRef};
 use crate::filter::{Filter, FilterOperator};
 use crate::provider::{
-    Capability, CodeSystemProvider, Compositional, Concept, ConceptSet, ContentMode, Declaration,
-    Designation, DesignationUse, FilterDefinition, Hierarchy, HierarchyMeaning, Identity,
-    ImplicitArgument, ImplicitForm, Located, Property, PropertyDefinition, PropertyKind,
-    PropertyValue, ProviderError, Status,
+    Capability, Compositional, Concept, ConceptSet, ContentMode, Declaration, FilterDefinition,
+    Hierarchy, HierarchyMeaning, Identity, ImplicitArgument, ImplicitForm, Located, Property,
+    PropertyDefinition, PropertyKind, ProviderError, Status,
 };
+use crate::stored::artifact::{Artifact, Layout};
+use crate::stored::system::{StoredProvider, StoredSystem};
+use crate::stored::{self, storage};
 
 /// The system URI.
 pub const SYSTEM: &str = "http://loinc.org";
-/// The manifest version this provider reads.
-pub const MANIFEST_VERSION: u32 = 2;
-
 /// The properties the FHIR page names, with their types
 /// (<https://hl7.org/fhir/R4B/loinc.html>, "Properties").
 const FHIR_PROPERTIES: [(&str, PropertyKind); 12] = [
@@ -106,56 +100,18 @@ const DEFAULT_LANGUAGE: &str = "en";
 /// A failure to open an artifact as LOINC.
 #[derive(Debug, thiserror::Error)]
 pub enum OpenError {
-    /// A file does not read.
-    #[error("cannot read {path}")]
-    Io {
-        /// The path.
-        path: PathBuf,
-        /// The cause.
-        #[source]
-        source: std::io::Error,
-    },
-    /// The manifest does not parse.
-    #[error("{path} is not an artifact manifest")]
-    Manifest {
-        /// The path.
-        path: PathBuf,
-        /// The cause.
-        #[source]
-        source: serde_json::Error,
-    },
     /// The artifact serves another system.
     #[error("the artifact serves `{0}`, not LOINC")]
     NotLoinc(String),
-    /// The manifest is of another layout version.
-    #[error("the manifest is version {0}; this server reads version {MANIFEST_VERSION}")]
-    ManifestVersion(u32),
-    /// The store cannot be opened or read.
+    /// The artifact's shared files do not read.
     #[error(transparent)]
-    Store(#[from] StoreError),
-    /// The hierarchy file does not read.
-    #[error("cannot read the hierarchy file")]
-    Hierarchy(#[from] concept_graph::persist::PersistError),
-    /// The designation index file does not read.
-    #[error("cannot read the designation index file")]
-    Text(#[from] designation_index::persist::PersistError),
-    /// The child adjacency cannot be derived.
-    #[error("cannot derive the child adjacency")]
-    Transpose(#[from] CsrError),
-    /// The concept count meta entry is missing or malformed.
-    #[error("the store's concept count is `{0:?}`")]
-    ConceptCount(Option<String>),
+    Artifact(#[from] stored::OpenError),
 }
 
 #[derive(Debug, Deserialize)]
 struct Manifest {
-    #[serde(rename = "manifest")]
-    layout: u32,
     system: String,
     version: String,
-    store: String,
-    hierarchy: String,
-    text: String,
     /// The language the release's own tables are in; an artifact built before
     /// the build wrote it has none.
     #[serde(default)]
@@ -164,84 +120,15 @@ struct Manifest {
     languages: Vec<String>,
 }
 
-/// The multiaxial hierarchy over the artifact's graph.
+/// What LOINC decides: the part axes, the answer lists, and their filters.
 #[derive(Debug)]
-struct LoincHierarchy {
-    graph: GraphHierarchy,
-    children: Csr,
-}
-
-impl Hierarchy for LoincHierarchy {
-    fn parents(&self, concept: Concept) -> ConceptSet {
-        self.graph
-            .is_a
-            .neighbours(Ordinal::new(concept.index()))
-            .iter()
-            .copied()
-            .collect()
-    }
-
-    fn children(&self, concept: Concept) -> ConceptSet {
-        self.children
-            .neighbours(Ordinal::new(concept.index()))
-            .iter()
-            .copied()
-            .collect()
-    }
-
-    fn ancestors(&self, concept: Concept) -> ConceptSet {
-        self.graph
-            .closure
-            .ancestors(Ordinal::new(concept.index()))
-            .clone()
-    }
-
-    fn descendants(&self, concept: Concept) -> ConceptSet {
-        self.graph
-            .closure
-            .descendants(Ordinal::new(concept.index()))
-            .clone()
-    }
+pub struct Loinc {
+    /// The language the release's own tables are in.
+    base_language: String,
 }
 
 /// One LOINC release behind the seam.
-pub struct LoincProvider {
-    identity: Identity,
-    declaration: Declaration,
-    store: Store,
-    hierarchy: LoincHierarchy,
-    text: TextIndex,
-    concepts: u32,
-    /// The language the release's own tables are in.
-    base_language: String,
-    /// The artifact the version was read from.
-    source: Source,
-    /// Property key ordinal to name.
-    keys: BTreeMap<u32, String>,
-    /// Designation use ordinal to name.
-    uses: BTreeMap<u32, String>,
-}
-
-impl std::fmt::Debug for LoincProvider {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("LoincProvider")
-            .field("version", &self.identity.version)
-            .field("concepts", &self.concepts)
-            .finish_non_exhaustive()
-    }
-}
-
-fn storage(error: StoreError) -> ProviderError {
-    ProviderError::Storage(Box::new(error))
-}
-
-fn primary_subtag(language: &str) -> String {
-    language
-        .split(['-', '_'])
-        .next()
-        .unwrap_or(language)
-        .to_ascii_lowercase()
-}
+pub type LoincProvider = StoredProvider<Loinc>;
 
 impl LoincProvider {
     /// Opens the artifact directory `dir`.
@@ -251,132 +138,28 @@ impl LoincProvider {
     /// Returns [`OpenError`] when the manifest, the store, or a side file
     /// does not read, or the artifact is not a LOINC release.
     pub fn open(dir: &Path) -> Result<Self, OpenError> {
-        let manifest_path = dir.join(MANIFEST_FILE);
-        let text = std::fs::read_to_string(&manifest_path).map_err(|source| OpenError::Io {
-            path: manifest_path.clone(),
-            source,
+        let (artifact, manifest) = Artifact::open(dir, Layout::Tree, |manifest: &Manifest| {
+            stored::serves(&manifest.system, SYSTEM, OpenError::NotLoinc)
         })?;
-        let manifest: Manifest =
-            serde_json::from_str(&text).map_err(|source| OpenError::Manifest {
-                path: manifest_path,
-                source,
-            })?;
-        if manifest.system != SYSTEM {
-            return Err(OpenError::NotLoinc(manifest.system));
-        }
-        if manifest.layout != MANIFEST_VERSION {
-            return Err(OpenError::ManifestVersion(manifest.layout));
-        }
-        let store = Store::open(&dir.join(&manifest.store))?;
-        let read = |name: &str| {
-            let path = dir.join(name);
-            concept_graph::read::buffered(&path).map_err(|source| OpenError::Io { path, source })
-        };
-        let graph = GraphHierarchy::read_from(&mut read(&manifest.hierarchy)?)?;
-        let children = graph.is_a.transpose()?;
-        let text = designation_index::persist::read_from(&mut read(&manifest.text)?)?;
-        let concepts = store.meta(tables::META_CONCEPTS)?;
-        let concepts: u32 = concepts
-            .as_deref()
-            .and_then(|c| c.parse().ok())
-            .ok_or(OpenError::ConceptCount(concepts))?;
-        let mut keys = BTreeMap::new();
-        let mut ordinal = 0;
-        while let Some(name) = store.vocabulary(Vocabulary::PropertyKeys, ordinal)? {
-            keys.insert(ordinal, name);
-            ordinal += 1;
-        }
-        let mut uses = BTreeMap::new();
-        let mut ordinal = 0;
-        while let Some(name) = store.vocabulary(Vocabulary::DesignationUses, ordinal)? {
-            uses.insert(ordinal, name);
-            ordinal += 1;
-        }
-        let source = Source::new(dir, &manifest.version);
-        Ok(Self {
-            identity: Identity {
+        Ok(Self::new(
+            Identity {
                 url: SYSTEM.to_owned(),
-                version: manifest.version,
                 title: Some(String::from("LOINC")),
                 name: None,
                 version_needed: false,
+                version: manifest.version.clone(),
             },
-            declaration: declaration(&keys, manifest.languages),
-            store,
-            hierarchy: LoincHierarchy { graph, children },
-            text,
-            concepts,
-            base_language: if manifest.language.is_empty() {
-                String::from(DEFAULT_LANGUAGE)
-            } else {
-                manifest.language
+            declaration(&artifact.keys, manifest.languages),
+            Source::new(dir, &manifest.version),
+            artifact,
+            Loinc {
+                base_language: if manifest.language.is_empty() {
+                    String::from(DEFAULT_LANGUAGE)
+                } else {
+                    manifest.language
+                },
             },
-            keys,
-            uses,
-            source,
-        })
-    }
-
-    fn ordinal(concept: Concept) -> Ordinal {
-        Ordinal::new(concept.index())
-    }
-
-    fn key_of(&self, name: &str) -> Option<u32> {
-        self.keys
-            .iter()
-            .find(|(_, n)| n.as_str() == name)
-            .map(|(k, _)| *k)
-    }
-
-    fn use_coding(&self, use_ordinal: u32) -> DesignationUse {
-        let code = self
-            .uses
-            .get(&use_ordinal)
-            .cloned()
-            .unwrap_or_else(|| use_ordinal.to_string());
-        DesignationUse {
-            system: SYSTEM.to_owned(),
-            display: Some(code.clone()),
-            code,
-        }
-    }
-
-    /// The display: the long common name (or the display of a part, list, or
-    /// answer) in the requested language, else in the release's own language,
-    /// else any.
-    fn choose_display(
-        &self,
-        ordinal: Ordinal,
-        language: Option<&str>,
-    ) -> Result<Option<String>, ProviderError> {
-        let designations = self.store.designations(ordinal).map_err(storage)?;
-        let base = primary_subtag(&self.base_language);
-        let wanted = language.map_or_else(|| base.clone(), primary_subtag);
-        let pick = |lang: Option<&str>| {
-            designations
-                .iter()
-                .find(|d| {
-                    (d.use_ordinal == LONG_COMMON_NAME || d.use_ordinal == DISPLAY)
-                        && lang.is_none_or(|l| primary_subtag(&d.language) == l)
-                })
-                .map(|d| d.term.clone())
-        };
-        Ok(pick(Some(&wanted))
-            .or_else(|| pick(Some(&base)))
-            .or_else(|| pick(None)))
-    }
-
-    fn codes(
-        &self,
-        set: impl IntoIterator<Item = u32>,
-    ) -> Result<Vec<PropertyValue>, ProviderError> {
-        let mut out = Vec::new();
-        for index in set {
-            if let Some(concept) = self.store.concept(Ordinal::new(index)).map_err(storage)? {
-                out.push(PropertyValue::Code(concept.code));
-            }
-        }
-        Ok(out)
+        ))
     }
 
     /// The part codes a `parent`/`ancestor` filter names, as concepts.
@@ -385,21 +168,23 @@ impl LoincProvider {
         let mut parts = ConceptSet::new();
         for value in wanted {
             if let Some(ordinal) = self
+                .stored()
                 .store
                 .ordinal(&value.to_ascii_uppercase())
                 .map_err(storage)?
             {
                 parts.insert(ordinal.index());
             }
-            for designation in self.text.matches(&Query {
+            for designation in self.stored().text.matches(&Query {
                 text: (*value).to_owned(),
                 active_only: true,
                 ..Query::default()
             }) {
-                let Some(entry) = self.text.entry(designation) else {
+                let Some(entry) = self.stored().text.entry(designation) else {
                     continue;
                 };
                 let named = self
+                    .stored()
                     .store
                     .designations(entry.concept)
                     .map_err(storage)?
@@ -435,12 +220,12 @@ impl LoincProvider {
         } else {
             self.parts_matching(&wanted)?
         };
-        let Some(key) = self.key_of(&filter.property) else {
+        let Some(key) = self.stored().key_of(&filter.property) else {
             return Ok(ConceptSet::new());
         };
         let mut part_names: BTreeMap<u32, String> = BTreeMap::new();
         let mut set = ConceptSet::new();
-        for index in 0..self.concepts {
+        for index in 0..self.stored().concepts {
             if self.axis_matches(
                 Ordinal::new(index),
                 key,
@@ -466,7 +251,7 @@ impl LoincProvider {
         regex: Option<&Regex>,
         part_names: &mut BTreeMap<u32, String>,
     ) -> Result<bool, ProviderError> {
-        let properties = self.store.properties(ordinal).map_err(storage)?;
+        let properties = self.stored().store.properties(ordinal).map_err(storage)?;
         let Some((_, values)) = properties.iter().find(|(k, _)| *k == key) else {
             return Ok(false);
         };
@@ -493,6 +278,7 @@ impl LoincProvider {
             (record::PropertyValue::Concept(part), Some(regex)) => {
                 let name = self.part_name(*part, part_names)?;
                 let code = self
+                    .stored()
                     .store
                     .concept(*part)
                     .map_err(storage)?
@@ -516,8 +302,7 @@ impl LoincProvider {
         if let Some(name) = part_names.get(&part.index()) {
             return Ok(name.clone());
         }
-        let name = self
-            .choose_display(part, None)
+        let name = Loinc::display(self, Concept::new(part.index()), None)
             .map_err(|e| ProviderError::Storage(Box::new(e)))?
             .unwrap_or_default();
         part_names.insert(part.index(), name.clone());
@@ -529,6 +314,7 @@ impl LoincProvider {
         for code in filter.value.split(',') {
             let code = code.trim();
             let Some(ordinal) = self
+                .stored()
                 .store
                 .ordinal(&code.to_ascii_uppercase())
                 .map_err(storage)?
@@ -541,163 +327,78 @@ impl LoincProvider {
     }
 }
 
-impl CodeSystemProvider for LoincProvider {
-    fn identity(&self) -> &Identity {
-        &self.identity
+impl LoincProvider {
+    /// `parent` (the children of the named parts) or `ancestor` (everything
+    /// under them).
+    fn part_filter(&self, filter: &Filter) -> Result<ConceptSet, ProviderError> {
+        let tree = &self.stored().tree;
+        let mut set = ConceptSet::new();
+        for part in self.parts_named(filter)? {
+            if filter.property == "parent" {
+                set |= tree.children(part);
+            } else {
+                set |= tree.descendants(part);
+            }
+        }
+        Ok(set)
     }
+}
 
-    fn declaration(&self) -> &Declaration {
-        &self.declaration
-    }
-
+impl StoredSystem for Loinc {
     /// The language of the displays this provider returns, so a
     /// `displayLanguage` the release carries no variant for is answered as a
     /// language the system has no display in
     /// (`OperationDefinition/CodeSystem-validate-code`: `displayLanguage`
     /// "Specifies the language to be used for description when validating the
     /// display property").
-    fn language(&self) -> Option<&str> {
-        Some(&self.base_language)
+    fn language(provider: &LoincProvider) -> Option<&str> {
+        Some(&provider.system().base_language)
     }
 
-    fn artifact(&self) -> Option<&Source> {
-        Some(&self.source)
-    }
-
-    fn locate(&self, code: &str) -> Result<Option<Located>, ProviderError> {
+    fn locate(provider: &LoincProvider, code: &str) -> Result<Option<Located>, ProviderError> {
         // NOTE: LOINC codes are not case sensitive
         // (<https://hl7.org/fhir/R4B/loinc.html>); the store holds them upper case.
-        let Some(ordinal) = self
-            .store
-            .ordinal(&code.trim().to_ascii_uppercase())
-            .map_err(storage)?
-        else {
-            return Ok(None);
-        };
-        let stored = self.store.concept(ordinal).map_err(storage)?;
-        Ok(stored.map(|c| Located {
-            concept: Concept::new(ordinal.index()),
-            code: c.code,
-        }))
+        provider.stored().located(&code.trim().to_ascii_uppercase())
     }
 
-    fn code(&self, concept: Concept) -> Result<Option<String>, ProviderError> {
-        Ok(self
-            .store
-            .concept(Self::ordinal(concept))
-            .map_err(storage)?
-            .map(|c| c.code))
-    }
-
+    /// The long common name (or the display of a part, list, or answer) in
+    /// the requested language, else in the release's own language, else any.
     fn display(
-        &self,
+        provider: &LoincProvider,
         concept: Concept,
         language: Option<&str>,
     ) -> Result<Option<String>, ProviderError> {
-        self.choose_display(Self::ordinal(concept), language)
+        provider.stored().display_in(
+            concept,
+            &provider.system().base_language,
+            language,
+            |use_ordinal| use_ordinal == LONG_COMMON_NAME || use_ordinal == DISPLAY,
+        )
     }
 
-    fn status(&self, concept: Concept) -> Result<Status, ProviderError> {
-        let record = self
-            .store
-            .concept(Self::ordinal(concept))
-            .map_err(storage)?;
-        let active = record.is_some_and(|c| c.active);
+    fn status(provider: &LoincProvider, concept: Concept) -> Result<Status, ProviderError> {
+        let active = provider.stored().active(concept)?;
         Ok(Status {
-            standards_status: None,
             active,
             inactive_reason: (!active).then(|| String::from("DEPRECATED")),
-            abstract_concept: false,
-            codeless: false,
+            ..Status::default()
         })
     }
 
-    fn designations(
-        &self,
+    fn properties(
+        provider: &LoincProvider,
         concept: Concept,
-        language: Option<&str>,
-    ) -> Result<Vec<Designation>, ProviderError> {
-        let wanted = language.map(primary_subtag);
-        Ok(self
-            .store
-            .designations(Self::ordinal(concept))
-            .map_err(storage)?
-            .into_iter()
-            .filter(|d| {
-                wanted
-                    .as_deref()
-                    .is_none_or(|w| primary_subtag(&d.language) == w)
-            })
-            .map(|d| Designation {
-                standards_status: None,
-                language: Some(d.language.clone()),
-                use_: Some(self.use_coding(d.use_ordinal)),
-                value: d.term,
-            })
-            .collect())
-    }
-
-    fn properties(&self, concept: Concept) -> Result<Vec<Property>, ProviderError> {
-        let ordinal = Self::ordinal(concept);
-        let Some(record) = self.store.concept(ordinal).map_err(storage)? else {
-            return Ok(Vec::new());
-        };
-        let mut out = vec![Property {
-            code: String::from("inactive"),
-            value: PropertyValue::Boolean(!record.active),
-            ..Property::default()
-        }];
-        for (key, values) in self.store.properties(ordinal).map_err(storage)? {
-            let Some(name) = self.keys.get(&key) else {
-                continue;
-            };
-            for value in values {
-                let value = match value {
-                    record::PropertyValue::Concept(target) => {
-                        match self.store.concept(target).map_err(storage)? {
-                            Some(target) => PropertyValue::Code(target.code),
-                            None => continue,
-                        }
-                    }
-                    record::PropertyValue::Code(c) => PropertyValue::Code(c),
-                    record::PropertyValue::String(s) => PropertyValue::String(s),
-                    record::PropertyValue::Integer(i) => PropertyValue::Integer(i),
-                    record::PropertyValue::Boolean(b) => PropertyValue::Boolean(b),
-                    record::PropertyValue::Decimal(d) => PropertyValue::Decimal(d),
-                    record::PropertyValue::DateTime(d) => PropertyValue::DateTime(d),
-                };
-                out.push(Property {
-                    code: name.clone(),
-                    value,
-                    ..Property::default()
-                });
-            }
-        }
-        for value in self.codes(self.hierarchy.parents(concept))? {
-            out.push(Property {
-                code: String::from("parent"),
-                value,
-                ..Property::default()
-            });
-        }
-        for value in self.codes(self.hierarchy.children(concept))? {
-            out.push(Property {
-                code: String::from("child"),
-                value,
-                ..Property::default()
-            });
-        }
-        Ok(out)
-    }
-
-    fn hierarchy(&self) -> Option<&dyn Hierarchy> {
-        Some(&self.hierarchy)
+    ) -> Result<Vec<Property>, ProviderError> {
+        provider.stored().listed_properties(concept, true)
     }
 
     /// `http://loinc.org/vs` (every code), `/vs/LL…` (the answers of a list),
     /// and `/vs/LP…` (everything under a part)
     /// (<https://hl7.org/fhir/R4B/loinc.html>, "Implicit Value Sets").
-    fn implicit_value_set(&self, url: &str) -> Option<Result<Compose, ProviderError>> {
+    fn implicit_value_set(
+        provider: &LoincProvider,
+        url: &str,
+    ) -> Option<Result<Compose, ProviderError>> {
         let rest = url.strip_prefix(SYSTEM)?.strip_prefix("/vs")?;
         let system = SystemRef {
             url: SYSTEM.to_owned(),
@@ -715,7 +416,7 @@ impl CodeSystemProvider for LoincProvider {
                 // `/vs/[partcode]` without saying how to tell them apart; splitting on the
                 // `LL` and `LP` prefixes is a heuristic no page states.
                 if upper.starts_with("LL") {
-                    let concepts = match self.answers_of(&upper) {
+                    let concepts = match provider.answers_of(&upper) {
                         Ok(Some(codes)) => codes,
                         Ok(None) => {
                             return Some(Err(ProviderError::malformed_implicit_value_set(
@@ -761,73 +462,49 @@ impl CodeSystemProvider for LoincProvider {
         }))
     }
 
-    fn all(&self) -> Result<ConceptSet, ProviderError> {
-        Ok(crate::provider::every(self.concepts))
-    }
-
-    fn search(&self, text: &str, language: Option<&str>) -> Result<ConceptSet, ProviderError> {
-        let query = Query {
-            text: text.to_owned(),
-            language: language.map(primary_subtag),
-            ..Query::default()
-        };
-        let mut concepts = ConceptSet::new();
-        for designation in self.text.matches(&query) {
-            if let Some(entry) = self.text.entry(designation) {
-                concepts.insert(entry.concept.index());
-            }
-        }
-        Ok(concepts)
-    }
-
     /// `parent` and `ancestor` over the multiaxial hierarchy; an axis property
     /// (`COMPONENT`, `PROPERTY`, `TIME_ASPCT`, `SYSTEM`, `SCALE_TYP`,
     /// `METHOD_TYP`) with `=` or `in` matches the linked part by its code or
     /// its name, or the column text of a term without a link; every other
     /// filter is the generic evaluation over the stored fields.
-    fn filter(&self, filter: &Filter) -> Result<ConceptSet, ProviderError> {
-        match (filter.property.as_str(), filter.op) {
+    fn filter(
+        provider: &LoincProvider,
+        filter: &Filter,
+    ) -> Option<Result<ConceptSet, ProviderError>> {
+        Some(match (filter.property.as_str(), filter.op) {
             // NOTE: no specification defines these; they are what tx.fhir.org answers,
             // and the FHIR LOINC page has carried a `TODO: Document Ontology`
             // placeholder since STU3 (<https://hl7.org/fhir/R4B/loinc.html>, #277).
             (LIST_FILTER | ANSWERS_FOR_FILTER, FilterOperator::Equal) => {
-                self.answers_filter(&filter.value)
+                provider.answers_filter(&filter.value)
             }
             (property, FilterOperator::Equal | FilterOperator::Exists)
                 if document_axis(property).is_some() =>
             {
-                self.document_filter(property, filter)
+                provider.document_filter(property, filter)
             }
             (
                 "COMPONENT" | "PROPERTY" | "TIME_ASPCT" | "SYSTEM" | "SCALE_TYP" | "METHOD_TYP",
                 FilterOperator::Equal | FilterOperator::In | FilterOperator::Regex,
-            ) => self.axis_filter(filter),
+            ) => provider.axis_filter(filter),
             ("parent" | "ancestor", FilterOperator::Equal | FilterOperator::In) => {
-                let mut set = ConceptSet::new();
-                for part in self.parts_named(filter)? {
-                    if filter.property == "parent" {
-                        set |= self.hierarchy.children(part);
-                    } else {
-                        set |= self.hierarchy.descendants(part);
-                    }
-                }
-                Ok(set)
+                provider.part_filter(filter)
             }
-            _ => crate::filter::evaluate(self, filter),
-        }
+            _ => return None,
+        })
     }
 }
 
 impl LoincProvider {
     /// The answer codes of the list `code`, when it is one.
     fn answers_of(&self, code: &str) -> Result<Option<Vec<String>>, ProviderError> {
-        let Some(ordinal) = self.store.ordinal(code).map_err(storage)? else {
+        let Some(ordinal) = self.stored().store.ordinal(code).map_err(storage)? else {
             return Ok(None);
         };
-        let Some(key) = self.key_of(ANSWERS_KEY) else {
+        let Some(key) = self.stored().key_of(ANSWERS_KEY) else {
             return Ok(None);
         };
-        let properties = self.store.properties(ordinal).map_err(storage)?;
+        let properties = self.stored().store.properties(ordinal).map_err(storage)?;
         Ok(properties
             .into_iter()
             .find(|(k, _)| *k == key)
@@ -851,7 +528,7 @@ impl LoincProvider {
         let mut set = ConceptSet::new();
         for list in self.answer_lists(value)? {
             for answer in self.answers_of(&list)?.unwrap_or_default() {
-                if let Some(ordinal) = self.store.ordinal(&answer).map_err(storage)? {
+                if let Some(ordinal) = self.stored().store.ordinal(&answer).map_err(storage)? {
                     set.insert(ordinal.index());
                 }
             }
@@ -865,13 +542,13 @@ impl LoincProvider {
         if self.answers_of(value)?.is_some() {
             return Ok(vec![value.to_owned()]);
         }
-        let Some(ordinal) = self.store.ordinal(value).map_err(storage)? else {
+        let Some(ordinal) = self.stored().store.ordinal(value).map_err(storage)? else {
             return Ok(Vec::new());
         };
-        let Some(key) = self.key_of(ANSWER_LIST_KEY) else {
+        let Some(key) = self.stored().key_of(ANSWER_LIST_KEY) else {
             return Ok(Vec::new());
         };
-        let properties = self.store.properties(ordinal).map_err(storage)?;
+        let properties = self.stored().store.properties(ordinal).map_err(storage)?;
         let Some((_, values)) = properties.iter().find(|(k, _)| *k == key) else {
             return Ok(Vec::new());
         };
@@ -894,15 +571,15 @@ impl LoincProvider {
         let Some(axis) = document_axis(property) else {
             return Ok(ConceptSet::new());
         };
-        let Some(key) = self.key_of(axis) else {
+        let Some(key) = self.stored().key_of(axis) else {
             return Ok(ConceptSet::new());
         };
         if filter.op == FilterOperator::Exists {
             let wanted = crate::filter::boolean(filter)?;
             let mut set = ConceptSet::new();
-            for index in 0..self.concepts {
+            for index in 0..self.stored().concepts {
                 let ordinal = Ordinal::new(index);
-                let properties = self.store.properties(ordinal).map_err(storage)?;
+                let properties = self.stored().store.properties(ordinal).map_err(storage)?;
                 let has = properties
                     .iter()
                     .any(|(k, values)| *k == key && !values.is_empty());

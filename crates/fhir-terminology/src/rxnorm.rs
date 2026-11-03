@@ -15,17 +15,14 @@
 //! served (`TTY`, `SAB`, `STY`, the `RXNORM` attributes, the relationships)
 //! are our own design.
 
-use crate::artifact::MANIFEST_FILE;
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use concept_graph::ordinal::Ordinal;
 use concept_graph::relations::{Relations, RelationsError};
 use concept_store::keys::{KeyTable, KeyTableError};
 use concept_store::record;
-use concept_store::store::{Store, StoreError, Vocabulary};
-use concept_store::tables;
-use designation_index::index::{Query, TextIndex};
+use concept_store::store::Store;
 use roaring::RoaringBitmap;
 use serde::Deserialize;
 
@@ -33,15 +30,16 @@ use crate::artifact::Source;
 use crate::compose::{Compose, Include, SystemRef};
 use crate::filter::{Filter, FilterOperator};
 use crate::provider::{
-    Capability, CodeSystemProvider, Compositional, Concept, ConceptSet, ContentMode, Declaration,
-    Designation, DesignationUse, FilterDefinition, Identity, ImplicitArgument, ImplicitForm,
-    Located, Property, PropertyDefinition, PropertyKind, PropertyValue, ProviderError, Status,
+    Capability, Compositional, Concept, ConceptSet, ContentMode, Declaration, FilterDefinition,
+    Identity, ImplicitArgument, ImplicitForm, Located, Property, PropertyDefinition, PropertyKind,
+    PropertyValue, ProviderError, Status,
 };
+use crate::stored::artifact::{Artifact, Layout};
+use crate::stored::system::{StoredProvider, StoredSystem};
+use crate::stored::{self, storage};
 
 /// The system URI.
 pub const SYSTEM: &str = "http://www.nlm.nih.gov/research/umls/rxnorm";
-/// The manifest version this provider reads.
-pub const MANIFEST_VERSION: u32 = 2;
 /// The properties with an inverted index, which are also the FHIR filters
 /// beside the relationships.
 const INDEXED: [&str; 3] = ["TTY", "SAB", "STY"];
@@ -55,55 +53,27 @@ const DEFAULT_LANGUAGE: &str = "en";
 /// A failure to open an artifact as `RxNorm`.
 #[derive(Debug, thiserror::Error)]
 pub enum OpenError {
-    /// A file does not read.
-    #[error("cannot read {path}")]
-    Io {
-        /// The path.
-        path: PathBuf,
-        /// The cause.
-        #[source]
-        source: std::io::Error,
-    },
-    /// The manifest does not parse.
-    #[error("{path} is not an artifact manifest")]
-    Manifest {
-        /// The path.
-        path: PathBuf,
-        /// The cause.
-        #[source]
-        source: serde_json::Error,
-    },
     /// The artifact serves another system.
     #[error("the artifact serves `{0}`, not RxNorm")]
     NotRxNorm(String),
-    /// The manifest is of another layout version.
-    #[error("the manifest is version {0}; this server reads version {MANIFEST_VERSION}")]
-    ManifestVersion(u32),
-    /// The store cannot be opened or read.
+    /// The artifact's shared files do not read.
     #[error(transparent)]
-    Store(#[from] StoreError),
-    /// The designation index file does not read.
-    #[error("cannot read the designation index file")]
-    Text(#[from] designation_index::persist::PersistError),
+    Artifact(#[from] stored::OpenError),
+    /// The store cannot be read.
+    #[error(transparent)]
+    Store(#[from] concept_store::store::StoreError),
     /// The relations file does not read.
     #[error("cannot read the relations file")]
     Relations(#[from] RelationsError),
     /// The atom table does not read.
     #[error("cannot read the atom table")]
     Atoms(#[from] KeyTableError),
-    /// The concept count meta entry is missing or malformed.
-    #[error("the store's concept count is `{0:?}`")]
-    ConceptCount(Option<String>),
 }
 
 #[derive(Debug, Deserialize)]
 struct Manifest {
-    #[serde(rename = "manifest")]
-    layout: u32,
     system: String,
     version: String,
-    store: String,
-    text: String,
     #[serde(default)]
     relations: String,
     #[serde(default)]
@@ -118,68 +88,69 @@ struct Manifest {
     languages: Vec<String>,
 }
 
-/// One `RxNorm` release behind the seam.
-pub struct RxNormProvider {
-    identity: Identity,
-    declaration: Declaration,
-    store: Store,
-    text: TextIndex,
+/// What `RxNorm` decides: the relationships, the atoms, the indexed
+/// attributes, and the `RXNORM` display.
+pub struct RxNorm {
     relations: Relations,
     atoms: KeyTable,
-    concepts: u32,
     /// The code of every concept by ordinal, so a property listing hundreds
     /// of relationship targets stays a point read.
     codes: Vec<String>,
-    /// Property key ordinal to name.
-    keys: BTreeMap<u32, String>,
-    /// Designation use ordinal to name (the term types).
-    uses: BTreeMap<u32, String>,
     /// The language the release's own atoms are in.
     base_language: String,
     /// The concepts per `(property name, value)` for `TTY`, `SAB`, and `STY`.
     indexed: BTreeMap<(String, String), RoaringBitmap>,
-    /// The artifact the version was read from.
-    source: Source,
 }
 
-impl std::fmt::Debug for RxNormProvider {
+impl std::fmt::Debug for RxNorm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RxNormProvider")
-            .field("version", &self.identity.version)
-            .field("concepts", &self.concepts)
+        f.debug_struct("RxNorm")
             .field("relationships", &self.relations.edges())
             .finish_non_exhaustive()
     }
 }
 
-fn storage(error: StoreError) -> ProviderError {
-    ProviderError::Storage(Box::new(error))
-}
+/// One `RxNorm` release behind the seam.
+pub type RxNormProvider = StoredProvider<RxNorm>;
 
-fn primary_subtag(language: &str) -> String {
-    language
-        .split(['-', '_'])
-        .next()
-        .unwrap_or(language)
-        .to_ascii_lowercase()
-}
+/// The code of every concept of `store` by ordinal, and the concepts per
+/// `(name, value)` of the indexed attributes.
+type Columns = (Vec<String>, BTreeMap<(String, String), RoaringBitmap>);
 
-fn convert(
-    value: record::PropertyValue,
-    store: &Store,
-) -> Result<Option<PropertyValue>, ProviderError> {
-    Ok(Some(match value {
-        record::PropertyValue::Concept(target) => match store.concept(target).map_err(storage)? {
-            Some(target) => PropertyValue::Code(target.code),
-            None => return Ok(None),
-        },
-        record::PropertyValue::Code(c) => PropertyValue::Code(c),
-        record::PropertyValue::String(s) => PropertyValue::String(s),
-        record::PropertyValue::Integer(i) => PropertyValue::Integer(i),
-        record::PropertyValue::Boolean(b) => PropertyValue::Boolean(b),
-        record::PropertyValue::Decimal(d) => PropertyValue::Decimal(d),
-        record::PropertyValue::DateTime(d) => PropertyValue::DateTime(d),
-    }))
+/// Reads the code column and the inverted index of `TTY`, `SAB`, and `STY`.
+fn columns(artifact: &Artifact) -> Result<Columns, concept_store::store::StoreError> {
+    let store: &Store = &artifact.store;
+    let mut indexed: BTreeMap<(String, String), RoaringBitmap> = BTreeMap::new();
+    let mut codes = Vec::with_capacity(usize::try_from(artifact.concepts).unwrap_or_default());
+    for index in 0..artifact.concepts {
+        codes.push(
+            store
+                .concept(Ordinal::new(index))?
+                .map(|c| c.code)
+                .unwrap_or_default(),
+        );
+        for (key, values) in store.properties(Ordinal::new(index))? {
+            let Some(name) = artifact
+                .keys
+                .get(&key)
+                .filter(|n| INDEXED.contains(&n.as_str()))
+            else {
+                continue;
+            };
+            for value in values {
+                let (record::PropertyValue::Code(text) | record::PropertyValue::String(text)) =
+                    value
+                else {
+                    continue;
+                };
+                indexed
+                    .entry((name.clone(), text))
+                    .or_default()
+                    .insert(index);
+            }
+        }
+    }
+    Ok((codes, indexed))
 }
 
 impl RxNormProvider {
@@ -190,122 +161,40 @@ impl RxNormProvider {
     /// Returns [`OpenError`] when the manifest, the store, or a side file
     /// does not read, or the artifact is not an `RxNorm` release.
     pub fn open(dir: &Path) -> Result<Self, OpenError> {
-        let manifest_path = dir.join(MANIFEST_FILE);
-        let text = std::fs::read_to_string(&manifest_path).map_err(|source| OpenError::Io {
-            path: manifest_path.clone(),
-            source,
+        let (artifact, manifest) = Artifact::open(dir, Layout::Flat, |manifest: &Manifest| {
+            stored::serves(&manifest.system, SYSTEM, OpenError::NotRxNorm)
         })?;
-        let manifest: Manifest =
-            serde_json::from_str(&text).map_err(|source| OpenError::Manifest {
-                path: manifest_path,
-                source,
-            })?;
-        if manifest.system != SYSTEM {
-            return Err(OpenError::NotRxNorm(manifest.system));
-        }
-        if manifest.layout != MANIFEST_VERSION {
-            return Err(OpenError::ManifestVersion(manifest.layout));
-        }
-        let store = Store::open(&dir.join(&manifest.store))?;
-        let read = |name: &str| {
-            let path = dir.join(name);
-            concept_graph::read::buffered(&path).map_err(|source| OpenError::Io { path, source })
-        };
-        let text = designation_index::persist::read_from(&mut read(&manifest.text)?)?;
-        let relations = Relations::read_from(&mut read(&manifest.relations)?)?;
-        let atoms = KeyTable::read_from(&mut read(&manifest.atoms)?)?;
-        let concepts = store.meta(tables::META_CONCEPTS)?;
-        let concepts: u32 = concepts
-            .as_deref()
-            .and_then(|c| c.parse().ok())
-            .ok_or(OpenError::ConceptCount(concepts))?;
-        let mut keys = BTreeMap::new();
-        let mut ordinal = 0;
-        while let Some(name) = store.vocabulary(Vocabulary::PropertyKeys, ordinal)? {
-            keys.insert(ordinal, name);
-            ordinal += 1;
-        }
-        let mut uses = BTreeMap::new();
-        let mut ordinal = 0;
-        while let Some(name) = store.vocabulary(Vocabulary::DesignationUses, ordinal)? {
-            uses.insert(ordinal, name);
-            ordinal += 1;
-        }
-        let mut indexed: BTreeMap<(String, String), RoaringBitmap> = BTreeMap::new();
-        let mut codes = Vec::with_capacity(usize::try_from(concepts).unwrap_or_default());
-        for index in 0..concepts {
-            codes.push(
-                store
-                    .concept(Ordinal::new(index))?
-                    .map(|c| c.code)
-                    .unwrap_or_default(),
-            );
-            for (key, values) in store.properties(Ordinal::new(index))? {
-                let Some(name) = keys.get(&key).filter(|n| INDEXED.contains(&n.as_str())) else {
-                    continue;
-                };
-                for value in values {
-                    let (record::PropertyValue::Code(text) | record::PropertyValue::String(text)) =
-                        value
-                    else {
-                        continue;
-                    };
-                    indexed
-                        .entry((name.clone(), text))
-                        .or_default()
-                        .insert(index);
-                }
-            }
-        }
-        let declaration = declaration(
-            &keys,
-            &relations,
-            manifest.semantic_types,
-            manifest.languages,
-        );
-        let source = Source::new(dir, &manifest.version);
-        Ok(Self {
-            identity: Identity {
+        let relations = Relations::read_from(&mut stored::side_file(dir, &manifest.relations)?)?;
+        let atoms = KeyTable::read_from(&mut stored::side_file(dir, &manifest.atoms)?)?;
+        let (codes, indexed) = columns(&artifact)?;
+        Ok(Self::new(
+            Identity {
                 url: SYSTEM.to_owned(),
-                version: manifest.version,
                 title: Some(String::from("RxNorm")),
                 name: None,
                 version_needed: false,
+                version: manifest.version.clone(),
             },
-            declaration,
-            store,
-            text,
-            relations,
-            atoms,
-            concepts,
-            codes,
-            keys,
-            uses,
-            base_language: if manifest.language.is_empty() {
-                String::from(DEFAULT_LANGUAGE)
-            } else {
-                manifest.language
+            declaration(
+                &artifact.keys,
+                &relations,
+                manifest.semantic_types,
+                manifest.languages,
+            ),
+            Source::new(dir, &manifest.version),
+            artifact,
+            RxNorm {
+                relations,
+                atoms,
+                codes,
+                base_language: if manifest.language.is_empty() {
+                    String::from(DEFAULT_LANGUAGE)
+                } else {
+                    manifest.language
+                },
+                indexed,
             },
-            indexed,
-            source,
-        })
-    }
-
-    fn ordinal(concept: Concept) -> Ordinal {
-        Ordinal::new(concept.index())
-    }
-
-    fn use_coding(&self, use_ordinal: u32) -> DesignationUse {
-        let code = self
-            .uses
-            .get(&use_ordinal)
-            .cloned()
-            .unwrap_or_else(|| use_ordinal.to_string());
-        DesignationUse {
-            system: SYSTEM.to_owned(),
-            display: Some(code.clone()),
-            code,
-        }
+        ))
     }
 
     /// The concept a relationship filter value names: `CUI:[RXCUI]` or `AUI:[RXAUI]`.
@@ -314,6 +203,7 @@ impl RxNormProvider {
             |reason: &str| ProviderError::invalid_filter_value(&filter.property, value, reason);
         match value.split_once(':') {
             Some(("CUI", rxcui)) => self
+                .stored()
                 .store
                 .ordinal(rxcui.trim())
                 .map_err(storage)?
@@ -323,7 +213,8 @@ impl RxNormProvider {
                     .trim()
                     .parse()
                     .map_err(|source| invalid(&format!("the AUI is not a number: {source}")))?;
-                self.atoms
+                self.system()
+                    .atoms
                     .get(id)
                     .map(Ordinal::new)
                     .ok_or_else(|| ProviderError::UnknownCode(value.to_owned()))
@@ -333,138 +224,62 @@ impl RxNormProvider {
     }
 }
 
-impl CodeSystemProvider for RxNormProvider {
-    fn identity(&self) -> &Identity {
-        &self.identity
-    }
-
-    fn declaration(&self) -> &Declaration {
-        &self.declaration
-    }
-
+impl StoredSystem for RxNorm {
     /// The language of the displays this provider returns, so a
     /// `displayLanguage` the release carries no atom for is answered as a
     /// language the system has no display in
     /// (`OperationDefinition/CodeSystem-validate-code`: `displayLanguage`
     /// "Specifies the language to be used for description when validating the
     /// display property").
-    fn language(&self) -> Option<&str> {
-        Some(&self.base_language)
+    fn language(provider: &RxNormProvider) -> Option<&str> {
+        Some(&provider.system().base_language)
     }
 
-    fn artifact(&self) -> Option<&Source> {
-        Some(&self.source)
-    }
-
-    fn locate(&self, code: &str) -> Result<Option<Located>, ProviderError> {
+    fn locate(provider: &RxNormProvider, code: &str) -> Result<Option<Located>, ProviderError> {
         let code = code.trim();
         if code.is_empty() || !code.bytes().all(|b| b.is_ascii_digit()) {
             return Ok(None);
         }
-        let Some(ordinal) = self.store.ordinal(code).map_err(storage)? else {
-            return Ok(None);
-        };
-        let stored = self.store.concept(ordinal).map_err(storage)?;
-        Ok(stored.map(|c| Located {
-            concept: Concept::new(ordinal.index()),
-            code: c.code,
-        }))
-    }
-
-    fn code(&self, concept: Concept) -> Result<Option<String>, ProviderError> {
-        Ok(self
-            .store
-            .concept(Self::ordinal(concept))
-            .map_err(storage)?
-            .map(|c| c.code))
+        provider.stored().located(code)
     }
 
     /// The `RXNORM` string of the most preferred term type: the first
     /// designation, the build's order.
     fn display(
-        &self,
+        provider: &RxNormProvider,
         concept: Concept,
         _language: Option<&str>,
     ) -> Result<Option<String>, ProviderError> {
-        Ok(self
-            .store
-            .designations(Self::ordinal(concept))
-            .map_err(storage)?
-            .into_iter()
-            .next()
-            .map(|d| d.term))
+        provider
+            .stored()
+            .first_term(Ordinal::new(concept.index()), &[None], |_| true)
     }
 
-    fn status(&self, concept: Concept) -> Result<Status, ProviderError> {
-        let record = self
-            .store
-            .concept(Self::ordinal(concept))
-            .map_err(storage)?;
-        let active = record.is_some_and(|c| c.active);
+    fn status(provider: &RxNormProvider, concept: Concept) -> Result<Status, ProviderError> {
+        let active = provider.stored().active(concept)?;
         Ok(Status {
-            standards_status: None,
             active,
             inactive_reason: (!active).then(|| String::from("obsolete")),
-            abstract_concept: false,
-            codeless: false,
+            ..Status::default()
         })
     }
 
-    fn designations(
-        &self,
+    fn properties(
+        provider: &RxNormProvider,
         concept: Concept,
-        language: Option<&str>,
-    ) -> Result<Vec<Designation>, ProviderError> {
-        let wanted = language.map(primary_subtag);
-        Ok(self
-            .store
-            .designations(Self::ordinal(concept))
-            .map_err(storage)?
-            .into_iter()
-            .filter(|d| {
-                wanted
-                    .as_deref()
-                    .is_none_or(|w| primary_subtag(&d.language) == w)
-            })
-            .map(|d| Designation {
-                standards_status: None,
-                language: Some(d.language.clone()),
-                use_: Some(self.use_coding(d.use_ordinal)),
-                value: d.term,
-            })
-            .collect())
-    }
-
-    fn properties(&self, concept: Concept) -> Result<Vec<Property>, ProviderError> {
-        let ordinal = Self::ordinal(concept);
-        let Some(record) = self.store.concept(ordinal).map_err(storage)? else {
+    ) -> Result<Vec<Property>, ProviderError> {
+        let Some(mut out) = provider.stored().stored_properties(concept)? else {
             return Ok(Vec::new());
         };
-        let mut out = vec![Property {
-            code: String::from("inactive"),
-            value: PropertyValue::Boolean(!record.active),
-            ..Property::default()
-        }];
-        for (key, values) in self.store.properties(ordinal).map_err(storage)? {
-            let Some(name) = self.keys.get(&key) else {
-                continue;
-            };
-            for value in values {
-                if let Some(value) = convert(value, &self.store)? {
-                    out.push(Property {
-                        code: name.clone(),
-                        value,
-                        ..Property::default()
-                    });
-                }
-            }
-        }
-        for (kind, target) in self.relations.outgoing(ordinal) {
+        let system = provider.system();
+        for (kind, target) in system.relations.outgoing(Ordinal::new(concept.index())) {
             let (Some(name), Some(code)) = (
-                self.relations
+                system
+                    .relations
                     .types()
                     .get(usize::try_from(kind).unwrap_or(usize::MAX)),
-                self.codes
+                system
+                    .codes
                     .get(usize::try_from(target.index()).unwrap_or(usize::MAX)),
             ) else {
                 continue;
@@ -480,7 +295,10 @@ impl CodeSystemProvider for RxNormProvider {
 
     /// `http://www.nlm.nih.gov/research/umls/rxnorm/vs`: every code
     /// (<https://hl7.org/fhir/R4B/rxnorm.html>, "Implicit Value Sets").
-    fn implicit_value_set(&self, url: &str) -> Option<Result<Compose, ProviderError>> {
+    fn implicit_value_set(
+        _provider: &RxNormProvider,
+        url: &str,
+    ) -> Option<Result<Compose, ProviderError>> {
         let rest = url.strip_prefix(SYSTEM)?.strip_prefix("/vs")?;
         if !rest.is_empty() {
             return Some(Err(ProviderError::malformed_implicit_value_set(
@@ -500,29 +318,14 @@ impl CodeSystemProvider for RxNormProvider {
         }))
     }
 
-    fn all(&self) -> Result<ConceptSet, ProviderError> {
-        Ok(crate::provider::every(self.concepts))
-    }
-
-    fn search(&self, text: &str, language: Option<&str>) -> Result<ConceptSet, ProviderError> {
-        let query = Query {
-            text: text.to_owned(),
-            language: language.map(primary_subtag),
-            ..Query::default()
-        };
-        let mut concepts = ConceptSet::new();
-        for designation in self.text.matches(&query) {
-            if let Some(entry) = self.text.entry(designation) {
-                concepts.insert(entry.concept.index());
-            }
-        }
-        Ok(concepts)
-    }
-
     /// `STY`, `SAB`, and `TTY` from the inverted index; a `REL` code or `RELA`
     /// label from the typed edges arriving at the named concept; everything
     /// else the generic evaluation.
-    fn filter(&self, filter: &Filter) -> Result<ConceptSet, ProviderError> {
+    fn filter(
+        provider: &RxNormProvider,
+        filter: &Filter,
+    ) -> Option<Result<ConceptSet, ProviderError>> {
+        let system = provider.system();
         let property = filter.property.as_str();
         let values = || {
             filter
@@ -531,28 +334,30 @@ impl CodeSystemProvider for RxNormProvider {
                 .map(str::trim)
                 .filter(|v| !v.is_empty())
         };
-        if INDEXED.contains(&property)
-            && matches!(filter.op, FilterOperator::Equal | FilterOperator::In)
-        {
+        if !matches!(filter.op, FilterOperator::Equal | FilterOperator::In) {
+            return None;
+        }
+        if INDEXED.contains(&property) {
             let mut set = ConceptSet::new();
             for value in values() {
-                if let Some(concepts) = self.indexed.get(&(property.to_owned(), value.to_owned())) {
+                if let Some(concepts) = system.indexed.get(&(property.to_owned(), value.to_owned()))
+                {
                     set |= concepts;
                 }
             }
-            return Ok(set);
+            return Some(Ok(set));
         }
-        if let Some(kind) = self.relations.kind(property)
-            && matches!(filter.op, FilterOperator::Equal | FilterOperator::In)
-        {
-            let mut set = ConceptSet::new();
-            for value in values() {
-                let target = self.named(filter, value)?;
-                set.extend(self.relations.sources(target, kind).map(Ordinal::index));
+        let kind = system.relations.kind(property)?;
+        let mut set = ConceptSet::new();
+        for value in values() {
+            match provider.named(filter, value) {
+                Ok(target) => {
+                    set.extend(system.relations.sources(target, kind).map(Ordinal::index));
+                }
+                Err(error) => return Some(Err(error)),
             }
-            return Ok(set);
         }
-        crate::filter::evaluate(self, filter)
+        Some(Ok(set))
     }
 }
 

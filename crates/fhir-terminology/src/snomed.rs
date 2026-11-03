@@ -13,11 +13,9 @@
 //! store. Reads are point reads and bitmap lookups; nothing walks the graph
 //! per request.
 
-use crate::artifact::MANIFEST_FILE;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
-use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Arc, Mutex, OnceLock};
 
 mod conceptmap;
@@ -26,16 +24,12 @@ pub mod expression;
 
 use concept_graph::attributes;
 use concept_graph::attributes::{Attributes, AttributesError};
-use concept_graph::csr::{Csr, CsrError};
 use concept_graph::identifiers::{Identifiers, IdentifiersError};
 use concept_graph::members::{MembersError, Memberships};
 use concept_graph::ordinal::Ordinal;
-use concept_graph::persist::Hierarchy as GraphHierarchy;
 use concept_graph::refsets::{RefsetMembers, RefsetsError};
 use concept_store::record;
 use concept_store::store::{Store, StoreError, Vocabulary};
-use concept_store::tables;
-use designation_index::index::{Query, TextIndex};
 use rf2::constants;
 use rf2::id::ConceptId;
 use roaring::RoaringBitmap;
@@ -48,10 +42,13 @@ use crate::filter::{Filter, FilterOperator};
 use crate::normal_form;
 use crate::provider::{
     Capability, CodeSystemProvider, Compositional, Concept, ConceptSet, ContentMode, Declaration,
-    Designation, DesignationUse, FilterDefinition, Hierarchy, HierarchyMeaning, Identity,
-    ImplicitArgument, ImplicitForm, InvalidValue, Located, MalformedValueSet, Property,
-    PropertyDefinition, PropertyKind, PropertyValue, ProviderError, Status,
+    DesignationUse, FilterDefinition, HierarchyMeaning, Identity, ImplicitArgument, ImplicitForm,
+    InvalidValue, Located, MalformedValueSet, Property, PropertyDefinition, PropertyKind,
+    PropertyValue, ProviderError, Status,
 };
+use crate::stored::artifact::{Artifact, Layout};
+use crate::stored::system::{StoredProvider, StoredSystem};
+use crate::stored::{self, primary_subtag, storage};
 
 /// The SNOMED CT system URI.
 pub const SYSTEM: &str = "http://snomed.info/sct";
@@ -75,10 +72,6 @@ const SCG_OPERATORS: [char; 8] = ['+', ':', '=', '{', '}', ',', '|', '<'];
 /// The filter property that says whether post-coordination is allowed
 /// (<https://hl7.org/fhir/R4B/snomedct.html>, "Filter Properties").
 const EXPRESSIONS: &str = "expressions";
-
-/// The manifest version this provider reads: the store beside the hierarchy
-/// and the designation index as their own files.
-pub const MANIFEST_VERSION: u32 = 2;
 
 /// The copyright notice every implicit value set template of the FHIR SNOMED
 /// CT page carries, verbatim (<https://hl7.org/fhir/R4B/snomedct.html>,
@@ -117,42 +110,15 @@ pub const FHIR_PROPERTIES: [(&str, PropertyKind); 6] = [
 /// A failure to open an artifact directory.
 #[derive(Debug, thiserror::Error)]
 pub enum OpenError {
-    /// The manifest cannot be read.
-    #[error("cannot read {path}")]
-    Io {
-        /// The file.
-        path: PathBuf,
-        /// The cause.
-        #[source]
-        source: io::Error,
-    },
-    /// The manifest is not the JSON this provider reads.
-    #[error("cannot parse {path}")]
-    Manifest {
-        /// The file.
-        path: PathBuf,
-        /// The cause.
-        #[source]
-        source: serde_json::Error,
-    },
     /// The manifest names another system.
     #[error("the artifact is for `{0}`, not SNOMED CT")]
     NotSnomed(String),
-    /// The store cannot be opened or read.
+    /// The artifact's shared files do not read.
+    #[error(transparent)]
+    Artifact(#[from] stored::OpenError),
+    /// The store cannot be read.
     #[error(transparent)]
     Store(#[from] StoreError),
-    /// The manifest is of another layout version.
-    #[error("the manifest is version {0}; this server reads version {MANIFEST_VERSION}")]
-    ManifestVersion(u32),
-    /// The hierarchy file does not read.
-    #[error("cannot read the hierarchy file")]
-    Hierarchy(#[from] concept_graph::persist::PersistError),
-    /// The designation index file does not read.
-    #[error("cannot read the designation index file")]
-    Text(#[from] designation_index::persist::PersistError),
-    /// The child adjacency cannot be derived.
-    #[error("cannot transpose the hierarchy")]
-    Transpose(#[from] CsrError),
     /// A vocabulary entry the provider relies on is missing.
     #[error("the store's {vocabulary} vocabulary has no `{name}`")]
     MissingVocabulary {
@@ -173,27 +139,16 @@ pub enum OpenError {
     /// The alternate identifiers file does not read.
     #[error("cannot read the alternate identifiers")]
     Identifiers(#[from] IdentifiersError),
-    /// The store's metadata is incomplete.
-    #[error("the store's metadata has no `{0}`")]
-    MissingMeta(&'static str),
-    /// The concept count does not parse.
-    #[error("the store's concept count `{0}` is not a number")]
-    ConceptCount(String),
 }
 
 #[derive(Debug, Deserialize)]
 struct Manifest {
-    #[serde(rename = "manifest")]
-    layout: u32,
     system: String,
     edition: String,
     version: String,
     /// The release date the offline build recorded for the edition.
     #[serde(default, rename = "releaseDate")]
     release_date: Option<String>,
-    store: String,
-    hierarchy: String,
-    text: String,
     /// The reference set memberships; an artifact built before they were
     /// written has none.
     #[serde(default)]
@@ -225,59 +180,9 @@ struct Keys {
     refsets: Vec<(u32, String)>,
 }
 
-/// The hierarchy of the edition, in the seam's vocabulary.
-#[derive(Debug)]
-struct SnomedHierarchy {
-    graph: GraphHierarchy,
-    children: Csr,
-}
-
-impl Hierarchy for SnomedHierarchy {
-    fn parents(&self, concept: Concept) -> ConceptSet {
-        self.graph
-            .is_a
-            .neighbours(Ordinal::new(concept.index()))
-            .iter()
-            .copied()
-            .collect()
-    }
-
-    fn any_parent_in(&self, concept: Concept, set: &ConceptSet) -> bool {
-        self.graph
-            .is_a
-            .neighbours(Ordinal::new(concept.index()))
-            .iter()
-            .any(|parent| set.contains(*parent))
-    }
-
-    fn children(&self, concept: Concept) -> ConceptSet {
-        self.children
-            .neighbours(Ordinal::new(concept.index()))
-            .iter()
-            .copied()
-            .collect()
-    }
-
-    fn ancestors(&self, concept: Concept) -> ConceptSet {
-        self.graph
-            .closure
-            .ancestors(Ordinal::new(concept.index()))
-            .clone()
-    }
-
-    fn descendants(&self, concept: Concept) -> ConceptSet {
-        self.graph
-            .closure
-            .descendants(Ordinal::new(concept.index()))
-            .clone()
-    }
-}
-
-/// One SNOMED CT edition version behind the seam.
-pub struct SnomedProvider {
-    store: Store,
-    hierarchy: SnomedHierarchy,
-    text: TextIndex,
+/// What SNOMED CT decides: the reference sets, the concept model, the
+/// expression constraints and expressions, and the edition's version rules.
+pub struct Snomed {
     memberships: Memberships,
     attributes: Attributes,
     member_tables: RefsetMembers,
@@ -294,14 +199,22 @@ pub struct SnomedProvider {
     attribute_ordinals: OnceLock<Vec<Option<u32>>>,
     /// The inactive concepts, read once on the first request that needs them.
     inactive: OnceLock<ConceptSet>,
-    identity: Identity,
-    declaration: Declaration,
     keys: Keys,
     edition: String,
-    source: Source,
     base_language: String,
-    concepts: u32,
 }
+
+impl std::fmt::Debug for Snomed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Snomed")
+            .field("edition", &self.edition)
+            .field("base_language", &self.base_language)
+            .finish_non_exhaustive()
+    }
+}
+
+/// One SNOMED CT edition version behind the seam.
+pub type SnomedProvider = StoredProvider<Snomed>;
 
 /// What each structure of a served edition holds in memory, in bytes.
 ///
@@ -331,29 +244,6 @@ pub struct Footprint {
     pub identifiers: usize,
 }
 
-impl std::fmt::Debug for SnomedProvider {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SnomedProvider")
-            .field("version", &self.identity.version)
-            .field("concepts", &self.concepts)
-            .field("base_language", &self.base_language)
-            .finish_non_exhaustive()
-    }
-}
-
-fn storage(error: StoreError) -> ProviderError {
-    ProviderError::Storage(Box::new(error))
-}
-
-/// The primary language subtag of a BCP 47 tag (`en-GB` is `en`), lowercased.
-fn primary_subtag(language: &str) -> String {
-    language
-        .split(['-', '_'])
-        .next()
-        .unwrap_or(language)
-        .to_ascii_lowercase()
-}
-
 impl SnomedProvider {
     /// Opens the artifact directory `dir`; `default_language` is the BCP 47
     /// tag used when a request names none, when the edition carries it.
@@ -363,28 +253,15 @@ impl SnomedProvider {
     /// Returns [`OpenError`] when the manifest, the store, or a side file does not
     /// read, or the artifact is not a SNOMED CT edition.
     pub fn open(dir: &Path, default_language: &str) -> Result<Self, OpenError> {
-        let manifest = Self::read_manifest(dir)?;
-        let store = Store::open(&dir.join(&manifest.store))?;
-        let read = |name: &str| {
-            let path = dir.join(name);
-            concept_graph::read::buffered(&path).map_err(|source| OpenError::Io { path, source })
-        };
-        let graph = GraphHierarchy::read_from(&mut read(&manifest.hierarchy)?)?;
-        let children = graph.is_a.transpose()?;
-        let text = designation_index::persist::read_from(&mut read(&manifest.text)?)?;
+        let (artifact, manifest) = Artifact::open(dir, Layout::Tree, |manifest: &Manifest| {
+            stored::serves(&manifest.system, SYSTEM, OpenError::NotSnomed)
+        })?;
         let memberships = match &manifest.refsets {
-            Some(name) => Memberships::read_from(&mut read(name)?)?,
+            Some(name) => Memberships::read_from(&mut stored::side_file(dir, name)?)?,
             None => Memberships::default(),
         };
         let (attributes, member_tables, identifiers) = Self::read_ecl_files(dir, &manifest)?;
-        let concepts = store
-            .meta(tables::META_CONCEPTS)?
-            .ok_or(OpenError::MissingMeta(tables::META_CONCEPTS))?;
-        // The error carries the text; a `ParseIntError` adds nothing to it.
-        let Ok(concepts) = concepts.parse::<u32>() else {
-            return Err(OpenError::ConceptCount(concepts.clone()));
-        };
-        let keys = Self::resolve_keys(&store)?;
+        let keys = Self::resolve_keys(&artifact.store)?;
         let base_language = Self::base_language(default_language, &manifest.languages);
         // NOTE: no FHIR/SNOMED spec governs this: our own design, and the
         // release date is the edition identifier the build records.
@@ -418,65 +295,66 @@ impl SnomedProvider {
             description: None,
             kind: PropertyKind::Code,
         }));
-        Ok(Self {
-            store,
-            hierarchy: SnomedHierarchy { graph, children },
-            text,
-            memberships,
-            attributes,
-            member_tables,
-            identifiers,
-            roots: OnceLock::new(),
-            leaves: OnceLock::new(),
-            defined: OnceLock::new(),
-            expressions: Mutex::new(HashMap::new()),
-            scg: Mutex::new(expression::Expressions::default()),
-            attribute_ordinals: OnceLock::new(),
-            inactive: OnceLock::new(),
-            identity: Identity {
-                url: SYSTEM.to_owned(),
-                version: manifest.version,
-                title: Some(String::from("SNOMED CT")),
-                name: None,
-                // NOTE: the canonical R4B CodeSystem for SNOMED CT declares
-                // versionNeeded = false (<https://hl7.org/fhir/R4B/snomedct.html>).
-                version_needed: false,
-            },
-            declaration: Declaration {
-                content: ContentMode::NotPresent,
-                // NOTE: caseSensitive = false per the canonical R4B CodeSystem;
-                // SNOMED codes are digits, so the flag never changes a lookup.
-                case_sensitive: false,
-                hierarchy_meaning: Some(HierarchyMeaning::IsA),
-                // NOTE: SNOMED CT defines Compositional Grammar
-                // (<http://snomed.org/scg>) and this server evaluates it, so
-                // an expression is a code this version locates.
-                compositional: Compositional::Supported,
-                languages: manifest.languages,
-                properties,
-                // NOTE: the FHIR SNOMED CT page defines `concept is-a` and `concept in`
-                // (<https://hl7.org/fhir/R4B/snomedct.html>, "Filter Properties").
-                filters: Self::filter_definitions(),
-                capabilities: BTreeSet::from([
-                    Capability::Subsumption,
-                    Capability::Enumeration,
-                    Capability::ImplicitConceptMaps,
-                ]),
-                implicit_forms: implicit_forms(),
-            },
-            keys,
-            edition: manifest.edition,
+        let identity = Identity {
+            url: SYSTEM.to_owned(),
+            version: manifest.version,
+            title: Some(String::from("SNOMED CT")),
+            name: None,
+            // NOTE: the canonical R4B CodeSystem for SNOMED CT declares
+            // versionNeeded = false (<https://hl7.org/fhir/R4B/snomedct.html>).
+            version_needed: false,
+        };
+        let declaration = Declaration {
+            content: ContentMode::NotPresent,
+            // NOTE: caseSensitive = false per the canonical R4B CodeSystem;
+            // SNOMED codes are digits, so the flag never changes a lookup.
+            case_sensitive: false,
+            hierarchy_meaning: Some(HierarchyMeaning::IsA),
+            // NOTE: SNOMED CT defines Compositional Grammar
+            // (<http://snomed.org/scg>) and this server evaluates it, so
+            // an expression is a code this version locates.
+            compositional: Compositional::Supported,
+            languages: manifest.languages,
+            properties,
+            // NOTE: the FHIR SNOMED CT page defines `concept is-a` and `concept in`
+            // (<https://hl7.org/fhir/R4B/snomedct.html>, "Filter Properties").
+            filters: Self::filter_definitions(),
+            capabilities: BTreeSet::from([
+                Capability::Subsumption,
+                Capability::Enumeration,
+                Capability::ImplicitConceptMaps,
+            ]),
+            implicit_forms: implicit_forms(),
+        };
+        Ok(Self::new(
+            identity,
+            declaration,
             source,
-            base_language,
-            concepts,
-        })
+            artifact,
+            Snomed {
+                memberships,
+                attributes,
+                member_tables,
+                identifiers,
+                roots: OnceLock::new(),
+                leaves: OnceLock::new(),
+                defined: OnceLock::new(),
+                expressions: Mutex::new(HashMap::new()),
+                scg: Mutex::new(expression::Expressions::default()),
+                attribute_ordinals: OnceLock::new(),
+                inactive: OnceLock::new(),
+                keys,
+                edition: manifest.edition,
+                base_language,
+            },
+        ))
     }
 
     /// The edition URI (`http://snomed.info/sct/{module}`), the version URI
     /// without its date.
     #[must_use]
     pub fn edition_uri(&self) -> &str {
-        &self.edition
+        &self.system().edition
     }
 
     /// What every structure of this edition holds in memory.
@@ -489,16 +367,16 @@ impl SnomedProvider {
     #[must_use]
     pub fn footprint(&self) -> Footprint {
         Footprint {
-            store_columns: self.store.column_sizes(),
-            is_a: self.hierarchy.graph.is_a.size_in_bytes(),
-            closure: self.hierarchy.graph.closure.size_in_bytes(),
-            children: self.hierarchy.children.size_in_bytes(),
-            text: self.text.size_in_bytes(),
-            member_tables: self.member_tables.size_in_bytes(),
-            attributes: self.attributes.rows_size_in_bytes(),
-            attributes_inverted: self.attributes.inverted_size_in_bytes(),
-            memberships: self.memberships.size_in_bytes(),
-            identifiers: self.identifiers.size_in_bytes(),
+            store_columns: self.stored().store.column_sizes(),
+            is_a: self.stored().tree.graph.is_a.size_in_bytes(),
+            closure: self.stored().tree.graph.closure.size_in_bytes(),
+            children: self.stored().tree.children.size_in_bytes(),
+            text: self.stored().text.size_in_bytes(),
+            member_tables: self.system().member_tables.size_in_bytes(),
+            attributes: self.system().attributes.rows_size_in_bytes(),
+            attributes_inverted: self.system().attributes.inverted_size_in_bytes(),
+            memberships: self.system().memberships.size_in_bytes(),
+            identifiers: self.system().identifiers.size_in_bytes(),
         }
     }
 
@@ -591,37 +469,12 @@ impl SnomedProvider {
         ]
     }
 
-    /// The manifest of the artifact under `dir`, checked to be a SNOMED CT
-    /// artifact of the layout this build reads.
-    fn read_manifest(dir: &Path) -> Result<Manifest, OpenError> {
-        let manifest_path = dir.join(MANIFEST_FILE);
-        let text = std::fs::read_to_string(&manifest_path).map_err(|source| OpenError::Io {
-            path: manifest_path.clone(),
-            source,
-        })?;
-        let manifest: Manifest =
-            serde_json::from_str(&text).map_err(|source| OpenError::Manifest {
-                path: manifest_path,
-                source,
-            })?;
-        if manifest.system != SYSTEM {
-            return Err(OpenError::NotSnomed(manifest.system));
-        }
-        if manifest.layout != MANIFEST_VERSION {
-            return Err(OpenError::ManifestVersion(manifest.layout));
-        }
-        Ok(manifest)
-    }
-
     /// The files the ECL evaluator reads, when the artifact has them.
     fn read_ecl_files(
         dir: &Path,
         manifest: &Manifest,
     ) -> Result<(Attributes, RefsetMembers, Identifiers), OpenError> {
-        let read = |name: &str| {
-            let path = dir.join(name);
-            concept_graph::read::buffered(&path).map_err(|source| OpenError::Io { path, source })
-        };
+        let read = |name: &str| stored::side_file(dir, name);
         let attributes = match &manifest.attributes {
             Some(name) => Attributes::read_from(&mut read(name)?)?,
             None => Attributes::default(),
@@ -644,13 +497,13 @@ impl SnomedProvider {
     )]
     #[must_use]
     pub fn attributes(&self) -> &Attributes {
-        &self.attributes
+        &self.system().attributes
     }
 
     /// The active reference set member rows of the edition, with their fields.
     #[must_use]
     pub fn member_tables(&self) -> &RefsetMembers {
-        &self.member_tables
+        &self.system().member_tables
     }
 
     /// The alternate identifiers of the edition.
@@ -660,32 +513,22 @@ impl SnomedProvider {
     )]
     #[must_use]
     pub fn identifiers(&self) -> &Identifiers {
-        &self.identifiers
+        &self.system().identifiers
     }
 
     /// The language reference sets of the edition, as SCTIDs.
     #[must_use]
     pub fn language_refsets(&self) -> Vec<&str> {
-        self.keys.refsets.iter().map(|(_, s)| s.as_str()).collect()
+        self.system()
+            .keys
+            .refsets
+            .iter()
+            .map(|(_, s)| s.as_str())
+            .collect()
     }
 
     fn ordinal(concept: Concept) -> Ordinal {
         Ordinal::new(concept.index())
-    }
-
-    fn use_coding(&self, use_ordinal: u32) -> DesignationUse {
-        let (code, display) = if use_ordinal == self.keys.fsn {
-            (constants::FULLY_SPECIFIED_NAME, "Fully specified name")
-        } else if use_ordinal == self.keys.definition {
-            (constants::DEFINITION, "Definition")
-        } else {
-            (constants::SYNONYM, "Synonym")
-        };
-        DesignationUse {
-            system: SYSTEM.to_owned(),
-            code: code.to_string(),
-            display: Some(display.to_owned()),
-        }
     }
 
     /// The language this edition's own displays are in: the configured
@@ -713,8 +556,9 @@ impl SnomedProvider {
         ordinal: Ordinal,
         language: &str,
     ) -> Result<Option<String>, ProviderError> {
-        let refsets = self.keys.refsets.iter().map(|(refset, _)| *refset);
-        self.store
+        let refsets = self.system().keys.refsets.iter().map(|(refset, _)| *refset);
+        self.stored()
+            .store
             .display(ordinal, refsets, |found| primary_subtag(found) == language)
             .map_err(storage)
     }
@@ -728,24 +572,26 @@ impl SnomedProvider {
         ordinal: Ordinal,
         language: Option<&str>,
     ) -> Result<Option<String>, ProviderError> {
-        let wanted = language.map_or_else(|| self.base_language.clone(), primary_subtag);
+        let wanted = language.map_or_else(|| self.system().base_language.clone(), primary_subtag);
         if let Some(term) = self.preferred_in(ordinal, &wanted)? {
             return Ok(Some(term));
         }
-        let designations = self.store.designations(ordinal).map_err(storage)?;
+        let designations = self.stored().store.designations(ordinal).map_err(storage)?;
         if let Some(synonym) = designations.iter().find(|d| {
-            d.active && d.use_ordinal == self.keys.synonym && primary_subtag(&d.language) == wanted
+            d.active
+                && d.use_ordinal == self.system().keys.synonym
+                && primary_subtag(&d.language) == wanted
         }) {
             return Ok(Some(synonym.term.clone()));
         }
-        if wanted != self.base_language
-            && let Some(term) = self.preferred_in(ordinal, &self.base_language)?
+        if wanted != self.system().base_language
+            && let Some(term) = self.preferred_in(ordinal, &self.system().base_language)?
         {
             return Ok(Some(term));
         }
         if let Some(fsn) = designations
             .iter()
-            .find(|d| d.active && d.use_ordinal == self.keys.fsn)
+            .find(|d| d.active && d.use_ordinal == self.system().keys.fsn)
         {
             return Ok(Some(fsn.term.clone()));
         }
@@ -794,8 +640,8 @@ impl SnomedProvider {
     pub(crate) fn implicit_version(&self, base: &str) -> Result<Option<String>, ProviderError> {
         if base == SYSTEM {
             Ok(None)
-        } else if base == self.edition || base == self.identity.version {
-            Ok(Some(self.identity.version.clone()))
+        } else if base == self.system().edition || base == self.identity().version {
+            Ok(Some(self.identity().version.clone()))
         } else {
             Err(ProviderError::UnservedImplicitVersion {
                 url: SYSTEM.to_owned(),
@@ -818,13 +664,19 @@ impl SnomedProvider {
                 let refset = self.sctid_of(url, argument)?;
                 if ConceptId::parse(&refset)
                     .ok()
-                    .and_then(|id| self.memberships.members(id.value()))
+                    .and_then(|id| self.system().memberships.members(id.value()))
                     .is_none()
                 {
                     // NOTE: a language reference set references descriptions, so
                     // "all concept ids in the specified reference set" selects none
                     // (<https://hl7.org/fhir/R4B/snomedct.html>).
-                    if self.keys.refsets.iter().any(|(_, id)| *id == refset) {
+                    if self
+                        .system()
+                        .keys
+                        .refsets
+                        .iter()
+                        .any(|(_, id)| *id == refset)
+                    {
                         return Err(ProviderError::invalid_filter_value(
                             "concept",
                             refset,
@@ -867,13 +719,13 @@ impl SnomedProvider {
         &self,
         text: &str,
     ) -> Result<Arc<ExpressionConstraint>, sct_scg::front::ParseError> {
-        if let Ok(cache) = self.expressions.lock()
+        if let Ok(cache) = self.system().expressions.lock()
             && let Some(parsed) = cache.get(text)
         {
             return Ok(Arc::clone(parsed));
         }
         let parsed = Arc::new(sct_ecl::parse(text)?);
-        if let Ok(mut cache) = self.expressions.lock() {
+        if let Ok(mut cache) = self.system().expressions.lock() {
             if cache.len() >= 256 {
                 cache.clear();
             }
@@ -904,10 +756,10 @@ impl SnomedProvider {
     /// `sufficientlyDefined` property is derived from
     /// (<https://hl7.org/fhir/R4B/snomedct.html>, "SNOMED CT Properties").
     fn is_defined(&self, ordinal: Ordinal) -> Result<bool, ProviderError> {
-        let stored = self.store.properties(ordinal).map_err(storage)?;
+        let stored = self.stored().store.properties(ordinal).map_err(storage)?;
         Ok(stored
             .iter()
-            .filter(|(key, _)| *key == self.keys.definition_status)
+            .filter(|(key, _)| *key == self.system().keys.definition_status)
             .any(|(_, values)| {
                 values.iter().any(|value| {
                     matches!(value, record::PropertyValue::Code(code) if *code == constants::DEFINED.to_string())
@@ -932,6 +784,7 @@ impl SnomedProvider {
         let reference =
             |ordinal: Ordinal| -> Result<Option<normal_form::Reference>, ProviderError> {
                 let Some(code) = self
+                    .stored()
                     .store
                     .codes([ordinal])
                     .map_err(storage)?
@@ -956,7 +809,8 @@ impl SnomedProvider {
 
         let mut focus = Vec::new();
         for parent in self
-            .hierarchy
+            .stored()
+            .tree
             .graph
             .is_a
             .neighbours(ordinal)
@@ -969,9 +823,15 @@ impl SnomedProvider {
         }
 
         let mut attributes = Vec::new();
-        for row in self.attributes.rows(ordinal) {
+        for row in self.system().attributes.rows(ordinal) {
             let index = usize::try_from(row.kind).unwrap_or(usize::MAX);
-            let Some(kind) = self.attributes.types().get(index).map(u64::to_string) else {
+            let Some(kind) = self
+                .system()
+                .attributes
+                .types()
+                .get(index)
+                .map(u64::to_string)
+            else {
                 continue;
             };
             let value = match row.value {
@@ -988,7 +848,7 @@ impl SnomedProvider {
                 // An attribute type is a concept of the same system, so its
                 // term is read the way any other is, through the ordinal its
                 // identifier resolves to.
-                term: match self.store.ordinal(&kind).map_err(storage)? {
+                term: match self.stored().store.ordinal(&kind).map_err(storage)? {
                     Some(ordinal) if terms => self
                         .choose_display(ordinal, None)?
                         .filter(|term| !term.contains('|')),
@@ -1010,51 +870,92 @@ impl SnomedProvider {
         }
         .render())
     }
+}
 
-    /// The codes of `set`, sliced out of the concept column: a concept with
-    /// hundreds of children costs one string per child and no search (#314).
-    fn codes(
+impl SnomedProvider {
+    /// The inactive concepts, scanned once from the store and kept.
+    fn inactive_set(&self) -> Result<ConceptSet, ProviderError> {
+        if let Some(set) = self.system().inactive.get() {
+            return Ok(set.clone());
+        }
+        let mut set = ConceptSet::new();
+        for index in 0..self.stored().concepts {
+            if let Some(record) = self
+                .stored()
+                .store
+                .concept(Ordinal::new(index))
+                .map_err(storage)?
+                && !record.active
+            {
+                set.insert(index);
+            }
+        }
+        Ok(self.system().inactive.get_or_init(|| set).clone())
+    }
+
+    /// The members of the reference sets a `concept in` filter names.
+    fn reference_set_members(&self, filter: &Filter) -> Result<ConceptSet, ProviderError> {
+        let mut set = ConceptSet::new();
+        for value in filter
+            .value
+            .split(',')
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+        {
+            // The error names the value and the reason; the id error adds nothing.
+            let Ok(refset) = ConceptId::parse(value) else {
+                return Err(ProviderError::invalid_filter_value(
+                    &filter.property,
+                    value,
+                    "not an SCTID",
+                ));
+            };
+            let members = self
+                .system()
+                .memberships
+                .members(refset.value())
+                .ok_or_else(|| ProviderError::UnknownCode(value.to_owned()))?;
+            set |= members;
+        }
+        Ok(set)
+    }
+
+    /// Whether the expression `record` passes `filter`: through its focus
+    /// concepts, which subsume it.
+    fn expression_passes(
         &self,
-        set: impl IntoIterator<Item = u32>,
-    ) -> Result<Vec<PropertyValue>, ProviderError> {
-        let ordinals = set.into_iter().map(Ordinal::new);
-        Ok(self
-            .store
-            .codes(ordinals)
-            .map_err(storage)?
-            .into_iter()
-            .flatten()
-            .map(PropertyValue::Code)
-            .collect())
+        record: &expression::Registered,
+        filter: &Filter,
+    ) -> Result<bool, ProviderError> {
+        if filter.op == FilterOperator::Equal && filter.property == EXPRESSIONS {
+            return Ok(filter.value.trim() == "true");
+        }
+        let selected = self.filter(filter)?;
+        Ok(record
+            .focus_concepts()
+            .iter()
+            .all(|focus| selected.contains(*focus)))
     }
 }
 
-impl CodeSystemProvider for SnomedProvider {
-    fn identity(&self) -> &Identity {
-        &self.identity
-    }
-
-    fn declaration(&self) -> &Declaration {
-        &self.declaration
-    }
-
+impl StoredSystem for Snomed {
     // NOTE: the edition URI names a distribution, and the service "may default to
     // the most recent version of the named SNOMED CT distribution"
     // (<https://hl7.org/fhir/R4B/snomedct.html>, "Versions").
-    fn answers_version(&self, version: &str) -> bool {
-        version == self.edition
+    fn answers_version(provider: &SnomedProvider, version: &str) -> bool {
+        version == provider.system().edition
     }
 
-    fn unserved_properties(&self) -> &[&'static str] {
+    fn unserved_properties(_provider: &SnomedProvider) -> &[&'static str] {
         &UNSERVED_PROPERTIES
     }
 
-    fn generated_properties(&self) -> &[&'static str] {
+    fn generated_properties(_provider: &SnomedProvider) -> &[&'static str] {
         &GENERATED_PROPERTIES
     }
 
     fn generated_property(
-        &self,
+        provider: &SnomedProvider,
         concept: Concept,
         name: &str,
     ) -> Result<Option<Property>, ProviderError> {
@@ -1063,9 +964,9 @@ impl CodeSystemProvider for SnomedProvider {
             NORMAL_FORM_TERSE => false,
             _ => return Ok(None),
         };
-        let generated = match self.registered(concept)? {
-            Some(record) => self.expression_normal_form(&record, terms)?,
-            None => self.normal_form(concept, terms)?,
+        let generated = match provider.registered(concept)? {
+            Some(record) => provider.expression_normal_form(&record, terms)?,
+            None => provider.normal_form(concept, terms)?,
         };
         let Some(expression) = generated else {
             return Ok(None);
@@ -1083,20 +984,16 @@ impl CodeSystemProvider for SnomedProvider {
     /// (`OperationDefinition/CodeSystem-validate-code`: `displayLanguage`
     /// "Specifies the language to be used for description when validating the
     /// display property").
-    fn language(&self) -> Option<&str> {
-        Some(&self.base_language)
+    fn language(provider: &SnomedProvider) -> Option<&str> {
+        Some(&provider.system().base_language)
     }
 
-    fn artifact(&self) -> Option<&Source> {
-        Some(&self.source)
-    }
-
-    fn locate(&self, code: &str) -> Result<Option<Located>, ProviderError> {
+    fn locate(provider: &SnomedProvider, code: &str) -> Result<Option<Located>, ProviderError> {
         // NOTE: an expression in Compositional Grammar is a valid code and is
         // "subject to the same rules as precoordinated concepts"
         // (<https://hl7.org/fhir/R4B/snomedct.html>, "Code").
-        if self.is_expression(code) {
-            return Ok(self
+        if provider.is_expression(code) {
+            return Ok(provider
                 .resolve_expression(code)?
                 .ok()
                 .map(|(concept, code)| Located { concept, code }));
@@ -1107,7 +1004,8 @@ impl CodeSystemProvider for SnomedProvider {
         if ConceptId::parse(code).is_err() {
             return Ok(None);
         }
-        Ok(self
+        Ok(provider
+            .stored()
             .store
             .ordinal(code)
             .map_err(storage)?
@@ -1120,70 +1018,80 @@ impl CodeSystemProvider for SnomedProvider {
     // NOTE: SNOMED CT Expressions in Compositional Grammar are valid codes
     // (<https://hl7.org/fhir/R4B/snomedct.html>, "Code"), and a concept
     // reference alone carries none of the grammar's own characters.
-    fn is_expression(&self, code: &str) -> bool {
+    fn is_expression(_provider: &SnomedProvider, code: &str) -> bool {
         code.contains(SCG_OPERATORS)
     }
 
     /// Why an expression is not a code of this version: the grammar's own
     /// position for a malformed one, and the concept named otherwise (the
     /// Compositional Grammar specification, §7.3 Validating).
-    fn rejection(&self, code: &str) -> Option<String> {
-        if !self.is_expression(code) {
+    fn rejection(provider: &SnomedProvider, code: &str) -> Option<String> {
+        if !provider.is_expression(code) {
             return None;
         }
         // NOTE: no FHIR/SNOMED spec governs this: our own design. A store this
         // read cannot reach says nothing more than "absent", which is what the
         // caller reports when this answers `None`.
-        self.resolve_expression(code)
+        provider
+            .resolve_expression(code)
             .ok()?
             .err()
             .map(|error| error.to_string())
     }
 
-    fn is_postcoordinated(&self, concept: Concept) -> bool {
-        Self::is_expression_handle(concept)
+    /// An expression carries no designation: "SNOMED International does not
+    /// define terms for expressions"
+    /// (<https://hl7.org/fhir/R4B/snomedct.html>, "Display"), so the generated
+    /// display is the only term and `$lookup` adds it by itself.
+    fn is_postcoordinated(_provider: &SnomedProvider, concept: Concept) -> bool {
+        SnomedProvider::is_expression_handle(concept)
     }
 
     /// `expressions = true` is the filter that admits post-coordination
     /// (<https://hl7.org/fhir/R4B/snomedct.html>, "Filter Properties").
-    fn admits_post_coordination(&self, filter: &Filter) -> bool {
+    fn admits_post_coordination(_provider: &SnomedProvider, filter: &Filter) -> bool {
         filter.op == FilterOperator::Equal
             && filter.property == EXPRESSIONS
             && filter.value.trim() == "true"
     }
 
-    fn code(&self, concept: Concept) -> Result<Option<String>, ProviderError> {
-        if let Some(record) = self.registered(concept)? {
+    fn code(provider: &SnomedProvider, concept: Concept) -> Result<Option<String>, ProviderError> {
+        if let Some(record) = provider.registered(concept)? {
             return Ok(Some(record.canonical().to_owned()));
         }
-        Ok(self
+        Ok(provider
+            .stored()
             .store
-            .code(Self::ordinal(concept))
+            .code(SnomedProvider::ordinal(concept))
             .map_err(storage)?
             .map(ToOwned::to_owned))
     }
 
     fn display(
-        &self,
+        provider: &SnomedProvider,
         concept: Concept,
         language: Option<&str>,
     ) -> Result<Option<String>, ProviderError> {
-        if let Some(record) = self.registered(concept)? {
-            return Ok(Some(self.expression_display(&record, language)?));
+        if let Some(record) = provider.registered(concept)? {
+            return Ok(Some(provider.expression_display(&record, language)?));
         }
-        self.choose_display(Self::ordinal(concept), language)
+        provider.choose_display(SnomedProvider::ordinal(concept), language)
     }
 
-    fn definition(&self, concept: Concept) -> Result<Option<String>, ProviderError> {
-        if Self::is_expression_handle(concept) {
+    fn definition(
+        provider: &SnomedProvider,
+        concept: Concept,
+    ) -> Result<Option<String>, ProviderError> {
+        if SnomedProvider::is_expression_handle(concept) {
             return Ok(None);
         }
-        Ok(self
+        Ok(provider
+            .stored()
             .store
-            .designations(Self::ordinal(concept))
+            .designations(SnomedProvider::ordinal(concept))
             .map_err(storage)?
             .into_iter()
-            .find(|d| d.active && d.use_ordinal == self.keys.definition)
+            .find(|d| d.active && d.use_ordinal == provider.system().keys.definition)
             .map(|d| d.term))
     }
 
@@ -1194,70 +1102,52 @@ impl CodeSystemProvider for SnomedProvider {
     /// Grammar specification, §7.3 Validating). Inactive is not invalid on
     /// this server, so an expression over an inactive concept validates and
     /// says which it is (<https://hl7.org/fhir/R4B/snomedct.html>, "Inactive").
-    fn status(&self, concept: Concept) -> Result<Status, ProviderError> {
-        if let Some(record) = self.registered(concept)? {
+    fn status(provider: &SnomedProvider, concept: Concept) -> Result<Status, ProviderError> {
+        if let Some(record) = provider.registered(concept)? {
             return Ok(Status {
                 standards_status: None,
-                active: self.expression_is_active(&record)?,
+                active: provider.expression_is_active(&record)?,
                 inactive_reason: None,
                 abstract_concept: false,
                 codeless: false,
             });
         }
-        let record = self
-            .store
-            .concept(Self::ordinal(concept))
-            .map_err(storage)?;
         Ok(Status {
-            standards_status: None,
-            active: record.is_some_and(|c| c.active),
-            inactive_reason: None,
-            abstract_concept: false,
-            codeless: false,
+            active: provider.stored().active(concept)?,
+            ..Status::default()
         })
     }
 
-    /// An expression carries no designation: "SNOMED International does not
-    /// define terms for expressions"
-    /// (<https://hl7.org/fhir/R4B/snomedct.html>, "Display"), so the generated
-    /// display is the only term and `$lookup` adds it by itself.
-    fn designations(
-        &self,
-        concept: Concept,
-        language: Option<&str>,
-    ) -> Result<Vec<Designation>, ProviderError> {
-        if Self::is_expression_handle(concept) {
-            return Ok(Vec::new());
+    /// The use of a description: its type, as the SNOMED CT concept the type
+    /// is.
+    fn designation_use(provider: &SnomedProvider, use_ordinal: u32) -> DesignationUse {
+        let keys = &provider.system().keys;
+        let (code, display) = if use_ordinal == keys.fsn {
+            (constants::FULLY_SPECIFIED_NAME, "Fully specified name")
+        } else if use_ordinal == keys.definition {
+            (constants::DEFINITION, "Definition")
+        } else {
+            (constants::SYNONYM, "Synonym")
+        };
+        DesignationUse {
+            system: SYSTEM.to_owned(),
+            code: code.to_string(),
+            display: Some(display.to_owned()),
         }
-        let wanted = language.map(primary_subtag);
-        Ok(self
-            .store
-            .designations(Self::ordinal(concept))
-            .map_err(storage)?
-            .into_iter()
-            .filter(|d| {
-                wanted
-                    .as_deref()
-                    .is_none_or(|wanted| primary_subtag(&d.language) == wanted)
-            })
-            .map(|d| Designation {
-                standards_status: None,
-                language: Some(d.language.clone()),
-                use_: Some(self.use_coding(d.use_ordinal)),
-                value: d.term,
-            })
-            .collect())
     }
 
-    fn properties(&self, concept: Concept) -> Result<Vec<Property>, ProviderError> {
+    fn properties(
+        provider: &SnomedProvider,
+        concept: Concept,
+    ) -> Result<Vec<Property>, ProviderError> {
         // NOTE: the FHIR-defined properties of "the given code or expression"
         // that an expression itself states (<https://hl7.org/fhir/R4B/snomedct.html>,
         // "SNOMED CT Properties"): its status and its own refinement.
-        if let Some(record) = self.registered(concept)? {
+        if let Some(record) = provider.registered(concept)? {
             let mut out = vec![
                 Property {
                     code: String::from("inactive"),
-                    value: PropertyValue::Boolean(!self.expression_is_active(&record)?),
+                    value: PropertyValue::Boolean(!provider.expression_is_active(&record)?),
                     ..Property::default()
                 },
                 Property {
@@ -1266,21 +1156,25 @@ impl CodeSystemProvider for SnomedProvider {
                     ..Property::default()
                 },
             ];
-            out.extend(Self::expression_attributes(&record));
+            out.extend(SnomedProvider::expression_attributes(&record));
             return Ok(out);
         }
-        let ordinal = Self::ordinal(concept);
-        let Some(record) = self.store.concept(ordinal).map_err(storage)? else {
+        let ordinal = SnomedProvider::ordinal(concept);
+        let Some(record) = provider.stored().store.concept(ordinal).map_err(storage)? else {
             return Ok(Vec::new());
         };
-        let stored = self.store.properties(ordinal).map_err(storage)?;
+        let stored = provider
+            .stored()
+            .store
+            .properties(ordinal)
+            .map_err(storage)?;
         let of = |key: u32| stored.iter().find(|(k, _)| *k == key).map(|(_, v)| v);
         let mut out = vec![Property {
             code: String::from("inactive"),
             value: PropertyValue::Boolean(!record.active),
             ..Property::default()
         }];
-        let defined = of(self.keys.definition_status).is_some_and(|values| {
+        let defined = of(provider.system().keys.definition_status).is_some_and(|values| {
             values
                 .iter()
                 .any(|v| matches!(v, record::PropertyValue::Code(c) if *c == constants::DEFINED.to_string()))
@@ -1290,7 +1184,7 @@ impl CodeSystemProvider for SnomedProvider {
             value: PropertyValue::Boolean(defined),
             ..Property::default()
         });
-        if let Some(values) = of(self.keys.module)
+        if let Some(values) = of(provider.system().keys.module)
             && let Some(record::PropertyValue::Code(module)) = values.first()
         {
             out.push(Property {
@@ -1306,38 +1200,14 @@ impl CodeSystemProvider for SnomedProvider {
                 ..Property::default()
             });
         }
-        for value in self.codes(self.hierarchy.parents(concept))? {
-            out.push(Property {
-                code: String::from("parent"),
-                value,
-                ..Property::default()
-            });
-        }
-        for value in self.codes(self.hierarchy.children(concept))? {
-            out.push(Property {
-                code: String::from("child"),
-                value,
-                ..Property::default()
-            });
-        }
-        for (key, sctid) in &self.keys.attributes {
+        provider.stored().relatives(concept, &mut out)?;
+        for (key, sctid) in &provider.system().keys.attributes {
             let Some(values) = of(*key) else {
                 continue;
             };
             for value in values {
-                let value = match value {
-                    record::PropertyValue::Concept(target) => {
-                        match self.store.concept(*target).map_err(storage)? {
-                            Some(target) => PropertyValue::Code(target.code),
-                            None => continue,
-                        }
-                    }
-                    record::PropertyValue::Code(c) => PropertyValue::Code(c.clone()),
-                    record::PropertyValue::String(s) => PropertyValue::String(s.clone()),
-                    record::PropertyValue::Integer(i) => PropertyValue::Integer(*i),
-                    record::PropertyValue::Boolean(b) => PropertyValue::Boolean(*b),
-                    record::PropertyValue::Decimal(d) => PropertyValue::Decimal(d.clone()),
-                    record::PropertyValue::DateTime(d) => PropertyValue::DateTime(d.clone()),
+                let Some(value) = provider.stored().property_value(value.clone())? else {
+                    continue;
                 };
                 out.push(Property {
                     code: sctid.clone(),
@@ -1349,24 +1219,9 @@ impl CodeSystemProvider for SnomedProvider {
         Ok(out)
     }
 
-    fn hierarchy(&self) -> Option<&dyn Hierarchy> {
-        Some(&self.hierarchy)
-    }
-
     /// The inactive concepts, scanned once from the store and kept.
-    fn inactive(&self) -> Result<ConceptSet, ProviderError> {
-        if let Some(set) = self.inactive.get() {
-            return Ok(set.clone());
-        }
-        let mut set = ConceptSet::new();
-        for index in 0..self.concepts {
-            if let Some(record) = self.store.concept(Ordinal::new(index)).map_err(storage)?
-                && !record.active
-            {
-                set.insert(index);
-            }
-        }
-        Ok(self.inactive.get_or_init(|| set).clone())
+    fn inactive(provider: &SnomedProvider) -> Option<Result<ConceptSet, ProviderError>> {
+        Some(provider.inactive_set())
     }
 
     /// `concept in [sctid]` is reference set membership, `constraint = [ecl]`
@@ -1378,48 +1233,28 @@ impl CodeSystemProvider for SnomedProvider {
     /// The `expressions` value decides whether an expression may join the
     /// selection, which is a question about a code the version does not
     /// enumerate, so it is answered in `filter_matches` and not by this set.
-    fn filter(&self, filter: &Filter) -> Result<ConceptSet, ProviderError> {
+    fn filter(
+        provider: &SnomedProvider,
+        filter: &Filter,
+    ) -> Option<Result<ConceptSet, ProviderError>> {
         if filter.op == FilterOperator::Equal {
             match filter.property.as_str() {
-                "constraint" => return self.constraint(&filter.value),
+                "constraint" => return Some(provider.constraint(&filter.value)),
                 EXPRESSIONS => {
-                    return match filter.value.trim() {
-                        "false" | "true" => self.all(),
+                    return Some(match filter.value.trim() {
+                        "false" | "true" => provider.all(),
                         other => Err(ProviderError::invalid_filter_value(
                             &filter.property,
                             other,
                             "expected `true` or `false`",
                         )),
-                    };
+                    });
                 }
                 _ => {}
             }
         }
-        if filter.property != "concept" || filter.op != FilterOperator::In {
-            return crate::filter::evaluate(self, filter);
-        }
-        let mut set = ConceptSet::new();
-        for value in filter
-            .value
-            .split(',')
-            .map(str::trim)
-            .filter(|v| !v.is_empty())
-        {
-            // The error names the value and the reason; the id error adds nothing.
-            let Ok(refset) = ConceptId::parse(value) else {
-                return Err(ProviderError::invalid_filter_value(
-                    &filter.property,
-                    value,
-                    "not an SCTID",
-                ));
-            };
-            let members = self
-                .memberships
-                .members(refset.value())
-                .ok_or_else(|| ProviderError::UnknownCode(value.to_owned()))?;
-            set |= members;
-        }
-        Ok(set)
+        (filter.property == "concept" && filter.op == FilterOperator::In)
+            .then(|| provider.reference_set_members(filter))
     }
 
     /// A SNOMED CT selection admits the post-coordinated expressions its
@@ -1430,7 +1265,7 @@ impl CodeSystemProvider for SnomedProvider {
     /// `expressions = false` filter is what keeps them out
     /// (<https://hl7.org/fhir/R4B/snomedct.html>, "Filter Properties"), so a
     /// selection stating it is complete.
-    fn unclosed(&self, filters: &[Filter]) -> bool {
+    fn unclosed(_provider: &SnomedProvider, filters: &[Filter]) -> bool {
         !filters.iter().any(|filter| {
             filter.property == EXPRESSIONS
                 && filter.op == FilterOperator::Equal
@@ -1449,31 +1284,29 @@ impl CodeSystemProvider for SnomedProvider {
     /// (reference set membership, a property equality) can admit an expression
     /// it does not hold. The `expressions` filter bounds it: a value set says
     /// `true` before any expression is considered.
-    fn filter_matches(&self, concept: Concept, filter: &Filter) -> Result<bool, ProviderError> {
-        let Some(record) = self.registered(concept)? else {
-            return Ok(self.filter(filter)?.contains(concept.index()));
-        };
-        if filter.op == FilterOperator::Equal && filter.property == EXPRESSIONS {
-            return Ok(filter.value.trim() == "true");
+    fn filter_matches(
+        provider: &SnomedProvider,
+        concept: Concept,
+        filter: &Filter,
+    ) -> Option<Result<bool, ProviderError>> {
+        match provider.registered(concept) {
+            Ok(Some(record)) => Some(provider.expression_passes(&record, filter)),
+            Ok(None) => None,
+            Err(error) => Some(Err(error)),
         }
-        let selected = self.filter(filter)?;
-        Ok(record
-            .focus_concepts()
-            .iter()
-            .all(|focus| selected.contains(*focus)))
     }
 
     /// The subsumption between two codes when either is an expression; the
     /// materialized closure answers the rest.
     fn subsumes(
-        &self,
+        provider: &SnomedProvider,
         a: Concept,
         b: Concept,
     ) -> Result<Option<concept_graph::subsumption::Outcome>, ProviderError> {
-        if !Self::is_expression_handle(a) && !Self::is_expression_handle(b) {
+        if !SnomedProvider::is_expression_handle(a) && !SnomedProvider::is_expression_handle(b) {
             return Ok(None);
         }
-        self.expression_subsumes(a, b).map(Some)
+        provider.expression_subsumes(a, b).map(Some)
     }
 
     /// The implicit value sets of the FHIR SNOMED CT page
@@ -1482,10 +1315,10 @@ impl CodeSystemProvider for SnomedProvider {
     /// `?fhir_vs=refset/[sctid]`, on the bare system URI or on this edition's
     /// edition or version URI. `ecl/` waits for the evaluator.
     fn successors(
-        &self,
+        provider: &SnomedProvider,
         concept: Concept,
     ) -> Result<Vec<crate::provider::Successor>, ProviderError> {
-        conceptmap::successors(self, concept)
+        conceptmap::successors(provider, concept)
     }
 
     /// The implicit concept maps of the FHIR SNOMED CT page
@@ -1493,7 +1326,7 @@ impl CodeSystemProvider for SnomedProvider {
     /// `?fhir_cm=[sctid]` names a map reference set of this edition, on the
     /// bare system URI or on this edition's edition or version URI.
     fn implicit_concept_map(
-        &self,
+        provider: &SnomedProvider,
         url: &str,
         selection: crate::provider::MapSelection<'_>,
     ) -> Option<Result<crate::conceptmap::model::ConceptMapModel, ProviderError>> {
@@ -1505,7 +1338,7 @@ impl CodeSystemProvider for SnomedProvider {
         // NOTE: the base must be this edition or the bare system URI; the map itself
         // always states the served version
         // (<https://hl7.org/fhir/R4B/snomedct.html>, "Implicit Concept Maps").
-        if let Err(error) = self.implicit_version(base) {
+        if let Err(error) = provider.implicit_version(base) {
             return Some(Err(error));
         }
         let Some(decoded) = percent_decode(form) else {
@@ -1517,17 +1350,20 @@ impl CodeSystemProvider for SnomedProvider {
             return Some(Err(malformed(format!("`{decoded}` is not an SCTID"))));
         };
         Some(conceptmap::concept_map(
-            self,
+            provider,
             url,
             refset.value(),
             selection,
         ))
     }
 
-    fn implicit_value_set(&self, url: &str) -> Option<Result<Compose, ProviderError>> {
+    fn implicit_value_set(
+        provider: &SnomedProvider,
+        url: &str,
+    ) -> Option<Result<Compose, ProviderError>> {
         let (base, form) = implicit_parts(url, FHIR_VS)?;
         let malformed = |reason: String| ProviderError::malformed_implicit_value_set(url, reason);
-        let version = match self.implicit_version(base) {
+        let version = match provider.implicit_version(base) {
             Ok(version) => version,
             Err(error) => return Some(Err(error)),
         };
@@ -1544,9 +1380,11 @@ impl CodeSystemProvider for SnomedProvider {
                 // NOTE: the set is "all concept ids that correspond to reference sets
                 // that are explicitly defined in the specified SNOMED CT edition",
                 // with no category excluded (<https://hl7.org/fhir/R4B/snomedct.html>).
-                let mut defined: BTreeSet<u64> = self.memberships.refsets().collect();
+                let mut defined: BTreeSet<u64> = provider.system().memberships.refsets().collect();
                 defined.extend(
-                    self.keys
+                    provider
+                        .system()
+                        .keys
                         .refsets
                         .iter()
                         .filter_map(|(_, id)| ConceptId::parse(id).ok())
@@ -1554,7 +1392,7 @@ impl CodeSystemProvider for SnomedProvider {
                 );
                 let mut concepts = Vec::new();
                 for refset in defined {
-                    if let Ok(Some(located)) = self.locate(&refset.to_string()) {
+                    if let Ok(Some(located)) = provider.locate(&refset.to_string()) {
                         concepts.push(ConceptRef {
                             deprecated: false,
                             code: located.code,
@@ -1574,7 +1412,7 @@ impl CodeSystemProvider for SnomedProvider {
                 }
             }
             other => {
-                let filter = match self.implicit_filter(url, other) {
+                let filter = match provider.implicit_filter(url, other) {
                     Ok(filter) => filter,
                     Err(error) => return Some(Err(error)),
                 };
@@ -1598,7 +1436,10 @@ impl CodeSystemProvider for SnomedProvider {
     /// resource must conform to the template provided". It prints none for the
     /// bare `?fhir_vs`, so that form carries only the fields every template
     /// shares: the edition version and the copyright.
-    fn implicit_metadata(&self, url: &str) -> crate::provider::ImplicitMetadata {
+    fn implicit_metadata(
+        provider: &SnomedProvider,
+        url: &str,
+    ) -> crate::provider::ImplicitMetadata {
         let Some((_, form)) = implicit_parts(url, FHIR_VS) else {
             return crate::provider::ImplicitMetadata::default();
         };
@@ -1607,7 +1448,7 @@ impl CodeSystemProvider for SnomedProvider {
                 Some(format!("SNOMED CT Concept {sctid} and descendants")),
                 Some(format!(
                     "All SNOMED CT concepts for {}",
-                    self.term_or_code(sctid)
+                    provider.term_or_code(sctid)
                 )),
             ),
             ("refset", "") => (
@@ -1620,7 +1461,7 @@ impl CodeSystemProvider for SnomedProvider {
                 Some(format!("SNOMED CT Reference Set {sctid}")),
                 Some(format!(
                     "All SNOMED CT concepts in the reference set {}",
-                    self.term_or_code(sctid)
+                    provider.term_or_code(sctid)
                 )),
             ),
             ("ecl", ecl) => {
@@ -1635,7 +1476,7 @@ impl CodeSystemProvider for SnomedProvider {
             _ => (None, None),
         };
         crate::provider::ImplicitMetadata {
-            version: Some(self.identity.version.clone()),
+            version: Some(provider.identity().version.clone()),
             name,
             title: None,
             experimental: None,
@@ -1643,25 +1484,6 @@ impl CodeSystemProvider for SnomedProvider {
             description,
             copyright: Some(String::from(TEMPLATE_COPYRIGHT)),
         }
-    }
-
-    fn all(&self) -> Result<ConceptSet, ProviderError> {
-        Ok(crate::provider::every(self.concepts))
-    }
-
-    fn search(&self, text: &str, language: Option<&str>) -> Result<ConceptSet, ProviderError> {
-        let query = Query {
-            text: text.to_owned(),
-            language: language.map(primary_subtag),
-            ..Query::default()
-        };
-        let mut concepts = ConceptSet::new();
-        for designation in self.text.matches(&query) {
-            if let Some(entry) = self.text.entry(designation) {
-                concepts.insert(entry.concept.index());
-            }
-        }
-        Ok(concepts)
     }
 }
 
@@ -1731,7 +1553,7 @@ fn implicit_forms() -> Vec<ImplicitForm> {
 
 #[cfg(test)]
 mod tests {
-    use super::{FHIR_CM, FHIR_VS, implicit_parts, percent_decode, primary_subtag};
+    use super::{FHIR_CM, FHIR_VS, implicit_parts, percent_decode};
 
     #[test]
     fn percent_encoding_decodes_and_a_stray_percent_is_refused() {
@@ -1742,13 +1564,6 @@ mod tests {
         assert_eq!(percent_decode("<< 1").as_deref(), Some("<< 1"));
         assert_eq!(percent_decode("%3"), None);
         assert_eq!(percent_decode("%zz"), None);
-    }
-
-    #[test]
-    fn the_primary_subtag_is_the_language() {
-        assert_eq!(primary_subtag("en-GB"), "en");
-        assert_eq!(primary_subtag("nl"), "nl");
-        assert_eq!(primary_subtag("EN_us"), "en");
     }
 
     #[test]

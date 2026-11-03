@@ -30,7 +30,8 @@ use sct_scg::ast;
 
 use crate::normal_form;
 use crate::provider::{Concept, Property, PropertyValue, ProviderError};
-use crate::snomed::{SnomedProvider, storage};
+use crate::snomed::SnomedProvider;
+use crate::stored::storage;
 
 /// The first concept handle an expression takes.
 ///
@@ -293,6 +294,7 @@ impl SnomedProvider {
             return Ok(None);
         }
         let table = self
+            .system()
             .scg
             .lock()
             .map_err(|_poisoned| ProviderError::Storage(Box::new(PoisonedTable)))?;
@@ -333,6 +335,7 @@ impl SnomedProvider {
             defined,
         };
         let mut table = self
+            .system()
             .scg
             .lock()
             .map_err(|_poisoned| ProviderError::Storage(Box::new(PoisonedTable)))?;
@@ -345,9 +348,10 @@ impl SnomedProvider {
         &self,
         sub: &ast::SubExpression,
     ) -> Result<Result<Term, ExpressionError>, ProviderError> {
+        let store = &self.stored().store;
         let mut focus = Vec::with_capacity(sub.focus.len());
         for concept in &sub.focus {
-            match self.store.ordinal(&concept.concept_id).map_err(storage)? {
+            match store.ordinal(&concept.concept_id).map_err(storage)? {
                 Some(ordinal) => focus.push(ordinal.index()),
                 None => {
                     return Ok(Err(ExpressionError::UnknownConcept {
@@ -381,20 +385,17 @@ impl SnomedProvider {
         &self,
         attributes: &[ast::Attribute],
     ) -> Result<Result<Vec<Attribute>, ExpressionError>, ProviderError> {
+        let store = &self.stored().store;
         let mut out = Vec::with_capacity(attributes.len());
         for attribute in attributes {
-            let Some(kind) = self
-                .store
-                .ordinal(&attribute.name.concept_id)
-                .map_err(storage)?
-            else {
+            let Some(kind) = store.ordinal(&attribute.name.concept_id).map_err(storage)? else {
                 return Ok(Err(ExpressionError::UnknownConcept {
                     code: attribute.name.concept_id.clone(),
                 }));
             };
             let value = match &attribute.value {
                 ast::AttributeValue::Concept(concept) => {
-                    match self.store.ordinal(&concept.concept_id).map_err(storage)? {
+                    match store.ordinal(&concept.concept_id).map_err(storage)? {
                         Some(target) => Value::Concept(Box::new(Term {
                             focus: vec![target.index()],
                             ..Term::default()
@@ -525,7 +526,7 @@ impl SnomedProvider {
         let Terms::In(language) = language else {
             return Ok(None);
         };
-        let Some(ordinal) = self.store.ordinal(code).map_err(storage)? else {
+        let Some(ordinal) = self.stored().store.ordinal(code).map_err(storage)? else {
             return Ok(None);
         };
         self.choose_display(ordinal, language)
@@ -557,10 +558,11 @@ impl SnomedProvider {
     /// Returns [`ProviderError`] when the substrate fails.
     pub(super) fn expression_is_active(&self, record: &Registered) -> Result<bool, ProviderError> {
         for code in named_concepts(&record.tree.sub_expression) {
-            let Some(ordinal) = self.store.ordinal(code).map_err(storage)? else {
+            let Some(ordinal) = self.stored().store.ordinal(code).map_err(storage)? else {
                 return Ok(false);
             };
             if !self
+                .stored()
                 .store
                 .concept(ordinal)
                 .map_err(storage)?
@@ -624,6 +626,7 @@ impl SnomedProvider {
         let mut focus = Vec::with_capacity(minimal.len());
         for ordinal in &minimal {
             let Some(code) = self
+                .stored()
                 .store
                 .code(Ordinal::new(*ordinal))
                 .map_err(storage)?
@@ -668,19 +671,17 @@ impl SnomedProvider {
         offset: u32,
         language: Terms<'_>,
     ) -> Result<Vec<normal_form::Attribute>, ProviderError> {
+        let attributes = &self.system().attributes;
         let mut out = Vec::new();
-        for row in self.attributes.rows(ordinal) {
+        for row in attributes.rows(ordinal) {
             let index = usize::try_from(row.kind).unwrap_or(usize::MAX);
-            let Some(kind) = self.attributes.types().get(index).map(u64::to_string) else {
+            let Some(kind) = attributes.types().get(index).map(u64::to_string) else {
                 continue;
             };
             let value = match row.value {
                 ValueRef::Concept(target) => {
-                    let Some(code) = self
-                        .store
-                        .code(target)
-                        .map_err(storage)?
-                        .map(ToOwned::to_owned)
+                    let store = &self.stored().store;
+                    let Some(code) = store.code(target).map_err(storage)?.map(ToOwned::to_owned)
                     else {
                         continue;
                     };
@@ -736,7 +737,7 @@ impl SnomedProvider {
         // A concept with no code is no concept of this version, and two of
         // them would compare equal by an empty identity, which is a wrong
         // subsumption rather than a missing one.
-        let Some(code) = self.store.code(ordinal).map_err(storage)? else {
+        let Some(code) = self.stored().store.code(ordinal).map_err(storage)? else {
             return Err(ProviderError::CannotDetermine(format!(
                 "concept {} is not in this version",
                 concept.index()
@@ -812,7 +813,7 @@ impl SnomedProvider {
     /// The inferred definition of a concept as a term: its `is a` parents as
     /// focus concepts and its other inferred rows as the refinement.
     fn definition_term(&self, ordinal: Ordinal) -> Result<Term, ProviderError> {
-        let focus = self.hierarchy.graph.is_a.neighbours(ordinal).to_vec();
+        let focus = self.stored().tree.graph.is_a.neighbours(ordinal).to_vec();
         let (ungrouped, groups) = self.inferred_term(ordinal)?;
         Ok(Term {
             focus,
@@ -834,7 +835,7 @@ impl SnomedProvider {
         let mut groups = term.groups.clone();
         for focus in &term.focus {
             let ordinal = Ordinal::new(*focus);
-            supertypes |= self.hierarchy.graph.closure.ancestors_or_self(ordinal);
+            supertypes |= self.stored().tree.graph.closure.ancestors_or_self(ordinal);
             let (inherited, inherited_groups) = self.inferred_term(ordinal)?;
             ungrouped.extend(inherited);
             groups.extend(inherited_groups);
@@ -854,7 +855,7 @@ impl SnomedProvider {
     ) -> Result<(Vec<Attribute>, Vec<Vec<Attribute>>), ProviderError> {
         let mut ungrouped = Vec::new();
         let mut groups: BTreeMap<u32, Vec<Attribute>> = BTreeMap::new();
-        for row in self.attributes.rows(ordinal) {
+        for row in self.system().attributes.rows(ordinal) {
             let Some(kind) = self.attribute_ordinal(row.kind)? else {
                 continue;
             };
@@ -879,19 +880,20 @@ impl SnomedProvider {
     /// The store ordinal of an attribute type, by its index in the attribute
     /// table, resolved once for the edition.
     fn attribute_ordinal(&self, kind: u32) -> Result<Option<u32>, ProviderError> {
-        let table = if let Some(table) = self.attribute_ordinals.get() {
+        let table = if let Some(table) = self.system().attribute_ordinals.get() {
             table
         } else {
-            let mut built = Vec::with_capacity(self.attributes.types().len());
-            for sctid in self.attributes.types() {
+            let (store, types) = (&self.stored().store, self.system().attributes.types());
+            let mut built = Vec::with_capacity(types.len());
+            for sctid in types {
                 built.push(
-                    self.store
+                    store
                         .ordinal(&sctid.to_string())
                         .map_err(storage)?
                         .map(Ordinal::index),
                 );
             }
-            self.attribute_ordinals.get_or_init(|| built)
+            self.system().attribute_ordinals.get_or_init(|| built)
         };
         let index = usize::try_from(kind).unwrap_or(usize::MAX);
         Ok(table.get(index).copied().flatten())
@@ -980,10 +982,8 @@ impl SnomedProvider {
         required: &Attribute,
         depth: usize,
     ) -> Result<bool, ProviderError> {
-        if !self
-            .hierarchy
-            .graph
-            .closure
+        let closure = &self.stored().tree.graph.closure;
+        if !closure
             .ancestors_or_self(Ordinal::new(candidate.kind))
             .contains(required.kind)
         {
@@ -1006,16 +1006,11 @@ impl SnomedProvider {
     /// The focus concepts with every concept another focus concept is subsumed
     /// by removed, since a conjunction states only its most specific members.
     fn minimal_focus(&self, focus: &[u32]) -> Vec<u32> {
+        let closure = &self.stored().tree.graph.closure;
         let mut minimal: Vec<u32> = Vec::with_capacity(focus.len());
         for candidate in focus {
             let strictly_narrower = focus.iter().any(|other| {
-                other != candidate
-                    && self
-                        .hierarchy
-                        .graph
-                        .closure
-                        .ancestors(Ordinal::new(*other))
-                        .contains(*candidate)
+                other != candidate && closure.ancestors(Ordinal::new(*other)).contains(*candidate)
             });
             if !strictly_narrower && !minimal.contains(candidate) {
                 minimal.push(*candidate);

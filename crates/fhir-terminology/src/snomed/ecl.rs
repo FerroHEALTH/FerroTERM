@@ -58,10 +58,11 @@ pub(super) fn refusal(error: EvalError, text: &str) -> ProviderError {
 impl SnomedProvider {
     /// The concepts with no parent, computed once.
     fn root_set(&self) -> &RoaringBitmap {
-        self.roots.get_or_init(|| {
-            (0..self.concepts)
+        self.system().roots.get_or_init(|| {
+            (0..self.stored().concepts)
                 .filter(|&i| {
-                    self.hierarchy
+                    self.stored()
+                        .tree
                         .graph
                         .is_a
                         .neighbours(Ordinal::new(i))
@@ -73,10 +74,11 @@ impl SnomedProvider {
 
     /// The concepts with no child, computed once.
     fn leaf_set(&self) -> &RoaringBitmap {
-        self.leaves.get_or_init(|| {
-            (0..self.concepts)
+        self.system().leaves.get_or_init(|| {
+            (0..self.stored().concepts)
                 .filter(|&i| {
-                    self.hierarchy
+                    self.stored()
+                        .tree
                         .children
                         .neighbours(Ordinal::new(i))
                         .is_empty()
@@ -87,19 +89,20 @@ impl SnomedProvider {
 
     /// The sufficiently defined concepts, scanned once from the store.
     fn defined_set(&self) -> Result<&RoaringBitmap, EvalError> {
-        if let Some(set) = self.defined.get() {
+        if let Some(set) = self.system().defined.get() {
             return Ok(set);
         }
         let defined = constants::DEFINED.to_string();
         let mut set = RoaringBitmap::new();
-        for index in 0..self.concepts {
+        for index in 0..self.stored().concepts {
             let properties = self
+                .stored()
                 .store
                 .properties(Ordinal::new(index))
                 .map_err(|e| storage(&e))?;
             let is_defined = properties
                 .iter()
-                .find(|(k, _)| *k == self.keys.definition_status)
+                .find(|(k, _)| *k == self.system().keys.definition_status)
                 .is_some_and(|(_, values)| {
                     values
                         .iter()
@@ -109,15 +112,19 @@ impl SnomedProvider {
                 set.insert(index);
             }
         }
-        Ok(self.defined.get_or_init(|| set))
+        Ok(self.system().defined.get_or_init(|| set))
     }
 
     /// The module SCTID of a concept, from its stored property.
     fn module_of(&self, concept: Ordinal) -> Result<Option<u64>, EvalError> {
-        let properties = self.store.properties(concept).map_err(|e| storage(&e))?;
+        let properties = self
+            .stored()
+            .store
+            .properties(concept)
+            .map_err(|e| storage(&e))?;
         Ok(properties
             .iter()
-            .find(|(k, _)| *k == self.keys.module)
+            .find(|(k, _)| *k == self.system().keys.module)
             .and_then(|(_, values)| values.first())
             .and_then(|v| match v {
                 record::PropertyValue::Code(code) => code.parse().ok(),
@@ -128,6 +135,7 @@ impl SnomedProvider {
     /// The SCTID a designation use ordinal stands for.
     fn use_sctid(&self, use_ordinal: u32) -> Result<Option<u64>, EvalError> {
         Ok(self
+            .stored()
             .store
             .vocabulary(Vocabulary::DesignationUses, use_ordinal)
             .map_err(|e| storage(&e))?
@@ -194,6 +202,7 @@ impl SnomedProvider {
     ) -> Result<bool, EvalError> {
         for (refset, allowed) in dialects {
             let Some((ordinal, _)) = self
+                .system()
                 .keys
                 .refsets
                 .iter()
@@ -202,6 +211,7 @@ impl SnomedProvider {
                 continue;
             };
             let Some(acceptability) = self
+                .stored()
                 .store
                 .acceptability(concept, index, *ordinal)
                 .map_err(|e| storage(&e))?
@@ -209,6 +219,7 @@ impl SnomedProvider {
                 continue;
             };
             let name = self
+                .stored()
                 .store
                 .vocabulary(Vocabulary::Acceptabilities, acceptability)
                 .map_err(|e| storage(&e))?;
@@ -240,7 +251,7 @@ impl SnomedProvider {
                 let mut out = RoaringBitmap::new();
                 for term in terms {
                     if let TypedSearchTerm::Match(words) = term {
-                        out |= self.text.matches(&Query {
+                        out |= self.stored().text.matches(&Query {
                             text: words.join(" "),
                             active_only,
                             ..Query::default()
@@ -263,13 +274,14 @@ impl SnomedProvider {
     ) -> Result<RoaringBitmap, EvalError> {
         let mut out = RoaringBitmap::new();
         for designation in candidates {
-            let Some(entry) = self.text.entry(designation) else {
+            let Some(entry) = self.stored().text.entry(designation) else {
                 continue;
             };
             if !within.contains(entry.concept.index()) || out.contains(entry.concept.index()) {
                 continue;
             }
             let designations = self
+                .stored()
                 .store
                 .designations(entry.concept)
                 .map_err(|e| storage(&e))?;
@@ -295,6 +307,7 @@ impl SnomedProvider {
         for concept in within {
             let ordinal = Ordinal::new(concept);
             for (index, record) in self
+                .stored()
                 .store
                 .designations(ordinal)
                 .map_err(|e| storage(&e))?
@@ -314,13 +327,15 @@ impl SnomedProvider {
 
 impl Model for SnomedProvider {
     fn concept(&self, id: Sctid) -> Result<Option<Ordinal>, EvalError> {
-        self.store
+        self.stored()
+            .store
             .ordinal(&id.0.to_string())
             .map_err(|e| storage(&e))
     }
 
     fn sctid(&self, concept: Ordinal) -> Result<Option<Sctid>, EvalError> {
         Ok(self
+            .stored()
             .store
             .concept(concept)
             .map_err(|e| storage(&e))?
@@ -328,7 +343,7 @@ impl Model for SnomedProvider {
     }
 
     fn all(&self) -> RoaringBitmap {
-        (0..self.concepts).collect()
+        (0..self.stored().concepts).collect()
     }
 
     fn roots(&self) -> RoaringBitmap {
@@ -340,15 +355,16 @@ impl Model for SnomedProvider {
     }
 
     fn descendants(&self, concept: Ordinal) -> &RoaringBitmap {
-        self.hierarchy.graph.closure.descendants(concept)
+        self.stored().tree.graph.closure.descendants(concept)
     }
 
     fn ancestors(&self, concept: Ordinal) -> &RoaringBitmap {
-        self.hierarchy.graph.closure.ancestors(concept)
+        self.stored().tree.graph.closure.ancestors(concept)
     }
 
     fn children(&self, concept: Ordinal) -> RoaringBitmap {
-        self.hierarchy
+        self.stored()
+            .tree
             .children
             .neighbours(concept)
             .iter()
@@ -357,7 +373,8 @@ impl Model for SnomedProvider {
     }
 
     fn parents(&self, concept: Ordinal) -> RoaringBitmap {
-        self.hierarchy
+        self.stored()
+            .tree
             .graph
             .is_a
             .neighbours(concept)
@@ -367,26 +384,27 @@ impl Model for SnomedProvider {
     }
 
     fn attributes(&self) -> &Attributes {
-        &self.attributes
+        &self.system().attributes
     }
 
     fn members(&self) -> &RefsetMembers {
-        &self.member_tables
+        &self.system().member_tables
     }
 
     fn identifiers(&self) -> &Identifiers {
-        &self.identifiers
+        &self.system().identifiers
     }
 
     /// An alias is an active term of one of the scheme concepts the
     /// identifier file names, compared without case. No specification
     /// defines the alias table: our own design.
     fn scheme(&self, alias: &str) -> Result<Option<u64>, EvalError> {
-        for scheme in self.identifiers.schemes() {
+        for scheme in self.system().identifiers.schemes() {
             let Some(ordinal) = self.concept(Sctid(scheme))? else {
                 continue;
             };
             let named = self
+                .stored()
                 .store
                 .designations(ordinal)
                 .map_err(|e| storage(&e))?
@@ -494,6 +512,7 @@ impl SnomedProvider {
         let mut keep = RoaringBitmap::new();
         for concept in set {
             let time: u32 = self
+                .stored()
                 .store
                 .concept(Ordinal::new(concept))
                 .map_err(|e| storage(&e))?
