@@ -383,6 +383,8 @@ translate/translate-2
 translate/translate-3
 translate/translate-4
 translate2/translate-5a
+translate2/translate-6a
+translate2/translate-6b
 validation/validation-complex-codeableconcept-full
 validation/validation-complex-codeableconcept-vsonly
 validation/validation-contained-bad

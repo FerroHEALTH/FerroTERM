@@ -380,3 +380,94 @@ fn an_r6_element_comment_reads_from_the_field_and_from_the_extension() {
         );
     }
 }
+
+/// R5 `ConceptMap.sourceScope[x]` limits the map to source codes that are
+/// members of the value set, so a code outside it gets no match, the
+/// `unmapped` rule included, whether the map is chosen, named or chained
+/// (<https://hl7.org/fhir/R5/conceptmap-definitions.html#ConceptMap.sourceScope_x_>).
+#[test]
+fn a_map_applies_only_to_codes_in_its_source_scope() {
+    let world = World::load();
+    let inside = TranslateInput {
+        url: Some(CM_ANIMALS_COLOURS.to_owned()),
+        code: Some(String::from("kitten")),
+        system: Some(ANIMALS.to_owned()),
+        ..TranslateInput::default()
+    };
+    assert_eq!(
+        target_code(&run(&world, &inside).matches[0]),
+        Some("blue"),
+        "a code inside the scope reaches the unmapped rule"
+    );
+    let named = TranslateInput {
+        url: Some(CM_ANIMALS_COLOURS.to_owned()),
+        code: Some(String::from("dodo")),
+        system: Some(ANIMALS.to_owned()),
+        ..TranslateInput::default()
+    };
+    let translation = run(&world, &named);
+    assert!(!translation.result);
+    assert!(
+        translation.matches.is_empty(),
+        "the unmapped rule does not fire"
+    );
+    let message = translation.message.expect("a message");
+    assert!(message.contains("'dodo'"), "{message}");
+    assert!(message.contains(CM_ANIMALS_COLOURS), "{message}");
+    let chosen = TranslateInput {
+        code: Some(String::from("dodo")),
+        system: Some(ANIMALS.to_owned()),
+        target_system: Some(COLOURS.to_owned()),
+        ..TranslateInput::default()
+    };
+    let translation = run(&world, &chosen);
+    assert!(!translation.result);
+    assert!(
+        translation.matches.is_empty(),
+        "the fallback map has no scope and chains to a map that leaves dodo out"
+    );
+    let chained = TranslateInput {
+        url: Some(CM_FALLBACK.to_owned()),
+        code: Some(String::from("dodo")),
+        system: Some(ANIMALS.to_owned()),
+        ..TranslateInput::default()
+    };
+    assert_eq!(run(&world, &chained).matches, Vec::<Match>::new());
+}
+
+#[test]
+fn a_source_scope_that_cannot_be_resolved_is_an_error_naming_it() {
+    let world = World::load();
+    let scope = "http://example.org/fhir/ValueSet/nowhere";
+    let inline = ConceptMap {
+        url: Some("http://example.org/inline-map".into()),
+        status: "draft".into(),
+        source: Some(fhir_types::r4b::concept_map::ConceptMapSource::Uri(
+            scope.into(),
+        )),
+        group: vec![ConceptMapGroup {
+            source: Some(ANIMALS.into()),
+            target: Some(COLOURS.into()),
+            element: vec![ConceptMapGroupElement {
+                code: Some("plant".into()),
+                target: vec![ConceptMapGroupElementTarget {
+                    code: Some("Green".into()),
+                    equivalence: "wider".into(),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let request = TranslateInput {
+        inline_concept_map: Some(convert::r4b::convert(&inline)),
+        code: Some(String::from("plant")),
+        system: Some(ANIMALS.to_owned()),
+        ..TranslateInput::default()
+    };
+    let error = translate(&world.sources(), &request).expect_err("an unknown scope");
+    assert!(error.to_string().contains(scope), "{error}");
+    assert_eq!(error.status(), http::StatusCode::NOT_FOUND);
+}
