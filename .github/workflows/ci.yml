@@ -449,6 +449,9 @@ jobs:
         with:
           components: clippy
       - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+      # The fuzz crate sits outside the workspace, so the run above never
+      # compiles it; a check needs no sanitizer and runs on the pinned stable.
+      - run: cargo check --locked --manifest-path fuzz/Cargo.toml --bins
 
   test:
     name: test
