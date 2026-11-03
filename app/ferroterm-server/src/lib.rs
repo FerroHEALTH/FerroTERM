@@ -52,10 +52,6 @@ use tokio::net::TcpListener;
 
 use crate::reload::Serving;
 
-/// The base path of every served FHIR version; the router mounts each and the
-/// boot lines name them.
-pub const FHIR_BASES: [&str; 4] = ["/r4", "/r4b", "/r5", "/r6"];
-
 /// How long `ferroterm healthcheck` waits for the readiness answer: shorter
 /// than the image's `HEALTHCHECK --timeout=5s`, so the probe reports the
 /// reason itself instead of being killed.
@@ -92,7 +88,8 @@ pub fn routes(serving: Serving) -> Router {
         Some(smart) => smart::guard::fhir(router, smart, base),
         None => router,
     };
-    let [r4, r4b, r5, r6] = FHIR_BASES;
+    let bases: &'static [String; 4] = &served::BASES;
+    let [r4, r4b, r5, r6] = bases.each_ref().map(String::as_str);
     let telemetry = std::sync::Arc::clone(serving.telemetry());
     Router::new()
         .nest(r4, gated(version::r4::router(), r4))
@@ -111,16 +108,21 @@ pub fn routes(serving: Serving) -> Router {
         ))
 }
 
+/// The detail of the problem a path outside every FHIR base answers.
+static UNMATCHED: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+    let [r4, r4b, r5, r6] = &*served::BASES;
+    format!(
+        "nothing on this server answers this path; the FHIR bases are {r4}, {r4b}, {r5} and {r6}"
+    )
+});
+
 /// The answer to a path no route of the FHIR listener matches: the FHIR
 /// `not-found` under a FHIR base, a problem elsewhere.
 async fn unmatched(uri: http::Uri, headers: http::HeaderMap) -> axum::response::Response {
     if problem::is_fhir(uri.path()) {
         wire::not_found(&headers)
     } else {
-        ferroterm_problem::blank(
-            http::StatusCode::NOT_FOUND,
-            "nothing on this server answers this path; the FHIR bases are /r4, /r4b, /r5 and /r6",
-        )
+        ferroterm_problem::blank(http::StatusCode::NOT_FOUND, UNMATCHED.as_str())
     }
 }
 
