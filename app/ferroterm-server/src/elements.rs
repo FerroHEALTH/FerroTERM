@@ -11,10 +11,12 @@
 //!
 //! Three obligations come with honouring it, and each is a test below.
 //!
-//! The specification calls the list a hint: "the server SHOULD always return
-//! mandatory elements whether they are requested or not". So `resourceType`
-//! and `id` survive whatever was asked for, and so does `meta`, which is where
-//! the tag goes.
+//! The specification calls the list a hint: "Servers SHOULD always return
+//! mandatory elements whether they are requested or not"
+//! (<https://hl7.org/fhir/R4/search.html#elements>). So `resourceType`, `id`
+//! and `meta`, which is where the tag goes, survive whatever was asked for,
+//! and so does every top-level element the resource's definition at the
+//! served version makes mandatory (`min` of 1 or more).
 //!
 //! A resource returned as a subset carries the `SUBSETTED` tag, from
 //! `http://terminology.hl7.org/CodeSystem/v3-ObservationValue`, so a client
@@ -162,7 +164,7 @@ impl Projection {
             Some(Summary::Data) => keep(resource, |name| name != "text"),
             None | Some(Summary::False | Summary::Count) => resource.clone(),
         };
-        project(&viewed, &self.elements)
+        project(&viewed, &self.elements, schemas)
     }
 
     /// Every matched `entry.resource` of a searchset `bundle`, projected.
@@ -279,22 +281,27 @@ pub fn requested(value: &str) -> Vec<String> {
         .collect()
 }
 
-/// `resource`, reduced to `wanted` plus the elements every resource keeps, and
+/// `resource`, reduced to `wanted` plus the elements every resource keeps and
+/// the top-level elements its definition in `schemas` makes mandatory, and
 /// marked as a subset.
 ///
 /// The sibling `_name` of a primitive goes with its element
-/// (<https://hl7.org/fhir/R4B/json.html#primitive>). Returns the resource untouched when `wanted` is empty, because a client
-/// that named nothing asked for everything.
+/// (<https://hl7.org/fhir/R4B/json.html#primitive>). Returns the resource
+/// untouched when `wanted` is empty, because a client that named nothing
+/// asked for everything.
 #[must_use]
-pub fn project(resource: &Object, wanted: &[String]) -> Object {
+pub fn project(resource: &Object, wanted: &[String], schemas: &Schemas) -> Object {
     if wanted.is_empty() {
         return resource.clone();
     }
+    let schema = resource_schema(resource, schemas);
     let mut kept: Object = resource
         .iter()
         .filter(|(name, _)| {
             let element = name.strip_prefix('_').unwrap_or(name);
-            MANDATORY.contains(&element) || wanted.iter().any(|asked| asked == element)
+            MANDATORY.contains(&element)
+                || wanted.iter().any(|asked| asked == element)
+                || defined_with(schema, element, |field| field.min > 0)
         })
         .map(|(name, value)| (name.clone(), value.clone()))
         .collect();
@@ -359,6 +366,9 @@ fn matched_resources(bundle: &mut Object) -> impl Iterator<Item = &mut Object> {
 mod tests {
     use super::*;
 
+    /// The element table the unit tests project over.
+    const SCHEMAS: &Schemas = &fhir_types::r4b::schema::SCHEMAS;
+
     /// A `CodeSystem` as a search would have rendered it.
     fn code_system() -> Object {
         BTreeMap::from([
@@ -417,7 +427,7 @@ mod tests {
     fn naming_nothing_asks_for_everything() {
         let whole = code_system();
         assert_eq!(
-            project(&whole, &[]),
+            project(&whole, &[], SCHEMAS),
             whole,
             "a search with no _elements is the search it always was"
         );
@@ -425,10 +435,14 @@ mod tests {
 
     #[test]
     fn only_the_named_elements_and_the_mandatory_ones_survive() {
-        let projected = project(&code_system(), &requested("url,title"));
+        let projected = project(&code_system(), &requested("url,title"), SCHEMAS);
         let mut names: Vec<&str> = projected.keys().map(String::as_str).collect();
         names.sort_unstable();
-        assert_eq!(names, ["id", "meta", "resourceType", "title", "url"]);
+        assert_eq!(
+            names,
+            ["id", "meta", "resourceType", "status", "title", "url"],
+            "`status` is mandatory in CodeSystem, so it comes back unasked"
+        );
         assert!(
             !projected.contains_key("concept"),
             "the element a client did not ask for is what this parameter exists to leave out"
@@ -437,7 +451,7 @@ mod tests {
 
     #[test]
     fn a_mandatory_element_survives_whether_it_was_asked_for_or_not() {
-        let projected = project(&code_system(), &requested("title"));
+        let projected = project(&code_system(), &requested("title"), SCHEMAS);
         assert_eq!(
             projected.get("resourceType"),
             Some(&Value::String("CodeSystem".to_owned())),
@@ -451,8 +465,33 @@ mod tests {
     }
 
     #[test]
+    fn every_element_the_definition_makes_mandatory_survives_unasked() {
+        let mut whole = code_system();
+        whole.insert("content".to_owned(), Value::String("complete".to_owned()));
+        whole.insert("_content".to_owned(), Value::Object(BTreeMap::new()));
+        for schemas in [
+            &fhir_types::r4::schema::SCHEMAS,
+            &fhir_types::r4b::schema::SCHEMAS,
+            &fhir_types::r5::schema::SCHEMAS,
+            &fhir_types::r6::schema::SCHEMAS,
+        ] {
+            let projected = project(&whole, &requested("url"), schemas);
+            for element in ["content", "_content", "status"] {
+                assert!(
+                    projected.contains_key(element),
+                    "`{element}` goes with a mandatory element, which a server returns whether it was requested or not"
+                );
+            }
+            assert!(
+                !projected.contains_key("title"),
+                "an optional element nobody asked for is still left out"
+            );
+        }
+    }
+
+    #[test]
     fn a_subset_says_it_is_one() {
-        let projected = project(&code_system(), &requested("url"));
+        let projected = project(&code_system(), &requested("url"), SCHEMAS);
         assert_eq!(
             tags(&projected),
             ["SUBSETTED"],
@@ -462,8 +501,8 @@ mod tests {
 
     #[test]
     fn the_tag_is_added_once_however_often_a_resource_is_projected() {
-        let once = project(&code_system(), &requested("url"));
-        let twice = project(&once, &requested("url"));
+        let once = project(&code_system(), &requested("url"), SCHEMAS);
+        let twice = project(&once, &requested("url"), SCHEMAS);
         assert_eq!(tags(&twice), ["SUBSETTED"]);
     }
 
@@ -483,7 +522,7 @@ mod tests {
                 ]))]),
             )])),
         );
-        let projected = project(&whole, &requested("url"));
+        let projected = project(&whole, &requested("url"), SCHEMAS);
         assert_eq!(
             tags(&projected),
             ["local", "SUBSETTED"],
@@ -493,7 +532,7 @@ mod tests {
 
     #[test]
     fn an_element_the_resource_does_not_have_is_not_an_error() {
-        let projected = project(&code_system(), &requested("url,copyright"));
+        let projected = project(&code_system(), &requested("url,copyright"), SCHEMAS);
         assert!(
             !projected.contains_key("copyright"),
             "an absent element is absent, not null"
@@ -509,13 +548,13 @@ mod tests {
         let mut whole = code_system();
         whole.insert("_title".to_owned(), Value::Object(BTreeMap::new()));
         whole.insert("_version".to_owned(), Value::Object(BTreeMap::new()));
-        let projected = project(&whole, &requested("title"));
+        let projected = project(&whole, &requested("title"), SCHEMAS);
         let mut names: Vec<&str> = projected.keys().map(String::as_str).collect();
         names.sort_unstable();
         assert_eq!(
             names,
-            ["_title", "id", "meta", "resourceType", "title"],
-            "a primitive's extension member goes with its element"
+            ["_title", "id", "meta", "resourceType", "status", "title"],
+            "a primitive's extension member goes with its element, and the mandatory `status` stays"
         );
     }
 
@@ -669,6 +708,10 @@ mod tests {
             .apply(&whole, &fhir_types::r5::schema::SCHEMAS);
         let mut names: Vec<&str> = viewed.keys().map(String::as_str).collect();
         names.sort_unstable();
-        assert_eq!(names, ["id", "meta", "resourceType", "url"]);
+        assert_eq!(
+            names,
+            ["id", "meta", "resourceType", "status", "url"],
+            "`text` goes with the data view, and the mandatory `status` stays"
+        );
     }
 }

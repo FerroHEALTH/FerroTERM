@@ -940,6 +940,22 @@ jobs:
 
   # ── The single required check ───────────────────────────────────────────────
 
+  # No tracked file keeps an unresolved merge conflict (#1048; no
+  # specification governs the guard: our own design).
+  conflict-markers:
+    name: conflict-markers
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: The guard refuses each marker and skips the vendored trees
+        run: bash scripts/checks/conflict-markers.sh --self-test
+      - run: bash scripts/checks/conflict-markers.sh
+
   conclusion:
     name: conclusion
     needs:
@@ -978,6 +994,7 @@ jobs:
       - bench-bars
       - tx-ecosystem
       - dependency-review
+      - conflict-markers
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
