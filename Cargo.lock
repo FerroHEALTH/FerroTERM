@@ -1540,6 +1540,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "forwarders"
+version = "0.3.2"
+dependencies = [
+ "anyhow",
+ "proc-macro2",
+ "quote",
+ "syn 3.0.9",
+]
+
+[[package]]
 name = "fraction"
 version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

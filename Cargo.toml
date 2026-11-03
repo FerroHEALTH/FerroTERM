@@ -112,6 +112,12 @@ jsonwebtoken = { version = "11.1.0", default-features = false, features = ["aws_
 # Errors.
 thiserror = "2.0.20"
 anyhow = "1.0.104"
+# The forwarder ratchet (tools/forwarders) parses the hand-written Rust;
+# `span-locations` gives a parsed span its line outside a proc macro.
+# Checked against crates.io on 2026-11-03.
+syn = { version = "3.0.9", default-features = false, features = ["full", "parsing", "printing"] }
+proc-macro2 = { version = "1.0.107", default-features = false, features = ["span-locations"] }
+quote = { version = "1.0.47", default-features = false }
 # Dates and times.
 jiff = "0.2.35"
 # Expansion identifiers (`ValueSet.expansion.identifier`, a `urn:uuid:`).

@@ -364,6 +364,7 @@ code system adds a loader crate (`rf2` is the first) that feeds them.
 | `tools/ferroterm-build` | The offline build: a code system release (RF2 first) → the graph/store/text artifacts the server reads, once per release | tooling |
 | `tools/ferroterm-testkit` | Synthetic fixtures for the test suites, a shaped edition written the way the build writes it; a dev-dependency only, never shipped | tooling |
 | `tools/ferroterm-bench` | The benchmark harness: ingest, footprint, and latency of every served code system into reproducible records | tooling |
+| `tools/forwarders` | The forwarder ratchet's detector: lists the hand-written functions whose whole body forwards to one other call, for `scripts/checks/forwarders.sh` | tooling |
 
 Dependencies point one way (app/tools/addons → crates); nothing depends upward
 into the server.
