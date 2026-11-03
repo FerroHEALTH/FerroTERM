@@ -1,17 +1,18 @@
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
 
-# Ratchet tighten (#954, #950, #971). No specification governs this: our own
-# design.
+# Ratchet tighten (#954, #950, #971, #972). No specification governs this:
+# our own design.
 #
-# The ratchet guards (scripts/checks/duplication.sh, file-size.sh and
-# stray-literals.sh) fail a rise and pass a fall with a note, so a pull
-# request that removes duplication, shortens a file or moves strings to the
-# catalogs touches none of the shared ratchet files and conflicts with no
-# other open pull request. This lane does the tightening instead: once a day
-# it runs each guard's --update on main and pushes one branch,
-# chore/ratchet-tighten, that holds only the ratchet files, or moves an open
-# pull request on it to the new counts. When nothing fell it does nothing.
+# The ratchet guards (scripts/checks/duplication.sh, file-size.sh,
+# stray-literals.sh and forwarders.sh) fail a rise and pass a fall with a
+# note, so a pull request that removes duplication, shortens a file, moves
+# strings to the catalogs or removes a forwarder touches none of the shared
+# ratchet files and conflicts with no other open pull request. This lane does
+# the tightening instead: once a day it runs each guard's --update on main
+# and pushes one branch, chore/ratchet-tighten, that holds only the ratchet
+# files, or moves an open pull request on it to the new counts. When nothing
+# fell it does nothing.
 #
 # It never pushes to main. The commit is made through the Git Data REST API,
 # so GitHub signs it and it shows Verified
@@ -55,6 +56,11 @@ jobs:
         with:
           persist-credentials: false
 
+      # forwarders.sh builds tools/forwarders with the pinned toolchain.
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
+        with:
+          cache: false
+
       # A rise on main is a failure for a person to look at, never a count
       # this lane writes down.
       - name: No ratchet has risen on main
@@ -63,6 +69,7 @@ jobs:
           bash scripts/checks/duplication.sh
           bash scripts/checks/file-size.sh
           bash scripts/checks/stray-literals.sh app/ferroterm-console/src
+          bash scripts/checks/forwarders.sh
 
       - name: Lower the counts
         id: update
@@ -78,10 +85,18 @@ jobs:
           fi
           bash scripts/checks/file-size.sh --update
           bash scripts/checks/stray-literals.sh --update app/ferroterm-console/src
+          forwarders_before=$(git show HEAD:scripts/checks/forwarders.count | awk '/^[[:space:]]*(#|$)/ { next } { print; exit }')
+          bash scripts/checks/forwarders.sh --update
+          forwarders_after=$(awk '/^[[:space:]]*(#|$)/ { next } { print; exit }' scripts/checks/forwarders.count)
+          # As for duplication: a key that moved with the count unchanged is no reason for a PR.
+          if [ "$forwarders_before" = "$forwarders_after" ]; then
+            git checkout -- scripts/checks/forwarders.count scripts/checks/forwarders-baseline.txt
+          fi
 
           git diff --name-only -- \
             scripts/checks/duplication.count scripts/checks/duplication-baseline.txt \
-            scripts/checks/file-size.list scripts/checks/stray-literals.baseline >changed-files.txt
+            scripts/checks/file-size.list scripts/checks/stray-literals.baseline \
+            scripts/checks/forwarders.count scripts/checks/forwarders-baseline.txt >changed-files.txt
           other=$(git status --porcelain --untracked-files=no | awk '{ print $2 }' | grep -vxF -f changed-files.txt || true)
           if [ -n "$other" ]; then
             echo "$other"
@@ -97,6 +112,8 @@ jobs:
           {
             echo "duplication_before=$count_before"
             echo "duplication_after=$count_after"
+            echo "forwarders_before=$forwarders_before"
+            echo "forwarders_after=$forwarders_after"
           } >>"$GITHUB_OUTPUT"
           {
             echo '### Ratchet files lowered'
@@ -114,6 +131,8 @@ jobs:
           BASE_SHA: ${{ github.sha }}
           DUP_BEFORE: ${{ steps.update.outputs.duplication_before }}
           DUP_AFTER: ${{ steps.update.outputs.duplication_after }}
+          FWD_BEFORE: ${{ steps.update.outputs.forwarders_before }}
+          FWD_AFTER: ${{ steps.update.outputs.forwarders_after }}
         run: |
           set -euo pipefail
           branch="chore/ratchet-tighten"
@@ -160,6 +179,10 @@ jobs:
             if [ -n "$DUP_BEFORE" ] && [ "$DUP_BEFORE" != "$DUP_AFTER" ]; then
               echo
               echo "Duplicated lines: ${DUP_BEFORE} to ${DUP_AFTER}."
+            fi
+            if [ -n "$FWD_BEFORE" ] && [ "$FWD_BEFORE" != "$FWD_AFTER" ]; then
+              echo
+              echo "Forwarders: ${FWD_BEFORE} to ${FWD_AFTER}."
             fi
             echo
             echo "Made by \`.github/workflows/ratchet-tighten.yml\` from each guard's \`--update\`. No user-visible change, so it carries the \`no-changelog\` label."

@@ -99,6 +99,9 @@ server. Every crate carries its own `CLAUDE.md` with crate-local discipline.
   shaped SNOMED edition written the way the build writes it). A
   dev-dependency of any crate's tests, never a runtime dependency, never
   published: the one sanctioned edge from a crate's tests into `tools/`.
+- `tools/forwarders`: the forwarder ratchet's detector, which parses the
+  hand-written Rust with `syn` and lists every function whose whole body
+  forwards to one other call; never shipped.
 - `scripts/checks/`: the committed guards. Two hold code to one owner
   (`.claude/rules/rust-style.md`, Code is written once): `duplication.sh`,
   the ratchet on the duplicated lines jscpd measures in `addons/*/src`,
@@ -108,10 +111,12 @@ server. Every crate carries its own `CLAUDE.md` with crate-local discipline.
   hand-written file, also run per edit, with the files over it in
   `file-size.list` that may shrink and never grow. `stray-literals.sh` is
   the third ratchet: a console file may hold no more stray literals than
-  `stray-literals.baseline` allows. A fall passes with a note and only a
-  rise fails; `.github/workflows/ratchet-tighten.yml` lowers the counts on
-  `main` once a day in its own pull request, so no other pull request touches
-  the ratchet files.
+  `stray-literals.baseline` allows. `forwarders.sh` is the fourth: the
+  functions `tools/forwarders` finds that only forward to another call
+  (count in `forwarders.count`, keys in `forwarders-baseline.txt`), also run
+  per edit. A fall passes with a note and only a rise fails;
+  `.github/workflows/ratchet-tighten.yml` lowers the counts on `main` once a
+  day on its own branch, so no other pull request touches the ratchet files.
 
 Dependencies point one way (app/tools depend on crates); nothing depends upward
 into the server. A code system is a graph MODEL served from an

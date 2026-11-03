@@ -231,6 +231,31 @@ jobs:
       - name: No file over the budget or past its entry
         run: bash scripts/checks/file-size.sh
 
+  # No function only forwards to another (.claude/rules/rust-style.md,
+  # #972): the forwarders tools/forwarders finds in addons/*/src, app/*/src,
+  # crates/*/src and tools/*/src may fall and never rise. The count and the
+  # key of every counted forwarder are committed beside the guard. A rise
+  # fails and names each new forwarder with its target; a fall passes, and
+  # ratchet-tighten.yml lowers the count on main. No rust-cache: the tool
+  # builds proc-macro2, quote and syn alone.
+  forwarders:
+    name: forwarders
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
+        with:
+          cache: false
+      - name: Forwarder ratchet self-test
+        run: bash scripts/checks/forwarders.sh --self-test
+      - name: The forwarders have not risen
+        run: bash scripts/checks/forwarders.sh
+
   # dockerfile-lint — hadolint over the container recipe. The image copies a
   # prebuilt binary onto a digest-pinned base, so the rules that matter are
   # the pinned FROM, the numeric non-root USER, and the exec-form ENTRYPOINT.
@@ -916,6 +941,7 @@ jobs:
       - stray-literals
       - duplication
       - file-size
+      - forwarders
       - tree-guards
       - dockerfile-lint
       - versions
