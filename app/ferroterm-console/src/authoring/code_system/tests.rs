@@ -585,11 +585,11 @@ fn a_stored_code_system_reads_the_elements_an_update_needs() {
 
 #[test]
 fn an_answer_carrying_no_code_system_reads_as_none() {
-    assert!(searched(OUTCOME_ENTRY).found().is_empty());
+    assert_eq!(searched(OUTCOME_ENTRY).found(), Vec::<&Draft>::new());
     let empty: crate::fhir::searchset::Found<Draft> = FhirVersion::R4B
         .decode(r#"{"resourceType":"Bundle","type":"searchset","total":0}"#)
         .expect("the server's own answer decodes at R4B");
-    assert!(empty.found().is_empty());
+    assert_eq!(empty.found(), Vec::<&Draft>::new());
 }
 
 /// Every arm of `property.value[x]` reads back as the text its control

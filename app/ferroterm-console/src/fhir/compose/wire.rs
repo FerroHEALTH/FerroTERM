@@ -48,7 +48,10 @@ macro_rules! writes_value_set {
             /// `clause`, written over `held`, the entry it was read from, so an
             /// element the form does not draw travels back rather than being
             /// deleted by the update.
-            fn written(mut held: ValueSetComposeInclude, clause: &Clause) -> ValueSetComposeInclude {
+            fn written(
+                mut held: ValueSetComposeInclude,
+                clause: &Clause,
+            ) -> ValueSetComposeInclude {
                 let system = clause.system.trim();
                 held.system = stated(system);
                 held.version = if system.is_empty() {
@@ -103,8 +106,7 @@ macro_rules! writes_value_set {
                             .unwrap_or_default();
                         written.property = property.into();
                         written.op = filter.op.trim().into();
-                        written.value =
-                            From::from(primitives::String::from(filter.value.trim()));
+                        written.value = From::from(primitives::String::from(filter.value.trim()));
                         written
                     })
                     .collect::<Vec<ValueSetComposeIncludeFilter>>();
@@ -126,7 +128,9 @@ macro_rules! writes_value_set {
                 draft
                     .side(included)
                     .enumerate()
-                    .map(|(at, clause)| written(stored.get(at).cloned().unwrap_or_default(), clause))
+                    .map(|(at, clause)| {
+                        written(stored.get(at).cloned().unwrap_or_default(), clause)
+                    })
                     .collect()
             }
 

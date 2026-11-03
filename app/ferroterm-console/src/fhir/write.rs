@@ -284,14 +284,11 @@ impl Written {
     /// The `ETag` is preferred over `meta.versionId`, because it is what the
     /// server just committed to and what `If-Match` is compared against.
     pub(crate) fn version_id(&self) -> Option<&str> {
-        self.etag
-            .as_deref()
-            .map(strong_tag_of)
-            .or_else(|| {
-                self.resource
-                    .as_ref()
-                    .and_then(|stamp| stamp.version_id.as_deref())
-            })
+        self.etag.as_deref().map(strong_tag_of).or_else(|| {
+            self.resource
+                .as_ref()
+                .and_then(|stamp| stamp.version_id.as_deref())
+        })
     }
 }
 

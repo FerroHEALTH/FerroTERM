@@ -213,3 +213,39 @@ async fn a_validation_answer_that_does_not_decode_at_its_release_draws_the_error
         "no partial page draws the issue the answer carried"
     );
 }
+
+#[tokio::test]
+async fn a_history_that_does_not_decode_at_its_release_draws_the_error_state() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/r4b/CodeSystem/_history"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "resourceType": "Bundle",
+            "type": "history",
+            "entry": [{
+                "resource": {
+                    "resourceType": "CodeSystem",
+                    "id": "colours",
+                    "status": "active",
+                    "title": "Colours"
+                },
+                "request": { "method": "PUT", "url": "CodeSystem/colours" }
+            }]
+        })))
+        .mount(&server)
+        .await;
+    let state = console(
+        None,
+        &format!("[ferroterm]\nbase_url = \"{}/\"\n", server.uri()),
+    )
+    .await;
+    let page = text(send(&state, get("/?fhir=r4b", &[])).await).await;
+    assert!(
+        page.contains("FHIR R4B: ") && page.contains("Bundle.entry[0]") && page.contains("content"),
+        "the error names the version, the resource and the element the entry lacks: {page}"
+    );
+    assert!(
+        !page.contains(">Colours<"),
+        "no partial page draws the write the answer named"
+    );
+}

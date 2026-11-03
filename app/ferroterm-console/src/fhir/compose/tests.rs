@@ -318,11 +318,14 @@ fn an_exclude_alone_is_not_savable() {
 fn a_preview_sends_the_unsaved_compose_inline_and_its_page() {
     let (mut draft, key) = over("https://terminology.example/x");
     draft.add_concept(key, "A", "Alpha");
-    let body = preview(&draft, &Preview {
-        filter: Some(String::from("alp")),
-        count: 20,
-        offset: 40,
-    });
+    let body = preview(
+        &draft,
+        &Preview {
+            filter: Some(String::from("alp")),
+            count: 20,
+            offset: 40,
+        },
+    );
     assert!(
         body.starts_with(r#"{"parameter":[{"name":"valueSet","resource":{"compose":"#),
         "the compose travels as a resource rather than as a canonical: {body}"
@@ -344,11 +347,14 @@ fn a_preview_sends_the_unsaved_compose_inline_and_its_page() {
 #[test]
 fn the_first_page_sends_no_offset() {
     let (draft, _key) = over("https://terminology.example/x");
-    let body = preview(&draft, &Preview {
-        filter: None,
-        count: 20,
-        offset: 0,
-    });
+    let body = preview(
+        &draft,
+        &Preview {
+            filter: None,
+            count: 20,
+            offset: 0,
+        },
+    );
     assert!(
         !body.contains("offset"),
         "an unmoved page states no offset: {body}"

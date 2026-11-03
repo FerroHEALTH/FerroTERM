@@ -487,8 +487,9 @@ fn a_searchset_answers_the_first_resource_of_the_type_that_was_searched_for() {
         FhirVersion::R4B
             .decode(SEARCHED)
             .expect("the server's own answer decodes at R4B");
-    assert!(
-        systems.found().is_empty(),
+    assert_eq!(
+        systems.found(),
+        Vec::<&crate::authoring::code_system::Draft>::new(),
         "a search for one type does not answer another"
     );
 }

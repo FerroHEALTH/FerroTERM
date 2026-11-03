@@ -214,7 +214,11 @@ fn screen(request: &Request, kind: Kind, opened: &Opened, restored: Option<&Rest
             title,
             status: element(current, |stamp| &stamp.status).map(str::to_owned),
             canonical: canonical.clone(),
-            line: line(locale, element(current, |stamp| &stamp.version), Source::Stored),
+            line: line(
+                locale,
+                element(current, |stamp| &stamp.version),
+                Source::Stored,
+            ),
             actions,
         },
     );

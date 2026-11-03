@@ -96,7 +96,7 @@ mod tests {
     use crate::fhir::write::History;
 
     /// `value`, a history `Bundle` the server answered, decoded at R4B.
-    fn history(value: serde_json::Value) -> History {
+    fn history(value: &serde_json::Value) -> History {
         crate::fhir::version::FhirVersion::R4B
             .decode(&value.to_string())
             .expect("the server's own history Bundle decodes at R4B")
@@ -104,19 +104,23 @@ mod tests {
 
     #[test]
     fn the_writes_of_three_types_merge_newest_first_and_name_each_resource() {
-        let systems = history(json!({"resourceType": "Bundle", "type": "history", "entry": [
-            {"resource": {"resourceType": "CodeSystem", "id": "a", "title": "Colours",
-              "status": "active", "content": "complete",
-              "meta": {"versionId": "2", "lastUpdated": "2026-10-02T10:00:00Z"}},
-             "request": {"method": "PUT", "url": "CodeSystem/a"}}
-        ]}));
-        let sets = history(json!({"resourceType": "Bundle", "type": "history", "entry": [
-            {"resource": {"resourceType": "ValueSet", "id": "b", "name": "Warm", "status": "active",
-              "meta": {"versionId": "1", "lastUpdated": "2026-10-03T09:00:00Z"}},
-             "request": {"method": "POST", "url": "ValueSet"}},
-            {"request": {"method": "DELETE", "url": "ValueSet/c"},
-             "response": {"status": "204", "lastModified": "2026-10-01T08:00:00Z"}}
-        ]}));
+        let systems = history(
+            &json!({"resourceType": "Bundle", "type": "history", "entry": [
+                {"resource": {"resourceType": "CodeSystem", "id": "a", "title": "Colours",
+                  "status": "active", "content": "complete",
+                  "meta": {"versionId": "2", "lastUpdated": "2026-10-02T10:00:00Z"}},
+                 "request": {"method": "PUT", "url": "CodeSystem/a"}}
+            ]}),
+        );
+        let sets = history(
+            &json!({"resourceType": "Bundle", "type": "history", "entry": [
+                {"resource": {"resourceType": "ValueSet", "id": "b", "name": "Warm", "status": "active",
+                  "meta": {"versionId": "1", "lastUpdated": "2026-10-03T09:00:00Z"}},
+                 "request": {"method": "POST", "url": "ValueSet"}},
+                {"request": {"method": "DELETE", "url": "ValueSet/c"},
+                 "response": {"status": "204", "lastModified": "2026-10-01T08:00:00Z"}}
+            ]}),
+        );
         let merged = recent(&[("CodeSystem", &systems), ("ValueSet", &sets)], 10);
         let ids: Vec<&str> = merged.iter().map(|change| change.id.as_str()).collect();
         assert_eq!(ids, ["b", "a", "c"]);
