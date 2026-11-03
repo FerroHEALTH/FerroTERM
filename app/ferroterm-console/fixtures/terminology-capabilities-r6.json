@@ -1060,12 +1060,12 @@
             "parent",
             "child"
           ],
-          "value": "48"
+          "value": "49"
         }
       ]
     }
   ],
-  "date": "2026-11-02T23:33:07.575399Z",
+  "date": "2026-11-02T23:46:28.469337Z",
   "description": "Serves the FHIR R6 ballot (version 6.0.0-ballot5). Every behaviour grounded only in the ballot is re-verified against the published specification when it appears, and may change with it.",
   "expansion": {
     "hierarchical": false,

@@ -1007,7 +1007,7 @@
       "uri": "urn:iso:std:iso:3166",
       "version": [
         {
-          "code": "48",
+          "code": "49",
           "compositional": false,
           "filter": [
             {
@@ -1049,7 +1049,7 @@
       ]
     }
   ],
-  "date": "2026-11-02T23:33:07.553409Z",
+  "date": "2026-11-02T23:46:28.443037Z",
   "expansion": {
     "hierarchical": false,
     "incomplete": false,

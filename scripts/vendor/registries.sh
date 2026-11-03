@@ -3,7 +3,9 @@
 # SPDX-License-Identifier: BUSL-1.1
 # Fetches the public registries the registry code systems are built from,
 # verbatim, into crates/fhir-terminology/data/, and rewrites the
-# provenance stamp. Re-run to refresh; commit the result.
+# provenance stamp. CLDR and UCUM come from the pins in docs/VERSIONS.md;
+# the IANA registries are read as published today. Re-run to refresh;
+# commit the result.
 #
 #   scripts/vendor/registries.sh
 #
@@ -19,7 +21,18 @@ cd "$(dirname "$0")/../.."
 data=crates/fhir-terminology/data
 mkdir -p "$data/iana/media-types" "$data/cldr"
 
-CLDR_REF=${CLDR_REF:-main}
+# The pin of the docs/VERSIONS.md row named $1: the first word of its second
+# cell. CLDR_REF and UCUM_REF override them for a one-off fetch.
+pin() {
+  awk -F'|' -v want="$1" '{ label = $2; gsub(/^[[:space:]]+|[[:space:]]+$/, "", label) }
+    label == want { v = $3; gsub(/^[[:space:]]+/, "", v); split(v, w, /[[:space:]]/); print w[1]; exit }' docs/VERSIONS.md
+}
+CLDR_REF=${CLDR_REF:-$(pin 'Unicode CLDR')}
+UCUM_REF=${UCUM_REF:-$(pin UCUM)}
+if [[ -z "$CLDR_REF" || -z "$UCUM_REF" ]]; then
+  echo "registries: docs/VERSIONS.md has no Unicode CLDR or UCUM pin" >&2
+  exit 1
+fi
 
 # Every fetch refuses a protocol other than HTTPS and a TLS version below 1.2.
 https_only=(--proto '=https' --tlsv1.2)
@@ -36,7 +49,6 @@ curl "${https_only[@]}" -sSL -o "$data/cldr/codeMappings.json" \
 curl "${https_only[@]}" -sSL -o "$data/cldr/LICENSE" "https://raw.githubusercontent.com/unicode-org/cldr-json/$CLDR_REF/LICENSE"
 
 mkdir -p "$data/ucum"
-UCUM_REF=${UCUM_REF:-main}
 curl "${https_only[@]}" -sSL -o "$data/ucum/ucum-essence.xml" "https://raw.githubusercontent.com/ucum-org/ucum/$UCUM_REF/ucum-essence.xml"
 curl "${https_only[@]}" -sSL -o "$data/ucum/LICENSE.md" "https://raw.githubusercontent.com/ucum-org/ucum/$UCUM_REF/LICENSE.md"
 ucum_version=$(grep -o 'ucum-essence" version="[0-9.]*"' "$data/ucum/ucum-essence.xml" | sed 's/.*version="//; s/"$//')

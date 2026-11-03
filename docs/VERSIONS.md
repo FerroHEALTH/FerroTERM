@@ -74,6 +74,19 @@ in a change that moves the pin with it.
 | SCG | 23d3812cf17ac8459fc9f1a0068041b95bacd3e1 (the commit of the official `IHTSDO/SNOMEDCT-Languages` repository, which publishes no tags; the normative Compositional Grammar ABNF and the example corpus vendored under `crates/sct-scg/vendor/` by `scripts/vendor/scg-grammar.sh`) |
 | SNOMED CT content | **not pinned in-repo**: licence-gated, bring-your-own RF2 (International edition); the loaded edition+version is a runtime/deployment fact (`.claude/rules/snomed-terminology.md`) |
 
+## Registry data
+
+`scripts/vendor/registries.sh` reads these two pins and vendors the data
+under `crates/fhir-terminology/data/`. The IANA Language Subtag and Media
+Types registries have no release to pin: the script reads them as
+published, and `PROVENANCE.md` records the registry File-Date and the fetch
+date.
+
+| Item | Pin |
+|---|---|
+| Unicode CLDR | 49.0.0 (the release tag of `unicode-org/cldr-json`; the English territory names and the ISO 3166-1 code mappings behind the ISO 3166 code system) |
+| UCUM | v2.2 (the release tag of `ucum-org/ucum`; `ucum-essence.xml` and its licence behind the UCUM code system, the bytes FerroBRIDGE pins) |
+
 ## Usage report contract
 
 | Item | Pin |
