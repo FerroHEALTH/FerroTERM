@@ -29,6 +29,32 @@ fn provider(error: &ProviderError) -> EvalError {
     EvalError::Storage(error.to_string())
 }
 
+/// What the provider answers for an expression constraint `text` the
+/// evaluator refused.
+pub(super) fn refusal(error: EvalError, text: &str) -> ProviderError {
+    match error {
+        EvalError::UnknownConcept(id) => ProviderError::InvalidCode {
+            code: id.to_string(),
+            reason: String::from("not a concept of the edition"),
+        },
+        EvalError::NotAReferenceSet(id) => ProviderError::InvalidCode {
+            code: id.to_string(),
+            reason: String::from("not a reference set with concept members in the edition"),
+        },
+        EvalError::Unsupported(what) => ProviderError::UnsupportedFilter {
+            property: String::from("constraint"),
+            operator: format!("= ({what})"),
+        },
+        EvalError::Storage(message) => ProviderError::Storage(message.into()),
+        // NOTE: the grammar admits only digits for a number or a time, so a
+        // value that does not convert is the edition's data, not the request's.
+        defect @ (EvalError::InvalidNumber { .. } | EvalError::InvalidTime { .. }) => {
+            ProviderError::Storage(Box::new(defect))
+        }
+        other => ProviderError::invalid_filter_value("constraint", text, other.to_string()),
+    }
+}
+
 impl SnomedProvider {
     /// The concepts with no parent, computed once.
     fn root_set(&self) -> &RoaringBitmap {

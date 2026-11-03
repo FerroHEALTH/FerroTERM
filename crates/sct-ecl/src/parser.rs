@@ -220,14 +220,16 @@ fn bare_or_set<'i, T>(
 /// `sctid`: 6 to 18 digits, the first not zero.
 fn sctid(i: &mut Tokens<'_>) -> PResult<Sctid> {
     kind(Kind::Integer)
-        .verify_map(|t: &Token<'_>| {
-            let digits = t.text.len();
-            ((6..=18).contains(&digits) && !t.text.starts_with('0'))
-                .then(|| t.text.parse().ok().map(Sctid))
-                .flatten()
-        })
+        .verify_map(|t: &Token<'_>| sctid_text(t.text))
         .expecting("a SNOMED CT identifier")
         .parse_next(i)
+}
+
+/// `digits` as an `sctId`: 6 to 18 digits with no leading zero.
+fn sctid_text(digits: &str) -> Option<Sctid> {
+    ((6..=18).contains(&digits.len()) && !digits.starts_with('0'))
+        .then(|| digits.parse().ok().map(Sctid))
+        .flatten()
 }
 
 /// `term`: the text between pipes, without its surrounding whitespace; one
@@ -340,10 +342,7 @@ fn refset_operator(i: &mut Tokens<'_>) -> PResult<(RefsetOperator, Option<FocusC
         if rest.is_empty() {
             return Ok((RefsetOperator::ContainingAny, None));
         }
-        let Some(id) = ((6..=18).contains(&rest.len()) && !rest.starts_with('0'))
-            .then(|| rest.parse().ok().map(Sctid))
-            .flatten()
-        else {
+        let Some(id) = sctid_text(rest) else {
             return refuse(i, &start, "a SNOMED CT identifier");
         };
         let term = opt(term).parse_next(i)?;
@@ -381,6 +380,16 @@ fn sub_expression_constraint(i: &mut Tokens<'_>) -> PResult<SubExpressionConstra
         None if operator.is_some() || refset_operator.is_some() => cut_err(focus).parse_next(i)?,
         None => focus.parse_next(i)?,
     };
+    sub_expression_rest(i, operator, refset_operator, focus)
+}
+
+/// The filters and the history supplement after a sub-expression's focus.
+fn sub_expression_rest(
+    i: &mut Tokens<'_>,
+    operator: Option<ConstraintOperator>,
+    refset_operator: Option<RefsetOperator>,
+    focus: FocusConcept,
+) -> PResult<SubExpressionConstraint> {
     let member_filters = repeat(0.., member_filter_constraint).parse_next(i)?;
     let filters = repeat(
         0..,
@@ -690,11 +699,12 @@ fn history_supplement(i: &mut Tokens<'_>) -> PResult<HistorySupplement> {
 /// same way.
 fn attribute(i: &mut Tokens<'_>) -> PResult<Attribute> {
     let cardinality = opt(cardinality).parse_next(i)?;
-    let reverse = opt(keyword("R")).parse_next(i)?.is_some();
-    let name = if reverse {
-        cut_err(sub_expression_constraint).parse_next(i)?
+    let (reverse, name) = if let Some(name) = glued_reverse(i)? {
+        (true, name)
+    } else if opt(keyword("R")).parse_next(i)?.is_some() {
+        (true, cut_err(sub_expression_constraint).parse_next(i)?)
     } else {
-        sub_expression_constraint.parse_next(i)?
+        (false, sub_expression_constraint.parse_next(i)?)
     };
     let value = cut_err(attribute_value).parse_next(i)?;
     Ok(Attribute {
@@ -703,6 +713,24 @@ fn attribute(i: &mut Tokens<'_>) -> PResult<Attribute> {
         name,
         value,
     })
+}
+
+/// `reverseflag ws eclattributename` with the empty `ws`: the lexer reads
+/// `R363698007` as one word, so the identifier after the `R` (or `r`, the
+/// rule is `CAP_R | R`) comes back as the attribute name's focus.
+fn glued_reverse(i: &mut Tokens<'_>) -> PResult<Option<SubExpressionConstraint>> {
+    let Some(id) = i.peek_token().and_then(|t| {
+        let rest = t.text.strip_prefix(['R', 'r'])?;
+        (t.kind == Kind::Identifier && rest.bytes().all(|b| b.is_ascii_digit()))
+            .then(|| sctid_text(rest))
+            .flatten()
+    }) else {
+        return Ok(None);
+    };
+    any.void().parse_next(i)?;
+    let term = opt(term).parse_next(i)?;
+    let focus = FocusConcept::Reference(ConceptReference { id, term });
+    sub_expression_rest(i, None, None, focus).map(Some)
 }
 
 /// The comparison and value of `eclattribute`, in the grammar's order.
