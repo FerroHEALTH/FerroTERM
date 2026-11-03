@@ -97,7 +97,7 @@ macro_rules! batch {
 
             use axum::body::Bytes;
             use axum::extract::{Query, State};
-            use axum::response::{IntoResponse, Response};
+            use axum::response::Response;
             use fhir_types::codec::Json;
             use fhir_types::$fhir::bundle::{Bundle, BundleEntry, BundleEntryResponse};
             use fhir_types::$fhir::parameters::Parameters;
@@ -107,7 +107,6 @@ macro_rules! batch {
             use crate::outcome::Failure;
             use crate::state::AppState;
             use crate::version::batch::{split_url, status_text};
-            use crate::wire::Wire;
 
             use super::{operations, parameters};
 
@@ -118,17 +117,7 @@ macro_rules! batch {
                 Query(query): Query<Vec<(String, String)>>,
                 body: Bytes,
             ) -> Response {
-                let wire = match Wire::negotiate(&query, &headers) {
-                    Ok(wire) => wire,
-                    Err(failure) => return failure.into_response(),
-                };
-                match run(&state, &headers, &body) {
-                    Ok(bundle) => match parameters::respond_resource(&bundle, wire) {
-                        Ok(response) => response,
-                        Err(failure) => failure.respond(wire),
-                    },
-                    Err(failure) => failure.respond(wire),
-                }
+                parameters::respond_with(&query, &headers, || run(&state, &headers, &body))
             }
 
             /// The `batch-response` for the Bundle in `body`.

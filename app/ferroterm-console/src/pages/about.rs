@@ -9,9 +9,9 @@ use ferrohealth_ui::html::Html;
 use ferrohealth_ui::view::surface::Header;
 use ferrohealth_ui::view::template::about::{Link, Manufacturer, SelfDescription, about_page};
 
-use crate::fhir::capability::CapabilityStatement;
 use crate::fhir::version::FhirVersion;
 use crate::locale::{Msg, tr, tr_with};
+use crate::pages::parts::{failure, refusal_of};
 use crate::request::Request;
 use crate::shell::{PRODUCT, VERSION};
 
@@ -37,12 +37,29 @@ fn roots() -> String {
 pub(crate) async fn page(request: Request) -> Html {
     let locale = &request.locale;
     let version = request.version;
-    let statement = request.client.capability_statement(version).await.ok();
-    let document = request.client.capability_document(version).await.ok();
-    let server = statement
-        .as_ref()
-        .and_then(CapabilityStatement::software_line)
-        .unwrap_or_else(|| tr(locale, Msg::AboutServerUnanswered));
+    let statement = request.client.capability_statement(version).await;
+    let document = request.client.capability_document(version).await;
+    // NOTE: no specification governs this: our own design; a failed read draws its
+    // refusal with the cause, and the two reads of one address draw it once.
+    let mut cards = Vec::new();
+    let server = match &statement {
+        Ok(statement) => statement
+            .software_line()
+            .unwrap_or_else(|| tr(locale, Msg::AboutServerUnnamed)),
+        Err(error) => {
+            cards.push(failure(locale, error));
+            refusal_of(locale, error).summary
+        }
+    };
+    let document = match document {
+        Ok(document) => Some(document),
+        Err(error) => {
+            if statement.is_ok() {
+                cards.push(failure(locale, &error));
+            }
+            None
+        }
+    };
     let self_description = document.map(|document| SelfDescription {
         title: tr_with(
             locale,
@@ -91,7 +108,7 @@ pub(crate) async fn page(request: Request) -> Html {
                     href: String::from(BOOK),
                 }),
             },
-            cards: Vec::new(),
+            cards,
             self_description,
             replica: None,
         },
