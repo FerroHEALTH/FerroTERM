@@ -46,6 +46,19 @@ pub enum DataError {
         /// The dotted path of the missing member.
         member: String,
     },
+    /// A territory's numeric code is not a number.
+    #[error(
+        "the vendored CLDR file codeMappings.json gives {code} the numeric code `{numeric}`, which is not a number"
+    )]
+    Numeric {
+        /// The alpha-2 code.
+        code: String,
+        /// The numeric code as CLDR states it.
+        numeric: String,
+        /// The parse failure.
+        #[source]
+        source: std::num::ParseIntError,
+    },
     /// The table does not build.
     #[error(transparent)]
     Build(#[from] BuildError),
@@ -73,7 +86,9 @@ pub fn is_user_assigned(code: &str) -> bool {
 /// # Errors
 ///
 /// Returns [`DataError::Json`] when the vendored data does not parse, and
-/// [`DataError::Missing`] when it lacks the version, the names or the codes.
+/// [`DataError::Missing`] when it lacks the version, the names, the codes or
+/// the numeric code of a user-assigned code, and [`DataError::Numeric`] when a
+/// numeric code is not a number.
 pub fn code_system() -> Result<CodeSystemModel, DataError> {
     let mappings: serde_json::Value = serde_json::from_str(CODE_MAPPINGS)?;
     let territories: serde_json::Value = serde_json::from_str(TERRITORIES)?;
@@ -106,10 +121,9 @@ fn from_json(
         if code.len() != 2 || !code.bytes().all(|b| b.is_ascii_uppercase()) {
             continue;
         }
-        let Some(numeric) = mapping.get("_numeric").and_then(serde_json::Value::as_str) else {
+        let Some((numeric, official)) = numeric_of(code, mapping)? else {
             continue;
         };
-        let official = numeric.parse::<u16>().is_ok_and(|n| n < 900);
         if !official && !is_user_assigned(code) {
             continue;
         }
@@ -184,6 +198,36 @@ fn from_json(
         }],
         concepts,
     })
+}
+
+/// The numeric code of the entry `code` and whether it is officially
+/// assigned (below 900), or `None` for an entry CLDR gives no numeric.
+fn numeric_of<'a>(
+    code: &str,
+    mapping: &'a serde_json::Value,
+) -> Result<Option<(&'a str, bool)>, DataError> {
+    let member = || DataError::Missing {
+        file: MAPPINGS_FILE,
+        member: format!("supplemental.codeMappings.{code}._numeric"),
+    };
+    let Some(numeric) = mapping.get("_numeric") else {
+        // NOTE: CLDR gives no numeric only to the exceptionally reserved codes (`AC`,
+        // `CP`, `DG`, `EA`, `IC`, `TA`), which ISO 3166 reserves on request and does
+        // not officially assign (<https://www.iso.org/glossary-for-iso-3166.html>).
+        if is_user_assigned(code) {
+            return Err(member());
+        }
+        return Ok(None);
+    };
+    let numeric = numeric.as_str().ok_or_else(member)?;
+    let number = numeric
+        .parse::<u16>()
+        .map_err(|source| DataError::Numeric {
+            code: code.to_owned(),
+            numeric: numeric.to_owned(),
+            source,
+        })?;
+    Ok(Some((numeric, number < 900)))
 }
 
 /// One property as a code value.
@@ -286,6 +330,45 @@ mod tests {
             missing(&number, NAMES).1,
             "supplemental.version._cldrVersion"
         );
+    }
+
+    #[test]
+    fn an_exceptionally_reserved_code_without_a_numeric_is_not_served() {
+        let reserved = MAPPINGS.replace(
+            r#""NL": {"#,
+            r#""TA": {"_alpha3": "TAA"}, "EA": {}, "NL": {"#,
+        );
+        let model = read(&reserved, NAMES).expect("the reserved codes are skipped");
+        let codes: Vec<&str> = model.concepts.iter().map(|c| c.code.as_str()).collect();
+        assert_eq!(codes, ["NL", "NLD", "528"]);
+    }
+
+    #[test]
+    fn a_user_assigned_code_without_a_numeric_is_an_error() {
+        let user = MAPPINGS.replace(r#""NL": {"#, r#""XK": {"_alpha3": "XKK"}, "NL": {"#);
+        assert_eq!(
+            missing(&user, NAMES),
+            (
+                "codeMappings.json",
+                String::from("supplemental.codeMappings.XK._numeric")
+            )
+        );
+        let mistyped = MAPPINGS.replace(r#""_numeric": "528""#, r#""_numeric": 528"#);
+        assert_eq!(
+            missing(&mistyped, NAMES).1,
+            "supplemental.codeMappings.NL._numeric"
+        );
+    }
+
+    #[test]
+    fn a_numeric_code_that_is_not_a_number_is_an_error() {
+        let defective = MAPPINGS.replace(r#""_numeric": "528""#, r#""_numeric": "5x8""#);
+        match read(&defective, NAMES) {
+            Err(DataError::Numeric { code, numeric, .. }) => {
+                assert_eq!((code.as_str(), numeric.as_str()), ("NL", "5x8"));
+            }
+            other => panic!("expected a defective numeric, got {other:?}"),
+        }
     }
 
     #[test]
