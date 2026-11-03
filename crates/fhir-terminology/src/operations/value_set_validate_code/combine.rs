@@ -58,6 +58,26 @@ pub(super) fn this_code_not_in_vs(model: &ValueSetModel, coding: &CodingRef, bas
     }
 }
 
+/// The failed answer that no coding of a `CodeableConcept` is a valid code of
+/// the value set, with that one error and no code outputs.
+pub(super) fn no_valid_coding(model: &ValueSetModel) -> Validation {
+    failed(
+        None,
+        None,
+        Issue {
+            severity: "error",
+            code: "code-invalid",
+            kind: "not-in-vs",
+            message: crate::operations::MessageId::TxGeneralCcErrorMessage,
+            text: format!(
+                "No valid coding was found for the value set '{}'",
+                model.canonical()
+            ),
+            expression: None,
+        },
+    )
+}
+
 /// One answer for a `CodeableConcept` from its codings' judgements, the
 /// ecosystem's shape (its test cases): the first coding in the value set
 /// answers the code outputs and the other codings' issues join it; when none
@@ -175,21 +195,7 @@ pub(super) fn none_in_value_set(
     judged: &[(&CodingRef, Validation)],
 ) -> Validation {
     let base = |index: usize| format!("CodeableConcept.coding[{index}]");
-    let mut answer = failed(
-        None,
-        None,
-        Issue {
-            severity: "error",
-            code: "code-invalid",
-            kind: "not-in-vs",
-            message: crate::operations::MessageId::TxGeneralCcErrorMessage,
-            text: format!(
-                "No valid coding was found for the value set '{}'",
-                model.canonical()
-            ),
-            expression: None,
-        },
-    );
+    let mut answer = no_valid_coding(model);
     for (_, other) in judged {
         for issue in &other.issues {
             if issue.kind != "not-in-vs" && issue.severity == "error" {

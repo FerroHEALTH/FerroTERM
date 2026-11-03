@@ -96,10 +96,8 @@ pub(super) fn no_system(model: &ValueSetModel, subject: &Subject<'_>) -> Validat
         code: "invalid",
         kind: "invalid-data",
         message: crate::operations::MessageId::CodingHasNoSystemCannotValidate,
-        text: String::from(
-            "Coding has no system. A code with no system has no defined meaning, and it cannot be validated. A system should be provided",
-        ),
-        expression: super::super::at(subject.expression, "system"),
+        text: String::from(super::super::NO_SYSTEM),
+        expression: Some(super::super::element(subject.expression)),
     });
     validation.message = message_of(&validation.issues);
     validation.code = Some(subject.code.to_owned());
