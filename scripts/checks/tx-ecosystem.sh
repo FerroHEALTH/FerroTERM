@@ -22,10 +22,10 @@ set -euo pipefail
 # target/ and conformance/ are named relative to the repository root, so run there.
 cd "$(dirname "$0")/../.."
 
-VALIDATOR_VERSION=6.10.4
-VALIDATOR_SHA256=1106b9d58f9e363e47bea7c4fc065841e5fc91fe9d062775c3bfdd212bd653cc
+VALIDATOR_VERSION=7.0.4
+VALIDATOR_SHA256=43e29fa8822d670740a909c395ca5b70a3d07fbaa8936f8dedc6a98b007f555b
 SUITE_REPO=https://github.com/HL7/fhir-tx-ecosystem-ig
-SUITE_COMMIT=eaec771d82fba4eac596c14963546f39b4ecffe7
+SUITE_COMMIT=f158adedf67b280e2a596f805194489205bfe9bd
 # Seconds to wait for the started server to answer /health. Generous because it
 # covers reading an artifact, and safe because the wait ends the moment the
 # server exits.

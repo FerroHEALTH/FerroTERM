@@ -62,11 +62,13 @@ async fn translate_by_get_and_post_answers_matches() {
         )
         .await;
     assert_eq!(status, StatusCode::OK, "{body}");
-    // An explicit `noMap` is an answer: `result` true, the overlay's `noMap` part,
-    // no `equivalence`, and no message.
+    // An explicit `noMap` is a match that translates nothing: `result` false
+    // (R4B `$translate`, "can only be true if at least one returned match has
+    // an equivalence which is not unmatched or disjoint"), the overlay's
+    // `noMap` part, no `equivalence`, and no message.
     assert_eq!(
         param(&body, "result").expect("result")["valueBoolean"],
-        true
+        false
     );
     let m = param(&body, "match").expect("match");
     assert!(part(m, "equivalence").is_none(), "{body}");

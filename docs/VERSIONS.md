@@ -146,8 +146,8 @@ trailing `# vX.Y.Z` comment (`.claude/rules/ci-cd.md`); Dependabot bumps them.
 
 | Item | Pin |
 |---|---|
-| HL7 terminology ecosystem test cases | `HL7/fhir-tx-ecosystem-ig` at `eaec771d82fba4eac596c14963546f39b4ecffe7` (test cases 1.9.3), `tests/` only. The requirements are cited by their unversioned page (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>): the versioned 1.9.3 path does not resolve, and this table is where the version is pinned. |
-| FHIR Validator (`txTests` runner) | 6.10.4, `validator_cli.jar` sha256 `1106b9d58f9e363e47bea7c4fc065841e5fc91fe9d062775c3bfdd212bd653cc` |
+| HL7 terminology ecosystem test cases | `HL7/fhir-tx-ecosystem-ig` at `f158adedf67b280e2a596f805194489205bfe9bd` (test cases 1.10.0), `tests/` only. The requirements are cited by their unversioned page (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>): the versioned path does not resolve, and this table is where the version is pinned. |
+| FHIR Validator (`txTests` runner) | 7.0.4, `validator_cli.jar` sha256 `43e29fa8822d670740a909c395ca5b70a3d07fbaa8936f8dedc6a98b007f555b` |
 
 Both pins live in `scripts/checks/tx-ecosystem.sh`; the pass list is
 `conformance/tx-ecosystem/passing.txt`.

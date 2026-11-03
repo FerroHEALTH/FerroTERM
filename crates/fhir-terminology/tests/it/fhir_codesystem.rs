@@ -774,3 +774,42 @@ fn a_code_system_resource_declares_no_implicit_value_set_form() {
         crate::implicit_forms::declares_none(provider, &provider.identity().url);
     }
 }
+
+/// R4B `CodeSystem.property.uri` is the formal meaning of a property, so a
+/// property coded `notSelectable` under another URI does not make a concept
+/// abstract (the ecosystem's `notSelectable-unprop` cases).
+#[test]
+fn a_not_selectable_code_under_another_uri_is_no_abstract_marker() {
+    use fhir_types::codec::{Json, Path};
+    let object = serde_json::json!({
+        "resourceType": "CodeSystem", "url": "http://example.org/fhir/CodeSystem/unprop",
+        "version": "1", "status": "active", "content": "complete", "caseSensitive": true,
+        "property": [{"code": "notSelectable", "uri": "http://hl7.org/fhir/concept-properties#notSelectableX", "type": "boolean"}],
+        "concept": [
+            {"code": "codeNS", "display": "Not selectable", "property": [{"code": "notSelectable", "valueBoolean": true}]}
+        ]
+    });
+    let document: fhir_types::codec::Value =
+        serde_json::from_str(&object.to_string()).expect("the document parses");
+    let resource = fhir_types::r5::code_system::CodeSystem::from_json(
+        document.as_object().expect("object"),
+        &mut Path::root("CodeSystem"),
+    )
+    .expect("decodes");
+    let model =
+        fhir_terminology::fhir_codesystem::convert::r5::convert(&resource).expect("converts");
+    let provider = FhirCodeSystem::new(model).expect("builds");
+    let ns = provider.locate("codeNS").expect("locates").expect("codeNS");
+    assert!(
+        !provider
+            .status(ns.concept)
+            .expect("status")
+            .abstract_concept
+    );
+    let stated = provider
+        .properties(ns.concept)
+        .expect("properties")
+        .into_iter()
+        .any(|p| p.code == "notSelectable" && p.value == PropertyValue::Boolean(true));
+    assert!(stated, "the property is still listed as stated");
+}

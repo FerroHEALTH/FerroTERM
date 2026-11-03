@@ -205,16 +205,18 @@ impl FhirCodeSystem {
         }
     }
 
-    /// Whether `code` is the standard `notSelectable` property: by its code, or
-    /// by a declaration under the standard URI
+    /// Whether `code` is the standard `notSelectable` property: by the URI its
+    /// declaration names, or by its code when the declaration names no URI
     /// (<https://hl7.org/fhir/R4B/codesystem-concept-properties.html>).
     fn abstract_property(&self, code: &str) -> bool {
-        code == NOT_SELECTABLE
-            || self.model.properties.iter().any(|p| {
-                p.code == code
-                    && p.uri.as_deref()
-                        == Some("http://hl7.org/fhir/concept-properties#notSelectable")
-            })
+        // NOTE: `CodeSystem.property.uri` is "the formal meaning of the property"
+        // (<https://hl7.org/fhir/R4B/codesystem-definitions.html#CodeSystem.property.uri>),
+        // so a code declared under another URI is not the standard property.
+        let declared = self.model.properties.iter().find(|p| p.code == code);
+        match declared.and_then(|p| p.uri.as_deref()) {
+            Some(uri) => uri == "http://hl7.org/fhir/concept-properties#notSelectable",
+            None => code == NOT_SELECTABLE,
+        }
     }
 
     /// The concept's standing, read from the standard status properties.

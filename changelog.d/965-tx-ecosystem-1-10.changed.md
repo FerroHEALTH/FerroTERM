@@ -1,0 +1,1 @@
+- The HL7 terminology ecosystem conformance run moves to the test cases 1.10.0 (suite commit `f158ade`, 764 `general` cases) on FHIR Validator 7.0.4.

@@ -158,9 +158,10 @@ fn no_map_and_unmapped_rules_still_answer() {
         ..TranslateInput::default()
     };
     let translation = run(&world, &fish);
-    // NOTE: an explicit `noMap` is an answer, so `result` is true and there is no
-    // message (the ecosystem's `translate-4`, <https://hl7.org/fhir/uv/tx-ecosystem/>).
-    assert!(translation.result);
+    // NOTE: R4B `$translate`: `result` "can only be true if at least one returned
+    // match has an equivalence which is not unmatched or disjoint", so a `noMap`
+    // match answers false with no message (the ecosystem's `translate-4`).
+    assert!(!translation.result);
     assert_eq!(equivalence(&translation.matches[0]), "unmatched");
     assert!(translation.matches[0].origin.no_map);
     assert_eq!(
