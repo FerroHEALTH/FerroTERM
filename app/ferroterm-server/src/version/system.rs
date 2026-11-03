@@ -26,7 +26,7 @@ macro_rules! system {
             use http::{HeaderMap, StatusCode};
 
             use crate::outcome::Failure;
-            use super::metadata::FHIR_VERSION;
+            use crate::served::$fhir::FHIR_VERSION;
             use super::parameters;
             use super::resources::split_supplied;
             use crate::scope::{CACHE_ID_HEADER, cache_id};

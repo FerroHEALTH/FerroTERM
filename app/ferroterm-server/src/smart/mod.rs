@@ -439,8 +439,8 @@ fn version_bases(base_url: Option<&str>) -> Vec<String> {
         return Vec::new();
     };
     let mut bases = Vec::new();
-    for segment in crate::version::SEGMENTS {
-        let endpoint = crate::version::endpoint(base, segment);
+    for segment in crate::served::SEGMENTS {
+        let endpoint = crate::served::endpoint(base, segment);
         // NOTE: FHIR fixes a service base with no trailing slash
         // (<https://hl7.org/fhir/R4B/http.html#root>), so the slashed form is
         // our own tolerance and the only one performed.
@@ -529,7 +529,7 @@ pub async fn configuration(
     headers: HeaderMap,
 ) -> Response {
     let Some(smart) = smart else {
-        return crate::outcome::not_found(&headers);
+        return crate::wire::not_found(&headers);
     };
     let body = smart.configuration();
     match serde_json::to_vec(&body) {
@@ -556,7 +556,7 @@ mod tests {
     #[test]
     fn every_served_version_base_is_an_audience_of_the_write_routes() {
         let bases = version_bases(Some("https://tx.example.org"));
-        for segment in crate::version::SEGMENTS {
+        for segment in crate::served::SEGMENTS {
             let base = format!("https://tx.example.org/{segment}");
             assert!(bases.contains(&base), "{base}: {bases:?}");
             assert!(bases.contains(&format!("{base}/")), "{base}/");

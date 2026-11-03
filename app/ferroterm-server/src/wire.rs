@@ -342,6 +342,41 @@ pub fn without_format(query: &[(String, String)]) -> Vec<(String, String)> {
         .collect()
 }
 
+impl Failure {
+    /// The response in `wire`: the `OperationOutcome` as FHIR JSON or XML (the
+    /// R4B shape, which every served version declares alike).
+    #[must_use]
+    pub fn respond(&self, wire: Wire) -> Response {
+        // NOTE: encoding a hand-built OperationOutcome cannot fail; if the
+        // codec ever refuses, a bare status still tells the client the truth.
+        wire.resource(
+            self.status,
+            &self.outcome(),
+            &fhir_types::r4b::schema::SCHEMAS,
+        )
+        .unwrap_or_else(|_| self.status.into_response())
+    }
+}
+
+impl IntoResponse for Failure {
+    fn into_response(self) -> Response {
+        self.respond(Wire::Json)
+    }
+}
+
+/// The fallback for a path the server does not define, in the format `Accept`
+/// asks for.
+#[must_use]
+pub fn not_found(headers: &HeaderMap) -> Response {
+    let wire = Wire::negotiate(&[], headers).unwrap_or_default();
+    Failure::new(
+        StatusCode::NOT_FOUND,
+        "not-found",
+        "no such resource or operation on this server",
+    )
+    .respond(wire)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

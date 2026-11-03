@@ -121,12 +121,12 @@ async fn the_capability_statements_state_the_configured_base_url() {
 async fn the_endpoint_of_every_served_segment_is_the_one_the_router_answers() {
     let base = "https://tx.example.org/fhir";
     let server = Server::start_with_base_url(base);
-    for segment in ferroterm_server::version::SEGMENTS {
+    for segment in ferroterm_server::served::SEGMENTS {
         let (status, body) = server.get(&format!("/{segment}/metadata")).await;
         assert_eq!(status, StatusCode::OK, "{segment}: {body}");
         assert_eq!(
             body["implementation"]["url"],
-            ferroterm_server::version::endpoint(base, segment),
+            ferroterm_server::served::endpoint(base, segment),
             "{segment}: {body}"
         );
     }
