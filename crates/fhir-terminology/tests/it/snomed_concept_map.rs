@@ -7,10 +7,10 @@
 
 use std::sync::Arc;
 
-use fhir_terminology::conceptmap::model::{ConceptMapModel, Relationship};
 use fhir_terminology::conceptmap::store::ConceptMapStore;
 use fhir_terminology::operations::translate::{Match, TranslateInput, Translation, translate};
 use fhir_terminology::operations::{OperationError, Sources};
+use fhir_terminology::provider::concept_map::{ConceptMapModel, Relationship};
 use fhir_terminology::provider::{Capability, MapSelection, ProviderError};
 use fhir_terminology::registry::Registry;
 use fhir_terminology::snomed::{SYSTEM, SnomedProvider};

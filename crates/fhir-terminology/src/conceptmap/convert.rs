@@ -9,7 +9,7 @@
 //! family arm per version keeps the four conversions aligned:
 //! `convert::r4b::convert(&resource)`.
 
-use super::model::{ModelError, Relationship};
+use crate::provider::concept_map::{ModelError, Relationship};
 
 fn text<T: AsRef<str>>(value: Option<T>) -> Option<String> {
     value.map(|v| v.as_ref().to_owned())
@@ -55,7 +55,7 @@ macro_rules! convert_concept_map {
                 ConceptMapTarget,
             };
 
-            use super::super::model::{
+            use crate::provider::concept_map::{
                 ConceptMapModel, DependsOn, Element, Group, ModelError, Relationship, Target,
                 Unmapped, UnmappedMode,
             };
@@ -200,11 +200,11 @@ macro_rules! convert_concept_map {
             };
             use fhir_types::$module::extension::ExtensionValue;
 
-            use super::super::model::{
+            use super::{ELEMENT_COMMENT, split_canonical, text};
+            use crate::provider::concept_map::{
                 ConceptMapModel, DependsOn, Element, Group, ModelError, Relationship, Target,
                 Unmapped, UnmappedMode,
             };
-            use super::{ELEMENT_COMMENT, split_canonical, text};
 
             fn depends_on(d: &ConceptMapGroupElementTargetDependsOn) -> DependsOn {
                 let (system, value, display) = match &d.value {

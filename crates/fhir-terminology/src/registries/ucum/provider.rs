@@ -11,8 +11,8 @@ use concept_graph::subsumption::Outcome;
 use super::canonical::{Canonical, Reducer};
 use super::essence::{ESSENCE_DATA, Essence};
 use super::grammar::{Atom, Expression, parse};
-use crate::compose::{Compose, Include, SystemRef};
-use crate::filter::{Filter, FilterOperator};
+use crate::provider::compose::{Compose, Include, SystemRef};
+use crate::provider::filter::{Filter, FilterOperator};
 use crate::provider::{
     CodeSystemProvider, Compositional, Concept, ConceptSet, ContentMode, Declaration, Designation,
     DesignationUse, FilterDefinition, Hierarchy, Identity, ImplicitArgument, ImplicitForm, Located,

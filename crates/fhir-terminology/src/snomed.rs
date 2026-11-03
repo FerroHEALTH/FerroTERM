@@ -35,10 +35,10 @@ use roaring::RoaringBitmap;
 use sct_ecl::ast::ExpressionConstraint;
 use serde::Deserialize;
 
-use crate::artifact::Source;
-use crate::compose::{Compose, ConceptRef, Include, SystemRef};
-use crate::filter::{Filter, FilterOperator};
 use crate::normal_form;
+use crate::provider::compose::{Compose, ConceptRef, Include, SystemRef};
+use crate::provider::filter::{Filter, FilterOperator};
+use crate::provider::source::Source;
 use crate::provider::{
     Capability, CodeSystemProvider, Compositional, Concept, ConceptSet, ContentMode, Declaration,
     DesignationUse, FilterDefinition, HierarchyMeaning, Identity, ImplicitArgument, ImplicitForm,
@@ -1249,7 +1249,7 @@ impl StoredSystem for Snomed {
         provider: &SnomedProvider,
         url: &str,
         selection: crate::provider::MapSelection<'_>,
-    ) -> Option<Result<crate::conceptmap::model::ConceptMapModel, ProviderError>> {
+    ) -> Option<Result<crate::provider::concept_map::ConceptMapModel, ProviderError>> {
         let (base, form) = implicit_parts(url, FHIR_CM)?;
         let malformed = |reason: String| ProviderError::MalformedImplicitConceptMap {
             url: url.to_owned(),

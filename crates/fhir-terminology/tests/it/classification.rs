@@ -11,7 +11,7 @@ use ferroterm_testkit::classification::{
     write_claml_artifact, write_icd10cm_artifact,
 };
 use fhir_terminology::classification::{ClassificationProvider, OpenError};
-use fhir_terminology::filter::{Filter, FilterOperator};
+use fhir_terminology::provider::filter::{Filter, FilterOperator};
 use fhir_terminology::provider::{
     Capability, CodeSystemProvider, Concept, ContentMode, HierarchyMeaning, ProviderError,
 };

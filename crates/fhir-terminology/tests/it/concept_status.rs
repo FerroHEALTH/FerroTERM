@@ -4,10 +4,11 @@
 //! The standard concept status properties on a persisted `CodeSystem`
 //! (<https://hl7.org/fhir/R5/codesystem-concept-properties.html>).
 
-use fhir_terminology::operations::expand::{Contains, ExpandInput};
+use fhir_terminology::operations::expand::ExpandInput;
 use fhir_terminology::operations::value_set_validate_code::ValueSetValidateInput;
 use fhir_terminology::operations::{Invocation, expand, lookup, validate_code};
 use fhir_terminology::provider::{Concept, PropertyValue};
+use fhir_terminology::valueset::expansion::Contains;
 use fhir_types::codec::Json;
 
 use crate::value_set::World;
@@ -499,7 +500,7 @@ fn a_concept_whose_code_has_no_value_is_refused() {
     assert!(
         matches!(
             error,
-            fhir_terminology::fhir_codesystem::model::ModelError::ConceptCode { under: None }
+            fhir_terminology::provider::code_system::ModelError::ConceptCode { under: None }
         ),
         "{error:?}"
     );

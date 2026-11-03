@@ -4,7 +4,7 @@
 //! The version-neutral `ValueSet`: identity and `compose`
 //! (<https://hl7.org/fhir/R4B/valueset.html>).
 
-use crate::compose::Compose;
+use crate::provider::compose::Compose;
 
 /// What the compose layer and the operations need of a `ValueSet`.
 #[derive(Debug, Clone, PartialEq, Eq)]

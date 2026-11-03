@@ -21,8 +21,8 @@ use std::sync::Arc;
 
 use super::{CodeableConceptRef, CodingRef, OperationError, Sources};
 use crate::compose::ValueSetResolver;
-use crate::conceptmap::model::{ConceptMapModel, ModelError, Relationship};
 use crate::provider::MapSelection;
+use crate::provider::concept_map::{ConceptMapModel, ModelError, Relationship};
 use crate::valueset::store::Resolver;
 use crate::versioned::Versioned;
 

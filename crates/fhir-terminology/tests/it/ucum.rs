@@ -8,12 +8,12 @@ use std::sync::Arc;
 
 use concept_graph::subsumption::Outcome;
 use fhir_terminology::conceptmap::store::ConceptMapStore;
-use fhir_terminology::filter::{Filter, FilterOperator};
 use fhir_terminology::operations::expand::ExpandInput;
 use fhir_terminology::operations::value_set_validate_code::ValueSetValidateInput;
 use fhir_terminology::operations::{
     Invocation, OperationError, Sources, expand, subsumes, value_set_validate_code,
 };
+use fhir_terminology::provider::filter::{Filter, FilterOperator};
 use fhir_terminology::provider::{CodeSystemProvider, ProviderError};
 use fhir_terminology::registries::ucum::essence::ESSENCE_DATA;
 use fhir_terminology::registries::ucum::grammar::{GrammarError, parse};

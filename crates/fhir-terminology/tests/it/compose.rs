@@ -4,12 +4,10 @@
 //! The compose layer: union, intersection, exclude, dedup, order, paging
 //! (<https://hl7.org/fhir/R5/valueset.html#compositions>).
 
-use fhir_terminology::compose::{
-    Compose, ComposeError, ConceptRef, Expander, Expansion, Include, Options, SystemRef,
-    ValueSetResolver,
-};
-use fhir_terminology::filter::{Filter, FilterOperator};
+use fhir_terminology::compose::{ComposeError, Expander, Expansion, Options, ValueSetResolver};
 use fhir_terminology::provider::ProviderError;
+use fhir_terminology::provider::compose::{Compose, ConceptRef, Include, SystemRef};
+use fhir_terminology::provider::filter::{Filter, FilterOperator};
 use fhir_terminology::registry::ResolveError;
 
 use crate::fixture::{FLAT_URL, URL, registry};

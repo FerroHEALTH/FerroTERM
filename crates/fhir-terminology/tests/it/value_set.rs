@@ -14,15 +14,14 @@ use ferroterm_testkit::fhir::{
 use fhir_terminology::conceptmap::store::ConceptMapStore;
 use fhir_terminology::fhir_codesystem::load::{FhirVersion, load_dir};
 use fhir_terminology::fhir_codesystem::provider::FhirCodeSystem;
-use fhir_terminology::operations::expand::{
-    Contains, ExpandInput, ExpansionOutcome, ParameterValue,
-};
+use fhir_terminology::operations::expand::ExpandInput;
 use fhir_terminology::operations::value_set_validate_code::ValueSetValidateInput;
 use fhir_terminology::operations::{CodeableConceptRef, CodingRef, Issue};
 use fhir_terminology::operations::{OperationError, Sources, expand, value_set_validate_code};
 use fhir_terminology::provider::PropertyValue;
 use fhir_terminology::registry::Registry;
 use fhir_terminology::valueset;
+use fhir_terminology::valueset::expansion::{Contains, ExpansionOutcome, ParameterValue};
 use fhir_terminology::valueset::model::ExpansionDefault;
 use fhir_terminology::valueset::store::ValueSetStore;
 use fhir_types::r4b::extension::{Extension, ExtensionValue};
@@ -977,7 +976,10 @@ fn expand_returns_the_properties_asked_for() {
     )
     .expect("expands");
     assert!(none.contains.iter().all(|c| c.properties.is_empty()));
-    assert_eq!(none.properties, Vec::<expand::ExpansionProperty>::new());
+    assert_eq!(
+        none.properties,
+        Vec::<valueset::expansion::ExpansionProperty>::new()
+    );
 }
 
 // NOTE: the value set version trio and the system trio negotiate the versions an

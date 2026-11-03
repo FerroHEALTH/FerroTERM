@@ -13,8 +13,7 @@
 use std::sync::Arc;
 
 use concept_graph::subsumption::Outcome;
-use fhir_terminology::compose::{Compose, ConceptRef, Expander, Include, Options, SystemRef};
-use fhir_terminology::conceptmap::model::Relationship;
+use fhir_terminology::compose::{Expander, Options};
 use fhir_terminology::conceptmap::store::ConceptMapStore;
 use fhir_terminology::fhir_codesystem::load::FhirVersion;
 use fhir_terminology::operations::value_set_validate_code::ValueSetValidateInput;
@@ -22,6 +21,8 @@ use fhir_terminology::operations::{
     Invocation, OperationError, Sources, closure, lookup, subsumes, validate_code,
     value_set_validate_code,
 };
+use fhir_terminology::provider::compose::{Compose, ConceptRef, Include, SystemRef};
+use fhir_terminology::provider::concept_map::Relationship;
 use fhir_terminology::registry::Registry;
 use fhir_terminology::snomed::{SYSTEM, SnomedProvider};
 use fhir_terminology::valueset;

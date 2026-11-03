@@ -7,7 +7,7 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use crate::compose::Compose;
+use crate::provider::compose::Compose;
 use crate::provider::{CodeSystemProvider, ProviderError};
 
 /// A failure to resolve a system or version.
@@ -474,7 +474,7 @@ impl Registry {
         &self,
         url: &str,
         selection: crate::provider::MapSelection<'_>,
-    ) -> Option<Result<crate::conceptmap::model::ConceptMapModel, ProviderError>> {
+    ) -> Option<Result<crate::provider::concept_map::ConceptMapModel, ProviderError>> {
         let mut unserved = None;
         for provider in self.implicit_candidates(url) {
             match provider.implicit_concept_map(url, selection) {

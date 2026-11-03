@@ -7,8 +7,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
-use fhir_terminology::compose::{Compose, Include, SystemRef};
-use fhir_terminology::filter::{Filter, FilterOperator};
+use fhir_terminology::provider::compose::{Compose, Include, SystemRef};
+use fhir_terminology::provider::filter::{Filter, FilterOperator};
 use fhir_terminology::provider::{
     Capability, CodeSystemProvider, Compositional, Concept, ConceptSet, ContentMode, Declaration,
     Designation, DesignationUse, Hierarchy, HierarchyMeaning, Identity, Located, Property,

@@ -9,8 +9,8 @@ use concept_graph::subsumption::Outcome;
 use ferroterm_testkit::fhir::{ANIMALS, ANIMALS_NL, COLOURS, SKETCH, write_code_systems};
 use fhir_terminology::fhir_codesystem::load::{FhirVersion, load_dir, package_version};
 use fhir_terminology::fhir_codesystem::provider::FhirCodeSystem;
-use fhir_terminology::filter::{Filter, FilterOperator};
 use fhir_terminology::operations::{Invocation, OperationError, lookup, validate_code};
+use fhir_terminology::provider::filter::{Filter, FilterOperator};
 use fhir_terminology::provider::{
     Capability, CodeSystemProvider, ContentMode, PropertyValue, ProviderError,
 };
@@ -725,13 +725,13 @@ fn a_fragment_expansion_states_its_reason_and_names_its_used_fragment() {
             "This extension is based on a fragment of the code system {COLOURS}"
         )]
     );
-    let used: Vec<&fhir_terminology::operations::expand::ExpansionParameter> = outcome
+    let used: Vec<&fhir_terminology::valueset::expansion::ExpansionParameter> = outcome
         .parameters
         .iter()
         .filter(|p| p.name == "used-codesystem" || p.name == "used-fragment")
         .collect();
     let canonical =
-        fhir_terminology::operations::expand::ParameterValue::Uri(format!("{COLOURS}|1"));
+        fhir_terminology::valueset::expansion::ParameterValue::Uri(format!("{COLOURS}|1"));
     assert_eq!(
         used.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(),
         ["used-codesystem", "used-fragment"],

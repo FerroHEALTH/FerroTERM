@@ -6,9 +6,9 @@
 
 use std::sync::Arc;
 
-use fhir_terminology::compose::{Compose, Include, SystemRef};
 use fhir_terminology::fhir_codesystem::load::FhirVersion;
 use fhir_terminology::fhir_core::CoreTerminology;
+use fhir_terminology::provider::compose::{Compose, Include, SystemRef};
 use fhir_terminology::registry::Registry;
 use fhir_terminology::valueset::store::ValueSetStore;
 

@@ -18,8 +18,8 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-use crate::artifact::Source;
-use crate::filter::FilterOperator;
+use crate::provider::filter::FilterOperator;
+use crate::provider::source::Source;
 use crate::provider::{
     Capability, CodeSystemProvider, Compositional, Concept, ContentMode, Declaration,
     FilterDefinition, HierarchyMeaning, Identity, Located, Property, PropertyDefinition,

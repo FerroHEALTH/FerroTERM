@@ -15,9 +15,9 @@
 //! carries all three forms as properties
 //! (<https://terminology.hl7.org/ISO3166.html>).
 
-use crate::fhir_codesystem::model::{CodeSystemModel, ConceptEntry};
 use crate::fhir_codesystem::provider::{BuildError, FhirCodeSystem};
-use crate::filter::FilterOperator;
+use crate::provider::code_system::{CodeSystemModel, ConceptEntry};
+use crate::provider::filter::FilterOperator;
 use crate::provider::{
     ContentMode, Designation, FilterDefinition, Property, PropertyDefinition, PropertyKind,
     PropertyValue,
