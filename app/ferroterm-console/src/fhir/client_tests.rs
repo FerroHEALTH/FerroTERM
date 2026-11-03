@@ -272,7 +272,7 @@ async fn a_validation_reads_the_result_the_server_answers() {
     .expect("an answer");
     let validation = document
         .value
-        .validation(&ferrohealth_ui::i18n::Locale::english());
+        .validation(&ferrohealth_ui::i18n::Locale::default());
     assert_eq!(
         Some(false),
         validation.result,

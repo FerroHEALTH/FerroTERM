@@ -16,14 +16,17 @@ use std::collections::BTreeMap;
 use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
+use ferrohealth_ui::table::mapping::{
+    MapElement as Block, Relationship, map_element, map_elements,
+};
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::coding::Coding;
 use ferrohealth_ui::view::form::{FORM, Field, INPUT, SELECT, field_flow};
+use ferrohealth_ui::view::layout::{Gap, stack_at};
 use ferrohealth_ui::view::load_report::{Arrival, LoadReport, Outcome, load_report};
-use ferrohealth_ui::view::mapping::{MapElement as Block, Relationship, map_element, map_elements};
 use ferrohealth_ui::view::notice::{Announce, notice};
 use ferrohealth_ui::view::surface::{
-    SectionHead, card_action, panel_section, panel_sections_card, section_intro, stack,
+    SectionHead, card_action, panel_section, panel_sections_card, section_intro,
 };
 
 use crate::auth::scopes::Letter;
@@ -206,17 +209,20 @@ async fn edited(request: &Request, posted: Option<&Posted>) -> Html {
         },
     );
     let issues = (problems.len() > 1 && posted.is_some()).then(|| listed(locale, &problems));
-    let body = stack(Html::join([
-        answer.map(|(view, _)| view).unwrap_or_default(),
-        issues.unwrap_or_default(),
-        panel_sections_card(
-            title.clone(),
-            Html::join([
-                metadata(locale, &draft),
-                groups(locale, request.version, &draft, &systems, &names),
-            ]),
-        ),
-    ]));
+    let body = stack_at(
+        Gap::Loose,
+        Html::join([
+            answer.map(|(view, _)| view).unwrap_or_default(),
+            issues.unwrap_or_default(),
+            panel_sections_card(
+                title.clone(),
+                Html::join([
+                    metadata(locale, &draft),
+                    groups(locale, request.version, &draft, &systems, &names),
+                ]),
+            ),
+        ]),
+    );
     Html::join([
         heading(
             request,
@@ -727,7 +733,7 @@ fn element_block(
 
 /// A check box named `field_name` with the id `id`, labelled `label`.
 fn check_keyed(id: &str, label: String, field_name: &str, on: bool) -> Html {
-    ferrohealth_ui::view::form::keyed_check(id, label, checkbox(id, field_name, on))
+    ferrohealth_ui::view::form::check(id, label, checkbox(id, field_name, on))
 }
 
 /// The page after a save: the version the server now holds, and the way to
@@ -768,41 +774,4 @@ fn saved_page(request: &Request, opened: &MapDraft, saved: &str) -> Html {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{apply, relationship_choices};
-    use crate::authoring::concept_map::MapDraft;
-    use crate::fhir::version::FhirVersion;
-    use crate::posted::Posted;
-
-    #[test]
-    fn each_version_offers_its_own_relationship_codes() {
-        assert!(
-            relationship_choices(&ferrohealth_ui::i18n::Locale::english(), FhirVersion::R4)
-                .iter()
-                .any(|(code, _)| *code == "narrower")
-        );
-        assert!(
-            relationship_choices(&ferrohealth_ui::i18n::Locale::english(), FhirVersion::R5)
-                .iter()
-                .all(|(code, _)| *code != "narrower")
-        );
-    }
-
-    #[test]
-    fn a_post_rebuilds_the_groups_and_adds_the_target_asked_for() {
-        let posted = Posted::parse(
-            b"url=http%3A%2F%2Fx%2Fcm&status=draft&group.g0.source=http%3A%2F%2Fx%2Fa&group.g0.target=http%3A%2F%2Fx%2Fb\
-              &element.e1.group=g0&element.e1.code=A&target.t2.element=e1&target.t2.code=B&target.t2.relationship=equivalent\
-              &intent=add-target%3Ae1",
-        );
-        let mut draft = MapDraft::new();
-        apply(&posted, &MapDraft::new(), &mut draft);
-        assert_eq!(1, draft.groups.len());
-        assert_eq!("A", draft.groups[0].elements[0].code);
-        assert_eq!(2, draft.groups[0].elements[0].targets.len());
-        assert_eq!(
-            "equivalent",
-            draft.groups[0].elements[0].targets[0].relationship
-        );
-    }
-}
+mod tests;

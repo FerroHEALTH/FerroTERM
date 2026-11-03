@@ -9,9 +9,9 @@
 //! macros produces each version's modules from the generated
 //! `fhir_types::<version>` types: `surface!(r4b, "4.3.0", "R4B", to_r4b)`
 //! expands to `parameters`, `resources`, `map`, `metadata`, `system`,
-//! `operations`, and `router()`. The `map` module comes from one of two
-//! family macros: `map_r4` for R4 and R4B, `map_r5` for R5 and the R6 ballot,
-//! which share their result shapes and differ in a few inputs.
+//! `operations`, and `router()`. The `map` module comes from one macro,
+//! `map::family_map!`, whose `$flavour` arms state what the R4 family and the
+//! R5 family declare differently.
 
 /// The FHIR versions this server serves, each with the modules of its surface.
 ///
@@ -88,8 +88,7 @@ pub enum ReadError {
 
 pub(crate) mod batch;
 pub(crate) mod closure;
-pub(crate) mod map_r4;
-pub(crate) mod map_r5;
+pub(crate) mod map;
 pub(crate) mod metadata;
 pub(crate) mod operations;
 pub(crate) mod parameters;
@@ -132,7 +131,7 @@ macro_rules! surface {
         crate::version::resources::resources!($fhir);
         crate::version::metadata::metadata!($fhir, $fhir_version, $label, $capabilities);
         crate::version::system::system!($fhir);
-        crate::version::store::store!($fhir);
+        crate::version::store::routes::store!($fhir);
         crate::version::batch::batch!($fhir);
         crate::version::operations::operations!($fhir);
 

@@ -15,8 +15,9 @@ use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::kbd::{Shortcut, ShortcutGroup, shortcut_keys};
+use ferrohealth_ui::view::layout::Arrangement;
 use ferrohealth_ui::view::shortcuts::{GoTo, GoToPair};
-use ferrohealth_ui::view::surface::{card, definitions, grid_start};
+use ferrohealth_ui::view::surface::{card, definitions};
 
 use crate::locale::{Msg, tr};
 use crate::pages::parts::heading;
@@ -125,23 +126,23 @@ pub(crate) fn page(request: &Request) -> Html {
             tr(locale, Msg::KeysTitle),
             Some(tr(locale, Msg::KeysIntro)),
             Vec::new(),
-            ActionGroup::none(),
+            ActionGroup::default(),
         ),
-        grid_start(cards),
+        Arrangement::GridStart.wrap(cards),
     ])
 }
 
 #[cfg(test)]
 mod tests {
     use ferrohealth_ui::i18n::Locale;
-    use ferrohealth_ui::view::shortcuts::shortcut_legend_with_go_to;
+    use ferrohealth_ui::view::shortcuts::shortcut_legend;
 
     use super::{go_to, groups};
 
     #[test]
     fn the_legend_lists_the_console_s_keys_in_a_closed_dialog() {
-        let english = Locale::english();
-        let html = shortcut_legend_with_go_to(&english, groups(&english), go_to(&english));
+        let english = Locale::default();
+        let html = shortcut_legend(&english, groups(&english), Some(go_to(&english)));
         let html = html.as_str();
         assert!(html.contains("<dialog id=\"shortcuts\""), "{html}");
         assert!(!html.contains(" open"), "drawn closed: {html}");
@@ -156,8 +157,8 @@ mod tests {
 
     #[test]
     fn every_go_to_pair_is_a_link_of_the_navigation() {
-        let english = Locale::english();
-        let html = shortcut_legend_with_go_to(&english, groups(&english), go_to(&english));
+        let english = Locale::default();
+        let html = shortcut_legend(&english, groups(&english), Some(go_to(&english)));
         let html = html.as_str();
         assert!(html.contains("Go to"), "{html}");
         for path in [
@@ -175,7 +176,7 @@ mod tests {
 
     #[test]
     fn the_shortcuts_page_lists_the_go_to_pairs_as_keys() {
-        let english = Locale::english();
+        let english = Locale::default();
         let group = go_to(&english).group();
         let keys: Vec<&str> = group.shortcuts.iter().map(|s| s.keys.as_str()).collect();
         assert_eq!(keys, ["g d", "g c", "g v", "g m", "g b", "g o", "g s"]);

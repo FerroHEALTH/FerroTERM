@@ -112,7 +112,7 @@ impl FhirClient {
         Self {
             root,
             upstream: None,
-            locale: ferrohealth_ui::i18n::Locale::english(),
+            locale: ferrohealth_ui::i18n::Locale::default(),
         }
     }
 

@@ -5,10 +5,10 @@
 
 use std::collections::BTreeSet;
 
-use crate::provider::{
-    ContentMode, Designation, DesignationUse, FilterDefinition, HierarchyMeaning, Property,
-    PropertyDefinition, PropertyKind,
+use crate::provider::declaration::{
+    ContentMode, FilterDefinition, HierarchyMeaning, PropertyDefinition, PropertyKind,
 };
+use crate::provider::{Designation, DesignationUse, Property};
 
 /// The concept property codes the FHIR specification itself defines, in the
 /// `http://hl7.org/fhir/concept-properties` code system

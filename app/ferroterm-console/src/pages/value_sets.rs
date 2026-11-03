@@ -10,7 +10,9 @@ use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::model::Noun;
-use ferrohealth_ui::table::view::{Body, Column, DataTable, Role, cell, data_table, title_cell};
+use ferrohealth_ui::table::view::{
+    Body, Column, DataTable, Role, Shape, cell, data_table, title_cell,
+};
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::action_menu::{Act, Action};
 use ferrohealth_ui::view::coding::canonical;
@@ -119,7 +121,7 @@ pub(crate) async fn page(request: Request) -> Html {
                 tr(locale, Msg::ShellValueSets),
                 None,
                 Vec::new(),
-                ActionGroup::none(),
+                ActionGroup::default(),
             ),
             failure(locale, &error),
         ]),
@@ -196,6 +198,7 @@ fn listing(
         let fields = state.fields(request, &[]);
         let sort = state.sort();
         data_table(DataTable {
+            shape: Shape::Stacked,
             caption: &title,
             columns: &columns,
             sorting: ListState::sorting(&sort, &fields),
@@ -251,7 +254,12 @@ fn row(
     });
     h(format!(
         "<tr>{}{}{}{}{}</tr>",
-        title_cell(Some(&href), t(label_of(value_set)), Some(canonical(url))),
+        title_cell(
+            None,
+            Some(&href),
+            t(label_of(value_set)),
+            Some(canonical(url))
+        ),
         cell(source, source_of(value_set).tag(locale)),
         cell(version, t(version_words.unwrap_or_default())),
         cell(status, status_state(locale, value_set.status())),
@@ -269,6 +277,6 @@ fn create_action(request: &Request) -> ActionGroup {
             Act::Link(ui_link(COMPOSE_PATH, request.version)),
         ))
     } else {
-        ActionGroup::none()
+        ActionGroup::default()
     }
 }

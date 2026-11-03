@@ -11,7 +11,9 @@ use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::model::Noun;
-use ferrohealth_ui::table::view::{Body, Column, DataTable, Role, cell, data_table, title_cell};
+use ferrohealth_ui::table::view::{
+    Body, Column, DataTable, Role, Shape, cell, data_table, title_cell,
+};
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::action_menu::{Act, Action};
 use ferrohealth_ui::view::coding::canonical;
@@ -81,7 +83,7 @@ pub(crate) async fn page(request: Request) -> Html {
                 tr(locale, Msg::ShellConceptMaps),
                 None,
                 Vec::new(),
-                ActionGroup::none(),
+                ActionGroup::default(),
             ),
             failure(locale, &error),
         ]),
@@ -152,7 +154,7 @@ fn listing(
             let count = u32::try_from(map.mappings().len()).unwrap_or(u32::MAX);
             h(format!(
                 "<tr>{}{}{}{}</tr>",
-                title_cell(Some(&href), t(label_of(map)), Some(sub)),
+                title_cell(None, Some(&href), t(label_of(map)), Some(sub)),
                 cell(source, source_of(map).tag(locale)),
                 cell(
                     mappings,
@@ -168,6 +170,7 @@ fn listing(
         let fields = state.fields(request, &[]);
         let sort = state.sort();
         data_table(DataTable {
+            shape: Shape::Stacked,
             caption: &title,
             columns: &columns,
             sorting: ListState::sorting(&sort, &fields),
@@ -209,6 +212,6 @@ fn create_action(request: &Request) -> ActionGroup {
             Act::Link(ui_link(CONCEPT_MAP_EDITOR_PATH, request.version)),
         ))
     } else {
-        ActionGroup::none()
+        ActionGroup::default()
     }
 }

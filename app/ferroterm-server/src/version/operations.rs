@@ -3,6 +3,8 @@
 
 //! The operation handlers of one version: GET and POST, type and instance level, over the engine.
 
+pub(crate) mod handlers;
+
 macro_rules! operations {
     ($fhir:ident) => {
         pub mod operations {
@@ -114,34 +116,33 @@ macro_rules! operations {
 
             /// The value set `ValueSet/{id}/$expand` runs on.
             fn value_set_instance(state: &AppState, id: &str) -> Result<Bound, Failure> {
-                state
-                    .value_set_instance(id)
-                    .map(|model| Bound {
-                        url: model.url.clone(),
-                        version: model.version.clone(),
-                    })
-                    .ok_or_else(|| {
-                        Failure::new(
-                            StatusCode::NOT_FOUND,
-                            "not-found",
-                            format!("no ValueSet with id `{id}`"),
-                        )
-                    })
+                let model = state.value_set_instance(id);
+                bound_to(model.as_ref().map(|m| (&m.url, &m.version)), "ValueSet", id)
             }
 
             /// The concept map `ConceptMap/{id}/$translate` runs on.
             fn concept_map_instance(state: &AppState, id: &str) -> Result<Bound, Failure> {
-                state
-                    .concept_map_instance(id)
-                    .map(|model| Bound {
-                        url: model.url.clone(),
-                        version: model.version.clone(),
+                let model = state.concept_map_instance(id);
+                bound_to(model.as_ref().map(|m| (&m.url, &m.version)), "ConceptMap", id)
+            }
+
+            /// The canonical of the `kind` resource with `id`, which `found` holds when
+            /// the server has one.
+            fn bound_to(
+                found: Option<(&String, &Option<String>)>,
+                kind: &str,
+                id: &str,
+            ) -> Result<Bound, Failure> {
+                found
+                    .map(|(url, version)| Bound {
+                        url: url.clone(),
+                        version: version.clone(),
                     })
                     .ok_or_else(|| {
                         Failure::new(
                             StatusCode::NOT_FOUND,
                             "not-found",
-                            format!("no ConceptMap with id `{id}`"),
+                            format!("no {kind} with id `{id}`"),
                         )
                     })
             }
@@ -328,6 +329,24 @@ macro_rules! operations {
                 )))
             }
 
+            /// Runs a `ValueSet` operation on the instance it was invoked on, when it
+            /// was: the input's value set becomes the instance's, after [`binds`]
+            /// refuses one naming another.
+            fn bind_value_set(
+                instance: Option<&Bound>,
+                url: &mut Option<String>,
+                version: &mut Option<String>,
+                inline: bool,
+            ) -> Result<(), Failure> {
+                let Some(bound) = instance else {
+                    return Ok(());
+                };
+                binds(bound, "ValueSet", url.as_deref(), version.as_deref(), inline, "valueSet")?;
+                *url = Some(bound.url.clone());
+                version.clone_from(&bound.version);
+                Ok(())
+            }
+
             fn run_expand(
                 scope: &Scope,
                 instance: Option<&Bound>,
@@ -337,18 +356,12 @@ macro_rules! operations {
                 let request = ValueSetExpandRequest::from_parameters(parameters)
                     .map_err(|e| parameters::parameters_failure(&e))?;
                 let mut input = map::expand_input(&request);
-                if let Some(bound) = instance {
-                    binds(
-                        bound,
-                        "ValueSet",
-                        input.url.as_deref(),
-                        input.value_set_version.as_deref(),
-                        input.inline_value_set.is_some(),
-                        "valueSet",
-                    )?;
-                    input.url = Some(bound.url.clone());
-                    input.value_set_version.clone_from(&bound.version);
-                }
+                bind_value_set(
+                    instance,
+                    &mut input.url,
+                    &mut input.value_set_version,
+                    input.inline_value_set.is_some(),
+                )?;
                 let outcome = expand::expand(&scope.sources(), &input)
                     .map_err(|e| value_set_refused(scope, e, origin))?;
                 Ok(Answer::ValueSet(Box::new(render::$fhir::expansion(
@@ -377,18 +390,12 @@ macro_rules! operations {
                 let request = ValueSetValidateCodeRequest::from_parameters(parameters)
                     .map_err(|e| parameters::parameters_failure(&e))?;
                 let mut input = map::value_set_validate_input(&request);
-                if let Some(bound) = instance {
-                    binds(
-                        bound,
-                        "ValueSet",
-                        input.url.as_deref(),
-                        input.value_set_version.as_deref(),
-                        input.inline_value_set.is_some(),
-                        "valueSet",
-                    )?;
-                    input.url = Some(bound.url.clone());
-                    input.value_set_version.clone_from(&bound.version);
-                }
+                bind_value_set(
+                    instance,
+                    &mut input.url,
+                    &mut input.value_set_version,
+                    input.inline_value_set.is_some(),
+                )?;
                 let validation =
                     value_set_validate_code::validate_code(&scope.sources(), &input)
                         .map_err(|e| value_set_refused(scope, e, origin))?;
@@ -487,7 +494,7 @@ macro_rules! operations {
             }
 
             /// A failure as the `OperationOutcome` resource of one slot.
-            fn outcome_resource(failure: &Failure) -> Option<Resource> {
+            pub(super) fn outcome_resource(failure: &Failure) -> Option<Resource> {
                 failure.outcome().to_json().ok().and_then(|object| {
                     Resource::from_json(
                         &object,
@@ -702,501 +709,7 @@ macro_rules! operations {
                 }
             }
 
-            /// The response of a handled invocation, a failure rendered in `wire`.
-            fn finish(handled: Handled, wire: Wire) -> Response {
-                match handled {
-                    Ok(answer) => answer.respond(wire),
-                    Err(failure) => failure.respond(wire),
-                }
-            }
-
-            /// The negotiated format and the query less `_format`; a format the server
-            /// does not speak is refused (in JSON, at the call site).
-            fn negotiated(
-                headers: &HeaderMap,
-                query: &[(String, String)],
-            ) -> Result<(Wire, Vec<(String, String)>), Failure> {
-                Wire::negotiate(query, headers).map(|wire| (wire, without_format(query)))
-            }
-
-            /// `GET /CodeSystem/$lookup`.
-            pub async fn lookup_get(
-                State(state): State<Arc<AppState>>,
-                headers: HeaderMap,
-                Query(query): Query<Vec<(String, String)>>,
-            ) -> Response {
-                let (wire, query) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(
-                    from_query(&state, &CODE_SYSTEM_LOOKUP, &headers, &query)
-                        .and_then(|(scope, p)| run_lookup(&scope, &Invocation::Type, &p)), wire)
-            }
-
-            /// `POST /CodeSystem/$lookup`.
-            pub async fn lookup_post(
-                State(state): State<Arc<AppState>>,
-                headers: HeaderMap,
-                Query(query): Query<Vec<(String, String)>>,
-                body: Bytes,
-            ) -> Response {
-                let (wire, _) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(
-                    from_body(&state, &CODE_SYSTEM_LOOKUP, &headers, &body)
-                        .and_then(|(scope, p)| run_lookup(&scope, &Invocation::Type, &p)), wire)
-            }
-
-            /// `GET /CodeSystem/{id}/$lookup`, where the version declares it.
-            pub async fn lookup_instance_get(
-                State(state): State<Arc<AppState>>,
-                UrlPath(id): UrlPath<String>,
-                headers: HeaderMap,
-                Query(query): Query<Vec<(String, String)>>,
-            ) -> Response {
-                let (wire, query) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(instance(&state, &id).and_then(|invocation| {
-                    from_query(&state, &CODE_SYSTEM_LOOKUP, &headers, &query)
-                        .and_then(|(scope, p)| run_lookup(&scope, &invocation, &p))
-                }), wire)
-            }
-
-            /// `POST /CodeSystem/{id}/$lookup`, where the version declares it.
-            pub async fn lookup_instance_post(
-                State(state): State<Arc<AppState>>,
-                UrlPath(id): UrlPath<String>,
-                headers: HeaderMap,
-                Query(query): Query<Vec<(String, String)>>,
-                body: Bytes,
-            ) -> Response {
-                let (wire, _) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(instance(&state, &id).and_then(|invocation| {
-                    from_body(&state, &CODE_SYSTEM_LOOKUP, &headers, &body)
-                        .and_then(|(scope, p)| run_lookup(&scope, &invocation, &p))
-                }), wire)
-            }
-
-            /// `GET /CodeSystem/$validate-code`.
-            pub async fn validate_code_get(
-                State(state): State<Arc<AppState>>,
-                headers: HeaderMap,
-                Query(query): Query<Vec<(String, String)>>,
-            ) -> Response {
-                let (wire, query) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(
-                    from_query(&state, &CODE_SYSTEM_VALIDATE_CODE, &headers, &query)
-                        .and_then(|(scope, p)| run_validate_code(&scope, &Invocation::Type, &p)), wire)
-            }
-
-            /// `POST /CodeSystem/$validate-code`.
-            pub async fn validate_code_post(
-                State(state): State<Arc<AppState>>,
-                headers: HeaderMap,
-                Query(query): Query<Vec<(String, String)>>,
-                body: Bytes,
-            ) -> Response {
-                let (wire, _) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(
-                    from_body(&state, &CODE_SYSTEM_VALIDATE_CODE, &headers, &body)
-                        .and_then(|(scope, p)| run_validate_code(&scope, &Invocation::Type, &p)), wire)
-            }
-
-            /// `GET /CodeSystem/{id}/$validate-code`.
-            pub async fn validate_code_instance_get(
-                State(state): State<Arc<AppState>>,
-                UrlPath(id): UrlPath<String>,
-                headers: HeaderMap,
-                Query(query): Query<Vec<(String, String)>>,
-            ) -> Response {
-                let (wire, query) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(instance(&state, &id).and_then(|invocation| {
-                    from_query(&state, &CODE_SYSTEM_VALIDATE_CODE, &headers, &query)
-                        .and_then(|(scope, p)| run_validate_code(&scope, &invocation, &p))
-                }), wire)
-            }
-
-            /// `POST /CodeSystem/{id}/$validate-code`.
-            pub async fn validate_code_instance_post(
-                State(state): State<Arc<AppState>>,
-                UrlPath(id): UrlPath<String>,
-                headers: HeaderMap,
-                Query(query): Query<Vec<(String, String)>>,
-                body: Bytes,
-            ) -> Response {
-                let (wire, _) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(
-                    instance(&state, &id).and_then(|invocation| {
-                    from_body(&state, &CODE_SYSTEM_VALIDATE_CODE, &headers, &body)
-                        .and_then(|(scope, p)| run_validate_code(&scope, &invocation, &p))
-}),
-                    wire,
-                )
-            }
-
-            /// `GET /CodeSystem/$subsumes`.
-            pub async fn subsumes_get(
-                State(state): State<Arc<AppState>>,
-                headers: HeaderMap,
-                Query(query): Query<Vec<(String, String)>>,
-            ) -> Response {
-                let (wire, query) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(
-                    from_query(&state, &CODE_SYSTEM_SUBSUMES, &headers, &query)
-                        .and_then(|(scope, p)| run_subsumes(&scope, &Invocation::Type, &p)), wire)
-            }
-
-            /// `POST /CodeSystem/$subsumes`.
-            pub async fn subsumes_post(
-                State(state): State<Arc<AppState>>,
-                headers: HeaderMap,
-                Query(query): Query<Vec<(String, String)>>,
-                body: Bytes,
-            ) -> Response {
-                let (wire, _) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(
-                    from_body(&state, &CODE_SYSTEM_SUBSUMES, &headers, &body)
-                        .and_then(|(scope, p)| run_subsumes(&scope, &Invocation::Type, &p)), wire)
-            }
-
-            /// `GET /CodeSystem/{id}/$subsumes`.
-            pub async fn subsumes_instance_get(
-                State(state): State<Arc<AppState>>,
-                UrlPath(id): UrlPath<String>,
-                headers: HeaderMap,
-                Query(query): Query<Vec<(String, String)>>,
-            ) -> Response {
-                let (wire, query) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(instance(&state, &id).and_then(|invocation| {
-                    from_query(&state, &CODE_SYSTEM_SUBSUMES, &headers, &query)
-                        .and_then(|(scope, p)| run_subsumes(&scope, &invocation, &p))
-                }), wire)
-            }
-
-            /// `POST /CodeSystem/{id}/$subsumes`.
-            pub async fn subsumes_instance_post(
-                State(state): State<Arc<AppState>>,
-                UrlPath(id): UrlPath<String>,
-                headers: HeaderMap,
-                Query(query): Query<Vec<(String, String)>>,
-                body: Bytes,
-            ) -> Response {
-                let (wire, _) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(
-                    instance(&state, &id).and_then(|invocation| {
-                    from_body(&state, &CODE_SYSTEM_SUBSUMES, &headers, &body)
-                        .and_then(|(scope, p)| run_subsumes(&scope, &invocation, &p))
-}),
-                    wire,
-                )
-            }
-
-            /// `GET /ValueSet/$expand`.
-            pub async fn expand_get(
-                State(state): State<Arc<AppState>>,
-                headers: HeaderMap,
-                RawQuery(raw): RawQuery,
-                Query(query): Query<Vec<(String, String)>>,
-            ) -> Response {
-                let (wire, query) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                let origin = Origin::Query(raw.unwrap_or_default());
-                finish(
-                    from_query(&state, &VALUE_SET_EXPAND, &headers, &query)
-                        .and_then(|(scope, p)| run_expand(&scope, None, &p, &origin)), wire)
-            }
-
-            /// `POST /ValueSet/$expand`.
-            pub async fn expand_post(
-                State(state): State<Arc<AppState>>,
-                headers: HeaderMap,
-                Query(query): Query<Vec<(String, String)>>,
-                body: Bytes,
-            ) -> Response {
-                let (wire, _) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(
-                    from_body_placed(&state, &VALUE_SET_EXPAND, &[], &headers, &body)
-                        .and_then(|(scope, p, origin)| run_expand(&scope, None, &p, &origin)), wire)
-            }
-
-            /// `GET /ValueSet/{id}/$expand`.
-            pub async fn expand_instance_get(
-                State(state): State<Arc<AppState>>,
-                UrlPath(id): UrlPath<String>,
-                headers: HeaderMap,
-                Query(query): Query<Vec<(String, String)>>,
-            ) -> Response {
-                let (wire, query) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(
-                    value_set_instance(&state, &id).and_then(|bound| {
-                        from_query(&state, &VALUE_SET_EXPAND, &headers, &query)
-                            .and_then(|(scope, p)| run_expand(&scope, Some(&bound), &p, &Origin::Unplaced))
-                    }),
-                    wire,
-                )
-            }
-
-            /// `POST /ValueSet/{id}/$expand`.
-            pub async fn expand_instance_post(
-                State(state): State<Arc<AppState>>,
-                UrlPath(id): UrlPath<String>,
-                headers: HeaderMap,
-                Query(query): Query<Vec<(String, String)>>,
-                body: Bytes,
-            ) -> Response {
-                let (wire, _) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(
-                    value_set_instance(&state, &id).and_then(|bound| {
-                        from_body(&state, &VALUE_SET_EXPAND, &headers, &body)
-                            .and_then(|(scope, p)| run_expand(&scope, Some(&bound), &p, &Origin::Unplaced))
-                    }),
-                    wire,
-                )
-            }
-
-            /// `GET /ValueSet/$validate-code`.
-            pub async fn value_set_validate_code_get(
-                State(state): State<Arc<AppState>>,
-                headers: HeaderMap,
-                RawQuery(raw): RawQuery,
-                Query(query): Query<Vec<(String, String)>>,
-            ) -> Response {
-                let (wire, query) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                let origin = Origin::Query(raw.unwrap_or_default());
-                finish(
-                    from_query(&state, &VALUE_SET_VALIDATE_CODE, &headers, &query).and_then(
-                        |(scope, p)| run_value_set_validate_code(&scope, None, &p, &origin),
-                    ),
-                    wire,
-                )
-            }
-
-            /// `POST /ValueSet/$validate-code`.
-            pub async fn value_set_validate_code_post(
-                State(state): State<Arc<AppState>>,
-                headers: HeaderMap,
-                Query(query): Query<Vec<(String, String)>>,
-                body: Bytes,
-            ) -> Response {
-                let (wire, _) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(
-                    from_body_placed(&state, &VALUE_SET_VALIDATE_CODE, &[], &headers, &body).and_then(
-                        |(scope, p, origin)| run_value_set_validate_code(&scope, None, &p, &origin),
-                    ),
-                    wire,
-                )
-            }
-
-            /// `GET /ValueSet/{id}/$validate-code`.
-            pub async fn value_set_validate_code_instance_get(
-                State(state): State<Arc<AppState>>,
-                UrlPath(id): UrlPath<String>,
-                headers: HeaderMap,
-                Query(query): Query<Vec<(String, String)>>,
-            ) -> Response {
-                let (wire, query) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(
-                    value_set_instance(&state, &id).and_then(|bound| {
-                        from_query(&state, &VALUE_SET_VALIDATE_CODE, &headers, &query).and_then(
-                            |(scope, p)| run_value_set_validate_code(&scope, Some(&bound), &p, &Origin::Unplaced),
-                        )
-                    }),
-                    wire,
-                )
-            }
-
-            /// `POST /ValueSet/{id}/$validate-code`.
-            pub async fn value_set_validate_code_instance_post(
-                State(state): State<Arc<AppState>>,
-                UrlPath(id): UrlPath<String>,
-                headers: HeaderMap,
-                Query(query): Query<Vec<(String, String)>>,
-                body: Bytes,
-            ) -> Response {
-                let (wire, _) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(
-                    value_set_instance(&state, &id).and_then(|bound| {
-                        from_body(&state, &VALUE_SET_VALIDATE_CODE, &headers, &body).and_then(
-                            |(scope, p)| run_value_set_validate_code(&scope, Some(&bound), &p, &Origin::Unplaced),
-                        )
-                    }),
-                    wire,
-                )
-            }
-
-            /// `POST /ValueSet/$batch-validate-code` and `POST /CodeSystem/$batch-validate-code`.
-            ///
-            /// The operation changes nothing, but it carries its validations in a body,
-            /// so it is offered on `POST` alone
-            /// (<https://hl7.org/fhir/R4B/operations.html#executing>).
-            pub async fn batch_validate_code_post(
-                State(state): State<Arc<AppState>>,
-                headers: HeaderMap,
-                Query(query): Query<Vec<(String, String)>>,
-                body: Bytes,
-            ) -> Response {
-                let (wire, _) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(
-                    from_body_accepting(
-                        &state,
-                        &VALUE_SET_VALIDATE_CODE,
-                        &[VALIDATION],
-                        &headers,
-                        &body,
-                    )
-                    .and_then(|(scope, p)| run_batch_validate(&scope, &p)),
-                    wire,
-                )
-            }
-
-            /// `GET /ConceptMap/$translate`.
-            pub async fn translate_get(
-                State(state): State<Arc<AppState>>,
-                headers: HeaderMap,
-                Query(query): Query<Vec<(String, String)>>,
-            ) -> Response {
-                let (wire, query) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(
-                    reverse_refusal(query.iter().map(|(name, _)| name.as_str()))
-                        .and_then(|()| from_query(&state, &CONCEPT_MAP_TRANSLATE, &headers, &query))
-                        .and_then(|(scope, p)| run_translate(&scope, None, &p)), wire)
-            }
-
-            /// `GET /ConceptMap/{id}/$translate`.
-            pub async fn translate_instance_get(
-                State(state): State<Arc<AppState>>,
-                UrlPath(id): UrlPath<String>,
-                headers: HeaderMap,
-                Query(query): Query<Vec<(String, String)>>,
-            ) -> Response {
-                let (wire, query) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(
-                    concept_map_instance(&state, &id).and_then(|bound| {
-                        reverse_refusal(query.iter().map(|(name, _)| name.as_str()))
-                            .and_then(|()| {
-                                from_query(&state, &CONCEPT_MAP_TRANSLATE, &headers, &query)
-                            })
-                            .and_then(|(scope, p)| run_translate(&scope, Some(&bound), &p))
-                    }),
-                    wire,
-                )
-            }
-
-            /// `POST /ConceptMap/$translate`.
-            pub async fn translate_post(
-                State(state): State<Arc<AppState>>,
-                headers: HeaderMap,
-                Query(query): Query<Vec<(String, String)>>,
-                body: Bytes,
-            ) -> Response {
-                let (wire, _) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(
-                    // `reverse` reaches `run_translate`, which refuses it with
-                    // the ecosystem's own wording on a version that does not
-                    // declare it; the GET route does the same before decoding.
-                    from_body_accepting(
-                        &state,
-                        &CONCEPT_MAP_TRANSLATE,
-                        &["reverse"],
-                        &headers,
-                        &body,
-                    )
-                    .and_then(|(scope, p)| run_translate(&scope, None, &p)), wire)
-            }
-
-            /// `POST /ConceptMap/{id}/$translate`.
-            pub async fn translate_instance_post(
-                State(state): State<Arc<AppState>>,
-                UrlPath(id): UrlPath<String>,
-                headers: HeaderMap,
-                Query(query): Query<Vec<(String, String)>>,
-                body: Bytes,
-            ) -> Response {
-                let (wire, _) = match negotiated(&headers, &query) {
-                    Ok(negotiated) => negotiated,
-                    Err(failure) => return failure.into_response(),
-                };
-                finish(
-                    concept_map_instance(&state, &id).and_then(|bound| {
-                        from_body_accepting(
-                            &state,
-                            &CONCEPT_MAP_TRANSLATE,
-                            &["reverse"],
-                            &headers,
-                            &body,
-                        )
-                        .and_then(|(scope, p)| run_translate(&scope, Some(&bound), &p))
-                    }),
-                    wire,
-                )
-            }
+            $crate::version::operations::handlers::handlers!();
         }
     };
 }

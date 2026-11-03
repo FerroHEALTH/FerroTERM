@@ -61,7 +61,7 @@ fn bad(why: Msg) -> Response {
     (
         StatusCode::BAD_REQUEST,
         [(CACHE_CONTROL, "no-store")],
-        tr(&ferrohealth_ui::i18n::Locale::english(), why),
+        tr(&ferrohealth_ui::i18n::Locale::default(), why),
     )
         .into_response()
 }

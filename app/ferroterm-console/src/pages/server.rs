@@ -15,18 +15,18 @@ use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
+    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::{ActionGroup, action_button};
 use ferrohealth_ui::view::action_menu::{Act, Action, Item, Menu};
 use ferrohealth_ui::view::button::Variant;
-use ferrohealth_ui::view::dialog::{Confirmation, confirm_dialog};
+use ferrohealth_ui::view::dialog::{Confirmation, Stakes, confirm_dialog};
 use ferrohealth_ui::view::load_report::{Arrival, LoadReport, Outcome, load_report};
 use ferrohealth_ui::view::notice::{Announce, notice};
 use ferrohealth_ui::view::root_matrix::{MatrixRoot, MatrixRow, RootMatrix, root_matrix};
 use ferrohealth_ui::view::state::{Mark, state};
-use ferrohealth_ui::view::surface::{SectionHead, panel_section, panel_sections, section_intro};
+use ferrohealth_ui::view::surface::{Container, SectionHead, panel_section, section_intro};
 use ferrohealth_ui::view::tabs::{Tab, binder};
 use ferrohealth_ui::view::template::list::HeadingCount;
 
@@ -132,7 +132,7 @@ pub(crate) async fn page(request: Request) -> Html {
         if reloads {
             reload_actions(locale)
         } else {
-            ActionGroup::none()
+            ActionGroup::default()
         },
     );
     let form = request
@@ -203,6 +203,8 @@ fn reload_dialog(locale: &Locale) -> Html {
             title: tr(locale, Msg::ServerReloadQuestion).into(),
             message: tr(locale, Msg::ServerReloadMessage).into(),
         },
+        Stakes::Plain,
+        None,
         confirm,
     )
 }
@@ -381,7 +383,7 @@ fn roots_panel(
             rows,
         },
     );
-    panel_sections(Html::join([
+    Container::PanelSections.wrap(Html::join([
         panel_section(
             locale,
             None,
@@ -481,7 +483,7 @@ fn evidence(locale: &Locale) -> Html {
         Msg::ServerEvidenceLine,
         &[("release", evidence.release.into())],
     );
-    panel_sections(Html::join([
+    Container::PanelSections.wrap(Html::join([
         panel_section(locale, None, section_intro(line)),
         suite(locale, evidence.conformance),
         latency(locale, evidence.latency),
@@ -518,7 +520,7 @@ fn suite(locale: &Locale, conformance: Conformance) -> Html {
         };
         h(format!(
             "<tr>{}{}{}{}</tr>",
-            title_cell(None, code(mode.name), None),
+            title_cell(None, None, code(mode.name), None),
             cell(surface, code(mode.surface)),
             cell(passed, counted),
             cell(needs, t(content)),
@@ -526,6 +528,7 @@ fn suite(locale: &Locale, conformance: Conformance) -> Html {
     }));
     let caption = tr(locale, Msg::ServerSuiteTitle);
     let table = data_table(DataTable {
+        shape: Shape::Stacked,
         caption: &caption,
         columns: &columns,
         sorting: Sorting::default(),
@@ -564,13 +567,14 @@ fn latency(locale: &Locale, latency: Latency) -> Html {
     let rows = join(latency.bars.iter().map(|bar| {
         h(format!(
             "<tr>{}{}{}</tr>",
-            title_cell(None, code(bar.bench), None),
+            title_cell(None, None, code(bar.bench), None),
             cell(target, micro(bar.max_us)),
             cell(measured, micro(bar.measured_us)),
         ))
     }));
     let caption = tr(locale, Msg::ServerLatencyTitle);
     let table = data_table(DataTable {
+        shape: Shape::Stacked,
         caption: &caption,
         columns: &columns,
         sorting: Sorting::default(),

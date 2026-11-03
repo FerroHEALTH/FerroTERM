@@ -16,10 +16,12 @@ use concept_graph::subsumption::Outcome;
 use super::grammar::{Grammar, GrammarProvider, Table, outcome};
 use super::interned::Interned;
 use super::subtags::{Kind, REGISTRY_DATA, Registry};
+use crate::provider::declaration::{
+    Compositional, ContentMode, Declaration, FilterDefinition, PropertyDefinition, PropertyKind,
+};
 use crate::provider::filter::{Filter, FilterOperator};
 use crate::provider::{
-    Compositional, Concept, ConceptSet, ContentMode, Declaration, FilterDefinition, Identity,
-    Property, PropertyDefinition, PropertyKind, PropertyValue, ProviderError, Status,
+    Concept, ConceptSet, Identity, Property, PropertyValue, ProviderError, Status,
 };
 
 /// The system URI (<https://hl7.org/fhir/R4B/terminologies-systems.html>).

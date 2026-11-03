@@ -18,12 +18,14 @@ use std::path::Path;
 
 use serde::Deserialize;
 
+use crate::provider::declaration::{
+    Capability, Compositional, ContentMode, Declaration, FilterDefinition, HierarchyMeaning,
+    PropertyDefinition, PropertyKind,
+};
 use crate::provider::filter::FilterOperator;
 use crate::provider::source::Source;
 use crate::provider::{
-    Capability, CodeSystemProvider, Compositional, Concept, ContentMode, Declaration,
-    FilterDefinition, HierarchyMeaning, Identity, Located, Property, PropertyDefinition,
-    PropertyKind, ProviderError, Status,
+    CodeSystemProvider, Concept, Identity, Located, Property, ProviderError, Status,
 };
 use crate::stored;
 use crate::stored::artifact::{Artifact, Layout};

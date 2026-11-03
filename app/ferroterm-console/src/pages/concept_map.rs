@@ -17,14 +17,14 @@ use ferrohealth_ui::highlight::Language;
 use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
-use ferrohealth_ui::table::view::{Body, DataTable, Sorting, data_table, group_row};
+use ferrohealth_ui::table::mapping::{Mapping, Relationship, mapping_columns, mapping_row};
+use ferrohealth_ui::table::view::{Body, DataTable, Shape, Sorting, data_table, group_row};
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::action_menu::{Act, Action, Item, Menu};
 use ferrohealth_ui::view::code::{Code, CodeHead, code_section};
 use ferrohealth_ui::view::coding::{Coding, canonical};
-use ferrohealth_ui::view::mapping::{Mapping, Relationship, mapping_columns, mapping_row};
 use ferrohealth_ui::view::surface::{
-    SectionHead, definitions, or_none, panel_section, panel_sections, section_intro,
+    Container, SectionHead, definitions, or_none, panel_section, section_intro,
 };
 use ferrohealth_ui::view::template::list::HeadingCount;
 
@@ -53,7 +53,13 @@ pub(crate) async fn page(request: Request) -> Html {
             screen(&request, &id, &document, &names, pane)
         }
         Err(error) => Html::join([
-            heading(&request, id.clone(), None, Vec::new(), ActionGroup::none()),
+            heading(
+                &request,
+                id.clone(),
+                None,
+                Vec::new(),
+                ActionGroup::default(),
+            ),
             failure(&request.locale, &error),
         ]),
     }
@@ -253,7 +259,7 @@ fn mappings(
         Body::Bodies(bodies)
     };
     let count = u64::try_from(rows.len()).unwrap_or(u64::MAX);
-    panel_sections(panel_section(
+    Container::PanelSections.wrap(panel_section(
         locale,
         Some(SectionHead {
             title: caption.clone(),
@@ -261,6 +267,7 @@ fn mappings(
             actions: None,
         }),
         data_table(DataTable {
+            shape: Shape::Stacked,
             caption: &caption,
             columns: &columns,
             sorting: Sorting::default(),
@@ -357,7 +364,7 @@ fn overview(
             section_intro(tr(locale, Msg::ValueSetLoadedNote)),
         )
     });
-    panel_sections(Html::join([
+    Container::PanelSections.wrap(Html::join([
         note.unwrap_or_default(),
         panel_section(
             locale,
@@ -390,7 +397,7 @@ fn json(locale: &Locale, id: &str, document: &Document<PublishedConceptMap>) -> 
         current: None,
         diagnostics: Vec::new(),
     };
-    panel_sections(code_section(
+    Container::PanelSections.wrap(code_section(
         locale,
         CodeHead {
             title: format!("ConceptMap/{id}"),
@@ -405,7 +412,7 @@ fn json(locale: &Locale, id: &str, document: &Document<PublishedConceptMap>) -> 
 
 #[cfg(test)]
 mod tests {
-    use ferrohealth_ui::view::mapping::Relationship;
+    use ferrohealth_ui::table::mapping::Relationship;
 
     use super::relationship;
     use crate::fhir::version::FhirVersion;

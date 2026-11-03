@@ -282,7 +282,7 @@ pub(crate) fn notes(answer: &RootAnswer) -> Vec<(String, String)> {
 mod tests {
     /// The English locale the tests read the words in.
     fn english() -> ferrohealth_ui::i18n::Locale {
-        ferrohealth_ui::i18n::Locale::english()
+        ferrohealth_ui::i18n::Locale::default()
     }
 
     use super::*;

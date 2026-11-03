@@ -12,7 +12,8 @@ use std::sync::Arc;
 
 use super::Issue;
 use crate::language;
-use crate::provider::{CodeSystemProvider, Concept, ContentMode, ProviderError};
+use crate::provider::declaration::ContentMode;
+use crate::provider::{CodeSystemProvider, Concept, ProviderError};
 use crate::text_match;
 
 /// One display a concept accepts, with the language it is in.
@@ -397,10 +398,12 @@ pub fn unknown_code(provider: &dyn CodeSystemProvider, code: &str) -> (super::Me
     // the system lacks, so the caveat says which of the two this is
     // (<https://hl7.org/fhir/R4B/terminologycapabilities-definitions.html#TerminologyCapabilities.codeSystem.version.compositional>).
     let grammar = match provider.declaration().compositional {
-        crate::provider::Compositional::Defined if provider.is_expression(code) => String::from(
-            " - note that the code is an expression in the compositional grammar of the code system, which this server does not evaluate",
-        ),
-        crate::provider::Compositional::Supported => provider
+        crate::provider::declaration::Compositional::Defined if provider.is_expression(code) => {
+            String::from(
+                " - note that the code is an expression in the compositional grammar of the code system, which this server does not evaluate",
+            )
+        }
+        crate::provider::declaration::Compositional::Supported => provider
             .rejection(code)
             .map(|reason| format!(" - {reason}"))
             .unwrap_or_default(),

@@ -14,12 +14,15 @@
 use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
-use ferrohealth_ui::table::view::{Body, Column, DataTable, Role, Sorting, cell, data_table};
+use ferrohealth_ui::table::view::{
+    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table,
+};
 use ferrohealth_ui::view::form::{FORM, Field, INPUT, MEDIUM, SELECT, check, field_flow};
+use ferrohealth_ui::view::layout::{Gap, stack_at};
 use ferrohealth_ui::view::load_report::{Arrival, LoadReport, Outcome, load_report};
 use ferrohealth_ui::view::repeat::{Fields, ROW, Repeat, RepeatAdd, RepeatRow, RowEnd, repeat};
 use ferrohealth_ui::view::surface::{
-    SectionHead, card_action, panel_section, panel_sections_card, section_intro, stack,
+    SectionHead, card_action, panel_section, panel_sections_card, section_intro,
 };
 use ferrohealth_ui::view::template::list::HeadingCount;
 
@@ -270,17 +273,20 @@ fn drawn(
             Msg::EditorEdit
         },
     );
-    let body = stack(Html::join([
-        answer.map(|(view, _)| view).unwrap_or_default(),
-        panel_sections_card(
-            title.clone(),
-            Html::join([
-                metadata(locale, draft),
-                properties(locale, draft),
-                concepts(locale, draft, opened),
-            ]),
-        ),
-    ]));
+    let body = stack_at(
+        Gap::Loose,
+        Html::join([
+            answer.map(|(view, _)| view).unwrap_or_default(),
+            panel_sections_card(
+                title.clone(),
+                Html::join([
+                    metadata(locale, draft),
+                    properties(locale, draft),
+                    concepts(locale, draft, opened),
+                ]),
+            ),
+        ]),
+    );
     Html::join([
         heading(
             request,
@@ -631,6 +637,7 @@ fn concepts(locale: &Locale, draft: &Draft, opened: &Draft) -> Html {
         Html::join([
             section_intro(tr(locale, Msg::EditorRetiredNotRemoved)),
             data_table(DataTable {
+                shape: Shape::Stacked,
                 caption: &caption,
                 columns: &columns,
                 sorting: Sorting::default(),

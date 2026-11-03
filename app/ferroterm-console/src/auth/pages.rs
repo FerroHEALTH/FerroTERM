@@ -98,7 +98,7 @@ fn plain(status: StatusCode, why: Msg) -> Response {
     (
         status,
         [(CACHE_CONTROL, "no-store")],
-        tr(&ferrohealth_ui::i18n::Locale::english(), why),
+        tr(&ferrohealth_ui::i18n::Locale::default(), why),
     )
         .into_response()
 }

@@ -17,11 +17,11 @@
 
 use crate::fhir_codesystem::provider::{BuildError, FhirCodeSystem};
 use crate::provider::code_system::{CodeSystemModel, ConceptEntry};
-use crate::provider::filter::FilterOperator;
-use crate::provider::{
-    ContentMode, Designation, FilterDefinition, Property, PropertyDefinition, PropertyKind,
-    PropertyValue,
+use crate::provider::declaration::{
+    ContentMode, FilterDefinition, PropertyDefinition, PropertyKind,
 };
+use crate::provider::filter::FilterOperator;
+use crate::provider::{Designation, Property, PropertyValue};
 
 /// The system URI.
 pub const URL: &str = "urn:iso:std:iso:3166";

@@ -58,20 +58,11 @@ for (let node = texts.nextNode(); node && spilled.length < 6; node = texts.nextN
 return String(over) + ' px, by ' + named.concat(spilled).join(', ');
 ";
 
-/// The screens the walk leaves out while FerroUI's stylesheet widens them.
-const AWAITING_FERROUI: [&str; 1] = [
-    // TODO(#963): walk this once FerroUI#569 ships.
-    "/conceptmaps/e2e-taxonomy-map",
-];
-
 /// Walks every screen at [`WIDTH`] and fails on each that scrolls sideways.
 async fn walk(journey: &Journey, base: &str) -> WebDriverResult<()> {
     journey.resize(WIDTH, HEIGHT).await;
     let mut wide = Vec::new();
-    for screen in SCREENS
-        .into_iter()
-        .filter(|screen| !AWAITING_FERROUI.contains(screen))
-    {
+    for screen in SCREENS {
         let separator = if screen.contains('?') { '&' } else { '?' };
         journey
             .reopen(&format!("{base}{screen}{separator}fhir={VERSION}"))

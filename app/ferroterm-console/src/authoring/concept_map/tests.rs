@@ -379,7 +379,7 @@ fn every_problem_reads_as_a_sentence() {
     ] {
         assert!(
             !problem
-                .text(&ferrohealth_ui::i18n::Locale::english())
+                .text(&ferrohealth_ui::i18n::Locale::default())
                 .is_empty(),
             "{problem:?} renders as nothing"
         );
@@ -441,7 +441,7 @@ fn a_scope_that_names_a_value_set_or_nothing_is_savable() {
 
 #[test]
 fn the_scope_refusal_names_the_scope_and_the_definition() {
-    let locale = ferrohealth_ui::i18n::Locale::english();
+    let locale = ferrohealth_ui::i18n::Locale::default();
     let text = Problem::ScopeIsCodeSystem {
         side: Side::Source,
         scope: String::from("https://terminology.example/colours"),

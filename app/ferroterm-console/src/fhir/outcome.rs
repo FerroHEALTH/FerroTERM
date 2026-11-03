@@ -152,7 +152,7 @@ mod tests {
                  "diagnostics":"lookup failed"}]}"#,
         );
         assert_eq!(
-            outcome.lines(&ferrohealth_ui::i18n::Locale::english()),
+            outcome.lines(&ferrohealth_ui::i18n::Locale::default()),
             vec![IssueLine {
                 severity: "error".to_owned(),
                 code: "not-found".to_owned(),
@@ -175,7 +175,7 @@ mod tests {
         );
         assert_eq!(
             outcome
-                .lines(&ferrohealth_ui::i18n::Locale::english())
+                .lines(&ferrohealth_ui::i18n::Locale::default())
                 .first()
                 .map(|line| line.details.clone()),
             Some(vec![
@@ -194,7 +194,7 @@ mod tests {
         );
         assert_eq!(
             outcome
-                .lines(&ferrohealth_ui::i18n::Locale::english())
+                .lines(&ferrohealth_ui::i18n::Locale::default())
                 .first()
                 .map(|line| line.text.clone()),
             Some("count must be >= 0".to_owned()),
@@ -207,7 +207,7 @@ mod tests {
         let outcome = parse(r#"{"issue":[{"severity":"fatal","code":"exception"}]}"#);
         assert_eq!(
             outcome
-                .lines(&ferrohealth_ui::i18n::Locale::english())
+                .lines(&ferrohealth_ui::i18n::Locale::default())
                 .len(),
             1,
             "a refusal never renders as nothing"
@@ -221,7 +221,7 @@ mod tests {
                          {"code":"not-found","diagnostics":"second"}]}"#,
         );
         let texts: Vec<String> = outcome
-            .lines(&ferrohealth_ui::i18n::Locale::english())
+            .lines(&ferrohealth_ui::i18n::Locale::default())
             .into_iter()
             .map(|line| line.text)
             .collect();
@@ -237,7 +237,7 @@ mod tests {
         let outcome = parse(r#"{"issue":[{"code":"processing"}]}"#);
         assert_eq!(
             outcome
-                .lines(&ferrohealth_ui::i18n::Locale::english())
+                .lines(&ferrohealth_ui::i18n::Locale::default())
                 .first()
                 .map(|line| line.severity.clone()),
             Some("error".to_owned()),

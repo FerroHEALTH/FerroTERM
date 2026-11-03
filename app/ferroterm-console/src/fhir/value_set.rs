@@ -289,7 +289,7 @@ mod tests {
             .facts()
             .into_iter()
             .find(|fact| {
-                crate::locale::tr(&ferrohealth_ui::i18n::Locale::english(), fact.label) == label
+                crate::locale::tr(&ferrohealth_ui::i18n::Locale::default(), fact.label) == label
             })
             .expect("the screen draws a row for every fact it names")
             .value
@@ -366,7 +366,7 @@ mod tests {
         );
         assert!(
             resource.facts().iter().any(|fact| crate::locale::tr(
-                &ferrohealth_ui::i18n::Locale::english(),
+                &ferrohealth_ui::i18n::Locale::default(),
                 fact.label
             ) == "Purpose"),
             "the row is drawn so the screen can state the absence"

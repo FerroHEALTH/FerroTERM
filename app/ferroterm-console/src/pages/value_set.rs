@@ -16,7 +16,7 @@ use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
+    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::view::action::{ActionGroup, action_button};
 use ferrohealth_ui::view::action_menu::{Act, Action, Item, Menu};
@@ -24,9 +24,9 @@ use ferrohealth_ui::view::button::Variant;
 use ferrohealth_ui::view::clause::{Clause, ClauseCode, ClauseKind, clause, clause_codes, clauses};
 use ferrohealth_ui::view::code::{Code, CodeHead, code_section};
 use ferrohealth_ui::view::coding::{Coding, Layout, coding};
-use ferrohealth_ui::view::dialog::{Confirmation, danger_dialog};
+use ferrohealth_ui::view::dialog::{Confirmation, Stakes, confirm_dialog};
 use ferrohealth_ui::view::surface::{
-    SectionHead, card_action, definitions, or_none, panel_section, panel_sections, section_intro,
+    Container, SectionHead, card_action, definitions, or_none, panel_section, section_intro,
 };
 use ferrohealth_ui::view::template::list::HeadingCount;
 
@@ -98,7 +98,13 @@ pub(crate) async fn page(request: Request) -> Html {
         Ok(document) => document,
         Err(error) => {
             return Html::join([
-                heading(&request, id.clone(), None, Vec::new(), ActionGroup::none()),
+                heading(
+                    &request,
+                    id.clone(),
+                    None,
+                    Vec::new(),
+                    ActionGroup::default(),
+                ),
                 failure(locale, &error),
             ]);
         }
@@ -277,7 +283,7 @@ fn delete_dialog(request: &Request, id: &str, title: &str) -> Html {
         ),
         Variant::Destructive,
     );
-    danger_dialog(
+    confirm_dialog(
         locale,
         Confirmation {
             id: DELETE_DIALOG.into(),
@@ -289,6 +295,8 @@ fn delete_dialog(request: &Request, id: &str, title: &str) -> Html {
             .into(),
             message: tr(locale, Msg::ValueSetDeleteMessage).into(),
         },
+        Stakes::Danger,
+        None,
         confirm,
     )
 }
@@ -514,7 +522,7 @@ fn definition(request: &Request, read: &Read, source: Source) -> Html {
             section_intro(tr(locale, Msg::ValueSetLoadedNote)),
         )
     });
-    panel_sections(Html::join([
+    Container::PanelSections.wrap(Html::join([
         note.unwrap_or_default(),
         panel_section(
             locale,
@@ -569,7 +577,7 @@ fn expansion_panel(
                 }
                 h(format!(
                     "<tr>{}{}</tr>",
-                    title_cell(None, coding(locale, drawn, Layout::Inline), None),
+                    title_cell(None, None, coding(locale, drawn, Layout::Inline), None),
                     cell(
                         system,
                         ferrohealth_ui::view::coding::canonical(&concept.system)
@@ -578,6 +586,7 @@ fn expansion_panel(
             }));
             let caption = tr(locale, Msg::ValueSetFirstPage);
             let table = data_table(DataTable {
+                shape: Shape::Stacked,
                 caption: &caption,
                 columns: &columns,
                 sorting: Sorting::default(),
@@ -602,7 +611,7 @@ fn expansion_panel(
             Html::join([section_intro(total), table])
         }
     };
-    panel_sections(panel_section(
+    Container::PanelSections.wrap(panel_section(
         locale,
         Some(SectionHead {
             title: tr(locale, Msg::ValueSetExpansionTitle),
@@ -623,7 +632,7 @@ fn json(locale: &Locale, id: &str, document: &Document<PublishedValueSet>) -> Ht
         current: None,
         diagnostics: Vec::new(),
     };
-    panel_sections(code_section(
+    Container::PanelSections.wrap(code_section(
         locale,
         CodeHead {
             title: format!("ValueSet/{id}"),

@@ -25,7 +25,7 @@ use fhir_terminology::loinc::{self, LoincProvider};
 use fhir_terminology::operations::Sources;
 use fhir_terminology::provider::code_system::CodeSystemModel;
 use fhir_terminology::provider::concept_map::ConceptMapModel;
-use fhir_terminology::provider::{CodeSystemProvider, ContentMode, ProviderError};
+use fhir_terminology::provider::{CodeSystemProvider, ProviderError, declaration::ContentMode};
 use fhir_terminology::registries::ucum::provider::UcumProvider;
 use fhir_terminology::registries::{bcp13, bcp47, iso3166};
 use fhir_terminology::registry::{RegisterError, Registry, Resolved};

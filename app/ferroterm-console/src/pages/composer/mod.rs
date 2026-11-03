@@ -20,9 +20,10 @@ use ferrohealth_ui::view::coding::{Coding, Layout, coding};
 use ferrohealth_ui::view::form::{FORM, Field, SELECT, field_flow};
 use ferrohealth_ui::view::kbd::{aria_keys, kbd};
 use ferrohealth_ui::view::layout::main_aside;
+use ferrohealth_ui::view::layout::{Gap, stack_at};
 use ferrohealth_ui::view::load_report::{Arrival, LoadReport, Outcome, load_report};
 use ferrohealth_ui::view::surface::{
-    SectionHead, card_action, panel_section, panel_sections_card, section_intro, stack,
+    SectionHead, card_action, panel_section, panel_sections_card, section_intro,
 };
 use ferrohealth_ui::view::transform::transform_quiet;
 
@@ -194,10 +195,13 @@ async fn edited(request: &Request, posted: Option<&Posted>) -> Html {
         title.clone(),
         Html::join([metadata(locale, &draft), compose(locale, &draft, &offers)]),
     );
-    let body = stack(Html::join([
-        answer.map(|(view, _)| view).unwrap_or_default(),
-        main_aside(editor, preview_card(locale, preview, &names)),
-    ]));
+    let body = stack_at(
+        Gap::Loose,
+        Html::join([
+            answer.map(|(view, _)| view).unwrap_or_default(),
+            main_aside(editor, preview_card(locale, preview, &names)),
+        ]),
+    );
     Html::join([
         heading(
             request,
@@ -632,7 +636,7 @@ mod tests {
 
     #[test]
     fn run_the_preview_announces_ctrl_enter_for_the_keys_module() {
-        let html = preview_card(&Locale::english(), None, &BTreeMap::new());
+        let html = preview_card(&Locale::default(), None, &BTreeMap::new());
         let html = html.as_str();
         assert!(
             html.contains("value=\"preview\" aria-keyshortcuts=\"Control+Enter\""),

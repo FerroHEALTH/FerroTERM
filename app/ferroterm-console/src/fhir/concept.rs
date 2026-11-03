@@ -275,7 +275,7 @@ impl ConceptQuery {
         body.insert(
             String::from("resourceType"),
             Value::String(tr(
-                &ferrohealth_ui::i18n::Locale::english(),
+                &ferrohealth_ui::i18n::Locale::default(),
                 Msg::Parameters,
             )),
         );
