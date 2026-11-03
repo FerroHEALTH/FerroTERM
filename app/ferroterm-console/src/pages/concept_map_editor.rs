@@ -21,36 +21,30 @@ use ferrohealth_ui::table::mapping::{
 };
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::coding::Coding;
-use ferrohealth_ui::view::form::{FORM, Field, INPUT, SELECT, field_flow};
+use ferrohealth_ui::view::form::{Field, INPUT, SELECT, field_flow};
 use ferrohealth_ui::view::layout::{Gap, stack_at};
-use ferrohealth_ui::view::load_report::{Arrival, LoadReport, Outcome, load_report};
 use ferrohealth_ui::view::notice::{Announce, notice};
 use ferrohealth_ui::view::surface::{
     SectionHead, card_action, panel_section, panel_sections_card, section_intro,
 };
 
-use crate::auth::scopes::Letter;
 use crate::authoring::code_system::Key;
 use crate::authoring::concept_map::{MapDraft, MapElement, MapGroup, MapTarget, dialect};
 use crate::fhir::CONCEPT_MAP;
-use crate::fhir::compose::STATUSES;
-use crate::fhir::error::FhirError;
 use crate::fhir::version::FhirVersion;
 use crate::locale::{Msg, tr, tr_with};
 use crate::pages::detail::Kind;
 use crate::pages::editor::{
-    DISCARD, OPENED, OPENED_AT, SAVE, SAVED_PARAM, Standing, add_button, dock, field, form,
-    heading, icon_submit, name, opened_line, percent, refused, rows, text_field,
+    self, Guard, OPENED, OPENED_AT, SAVE, Standing, add_button, apply_metadata, dock, field, form,
+    heading, icon_submit, metadata_section, name, opened_line, rows, shown, status_options, target,
+    text_field,
 };
 use crate::pages::expand::checkbox;
 use crate::pages::operations::{hidden_field, option};
 use crate::pages::parts::{failure, name_of};
 use crate::posted::Posted;
 use crate::request::Request;
-use crate::routes::{
-    CONCEPT_MAP_EDITOR_ROUTE, CONCEPT_MAPS_PATH, MAP_EDITOR_PARAM, resource_link, sign_in_link,
-    ui_link,
-};
+use crate::routes::{CONCEPT_MAP_EDITOR_ROUTE, CONCEPT_MAPS_PATH, MAP_EDITOR_PARAM, resource_link};
 
 /// The list of groups in the form.
 const GROUP: &str = "group";
@@ -109,75 +103,52 @@ fn relationship_choices(locale: &Locale, version: FhirVersion) -> Vec<(&'static 
 
 /// The concept map editor.
 pub(crate) async fn page(request: Request) -> Html {
-    let locale = &request.locale;
-    let posted = request.posted.clone();
-    let letter = if request.text(MAP_EDITOR_PARAM).is_empty() {
-        Letter::Create
-    } else {
-        Letter::Update
-    };
-    if !request.can(CONCEPT_MAP, letter) {
-        if request.session.who().is_none() && request.sign_in {
-            request.answering.redirect(&sign_in_link(&request.back()));
-        }
-        return crate::pages::errors::forbidden_page(
-            &request,
-            Msg::EditorForbiddenConceptMap,
-            "user/ConceptMap.cu",
-            (
-                tr(locale, Msg::ShellConceptMaps),
-                ui_link(CONCEPT_MAPS_PATH, request.version),
-            ),
-        );
-    }
-    edited(&request, posted.as_ref()).await
+    editor::guarded(&request, &GUARD, edited).await
 }
 
-/// The editor's address: the canonical it edits, on the reader's version.
-fn address(request: &Request, canonical: &str) -> String {
-    let base = format!(
-        "{CONCEPT_MAP_EDITOR_ROUTE}?fhir={}",
-        request.version.segment()
-    );
-    if canonical.is_empty() {
-        base
-    } else {
-        format!("{base}&{MAP_EDITOR_PARAM}={}", percent(canonical))
-    }
-}
+/// Who may open the concept map editor.
+const GUARD: Guard = Guard {
+    route: CONCEPT_MAP_EDITOR_ROUTE,
+    resource_type: CONCEPT_MAP,
+    param: MAP_EDITOR_PARAM,
+    forbidden: Msg::EditorForbiddenConceptMap,
+    scope: "user/ConceptMap.cu",
+    back: (Msg::ShellConceptMaps, CONCEPT_MAPS_PATH),
+};
+
+editor::metadata!(MapDraft);
 
 /// The page, after whatever the reader `posted`.
 async fn edited(request: &Request, posted: Option<&Posted>) -> Html {
     let locale = &request.locale;
     let canonical = request.text(MAP_EDITOR_PARAM);
-    let here = address(request, &canonical);
-    if posted.is_some_and(|form| form.intent() == DISCARD) {
-        request.answering.redirect(&here);
-        return Html::empty();
+    let here = editor::address(request, &GUARD, &canonical);
+    if let Some(page) = editor::discarded(request, posted, &here) {
+        return page;
     }
-    let opened = match open(request, &canonical).await {
+    let opened = match open(request, &canonical)
+        .await
+        .and_then(|opened| editor::unless_saved(request, opened, saved_page))
+    {
         Ok(opened) => opened,
         Err(page) => return page,
     };
-    if let Some(saved) = request.param(SAVED_PARAM) {
-        return saved_page(request, &opened, &saved);
-    }
-    let (systems, names) = crate::pages::composer::systems_of(request).await;
-    let mut draft = opened.clone();
-    let mut opened_version = opened.version_id.clone();
-    let mut opened_at = jiff::Timestamp::now().to_string();
     let mut answer = None;
+    let (mut draft, opened_version, opened_at) = editor::reopened(posted, &opened);
     if let Some(form) = posted {
-        opened_version = form.text(OPENED);
-        opened_at = form.text(OPENED_AT);
         apply(form, &opened, &mut draft);
         if form.intent() == SAVE && draft.problems(request.version).is_empty() {
-            match save(request, &draft, &opened_version, &here).await {
-                Ok(()) => return Html::empty(),
-                Err(refusal) => answer = Some(*refusal),
+            let sent = (CONCEPT_MAP, draft.id.as_str(), draft.body(request.version));
+            let written_to = (opened_version.as_str(), here.as_str());
+            let reopen = |_: &crate::fhir::write::Written| {
+                editor::address(request, &GUARD, draft.url.trim())
+            };
+            if editor::saved(request, sent, written_to, reopen, &mut answer).await {
+                return Html::empty();
             }
         }
     }
+    let (systems, names) = crate::pages::composer::systems_of(request).await;
     let problems = draft.problems(request.version);
     let standing = match (&answer, problems.first()) {
         (Some((_, standing)), _) => standing.clone(),
@@ -273,7 +244,7 @@ async fn open(request: &Request, canonical: &str) -> Result<MapDraft, Html> {
     if opened.managed() {
         Ok(opened)
     } else {
-        Err(crate::pages::editor::unmanaged(
+        Err(editor::unmanaged(
             request,
             Kind::ConceptMap,
             resource_link(CONCEPT_MAPS_PATH, &opened.id, request.version),
@@ -281,66 +252,21 @@ async fn open(request: &Request, canonical: &str) -> Result<MapDraft, Html> {
     }
 }
 
-/// Saves `draft` over the version `opened` and redirects to what the
-/// server holds now, or answers the refusal over the draft at `here`.
-async fn save(
-    request: &Request,
-    draft: &MapDraft,
-    opened: &str,
-    here: &str,
-) -> Result<(), Box<(Html, Standing)>> {
-    let sent = match draft.body(request.version) {
-        Ok(body) => {
-            crate::pages::editor::send(request, CONCEPT_MAP, &draft.id, &body, opened).await
-        }
-        Err(error) => Err(FhirError::undecoded(here, request.version, &error)),
-    };
-    match sent {
-        Ok(written) => {
-            let version = written.version_id().unwrap_or_default().to_owned();
-            request.answering.redirect(&format!(
-                "{}&{SAVED_PARAM}={}",
-                address(request, draft.url.trim()),
-                percent(&version)
-            ));
-            Ok(())
-        }
-        Err(error) => Err(Box::new(refused(request, &error, here))),
-    }
-}
-
 /// The trail's step to the concept map `opened` read, once it is stored.
 fn crumb(request: &Request, opened: &MapDraft) -> Option<(String, String)> {
     (!opened.id.is_empty()).then(|| {
-        let shown = if opened.title.is_empty() {
-            opened.url.clone()
-        } else {
-            opened.title.clone()
-        };
         (
-            shown,
+            shown(&opened.title, &opened.url),
             resource_link(CONCEPT_MAPS_PATH, &opened.id, request.version),
         )
     })
-}
-
-/// The row key an intent such as `add-target:e3` names, when it names
-/// `action`.
-fn target<'a>(intent: &'a str, action: &str) -> Option<&'a str> {
-    intent
-        .strip_prefix(action)
-        .and_then(|rest| rest.strip_prefix(':'))
 }
 
 /// Writes the posted fields over `draft`, read from `opened`, the row a
 /// Remove names left out and the row an Add asks for added.
 fn apply(form: &Posted, opened: &MapDraft, draft: &mut MapDraft) {
     let intent = form.intent();
-    draft.url = form.text("url");
-    draft.title = form.text("title");
-    draft.name = form.text("name");
-    draft.version = form.text("version");
-    draft.status = form.text("status");
+    apply_metadata(form, draft);
     let elements = rows(form, ELEMENT);
     let targets = rows(form, TARGET);
     let mut keys = opened.keys;
@@ -425,33 +351,16 @@ fn apply(form: &Posted, opened: &MapDraft, draft: &mut MapDraft) {
 
 /// The metadata section.
 fn metadata(locale: &Locale, draft: &MapDraft) -> Html {
-    let statuses = Html::join(STATUSES.iter().map(|status| {
-        let words = tr(
-            locale,
-            match *status {
-                "active" => Msg::StatusActive,
-                "retired" => Msg::StatusRetired,
-                "unknown" => Msg::StatusUnknown,
-                _ => Msg::StatusDraft,
-            },
-        );
-        option(status, &words, *status == draft.status)
-    }));
-    panel_section(
+    let statuses = status_options(locale, &draft.status);
+    metadata_section(
         locale,
-        Some(SectionHead {
-            title: tr(locale, Msg::EditorMetadata),
-            count: None,
-            actions: None,
-        }),
-        Html::raw(format!(
-            r#"<div class="{FORM}">{}{}</div>"#,
+        &Html::join([
             text_field(
                 "cm-url",
                 "url",
                 tr(locale, Msg::EditorCanonical),
                 draft.url.clone(),
-                true
+                true,
             ),
             field_flow(Html::join([
                 text_field(
@@ -479,7 +388,7 @@ fn metadata(locale: &Locale, draft: &MapDraft) -> Html {
                     r#"<select id="cm-status" name="status" class="{SELECT}">{statuses}</select>"#
                 ))),
             ])),
-        )),
+        ]),
     )
 }
 
@@ -748,38 +657,10 @@ fn check_keyed(id: &str, label: String, field_name: &str, on: bool) -> Html {
 /// The page after a save: the version the server now holds, and the way to
 /// the concept map.
 fn saved_page(request: &Request, opened: &MapDraft, saved: &str) -> Html {
-    let locale = &request.locale;
     let href = resource_link(CONCEPT_MAPS_PATH, &opened.id, request.version);
-    let open = card_action(href.clone(), tr(locale, Msg::EditorOpenConceptMap));
-    let shown = if opened.title.is_empty() {
-        opened.url.clone()
-    } else {
-        opened.title.clone()
-    };
-    Html::join([
-        heading(
-            request,
-            Kind::ConceptMap,
-            Some((shown, href)),
-            tr(locale, Msg::EditorSavedTitle),
-            tr_with(
-                locale,
-                Msg::EditorVersion,
-                &[("version", saved.to_owned().into())],
-            ),
-        ),
-        load_report(LoadReport {
-            outcome: Outcome::Ok,
-            arrival: Arrival::AfterAction,
-            title: Html::text(tr_with(
-                locale,
-                Msg::EditorSaved,
-                &[("version", saved.to_owned().into())],
-            )),
-            counts: Vec::new(),
-            action: Some(open),
-        }),
-    ])
+    let open = card_action(href.clone(), tr(&request.locale, Msg::EditorOpenConceptMap));
+    let resource = Some((shown(&opened.title, &opened.url), href));
+    editor::saved_page(request, Kind::ConceptMap, resource, open, saved)
 }
 
 #[cfg(test)]

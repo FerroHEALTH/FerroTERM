@@ -26,23 +26,27 @@ use ferrohealth_ui::view::button::Variant;
 use ferrohealth_ui::view::dock::{
     Decision, DecisionBar, DecisionState, DockForm, DockLine, decision_bar,
 };
-use ferrohealth_ui::view::form::{Field, INPUT};
+use ferrohealth_ui::view::form::{FORM, Field, INPUT};
 use ferrohealth_ui::view::notice::{Announce, notice};
 use ferrohealth_ui::view::refusal::refusal;
-use ferrohealth_ui::view::surface::{Crumb, Header};
+use ferrohealth_ui::view::surface::{Crumb, Header, SectionHead, panel_section};
 use http::StatusCode;
 
+use ferrohealth_ui::view::load_report::{Arrival, LoadReport, Outcome, load_report};
+
+use crate::auth::scopes::Letter;
+use crate::fhir::compose::STATUSES;
 use crate::fhir::error::FhirError;
 use crate::fhir::write::Written;
 use crate::locale::{Msg, tr, tr_with};
 use crate::markup::p;
 use crate::pages::detail::Kind;
-use crate::pages::operations::hidden_field;
+use crate::pages::operations::{hidden_field, option};
 use crate::pages::parts::{ago, headed, refusal_of};
 use crate::pages::shortcuts::SAVE_KEYS;
 use crate::posted::Posted;
 use crate::request::Request;
-use crate::routes::sign_in_link;
+use crate::routes::{sign_in_link, ui_link};
 
 /// The id of an editor's form, which the docked bar's decisions join.
 pub(crate) const FORM_ID: &str = "editor";
@@ -423,6 +427,293 @@ pub(crate) async fn send(
             .update(request.version, resource_type, id, body, stated)
             .await
     }
+}
+
+/// One editor: where it is served, who may open it, and the page a reader
+/// without the scope is shown.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Guard {
+    /// The route the editor is served and posted at.
+    pub(crate) route: &'static str,
+    /// The resource type the editor writes.
+    pub(crate) resource_type: &'static str,
+    /// The address parameter that names the resource it edits; empty is a
+    /// create.
+    pub(crate) param: &'static str,
+    /// What the forbidden page says the reader lacks.
+    pub(crate) forbidden: Msg,
+    /// The SMART scope a write needs, as the forbidden page names it.
+    pub(crate) scope: &'static str,
+    /// The listing the forbidden page leads back to, and its address path.
+    pub(crate) back: (Msg, &'static str),
+}
+
+/// The page a reader is shown in place of the editor `guard` names, or
+/// `None` when the reader may write what it edits.
+///
+/// A visitor who is not signed in is sent to sign in when the console offers
+/// a sign-in.
+fn forbidden(request: &Request, guard: &Guard) -> Option<Html> {
+    let letter = if request.text(guard.param).is_empty() {
+        Letter::Create
+    } else {
+        Letter::Update
+    };
+    if request.can(guard.resource_type, letter) {
+        return None;
+    }
+    if request.session.who().is_none() && request.sign_in {
+        request.answering.redirect(&sign_in_link(&request.back()));
+    }
+    Some(crate::pages::errors::forbidden_page(
+        request,
+        guard.forbidden,
+        guard.scope,
+        (
+            tr(&request.locale, guard.back.0),
+            ui_link(guard.back.1, request.version),
+        ),
+    ))
+}
+
+/// The editor `guard` names, drawn by `edited` over what the reader posted,
+/// or the page a reader who may not write it is shown.
+pub(crate) async fn guarded(
+    request: &Request,
+    guard: &Guard,
+    edited: impl AsyncFn(&Request, Option<&Posted>) -> Html,
+) -> Html {
+    match forbidden(request, guard) {
+        Some(page) => page,
+        None => edited(request, request.posted.as_ref()).await,
+    }
+}
+
+/// `opened`, the draft an editor opened, or the page `saved_page` draws
+/// when the address names the version a save wrote.
+///
+/// # Errors
+///
+/// Returns that saved page in place of the draft.
+pub(crate) fn unless_saved<D>(
+    request: &Request,
+    opened: D,
+    saved_page: fn(&Request, &D, &str) -> Html,
+) -> Result<D, Html> {
+    match request.param(SAVED_PARAM) {
+        Some(saved) => Err(saved_page(request, &opened, &saved)),
+        None => Ok(opened),
+    }
+}
+
+/// The redirect back to `here` a Discard asks for, in place of the page.
+pub(crate) fn discarded(request: &Request, posted: Option<&Posted>, here: &str) -> Option<Html> {
+    posted
+        .is_some_and(|form| form.intent() == DISCARD)
+        .then(|| {
+            request.answering.redirect(here);
+            Html::empty()
+        })
+}
+
+/// The address of the editor `guard` names, naming `key` under its
+/// parameter on the reader's version; a create names nothing.
+pub(crate) fn address(request: &Request, guard: &Guard, key: &str) -> String {
+    let base = format!("{}?fhir={}", guard.route, request.version.segment());
+    if key.is_empty() {
+        base
+    } else {
+        format!("{base}&{}={}", guard.param, percent(key))
+    }
+}
+
+/// The draft a post is written over, a copy of `opened`, with the version
+/// the reader opened and when they opened it: what the posted form carried,
+/// else the version `opened` states and now.
+pub(crate) fn reopened<D: Metadata + Clone>(
+    posted: Option<&Posted>,
+    opened: &D,
+) -> (D, String, String) {
+    let (version, at) = posted.map_or_else(
+        || {
+            (
+                opened.version_id().to_owned(),
+                jiff::Timestamp::now().to_string(),
+            )
+        },
+        |form| (form.text(OPENED), form.text(OPENED_AT)),
+    );
+    (opened.clone(), version, at)
+}
+
+/// The five metadata elements every editor's form posts, in the order of
+/// [`Metadata::metadata`]: the canonical, the title, the name, the business
+/// version and the status.
+const METADATA_FIELDS: [&str; 5] = ["url", "title", "name", "version", "status"];
+
+/// A draft whose canonical, title, name, business version and status a form
+/// posts.
+pub(crate) trait Metadata {
+    /// `meta.versionId`, the version an update states in `If-Match`.
+    fn version_id(&self) -> &str;
+
+    /// The five elements, in the order of [`METADATA_FIELDS`].
+    fn metadata(&mut self) -> [&mut String; 5];
+}
+
+/// Implements [`Metadata`] for `$draft`, a draft with the five elements as
+/// `String` fields of their own names.
+macro_rules! metadata {
+    ($draft:ty) => {
+        impl crate::pages::editor::Metadata for $draft {
+            fn version_id(&self) -> &str {
+                &self.version_id
+            }
+
+            fn metadata(&mut self) -> [&mut String; 5] {
+                [
+                    &mut self.url,
+                    &mut self.title,
+                    &mut self.name,
+                    &mut self.version,
+                    &mut self.status,
+                ]
+            }
+        }
+    };
+}
+
+pub(crate) use metadata;
+
+/// Writes the metadata `form` posted over `draft`.
+pub(crate) fn apply_metadata(form: &Posted, draft: &mut impl Metadata) {
+    for (name, held) in METADATA_FIELDS.into_iter().zip(draft.metadata()) {
+        *held = form.text(name);
+    }
+}
+
+/// The metadata section of an editor's form, around `fields`.
+pub(crate) fn metadata_section(locale: &Locale, fields: &Html) -> Html {
+    panel_section(
+        locale,
+        Some(SectionHead {
+            title: tr(locale, Msg::EditorMetadata),
+            count: None,
+            actions: None,
+        }),
+        Html::raw(format!(r#"<div class="{FORM}">{fields}</div>"#)),
+    )
+}
+
+/// The name a stored resource is shown by: its title, else its canonical.
+pub(crate) fn shown(title: &str, url: &str) -> String {
+    if title.is_empty() {
+        url.to_owned()
+    } else {
+        title.to_owned()
+    }
+}
+
+/// The row key an intent such as `add-target:e3` names, when it names
+/// `action`.
+pub(crate) fn target<'a>(intent: &'a str, action: &str) -> Option<&'a str> {
+    intent
+        .strip_prefix(action)
+        .and_then(|rest| rest.strip_prefix(':'))
+}
+
+/// The words of a publication status.
+pub(crate) fn status_words(locale: &Locale, status: &str) -> String {
+    tr(
+        locale,
+        match status {
+            "active" => Msg::StatusActive,
+            "retired" => Msg::StatusRetired,
+            "unknown" => Msg::StatusUnknown,
+            _ => Msg::StatusDraft,
+        },
+    )
+}
+
+/// The status select's options, `picked` selected.
+pub(crate) fn status_options(locale: &Locale, picked: &str) -> Html {
+    Html::join(
+        STATUSES
+            .iter()
+            .map(|status| option(status, &status_words(locale, status), *status == picked)),
+    )
+}
+
+/// Sends a save of `body`, the draft written at the reader's release, and
+/// redirects to the saved page at the address `saved_at` names for what the
+/// server wrote; or keeps in `answer` the refusal over the draft at `here`.
+///
+/// Answers whether the save was written, so the page draws nothing in place
+/// of the redirect. A refusal is the server's own, or the release's refusal
+/// of the stored resource the draft was written over.
+pub(crate) async fn saved(
+    request: &Request,
+    sent: (&str, &str, Result<String, serde_json::Error>),
+    (opened, here): (&str, &str),
+    saved_at: impl FnOnce(&Written) -> String,
+    answer: &mut Option<(Html, Standing)>,
+) -> bool {
+    let (resource_type, id, body) = sent;
+    let written = match body {
+        Ok(body) => send(request, resource_type, id, &body, opened).await,
+        Err(error) => Err(FhirError::undecoded(here, request.version, &error)),
+    };
+    match written {
+        Ok(written) => {
+            let version = written.version_id().unwrap_or_default().to_owned();
+            request.answering.redirect(&format!(
+                "{}&{SAVED_PARAM}={}",
+                saved_at(&written),
+                percent(&version)
+            ));
+            true
+        }
+        Err(error) => {
+            *answer = Some(refused(request, &error, here));
+            false
+        }
+    }
+}
+
+/// The page a save redirects to: the saved resource, the version the server
+/// wrote, and `open`, the action that opens it.
+pub(crate) fn saved_page(
+    request: &Request,
+    kind: Kind,
+    resource: Option<(String, String)>,
+    open: Html,
+    saved: &str,
+) -> Html {
+    let locale = &request.locale;
+    Html::join([
+        heading(
+            request,
+            kind,
+            resource,
+            tr(locale, Msg::EditorSavedTitle),
+            tr_with(
+                locale,
+                Msg::EditorVersion,
+                &[("version", saved.to_owned().into())],
+            ),
+        ),
+        load_report(LoadReport {
+            outcome: Outcome::Ok,
+            arrival: Arrival::AfterAction,
+            title: Html::text(tr_with(
+                locale,
+                Msg::EditorSaved,
+                &[("version", saved.to_owned().into())],
+            )),
+            counts: Vec::new(),
+            action: Some(open),
+        }),
+    ])
 }
 
 /// A value percent-encoded as one query component.

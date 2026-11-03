@@ -17,35 +17,30 @@ use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::view::{
     Body, Column, DataTable, Role, Shape, Sorting, cell, data_table,
 };
-use ferrohealth_ui::view::form::{FORM, Field, INPUT, MEDIUM, SELECT, check, field_flow};
+use ferrohealth_ui::view::form::{Field, INPUT, MEDIUM, SELECT, check, field_flow};
 use ferrohealth_ui::view::layout::{Gap, stack_at};
-use ferrohealth_ui::view::load_report::{Arrival, LoadReport, Outcome, load_report};
 use ferrohealth_ui::view::repeat::{Fields, ROW, Repeat, RepeatAdd, RepeatRow, RowEnd, repeat};
 use ferrohealth_ui::view::surface::{
     SectionHead, card_action, panel_section, panel_sections_card, section_intro,
 };
 use ferrohealth_ui::view::template::list::HeadingCount;
 
-use crate::auth::scopes::Letter;
 use crate::authoring::code_system::{Concept, Declared, Draft, Lifecycle};
 use crate::fhir::CODE_SYSTEM;
-use crate::fhir::compose::STATUSES;
-use crate::fhir::error::FhirError;
+use crate::fhir::write::Written;
 use crate::locale::{Msg, tr, tr_with};
 use crate::markup::code;
 use crate::pages::detail::Kind;
 use crate::pages::editor::{
-    DISCARD, OPENED, OPENED_AT, SAVE, SAVED_PARAM, Standing, add_button, dock, field, form,
-    heading, name, opened_line, percent, refused, rows, text_field,
+    self, Guard, OPENED, OPENED_AT, SAVE, Standing, add_button, apply_metadata, dock, field, form,
+    heading, metadata_section, name, opened_line, rows, status_options, text_field,
 };
 use crate::pages::expand::checkbox;
 use crate::pages::operations::{hidden_field, option};
 use crate::pages::parts::failure;
 use crate::posted::{INTENT, Posted};
 use crate::request::Request;
-use crate::routes::{
-    CODE_SYSTEM_EDITOR_ROUTE, EDITOR_SYSTEM_PARAM, SYSTEMS_PATH, sign_in_link, system_link, ui_link,
-};
+use crate::routes::{CODE_SYSTEM_EDITOR_ROUTE, EDITOR_SYSTEM_PARAM, SYSTEMS_PATH, system_link};
 
 /// The content modes a code system states
 /// (<https://hl7.org/fhir/R4B/valueset-codesystem-content-mode.html>).
@@ -97,19 +92,6 @@ fn lifecycle_words(locale: &Locale, status: &str) -> String {
     )
 }
 
-/// The words of a publication status.
-fn status_words(locale: &Locale, status: &str) -> String {
-    tr(
-        locale,
-        match status {
-            "active" => Msg::StatusActive,
-            "retired" => Msg::StatusRetired,
-            "unknown" => Msg::StatusUnknown,
-            _ => Msg::StatusDraft,
-        },
-    )
-}
-
 /// The words of a content mode.
 fn content_words(locale: &Locale, mode: &str) -> String {
     tr(
@@ -127,50 +109,27 @@ fn content_words(locale: &Locale, mode: &str) -> String {
 
 /// The code system editor.
 pub(crate) async fn page(request: Request) -> Html {
-    let locale = &request.locale;
-    let posted = request.posted.clone();
-    let letter = if request.text(EDITOR_SYSTEM_PARAM).is_empty() {
-        Letter::Create
-    } else {
-        Letter::Update
-    };
-    if !request.can(CODE_SYSTEM, letter) {
-        if request.session.who().is_none() && request.sign_in {
-            request.answering.redirect(&sign_in_link(&request.back()));
-        }
-        return crate::pages::errors::forbidden_page(
-            &request,
-            Msg::EditorForbiddenCodeSystem,
-            "user/CodeSystem.cu",
-            (
-                tr(locale, Msg::ShellCodeSystems),
-                ui_link(SYSTEMS_PATH, request.version),
-            ),
-        );
-    }
-    edited(&request, posted.as_ref()).await
+    editor::guarded(&request, &GUARD, edited).await
 }
 
-/// The editor's address: the canonical it edits, on the reader's version.
-fn address(request: &Request, canonical: &str) -> String {
-    let base = format!(
-        "{CODE_SYSTEM_EDITOR_ROUTE}?fhir={}",
-        request.version.segment()
-    );
-    if canonical.is_empty() {
-        base
-    } else {
-        format!("{base}&{EDITOR_SYSTEM_PARAM}={}", percent(canonical))
-    }
-}
+editor::metadata!(Draft);
+
+/// Who may open the code system editor.
+const GUARD: Guard = Guard {
+    route: CODE_SYSTEM_EDITOR_ROUTE,
+    resource_type: CODE_SYSTEM,
+    param: EDITOR_SYSTEM_PARAM,
+    forbidden: Msg::EditorForbiddenCodeSystem,
+    scope: "user/CodeSystem.cu",
+    back: (Msg::ShellCodeSystems, SYSTEMS_PATH),
+};
 
 /// The page, after whatever the reader `posted`.
 async fn edited(request: &Request, posted: Option<&Posted>) -> Html {
     let system = request.text(EDITOR_SYSTEM_PARAM);
-    let here = address(request, &system);
-    if posted.is_some_and(|form| form.intent() == DISCARD) {
-        request.answering.redirect(&here);
-        return Html::empty();
+    let here = editor::address(request, &GUARD, &system);
+    if let Some(page) = editor::discarded(request, posted, &here) {
+        return page;
     }
     let stored = if system.is_empty() {
         None
@@ -184,48 +143,25 @@ async fn edited(request: &Request, posted: Option<&Posted>) -> Html {
     let held = stored.is_some();
     let opened = stored.unwrap_or_else(Draft::new);
     if held && !opened.managed() {
-        return crate::pages::editor::unmanaged(
+        return editor::unmanaged(
             request,
             Kind::CodeSystem,
             system_link(&opened.url, request.version),
         );
     }
-    if let Some(saved) = request.param(SAVED_PARAM) {
-        return saved_page(request, &opened, &saved);
-    }
-    let mut draft = opened.clone();
-    let mut opened_version = opened.version_id.clone();
-    let mut opened_at = jiff::Timestamp::now().to_string();
+    let opened = match editor::unless_saved(request, opened, saved_page) {
+        Ok(opened) => opened,
+        Err(page) => return page,
+    };
+    let (mut draft, opened_version, opened_at) = editor::reopened(posted, &opened);
     let mut answer = None;
     if let Some(form) = posted {
-        opened_version = form.text(OPENED);
-        opened_at = form.text(OPENED_AT);
         apply(form, &opened, &mut draft);
         if form.intent() == SAVE && draft.savable() {
-            let sent = match draft.body(request.version) {
-                Ok(body) => {
-                    crate::pages::editor::send(
-                        request,
-                        CODE_SYSTEM,
-                        &draft.id,
-                        &body,
-                        &opened_version,
-                    )
-                    .await
-                }
-                Err(error) => Err(FhirError::undecoded(&here, request.version, &error)),
-            };
-            match sent {
-                Ok(written) => {
-                    let version = written.version_id().unwrap_or_default().to_owned();
-                    request.answering.redirect(&format!(
-                        "{}&{SAVED_PARAM}={}",
-                        address(request, draft.url.trim()),
-                        percent(&version)
-                    ));
-                    return Html::empty();
-                }
-                Err(error) => answer = Some(refused(request, &error, &here)),
+            let sent = (CODE_SYSTEM, draft.id.as_str(), draft.body(request.version));
+            let at = |_written: &Written| editor::address(request, &GUARD, draft.url.trim());
+            if editor::saved(request, sent, (&opened_version, &here), at, &mut answer).await {
+                return Html::empty();
             }
         }
     }
@@ -240,7 +176,7 @@ async fn edited(request: &Request, posted: Option<&Posted>) -> Html {
 }
 
 /// The editor as it is drawn: the heading, the form over `draft` read from
-/// `opened`, the server's `answer` to a save, and the docked bar.
+/// `opened`, the server's `answer` to a and the docked bar.
 fn drawn(
     request: &Request,
     opened: &Draft,
@@ -320,11 +256,7 @@ fn drawn(
 /// Writes the posted fields over `draft`, read from `opened`, with the row
 /// a Remove names left out and the row an Add asks for added.
 fn apply(form: &Posted, opened: &Draft, draft: &mut Draft) {
-    draft.url = form.text("url");
-    draft.title = form.text("title");
-    draft.name = form.text("name");
-    draft.version = form.text("version");
-    draft.status = form.text("status");
+    apply_metadata(form, draft);
     draft.content = form.text("content");
     draft.case_sensitive = form.get("caseSensitive").is_some();
     let removed_property = form.get(REMOVE_PROPERTY).unwrap_or_default();
@@ -389,27 +321,15 @@ fn apply(form: &Posted, opened: &Draft, draft: &mut Draft) {
 /// The metadata section: the canonical, the names, the version, the status,
 /// the content mode and case sensitivity.
 fn metadata(locale: &Locale, draft: &Draft) -> Html {
-    let statuses = Html::join(STATUSES.iter().map(|status| {
-        option(
-            status,
-            &status_words(locale, status),
-            *status == draft.status,
-        )
-    }));
+    let statuses = status_options(locale, &draft.status);
     let modes = Html::join(
         CONTENT_MODES
             .iter()
             .map(|mode| option(mode, &content_words(locale, mode), *mode == draft.content)),
     );
-    panel_section(
+    metadata_section(
         locale,
-        Some(SectionHead {
-            title: tr(locale, Msg::EditorMetadata),
-            count: None,
-            actions: None,
-        }),
-        Html::raw(format!(
-            r#"<div class="{FORM}">{}{}{}{}</div>"#,
+        &Html::join([
             Field::new("cs-url", tr(locale, Msg::EditorCanonical)).view(Html::raw(format!(
                 r#"<input id="cs-url" name="url" class="{INPUT} fui-mono" value="{}" required>"#,
                 Html::text(&draft.url)
@@ -450,7 +370,7 @@ fn metadata(locale: &Locale, draft: &Draft) -> Html {
                 tr(locale, Msg::EditorCaseSensitive),
                 checkbox("cs-case", "caseSensitive", draft.case_sensitive),
             ),
-        )),
+        ]),
     )
 }
 
@@ -664,39 +584,8 @@ fn concepts(locale: &Locale, draft: &Draft, opened: &Draft) -> Html {
 /// The page after a save: the version the server now holds, and the way to
 /// the code system.
 fn saved_page(request: &Request, opened: &Draft, saved: &str) -> Html {
-    let locale = &request.locale;
-    let open = card_action(
-        system_link(&opened.url, request.version),
-        tr(locale, Msg::EditorOpenCodeSystem),
-    );
-    let resource = (!opened.url.is_empty()).then(|| {
-        (
-            opened.title.clone(),
-            system_link(&opened.url, request.version),
-        )
-    });
-    Html::join([
-        heading(
-            request,
-            Kind::CodeSystem,
-            resource,
-            tr(locale, Msg::EditorSavedTitle),
-            tr_with(
-                locale,
-                Msg::EditorVersion,
-                &[("version", saved.to_owned().into())],
-            ),
-        ),
-        load_report(LoadReport {
-            outcome: Outcome::Ok,
-            arrival: Arrival::AfterAction,
-            title: Html::text(tr_with(
-                locale,
-                Msg::EditorSaved,
-                &[("version", saved.to_owned().into())],
-            )),
-            counts: Vec::new(),
-            action: Some(open),
-        }),
-    ])
+    let href = system_link(&opened.url, request.version);
+    let open = card_action(href.clone(), tr(&request.locale, Msg::EditorOpenCodeSystem));
+    let resource = (!opened.url.is_empty()).then(|| (opened.title.clone(), href));
+    editor::saved_page(request, Kind::CodeSystem, resource, open, saved)
 }
