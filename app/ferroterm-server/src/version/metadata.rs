@@ -4,7 +4,7 @@
 //! `GET {root}/metadata` of one version: the `CapabilityStatement` and, with `mode=terminology`, the `TerminologyCapabilities`.
 
 macro_rules! metadata {
-    ($fhir:ident, $fhir_version:literal, $label:literal, $capabilities:ident) => {
+    ($fhir:ident, $label:literal, $capabilities:ident) => {
         pub mod metadata {
             //! `GET {root}/metadata` of one version: the capability statements.
             //!
@@ -44,11 +44,10 @@ macro_rules! metadata {
 
             use crate::outcome::Failure;
             use crate::config::{SECURITY_SERVICES, SECURITY_SERVICE_SYSTEM};
+            use crate::served::$fhir::FHIR_VERSION;
             use crate::smart::{OAUTH_URIS, SMART_ON_FHIR, Smart};
             use crate::state::AppState;
 
-            /// The FHIR version this surface serves.
-            pub const FHIR_VERSION: &str = $fhir_version;
             /// `rest.security.service`: the authentication in front of the server, which
             /// the terminology ecosystem requires a server to populate
             /// (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>, Metadata).
@@ -497,7 +496,7 @@ macro_rules! metadata {
             fn endpoint(state: &AppState) -> Option<String> {
                 state
                     .base_url()
-                    .map(|base| crate::version::endpoint(base, stringify!($fhir)))
+                    .map(|base| crate::served::endpoint(base, stringify!($fhir)))
             }
 
             /// The `TerminologyCapabilities` of this server, from the loaded providers.

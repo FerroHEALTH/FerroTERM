@@ -39,14 +39,14 @@ claim, not a test that merely touches the area.
 | Pure Rust, no `unsafe` | `Cargo.toml` `[workspace.lints.rust]` `unsafe_code = "forbid"`; every member carries `[lints] workspace = true` |
 | No JVM in the server | The only JVM is the FHIR Validator in CI: `.github/workflows/ci.yml` job `tx-ecosystem`, `actions/setup-java`; `docker/Dockerfile` ships two Rust binaries on a distroless static base |
 | No Elasticsearch, no database to run | No `elastic`, `postgres`, `sqlx`, `diesel`, `mysql`, or `mongodb` entry in `Cargo.lock`; storage is `redb`, declared in the root `Cargo.toml` |
-| Served from a memory-mapped index | `tools/ferroterm-build/src/pipeline.rs` writes `store.redb` with its `store.*.col` columns, `hierarchy.bin`, `text.bin`, `manifest.json`; the server opens them read-only in `app/ferroterm-server/src/state.rs` |
+| Served from a memory-mapped index | `tools/ferroterm-build/src/pipeline.rs` writes `store.redb` with its `store.*.col` columns, `hierarchy.bin`, `text.bin`, `manifest.json`; the server opens them read-only in `app/ferroterm-server/src/state/load.rs` |
 | Serves SNOMED CT, LOINC, ICD-10, ICD-11, RxNorm, UCUM, and any FHIR `CodeSystem` | See [Code systems served](#code-systems-served) below, per system |
 
 ### The quickstart
 
 | Claim | Evidence |
 |---|---|
-| The image serves UCUM, BCP 47, BCP 13, and ISO 3166-1 with no configuration | Registered unconditionally at `app/ferroterm-server/src/state.rs::build`; data vendored under `crates/fhir-terminology/data/` |
+| The image serves UCUM, BCP 47, BCP 13, and ISO 3166-1 with no configuration | Registered unconditionally at `app/ferroterm-server/src/state/load.rs::build`; data vendored under `crates/fhir-terminology/data/` |
 | `ghcr.io/ferrohealth/ferroterm:0.3.2` is the current image tag | `Cargo.toml` `version = "0.3.2"`, `compose.yaml` service `ferroterm` `image:`; enforced by `scripts/checks/versions.sh` and by the tag check in `.github/workflows/release.yml` job `plan` |
 | The UCUM `$lookup` answers name, version 2.2, display, and the `canonical` property | `crates/fhir-terminology/tests/it/ucum.rs::the_provider_locates_describes_and_filters_expressions` |
 | `ferroterm-build` ships in the image and in every release tarball | `docker/Dockerfile` copies both binaries; `.github/workflows/release-build.yml` step `Package` tars `ferroterm` and `ferroterm-build` |
@@ -194,7 +194,7 @@ claim, not a test that merely touches the area.
 
 | Claim | Evidence |
 |---|---|
-| A release is turned into served structures once by `ferroterm-build`; the server opens them read-only | `tools/ferroterm-build/src/pipeline.rs`; `app/ferroterm-server/src/state.rs` |
+| A release is turned into served structures once by `ferroterm-build`; the server opens them read-only | `tools/ferroterm-build/src/pipeline.rs`; `app/ferroterm-server/src/state/load.rs` |
 | For SNOMED CT the hierarchy is the inferred one, from the inferred relationship file | `crates/rf2`; `tools/ferroterm-build/src/pipeline.rs` |
 | CSR adjacency plus roaring bitmaps in both directions; subsumption is a membership test; set operations are bitmap AND, OR, and difference | `crates/concept-graph`; `crates/fhir-terminology/tests/it/ecl.rs::compound_constraints_are_set_algebra` and the proptest `invariants::the_algebra_holds` |
 | Typed relationships are a second adjacency, both directions materialized | `tools/ferroterm-build/src/rxnorm.rs` writes `relations.bin`; `crates/fhir-terminology/tests/it/rxnorm.rs` |
@@ -274,7 +274,7 @@ Per system, the loader flag, the provider, and the test that exercises it:
 
 | Claim | Evidence |
 |---|---|
-| The four version prefixes and their packages (4.0.1, 4.3.0, 5.0.0, 6.0.0-ballot5) | `app/ferroterm-server/src/r4.rs`, `r4b.rs`, `r5.rs`, `r6.rs`; each `PROVENANCE.md` |
+| The four version prefixes and their packages (4.0.1, 4.3.0, 5.0.0, 6.0.0-ballot5) | `app/ferroterm-server/src/served.rs`; `app/ferroterm-server/src/version/r4.rs`, `r4b.rs`, `r5.rs`, `r6.rs`; each `PROVENANCE.md` |
 | R4 and R4B declare the same terminology parameters, so one set of macros instantiates both | `app/ferroterm-server/src/version/mod.rs` `surface!` |
 | `$versions` names `4.0`, `4.3`, `5.0`, or `6.0` | `app/ferroterm-server/src/version/system.rs`; `app/ferroterm-server/tests/it/r4.rs::versions_names_r4` |
 | A parameter the version does not declare is refused with an `OperationOutcome` | `app/ferroterm-server/tests/it/r6.rs`, `tests/it/operations.rs` |
@@ -296,9 +296,9 @@ Per system, the loader flag, the provider, and the test that exercises it:
 | The five ways a value set arrives (loaded, persisted, inline, request-scoped, implicit) | `app/ferroterm-server/tests/it/scope.rs`, `tests/it/persisted.rs`, `tests/it/value_set.rs`, and the implicit value set tests |
 | `$expand` honours `count`, `offset`, `filter`, `activeOnly`, `includeDesignations`, `displayLanguage`, `system-version`, `check-system-version`, `force-system-version`, `exclude-system`, and echoes `used-codesystem` | `crates/fhir-terminology/src/operations/expand.rs`, `crates/fhir-terminology/src/compose.rs`; `app/ferroterm-server/tests/it/value_set.rs` |
 | At most 1,000 members without `count`, then `too-costly`; the limit is not configurable | `crates/fhir-terminology/src/operations/expand.rs` `EXPANSION_LIMIT`, read once in `expand`, absent from `Config`; `crates/fhir-terminology/tests/it/registries.rs::the_grammar_systems_refuse_expansion_and_validate_by_membership` |
-| `tx-resource` on a `POST`, layered over loaded resources; any other resource type refused with `not-supported` | `app/ferroterm-server/src/version/resources.rs`; `app/ferroterm-server/tests/it/scope.rs::tx_resources_serve_a_request_and_only_that_request`, `::a_tx_resource_of_another_type_is_refused` |
-| `$cache-control?mode=start` returns a `cache-id`, named by `X-Cache-Id`; `mode=end` releases it; an unknown id answers `404` | `app/ferroterm-server/src/scope.rs`; `app/ferroterm-server/tests/it/scope.rs::a_cache_front_loads_resources_and_ends` |
-| A cache unused for 30 minutes expires | `app/ferroterm-server/src/scope.rs::CACHE_IDLE` (`Duration::from_mins(30)`), pruned on `start` and `get`. No test, since it needs clock control |
+| `tx-resource` on a `POST`, layered over loaded resources; any other resource type refused with `not-supported` | `app/ferroterm-server/src/version/resources.rs`, `app/ferroterm-server/src/served.rs`; `app/ferroterm-server/tests/it/scope.rs::tx_resources_serve_a_request_and_only_that_request`, `::a_tx_resource_of_another_type_is_refused` |
+| `$cache-control?mode=start` returns a `cache-id`, named by `X-Cache-Id`; `mode=end` releases it; an unknown id answers `404` | `app/ferroterm-server/src/scope.rs`, `app/ferroterm-server/src/artefact.rs`; `app/ferroterm-server/tests/it/scope.rs::a_cache_front_loads_resources_and_ends` |
+| A cache unused for 30 minutes expires | `app/ferroterm-server/src/artefact.rs::CACHE_IDLE` (`Duration::from_mins(30)`), pruned on `start` and `get`. No test, since it needs clock control |
 | For SNOMED CT the version is the edition and version URI, never a bare date | `crates/fhir-terminology/tests/it/snomed.rs::identity_and_declaration_follow_the_manifest` |
 | `displayLanguage` and `Accept-Language` both select the display; the parameter wins; language ranges with quality values; fallback to the system's own | `crates/fhir-terminology/src/operations/display.rs`; the language tests in `app/ferroterm-server/tests/it/` |
 | Persisted resources: `POST`, `PUT`, `GET`, `DELETE`, `_history/{versionId}`, the `?url=` searchset, `ETag` `W/"n"`, `If-Match` to `412`, deleted to `410` | `app/ferroterm-server/tests/it/persisted.rs::a_put_creates_then_updates_with_the_fhir_status_codes_and_headers`, `::a_version_read_answers_an_earlier_version_and_a_delete_leaves_the_history`, `::an_if_match_that_names_another_version_is_refused`, `::a_search_returns_the_persisted_and_the_loaded_value_sets` |
@@ -343,7 +343,7 @@ Per system, the loader flag, the provider, and the test that exercises it:
 
 | Claim | Evidence |
 |---|---|
-| Four registry systems served with no configuration | `app/ferroterm-server/src/state.rs::build` |
+| Four registry systems served with no configuration | `app/ferroterm-server/src/state/load.rs::build` |
 | `GET /health`, `GET /health/liveness`, `GET /health/readiness` | `app/ferroterm-server/src/lib.rs::router` over `ferrohealth_server::stack::app`; `app/ferroterm-server/tests/it/health.rs::the_three_health_routes_answer_a_serving_server` and `readiness_is_withdrawn_once_the_server_drains` |
 | The image runs as numeric user `65532` on a distroless base, with `FERROTERM__SERVER__LISTEN=0.0.0.0:8080` | `docker/Dockerfile:18,41,46` |
 | Tags are `<version>`, `<major.minor>`, and `latest` | `.github/workflows/release-image.yml` step `Image tags, labels, and annotations` (`type=semver`); `latest` comes from `docker/metadata-action`'s default flavour |
@@ -601,7 +601,7 @@ separately exercised.
 `icpc1`, or the ConceptMap URL in any Rust source, test, fixture, or script.
 The repository holds only `data/nhg/.gitkeep`. The generic `ConceptMap`
 directory mechanism that the row describes does exist and is tested
-(`app/ferroterm-server/src/state.rs::load_code_systems`;
+(`app/ferroterm-server/src/state/load.rs::load_code_systems`;
 `crates/fhir-terminology/tests/it/concept_map.rs::the_store_loads_both_maps_with_the_r5_shapes_reduced`),
 including the `"experimental": "false"` refusal the loading page documents, but
 nothing substantiates this specific map. Of the twenty rows in the code systems

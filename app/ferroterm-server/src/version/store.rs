@@ -29,7 +29,8 @@ use http::{HeaderMap, HeaderValue, StatusCode};
 use crate::elements::Projection;
 use crate::outcome::Failure;
 use crate::persistence::{HistoryEntry, Method, Record, ResourceType};
-use crate::state::{AppState, PersistError};
+use crate::state::AppState;
+use crate::state::persisted::PersistError;
 use crate::wire::Wire;
 
 /// The generated codec of one served version.

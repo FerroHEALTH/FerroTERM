@@ -124,7 +124,7 @@ pub(crate) fn base_of(
     uri: &http::Uri,
 ) -> Option<String> {
     if let Some(base) = state.base_url() {
-        return Some(crate::version::endpoint(base, segment));
+        return Some(crate::served::endpoint(base, segment));
     }
     let authority = uri
         .authority()
@@ -135,7 +135,7 @@ pub(crate) fn base_of(
                 .and_then(|value| value.to_str().ok())
         })
         .filter(|authority| !authority.is_empty())?;
-    Some(crate::version::endpoint(
+    Some(crate::served::endpoint(
         &format!("http://{authority}"),
         segment,
     ))

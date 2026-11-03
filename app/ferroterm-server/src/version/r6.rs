@@ -14,4 +14,4 @@
 //! publishes.
 
 crate::version::map::family_map!(r6, r6);
-crate::version::surface!(r6, "6.0.0-ballot5", "R6 ballot", to_r6);
+crate::version::surface!(r6, "R6 ballot", to_r6);
