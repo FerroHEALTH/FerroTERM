@@ -41,6 +41,7 @@ exist.
 | `ci.yml` (`tx-ecosystem` job) | the HL7 terminology ecosystem suite (`general` mode) against a release build through the FHIR Validator's `txTests`, gated by the committed pass list `conformance/tx-ecosystem/passing.txt` (`scripts/checks/tx-ecosystem.sh`) | on workspace |
 | `ci.yml` (`ui-e2e` job) | the console's browser journeys: the server, the console and the stub identity provider on loopback, driven by Chrome for Testing at the pinned release over WebDriver (`scripts/ui-e2e.sh`) | on workspace |
 | `differential.yml` | weekly: the request sample of `conformance/differential/` answered by FerroTERM and by Snowstorm over the same licensed edition (`scripts/checks/differential.sh`), an issue filed on divergence | when `SNOMED_RF2_URL` and `SNOWSTORM_URL` are set |
+| `pin-freshness.yml` | weekly: every pin no Dependabot ecosystem reads (the ECL grammar, the ecosystem test cases and the FHIR Validator, CLDR, UCUM, SCG, the R6 core package, Chrome for Testing, jscpd) compared with its newest upstream release by `scripts/checks/pin-freshness.sh`, one issue filed when a pin is behind; a pin held on purpose names its reason in `docs/VERSIONS.md` | weekly |
 | `ratchet-tighten.yml` | daily: each ratchet guard (`duplication.sh`, `file-size.sh`, `stray-literals.sh`) run with `--update` on `main`, and one pull request opened or moved with only the lowered ratchet files; nothing when nothing fell | daily |
 
 Dependabot (`github-actions` + `cargo`) keeps `uses:` SHAs (the workflows and

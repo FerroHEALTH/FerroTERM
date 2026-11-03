@@ -1,0 +1,94 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+
+# The freshness half of the pin discipline (#965; no specification governs
+# this: our own design, the lane FerroBRIDGE runs).
+#
+# scripts/checks/versions.sh catches drift between two files we control, and
+# Dependabot bumps what its ecosystems read, which is `uses:` references and
+# the Cargo manifests. Between the two sits a set of pins nothing watches: the
+# ECL grammar tag, the ecosystem test cases and the FHIR Validator that runs
+# them, the CLDR and UCUM releases, the SCG commit, the R6 core package, the
+# Chrome for Testing release and jscpd. This workflow reads the newest
+# upstream release, branch head or registry `latest` of each and opens ONE
+# issue when a pin is behind.
+#
+# It opens an issue rather than failing: a weekly red job trains a maintainer
+# to ignore red jobs, and a newer upstream release is not a broken build.
+name: Pin freshness
+
+on:
+  schedule:
+    # Mondays 06:17 UTC: off the hour, after the weekly Dependabot run, and in
+    # a slot no other lane uses (`grep -rE '^ +- cron:' .github/workflows/`).
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  freshness:
+    name: pin freshness
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Compare every unwatched pin with its newest upstream release
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          status=0
+          bash scripts/checks/pin-freshness.sh > freshness.txt || status=$?
+          cat freshness.txt
+          # 0 every pin current or held, 1 at least one behind, 2 a release
+          # could not be read. Only 1 opens an issue; 2 fails the job, because
+          # a pin that could not be compared is not a pin known to be fresh.
+          if [ "$status" -eq 2 ]; then
+            echo "a release could not be read; the comparison is incomplete" >&2
+            exit 1
+          fi
+          echo "stale=$([ "$status" -eq 1 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Open an issue when a pin is behind
+        if: steps.check.outputs.stale == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: A vendored input or tool pin is behind its newest upstream release
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          # --limit well past the open count: the default page is 30 issues,
+          # and a report that scrolled off it would be reopened every week.
+          open="$(gh issue list --state open --limit 500 --json number,title \
+            --jq "[.[] | select(.title == \"$TITLE\")] | length")"
+          if [ "$open" -ne 0 ]; then
+            echo "an open issue already carries this report; not opening a second"
+            exit 0
+          fi
+          {
+            echo "\`scripts/checks/pin-freshness.sh\` found a pin behind its newest upstream release."
+            echo
+            echo "Re-pin it in \`docs/VERSIONS.md\` and in the file that repeats it, re-vendor"
+            echo "with its \`scripts/vendor/*.sh\` fetcher where it has one, and re-run the gates."
+            echo "A pin that stays behind on purpose ends its cell in \`held: <reason>\`."
+            echo
+            echo '```text'
+            cat freshness.txt
+            echo '```'
+            echo
+            echo "Reported by [this run]($RUN_URL)."
+          } > body.md
+          # fields.sh files the issue as a Task at Low priority and Low effort;
+          # this job's default token may not read the organisation's issue
+          # types, and then the issue lands with its label alone and whoever
+          # picks it up sets the three (.claude/rules/issue-workflow.md).
+          bash scripts/gh/fields.sh new task low low \
+            --title "$TITLE" --body-file body.md --label ci

@@ -8,7 +8,11 @@ config file (`Cargo.toml`, `rust-toolchain.toml`, a vendored package's
 `PROVENANCE.md`, `CITATION.cff`) disagree, that is drift: fix it, do not let
 either silently win. `scripts/checks/versions.sh` enforces the cross-file
 agreement it can, and skips (loudly) what does not exist yet in this
-discovery-phase repo.
+discovery-phase repo. `scripts/checks/pin-freshness.sh`, run weekly by
+`.github/workflows/pin-freshness.yml`, compares every pin no Dependabot
+ecosystem reads with its newest upstream release and opens one issue when a
+pin is behind; a pin cell that ends in `held: <reason>` stays behind on
+purpose.
 
 ## Product and citation version
 
@@ -65,6 +69,10 @@ The requirement is a caret, so a later 0.1.x release resolves into `Cargo.lock`
 by itself. `scripts/checks/versions.sh` fails when the row above, the root
 requirement, and the lock disagree, so a new FHIR model reaches the build only
 in a change that moves the pin with it.
+
+| Item | Pin |
+|---|---|
+| FHIR R6 terminology bundles | 6.0.0-ballot5 (the `hl7.fhir.r6.core` package `crates/fhir-terminology/data/fhir/r6/` is generated from, the R6 package FerroBRIDGE pins), held: snapshot builds are not releases |
 
 ## SNOMED CT / ECL
 
