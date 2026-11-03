@@ -291,6 +291,11 @@ adopted in FerroHEALTH/FerroEHR#4663).
   borrows and clones of those. A call that reads a field of `self`, or calls
   a method of a field or a parameter, reaches what the caller cannot, so an
   accessor is never reported; nor are the `#[cfg]` arms of one function.
+  A `macro_rules!` arm whose body reads as items is scanned too, as a module
+  named after the macro (`parameters!::parameters::respond`), with each
+  `$name` read as a name and `$crate` as `crate`; an arm that does not read
+  as items, an expression or a `$(..)` repetition, is passed over, so a
+  forwarder written there is held by review alone.
   `scripts/checks/forwarders.sh` runs it in the `forwarders` CI job and per
   edit through `.claude/hooks/rust_fmt_clippy.sh`, and holds the total to
   `scripts/checks/forwarders.count`. `scripts/checks/forwarders-baseline.txt`
