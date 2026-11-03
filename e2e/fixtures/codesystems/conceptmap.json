@@ -9,7 +9,7 @@
   "experimental": true,
   "publisher": "FerroTERM",
   "description": "Synthetic content. A published ConceptMap out of the shaped taxonomy, so the concept map screen lists a resource and $translate answers a match rather than nothing. It carries no clinical meaning and no licensed content.",
-  "sourceUri": "https://ferroterm.eu/fhir/CodeSystem/e2e-taxonomy",
+  "sourceUri": "https://ferroterm.eu/fhir/ValueSet/e2e-taxonomy-all",
   "targetUri": "https://ferroterm.eu/fhir/CodeSystem/e2e-taxonomy-target",
   "group": [
     {

@@ -106,7 +106,6 @@ fn term_bindings() -> serde_json::Value {
       "resourceType": "ConceptMap",
       "url": TERM_BINDINGS, "version": "1", "name": "FtExampleBindings",
       "status": "active",
-      "sourceScopeUri": AT_CODES, "targetScopeUri": BOUND_SYSTEM,
       "group": [{
         "source": AT_CODES, "target": BOUND_SYSTEM,
         "element": [{"code": "at0005", "display": "Steady", "target": [
