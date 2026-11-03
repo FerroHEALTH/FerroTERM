@@ -102,6 +102,10 @@ macro_rules! family_map {
             /// then the ecosystem's `code`, `system`, and `abstract`.
             #[must_use]
             pub fn lookup_response(outcome: LookupOutcome) -> CodeSystemLookupResponse {
+                let selectability_stated = outcome
+                    .properties
+                    .iter()
+                    .any(|property| property.code == "notSelectable");
                 CodeSystemLookupResponse {
                     name: outcome.name.into(),
                     version: outcome.version.map(Into::into),
@@ -134,9 +138,10 @@ macro_rules! family_map {
                         .collect(),
                     code: Some(outcome.code.into()),
                     system: Some(outcome.system.into()),
-                    // NOTE: `abstract` is answered for an abstract concept only; the
-                    // ecosystem's cases expect no `abstract = false`.
-                    r#abstract: outcome.abstract_concept.then_some(true.into()),
+                    // NOTE: `abstract` is the ecosystem's output: answered for an abstract
+                    // concept, and as false when the concept states `notSelectable`.
+                    r#abstract: (outcome.abstract_concept || selectability_stated)
+                        .then(|| outcome.abstract_concept.into()),
                 }
             }
 
