@@ -67,16 +67,16 @@ pub enum FhirVersion {
 }
 
 impl FhirVersion {
+    /// Every version, in the order of [`crate::served::SEGMENTS`].
+    const ALL: [Self; 4] = [Self::R4, Self::R4b, Self::R5, Self::R6];
+
     /// The version a path prefix segment names.
     #[must_use]
     pub fn of_segment(segment: &str) -> Option<Self> {
-        match segment {
-            "r4" => Some(Self::R4),
-            "r4b" => Some(Self::R4b),
-            "r5" => Some(Self::R5),
-            "r6" => Some(Self::R6),
-            _ => None,
-        }
+        Self::ALL
+            .into_iter()
+            .zip(crate::served::SEGMENTS)
+            .find_map(|(version, served)| (served == segment).then_some(version))
     }
 
     /// The version whose base `path` lies under.

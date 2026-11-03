@@ -115,9 +115,7 @@ async fn run(
         .context("summarising the loaded code systems")?;
     tracing::info!(
         version = env!("CARGO_PKG_VERSION"),
-        fhir_versions = ferroterm_server::FHIR_BASES
-            .map(|base| base.trim_start_matches('/'))
-            .join(","),
+        fhir_versions = ferroterm_server::served::SEGMENTS.join(","),
         code_systems = summaries.len(),
         "ferroterm starting"
     );
@@ -169,7 +167,7 @@ async fn run(
         })?;
     tracing::info!(
         listen = %config.server.listen,
-        bases = ferroterm_server::FHIR_BASES.join(","),
+        bases = ferroterm_server::served::BASES.join(","),
         "listening"
     );
     let admin = match config.admin_listen() {
