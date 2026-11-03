@@ -13,14 +13,13 @@ use std::collections::BTreeSet;
 
 use concept_graph::subsumption::Outcome;
 
+use super::grammar::{Grammar, GrammarProvider, Table, outcome};
 use super::interned::Interned;
 use super::subtags::{Kind, REGISTRY_DATA, Registry};
-use crate::compose::Compose;
 use crate::filter::{Filter, FilterOperator};
 use crate::provider::{
-    CodeSystemProvider, Compositional, Concept, ConceptSet, ContentMode, Declaration, Designation,
-    FilterDefinition, Hierarchy, Identity, Located, Property, PropertyDefinition, PropertyKind,
-    PropertyValue, ProviderError, Status,
+    Compositional, Concept, ConceptSet, ContentMode, Declaration, FilterDefinition, Identity,
+    Property, PropertyDefinition, PropertyKind, PropertyValue, ProviderError, Status,
 };
 
 /// The system URI (<https://hl7.org/fhir/R4B/terminologies-systems.html>).
@@ -371,14 +370,15 @@ struct Selection {
     region: Option<String>,
 }
 
-/// The BCP 47 provider.
+/// The BCP 47 grammar: RFC 5646 language tags over the IANA Language Subtag
+/// Registry.
 #[derive(Debug)]
-pub struct Bcp47Provider {
-    identity: Identity,
-    declaration: Declaration,
-    interned: Interned,
+pub struct LanguageTags {
     registry: &'static Registry,
 }
+
+/// The BCP 47 provider.
+pub type Bcp47Provider = GrammarProvider<LanguageTags>;
 
 impl Default for Bcp47Provider {
     fn default() -> Self {
@@ -407,15 +407,15 @@ impl Bcp47Provider {
             ],
             value: String::from("a subtag"),
         };
-        Self {
-            identity: Identity {
+        GrammarProvider::from_parts(
+            Identity {
                 url: URL.to_owned(),
                 version: registry.file_date.clone(),
                 title: Some(String::from("IETF BCP 47 language tags")),
                 name: None,
                 version_needed: false,
             },
-            declaration: Declaration {
+            Declaration {
                 content: ContentMode::NotPresent,
                 case_sensitive: false,
                 hierarchy_meaning: None,
@@ -444,19 +444,21 @@ impl Bcp47Provider {
                 capabilities: BTreeSet::new(),
                 implicit_forms: Vec::new(),
             },
-            interned: Interned::new(),
-            registry,
-        }
+            Interned::new(),
+            LanguageTags { registry },
+        )
     }
 
     /// What the grammar and the registry say about `text`.
     #[must_use]
     pub fn analyze(&self, text: &str) -> Analysis {
-        analyze(text, self.registry)
+        analyze(text, self.grammar().registry)
     }
+}
 
-    fn tag(&self, concept: Concept) -> Option<Tag> {
-        let code = self.interned.code(concept)?;
+impl LanguageTags {
+    fn tag(&self, table: &Table<'_>, concept: Concept) -> Option<Tag> {
+        let code = table.code(concept)?;
         match analyze(&code, self.registry) {
             Analysis::Valid(tag) => Some(tag),
             _ => None,
@@ -554,33 +556,29 @@ impl Bcp47Provider {
 
     /// The ordinals of the tags `filters` enumerate, or `None` when this
     /// system does not enumerate that selection.
-    fn enumerate(&self, filters: &[Filter]) -> Result<Option<Vec<u32>>, ProviderError> {
+    fn enumerate(
+        &self,
+        table: &Table<'_>,
+        filters: &[Filter],
+    ) -> Result<Option<Vec<u32>>, ProviderError> {
         let Some(selection) = Self::selection(filters) else {
             return Ok(None);
         };
         let mut out = Vec::new();
         for tag in self.tags(&selection) {
-            out.push(self.interned.intern(&tag)?.index());
+            out.push(table.intern(&tag)?.index());
         }
         Ok(Some(out))
     }
 
     /// Why `filters` select nothing this system enumerates.
-    fn refusal(&self, filters: &[Filter]) -> ProviderError {
+    fn refusal(table: &Table<'_>, filters: &[Filter]) -> ProviderError {
         if filters.is_empty() {
             return ProviderError::NotEnumerable;
         }
         for filter in filters {
-            if !self
-                .declaration
-                .filters
-                .iter()
-                .any(|declared| declared.code == filter.property)
-            {
-                return ProviderError::UnsupportedFilter {
-                    property: filter.property.clone(),
-                    operator: filter.op.code().to_owned(),
-                };
+            if let Err(refused) = table.declared(filter) {
+                return refused;
             }
         }
         ProviderError::FilterNotEnumerable
@@ -598,39 +596,20 @@ impl Bcp47Provider {
     }
 }
 
-impl CodeSystemProvider for Bcp47Provider {
-    fn identity(&self) -> &Identity {
-        &self.identity
-    }
-
-    fn declaration(&self) -> &Declaration {
-        &self.declaration
-    }
-
-    fn locate(&self, code: &str) -> Result<Option<Located>, ProviderError> {
+impl Grammar for LanguageTags {
+    fn canonical(&self, code: &str) -> Option<String> {
         match analyze(code, self.registry) {
-            Analysis::Valid(tag) => {
-                let canonical = tag.canonical();
-                let concept = self.interned.intern(&canonical)?;
-                Ok(Some(Located {
-                    concept,
-                    code: canonical,
-                }))
-            }
-            Analysis::Malformed(_) | Analysis::WellFormed { .. } => Ok(None),
+            Analysis::Valid(tag) => Some(tag.canonical()),
+            Analysis::Malformed(_) | Analysis::WellFormed { .. } => None,
         }
-    }
-
-    fn code(&self, concept: Concept) -> Result<Option<String>, ProviderError> {
-        Ok(self.interned.code(concept))
     }
 
     fn display(
         &self,
+        table: &Table<'_>,
         concept: Concept,
-        _language: Option<&str>,
     ) -> Result<Option<String>, ProviderError> {
-        let Some(tag) = self.tag(concept) else {
+        let Some(tag) = self.tag(table, concept) else {
             return Ok(None);
         };
         if let Some(grandfathered) = &tag.grandfathered {
@@ -668,8 +647,8 @@ impl CodeSystemProvider for Bcp47Provider {
         Ok(Some(text))
     }
 
-    fn status(&self, concept: Concept) -> Result<Status, ProviderError> {
-        let Some(tag) = self.tag(concept) else {
+    fn status(&self, table: &Table<'_>, concept: Concept) -> Result<Status, ProviderError> {
+        let Some(tag) = self.tag(table, concept) else {
             return Ok(Status::default());
         };
         let deprecated = [
@@ -701,16 +680,12 @@ impl CodeSystemProvider for Bcp47Provider {
         })
     }
 
-    fn designations(
+    fn properties(
         &self,
-        _concept: Concept,
-        _language: Option<&str>,
-    ) -> Result<Vec<Designation>, ProviderError> {
-        Ok(Vec::new())
-    }
-
-    fn properties(&self, concept: Concept) -> Result<Vec<Property>, ProviderError> {
-        let Some(tag) = self.tag(concept) else {
+        table: &Table<'_>,
+        concept: Concept,
+    ) -> Result<Vec<Property>, ProviderError> {
+        let Some(tag) = self.tag(table, concept) else {
             return Ok(Vec::new());
         };
         let mut out = Vec::new();
@@ -726,39 +701,6 @@ impl CodeSystemProvider for Bcp47Provider {
         Ok(out)
     }
 
-    fn hierarchy(&self) -> Option<&dyn Hierarchy> {
-        None
-    }
-
-    fn implicit_value_set(&self, _url: &str) -> Option<Result<Compose, ProviderError>> {
-        None
-    }
-
-    fn all(&self) -> Result<ConceptSet, ProviderError> {
-        Err(ProviderError::NotEnumerable)
-    }
-
-    fn search(&self, _text: &str, _language: Option<&str>) -> Result<ConceptSet, ProviderError> {
-        Err(ProviderError::NotEnumerable)
-    }
-
-    /// A selection of language tags is incomplete: the registry of subtags is
-    /// finite, and the tags built from them with variants, extensions, and
-    /// private use (RFC 5646 §2.2.6 to §2.2.7) are not.
-    fn unclosed(&self, _filters: &[Filter]) -> bool {
-        true
-    }
-
-    fn unclosed_reason(&self) -> Option<String> {
-        Some(format!(
-            "The code System '{URL}' has a grammar and so has infinite members"
-        ))
-    }
-
-    fn filter(&self, filter: &Filter) -> Result<ConceptSet, ProviderError> {
-        self.filter_all(std::slice::from_ref(filter))
-    }
-
     /// A fixed primary language bounds a selection of language tags.
     ///
     /// `language = 2*3ALPHA / 4ALPHA / 5*8ALPHA`, `script = 4ALPHA`, and
@@ -769,31 +711,34 @@ impl CodeSystemProvider for Bcp47Provider {
     /// §4.1 recommends writing.
     // NOTE: no FHIR or BCP 47 specification says which finite subset of a grammar
     // system an expansion lists: enumerating one open position is our own design.
-    fn filter_all(&self, filters: &[Filter]) -> Result<ConceptSet, ProviderError> {
-        match self.enumerate(filters)? {
+    fn filter_all(
+        &self,
+        table: &Table<'_>,
+        filters: &[Filter],
+    ) -> Result<ConceptSet, ProviderError> {
+        match self.enumerate(table, filters)? {
             Some(order) => Ok(order.into_iter().collect()),
-            None => Err(self.refusal(filters)),
+            None => Err(Self::refusal(table, filters)),
         }
     }
 
     /// The tags in registry order, which the interned ordinals do not carry.
-    fn filter_ordered(&self, filters: &[Filter]) -> Result<Option<Vec<u32>>, ProviderError> {
-        self.enumerate(filters)
+    fn filter_ordered(
+        &self,
+        table: &Table<'_>,
+        filters: &[Filter],
+    ) -> Result<Option<Vec<u32>>, ProviderError> {
+        self.enumerate(table, filters)
     }
 
-    fn filter_matches(&self, concept: Concept, filter: &Filter) -> Result<bool, ProviderError> {
-        if !self
-            .declaration
-            .filters
-            .iter()
-            .any(|f| f.code == filter.property)
-        {
-            return Err(ProviderError::UnsupportedFilter {
-                property: filter.property.clone(),
-                operator: filter.op.code().to_owned(),
-            });
-        }
-        let Some(tag) = self.tag(concept) else {
+    fn filter_matches(
+        &self,
+        table: &Table<'_>,
+        concept: Concept,
+        filter: &Filter,
+    ) -> Result<bool, ProviderError> {
+        table.declared(filter)?;
+        let Some(tag) = self.tag(table, concept) else {
             return Ok(false);
         };
         let parts = Self::part(&tag, &filter.property);
@@ -816,6 +761,12 @@ impl CodeSystemProvider for Bcp47Provider {
         })
     }
 
+    fn unclosed_reason(&self) -> Option<String> {
+        Some(format!(
+            "The code System '{URL}' has a grammar and so has infinite members"
+        ))
+    }
+
     /// A tag subsumes another when it matches it as a language range under
     /// RFC 4647 §3.3.2 extended filtering, so `en` subsumes `en-US` and
     /// `en-US` subsumes `en-Latn-US`, the range "de-*-DE" and "its synonym
@@ -824,18 +775,19 @@ impl CodeSystemProvider for Bcp47Provider {
     /// No FHIR or BCP 47 specification defines subsumption over language
     /// tags: reading each tag as the extended language range of the same
     /// spelling is our own design.
-    fn subsumes(&self, a: Concept, b: Concept) -> Result<Option<Outcome>, ProviderError> {
-        let (Some(a), Some(b)) = (self.tag(a), self.tag(b)) else {
+    fn subsumes(
+        &self,
+        table: &Table<'_>,
+        a: Concept,
+        b: Concept,
+    ) -> Result<Option<Outcome>, ProviderError> {
+        let (Some(a), Some(b)) = (self.tag(table, a), self.tag(table, b)) else {
             return Ok(None);
         };
         let (a, b) = (match_subtags(&a), match_subtags(&b));
-        Ok(Some(
-            match (extended_filter(&a, &b), extended_filter(&b, &a)) {
-                (true, true) => Outcome::Equivalent,
-                (true, false) => Outcome::Subsumes,
-                (false, true) => Outcome::SubsumedBy,
-                (false, false) => Outcome::NotSubsumed,
-            },
-        ))
+        Ok(Some(outcome(
+            extended_filter(&a, &b),
+            extended_filter(&b, &a),
+        )))
     }
 }

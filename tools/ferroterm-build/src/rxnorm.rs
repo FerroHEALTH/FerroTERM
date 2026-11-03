@@ -17,22 +17,19 @@
 //! other builds.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::io;
 use std::path::{Path, PathBuf};
 
 use concept_graph::ordinal::Ordinal;
 use concept_graph::relations::{Relations, RelationsError};
-use concept_store::builder::{BuildError, PreferredRule, StoreBuilder};
-use concept_store::keys::{KeyTable, KeyTableError};
+use concept_store::builder::StoreBuilder;
 use concept_store::record::{Concept, Designation, PropertyValue};
-use concept_store::store::Vocabulary;
 use concept_store::tables;
 use rxnorm_rrf::row::Atom;
 use rxnorm_rrf::{Release, RrfError};
 use serde_json::json;
 
-use crate::common::{self, LanguageKey, PipelineError, Placed, PropertyKeys};
-use crate::pipeline::{MANIFEST_FILE, MANIFEST_VERSION, STORE_FILE, TEXT_FILE};
+use crate::artifact::{self, LanguageKey, Placed, PropertyKeys};
+use crate::pipeline::{MANIFEST_VERSION, STORE_FILE, TEXT_FILE};
 
 /// The system URI.
 pub const SYSTEM: &str = "http://www.nlm.nih.gov/research/umls/rxnorm";
@@ -87,74 +84,18 @@ pub enum Error {
     /// The release names no date and none was given.
     #[error("the release names no date; pass `--rxnorm-version`")]
     NoVersion,
-    /// The store cannot be written.
-    #[error(transparent)]
-    Store(#[from] BuildError),
     /// The relationships cannot be built or written.
     #[error(transparent)]
     Relations(#[from] RelationsError),
-    /// The atom table cannot be written.
+    /// A part of the artifact cannot be built or written.
     #[error(transparent)]
-    Atoms(#[from] KeyTableError),
-    /// The text index cannot be built.
-    #[error(transparent)]
-    Text(#[from] designation_index::index::BuildError),
-    /// The text index cannot be written.
-    #[error(transparent)]
-    TextPersist(#[from] designation_index::persist::PersistError),
-    /// A file cannot be written.
-    #[error("cannot write {path}")]
-    Io {
-        /// The path.
-        path: PathBuf,
-        /// The cause.
-        #[source]
-        source: io::Error,
-    },
-    /// More concepts than an ordinal can number.
-    #[error("too many concepts")]
-    TooMany,
-    /// A property key the build asked for and never registered.
-    #[error("the property key `{key}` is not in the vocabulary")]
-    UnknownPropertyKey {
-        /// The key the build asked for.
-        key: String,
-    },
+    Artifact(#[from] artifact::Error),
     /// A relationship type the build asked for and never gathered.
     #[error("the relationship type `{name}` is not in the vocabulary")]
     UnknownRelationshipType {
         /// The type the build asked for.
         name: String,
     },
-}
-
-impl PipelineError for Error {
-    fn too_many() -> Self {
-        Self::TooMany
-    }
-
-    fn io(path: &Path, source: io::Error) -> Self {
-        Self::Io {
-            path: path.to_path_buf(),
-            source,
-        }
-    }
-
-    fn unknown_property_key(key: &str) -> Self {
-        Self::UnknownPropertyKey {
-            key: key.to_owned(),
-        }
-    }
-}
-
-/// The ordinal of `index`, in this pipeline's error type.
-fn ordinal(index: usize) -> Result<Ordinal, Error> {
-    common::ordinal(index)
-}
-
-/// A closure naming `path` in this pipeline's I/O failure.
-fn io_error(path: &Path) -> impl FnOnce(io::Error) -> Error + '_ {
-    common::io_error(path)
 }
 
 /// The language the release's own atoms are in.
@@ -249,7 +190,7 @@ fn number(release: &Release, sources: &[String]) -> Result<Numbered, Error> {
     by_concept.retain(|_, atoms| atoms.iter().any(|a| a.sab == RXNORM));
     let mut ordinals: BTreeMap<u64, Ordinal> = BTreeMap::new();
     for (i, rxcui) in by_concept.keys().enumerate() {
-        ordinals.insert(*rxcui, ordinal(i)?);
+        ordinals.insert(*rxcui, artifact::ordinal(i)?);
     }
     let mut atom_concepts: BTreeMap<u64, u64> = BTreeMap::new();
     for (rxcui, atoms) in &mut by_concept {
@@ -352,7 +293,7 @@ fn build_relations(release: &Release, numbered: &Numbered) -> Result<Relations, 
             })?;
             // A count past `u32::MAX` is the whole message, as in `ordinal`.
             let Ok(kind) = u32::try_from(index) else {
-                return Err(Error::TooMany);
+                return Err(artifact::Error::TooMany.into());
             };
             Ok(kind)
         };
@@ -360,32 +301,18 @@ fn build_relations(release: &Release, numbered: &Numbered) -> Result<Relations, 
     for (source, kind, target) in raw_edges {
         edges.push((source, kind_of(&kind)?, target));
     }
-    let count = ordinal(numbered.ordinals.len())?.index();
+    let count = artifact::ordinal(numbered.ordinals.len())?.index();
     Ok(Relations::build(count, types, edges)?)
 }
 
-/// Writes the designation-use vocabulary: the term types of the kept atoms.
-///
-/// # Errors
-///
-/// Returns [`Error`] when the store does not take the vocabulary or there are
-/// more term types than an ordinal can number.
-fn write_uses<'a>(
-    builder: &mut StoreBuilder,
-    numbered: &'a Numbered,
-) -> Result<BTreeMap<&'a str, u32>, Error> {
+/// The designation uses: the term types of the kept atoms, sorted.
+fn term_types(numbered: &Numbered) -> Vec<&str> {
     let ttys: BTreeSet<&str> = numbered
         .by_concept
         .values()
         .flat_map(|atoms| atoms.iter().map(|a| a.tty.as_str()))
         .collect();
-    let mut uses: BTreeMap<&str, u32> = BTreeMap::new();
-    for (i, tty) in ttys.iter().enumerate() {
-        let use_ordinal = ordinal(i)?.index();
-        builder.vocabulary(Vocabulary::DesignationUses, use_ordinal, tty)?;
-        uses.insert(tty, use_ordinal);
-    }
-    Ok(uses)
+    ttys.into_iter().collect()
 }
 
 /// The property keys of one release, in the order the store numbers them: the
@@ -409,16 +336,16 @@ fn property_key_names(semantic_types: &SemanticTypes, attributes: &Attributes) -
 ///
 /// # Errors
 ///
-/// Returns [`Error`] when the store does not take a concept or a property, or
+/// Returns [`artifact::Error`] when the store does not take a concept or a property, or
 /// a key is unknown.
 fn write_concepts(
     builder: &mut StoreBuilder,
     numbered: &Numbered,
     uses: &BTreeMap<&str, u32>,
-    keys: &PropertyKeys<Error>,
+    keys: &PropertyKeys,
     semantic_types: &SemanticTypes,
     attributes: &Attributes,
-) -> Result<Gathered, Error> {
+) -> Result<Gathered, artifact::Error> {
     let mut gathered = Gathered::default();
     for (rxcui, atoms) in &numbered.by_concept {
         let Some(&ordinal) = numbered.ordinals.get(rxcui) else {
@@ -492,66 +419,51 @@ fn write_concepts(
 ///
 /// # Errors
 ///
-/// Returns [`Error`] when the file cannot be written.
+/// Returns [`Error`] when the relationships or the file cannot be written.
 fn write_relations(out: &Path, relations: &Relations) -> Result<(), Error> {
     let mut relation_bytes = Vec::new();
     relations.write_to(&mut relation_bytes)?;
-    let relations_path = out.join(RELATIONS_FILE);
-    std::fs::write(&relations_path, &relation_bytes).map_err(io_error(&relations_path))
-}
-
-/// Writes the atom table beside the store and returns the number of atoms it
-/// holds.
-///
-/// # Errors
-///
-/// Returns [`Error`] when the file cannot be written.
-fn write_atoms(out: &Path, atom_pairs: Vec<(u64, u32)>) -> Result<usize, Error> {
-    let atoms = KeyTable::new(atom_pairs);
-    let mut atom_bytes = Vec::new();
-    atoms.write_to(&mut atom_bytes)?;
-    let atoms_path = out.join(ATOMS_FILE);
-    std::fs::write(&atoms_path, &atom_bytes).map_err(io_error(&atoms_path))?;
-    Ok(atoms.len())
+    Ok(artifact::write_file(
+        &out.join(RELATIONS_FILE),
+        &relation_bytes,
+    )?)
 }
 
 /// Writes the manifest beside the store.
 ///
 /// # Errors
 ///
-/// Returns [`Error`] when the manifest cannot be rendered or written.
+/// Returns [`artifact::Error`] when the manifest cannot be rendered or
+/// written.
 fn write_manifest(
     out: &Path,
     version: &str,
     sources: &BTreeSet<String>,
     counts: &Counts,
     semantic_types: bool,
-) -> Result<(), Error> {
-    let manifest = json!({
-        "manifest": MANIFEST_VERSION,
-        "system": SYSTEM,
-        "edition": SYSTEM,
-        "version": version,
-        "store": STORE_FILE,
-        "storeLayout": tables::LAYOUT_VERSION,
-        "text": TEXT_FILE,
-        "relations": RELATIONS_FILE,
-        "atoms": ATOMS_FILE,
-        "semanticTypes": semantic_types,
-        "sources": sources,
-        "concepts": counts.concepts,
-        "designations": counts.designations,
-        "relationships": counts.relationships,
-        "words": counts.words,
-        "language": BASE_LANGUAGE,
-        "languages": [BASE_LANGUAGE],
-    });
-    let manifest_path = out.join(MANIFEST_FILE);
-    let text = serde_json::to_string_pretty(&manifest).map_err(|source| Error::Io {
-        path: manifest_path.clone(),
-        source: io::Error::other(source),
-    })?;
-    std::fs::write(&manifest_path, format!("{text}\n")).map_err(io_error(&manifest_path))
+) -> Result<(), artifact::Error> {
+    artifact::write_manifest(
+        out,
+        &json!({
+            "manifest": MANIFEST_VERSION,
+            "system": SYSTEM,
+            "edition": SYSTEM,
+            "version": version,
+            "store": STORE_FILE,
+            "storeLayout": tables::LAYOUT_VERSION,
+            "text": TEXT_FILE,
+            "relations": RELATIONS_FILE,
+            "atoms": ATOMS_FILE,
+            "semanticTypes": semantic_types,
+            "sources": sources,
+            "concepts": counts.concepts,
+            "designations": counts.designations,
+            "relationships": counts.relationships,
+            "words": counts.words,
+            "language": BASE_LANGUAGE,
+            "languages": [BASE_LANGUAGE],
+        }),
+    )
 }
 
 /// Builds the artifacts for the release under `root` into `out`.
@@ -580,11 +492,15 @@ pub fn build(
     let attributes = read_attributes(&release, &numbered)?;
     let semantic_types = read_semantic_types(&release, &numbered)?;
     let relations = build_relations(&release, &numbered)?;
-    std::fs::create_dir_all(out).map_err(io_error(out))?;
+    std::fs::create_dir_all(out).map_err(artifact::io_error(out))?;
     let store_path = out.join(STORE_FILE);
-    let mut builder = StoreBuilder::create(&store_path, SYSTEM, &version)?;
-    let uses = write_uses(&mut builder, &numbered)?;
-    let keys: PropertyKeys<Error> = PropertyKeys::write(
+    let ttys = term_types(&numbered);
+    let mut builder = artifact::open_store(&store_path, SYSTEM, &version, &ttys)?;
+    let mut uses: BTreeMap<&str, u32> = BTreeMap::new();
+    for (i, tty) in ttys.iter().enumerate() {
+        uses.insert(tty, artifact::ordinal(i)?.index());
+    }
+    let keys = PropertyKeys::write(
         &mut builder,
         &property_key_names(&semantic_types, &attributes),
     )?;
@@ -596,24 +512,19 @@ pub fn build(
         &semantic_types,
         &attributes,
     )?;
-    common::write_designations::<Error>(&mut builder, &gathered.placed)?;
-    let words = common::write_text_index::<Error>(out, &gathered.placed, LanguageKey::Whole)?;
+    artifact::write_designations(&mut builder, &gathered.placed)?;
+    let words = artifact::write_text_index(out, &gathered.placed, LanguageKey::Whole)?;
     write_relations(out, &relations)?;
     let Gathered {
         placed,
         atom_pairs,
         sabs,
     } = gathered;
-    let atoms = write_atoms(out, atom_pairs)?;
+    let atoms = artifact::write_key_table(&out.join(ATOMS_FILE), atom_pairs)?;
     // NOTE: the display is the first designation of each concept (the RXNORM
     // atom of the most preferred term type), so the preferred rule names use 0
     // only as a formality.
-    builder.finish(&PreferredRule {
-        preferred: 0,
-        // Nothing reads a display column for this system; its provider
-        // chooses a display from the designations it already reads.
-        display_use: None,
-    })?;
+    artifact::finish(builder)?;
     let counts = Counts {
         concepts: numbered.ordinals.len(),
         designations: placed.len(),
@@ -629,33 +540,4 @@ pub fn build(
         relationships: u64::try_from(counts.relationships).unwrap_or(u64::MAX),
         words: u64::try_from(counts.words).unwrap_or(u64::MAX),
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use concept_store::builder::StoreBuilder;
-
-    use super::{Error, PropertyKeys};
-
-    /// A key the vocabulary never received is a defect in the build, and says
-    /// so: it is not the capacity limit `TooMany` reports.
-    #[test]
-    fn an_unregistered_property_key_names_itself() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let mut builder =
-            StoreBuilder::create(&dir.path().join("store.redb"), super::SYSTEM, "09082026")
-                .expect("store");
-        let keys: PropertyKeys<Error> =
-            PropertyKeys::write(&mut builder, &[String::from("TTY")]).expect("writes");
-        assert_eq!(keys.key("TTY").expect("registered"), 0);
-        let error = keys.key("SAB").expect_err("never registered");
-        assert!(
-            matches!(&error, Error::UnknownPropertyKey { key } if key == "SAB"),
-            "the key is named: {error:?}"
-        );
-        assert_eq!(
-            error.to_string(),
-            "the property key `SAB` is not in the vocabulary"
-        );
-    }
 }

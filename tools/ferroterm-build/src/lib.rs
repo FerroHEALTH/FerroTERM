@@ -13,8 +13,8 @@
 #![doc(test(attr(deny(warnings))))]
 
 pub mod archive;
+pub mod artifact;
 pub mod classification;
-mod common;
 pub mod dhd;
 pub mod icd11;
 pub mod labcodeset;

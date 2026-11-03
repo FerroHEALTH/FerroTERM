@@ -12,26 +12,19 @@
 
 use std::path::Path;
 
-use crate::snomed::Item;
-
 use concept_graph::attributes::Attributes;
-use concept_graph::closure::Closure;
-use concept_graph::csr::Csr;
 use concept_graph::identifiers::Identifiers;
 use concept_graph::members::Memberships;
 use concept_graph::ordinal::Ordinal;
-use concept_graph::persist::Hierarchy;
 use concept_graph::refsets::{self, RefsetMembers};
-use concept_store::builder::{PreferredRule, StoreBuilder};
+use concept_store::builder::StoreBuilder;
 use concept_store::record::{Concept, Designation, PropertyValue};
-use concept_store::store::Vocabulary;
 use concept_store::tables;
 use designation_index::index::{IndexBuilder, Input};
 use rf2::constants;
 
-use crate::snomed::{
-    EDITION, FixtureError, GB_REFSET, ICD10_MAP_SCTID, NL_REFSET, VERSION, item, sctid,
-};
+use crate::edition;
+use crate::snomed::{EDITION, FixtureError, ICD10_MAP_SCTID, Item, VERSION, item, sctid};
 
 /// The children each concept has, so the tree is broad and shallow the way a
 /// SNOMED hierarchy is.
@@ -105,35 +98,8 @@ pub fn write(dir: &Path, concepts: u32) -> Result<(), FixtureError> {
 
     let mut builder =
         StoreBuilder::create(&dir.join("store.redb"), "http://snomed.info/sct", VERSION)?;
-    for (i, key) in ["parent", "definitionStatus", "module"].iter().enumerate() {
-        builder.vocabulary(Vocabulary::PropertyKeys, u32::try_from(i).unwrap_or(0), key)?;
-    }
-    for (i, use_id) in [
-        constants::FULLY_SPECIFIED_NAME,
-        constants::SYNONYM,
-        constants::DEFINITION,
-    ]
-    .iter()
-    .enumerate()
-    {
-        builder.vocabulary(
-            Vocabulary::DesignationUses,
-            u32::try_from(i).unwrap_or(0),
-            &use_id.to_string(),
-        )?;
-    }
-    builder.vocabulary(
-        Vocabulary::Acceptabilities,
-        0,
-        &constants::PREFERRED.to_string(),
-    )?;
-    builder.vocabulary(
-        Vocabulary::Acceptabilities,
-        1,
-        &constants::ACCEPTABLE.to_string(),
-    )?;
-    builder.vocabulary(Vocabulary::LanguageRefsets, gb, GB_REFSET)?;
-    builder.vocabulary(Vocabulary::LanguageRefsets, nl, NL_REFSET)?;
+    edition::write_property_keys(&mut builder)?;
+    edition::write_designation_vocabularies(&mut builder, gb, nl)?;
 
     let mut text = IndexBuilder::new();
     let mut edges = Vec::new();
@@ -196,37 +162,13 @@ pub fn write(dir: &Path, concepts: u32) -> Result<(), FixtureError> {
         }
     }
 
-    let graph_error = |e: &dyn std::fmt::Display| FixtureError::Graph(e.to_string());
-    let csr = Csr::build(
-        concepts,
-        edges
-            .iter()
-            .map(|(child, above)| (Ordinal::new(*child), Ordinal::new(*above))),
-    )
-    .map_err(|e| graph_error(&e))?;
-    let closure = Closure::compute(&csr).map_err(|e| graph_error(&e))?;
-    let hierarchy = Hierarchy { is_a: csr, closure };
-    let mut graph_bytes = Vec::new();
-    hierarchy
-        .write_to(&mut graph_bytes)
-        .map_err(|e| graph_error(&e))?;
-    std::fs::write(dir.join("hierarchy.bin"), &graph_bytes)?;
+    edition::write_hierarchy(dir, concepts, edges)?;
 
-    let attributes =
-        Attributes::build(concepts, Vec::new(), Vec::new()).map_err(|e| graph_error(&e))?;
-    let mut attribute_bytes = Vec::new();
-    attributes
-        .write_to(&mut attribute_bytes)
-        .map_err(|e| graph_error(&e))?;
-    std::fs::write(dir.join("attributes.bin"), &attribute_bytes)?;
+    let attributes = Attributes::build(concepts, Vec::new(), Vec::new())
+        .map_err(|e| FixtureError::Graph(e.to_string()))?;
+    edition::write_graph_part(dir, "attributes.bin", |bytes| attributes.write_to(bytes))?;
 
-    let index = text
-        .build()
-        .map_err(|e| FixtureError::Text(e.to_string()))?;
-    let mut text_bytes = Vec::new();
-    designation_index::persist::write_to(&index, &mut text_bytes)
-        .map_err(|e| FixtureError::Text(e.to_string()))?;
-    std::fs::write(dir.join("text.bin"), &text_bytes)?;
+    edition::write_text(dir, text)?;
 
     let set: u64 = code(refset(concepts)).parse().unwrap_or_default();
     let map: u64 = ICD10_MAP_SCTID.parse().unwrap_or_default();
@@ -241,11 +183,7 @@ pub fn write(dir: &Path, concepts: u32) -> Result<(), FixtureError> {
     for ordinal in 0..concepts {
         memberships.insert(map, Ordinal::new(ordinal));
     }
-    let mut member_bytes = Vec::new();
-    memberships
-        .write_to(&mut member_bytes)
-        .map_err(|e| graph_error(&e))?;
-    std::fs::write(dir.join("refsets.bin"), &member_bytes)?;
+    edition::write_graph_part(dir, "refsets.bin", |bytes| memberships.write_to(bytes))?;
 
     let mut tables = RefsetMembers::new();
     tables
@@ -262,59 +200,34 @@ pub fn write(dir: &Path, concepts: u32) -> Result<(), FixtureError> {
                 })
                 .collect(),
         )
-        .map_err(|e| graph_error(&e))?;
+        .map_err(|e| FixtureError::Graph(e.to_string()))?;
     // The ICD-10 extended map, in the columns RF2 gives it, under the published
     // reference set id, so the implicit concept map of the edition names a target
     // code system (RF2 §Extended Map Reference Set).
     tables
         .insert(
             map,
-            &[
-                (String::from("mapGroup"), refsets::FieldKind::Integer),
-                (String::from("mapPriority"), refsets::FieldKind::Integer),
-                (String::from("mapRule"), refsets::FieldKind::String),
-                (String::from("mapAdvice"), refsets::FieldKind::String),
-                (String::from("mapTarget"), refsets::FieldKind::String),
-                (String::from("correlationId"), refsets::FieldKind::Component),
-            ],
+            &edition::extended_map_columns(),
             (0..concepts)
                 .map(|ordinal| refsets::MemberRow {
                     concept: Ordinal::new(ordinal),
                     effective_time: 20_260_101,
                     module: module_id,
-                    values: vec![
-                        refsets::FieldValue::Integer(1),
-                        refsets::FieldValue::Integer(1),
-                        refsets::FieldValue::String(String::from("TRUE")),
-                        refsets::FieldValue::String(format!("ALWAYS {}", map_target(ordinal))),
-                        refsets::FieldValue::String(map_target(ordinal)),
-                        refsets::FieldValue::Component(447_561_005),
-                    ],
+                    values: edition::extended_map_values(&map_target(ordinal)),
                 })
                 .collect(),
         )
-        .map_err(|e| graph_error(&e))?;
-    let mut table_bytes = Vec::new();
-    tables
-        .write_to(&mut table_bytes)
-        .map_err(|e| graph_error(&e))?;
-    std::fs::write(dir.join("members.bin"), &table_bytes)?;
+        .map_err(|e| FixtureError::Graph(e.to_string()))?;
+    edition::write_graph_part(dir, "members.bin", |bytes| tables.write_to(bytes))?;
 
     let identifiers = Identifiers::new(Vec::new());
-    let mut identifier_bytes = Vec::new();
-    identifiers
-        .write_to(&mut identifier_bytes)
-        .map_err(|e| graph_error(&e))?;
-    std::fs::write(dir.join("identifiers.bin"), &identifier_bytes)?;
+    edition::write_graph_part(dir, "identifiers.bin", |bytes| identifiers.write_to(bytes))?;
 
-    builder.finish(&PreferredRule {
-        preferred,
-        // The synonym, the second designation use written above: a SNOMED
-        // display is the preferred synonym of a language reference set.
-        display_use: Some(1),
-    })?;
+    edition::finish(builder, preferred)?;
 
-    let manifest = serde_json::json!({
+    edition::write_manifest(
+        dir,
+        &serde_json::json!({
         "manifest": 2,
         "system": "http://snomed.info/sct",
         "edition": EDITION,
@@ -330,9 +243,6 @@ pub fn write(dir: &Path, concepts: u32) -> Result<(), FixtureError> {
         "identifiers": "identifiers.bin",
         "concepts": concepts,
         "languages": ["en", "nl"],
-    });
-    let rendered = serde_json::to_string_pretty(&manifest)
-        .map_err(|e| FixtureError::Io(std::io::Error::other(e)))?;
-    std::fs::write(dir.join(concept_store::MANIFEST_FILE), rendered)?;
-    Ok(())
+        }),
+    )
 }
