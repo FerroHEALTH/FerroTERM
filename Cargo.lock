@@ -1204,9 +1204,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-session"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4de0ed8e549e279ebf0adb1e8805a62f43bf5c61685cafe58682d43be83d8607"
+checksum = "9c535992652e1f028253d780e238af54b3f31d5d3eeb3f1356abbbfcabef7520"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -1363,7 +1363,6 @@ dependencies = [
  "axum",
  "base64 0.23.1",
  "clap",
- "cookie",
  "ferrohealth-config",
  "ferrohealth-health",
  "ferrohealth-secret",
