@@ -110,7 +110,7 @@ jobs:
           tool: cargo-llvm-cov,cargo-nextest
       - name: Instrumented tests → lcov
         if: ${{ hashFiles('Cargo.toml') != '' }}
-        run: cargo llvm-cov nextest --locked --workspace --all-features --no-tests=pass --lcov --output-path lcov.info
+        run: cargo llvm-cov nextest --locked --workspace --all-features --no-tests=pass --no-fail-fast --lcov --output-path lcov.info
 
       # The console's screens are proven by the browser journeys, which the
       # nextest run above never drives, so the journeys run here against an
