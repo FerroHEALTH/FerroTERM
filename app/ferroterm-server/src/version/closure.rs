@@ -28,8 +28,12 @@ macro_rules! closure {
 
             use crate::outcome::Failure;
             use crate::persistence::{Closure, ClosureEdge, ClosureMember};
+            use fhir_terminology::registry::Registry;
+
+            use crate::scope::scope_of;
             use crate::state::AppState;
 
+            use super::resources::split_supplied;
             use super::{map, parameters};
 
             /// `POST [base]/$closure`.
@@ -51,7 +55,14 @@ macro_rules! closure {
                 headers: &HeaderMap,
                 body: &Bytes,
             ) -> Result<fhir_types::$fhir::concept_map::ConceptMap, Failure> {
-                let sent = parameters::parameters_from_body(headers, body)?;
+                // NOTE: the ecosystem supplies the code systems a request needs as
+                // `tx-resource` parameters on every operation
+                // (<https://build.fhir.org/ig/HL7/fhir-tx-ecosystem-ig/requirements.html>), so the
+                // closure is computed over the request's scope.
+                let object = parameters::object_from_body(headers, body)?;
+                let (sent, resources) = split_supplied(object)?;
+                parameters::refuse_undeclared(&CONCEPT_MAP_CLOSURE, &[], &sent)?;
+                let scope = scope_of(state, crate::served::$fhir::FHIR_VERSION, headers, resources)?;
                 let request = ConceptMapClosureRequest::from_parameters(&sent)
                     .map_err(|e| parameters::parameters_failure(&e))?;
                 let name = request.name.value.as_deref().unwrap_or_default();
@@ -73,8 +84,8 @@ macro_rules! closure {
                 }
                 match resync {
                     Some(version) => replay(state, name, &version),
-                    None if added.is_empty() => initialise(state, name),
-                    None => extend(state, name, &added),
+                    None if added.is_empty() => initialise(state, scope.registry(), name),
+                    None => extend(state, scope.registry(), name, &added),
                 }
             }
 
@@ -86,12 +97,13 @@ macro_rules! closure {
             /// Closure Table").
             fn initialise(
                 state: &AppState,
+                registry: &Registry,
                 name: &str,
             ) -> Result<fhir_types::$fhir::concept_map::ConceptMap, Failure> {
                 let closure = Closure {
                     name: name.to_owned(),
                     version: 0,
-                    edition: edition(state),
+                    edition: edition(registry),
                     members: Vec::new(),
                     edges: Vec::new(),
                 };
@@ -108,14 +120,11 @@ macro_rules! closure {
 
             /// What the loaded code systems are, so a table that was built over
             /// other content can be refused.
-            fn edition(state: &AppState) -> Vec<String> {
-                let layer = state.layer();
-                let mut out: Vec<String> = layer
-                    .registry()
+            fn edition(registry: &Registry) -> Vec<String> {
+                let mut out: Vec<String> = registry
                     .systems()
                     .flat_map(|system| {
-                        layer
-                            .registry()
+                        registry
                             .versions(system)
                             .map(|provider| {
                                 let identity = provider.identity();
@@ -160,11 +169,12 @@ macro_rules! closure {
             /// Closure Table").
             fn extend(
                 state: &AppState,
+                registry: &Registry,
                 name: &str,
                 added: &[Member],
             ) -> Result<fhir_types::$fhir::concept_map::ConceptMap, Failure> {
                 let mut held = table(state, name)?;
-                if held.edition != edition(state) {
+                if held.edition != edition(registry) {
                     // NOTE: a table built over other content cannot be trusted, and the
                     // client's only move is to initialise and replay its codes
                     // (<https://hl7.org/fhir/R4B/terminology-service.html>).
@@ -182,8 +192,7 @@ macro_rules! closure {
                     .filter(|member| !held.members.iter().any(|kept| same(kept, member)))
                     .cloned()
                     .collect();
-                let layer = state.layer();
-                let edges = relate(layer.registry(), &held_members(&held), &fresh)?;
+                let edges = relate(registry, &held_members(&held), &fresh)?;
                 held.version = held.version.saturating_add(1);
                 for member in fresh {
                     held.members.push(ClosureMember {
