@@ -298,6 +298,17 @@ macro_rules! operations {
                 invocation: &Invocation,
                 parameters: &Parameters,
             ) -> Handled {
+                Ok(Answer::Parameters(Box::new(code_system_validation(
+                    scope, invocation, parameters,
+                )?)))
+            }
+
+            /// One `CodeSystem/$validate-code` as this version's `Parameters`.
+            fn code_system_validation(
+                scope: &Scope,
+                invocation: &Invocation,
+                parameters: &Parameters,
+            ) -> Result<Parameters, Failure> {
                 let request = CodeSystemValidateCodeRequest::from_parameters(parameters)
                     .map_err(|e| parameters::parameters_failure(&e))?;
                 let outcome = validate_code::validate_code(
@@ -306,9 +317,7 @@ macro_rules! operations {
                     &map::validate_code_input(&request),
                 )
                 .map_err(|e| scope.refused(e))?;
-                Ok(Answer::Parameters(Box::new(
-                    map::validate_code_response(outcome).to_parameters(),
-                )))
+                Ok(map::validate_code_response(outcome).to_parameters())
             }
 
             fn run_subsumes(
@@ -405,8 +414,11 @@ macro_rules! operations {
             /// The name of one validation in a batch, in and out.
             const VALIDATION: &str = "validation";
 
-            /// `$batch-validate-code`: many validations against one value set, in one
-            /// request.
+            /// One validation of a batch, run on the inputs it shares with the request.
+            type Validate = dyn Fn(&Scope, &Parameters) -> Result<Parameters, Failure>;
+
+            /// `$batch-validate-code`: many validations in one request, each run by
+            /// `validate`, the `$validate-code` of the resource the URL names.
             ///
             /// No `OperationDefinition` declares this operation, in any core package or
             /// in the terminology ecosystem IG, so the contract is the IG's own test
@@ -415,7 +427,11 @@ macro_rules! operations {
             /// inputs once and a `validation` parameter per validation, each a
             /// `Parameters` of that validation's own inputs, and the answer repeats
             /// `validation` in the same order.
-            fn run_batch_validate(scope: &Scope, parameters: &Parameters) -> Handled {
+            fn run_batch_validate(
+                scope: &Scope,
+                parameters: &Parameters,
+                validate: &Validate,
+            ) -> Handled {
                 let mut shared = Vec::new();
                 let mut validations = Vec::new();
                 for parameter in &parameters.parameter {
@@ -427,7 +443,7 @@ macro_rules! operations {
                 }
                 let answered: Vec<ParametersParameter> = validations
                     .into_iter()
-                    .map(|validation| answer(scope, &shared, validation))
+                    .map(|validation| answer(scope, &shared, validation, validate))
                     .collect();
                 Ok(Answer::Parameters(Box::new(Parameters {
                     parameter: answered,
@@ -444,11 +460,12 @@ macro_rules! operations {
                 scope: &Scope,
                 shared: &[ParametersParameter],
                 validation: &ParametersParameter,
+                validate: &Validate,
             ) -> ParametersParameter {
                 let resource = match own(validation) {
                     Ok(own) => {
                         let merged = merge(shared, own);
-                        match value_set_validation(scope, None, &merged, &Origin::Unplaced) {
+                        match validate(scope, &merged) {
                             Ok(answered) => Some(Resource::Parameters(Box::new(answered))),
                             Err(failure) => outcome_resource(&failure),
                         }

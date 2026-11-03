@@ -23,9 +23,10 @@ use ferrohealth_ui::view::load_report::Outcome;
 use ferrohealth_ui::view::surface::{SectionHead, definitions, panel_section};
 use ferrohealth_ui::view::transform::field_checks;
 
+use crate::fhir::VALUE_SET;
 use crate::fhir::expansion::{ExpandRequest, Expansion};
-use crate::fhir::{CODE_SYSTEM, VALUE_SET};
 use crate::locale::{Msg, message, tr, tr_with};
+use crate::pages::operations::published;
 use crate::pages::operations::{
     Op, before, choices, frame, options, run, select, sent, text, verdict,
 };
@@ -128,11 +129,10 @@ pub(crate) fn checkbox(id: &str, name: &str, checked: bool) -> Html {
 /// The Expand tab.
 pub(crate) async fn page(request: Request) -> Html {
     let locale = &request.locale;
-    let sets_named = request
-        .client
-        .published_names(request.version, VALUE_SET)
-        .await
-        .ok();
+    let sets_named = match published(&request, VALUE_SET).await {
+        Ok(named) => named,
+        Err(error) => return failure(&request.locale, &error),
+    };
     let sets = choices(sets_named.as_ref());
     let set_names = sets_named
         .as_ref()
@@ -221,12 +221,10 @@ async fn answer(request: &Request, asked: &Asked, set: &str) -> Html {
                 sent(locale, &url, None),
             ]),
             Some(expansion) => {
-                let names = request
-                    .client
-                    .published_names(request.version, CODE_SYSTEM)
-                    .await
-                    .map(|named| named.names())
-                    .unwrap_or_default();
+                let names = match crate::pages::parts::system_names(request).await {
+                    Ok(names) => names,
+                    Err(error) => return panel_section(locale, None, failure(locale, &error)),
+                };
                 Html::join([
                     verdict(
                         locale,

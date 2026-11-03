@@ -148,7 +148,10 @@ async fn edited(request: &Request, posted: Option<&Posted>) -> Html {
             }
         }
     }
-    let (systems, names) = crate::pages::composer::systems_of(request).await;
+    let (systems, names) = match crate::pages::composer::systems_of(request).await {
+        Ok(systems) => systems,
+        Err(error) => return failure(locale, &error),
+    };
     let problems = draft.problems(request.version);
     let standing = match (&answer, problems.first()) {
         (Some((_, standing)), _) => standing.clone(),

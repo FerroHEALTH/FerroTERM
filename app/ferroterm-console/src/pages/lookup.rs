@@ -18,6 +18,7 @@ use crate::fhir::concept::{Concept, LookupRequest};
 use crate::fhir::terminology::SystemCard;
 use crate::locale::{Msg, tr, tr_with};
 use crate::markup::{p, strong};
+use crate::pages::operations::published;
 use crate::pages::operations::{
     Op, before, choices, frame, options, run, select, sent, text, verdict,
 };
@@ -34,11 +35,10 @@ const LANGUAGE_PARAM: &str = "displayLanguage";
 /// The Look up tab.
 pub(crate) async fn page(request: Request) -> Html {
     let locale = &request.locale;
-    let named = request
-        .client
-        .published_names(request.version, CODE_SYSTEM)
-        .await
-        .ok();
+    let named = match published(&request, CODE_SYSTEM).await {
+        Ok(named) => named,
+        Err(error) => return failure(&request.locale, &error),
+    };
     let systems = choices(named.as_ref());
     let system = request.text(SYSTEM_PARAM);
     let system = if system.is_empty() {

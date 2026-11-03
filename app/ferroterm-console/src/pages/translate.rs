@@ -26,6 +26,7 @@ use crate::locale::{Msg, tr, tr_with};
 use crate::markup::{code, p, strong};
 use crate::pages::concept_map::relationship;
 use crate::pages::lookup::CODE_PARAM;
+use crate::pages::operations::published;
 use crate::pages::operations::{
     Op, before, choices, frame, options, run, select, sent, text, verdict,
 };
@@ -42,21 +43,19 @@ const TARGET_PARAM: &str = "targetSystem";
 /// The Translate tab.
 pub(crate) async fn page(request: Request) -> Html {
     let locale = &request.locale;
-    let systems_named = request
-        .client
-        .published_names(request.version, CODE_SYSTEM)
-        .await
-        .ok();
+    let systems_named = match published(&request, CODE_SYSTEM).await {
+        Ok(named) => named,
+        Err(error) => return failure(&request.locale, &error),
+    };
     let systems = choices(systems_named.as_ref());
     let system_names = systems_named
         .as_ref()
         .map(crate::fhir::named::NamedSearch::names)
         .unwrap_or_default();
-    let maps_named = request
-        .client
-        .published_names(request.version, CONCEPT_MAP)
-        .await
-        .ok();
+    let maps_named = match published(&request, CONCEPT_MAP).await {
+        Ok(named) => named,
+        Err(error) => return failure(&request.locale, &error),
+    };
     let maps = choices(maps_named.as_ref());
     let map_names = maps_named
         .as_ref()

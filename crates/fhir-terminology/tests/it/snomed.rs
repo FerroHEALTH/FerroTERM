@@ -493,12 +493,13 @@ fn a_language_reference_set_is_listed_and_its_member_forms_are_refused() {
     ));
 }
 
-/// `$lookup` bounds its `property` values: beside the ones it names itself,
-/// "any property codes defined by this specification or by the `CodeSystem` are
-/// allowed" (<https://hl7.org/fhir/R5/codesystem-operation-lookup.html>). A
-/// code outside that set is refused.
+/// `property` is "A property that the client wishes to be returned in the
+/// output", and the codes the specification or the `CodeSystem` define "are
+/// allowed, and these are returned in the out parameter `property`"
+/// (<https://hl7.org/fhir/R5/codesystem-operation-lookup.html>). A code
+/// neither defines names nothing to return, so it is left out with no issue.
 #[test]
-fn a_property_the_code_system_does_not_define_is_refused_rather_than_dropped() {
+fn a_property_the_code_system_does_not_define_is_left_out() {
     let (_dir, p) = provider();
     let mut registry = Registry::default();
     registry.register(Arc::new(p)).expect("registers");
@@ -514,7 +515,14 @@ fn a_property_the_code_system_does_not_define_is_refused_rather_than_dropped() {
             },
         )
     };
-    assert!(matches!(ask("nonesuch"), Err(OperationError::Invalid(_))));
+    let answered = ask("nonesuch").expect("a property nothing defines is no request error");
+    assert!(
+        answered
+            .properties
+            .iter()
+            .all(|property| property.code != "nonesuch"),
+        "nothing is answered for it"
+    );
     for property in ["normalForm", "normalFormTerse"] {
         assert!(
             ask(property).is_ok(),
