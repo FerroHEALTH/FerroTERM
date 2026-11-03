@@ -36,7 +36,7 @@ async fn a_resource_the_api_lists_lands_in_the_managed_directory() {
     harness.reloads_with(200).await;
     harness.accepts_webhooks().await;
     let clock = TestClock::new("2026-10-01T03:00:00Z", 0);
-    let subscription = Subscription::new()
+    let subscription = Subscription::default()
         .with_system("https://example.invalid/ValueSet/a")
         .with_category(CategoryTerm::FhirValueSet);
     let service = harness.service(vec![harness.source_with_api(subscription)], clock);
@@ -100,7 +100,7 @@ async fn a_resource_already_served_is_not_taken_from_the_api_again() {
     harness.reloads_with(200).await;
     harness.accepts_webhooks().await;
     let clock = TestClock::new("2026-10-01T03:00:00Z", 0);
-    let subscription = Subscription::new().with_category(CategoryTerm::FhirValueSet);
+    let subscription = Subscription::default().with_category(CategoryTerm::FhirValueSet);
     let service = harness.service(vec![harness.source_with_api(subscription)], clock);
 
     let first = service.run(Trigger::RunOnce).await;
@@ -127,7 +127,7 @@ async fn a_subscribed_system_no_listing_carries_is_reported_as_not_visible() {
     harness.reloads_with(200).await;
     harness.accepts_webhooks().await;
     let clock = TestClock::new("2026-10-01T03:00:00Z", 0);
-    let subscription = Subscription::new()
+    let subscription = Subscription::default()
         .with_system("http://loinc.org")
         .with_category(CategoryTerm::FhirCodeSystem);
     let service = harness.service(vec![harness.source_with_api(subscription)], clock);
@@ -153,7 +153,7 @@ async fn an_api_that_does_not_answer_fails_the_run_and_keeps_the_feed_lane() {
     harness.reloads_with(200).await;
     harness.accepts_webhooks().await;
     let clock = TestClock::new("2026-10-01T03:00:00Z", 0);
-    let subscription = Subscription::new().with_category(CategoryTerm::FhirValueSet);
+    let subscription = Subscription::default().with_category(CategoryTerm::FhirValueSet);
     let service = harness.service(vec![harness.source_with_api(subscription)], clock);
 
     let record = service.run(Trigger::RunOnce).await;
@@ -209,7 +209,7 @@ async fn resources_outside_the_subscription_are_counted_not_listed() {
     harness.reloads_with(200).await;
     harness.accepts_webhooks().await;
     let clock = TestClock::new("2026-10-01T03:00:00Z", 0);
-    let subscription = Subscription::new()
+    let subscription = Subscription::default()
         .with_system("https://example.invalid/ValueSet/a")
         .with_category(CategoryTerm::FhirValueSet);
     let service = harness.service(vec![harness.source_with_api(subscription)], clock);

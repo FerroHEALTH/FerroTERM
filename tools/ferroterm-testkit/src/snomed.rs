@@ -704,7 +704,7 @@ fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureError> {
     };
     edition::write_designation_vocabularies(&mut builder, gb, nl)?;
 
-    let mut text = IndexBuilder::new();
+    let mut text = IndexBuilder::default();
     write_concepts(&mut builder, &mut text, &rows, &is_a, &module)?;
     // The cat and the dog have covering fur and four legs; the cat states both
     // in one role group, the dog in two.
@@ -767,7 +767,7 @@ fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureError> {
 
     edition::write_hierarchy(dir, ord(rows.len()), is_a.iter().copied())?;
     edition::write_text(dir, text)?;
-    let mut memberships = Memberships::new();
+    let mut memberships = Memberships::default();
     let refset_id = |ordinal: u32| -> Result<u64, FixtureError> {
         rows.iter()
             .find(|r| r.ordinal == ordinal)
@@ -801,7 +801,7 @@ fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureError> {
         module: module_id,
         values,
     };
-    let mut tables = RefsetMembers::new();
+    let mut tables = RefsetMembers::default();
     let mut pet_rows = vec![member(CAT, vec![]), member(DOG, vec![])];
     if shape.bird {
         pet_rows.push(member(BIRD, vec![]));

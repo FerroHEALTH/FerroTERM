@@ -456,7 +456,7 @@ impl Harness {
 
 /// The subscription every case runs under: every system, both lanes.
 pub(crate) fn subscription() -> Subscription {
-    Subscription::new()
+    Subscription::default()
         .with_category(CategoryTerm::SnomedRf2Snapshot)
         .with_category(CategoryTerm::FhirValueSet)
         .with_category(CategoryTerm::FhirCodeSystem)

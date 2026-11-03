@@ -36,13 +36,13 @@ impl World {
         let dir = tempfile::tempdir().expect("tempdir");
         snomed::write(dir.path()).expect("writes the fixture");
         let provider = SnomedProvider::open(dir.path(), "en").expect("opens");
-        let mut registry = Registry::new();
+        let mut registry = Registry::default();
         registry.register(Arc::new(provider)).expect("registers");
         Self {
             _dir: dir,
             registry,
-            value_sets: ValueSetStore::new(),
-            concept_maps: ConceptMapStore::new(),
+            value_sets: ValueSetStore::default(),
+            concept_maps: ConceptMapStore::default(),
         }
     }
 
@@ -392,13 +392,13 @@ impl MappedWorld {
         let dir = tempfile::tempdir().expect("tempdir");
         scaled::write(dir.path(), concepts).expect("writes the edition");
         let provider = SnomedProvider::open(dir.path(), "en").expect("opens");
-        let mut registry = Registry::new();
+        let mut registry = Registry::default();
         registry.register(Arc::new(provider)).expect("registers");
         Self {
             _dir: dir,
             registry,
-            value_sets: ValueSetStore::new(),
-            concept_maps: ConceptMapStore::new(),
+            value_sets: ValueSetStore::default(),
+            concept_maps: ConceptMapStore::default(),
             url: map_url(ICD10_MAP_SCTID),
         }
     }

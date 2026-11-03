@@ -34,7 +34,7 @@ fn registry() -> (tempfile::TempDir, Registry) {
     let dir = tempfile::tempdir().expect("tempdir");
     snomed::write(dir.path()).expect("writes the fixture");
     let provider = SnomedProvider::open(dir.path(), "en").expect("opens");
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry.register(Arc::new(provider)).expect("registers");
     (dir, registry)
 }
@@ -417,11 +417,11 @@ fn in_value_set(expressions: Option<&str>, code: &str) -> bool {
         serde_json::to_string(&value_set(expressions)).expect("serialises"),
     )
     .expect("writes");
-    let mut value_sets = ValueSetStore::new();
+    let mut value_sets = ValueSetStore::default();
     for model in valueset::load::load_dir(sets.path(), FhirVersion::R4B).expect("loads") {
         value_sets.insert(model).expect("stores");
     }
-    let concept_maps = ConceptMapStore::new();
+    let concept_maps = ConceptMapStore::default();
     let sources = Sources {
         registry: &registry,
         value_sets: &value_sets,
@@ -584,11 +584,11 @@ fn a_value_set_that_enumerates_an_expression_contains_it() {
         serde_json::to_string(&enumerated).expect("serialises"),
     )
     .expect("writes");
-    let mut value_sets = ValueSetStore::new();
+    let mut value_sets = ValueSetStore::default();
     for model in valueset::load::load_dir(sets.path(), FhirVersion::R4B).expect("loads") {
         value_sets.insert(model).expect("stores");
     }
-    let concept_maps = ConceptMapStore::new();
+    let concept_maps = ConceptMapStore::default();
     let sources = Sources {
         registry: &registry,
         value_sets: &value_sets,

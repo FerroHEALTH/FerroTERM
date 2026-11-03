@@ -19,7 +19,7 @@ fn corpus() -> impl Strategy<Value = Vec<(String, bool, u32)>> {
 }
 
 fn build(rows: &[(String, bool, u32)]) -> TextIndex {
-    let mut builder = IndexBuilder::new();
+    let mut builder = IndexBuilder::default();
     for (position, (term, active, use_ordinal)) in rows.iter().enumerate() {
         builder
             .add(&Input {

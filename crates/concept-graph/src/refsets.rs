@@ -274,12 +274,6 @@ impl RefsetMembers {
         )
     }
 
-    /// An empty set of tables.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Adds the table of `refset` with `fields` (names and kinds beyond the
     /// referenced component) and its active `rows`.
     ///
@@ -561,7 +555,7 @@ mod tests {
     use crate::ordinal::Ordinal;
 
     fn sample() -> RefsetMembers {
-        let mut members = RefsetMembers::new();
+        let mut members = RefsetMembers::default();
         members
             .insert(
                 42,
@@ -635,7 +629,7 @@ mod tests {
             RefsetMembers::read_from(&mut b"XXXXXXXX\0\0\0\0".as_slice()),
             Err(RefsetsError::Magic)
         ));
-        let mut bad = RefsetMembers::new();
+        let mut bad = RefsetMembers::default();
         assert!(matches!(
             bad.insert(
                 1,

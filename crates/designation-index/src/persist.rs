@@ -228,7 +228,7 @@ mod tests {
 
     #[test]
     fn the_layout_round_trips_and_rejects_foreign_bytes() {
-        let mut builder = IndexBuilder::new();
+        let mut builder = IndexBuilder::default();
         builder
             .add(&Input {
                 concept: Ordinal::new(4),

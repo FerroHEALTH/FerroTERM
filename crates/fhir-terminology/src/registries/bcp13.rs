@@ -211,7 +211,7 @@ impl Bcp13Provider {
     /// the first ordinals so `registered = true` enumerates.
     #[must_use]
     pub fn new() -> Self {
-        let interned = Interned::new();
+        let interned = Interned::default();
         for base in REGISTERED.iter() {
             // NOTE: the table starts empty and holds fewer than u32::MAX entries, so
             // interning the registry cannot fail; a failure would be a defect.

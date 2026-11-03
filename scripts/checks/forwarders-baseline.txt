@@ -24,7 +24,7 @@ crates/concept-graph/src/members.rs: Memberships::new -> Self::default()
 crates/concept-graph/src/refsets.rs: RefsetMembers::new -> Self::default()
 crates/designation-index/src/index.rs: IndexBuilder::new -> Self::default()
 crates/fhir-terminology/src/artifact.rs: reader -> concept_graph::read::buffered(path)
-crates/fhir-terminology/src/clock.rs: now -> jiff::Timestamp::now()
+crates/fhir-terminology/src/clock.rs: now -> jiff::Timestamp::now()	the one wall-clock read: its NOTE records the panic decision every caller shares
 crates/fhir-terminology/src/registries/bcp47.rs: analyze_tag -> analyze(text, &REGISTRY_DATA)
 crates/fhir-terminology/src/registries/interned.rs: Interned::new -> Self::default()
 crates/fhir-terminology/src/registry.rs: Registry::new -> Self::default()

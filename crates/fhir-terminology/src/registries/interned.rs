@@ -23,12 +23,6 @@ struct Table {
 }
 
 impl Interned {
-    /// An empty table.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// The ordinal of `canonical`, assigned now when new.
     ///
     /// # Errors

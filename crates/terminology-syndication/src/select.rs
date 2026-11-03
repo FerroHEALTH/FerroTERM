@@ -61,12 +61,6 @@ pub struct Subscription {
 }
 
 impl Subscription {
-    /// An empty subscription: every system, no category.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Restricts the subscription to one more canonical identifier.
     #[must_use]
     pub fn with_system(mut self, canonical: impl Into<String>) -> Self {
@@ -127,12 +121,6 @@ pub struct Holdings {
 }
 
 impl Holdings {
-    /// An empty set of holdings: nothing is served yet.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Records that `canonical` at `version` is served, as of `date`.
     pub fn record(
         &mut self,

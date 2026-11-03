@@ -608,7 +608,7 @@ impl CodeSystemProvider for FhirCodeSystem {
 
     fn search(&self, text: &str, language: Option<&str>) -> Result<ConceptSet, ProviderError> {
         self.complete_enough()?;
-        let words = text_match::query_words(text);
+        let words = designation_index::tokenize::prefixes(text);
         let mut hits = ConceptSet::new();
         for (i, entry) in self.model.concepts.iter().enumerate() {
             let mut terms: Vec<&str> = Vec::new();

@@ -968,7 +968,7 @@ fn read_refsets(
         .par_iter()
         .map(|file| read_refset_file(file, ordinals))
         .collect::<Result<_, Error>>()?;
-    let mut memberships = Memberships::new();
+    let mut memberships = Memberships::default();
     let mut tables: BTreeMap<u64, PendingTable> = BTreeMap::new();
     let mut language = Vec::new();
     for part in parts {
@@ -984,7 +984,7 @@ fn read_refsets(
         }
         language.extend(part.language);
     }
-    let mut member_tables = RefsetMembers::new();
+    let mut member_tables = RefsetMembers::default();
     for (refset, (fields, rows)) in tables {
         member_tables.insert(refset, &fields, rows)?;
     }
@@ -1293,7 +1293,7 @@ fn build_text(
     designations: &[Placed],
     acceptabilities: &Acceptabilities,
 ) -> Result<(Vec<u8>, u64), Error> {
-    let mut index = IndexBuilder::new();
+    let mut index = IndexBuilder::default();
     for placed in designations {
         let refsets: Vec<u32> = acceptabilities
             .get(&(placed.ordinal, placed.index))

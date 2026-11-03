@@ -145,8 +145,8 @@ async fn the_api_is_listed_across_every_page_as_feed_entries() {
     );
     let selection = terminology_syndication::select::select(
         &feed,
-        &Subscription::new().with_category(CategoryTerm::FhirValueSet),
-        &Holdings::new(),
+        &Subscription::default().with_category(CategoryTerm::FhirValueSet),
+        &Holdings::default(),
     );
     assert_eq!(
         selection.taken.len(),
@@ -240,7 +240,7 @@ async fn a_listed_resource_is_fetched_and_its_digest_computed() {
 async fn a_subscribed_canonical_no_listing_carries_is_named() {
     let server = service().await;
     let api = source(&server).list_api().await.expect("the API lists");
-    let subscription = Subscription::new()
+    let subscription = Subscription::default()
         .with_system("https://example.invalid/ValueSet/a")
         .with_system("http://loinc.org")
         .with_system("http://snomed.info/sct/11000146104");
@@ -260,7 +260,7 @@ async fn a_subscribed_canonical_no_listing_carries_is_named() {
         "the value set is on the API, the edition is on the feed, and LOINC is on neither"
     );
     assert!(
-        unseen(&Subscription::new(), &[&feed, &api]).is_empty(),
+        unseen(&Subscription::default(), &[&feed, &api]).is_empty(),
         "a subscription to every system has nothing to miss"
     );
 }
@@ -288,8 +288,8 @@ async fn a_code_system_without_content_is_left_behind_with_its_term() {
     let feed = source(&server).list_api().await.expect("the API lists");
     let selection = terminology_syndication::select::select(
         &feed,
-        &Subscription::new().with_category(CategoryTerm::FhirCodeSystem),
-        &Holdings::new(),
+        &Subscription::default().with_category(CategoryTerm::FhirCodeSystem),
+        &Holdings::default(),
     );
     assert!(selection.taken.is_empty(), "a stub is never taken");
     assert_eq!(

@@ -351,14 +351,14 @@ fn a_codeless_grouper_expands_abstract_and_is_refused_when_abstract_is_not_allow
 
     let dir = tempfile::tempdir().expect("tempdir");
     write_artifacts(dir.path()).expect("builds");
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry
         .register(Arc::new(
             Icd11Provider::open(&dir.path().join("mms")).expect("opens mms"),
         ))
         .expect("registers");
-    let value_sets = ValueSetStore::new();
-    let concept_maps = ConceptMapStore::new();
+    let value_sets = ValueSetStore::default();
+    let concept_maps = ConceptMapStore::default();
     let sources = Sources {
         registry: &registry,
         value_sets: &value_sets,
@@ -471,14 +471,14 @@ fn the_exclude_flags_drop_a_postcoordinated_expression_and_a_codeless_grouper() 
 
     let dir = tempfile::tempdir().expect("tempdir");
     write_artifacts(dir.path()).expect("builds");
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry
         .register(Arc::new(
             Icd11Provider::open(&dir.path().join("mms")).expect("opens mms"),
         ))
         .expect("registers");
-    let value_sets = ValueSetStore::new();
-    let concept_maps = ConceptMapStore::new();
+    let value_sets = ValueSetStore::default();
+    let concept_maps = ConceptMapStore::default();
     let sources = Sources {
         registry: &registry,
         value_sets: &value_sets,
@@ -550,7 +550,7 @@ fn the_composes_spelling_survives_an_include_merge_and_a_value_set_import() {
 
     let dir = tempfile::tempdir().expect("tempdir");
     write_artifacts(dir.path()).expect("builds");
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry
         .register(Arc::new(
             Icd11Provider::open(&dir.path().join("mms")).expect("opens mms"),
@@ -578,11 +578,11 @@ fn the_composes_spelling_survives_an_include_merge_and_a_value_set_import() {
         }),
         ..Default::default()
     };
-    let mut value_sets = ValueSetStore::new();
+    let mut value_sets = ValueSetStore::default();
     value_sets
         .insert(fhir_terminology::valueset::convert::r4b::convert(&uri_set).expect("converts"))
         .expect("stores");
-    let concept_maps = ConceptMapStore::new();
+    let concept_maps = ConceptMapStore::default();
     let sources = Sources {
         registry: &registry,
         value_sets: &value_sets,
@@ -671,7 +671,7 @@ fn a_display_in_the_base_language_does_not_satisfy_a_request_for_another_one() {
 
     let dir = tempfile::tempdir().expect("tempdir");
     write_artifacts(dir.path()).expect("builds");
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry
         .register(Arc::new(
             Icd11Provider::open(&dir.path().join("mms")).expect("opens mms"),

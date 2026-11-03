@@ -96,12 +96,6 @@ pub struct Registry {
 pub struct UnknownSupplement(pub String);
 
 impl Registry {
-    /// An empty registry.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// This registry with `beneath` under it.
     ///
     /// The layers resolve per system version: a version this registry holds

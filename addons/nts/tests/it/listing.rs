@@ -52,7 +52,7 @@ async fn an_unsubscribed_system_is_reported_as_skipped() {
     let source = support::source(&server, support::password_account(), clock);
     let feed = source.list().await.expect("the listing is served");
 
-    let selection = source.select(&feed, &Holdings::new());
+    let selection = source.select(&feed, &Holdings::default());
     let skipped = selection
         .skipped
         .iter()
@@ -103,7 +103,7 @@ async fn a_system_offered_only_as_the_binary_index_is_not_syndicable() {
         "http://loinc.org is offered only as BINARY, which is not syndicable"
     );
 
-    let selection = source.select(&feed, &Holdings::new());
+    let selection = source.select(&feed, &Holdings::default());
     assert!(
         selection
             .skipped
@@ -127,7 +127,7 @@ async fn the_subscribed_releases_are_taken() {
     let source = support::source(&server, support::password_account(), clock);
     let feed = source.list().await.expect("the listing is served");
 
-    let selection = source.select(&feed, &Holdings::new());
+    let selection = source.select(&feed, &Holdings::default());
     let taken: Vec<&str> = selection
         .taken
         .iter()
@@ -147,7 +147,7 @@ async fn a_release_already_served_is_not_taken_again() {
     let source = support::source(&server, support::password_account(), clock);
     let feed = source.list().await.expect("the listing is served");
 
-    let mut holdings = Holdings::new();
+    let mut holdings = Holdings::default();
     holdings.record(
         "http://snomed.info/sct",
         "http://snomed.info/sct/11000146104/version/20260331",

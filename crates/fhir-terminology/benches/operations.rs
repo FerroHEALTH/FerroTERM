@@ -46,7 +46,7 @@ fn operations(c: &mut Criterion) {
     let (_dir, provider) = edition();
     let root = ferroterm_testkit::scaled::code(ferroterm_testkit::scaled::ROOT);
     let deep = ferroterm_testkit::scaled::code(DEEP);
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry.register(Arc::new(provider)).expect("registers");
 
     let mut group = c.benchmark_group("operations");
@@ -73,8 +73,8 @@ fn operations(c: &mut Criterion) {
     // The edition's ICD-10 extended map states one mapping per concept, so a
     // translation that read the map whole would cost the release. It reads the
     // mappings of the code it was asked about, so it costs the answer (#369).
-    let value_sets = ValueSetStore::new();
-    let concept_maps = ConceptMapStore::new();
+    let value_sets = ValueSetStore::default();
+    let concept_maps = ConceptMapStore::default();
     let sources = Sources {
         registry: &registry,
         value_sets: &value_sets,

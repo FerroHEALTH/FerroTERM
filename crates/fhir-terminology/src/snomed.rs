@@ -367,14 +367,14 @@ impl SnomedProvider {
         let store = Store::open(&dir.join(&manifest.store))?;
         let read = |name: &str| {
             let path = dir.join(name);
-            crate::artifact::reader(&path).map_err(|source| OpenError::Io { path, source })
+            concept_graph::read::buffered(&path).map_err(|source| OpenError::Io { path, source })
         };
         let graph = GraphHierarchy::read_from(&mut read(&manifest.hierarchy)?)?;
         let children = graph.is_a.transpose()?;
         let text = designation_index::persist::read_from(&mut read(&manifest.text)?)?;
         let memberships = match &manifest.refsets {
             Some(name) => Memberships::read_from(&mut read(name)?)?,
-            None => Memberships::new(),
+            None => Memberships::default(),
         };
         let (attributes, member_tables, identifiers) = Self::read_ecl_files(dir, &manifest)?;
         let concepts = store
@@ -620,7 +620,7 @@ impl SnomedProvider {
     ) -> Result<(Attributes, RefsetMembers, Identifiers), OpenError> {
         let read = |name: &str| {
             let path = dir.join(name);
-            crate::artifact::reader(&path).map_err(|source| OpenError::Io { path, source })
+            concept_graph::read::buffered(&path).map_err(|source| OpenError::Io { path, source })
         };
         let attributes = match &manifest.attributes {
             Some(name) => Attributes::read_from(&mut read(name)?)?,
@@ -628,7 +628,7 @@ impl SnomedProvider {
         };
         let member_tables = match &manifest.members {
             Some(name) => RefsetMembers::read_from(&mut read(name)?)?,
-            None => RefsetMembers::new(),
+            None => RefsetMembers::default(),
         };
         let identifiers = match &manifest.identifiers {
             Some(name) => Identifiers::read_from(&mut read(name)?)?,

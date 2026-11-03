@@ -60,7 +60,7 @@ impl World {
     }
 
     fn from_dir(dir: tempfile::TempDir) -> Self {
-        let mut registry = Registry::new();
+        let mut registry = Registry::default();
         for model in load_dir(dir.path(), FhirVersion::R5).expect("loads") {
             if model.supplements.is_none() {
                 registry
@@ -77,11 +77,11 @@ impl World {
                 );
             }
         }
-        let mut value_sets = ValueSetStore::new();
+        let mut value_sets = ValueSetStore::default();
         for model in valueset::load::load_dir(dir.path(), FhirVersion::R5).expect("loads") {
             value_sets.insert(model).expect("stores");
         }
-        let mut concept_maps = ConceptMapStore::new();
+        let mut concept_maps = ConceptMapStore::default();
         for model in fhir_terminology::conceptmap::load::load_dir(dir.path(), FhirVersion::R5)
             .expect("loads")
         {

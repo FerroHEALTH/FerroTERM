@@ -417,7 +417,7 @@ fn a_display_in_the_releases_language_does_not_satisfy_a_request_for_another_one
 
     let (_dir, p) = provider();
     assert_eq!(p.language(), Some("en"));
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry.register(Arc::new(p)).expect("registers");
     let ask = |term: &str, display: &str| {
         validate_code(

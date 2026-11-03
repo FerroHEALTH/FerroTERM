@@ -29,7 +29,7 @@ async fn a_matching_sha256_writes_the_destination() {
     let request = reqwest::Client::new().get(format!("{}/content/item.zip", server.uri()));
     let expected = Checksum::Sha256(sha256_of(BODY));
 
-    let fetched = download::to_file(request, &destination, &expected)
+    let fetched = download::to_file(request, &destination, Some(&expected))
         .await
         .expect("the digest matches");
     assert_eq!(fetched.path, destination);
@@ -56,7 +56,7 @@ async fn a_matching_md5_writes_the_destination() {
     let request = reqwest::Client::new().get(format!("{}/content/item.zip", server.uri()));
     let expected = Checksum::Md5(md5_of(BODY));
 
-    let fetched = download::to_file(request, &destination, &expected)
+    let fetched = download::to_file(request, &destination, Some(&expected))
         .await
         .expect("the digest matches");
     assert_eq!(fetched.checksum.algorithm(), "md5");
@@ -74,7 +74,7 @@ async fn an_uppercase_digest_in_the_feed_still_matches() {
     let request = reqwest::Client::new().get(format!("{}/content/item.zip", server.uri()));
     let expected = Checksum::Sha256(sha256_of(BODY).to_ascii_uppercase());
 
-    download::to_file(request, &destination, &expected)
+    download::to_file(request, &destination, Some(&expected))
         .await
         .expect("a digest compares case-insensitively");
 }
@@ -87,7 +87,7 @@ async fn a_digest_that_does_not_match_removes_the_partial_file() {
     let request = reqwest::Client::new().get(format!("{}/content/item.zip", server.uri()));
     let expected = Checksum::Sha256(sha256_of("a different content item"));
 
-    let error = download::to_file(request, &destination, &expected)
+    let error = download::to_file(request, &destination, Some(&expected))
         .await
         .expect_err("the digest does not match");
     match error {
@@ -116,7 +116,7 @@ async fn an_md5_that_does_not_match_removes_the_partial_file() {
     let request = reqwest::Client::new().get(format!("{}/content/item.zip", server.uri()));
     let expected = Checksum::Md5(md5_of("a different content item"));
 
-    let error = download::to_file(request, &destination, &expected)
+    let error = download::to_file(request, &destination, Some(&expected))
         .await
         .expect_err("the digest does not match");
     assert!(
@@ -140,7 +140,7 @@ async fn a_refused_download_writes_nothing() {
     let request = reqwest::Client::new().get(format!("{}/content/item.zip", server.uri()));
     let expected = Checksum::Sha256(sha256_of(BODY));
 
-    let error = download::to_file(request, &destination, &expected)
+    let error = download::to_file(request, &destination, Some(&expected))
         .await
         .expect_err("the server refuses the download");
     match error {

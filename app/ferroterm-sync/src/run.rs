@@ -433,7 +433,7 @@ impl Service {
             Ok(held) => held,
             Err(error) => {
                 tracing::error!(%error, "the holdings could not be read");
-                Holdings::new()
+                Holdings::default()
             }
         };
         for staged in &state.pending {

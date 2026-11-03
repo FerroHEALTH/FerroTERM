@@ -167,7 +167,7 @@ impl NtsConfig {
     /// The subscription the configuration describes.
     #[must_use]
     pub fn subscription(&self) -> Subscription {
-        let mut subscription = Subscription::new();
+        let mut subscription = Subscription::default();
         for canonical in &self.systems {
             subscription = subscription.with_system(canonical.clone());
         }

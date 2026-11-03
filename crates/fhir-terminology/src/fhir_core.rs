@@ -159,7 +159,7 @@ fn resources_of(
 
 /// The registry of one version's bundled code systems.
 fn registry_of(bundle: &str, version: FhirVersion) -> Result<Registry, CoreError> {
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     for value in resources_of(bundle, version, "CodeSystem")? {
         let model =
             crate::fhir_codesystem::load::model_from_value(&value, version).map_err(|decoded| {
@@ -192,7 +192,7 @@ fn registry_of(bundle: &str, version: FhirVersion) -> Result<Registry, CoreError
 
 /// The store of one version's bundled value sets.
 fn store_of(bundle: &str, version: FhirVersion) -> Result<ValueSetStore, CoreError> {
-    let mut store = ValueSetStore::new();
+    let mut store = ValueSetStore::default();
     for value in resources_of(bundle, version, "ValueSet")? {
         let model =
             crate::valueset::load::model_from_value(&value, version).map_err(|decoded| {

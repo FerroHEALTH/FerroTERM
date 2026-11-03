@@ -66,7 +66,7 @@ fn reads(c: &mut Criterion) {
     });
     group.finish();
 
-    let mut registry = Registry::new();
+    let mut registry = Registry::default();
     registry.register(Arc::new(provider)).expect("registers");
     let mut group = c.benchmark_group("rxnorm_operations");
     let lookup_request = lookup::LookupInput {
