@@ -599,7 +599,7 @@ mod tests {
         let system = "https://example.org/fhir/CodeSystem/colours";
         assert_eq!(
             screen_link(
-                &ferrohealth_ui::i18n::Locale::english(),
+                &ferrohealth_ui::i18n::Locale::default(),
                 "CodeSystem",
                 system,
                 "colours",
@@ -610,7 +610,7 @@ mod tests {
         );
         assert_eq!(
             screen_link(
-                &ferrohealth_ui::i18n::Locale::english(),
+                &ferrohealth_ui::i18n::Locale::default(),
                 "ValueSet",
                 system,
                 "palette",
@@ -621,7 +621,7 @@ mod tests {
         );
         assert_eq!(
             screen_link(
-                &ferrohealth_ui::i18n::Locale::english(),
+                &ferrohealth_ui::i18n::Locale::default(),
                 "ConceptMap",
                 system,
                 "m",
@@ -632,7 +632,7 @@ mod tests {
         );
         assert_eq!(
             screen_link(
-                &ferrohealth_ui::i18n::Locale::english(),
+                &ferrohealth_ui::i18n::Locale::default(),
                 "ValueSet",
                 system,
                 "",
@@ -642,7 +642,7 @@ mod tests {
         );
         assert_eq!(
             screen_link(
-                &ferrohealth_ui::i18n::Locale::english(),
+                &ferrohealth_ui::i18n::Locale::default(),
                 "Patient",
                 system,
                 "p",

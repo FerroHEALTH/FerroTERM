@@ -160,7 +160,7 @@ pub(crate) fn heading(
             mono: false,
             badge: None,
         },
-        ActionGroup::none(),
+        ActionGroup::default(),
     )
 }
 
@@ -448,7 +448,7 @@ mod tests {
 
     #[test]
     fn the_docked_save_announces_ctrl_s_for_the_keys_module() {
-        let html = dock(&Locale::english(), String::from("Save"), &Standing::Changed);
+        let html = dock(&Locale::default(), String::from("Save"), &Standing::Changed);
         let html = html.as_str();
         assert!(html.contains("aria-keyshortcuts=\"Control+S\""), "{html}");
         assert_eq!(1, html.matches("aria-keyshortcuts").count(), "{html}");

@@ -110,7 +110,7 @@ impl FhirClient {
         Self {
             root,
             upstream: None,
-            locale: ferrohealth_ui::i18n::Locale::english(),
+            locale: ferrohealth_ui::i18n::Locale::default(),
         }
     }
 
@@ -1633,7 +1633,7 @@ mod client_tests {
         .expect("an answer");
         let validation = document
             .value
-            .validation(&ferrohealth_ui::i18n::Locale::english());
+            .validation(&ferrohealth_ui::i18n::Locale::default());
         assert_eq!(
             Some(false),
             validation.result,

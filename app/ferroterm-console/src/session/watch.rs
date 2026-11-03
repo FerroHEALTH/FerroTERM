@@ -61,7 +61,7 @@ fn gone() -> Response {
         ferrohealth_server::problem::Problem::new(StatusCode::UNAUTHORIZED).with_detail(
             crate::locale::tr_in(
                 crate::locale::catalog(),
-                &ferrohealth_ui::i18n::Locale::english(),
+                &ferrohealth_ui::i18n::Locale::default(),
                 crate::locale::Msg::SessionEndedDetail,
             ),
         ),

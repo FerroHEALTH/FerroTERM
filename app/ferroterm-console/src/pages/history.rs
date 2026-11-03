@@ -16,19 +16,19 @@
 use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
+use ferrohealth_ui::table::change::{Change, change_table_keyed};
 use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
+    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::{ActionGroup, action_button};
 use ferrohealth_ui::view::action_menu::{Act, Action};
 use ferrohealth_ui::view::button::Variant;
-use ferrohealth_ui::view::change::{Change, change_table};
-use ferrohealth_ui::view::dialog::{Confirmation, confirm_dialog};
+use ferrohealth_ui::view::dialog::{Confirmation, Stakes, confirm_dialog};
 use ferrohealth_ui::view::form::{Field, SELECT, action_field, field_flow};
 use ferrohealth_ui::view::notice::{Announce, notice};
 use ferrohealth_ui::view::refusal::refusal;
-use ferrohealth_ui::view::surface::{SectionHead, panel_section, panel_sections, section_intro};
+use ferrohealth_ui::view::surface::{Container, SectionHead, panel_section, section_intro};
 use ferrohealth_ui::view::template::list::HeadingCount;
 use serde_json::Value;
 
@@ -117,7 +117,7 @@ fn refused_page(request: &Request, subject: &Subject, error: &FhirError) -> Html
             format!("{}/{}", subject.resource_type, subject.id),
             None,
             Vec::new(),
-            ActionGroup::none(),
+            ActionGroup::default(),
         ),
         failure(&request.locale, error),
     ])
@@ -202,7 +202,7 @@ fn screen(request: &Request, kind: Kind, opened: &Opened, restored: Option<&Rest
         request.version,
     )
     .filter(|_| writable)
-    .map_or_else(ActionGroup::none, |href| {
+    .map_or_else(ActionGroup::default, |href| {
         ActionGroup::primary(Action::new(
             Some(Glyph::PENCIL),
             tr(locale, Msg::CodeSystemEdit),
@@ -235,7 +235,7 @@ fn screen(request: &Request, kind: Kind, opened: &Opened, restored: Option<&Rest
     };
     let panel = Html::join([
         outcome(request, opened, restored).unwrap_or_default(),
-        panel_sections(Html::join([
+        Container::PanelSections.wrap(Html::join([
             revisions(request, opened, writable),
             comparison(request, opened),
         ])),
@@ -355,7 +355,7 @@ fn revisions(request: &Request, opened: &Opened, writable: bool) -> Html {
             .then(|| restore_control(request, subject, version, &current));
         h(format!(
             "<tr>{}{}{}{}</tr>",
-            title_cell(None, name, None),
+            title_cell(None, None, name, None),
             changed
                 .as_ref()
                 .map(|column| cell(column, when.unwrap_or_default()))
@@ -390,6 +390,7 @@ fn revisions(request: &Request, opened: &Opened, writable: bool) -> Html {
         Html::join([
             section_intro(intro),
             data_table(DataTable {
+                shape: Shape::Stacked,
                 caption: &caption,
                 columns: &columns,
                 sorting: Sorting::default(),
@@ -457,6 +458,8 @@ fn restore_control(request: &Request, subject: &Subject, version: &Version, curr
             )
             .into(),
         },
+        Stakes::Plain,
+        None,
         confirm,
     );
     Html::join([trigger, dialog])
@@ -558,8 +561,14 @@ fn comparison(request: &Request, opened: &Opened) -> Html {
             to: Some(row.after.clone()).filter(|text| !text.is_empty()),
         })
         .collect::<Vec<_>>();
-    let table = (!changes.is_empty())
-        .then(|| change_table(locale, tr(locale, Msg::HistoryWhatChanged), &changes));
+    let table = (!changes.is_empty()).then(|| {
+        change_table_keyed(
+            locale,
+            tr(locale, Msg::HistoryWhatChanged),
+            tr(locale, Msg::HistoryPath),
+            &changes,
+        )
+    });
     panel_section(
         locale,
         Some(SectionHead {

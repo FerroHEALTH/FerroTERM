@@ -17,22 +17,21 @@ use std::collections::BTreeSet;
 
 use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
-use ferrohealth_ui::table::filter::Find;
+use ferrohealth_ui::table::filter::{Find, browser_find};
 use ferrohealth_ui::table::model::StateSource;
 use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
+    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::view::action::ActionGroup;
-use ferrohealth_ui::view::browser::{
-    BrowserPane, Heading, Panes, browser, browser_find, match_list, pane_body,
-};
+use ferrohealth_ui::view::browser::{BrowserPane, Heading, Panes, browser, match_list, pane_body};
 use ferrohealth_ui::view::coding::{Coding, Layout, coding};
 use ferrohealth_ui::view::surface::{
     SectionHead, card_action, definitions, panel_section, section_intro,
 };
 use ferrohealth_ui::view::template::list::HeadingCount;
 use ferrohealth_ui::view::transform::{Density, transform_options};
-use ferrohealth_ui::view::tree::{Tree, TreeKind, TreeNode, TreeWords, path_key, tree_view};
+use ferrohealth_ui::view::tree::path::path_key;
+use ferrohealth_ui::view::tree::{Tree, TreeKind, TreeNode, TreeWords, tree_view};
 
 use crate::fhir::concept::{
     CHILD_OF_OPERATOR, ChildOf, Concept, ConceptQuery, Hierarchy, LookupRequest, chosen_version,
@@ -211,7 +210,7 @@ pub(crate) async fn page(request: Request) -> Html {
             tr(locale, Msg::BrowseTitle),
             Some(tr(locale, Msg::BrowseSubtitle)),
             Vec::new(),
-            ActionGroup::none(),
+            ActionGroup::default(),
         ),
         h(format!(
             r#"<section class="fui-card fui-panel" aria-label="{}">{options}{body}</section>"#,
@@ -758,7 +757,7 @@ fn designations(locale: &Locale, concept: &Concept) -> Option<Html> {
     let rows = join(concept.designations.iter().map(|row| {
         h(format!(
             "<tr>{}{}{}</tr>",
-            title_cell(None, t(&row.value), None),
+            title_cell(None, None, t(&row.value), None),
             cell(language, t(row.language.clone().unwrap_or_default())),
             cell(usage, t(row.usage.clone().unwrap_or_default())),
         ))
@@ -774,6 +773,7 @@ fn designations(locale: &Locale, concept: &Concept) -> Option<Html> {
             actions: None,
         }),
         data_table(DataTable {
+            shape: Shape::Stacked,
             caption: &caption,
             columns: &columns,
             sorting: Sorting::default(),
@@ -795,7 +795,7 @@ fn properties(locale: &Locale, concept: &Concept) -> Option<Html> {
     let rows = join(concept.properties.iter().map(|row| {
         h(format!(
             "<tr>{}{}</tr>",
-            title_cell(None, code(&row.code), row.description.as_ref().map(t)),
+            title_cell(None, None, code(&row.code), row.description.as_ref().map(t)),
             cell(value, t(row.value.clone().unwrap_or_default())),
         ))
     }));
@@ -810,6 +810,7 @@ fn properties(locale: &Locale, concept: &Concept) -> Option<Html> {
             actions: None,
         }),
         data_table(DataTable {
+            shape: Shape::Stacked,
             caption: &caption,
             columns: &columns,
             sorting: Sorting::default(),

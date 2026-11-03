@@ -8,7 +8,7 @@ use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
+    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::view::action::small_action_button;
 use ferrohealth_ui::view::action_menu::{Act, Action};
@@ -290,7 +290,7 @@ fn concept_sections(locale: &Locale, concept: &Concept) -> Html {
         let rows = join(concept.designations.iter().map(|row| {
             h(format!(
                 "<tr>{}{}{}</tr>",
-                title_cell(None, t(&row.value), None),
+                title_cell(None, None, t(&row.value), None),
                 cell(language, t(row.language.clone().unwrap_or_default())),
                 cell(usage, t(row.usage.clone().unwrap_or_default())),
             ))
@@ -306,6 +306,7 @@ fn concept_sections(locale: &Locale, concept: &Concept) -> Html {
                 actions: None,
             }),
             data_table(DataTable {
+                shape: Shape::Stacked,
                 caption: &caption,
                 columns: &columns,
                 sorting: Sorting::default(),
@@ -322,7 +323,7 @@ fn concept_sections(locale: &Locale, concept: &Concept) -> Html {
         let rows = join(concept.properties.iter().map(|row| {
             h(format!(
                 "<tr>{}{}</tr>",
-                title_cell(None, code(&row.code), row.description.as_ref().map(t)),
+                title_cell(None, None, code(&row.code), row.description.as_ref().map(t)),
                 cell(value, t(row.value.clone().unwrap_or_default())),
             ))
         }));
@@ -337,6 +338,7 @@ fn concept_sections(locale: &Locale, concept: &Concept) -> Html {
                 actions: None,
             }),
             data_table(DataTable {
+                shape: Shape::Stacked,
                 caption: &caption,
                 columns: &columns,
                 sorting: Sorting::default(),

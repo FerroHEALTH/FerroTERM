@@ -14,7 +14,7 @@ use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
+    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::ActionGroup;
@@ -22,7 +22,7 @@ use ferrohealth_ui::view::action_menu::{Act, Action, Item, Menu};
 use ferrohealth_ui::view::code::{Code, CodeHead, code_section};
 use ferrohealth_ui::view::notice::{Announce, notice};
 use ferrohealth_ui::view::surface::{
-    SectionHead, definitions, or_none, panel_section, panel_sections, section_intro,
+    Container, SectionHead, definitions, or_none, panel_section, section_intro,
 };
 use ferrohealth_ui::view::template::list::HeadingCount;
 
@@ -121,7 +121,7 @@ fn refused(request: &Request, system: &str, error: &crate::fhir::error::FhirErro
             system.to_owned(),
             None,
             Vec::new(),
-            ActionGroup::none(),
+            ActionGroup::default(),
         ),
         failure(&request.locale, error),
     ])
@@ -148,7 +148,7 @@ fn undeclared(request: &Request, system: &str) -> Html {
                     Msg::CodeSystemOnVersion,
                     &[("version", request.version.label().into())],
                 ),
-                actions: ActionGroup::none(),
+                actions: ActionGroup::default(),
             },
         ),
         notice(
@@ -231,7 +231,7 @@ fn actions(request: &Request, read: &Read, title: &str) -> ActionGroup {
         ),
         more.into_iter().map(Item::new).collect(),
     );
-    let group = primary.map_or_else(ActionGroup::none, ActionGroup::primary);
+    let group = primary.map_or_else(ActionGroup::default, ActionGroup::primary);
     group.more(menu)
 }
 
@@ -313,7 +313,7 @@ fn read_only_note(locale: &Locale, source: Source) -> Option<Html> {
 fn overview(locale: &Locale, read: &Read) -> Html {
     let note = read_only_note(locale, read.source).unwrap_or_default();
     let Some(published) = &read.published else {
-        return panel_sections(Html::join([
+        return Container::PanelSections.wrap(Html::join([
             note,
             panel_section(
                 locale,
@@ -382,7 +382,7 @@ fn overview(locale: &Locale, read: &Read) -> Html {
         ),
     ]);
     let properties = declared_properties(locale, published).unwrap_or_default();
-    panel_sections(Html::join([
+    Container::PanelSections.wrap(Html::join([
         note,
         panel_section(
             locale,
@@ -420,7 +420,12 @@ fn declared_properties(locale: &Locale, published: &PublishedCodeSystem) -> Opti
         let rows = join(declared.iter().map(|property| {
             h(format!(
                 "<tr>{}{}{}</tr>",
-                title_cell(None, code(property.code.clone().unwrap_or_default()), None),
+                title_cell(
+                    None,
+                    None,
+                    code(property.code.clone().unwrap_or_default()),
+                    None
+                ),
                 cell(kind, t(property.kind.clone().unwrap_or_default())),
                 cell(
                     meaning,
@@ -434,6 +439,7 @@ fn declared_properties(locale: &Locale, published: &PublishedCodeSystem) -> Opti
         }));
         let caption = tr(locale, Msg::CodeSystemDeclaredProperties);
         let table = data_table(DataTable {
+            shape: Shape::Stacked,
             caption: &caption,
             columns: &columns,
             sorting: Sorting::default(),
@@ -484,11 +490,12 @@ fn version_filters(locale: &Locale, row: &VersionRow, filters_title: &str) -> Ht
         let rows = join(row.filters.iter().map(|filter| {
             h(format!(
                 "<tr>{}{}</tr>",
-                title_cell(None, code(&filter.code), None),
+                title_cell(None, None, code(&filter.code), None),
                 cell(operators, codes(&filter.operators)),
             ))
         }));
         data_table(DataTable {
+            shape: Shape::Stacked,
             caption: filters_title,
             columns: &columns,
             sorting: Sorting::default(),
@@ -570,7 +577,7 @@ fn versions(locale: &Locale, read: &Read) -> Html {
             ),
         ])
     }));
-    panel_sections(Html::join([
+    Container::PanelSections.wrap(Html::join([
         panel_section(
             locale,
             None,
@@ -584,7 +591,7 @@ fn versions(locale: &Locale, read: &Read) -> Html {
 /// a system served from an index.
 fn json(locale: &Locale, read: &Read) -> Html {
     let Some(text) = &read.text else {
-        return panel_sections(panel_section(
+        return Container::PanelSections.wrap(panel_section(
             locale,
             None,
             section_intro(tr(locale, Msg::CodeSystemNoResource)),
@@ -620,7 +627,7 @@ fn json(locale: &Locale, read: &Read) -> Html {
             section_intro(tr(locale, Msg::CodeSystemSummaryNote)),
         )
     });
-    panel_sections(Html::join([
+    Container::PanelSections.wrap(Html::join([
         note.unwrap_or_default(),
         code_section(
             locale,

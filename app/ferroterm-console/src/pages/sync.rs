@@ -22,17 +22,17 @@ use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
+    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::tone::Tone;
 use ferrohealth_ui::view::action::{ActionGroup, action_button};
 use ferrohealth_ui::view::action_menu::{Act, Action, Item, Menu};
 use ferrohealth_ui::view::button::Variant;
-use ferrohealth_ui::view::dialog::{Confirmation, confirm_dialog};
+use ferrohealth_ui::view::dialog::{Confirmation, Stakes, confirm_dialog};
 use ferrohealth_ui::view::notice::{Announce, notice};
 use ferrohealth_ui::view::state::{Mark, state};
 use ferrohealth_ui::view::surface::{
-    Crumb, Header, SectionHead, definitions, panel_section, panel_sections, section_intro,
+    Container, Crumb, Header, SectionHead, definitions, panel_section, section_intro,
 };
 use ferrohealth_ui::view::tabs::{Tab, binder};
 use ferrohealth_ui::view::template::list::HeadingCount;
@@ -200,7 +200,7 @@ pub(crate) async fn page(request: Request) -> Html {
         confirmations(locale),
         posted_failure(locale, refused.as_ref()),
         ran_notice(&request).unwrap_or_default(),
-        panel_sections(body),
+        Container::PanelSections.wrap(body),
     ])
 }
 
@@ -246,6 +246,8 @@ fn confirmations(locale: &Locale) -> Html {
                 title: tr(locale, question).into(),
                 message: tr(locale, message).into(),
             },
+            Stakes::Plain,
+            None,
             confirm,
         )
     };
@@ -313,7 +315,7 @@ fn runs_section(locale: &Locale, runs: &[RunSummary]) -> Html {
         let href = run_link(&run.id, false);
         h(format!(
             "<tr>{}{}{}{}{}</tr>",
-            title_cell(Some(&href), timestamp(locale, &run.started), None),
+            title_cell(None, Some(&href), timestamp(locale, &run.started), None),
             cell(trigger, t(trigger_words(locale, &run.trigger))),
             cell(outcome, outcome_view(locale, run.outcome)),
             cell(what, t(did(locale, run))),
@@ -341,6 +343,7 @@ fn runs_section(locale: &Locale, runs: &[RunSummary]) -> Html {
             actions: None,
         }),
         data_table(DataTable {
+            shape: Shape::Stacked,
             caption: &caption,
             columns: &columns,
             sorting: Sorting::default(),
@@ -379,7 +382,7 @@ pub(crate) async fn run_page(request: Request) -> Html {
                     tr_with(locale, Msg::SyncRunTitle, &[("when", id.clone().into())]),
                     None,
                     vec![crumb(locale)],
-                    ActionGroup::none(),
+                    ActionGroup::default(),
                 ),
                 if not_found {
                     notice(
@@ -439,7 +442,7 @@ fn run_screen(
             mono: false,
             badge: Some(outcome_view(locale, record.outcome)),
         },
-        ActionGroup::none(),
+        ActionGroup::default(),
     );
     let tabs = vec![
         Tab::new(
@@ -466,7 +469,7 @@ fn run_screen(
             tr(locale, Msg::SyncTabs),
             tabs,
             if findings { "findings" } else { "summary" },
-            panel_sections(panel),
+            Container::PanelSections.wrap(panel),
         ),
     ])
 }
@@ -775,7 +778,7 @@ fn findings_section(
         let href = finding_link(request, finding, ids);
         h(format!(
             "<tr>{}{}{}{}</tr>",
-            title_cell(href.as_deref(), t(&finding.resource), None),
+            title_cell(None, href.as_deref(), t(&finding.resource), None),
             cell(
                 code_column,
                 h(format!(
@@ -810,6 +813,7 @@ fn findings_section(
         Html::join([
             section_intro(tr(locale, Msg::SyncEffectIntro)),
             data_table(DataTable {
+                shape: Shape::Stacked,
                 caption: &caption,
                 columns: &columns,
                 sorting: Sorting::default(),
@@ -825,7 +829,7 @@ mod tests {
 
     /// The English locale the tests read the words in.
     fn english() -> Locale {
-        Locale::english()
+        Locale::default()
     }
 
     #[test]

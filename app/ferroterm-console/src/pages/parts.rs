@@ -350,7 +350,7 @@ mod tests {
         )
         .expect("an outcome");
         let refused = refusal_of(
-            &Locale::english(),
+            &Locale::default(),
             &FhirError::Refused {
                 url: String::from("http://x/r4/ValueSet/$expand"),
                 status: StatusCode::NOT_FOUND,
@@ -367,7 +367,7 @@ mod tests {
     #[test]
     fn a_request_with_no_answer_has_no_status() {
         let refused = refusal_of(
-            &Locale::english(),
+            &Locale::default(),
             &FhirError::Transport {
                 url: String::from("http://x/health"),
                 message: String::from("connection refused"),
@@ -384,7 +384,7 @@ mod tests {
 
     #[test]
     fn a_moment_reads_in_the_largest_whole_unit() {
-        let english = Locale::english();
+        let english = Locale::default();
         assert_eq!("13 s ago", ago(&english, 13));
         assert_eq!("13 min ago", ago(&english, 13 * 60 + 5));
         assert_eq!("1 h ago", ago(&english, 3_700));
@@ -408,7 +408,7 @@ mod tests {
     #[test]
     fn a_problem_an_admin_route_answers_is_drawn_as_its_issue_in_place_of_the_body() {
         let refused = refusal_of(
-            &Locale::english(),
+            &Locale::default(),
             &FhirError::Status {
                 url: String::from("http://sync:8181/runs/x"),
                 status: StatusCode::NOT_FOUND,

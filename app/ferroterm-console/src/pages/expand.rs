@@ -15,7 +15,7 @@ use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::model::{Noun, Paging, Window};
 use ferrohealth_ui::table::pager::{Listing, link_pager};
 use ferrohealth_ui::table::view::{
-    Body, Column, DataTable, Role, Sorting, cell, data_table, title_cell,
+    Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, title_cell,
 };
 use ferrohealth_ui::view::coding::{Coding, Layout, coding};
 use ferrohealth_ui::view::form::{Field, INPUT, NARROW, check};
@@ -302,7 +302,7 @@ fn concepts(
         );
         h(format!(
             "<tr>{}{}{}</tr>",
-            title_cell(None, coding(locale, drawn, Layout::Inline), None),
+            title_cell(None, None, coding(locale, drawn, Layout::Inline), None),
             cell(system, system_name),
             cell(version, t(concept.version.clone().unwrap_or_default())),
         ))
@@ -344,6 +344,7 @@ fn concepts(
         }),
         Html::join([
             data_table(DataTable {
+                shape: Shape::Stacked,
                 caption: &caption,
                 columns: &columns,
                 sorting: Sorting::default(),

@@ -186,7 +186,7 @@ mod tests {
 
     #[test]
     fn a_throwaway_catalog_changes_the_words_with_no_code_change() {
-        let english = Locale::english();
+        let english = Locale::default();
         assert_eq!(
             "No such screen",
             tr_in(catalog(), &english, Msg::ErrorsNotFoundTitle)
@@ -315,7 +315,7 @@ mod tests {
                 );
             }
         }
-        let words = Locale::english().lookup_with(
+        let words = Locale::default().lookup_with(
             catalog(),
             Msg::ValueSetShownOf.id(),
             &[("shown", 10_u32.into()), ("total", 12_345_u32.into())],

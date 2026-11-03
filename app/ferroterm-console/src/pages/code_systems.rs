@@ -15,7 +15,9 @@ use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
 use ferrohealth_ui::table::model::Noun;
-use ferrohealth_ui::table::view::{Body, Column, DataTable, Role, cell, data_table, title_cell};
+use ferrohealth_ui::table::view::{
+    Body, Column, DataTable, Role, Shape, cell, data_table, title_cell,
+};
 use ferrohealth_ui::view::action::ActionGroup;
 use ferrohealth_ui::view::action_menu::{Act, Action};
 use ferrohealth_ui::view::coding::canonical;
@@ -113,7 +115,7 @@ pub(crate) async fn page(request: Request) -> Html {
                 tr(locale, Msg::ShellCodeSystems),
                 None,
                 Vec::new(),
-                ActionGroup::none(),
+                ActionGroup::default(),
             ),
             failure(locale, &error),
         ]),
@@ -161,7 +163,12 @@ fn listing(request: &Request, all: Vec<SystemRow>) -> Html {
                 .collect();
             h(format!(
                 "<tr>{}{}{}{}{}</tr>",
-                title_cell(Some(&href), t(&row.name), Some(canonical(&row.card.url))),
+                title_cell(
+                    None,
+                    Some(&href),
+                    t(&row.name),
+                    Some(canonical(&row.card.url))
+                ),
                 cell(source, row.source.tag(locale)),
                 cell(versions, t(versions_word(locale, &codes))),
                 cell(
@@ -174,6 +181,7 @@ fn listing(request: &Request, all: Vec<SystemRow>) -> Html {
         let fields = state.fields(request, &[]);
         let sort = state.sort();
         data_table(DataTable {
+            shape: Shape::Stacked,
             caption: &title,
             columns: &columns,
             sorting: ListState::sorting(&sort, &fields),
@@ -187,7 +195,7 @@ fn listing(request: &Request, all: Vec<SystemRow>) -> Html {
             Act::Link(ui_link(CODE_SYSTEM_EDITOR_PATH, request.version)),
         ))
     } else {
-        ActionGroup::none()
+        ActionGroup::default()
     };
     state.frame(
         request,
