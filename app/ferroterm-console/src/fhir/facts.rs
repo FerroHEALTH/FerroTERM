@@ -45,16 +45,6 @@ pub(crate) fn named(text: Option<&str>) -> Option<&str> {
     text.map(str::trim).filter(|trimmed| !trimmed.is_empty())
 }
 
-/// The first of `candidates` that names something.
-///
-/// A choice element is one value under several names, and which name a
-/// document uses depends on the type the publisher chose and on the FHIR
-/// version they wrote it in. Reading them in a fixed order keeps that out of
-/// every caller.
-pub(crate) fn first_named<'a>(candidates: &[Option<&'a str>]) -> Option<&'a str> {
-    candidates.iter().copied().find_map(named)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,16 +77,6 @@ mod tests {
             },
             "the row is still drawn, so the screen can state the absence"
         );
-    }
-
-    #[test]
-    fn a_choice_element_reads_in_the_order_its_names_are_given() {
-        assert_eq!(
-            first_named(&[None, Some("  "), Some("b"), Some("c")]),
-            Some("b"),
-            "a name declared as blank is passed over rather than winning"
-        );
-        assert_eq!(first_named(&[None, None]), None);
     }
 
     #[test]
