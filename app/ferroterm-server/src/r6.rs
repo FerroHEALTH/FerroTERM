@@ -13,5 +13,5 @@
 //! marked as such in the capability statement and re-verified when R6
 //! publishes.
 
-crate::version::map_r5::family_map!(r6, r6);
+crate::version::map::family_map!(r6, r6);
 crate::version::surface!(r6, "6.0.0-ballot5", "R6 ballot", to_r6);

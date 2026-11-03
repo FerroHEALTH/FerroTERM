@@ -6,4 +6,4 @@
 
 crate::version::surface!(r4b, "4.3.0", "R4B", to_r4b, closure);
 
-crate::version::map_r4::family_map!(r4b);
+crate::version::map::family_map!(r4b, r4);
