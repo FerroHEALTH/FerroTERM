@@ -14,8 +14,7 @@
 
 use std::sync::Arc;
 
-use axum::body::Body;
-use axum::response::{IntoResponse, Response};
+use axum::response::IntoResponse;
 use ferrohealth_server::panic::PanicBody;
 use ferrohealth_server::refusal::RefusalBody;
 use ferrohealth_server::request_id::RequestIds;
@@ -28,10 +27,6 @@ use fhir_types::r4b::coding::Coding;
 use fhir_types::r4b::extension::{Extension, ExtensionValue};
 use fhir_types::r4b::operation_outcome::{OperationOutcome, OperationOutcomeIssue};
 use http::StatusCode;
-use http::header::CONTENT_TYPE;
-
-/// The media type of every FHIR response.
-pub const FHIR_JSON: &str = crate::wire::FHIR_JSON;
 
 /// A failure to answer, as the wire sees it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -290,53 +285,6 @@ impl From<OperationError> for Failure {
     fn from(error: OperationError) -> Self {
         Self::new(error.status(), error.issue_code(), error.to_string()).kind(error.tx_issue_type())
     }
-}
-
-impl Failure {
-    /// The response in `wire`: the `OperationOutcome` as FHIR JSON or XML (the
-    /// R4B shape, which every served version declares alike).
-    #[must_use]
-    pub fn respond(&self, wire: crate::wire::Wire) -> Response {
-        // NOTE: encoding a hand-built OperationOutcome cannot fail; if the
-        // codec ever refuses, a bare status still tells the client the truth.
-        wire.resource(
-            self.status,
-            &self.outcome(),
-            &fhir_types::r4b::schema::SCHEMAS,
-        )
-        .unwrap_or_else(|_| self.status.into_response())
-    }
-}
-
-impl IntoResponse for Failure {
-    fn into_response(self) -> Response {
-        self.respond(crate::wire::Wire::Json)
-    }
-}
-
-/// A FHIR JSON response body with `status`.
-pub fn fhir_json(status: StatusCode, value: &fhir_types::codec::Value) -> Response {
-    let Ok(body) = serde_json::to_vec(value) else {
-        return status.into_response();
-    };
-    Response::builder()
-        .status(status)
-        .header(CONTENT_TYPE, FHIR_JSON)
-        .body(Body::from(body))
-        .unwrap_or_else(|_| status.into_response())
-}
-
-/// The fallback for a path the server does not define, in the format `Accept`
-/// asks for.
-#[must_use]
-pub fn not_found(headers: &http::HeaderMap) -> Response {
-    let wire = crate::wire::Wire::negotiate(&[], headers).unwrap_or_default();
-    Failure::new(
-        StatusCode::NOT_FOUND,
-        "not-found",
-        "no such resource or operation on this server",
-    )
-    .respond(wire)
 }
 
 /// The body of a request whose handler panicked.
