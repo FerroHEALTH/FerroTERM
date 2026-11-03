@@ -678,3 +678,34 @@ fn the_active_filter_takes_a_wildcard() {
         "* {{ D active = * }}"
     );
 }
+
+/// ECL 2.3 `eclattribute : ... (reverseflag ws)? eclattributename` with
+/// `reverseflag : (CAP_R | R)` and a `ws` that may be empty: the flag may
+/// touch the attribute name.
+#[test]
+fn a_reverse_flag_may_touch_the_attribute_name() {
+    let spaced = parse("<< 404684003 : R 363698007 = *").expect("spaced parses");
+    for glued in [
+        "<< 404684003 : R363698007 = *",
+        "<< 404684003 : r363698007 = *",
+        "<< 404684003 : R  363698007 = *",
+    ] {
+        assert_eq!(parse(glued).expect(glued), spaced, "{glued}");
+    }
+    let termed = parse("<< 404684003 : R363698007 |Finding site| = *").expect("with a term");
+    assert_eq!(
+        termed.to_string(),
+        parse("<< 404684003 : R 363698007 |Finding site| = *")
+            .expect("spaced with a term")
+            .to_string()
+    );
+    assert_eq!(
+        parse(&termed.to_string()).expect("the printed form parses"),
+        termed
+    );
+    assert!(
+        parse("<< 404684003 : R12 = *").is_err(),
+        "no SCTID after the R"
+    );
+    assert!(parse("<< 404684003 : Rx363698007 = *").is_err());
+}

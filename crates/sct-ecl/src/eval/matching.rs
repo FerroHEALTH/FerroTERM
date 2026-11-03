@@ -7,6 +7,7 @@
 use concept_graph::attributes::{Row, ValueRef};
 use roaring::RoaringBitmap;
 
+use super::EvalError;
 use crate::ast::{ActiveValue, Cardinality, Comparison, ConcreteString, Equality, TimeValue};
 
 /// The kinds of the attribute types a set of type concepts names, or every
@@ -47,8 +48,14 @@ pub(super) enum ValueTest {
 }
 
 impl ValueTest {
-    pub(super) fn matches(&self, value: ValueRef<'_>) -> bool {
-        match (self, value) {
+    /// Whether `value` passes the test.
+    ///
+    /// # Errors
+    ///
+    /// [`EvalError::InvalidNumber`] when a numeric concrete value of the
+    /// edition does not convert to a number.
+    pub(super) fn matches(&self, value: ValueRef<'_>) -> Result<bool, EvalError> {
+        Ok(match (self, value) {
             // NOTE: `= *` matches any value, a concrete one too; the specification
             // spells the wildcard as any value and the reference servers agree.
             (Self::Concept { set: None, negated }, _) => !*negated,
@@ -59,9 +66,9 @@ impl ValueTest {
                 },
                 ValueRef::Concept(target),
             ) => set.contains(target.index()) != *negated,
-            (Self::Number(operator, expected), ValueRef::Number(text)) => text
-                .parse::<f64>()
-                .is_ok_and(|actual| compare_numbers(*operator, actual, *expected)),
+            (Self::Number(operator, expected), ValueRef::Number(text)) => {
+                compare_numbers(*operator, number(text)?, *expected)
+            }
             // NOTE: ECL 2.3, "Concrete Values": a concrete string must match the
             // string in the expression constraint exactly, case included.
             (Self::Text(operator, values), ValueRef::String(text)) => {
@@ -74,7 +81,7 @@ impl ValueTest {
                 boolean && ((actual == *expected) == (*operator == Equality::Equal))
             }
             _ => false,
-        }
+        })
     }
 }
 
@@ -128,17 +135,41 @@ pub(super) fn activity(operator: Equality, value: ActiveValue) -> Activity {
     }
 }
 
-/// Whether `values` (one time or a set) match `actual` under `operator`.
-pub(super) fn times_match(operator: Comparison, values: &[TimeValue], actual: u32) -> bool {
-    let expected = values
-        .iter()
-        .map(|v| v.0.parse::<u32>().unwrap_or_default());
+/// Whether `expected` (one time or a set) match `actual` under `operator`.
+pub(super) fn times_match(operator: Comparison, expected: &[u32], actual: u32) -> bool {
     match operator {
-        Comparison::NotEqual => expected.clone().all(|e| actual != e),
-        _ => expected
-            .into_iter()
-            .any(|e| compare_times(operator, actual, e)),
+        Comparison::NotEqual => expected.iter().all(|&e| actual != e),
+        _ => expected.iter().any(|&e| compare_times(operator, actual, e)),
     }
+}
+
+/// A numeric value as the number it compares as.
+pub(super) fn number(value: &str) -> Result<f64, EvalError> {
+    value.parse().map_err(|source| EvalError::InvalidNumber {
+        value: value.to_owned(),
+        source,
+    })
+}
+
+/// A `YYYYMMDD` time as the number it compares as.
+///
+/// # Errors
+///
+/// The empty time `""`, which the ECL 2.3 `timevalue` rule admits, is
+/// [`EvalError::Unsupported`]: nothing it would compare with is stored.
+pub(super) fn time(value: &str) -> Result<u32, EvalError> {
+    if value.is_empty() {
+        return Err(EvalError::Unsupported("an empty time value"));
+    }
+    value.parse().map_err(|source| EvalError::InvalidTime {
+        value: value.to_owned(),
+        source,
+    })
+}
+
+/// The times of a time filter's values.
+pub(super) fn times(values: &[TimeValue]) -> Result<Vec<u32>, EvalError> {
+    values.iter().map(|v| time(&v.0)).collect()
 }
 
 /// A compiled attribute: the type kinds, the value test, the cardinality.
@@ -150,8 +181,8 @@ pub(super) struct AttributeTest {
 }
 
 impl AttributeTest {
-    pub(super) fn matches(&self, row: &Row<'_>) -> bool {
-        self.kinds.contains(row.kind) && self.value.matches(row.value)
+    pub(super) fn matches(&self, row: &Row<'_>) -> Result<bool, EvalError> {
+        Ok(self.kinds.contains(row.kind) && self.value.matches(row.value)?)
     }
 }
 
@@ -189,30 +220,59 @@ pub(super) fn relationship_groups<'row, 'graph>(
 }
 
 /// Whether the rows of one group satisfy the set.
-pub(super) fn set_holds(set: &CompiledSet, rows: &[&Row<'_>]) -> bool {
+pub(super) fn set_holds(set: &CompiledSet, rows: &[&Row<'_>]) -> Result<bool, EvalError> {
     match set {
         CompiledSet::Single(item) => item_holds(item, rows),
-        CompiledSet::Conjunction(items) => items.iter().all(|i| item_holds(i, rows)),
-        CompiledSet::Disjunction(items) => items.iter().any(|i| item_holds(i, rows)),
+        CompiledSet::Conjunction(items) => {
+            for item in items {
+                if !item_holds(item, rows)? {
+                    return Ok(false);
+                }
+            }
+            Ok(true)
+        }
+        CompiledSet::Disjunction(items) => {
+            for item in items {
+                if item_holds(item, rows)? {
+                    return Ok(true);
+                }
+            }
+            Ok(false)
+        }
     }
 }
 
-fn item_holds(item: &CompiledItem, rows: &[&Row<'_>]) -> bool {
+fn item_holds(item: &CompiledItem, rows: &[&Row<'_>]) -> Result<bool, EvalError> {
     match item {
         CompiledItem::Nested(set) => set_holds(set, rows),
         CompiledItem::Attribute(test) => {
-            let count = rows.iter().filter(|row| test.matches(row)).count();
-            within(test.cardinality, u32::try_from(count).unwrap_or(u32::MAX))
+            let count = matching_rows(test, rows.iter().copied())?;
+            Ok(within(test.cardinality, count))
         }
     }
+}
+
+/// How many of `rows` pass `test`, saturating at `u32::MAX`.
+pub(super) fn matching_rows<'r, 'g: 'r>(
+    test: &AttributeTest,
+    rows: impl Iterator<Item = &'r Row<'g>>,
+) -> Result<u32, EvalError> {
+    let mut count = 0_u32;
+    for row in rows {
+        if test.matches(row)? {
+            count = count.saturating_add(1);
+        }
+    }
+    Ok(count)
 }
 
 #[cfg(test)]
 mod tests {
     use concept_graph::attributes::ValueRef;
 
-    use super::{Cardinality, ValueTest, compare_numbers, within};
+    use super::{Cardinality, ValueTest, compare_numbers, number, time, within};
     use crate::ast::{Comparison, ConcreteString, Equality, TypedSearchTerm};
+    use crate::eval::EvalError;
     use crate::eval::{term_matches, wild_matches};
 
     /// ECL 2.3, "Concrete Values": a concrete string matches exactly, with
@@ -221,18 +281,45 @@ mod tests {
     fn a_concrete_string_matches_the_whole_value_with_its_case() {
         let panadol =
             |operator| ValueTest::Text(operator, vec![ConcreteString(String::from("PANADOL"))]);
-        assert!(panadol(Equality::Equal).matches(ValueRef::String("PANADOL")));
-        assert!(!panadol(Equality::Equal).matches(ValueRef::String("panadol")));
-        assert!(!panadol(Equality::Equal).matches(ValueRef::String("PANADOL EXTRA")));
-        assert!(!panadol(Equality::Equal).matches(ValueRef::String("PANA")));
-        assert!(panadol(Equality::NotEqual).matches(ValueRef::String("PANADOL EXTRA")));
-        assert!(!panadol(Equality::NotEqual).matches(ValueRef::String("PANADOL")));
+        assert!(
+            panadol(Equality::Equal)
+                .matches(ValueRef::String("PANADOL"))
+                .expect("compares")
+        );
+        assert!(
+            !panadol(Equality::Equal)
+                .matches(ValueRef::String("panadol"))
+                .expect("compares")
+        );
+        assert!(
+            !panadol(Equality::Equal)
+                .matches(ValueRef::String("PANADOL EXTRA"))
+                .expect("compares")
+        );
+        assert!(
+            !panadol(Equality::Equal)
+                .matches(ValueRef::String("PANA"))
+                .expect("compares")
+        );
+        assert!(
+            panadol(Equality::NotEqual)
+                .matches(ValueRef::String("PANADOL EXTRA"))
+                .expect("compares")
+        );
+        assert!(
+            !panadol(Equality::NotEqual)
+                .matches(ValueRef::String("PANADOL"))
+                .expect("compares")
+        );
         let star = ValueTest::Text(Equality::Equal, vec![ConcreteString(String::from("a*"))]);
         assert!(
-            star.matches(ValueRef::String("a*")),
+            star.matches(ValueRef::String("a*")).expect("compares"),
             "an asterisk is itself"
         );
-        assert!(!star.matches(ValueRef::String("ab")), "not a wildcard");
+        assert!(
+            !star.matches(ValueRef::String("ab")).expect("compares"),
+            "not a wildcard"
+        );
         let set = ValueTest::Text(
             Equality::Equal,
             vec![
@@ -240,8 +327,15 @@ mod tests {
                 ConcreteString(String::from("B")),
             ],
         );
-        assert!(set.matches(ValueRef::String("B")), "any string of the set");
-        assert!(!panadol(Equality::Equal).matches(ValueRef::Number("5")));
+        assert!(
+            set.matches(ValueRef::String("B")).expect("compares"),
+            "any string of the set"
+        );
+        assert!(
+            !panadol(Equality::Equal)
+                .matches(ValueRef::Number("5"))
+                .expect("compares")
+        );
     }
 
     #[test]
@@ -272,5 +366,30 @@ mod tests {
         assert!(!term_matches(&term, "Heart"));
         assert!(compare_numbers(Comparison::GreaterOrEqual, 500.0, 500.0));
         assert!(!compare_numbers(Comparison::Less, 500.0, 500.0));
+    }
+
+    /// A numeric or time value that does not convert is a typed error, never
+    /// a silent non-match.
+    #[test]
+    fn a_defective_number_or_time_is_an_error() {
+        assert_eq!(number("12.5"), Ok(12.5));
+        assert!(
+            matches!(number("12,5"), Err(EvalError::InvalidNumber { value, .. }) if value == "12,5")
+        );
+        assert_eq!(time("20260331"), Ok(20_260_331));
+        assert!(
+            matches!(time("2026-03-31"), Err(EvalError::InvalidTime { value, .. }) if value == "2026-03-31")
+        );
+        assert!(
+            matches!(time("-1"), Err(EvalError::InvalidTime { .. })),
+            "a negative stored time"
+        );
+        assert_eq!(time(""), Err(EvalError::Unsupported("an empty time value")));
+        let five = ValueTest::Number(Comparison::Equal, 5.0);
+        assert_eq!(five.matches(ValueRef::Number("5")), Ok(true));
+        assert!(matches!(
+            five.matches(ValueRef::Number("five")),
+            Err(EvalError::InvalidNumber { .. })
+        ));
     }
 }

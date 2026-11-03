@@ -40,7 +40,6 @@ use rf2::constants;
 use rf2::id::ConceptId;
 use roaring::RoaringBitmap;
 use sct_ecl::ast::ExpressionConstraint;
-use sct_ecl::eval::EvalError;
 use serde::Deserialize;
 
 use crate::artifact::Source;
@@ -893,22 +892,7 @@ impl SnomedProvider {
                 source: Some(error),
             }))
         })?;
-        sct_ecl::eval::evaluate(self, &parsed).map_err(|error| match error {
-            EvalError::UnknownConcept(id) => ProviderError::InvalidCode {
-                code: id.to_string(),
-                reason: String::from("not a concept of the edition"),
-            },
-            EvalError::NotAReferenceSet(id) => ProviderError::InvalidCode {
-                code: id.to_string(),
-                reason: String::from("not a reference set with concept members in the edition"),
-            },
-            EvalError::Unsupported(what) => ProviderError::UnsupportedFilter {
-                property: String::from("constraint"),
-                operator: format!("= ({what})"),
-            },
-            EvalError::Storage(message) => ProviderError::Storage(message.into()),
-            other => ProviderError::invalid_filter_value("constraint", text, other.to_string()),
-        })
+        sct_ecl::eval::evaluate(self, &parsed).map_err(|error| ecl::refusal(error, text))
     }
 
     /// Whether the concept is sufficiently defined by its conditions.

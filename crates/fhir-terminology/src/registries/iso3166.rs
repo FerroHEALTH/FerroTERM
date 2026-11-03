@@ -28,6 +28,8 @@ pub const URL: &str = "urn:iso:std:iso:3166";
 
 const CODE_MAPPINGS: &str = include_str!("../../data/cldr/codeMappings.json");
 const TERRITORIES: &str = include_str!("../../data/cldr/territories.json");
+const MAPPINGS_FILE: &str = "codeMappings.json";
+const TERRITORIES_FILE: &str = "territories.json";
 
 /// The vendored CLDR data does not parse.
 #[derive(Debug, thiserror::Error)]
@@ -35,6 +37,15 @@ pub enum DataError {
     /// A JSON file does not parse or lacks the expected shape.
     #[error("the vendored CLDR data does not parse")]
     Json(#[from] serde_json::Error),
+    /// A JSON file parses and lacks a member the table is read from, or holds
+    /// it as another JSON type.
+    #[error("the vendored CLDR file {file} has no {member}")]
+    Missing {
+        /// The vendored file.
+        file: &'static str,
+        /// The dotted path of the missing member.
+        member: String,
+    },
     /// The table does not build.
     #[error(transparent)]
     Build(#[from] BuildError),
@@ -61,23 +72,36 @@ pub fn is_user_assigned(code: &str) -> bool {
 ///
 /// # Errors
 ///
-/// Returns [`DataError::Json`] when the vendored data does not parse.
+/// Returns [`DataError::Json`] when the vendored data does not parse, and
+/// [`DataError::Missing`] when it lacks the version, the names or the codes.
 pub fn code_system() -> Result<CodeSystemModel, DataError> {
     let mappings: serde_json::Value = serde_json::from_str(CODE_MAPPINGS)?;
     let territories: serde_json::Value = serde_json::from_str(TERRITORIES)?;
-    let version = at(&mappings, &["supplemental", "version", "_cldrVersion"])
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or("unknown")
-        .to_owned();
-    let names = at(
-        &territories,
-        &["main", "en", "localeDisplayNames", "territories"],
-    );
+    from_json(&mappings, &territories)
+}
+
+/// The code system from the parsed `codeMappings.json` and `territories.json`.
+fn from_json(
+    mappings: &serde_json::Value,
+    territories: &serde_json::Value,
+) -> Result<CodeSystemModel, DataError> {
+    const VERSION: &[&str] = &["supplemental", "version", "_cldrVersion"];
+    const NAMES: &[&str] = &["main", "en", "localeDisplayNames", "territories"];
+    const MAPPINGS: &[&str] = &["supplemental", "codeMappings"];
+    let version = required(mappings, VERSION, MAPPINGS_FILE, serde_json::Value::as_str)?.to_owned();
+    let names = required(
+        territories,
+        NAMES,
+        TERRITORIES_FILE,
+        serde_json::Value::as_object,
+    )?;
+    let entries = required(
+        mappings,
+        MAPPINGS,
+        MAPPINGS_FILE,
+        serde_json::Value::as_object,
+    )?;
     let mut concepts = Vec::new();
-    let entries = at(&mappings, &["supplemental", "codeMappings"])
-        .and_then(serde_json::Value::as_object)
-        .into_iter()
-        .flatten();
     for (code, mapping) in entries {
         if code.len() != 2 || !code.bytes().all(|b| b.is_ascii_uppercase()) {
             continue;
@@ -90,7 +114,7 @@ pub fn code_system() -> Result<CodeSystemModel, DataError> {
             continue;
         }
         let display = names
-            .and_then(|n| n.get(code))
+            .get(code)
             .and_then(serde_json::Value::as_str)
             .map_or_else(|| String::from("User-assigned"), str::to_owned);
         let alpha3 = mapping.get("_alpha3").and_then(serde_json::Value::as_str);
@@ -200,7 +224,87 @@ pub fn provider() -> Result<FhirCodeSystem, DataError> {
     Ok(FhirCodeSystem::new(code_system()?)?)
 }
 
-/// The value at `path` in `value`, when every step is an object with that key.
-fn at<'a>(value: &'a serde_json::Value, path: &[&str]) -> Option<&'a serde_json::Value> {
-    path.iter().try_fold(value, |v, key| v.get(key))
+/// The value at `path` in `value` in the form `read` takes, or the error
+/// naming the member of `file`.
+fn required<'a, T: ?Sized>(
+    value: &'a serde_json::Value,
+    path: &[&str],
+    file: &'static str,
+    read: impl FnOnce(&'a serde_json::Value) -> Option<&'a T>,
+) -> Result<&'a T, DataError> {
+    path.iter()
+        .try_fold(value, |v, key| v.get(key))
+        .and_then(read)
+        .ok_or_else(|| DataError::Missing {
+            file,
+            member: path.join("."),
+        })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{DataError, from_json};
+
+    const MAPPINGS: &str = r#"{"supplemental": {"version": {"_cldrVersion": "49"},
+        "codeMappings": {"NL": {"_numeric": "528", "_alpha3": "NLD"}}}}"#;
+    const NAMES: &str = r#"{"main": {"en": {"localeDisplayNames":
+        {"territories": {"NL": "Netherlands"}}}}}"#;
+
+    fn read(mappings: &str, names: &str) -> Result<super::CodeSystemModel, DataError> {
+        let mappings = serde_json::from_str(mappings).expect("the mappings parse");
+        let names = serde_json::from_str(names).expect("the names parse");
+        from_json(&mappings, &names)
+    }
+
+    fn missing(mappings: &str, names: &str) -> (&'static str, String) {
+        match read(mappings, names) {
+            Err(DataError::Missing { file, member }) => (file, member),
+            other => panic!("expected a missing member, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_whole_file_pair_reads_its_version_and_codes() {
+        let model = read(MAPPINGS, NAMES).expect("the synthetic data reads");
+        assert_eq!(model.version, "49");
+        let codes: Vec<&str> = model.concepts.iter().map(|c| c.code.as_str()).collect();
+        assert_eq!(codes, ["NL", "NLD", "528"]);
+    }
+
+    #[test]
+    fn a_missing_or_mistyped_version_is_an_error_never_unknown() {
+        let without = MAPPINGS.replace(r#""_cldrVersion": "49""#, r#""other": "49""#);
+        assert_eq!(
+            missing(&without, NAMES),
+            (
+                "codeMappings.json",
+                String::from("supplemental.version._cldrVersion")
+            )
+        );
+        let number = MAPPINGS.replace(r#""_cldrVersion": "49""#, r#""_cldrVersion": 49"#);
+        assert_eq!(
+            missing(&number, NAMES).1,
+            "supplemental.version._cldrVersion"
+        );
+    }
+
+    #[test]
+    fn missing_names_or_code_mappings_are_errors_never_an_empty_table() {
+        let no_names = r#"{"main": {"en": {"localeDisplayNames": {}}}}"#;
+        assert_eq!(
+            missing(MAPPINGS, no_names),
+            (
+                "territories.json",
+                String::from("main.en.localeDisplayNames.territories")
+            )
+        );
+        let no_codes = r#"{"supplemental": {"version": {"_cldrVersion": "49"}}}"#;
+        assert_eq!(
+            missing(no_codes, NAMES),
+            (
+                "codeMappings.json",
+                String::from("supplemental.codeMappings")
+            )
+        );
+    }
 }

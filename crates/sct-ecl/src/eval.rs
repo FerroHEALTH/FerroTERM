@@ -22,7 +22,8 @@ use roaring::RoaringBitmap;
 
 use self::matching::{
     Activity, AttributeTest, CompiledItem, CompiledSet, Kinds, ValueTest, activity,
-    compare_numbers, relationship_groups, set_holds, times_match, within,
+    compare_numbers, matching_rows, number, relationship_groups, set_holds, time, times,
+    times_match, within,
 };
 use crate::ast::{
     Acceptability, ActiveValue, Attribute, AttributeSet, AttributeValue, Cardinality, Comparison,
@@ -87,6 +88,24 @@ pub enum EvalError {
     /// The edition's storage failed.
     #[error("the edition could not be read: {0}")]
     Storage(String),
+    /// A numeric value of the expression does not convert to a number.
+    #[error("the numeric value `{value}` does not convert")]
+    InvalidNumber {
+        /// The value as written.
+        value: String,
+        /// Why it does not convert.
+        #[source]
+        source: std::num::ParseFloatError,
+    },
+    /// A time of the expression or of the edition's data is no `YYYYMMDD`.
+    #[error("the time `{value}` is no YYYYMMDD")]
+    InvalidTime {
+        /// The value as written or stored.
+        value: String,
+        /// Why it does not convert.
+        #[source]
+        source: std::num::ParseIntError,
+    },
 }
 
 /// One concept filter with its concept sets resolved, for the model.
@@ -688,8 +707,10 @@ impl<M: Model> Evaluator<'_, M> {
                     }
                 },
                 MemberFilter::EffectiveTime { operator, values } => {
-                    let actual = table.effective_time(row).unwrap_or_default();
-                    times_match(*operator, values, actual)
+                    let actual = table.effective_time(row).ok_or_else(|| {
+                        EvalError::Storage(format!("reference set row {row} has no effective time"))
+                    })?;
+                    times_match(*operator, &times(values)?, actual)
                 }
                 MemberFilter::Module { operator, value } => {
                     let modules = self.sctids_of(value)?;
@@ -722,7 +743,7 @@ impl<M: Model> Evaluator<'_, M> {
             }
             (FieldValue::Expression { operator, .. }, _) => *operator == Equality::NotEqual,
             (FieldValue::Numeric { operator, value }, Some(FieldRef::Integer(actual))) => {
-                let expected: f64 = value.0.parse().unwrap_or(f64::NAN);
+                let expected = number(&value.0)?;
                 #[expect(
                     clippy::as_conversions,
                     clippy::cast_precision_loss,
@@ -739,12 +760,10 @@ impl<M: Model> Evaluator<'_, M> {
                 (actual == *value) == (*operator == Equality::Equal)
             }
             (FieldValue::Time { operator, values }, Some(FieldRef::String(text))) => {
-                let actual: u32 = text.parse().unwrap_or_default();
-                times_match(*operator, values, actual)
+                times_match(*operator, &times(values)?, time(text)?)
             }
             (FieldValue::Time { operator, values }, Some(FieldRef::Integer(actual))) => {
-                let actual = u32::try_from(actual).unwrap_or_default();
-                times_match(*operator, values, actual)
+                times_match(*operator, &times(values)?, time(&actual.to_string())?)
             }
             _ => false,
         })
@@ -839,10 +858,7 @@ impl<M: Model> Evaluator<'_, M> {
                 ConceptFilter::EffectiveTime { operator, values } => {
                     ConceptPredicate::EffectiveTime {
                         operator: *operator,
-                        values: values
-                            .iter()
-                            .map(|v| v.0.parse().unwrap_or_default())
-                            .collect(),
+                        values: times(values)?,
                     }
                 }
             });
@@ -1145,11 +1161,13 @@ impl<M: Model> Evaluator<'_, M> {
         let mut out = RoaringBitmap::new();
         for concept in &candidates {
             let rows: Vec<Row<'_>> = graph.rows(Ordinal::new(concept)).collect();
-            let matching = relationship_groups(&rows)
-                .iter()
-                .filter(|group| set_holds(&tests, group))
-                .count();
-            if within(cardinality, u32::try_from(matching).unwrap_or(u32::MAX)) {
+            let mut matching = 0_u32;
+            for group in &relationship_groups(&rows) {
+                if set_holds(&tests, group)? {
+                    matching = matching.saturating_add(1);
+                }
+            }
+            if within(cardinality, matching) {
                 out.insert(concept);
             }
         }
@@ -1220,14 +1238,8 @@ impl<M: Model> Evaluator<'_, M> {
         let graph = self.model.attributes();
         let mut out = RoaringBitmap::new();
         for concept in focus {
-            let count = graph
-                .rows(Ordinal::new(concept))
-                .filter(|row| test.matches(row))
-                .count();
-            if within(
-                attribute.cardinality,
-                u32::try_from(count).unwrap_or(u32::MAX),
-            ) {
+            let rows: Vec<Row<'_>> = graph.rows(Ordinal::new(concept)).collect();
+            if within(attribute.cardinality, matching_rows(&test, rows.iter())?) {
                 out.insert(concept);
             }
         }
@@ -1337,7 +1349,7 @@ impl<M: Model> Evaluator<'_, M> {
                 }
             }
             AttributeValue::Numeric { operator, value } => {
-                ValueTest::Number(*operator, value.0.parse().unwrap_or(f64::NAN))
+                ValueTest::Number(*operator, number(&value.0)?)
             }
             AttributeValue::String { operator, values } => {
                 ValueTest::Text(*operator, values.clone())
