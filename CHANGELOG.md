@@ -17,6 +17,303 @@ fragments here under the version and its date.
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-11-04
+
+### Added
+
+- `$expand` on the R5 and R6 surfaces returns the properties a value set's
+  `compose.property` names (`*` for every one) when the request names none (#1064).
+- The console's keyboard shortcuts are back on FerroUI 0.6.2's `keys`
+  module: `g` then a letter opens a screen of the navigation, `Ctrl Enter`
+  runs an operation or the composer's preview from inside a field, and
+  `Ctrl S` saves an editor. The legend and `/shortcuts` list all three
+  groups; with scripts off every action keeps its button (#945).
+- ECL 2.3 (released 2026-03-31): `^R X` is the reference sets with an
+  active member whose referenced component is in `X`, and member filters
+  after it choose the members that count (`^R 73211009 {{ M mapTarget =
+  "C01" }}`). The `active` filter of a description, concept or member
+  filter takes `*` for either status: `{{ D active = * }}` matches active
+  and inactive descriptions, and `active != *` matches nothing. A member
+  filter `active = *` is refused like `active = 0`, because the served
+  reference set tables hold active members only. The crate line moves to
+  0.1.124 (#965).
+
+### Changed
+
+- The console signs operators in and keeps their sessions through
+  `ferrohealth-session` 0.1.0, the FerroHEALTH consoles' shared sign-in, in
+  place of its own code. The sign-in routes move: `GET /auth/login?back=` is
+  `GET /login?return=`, `POST /auth/sign-out` is `POST /logout`, and the
+  session watch `/auth/session` is `/session`; the sign-in page stays at
+  `/auth/sign-in` and the redirect URI registered at the provider stays
+  `/auth/callback`. `[oidc]` may leave out `authorization_endpoint`,
+  `token_endpoint`, `jwks_uri`, `end_session_endpoint` and
+  `revocation_endpoint`, which the console then reads from the provider's
+  metadata when it starts (`config check` reads none and works offline), and
+  gains `ca_file` and `timeout_s`; `[session]` gains `store` (`memory`, the
+  default, or `sealed` with `key` or `key_file`). `session.absolute_timeout_s`
+  below `session.idle_timeout_s` is now refused. A sign-out on a console
+  with no `[oidc]` ends the local session and lands on the signed-out page,
+  where it answered `503`, since no provider session exists to end.
+  Upgrade: change any link or bookmark to the old sign-in, sign-out or
+  session paths; the configuration keys a deployment already sets keep
+  their meaning (#1005).
+- The console's concept map editor refuses to save a map whose source or
+  target scope names a code system the map's groups map between. FHIR
+  defines both scopes as value sets (`ConceptMap.source[x]` and
+  `target[x]` in R4 and R4B, `sourceScope[x]` and `targetScope[x]` in R5),
+  and `$translate` cannot read such a map's scope (#1010).
+- The console reads each root's `CapabilityStatement` and
+  `TerminologyCapabilities` through `fhir-types`, decoding at the release of
+  the root that served it. A document that lacks a required element, or
+  carries a member its release does not define, draws the screen's error
+  state, which names the release, the resource and the element path, where
+  the console used to draw whatever it could read (#1027).
+- The console reads the code system screens and the listings' narrowed
+  `_elements` search through `fhir-types`, decoding at the release of the
+  root that served each. A code system or a listing that lacks a required
+  element, or carries a member its release does not define, draws the
+  screen's error state, which names the release, the resource and the
+  element path, where the code system screen, the code system listing and
+  the dashboard used to draw what they could read (#1028).
+- The console reads value sets, their searches, `$expand` answers and the
+  value set the composer opens through `fhir-types`, decoding at the
+  release of the root that served each. An answer that lacks a required
+  element, or carries a member its release does not define, draws the
+  screen's error state, which names the release, the resource and the
+  element path, where the console used to draw whatever it could read. The
+  composer no longer opens an unreadable value set as an empty one (#1029).
+- The console reads concept maps, their searches and `$translate` answers
+  through `fhir-types`, decoding at the release of the root that served
+  each. A map that lacks a required element, or names its scope in another
+  release's element, draws the screen's error state, which names the
+  release, the resource and the element path, where the console used to
+  draw whatever it could read (#1030).
+- The console reads `$lookup`, `$validate-code` and `$subsumes` answers,
+  and the `OperationOutcome` a refusal carries, through `fhir-types`,
+  decoding at the release of the root that served each, and writes the
+  concept browser's inline `$expand` through the same release. An answer
+  that lacks a required element, or carries a member its release does not
+  define, draws the screen's error state, which names the release, the
+  resource and the element path. A refusal whose `OperationOutcome` does
+  not decode at its release shows the status and the body the server sent (#1031).
+- The console's editors and history read and write through `fhir-types`, at
+  the release of the root that serves each: the code system editor, the
+  concept map editor and the value set composer open the stored resource
+  decoded at its release and save it written over that resource, the
+  composer's preview posts its `Parameters` through the same release, and
+  the history screen, the dashboard's recent writes and the answer to a
+  write decode the `Bundle` and the resource at it. A stored resource or a
+  history that does not decode draws the screen's error state, which names
+  the release, the resource and the element path (#1032).
+- The console takes `ferrohealth-session` 0.1.1. The crate now refuses an
+  `[oidc]` a console cannot sign in with safely (a provider URL that is
+  not `https` off loopback, a redirect URI with a fragment, `scopes`
+  without `openid` or with `offline_access`), so the console's own checks
+  are gone. A `post_logout_redirect_uri` without an `end_session_endpoint`
+  is no longer refused. The session watch again answers a session that is
+  gone with an RFC 9457 problem whose detail says to sign in again, and a
+  sign-in never returns to a page under the sign-in page (#1041).
+- `$lookup` leaves out a requested `property` that neither the FHIR
+  specification nor the code system defines, with no issue, where it
+  answered 400 `invalid`. A property the code system defines and the server
+  does not generate still answers `not-supported` (#1062).
+- `ValueSet/$validate-code` refuses a bare `code` with no `system` and no
+  `inferSystem` as a request error, as the operation requires; it inferred
+  the system from a value set with one system (#1063).
+- `$validate-code` answers `result` false with an `invalid-data` warning at
+  the coding for a `Coding` or `CodeableConcept` that states no code, or,
+  on `CodeSystem/$validate-code` with no `url`, no system, where it answered
+  400. The warning for a coding with no system now names the coding itself
+  (`Coding`, `CodeableConcept.coding[0]`) rather than its `system` (#1063).
+- `$validate-code` names the code system version in the case-difference
+  message, and a coding that names a version of a code system the server
+  serves no version of gets an `UNKNOWN_CODESYSTEM_VERSION_NONE` issue that
+  names the version asked for (#1065).
+- `[server] idle_timeout_ms` (default `120000`) closes a kept-alive HTTP/1.1
+  connection that sends no next request within that time, with a clean end
+  of stream. `[server] header_read_timeout_ms` now counts from the first byte
+  of each request head; it used to count from the previous response, so it
+  also closed an idle connection after 30 s, sometimes while a client was
+  sending its next request into it. A deployment that relied on the 30 s
+  idle close sets `idle_timeout_ms` (#940).
+- FerroTERM runs on `ferrohealth-server` 0.4.1, which keeps a product's own
+  fallback and the layers around it when the stack merges its routes
+  (FerroHEALTH/FerroSYS#199). FerroTERM was not exposed to the regression
+  0.4.1 fixes: the FHIR listener, the admin listener and the `ferroterm-sync`
+  admin listener each declare their own fallback inside their layers, so a
+  path no route matches was already answered there, and on the admin listener
+  an anonymous request to such a path is refused with `401` before and after (#942).
+- The console moves to FerroUI 0.6 and draws every page on its own server:
+  there is no WebAssembly and no Leptos in it any more, every page works with
+  scripts turned off, and a link or a form loads the next page whole. Its
+  Content-Security-Policy is `script-src 'self'; style-src 'self'` with no
+  nonce and no `'wasm-unsafe-eval'`, and FerroUI's stylesheet, script modules
+  and brand files are served by the console binary under
+  `/ferrohealth-ui/0.6.0/`, cached as immutable. A reverse proxy that
+  forwarded the old `/pkg/`, `/ferrohealth-ui.css` and `/theme.css` paths
+  can drop them (#944).
+- The console's own keyboard shortcuts (the `g` pairs that open a screen,
+  `Ctrl Enter` to run an operation, `Ctrl S` to save an editor) are gone
+  until FerroUI offers them as a module (#945); `/`, `?`, Escape and the
+  concept tree's keys work as before, and every action keeps its button. The
+  typed preferences (default FHIR version, display language, page size) are
+  plain forms that save with their own button (#946) (#944).
+- The display language and the page size in Your preferences are FerroUI
+  0.6.2's typed preferences: each saves when you press Enter or leave the
+  field changed, keeps the focus once saved, and is held in the browser to
+  what the console keeps (a language tag of at most 64 characters, a page
+  of 1 to 1000 rows). With scripts off, each still saves with its own
+  button (#946).
+- The FerroTERM Console moves to FerroUI 0.6.2 and `ferrohealth-server`
+  0.4.2. A select in a dense options row and a long identifier or link in
+  a stacked table no longer scroll the page sideways at 320 px, and the
+  code editor keeps its typing speed as a JSON or XML document grows. The
+  console's Content-Security-Policy is unchanged (`script-src 'self';
+  style-src 'self'`, no nonce) and now comes from the family's
+  server-rendered console headers, and FerroUI's script modules are served
+  under `/ferrohealth-ui/0.6.2/` (#952).
+- The console draws with FerroUI 0.6.5 (`ferrohealth-ui`), whose mapping
+  rows wrap a relationship's words inside their cell, so a concept map's
+  Mappings tab no longer reaches past a 320 px screen (WCAG 2.2 SC 1.4.10),
+  and whose search submit no longer clips its word on a narrow top bar. A
+  history comparison's key column is headed Path (#963).
+- The ISO 3166 code system reads its English names from the Unicode CLDR
+  49.0.0 release, pinned in `docs/VERSIONS.md` instead of a commit on `main`,
+  and its version is `49`. Three displays change: `HM` is "Heard Island &
+  McDonald Islands", `SH` is "St. Helena, Ascension & Tristan da Cunha" and
+  `TF` is "French Southern and Antarctic Lands", for their alpha-3 and
+  numeric forms too. The crate line moves to 0.1.123 (#965).
+- A string value in an ECL refinement is an ECL 2.3 concrete string: it
+  matches the attribute's value exactly and with its case, where it was
+  read as word prefixes before (`3460481009 |Has product name| = "PANADOL"`
+  no longer matches `PANADOL EXTRA`). The search term forms `wild:"..."` and
+  `match:"..."` stay in the description `term` filter and in member field
+  filters, and in a refinement they are now a syntax error (#965).
+- The BCP 47 and BCP 13 code systems read the IANA registries as of
+  2026-11-02: the Language Subtag Registry of File-Date 2026-09-17, which adds
+  the description `Naoero` to region `NR`, and the media type registry, which
+  adds 37 registrations (27 under `application/`, 5 under `text/`, 4 under
+  `model/` and 1 under `audio/`) and removes none. The new media types carry
+  `registered` true and enumerate in an expansion. The crate line moves to
+  0.1.122 (#965).
+- The HL7 terminology ecosystem conformance run moves to the test cases 1.10.0 (suite commit `f158ade`, 764 `general` cases) on FHIR Validator 7.0.4 (#965).
+- `fhir-terminology` 0.1.132 serves SNOMED CT, LOINC, `RxNorm`, ICD-11 and
+  the classifications through one `stored::system::StoredProvider`, generic
+  over the `StoredSystem` each system implements (`snomed::Snomed`,
+  `loinc::Loinc`, `rxnorm::RxNorm`, `icd11::Icd11`,
+  `classification::Classification`). `SnomedProvider`, `LoincProvider`,
+  `RxNormProvider`, `Icd11Provider` and `ClassificationProvider` name its
+  five instances, open as before, and answer every operation as before. The
+  open failures every artifact shares move to `stored::OpenError`, which each
+  system's `OpenError` carries as `Artifact`, and the five `MANIFEST_VERSION`
+  constants become `stored::MANIFEST_VERSION`. The default bodies of
+  `CodeSystemProvider::inactive` and `filter_matches` are
+  `filter::inactive_by_status` and `filter::selected_by` (#974).
+- `fhir-terminology` 0.1.134 keeps the types the provider seam hands across
+  under `provider`: `filter` moves to `provider::filter`, the
+  `ValueSet.compose` model (`Compose`, `Include`, `ConceptRef`, `SystemRef`,
+  `Side`, `FilterAt`) to `provider::compose`, `fhir_codesystem::model` to
+  `provider::code_system` (with `defined_property_uri`),
+  `conceptmap::model` to `provider::concept_map`, and `artifact::Source` to
+  `provider::source`. `valueset::negotiation` moves to `compose::negotiation`,
+  the `$expand` outcome types (`ExpansionOutcome`, `Contains`,
+  `ExpansionParameter`, `ExpansionProperty`, `ParameterValue`) to
+  `valueset::expansion`, and `language::check` returns its own
+  `language::InvalidLanguage`. The `LoadError` of the resource loaders carries
+  one `Model` variant, naming the resource type, for all three resources.
+  No top-level module of the crate imports one that imports it (#975).
+- `sct-scg` 0.1.129 carries `front`, the parser machinery both SNOMED CT
+  languages run on, and `sct-ecl` depends on it. `ParseError`,
+  `NESTING_LIMIT`, `LexError`, `Token` and `lex` now live in
+  `sct_scg::front` (`Token` and `lex` generic over each crate's
+  `lexer::Kind`), and `sct_ecl::ParseError`, `sct_scg::ParseError` and the
+  two crates' own `NESTING_LIMIT`, `LexError`, `Token` and `lex` are gone.
+  The parsers accept and refuse the same input with the same offsets (#976).
+- `fhir-terminology` 0.1.130 serves BCP 13 and BCP 47 through one
+  `registries::grammar::GrammarProvider`, generic over the `Grammar` each
+  system implements (`bcp13::MediaTypes`, `bcp47::LanguageTags`).
+  `Bcp13Provider` and `Bcp47Provider` name its two instances, and both
+  answer every operation as before (#977).
+- `fhir-terminology` 0.1.136 keeps what a provider declares about its code
+  system in `provider::declaration`: `ContentMode`, `HierarchyMeaning`,
+  `PropertyKind`, `PropertyDefinition`, `FilterDefinition`, `Capability`,
+  `Compositional`, `Declaration`, `ImplicitForm`, and `ImplicitArgument` move
+  there from `provider`. No other public path changes; the crate and tool
+  files over 1000 lines are split by concern into child modules (#978).
+
+### Removed
+
+- The console's `[server] site_root` key and its
+  `FERROTERM_CONSOLE__SERVER__SITE_ROOT` variable are gone, and so is the
+  release's `ferroterm-console-site` archive: the `ferroterm-console` binary
+  carries everything the browser loads. A configuration that still sets
+  `site_root` is refused at start as an unknown key, so delete the line
+  before you upgrade (#944).
+- The crate line 0.1.131 drops the functions that only forwarded to another
+  call: `Memberships::new`, `RefsetMembers::new`, `IndexBuilder::new`,
+  `Interned::new`, `Registry::new`, `VersionedStore::new`, `Holdings::new`
+  and `Subscription::new` (use `default()`), `fhir_terminology::artifact::reader`
+  (use `concept_graph::read::buffered`), `registries::bcp47::analyze_tag`
+  (use `analyze` with `subtags::REGISTRY_DATA`), `text_match::query_words`
+  (use `designation_index::tokenize::prefixes`), and
+  `terminology_syndication::download::to_file_unverified`: `download::to_file`
+  now takes the expected digest as an `Option` (#973).
+
+### Fixed
+
+- The console's session watch (`GET` and `POST /auth/session`) no longer
+  reports more time than a session has when its access token expires and no
+  refresh token can replace it: `absolute` ends at that token's expiry and
+  `idle` never passes `absolute`, so the warning before the end opens in
+  time (#1007).
+- The About page draws a failed `CapabilityStatement` read as its refusal,
+  with the cause and the address asked, where it said the server did not
+  answer whatever had gone wrong, and a server that names no software is
+  said to name none (#1033).
+- `_elements` keeps every top-level element the resource's definition at the
+  served version makes mandatory, beside the elements asked for, so a
+  `CodeSystem` listed with `_elements=url,name,title,version,status,meta`
+  still carries `content` and decodes as a valid resource (#1038).
+- `CodeSystem/$batch-validate-code` runs each validation as a
+  `CodeSystem/$validate-code`, so the shared `url` names a code system; it
+  was read as a value set and every validation answered that no such value
+  set exists (#1061).
+- An expansion of a value set whose compose names several versions of one
+  code system keeps `contains.version` on those codes when
+  `force-system-version` resolves them to one version (#1066).
+- `$validate-code` warns of a concept the value set marks deprecated with
+  `structuredefinition-standards-status` = `deprecated`, as it did for
+  `valueset-deprecated` (#1066).
+- `$closure` takes `tx-resource` parameters as every other operation does,
+  and computes the closure over the code systems they supply; it refused
+  them as undeclared (#1070).
+- The console's operation pages, the concept browser, the editors and the
+  value set and concept map screens draw the error state for a published
+  names search that does not decode at its release, which names the release,
+  the resource and the element path, where they used to offer an empty
+  picker or unnamed canonicals. A refused search still leaves the picker
+  empty (#1075).
+- `ValueSet/$validate-code` answers `result` true for a `CodeableConcept`
+  with a coding in the value set when another coding names a code system
+  the server does not hold and the value set does not name, as the
+  operation's `codeableConcept` input requires. That coding is reported as
+  a warning that it was not checked (`UNKNOWN_CODESYSTEM_CODING_NOT_CHECKED`)
+  and no longer as `x-unknown-system`; the answer failed before (#1105).
+- `ConceptMap/$translate` answers `result` false when every match is `unmatched`, `disjoint` (`not-related-to`) or an explicit `noMap`, as the R4B and R5 operation define `result`; it answered true for any match (#965).
+- A code system property coded `notSelectable` under another URI than the standard `notSelectable` property no longer marks a concept abstract in an expansion or a validation (#965).
+- The `status-check` note on a draft code system carries the message id `MSG_DRAFT_SRC_STATUS`, the one the terminology ecosystem test cases 1.10.0 name (#965).
+- An ECL expression whose numeric or time comparison meets a value that does not convert, in the expression or in the edition's data, is refused with a typed error instead of selecting nothing; an empty time value `""` is refused as unsupported (#987).
+- The ISO 3166 code system refuses to load when the vendored CLDR data lacks its version, its territory names or its code mappings, instead of serving the version `unknown` or an empty table (#988).
+- The ECL parser reads a reverse flag that touches the attribute name, `R363698007`, as ECL 2.3 `eclattribute` admits (#989).
+- `ConceptMap/$translate` applies a map to a code only when the code is a
+  member of the map's source scope (`sourceScope[x]` in R5, `source[x]` in R4
+  and R4B), whether the map was chosen, named by `url` or reached through an
+  `other-map` rule, so its `unmapped` rule no longer fires for a code outside
+  that value set. A code outside every scope answers `result` false with a
+  message naming the code and the maps. A source scope the server cannot
+  resolve is an error naming the value set (#996).
+
 ## [0.3.2] - 2026-10-29
 
 ### Added
@@ -2220,7 +2517,8 @@ binary answers `GET /health` only.
 - No existing Rust terminology or FHIR crate is a dependency; the README
   records the evaluation and the reasons.
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.2.0...v0.3.0
