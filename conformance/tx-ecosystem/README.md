@@ -16,7 +16,7 @@ turns the lists and the total into the README's badges at site build time.
 
 ## What is committed, per mode
 
-The `general` rows were recorded on 2026-11-03 with validator 7.0.4 and suite
+The `general` rows were recorded on 2026-11-04 with validator 7.0.4 and suite
 `f158adedf67b280e2a596f805194489205bfe9bd` (test cases 1.10.0), on CI. Every
 mode run also carries the two mode-independent `metadata` cases, so a mode's
 count is two above the suite's own. The `snomed`, `icd-11`, `tx.fhir.org`,
@@ -25,9 +25,9 @@ count is two above the suite's own. The `snomed`, `icd-11`, `tx.fhir.org`,
 
 | mode | surface | pass list | passed of ran | needs | open failures |
 |---|---|---|---|---|---|
-| `general` | `/r4b` | `passing.txt` | 639 of 764 | nothing | #995, #507, #1061 to #1070 |
-| `general` | `/r4` | `passing-r4.txt` | 651 of 764 | nothing | #995, #507, #1061 to #1070 |
-| `general` | `/r5` | `passing-r5.txt` | 652 of 764 | nothing | #995, #507, #1061 to #1070 |
+| `general` | `/r4b` | `passing.txt` | 658 of 764 | nothing | #995, #507, #1061 to #1070 |
+| `general` | `/r4` | `passing-r4.txt` | 670 of 764 | nothing | #995, #507, #1061 to #1070 |
+| `general` | `/r5` | `passing-r5.txt` | 671 of 764 | nothing | #995, #507, #1061 to #1070 |
 | `snomed` | `/r4b` | `passing-snomed.txt` | 2 of 170 | a SNOMED CT edition | #344, #352, #349 |
 | `icd-11` | `/r4b` | `passing-icd-11.txt` | 44 of 52 | the three ICD-11 artifacts | #350, #349, #117 |
 | `tx.fhir.org` | `/r4b` | `passing-tx.fhir.org.txt` | 57 of 227 | a LOINC release | #420, #421, #305, #349 |
