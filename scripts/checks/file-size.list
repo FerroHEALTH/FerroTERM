@@ -11,10 +11,10 @@ app/ferroterm-console/src/pages/sync.rs 827
 app/ferroterm-server/src/persistence.rs 843
 crates/fhir-terminology/src/compose.rs 951
 crates/fhir-terminology/src/icd11.rs 957
-crates/fhir-terminology/src/operations/mod.rs 914
-crates/fhir-terminology/src/operations/value_set_validate_code.rs 944
+crates/fhir-terminology/src/operations/mod.rs 852
+crates/fhir-terminology/src/operations/value_set_validate_code.rs 847
 crates/fhir-terminology/src/provider.rs 883
-crates/fhir-terminology/src/snomed.rs 969
+crates/fhir-terminology/src/snomed.rs 968
 crates/labcodeset/src/lib.rs 925
 crates/rf2/src/refset.rs 859
 crates/sct-ecl/src/eval.rs 857
