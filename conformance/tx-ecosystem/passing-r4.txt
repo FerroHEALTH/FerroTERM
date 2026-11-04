@@ -1,10 +1,14 @@
 batch/batch-validate
+batch/cs-batch-validate
+batch/cs-batch-validate-codings
 big/big-circle-bang
 big/big-circle-validate
 big/big-echo-fifty-fifty-limit
 big/big-echo-no-limit
 big/big-echo-zero-fifty-limit
 case/case-insensitive-code1-1
+case/case-insensitive-code1-2
+case/case-insensitive-code1-3
 case/case-sensitive-code1-1
 case/case-sensitive-code1-2
 case/case-sensitive-code1-3
@@ -21,6 +25,7 @@ default-valueset-version/indirect-validation-zero
 default-valueset-version/indirect-validation-zero-pinned
 default-valueset-version/indirect-validation-zero-pinned-wrong
 deprecated/deprecating-validate
+deprecated/deprecating-validate-2
 deprecated/draft
 deprecated/draft-validate
 deprecated/experimental
@@ -325,6 +330,8 @@ simple-cases/simple-expand-regexp-prop
 simple-cases/simple-expand-repeating-prop
 simple-cases/simple-expand-repeating-prop-values
 simple-cases/simple-expand-unknown-property
+simple-cases/simple-lookup-only-unknown-property
+simple-cases/simple-lookup-unknown-property
 simple-cases/simple-subsumes-child
 simple-cases/simple-subsumes-child-coding
 simple-cases/simple-subsumes-equivalent
@@ -392,6 +399,15 @@ validation/validation-contained-good
 validation/validation-contained-nested
 validation/validation-cs-code-bad-code
 validation/validation-cs-code-good
+validation/validation-missing-cs-cc-no-code
+validation/validation-missing-cs-cc-no-system
+validation/validation-missing-cs-coding-no-code
+validation/validation-missing-cs-coding-no-system
+validation/validation-missing-vs-cc-mixed
+validation/validation-missing-vs-cc-no-code
+validation/validation-missing-vs-cc-text-only
+validation/validation-missing-vs-coding-no-code
+validation/validation-missing-vs-coding-no-system-infer
 validation/validation-missing-vs-nothing
 validation/validation-missing-vs-system-no-code
 validation/validation-simple-child-of-child
@@ -445,6 +461,7 @@ validation/validation-simple-coding-good
 validation/validation-simple-coding-good-display
 validation/validation-simple-coding-good-language
 validation/validation-simple-coding-good-language-none
+validation/validation-simple-coding-no-system
 version/code-v10-vs10
 version/code-v10-vs10-check
 version/code-v10-vs10-default
@@ -608,6 +625,7 @@ version/validation-version-profile-coding
 version/version-simple-code-bad-version1
 version/version-simple-code-good-version
 version/version-simple-codeableconcept-bad-version1
+version/version-simple-codeableconcept-bad-version2
 version/version-simple-codeableconcept-good-version
 version/version-simple-coding-bad-version1
 version/version-simple-coding-good-version
@@ -628,6 +646,7 @@ version/vs-expand-all-v2-force
 version/vs-expand-v-mixed
 version/vs-expand-v-mixed-check
 version/vs-expand-v-mixed-default
+version/vs-expand-v-mixed-force
 version/vs-expand-v-n-check-request
 version/vs-expand-v-n-default-request
 version/vs-expand-v-n-force-request
