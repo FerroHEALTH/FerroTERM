@@ -170,14 +170,14 @@ async fn an_unreachable_revocation_endpoint_still_signs_the_operator_out() {
 }
 
 #[tokio::test]
-async fn a_sign_out_without_a_session_redirects_and_revokes_nothing() {
+async fn a_sign_out_without_a_session_lands_signed_out_and_revokes_nothing() {
     let provider = Provider::start().await;
     let state = console(Some(full(&provider)), "").await;
     let response = send(&state, sign_out(&[], "same-origin")).await;
     assert_eq!(StatusCode::SEE_OTHER, response.status());
-    let (_, query) = redirect_query(&response);
-    assert!(!query.contains_key("id_token_hint"), "{query:?}");
-    assert_eq!(CLIENT_ID, query["client_id"]);
+    // NOTE: OpenID Connect RP-Initiated Logout 1.0 §2: with no ID Token there
+    // is no provider session of the operator's to end.
+    assert_eq!("/auth/sign-in?state=signed-out", location(&response));
     assert!(provider.requests_at(REVOCATION_PATH).await.is_empty());
 }
 

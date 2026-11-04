@@ -16,7 +16,7 @@
 use ferrohealth_ui::html::Html;
 use ferrohealth_ui::i18n::Locale;
 use ferrohealth_ui::icon::Glyph;
-use ferrohealth_ui::table::change::{Change, change_table_keyed};
+use ferrohealth_ui::table::change::{Change, change_table};
 use ferrohealth_ui::table::view::{
     Body, Column, DataTable, Role, Shape, Sorting, cell, data_table, title_cell,
 };
@@ -564,10 +564,10 @@ fn comparison(request: &Request, opened: &Opened) -> Html {
         })
         .collect::<Vec<_>>();
     let table = (!changes.is_empty()).then(|| {
-        change_table_keyed(
+        change_table(
             locale,
             tr(locale, Msg::HistoryWhatChanged),
-            tr(locale, Msg::HistoryPath),
+            Some(tr(locale, Msg::HistoryPath)),
             &changes,
         )
     });

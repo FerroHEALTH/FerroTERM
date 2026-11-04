@@ -12,26 +12,26 @@ repository FerroHEALTH/FerroUI) is the family's component library and the
 one source of its console design and its component rules. Read these first,
 before any console change:
 
-- the consumer guide, [`docs/consoles.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.5/docs/consoles.md):
+- the consumer guide, [`docs/consoles.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.6/docs/consoles.md):
   how a console takes the library, what it keeps local, how it moves to a
   new release; and the move from 0.5,
-  [`docs/migration-0.6.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.5/docs/migration-0.6.md);
-- the component rules, [`.claude/rules/console-ui.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.5/.claude/rules/console-ui.md):
+  [`docs/migration-0.6.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.6/docs/migration-0.6.md);
+- the component rules, [`.claude/rules/console-ui.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.6/.claude/rules/console-ui.md):
   the mandates (§0: server-rendered HTML, a little plain JavaScript, no
   inline style, no route or state in the library, no patient identifier in
   a URL), the interaction contract (§1), templates and markup, modules,
   accessibility, tokens and themes, icons, the catalogs;
-- the crate discipline, [`crates/ferrohealth-ui/CLAUDE.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.5/crates/ferrohealth-ui/CLAUDE.md):
+- the crate discipline, [`crates/ferrohealth-ui/CLAUDE.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.6/crates/ferrohealth-ui/CLAUDE.md):
   the interaction contract and the rendering mode;
-- the reviewed design, [`design/README.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.5/design/README.md),
-  [`design/COMPONENTS.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.5/design/COMPONENTS.md)
+- the reviewed design, [`design/README.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.6/design/README.md),
+  [`design/COMPONENTS.md`](https://github.com/FerroHEALTH/FerroUI/blob/v0.6.6/design/COMPONENTS.md)
   (the component IDs such as R9, F13 and M1 to M6, the family rules, the
   page templates) and the console's mockup under
-  [`design/consoles/ferroterm/`](https://github.com/FerroHEALTH/FerroUI/tree/v0.6.5/design/consoles/ferroterm).
+  [`design/consoles/ferroterm/`](https://github.com/FerroHEALTH/FerroUI/tree/v0.6.6/design/consoles/ferroterm).
 
 **The pin decides the version you read.** The console pins `ferrohealth-ui
-= "=0.6.5"` (root `Cargo.toml`), so every FerroUI document above is read at
-the tag `v0.6.5`. FerroUI's `design/` is the only design source: a design
+= "=0.6.6"` (root `Cargo.toml`), so every FerroUI document above is read at
+the tag `v0.6.6`. FerroUI's `design/` is the only design source: a design
 folder anywhere else is stale and never synced from.
 
 **Nothing FerroUI has or should have is built here.** A missing component,
