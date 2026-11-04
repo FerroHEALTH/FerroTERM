@@ -17,6 +17,7 @@
 
 use crate::fhir_codesystem::provider::{BuildError, FhirCodeSystem};
 use crate::provider::code_system::{CodeSystemModel, ConceptEntry};
+use crate::provider::compose::Echoes;
 use crate::provider::declaration::{
     ContentMode, FilterDefinition, PropertyDefinition, PropertyKind,
 };
@@ -149,6 +150,7 @@ fn from_json(
         // the others without a second request.
         for form in forms.into_iter().flatten() {
             concepts.push(ConceptEntry {
+                echoes: Echoes::default(),
                 standards_status: None,
                 code: form.to_owned(),
                 display: Some(display.clone()),

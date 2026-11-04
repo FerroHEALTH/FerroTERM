@@ -8,6 +8,7 @@
 use std::sync::Arc;
 
 use super::model::ValueSetModel;
+use crate::provider::compose::Echoes;
 use crate::provider::{Designation, Property};
 
 /// One echoed `expansion.parameter`.
@@ -58,6 +59,8 @@ pub struct Contains {
     /// The properties asked for with `property`
     /// (<https://hl7.org/fhir/R5/valueset-operation-expand.html>).
     pub properties: Vec<Property>,
+    /// The extensions echoed from the code system and the value set.
+    pub echoes: Echoes,
     /// The entry's children, when the expansion carries the system's hierarchy
     /// (<https://hl7.org/fhir/R4B/valueset-definitions.html#ValueSet.expansion.contains>).
     pub contains: Vec<Contains>,

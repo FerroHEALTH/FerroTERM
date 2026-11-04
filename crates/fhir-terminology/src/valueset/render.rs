@@ -12,6 +12,15 @@
 //! and `…extension-ValueSet.expansion.contains.property`
 //! (<https://hl7.org/fhir/R5/versions.html#extensions>); the `extension` arms fill those.
 
+/// The echoed extensions an expansion entry carries
+/// (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>, Extensions).
+const RENDERING_STYLE: &str = "http://hl7.org/fhir/StructureDefinition/rendering-style";
+const RENDERING_XHTML: &str = "http://hl7.org/fhir/StructureDefinition/rendering-xhtml";
+const VALUESET_LABEL: &str = "http://hl7.org/fhir/StructureDefinition/valueset-label";
+const VALUESET_CONCEPT_ORDER: &str =
+    "http://hl7.org/fhir/StructureDefinition/valueset-conceptOrder";
+const VALUESET_CONCEPT_DEFINITION: &str =
+    "http://hl7.org/fhir/StructureDefinition/valueset-concept-definition";
 /// The cross-version extension carrying R5's `ValueSet.expansion.property`.
 const EXPANSION_PROPERTY_EXTENSION: &str =
     "http://hl7.org/fhir/5.0/StructureDefinition/extension-ValueSet.expansion.property";
@@ -136,7 +145,7 @@ macro_rules! render_value_set {
     };
     (@properties extension, $module:ident, $entry:expr, $item:ident) => {{
         let mut entry = $entry;
-        entry.extension = $item
+        entry.extension.extend($item
             .properties
             .iter()
             .map(|p| {
@@ -159,8 +168,7 @@ macro_rules! render_value_set {
                     extension: parts,
                     ..Default::default()
                 }
-            })
-            .collect();
+            }));
         entry
     }};
     (@properties element, $module:ident, $entry:expr, $item:ident) => {{
@@ -241,7 +249,9 @@ macro_rules! render_value_set {
                 ValueSetExpansionParameterValue,
             };
 
-            use crate::provider::compose::{Compose, Include};
+            use fhir_types::$module::extension::ExtensionValue;
+
+            use crate::provider::compose::{Compose, Echoes, Include};
             use crate::valueset::expansion::{Contains, ExpansionOutcome, ParameterValue};
             use crate::valueset::model::ValueSetModel;
 
@@ -364,6 +374,33 @@ macro_rules! render_value_set {
                 }
             }
 
+            fn extension(url: &str, value: ExtensionValue) -> fhir_types::$module::extension::Extension {
+                fhir_types::$module::extension::Extension {
+                    url: String::from(url),
+                    value: Some(value),
+                    ..Default::default()
+                }
+            }
+
+            /// The echoes an entry carries on itself, in a fixed order: the
+            /// style, the label, the order, then the value set's definition.
+            fn echoes(echoes: &Echoes) -> Vec<fhir_types::$module::extension::Extension> {
+                let mut out = Vec::new();
+                if let Some(style) = &echoes.style {
+                    out.push(extension(super::RENDERING_STYLE, ExtensionValue::String(style.as_str().into())));
+                }
+                if let Some(label) = &echoes.label {
+                    out.push(extension(super::VALUESET_LABEL, ExtensionValue::String(label.as_str().into())));
+                }
+                if let Some(order) = echoes.order {
+                    out.push(extension(super::VALUESET_CONCEPT_ORDER, ExtensionValue::Integer(order.into())));
+                }
+                if let Some(definition) = &echoes.definition {
+                    out.push(extension(super::VALUESET_CONCEPT_DEFINITION, ExtensionValue::String(definition.as_str().into())));
+                }
+                out
+            }
+
             /// One level of the expansion tree, with its children below it.
             fn entries(
                 items: &[Contains],
@@ -373,6 +410,7 @@ macro_rules! render_value_set {
                 .iter()
                 .map(|item| {
                     let entry = ValueSetExpansionContains {
+                        extension: echoes(&item.echoes),
                         system: Some(item.system.as_str().into()),
                         version: versioned
                             .contains(item.system.as_str())
@@ -380,7 +418,13 @@ macro_rules! render_value_set {
                         r#abstract: item.abstract_concept.then_some(true.into()),
                         inactive: item.inactive.then_some(true.into()),
                         code: Some(item.code.as_str().into()),
-                        display: item.display.as_deref().map(Into::into),
+                        display: item.display.as_deref().map(|display| {
+                            let mut display: fhir_types::$module::primitives::String = display.into();
+                            display.extension = item.echoes.xhtml.iter().map(|x| {
+                                extension(super::RENDERING_XHTML, ExtensionValue::String(x.as_str().into()))
+                            }).collect();
+                            display
+                        }),
                         designation: item
                             .designations
                             .iter()

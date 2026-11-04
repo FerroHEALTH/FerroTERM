@@ -823,9 +823,8 @@ impl StoredSystem for Snomed {
                 for refset in defined {
                     if let Ok(Some(located)) = provider.locate(&refset.to_string()) {
                         concepts.push(ConceptRef {
-                            deprecated: false,
                             code: located.code,
-                            display: None,
+                            ..ConceptRef::default()
                         });
                     }
                 }

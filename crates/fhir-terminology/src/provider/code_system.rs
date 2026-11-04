@@ -66,6 +66,8 @@ pub struct ConceptEntry {
     pub standards_status: Option<String>,
     /// `concept.property`, as declared.
     pub properties: Vec<Property>,
+    /// The extensions on the concept that `$expand` echoes.
+    pub echoes: super::compose::Echoes,
     /// The codes of the parents: the enclosing concept, plus every `parent`
     /// and `subsumedBy` property value.
     pub parents: Vec<String>,
