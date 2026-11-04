@@ -104,21 +104,26 @@ macro_rules! convert_value_set {
                         .map(|c| ConceptRef {
                             code: text(c.code.value.as_deref()).unwrap_or_default(),
                             display: text(c.display.as_ref().and_then(|d| d.value.as_deref())),
-                            // NOTE: `valueset-deprecated` marks a concept the value set
-                            // still lists but discourages
-                            // (<https://hl7.org/fhir/R4B/extension-valueset-deprecated.html>).
+                            // NOTE: `valueset-deprecated` and a `deprecated` standards status both mark a
+                            // concept the value set still lists but discourages
+                            // (<https://hl7.org/fhir/extensions/StructureDefinition-structuredefinition-standards-status.html>).
                             deprecated: c.extension.iter().any(|x| {
-                                x.url == "http://hl7.org/fhir/StructureDefinition/valueset-deprecated"
-                                    && match &x.value {
-                                        Some(fhir_types::$module::extension::ExtensionValue::Boolean(b)) => {
-                                            b.value == Some(true)
-                                        }
-                                        // The ecosystem's fixtures spell the boolean as a code.
-                                        Some(fhir_types::$module::extension::ExtensionValue::Code(c)) => {
-                                            c.value.as_deref() == Some("true")
-                                        }
-                                        _ => false,
-                                    }
+                                match (x.url.as_str(), &x.value) {
+                                    (
+                                        "http://hl7.org/fhir/StructureDefinition/valueset-deprecated",
+                                        Some(fhir_types::$module::extension::ExtensionValue::Boolean(b)),
+                                    ) => b.value == Some(true),
+                                    // The ecosystem's fixtures spell the boolean as a code.
+                                    (
+                                        "http://hl7.org/fhir/StructureDefinition/valueset-deprecated",
+                                        Some(fhir_types::$module::extension::ExtensionValue::Code(c)),
+                                    ) => c.value.as_deref() == Some("true"),
+                                    (
+                                        "http://hl7.org/fhir/StructureDefinition/structuredefinition-standards-status",
+                                        Some(fhir_types::$module::extension::ExtensionValue::Code(c)),
+                                    ) => c.value.as_deref() == Some("deprecated"),
+                                    _ => false,
+                                }
                             }),
                         })
                         .collect(),

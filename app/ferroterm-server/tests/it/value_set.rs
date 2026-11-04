@@ -707,3 +707,87 @@ async fn expand_returns_the_properties_compose_property_names() {
         "the request's own property wins: {body}"
     );
 }
+
+// A compose that names two versions of one system keeps `contains.version`
+// on its codes even when `force-system-version` resolves both to one, so
+// the codes stay distinguishable
+// (<https://hl7.org/fhir/R4B/valueset-definitions.html#ValueSet.expansion.contains.version>).
+#[tokio::test]
+async fn a_compose_naming_two_versions_keeps_contains_version_when_forced_to_one() {
+    let server = Server::start();
+    let system = "http://example.org/fhir/CodeSystem/versioned";
+    let code_system = |version: &str| {
+        json!({"resource": {"resourceType": "CodeSystem", "url": system, "version": version,
+            "status": "active", "content": "complete",
+            "concept": [{"code": "one", "display": "One"}, {"code": "two", "display": "Two"}]}})
+    };
+    let value_set = json!({"resourceType": "ValueSet", "url": "http://example.org/fhir/ValueSet/mixed", "status": "active",
+    "compose": {"include": [
+        {"system": system, "version": "1.0.0", "concept": [{"code": "one"}]},
+        {"system": system, "version": "1.2.0", "concept": [{"code": "two"}]}
+    ]}});
+    let (status, body) = server
+        .post(
+            "/r4b/ValueSet/$expand",
+            &parameters(&[
+                ("valueSet", json!({"resource": value_set})),
+                ("tx-resource", code_system("1.0.0")),
+                ("tx-resource", code_system("1.2.0")),
+                (
+                    "force-system-version",
+                    json!({"valueCanonical": format!("{system}|1.0.0")}),
+                ),
+            ]),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let versions: Vec<&str> = body["expansion"]["contains"]
+        .as_array()
+        .expect("contains")
+        .iter()
+        .map(|c| c["version"].as_str().unwrap_or_default())
+        .collect();
+    assert_eq!(versions, ["1.0.0", "1.0.0"], "{body}");
+}
+
+// `structuredefinition-standards-status` = `deprecated` on a
+// `compose.include.concept`, which that extension's context admits
+// (<https://hl7.org/fhir/extensions/StructureDefinition-structuredefinition-standards-status.html>),
+// marks the concept deprecated in the value set.
+#[tokio::test]
+async fn a_concept_the_value_set_marks_deprecated_by_standards_status_is_warned_of() {
+    let server = Server::start_with_resources();
+    let value_set = json!({"resourceType": "ValueSet", "url": "http://example.org/fhir/ValueSet/deprecating", "status": "active",
+    "compose": {"include": [{"system": ANIMALS, "concept": [{"code": "dog", "extension": [
+        {"url": "http://hl7.org/fhir/StructureDefinition/structuredefinition-standards-status", "valueCode": "deprecated"}
+    ]}]}]}});
+    let (status, body) = server
+        .post(
+            "/r4b/ValueSet/$validate-code",
+            &parameters(&[
+                ("valueSet", json!({"resource": value_set})),
+                (
+                    "coding",
+                    json!({"valueCoding": {"system": ANIMALS, "code": "dog"}}),
+                ),
+            ]),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let issues = body["parameter"]
+        .as_array()
+        .expect("parameters")
+        .iter()
+        .find(|p| p["name"] == "issues")
+        .expect("issues");
+    assert!(
+        issues["resource"]["issue"]
+            .as_array()
+            .expect("issue")
+            .iter()
+            .any(|i| i["details"]["text"]
+                .as_str()
+                .is_some_and(|t| t.contains("marked with a status of deprecated"))),
+        "{body}"
+    );
+}
