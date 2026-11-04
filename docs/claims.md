@@ -47,7 +47,7 @@ claim, not a test that merely touches the area.
 | Claim | Evidence |
 |---|---|
 | The image serves UCUM, BCP 47, BCP 13, and ISO 3166-1 with no configuration | Registered unconditionally at `app/ferroterm-server/src/state/load.rs::build`; data vendored under `crates/fhir-terminology/data/` |
-| `ghcr.io/ferrohealth/ferroterm:0.3.3` is the current image tag | `Cargo.toml` `version = "0.3.3"`, `compose.yaml` service `ferroterm` `image:`; enforced by `scripts/checks/versions.sh` and by the tag check in `.github/workflows/release.yml` job `plan` |
+| `ghcr.io/ferrohealth/ferroterm:0.4.0` is the current image tag | `Cargo.toml` `version = "0.4.0"`, `compose.yaml` service `ferroterm` `image:`; enforced by `scripts/checks/versions.sh` and by the tag check in `.github/workflows/release.yml` job `plan` |
 | The UCUM `$lookup` answers name, version 2.2, display, and the `canonical` property | `crates/fhir-terminology/tests/it/ucum.rs::the_provider_locates_describes_and_filters_expressions` |
 | `ferroterm-build` ships in the image and in every release tarball | `docker/Dockerfile` copies both binaries; `.github/workflows/release-build.yml` step `Package` tars `ferroterm` and `ferroterm-build` |
 | The release attaches a `compose.yaml` with a `build` profile | `compose.yaml` service `build` (`profiles: [build]`, entrypoint `ferroterm-build`, the zip bind-mounted `read_only: true`, output to `${FERROTERM_INDEX_DIR:-./index}`); attached by `.github/workflows/release.yml` job `github-release`, step `Create the GitHub release as a draft` (`files: compose.yaml`) |

@@ -17,6 +17,28 @@ fragments here under the version and its date.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-04
+
+### Added
+
+- `$expand` echoes the extensions the terminology ecosystem guide lists on
+  each `expansion.contains` entry, where the code system or the value set
+  states them on the concept: `valueset-label` (from `valueset-label`, else
+  `codesystem-label`), `valueset-conceptOrder` (likewise from
+  `codesystem-conceptOrder`) and `rendering-style` on the entry, and
+  `rendering-xhtml` on its `display`. A value set's own statement wins over
+  its code system's. `valueset-concept-definition` is echoed when the
+  request asks for the `definition` property. `itemWeight` and
+  `valueset-deprecated` are not echoed, because their published contexts
+  (`Coding`, `ValueSet.compose.include.concept`) admit no expansion
+  element. The crate line moves to 0.1.142 (#1106).
+- An inactive designation in an expansion, one whose
+  `structuredefinition-standards-status` is `withdrawn` or `deprecated`,
+  carries the SNOMED CT use code `900000000000546006` (Inactive value), as
+  the terminology ecosystem guide asks. That extension's context does not
+  admit `contains.designation`. A designation that already states a use
+  cannot carry both, so it is left out of the expansion (#1106).
+
 ## [0.3.3] - 2026-11-04
 
 ### Added
@@ -2517,7 +2539,8 @@ binary answers `GET /health` only.
 - No existing Rust terminology or FHIR crate is a dependency; the README
   records the evaluation and the reasons.
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.0...v0.3.1
