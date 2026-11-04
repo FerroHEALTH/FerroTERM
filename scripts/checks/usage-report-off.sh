@@ -34,6 +34,9 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 
+# shellcheck source=scripts/lib/usage-report-siblings.sh
+. scripts/lib/usage-report-siblings.sh
+
 readonly SELF='scripts/checks/usage-report-off.sh'
 readonly OWN_KEY='FERROTERM__USAGE_REPORT__ENABLED'
 readonly SWITCH='FERROTERM__USAGE_REPORT__ENABLED(=|:[[:space:]]*["'\'']?)["'\'']?false|usageReport\.enabled=false'
@@ -137,7 +140,7 @@ findings() {
     [[ "$covered" -eq 1 ]] || printf '%s\n' "$f"
   done <<<"$list"
   rust_findings "$@"
-  sibling_findings "$@"
+  sibling_findings "$OWN_KEY" '' "$list" "$@"
 }
 
 # Prints every tracked Rust source that starts the server as a child process
@@ -155,120 +158,6 @@ rust_findings() {
     grep -qE "$RUST_SWITCH" <<<"$text" || printf '%s\n' "$f"
   done < <("$@" | grep -E '^(app|tools|crates|addons)/.*\.rs$' | sort)
 }
-
-# --- Sibling servers: the family products a launcher starts besides this one.
-#
-# A Compose file, a `docker run` or a test harness can start another family
-# server (FerroEHR, FerroPIX, FerroTERM, FerroFED, FerroBRIDGE), and each one
-# reports under its own key, `<PRODUCT>__USAGE_REPORT__ENABLED`. This repo's
-# switch stops none of them on its own.
-readonly FAMILY='ferroehr|ferropix|ferroterm|ferrofed|ferrobridge'
-readonly FAMILY_IMAGE="ghcr\\.io/ferrohealth/($FAMILY)[:@]"
-
-# Prints `file: service (KEY)` for each service of a Compose file that runs a
-# family server image without that server's switch in its own `environment`:
-# KEY set to false, or to an interpolation of OWN_KEY, which every Compose
-# launcher exports as false. A service that merges an `x-` anchor
-# (`<<: *name`) runs the anchor's image; one whose `entrypoint` names another
-# binary of the image, or whose `command` names a subcommand other than
-# `serve`, starts no server.
-compose_findings() {
-  awk -v own="$OWN_KEY" -v img="$FAMILY_IMAGE" -v file="$1" -v sq="'" '
-    function close_block() {
-      if (kind == "anchor" && product != "") anchor_image[name] = product
-      if (kind == "service") { svc[++n] = name; svc_image[name] = product; svc_merge[name] = merge; svc_entry[name] = entry; svc_cmd[name] = cmd }
-      kind = ""; name = ""; product = ""; merge = ""; entry = ""; cmd = ""
-    }
-    /^[[:space:]]*#/ { next }
-    /^[^[:space:]]/ {
-      close_block(); in_services = ($0 ~ /^services:/)
-      if (match($0, /&[A-Za-z0-9_-]+/)) { kind = "anchor"; name = substr($0, RSTART + 1, RLENGTH - 1) }
-      next
-    }
-    in_services && /^  [A-Za-z0-9_.-]+:/ {
-      close_block(); kind = "service"; name = $0; sub(/^  /, "", name); sub(/:.*/, "", name); next
-    }
-    kind == "" { next }
-    /^[[:space:]]+image:/ && match($0, img) { product = toupper(substr($0, RSTART + 20, RLENGTH - 21)) }
-    /^[[:space:]]+entrypoint:/ { entry = $0 }
-    /^[[:space:]]+command:/ { cmd = $0; sub(/^[[:space:]]+command:[[:space:]]*\[?[[:space:]]*["\047]?/, "", cmd); sub(/[^-A-Za-z0-9_].*/, "", cmd) }
-    match($0, /<<:[[:space:]]*\*[A-Za-z0-9_-]+/) { merge = substr($0, RSTART, RLENGTH); sub(/.*\*/, "", merge) }
-    match($0, /[A-Z]+__USAGE_REPORT__ENABLED[[:space:]]*[:=]/) {
-      key = substr($0, RSTART, RLENGTH); sub(/[[:space:]]*[:=]$/, "", key)
-      value = substr($0, RSTART + RLENGTH); gsub(sq, "", value); gsub(/^[[:space:]"]+|[[:space:]"]+$/, "", value)
-      if (kind == "service" && (value == "false" || index(value, "${" own) > 0)) ok[name, key] = 1
-    }
-    END {
-      close_block()
-      for (i = 1; i <= n; i++) {
-        s = svc[i]; p = svc_image[s]
-        if (p == "" && svc_merge[s] != "") p = anchor_image[svc_merge[s]]
-        # An entrypoint naming another binary of the image (an index build) serves nothing.
-        if (p != "" && svc_entry[s] != "" && svc_entry[s] !~ ("/" tolower(p) "([^-a-z]|$)")) continue
-        # So does a `command` naming a subcommand other than serve (`cdm init`).
-        if (p != "" && svc_cmd[s] != "" && svc_cmd[s] !~ /^-/ && svc_cmd[s] != "serve") continue
-        if (p != "" && !((s, p "__USAGE_REPORT__ENABLED") in ok))
-          printf "%s: %s (%s__USAGE_REPORT__ENABLED)\n", file, s, p
-      }
-    }
-  ' "$1"
-}
-
-# Prints `file (KEY)` for each `docker run` in $1 that starts a sibling family
-# server without handing the container that server's switch on its own
-# command line. A one-shot job starts no server.
-sibling_run_findings() {
-  local line product key
-  while IFS= read -r line; do
-    product="$(grep -oE "$FAMILY_IMAGE" <<<"$line" | sed -nE '1{s|.*/||; s|[:@]$||; p;}' | tr '[:lower:]' '[:upper:]')"
-    key="${product}__USAGE_REPORT__ENABLED"
-    [[ -n "$product" && "$key" != "$OWN_KEY" ]] || continue
-    grep -qE '[[:space:]](healthcheck|--version|--help|config[[:space:]]+check)([[:space:]]|$)' <<<"$line" && continue
-    grep -qE "(-e|--env)[[:space:]=]+[\"']?${key}=false" <<<"$line" || printf '%s (%s)\n' "$1" "$key"
-  done < <(logical_lines "$1" | grep -E "docker[[:space:]]+run[[:space:]].*$FAMILY_IMAGE" || true)
-}
-
-# Prints `crate (KEY)` for each crate whose Rust source names a sibling
-# family server image (`"ghcr.io/ferrohealth/<product>"`) while no Rust
-# source of that crate sets `"<PRODUCT>__USAGE_REPORT__ENABLED", "false"` on
-# the container. $@ = the file-listing command.
-rust_sibling_findings() {
-  local files f crate product key
-  files="$("$@" | grep -E '\.rs$' || true)"
-  [[ -n "$files" ]] || return 0
-  # shellcheck disable=SC2086 # one word per tracked path, none with spaces
-  while IFS= read -r f; do
-    crate="$(cut -d/ -f1-2 <<<"$f")"
-    while IFS= read -r product; do
-      key="$(tr '[:lower:]' '[:upper:]' <<<"$product")__USAGE_REPORT__ENABLED"
-      [[ "$key" != "$OWN_KEY" ]] || continue
-      # shellcheck disable=SC2046 # one word per tracked path, none with spaces
-      grep -qE "\"${key}\",[[:space:]]*\"false\"" $(grep -E "^${crate}/" <<<"$files") ||
-        printf '%s (%s)\n' "$crate" "$key"
-    done < <(grep -oE "\"ghcr\\.io/ferrohealth/($FAMILY)\"" "$f" | sed -E 's|.*/||; s|"$||' | sort -u)
-  done < <(grep -lE "\"ghcr\\.io/ferrohealth/($FAMILY)\"" $files 2>/dev/null || true)
-}
-
-# The Compose files among the listed ones: YAML with a top-level `services:`.
-compose_files() {
-  local f
-  while IFS= read -r f; do
-    case "$f" in
-      .github/* | scripts/checks/*) continue ;;
-      *.yml | *.yaml) grep -qE '^services:' "$f" 2>/dev/null && printf '%s\n' "$f" ;;
-      *) ;;
-    esac
-  done < <("$@")
-}
-
-# Prints every sibling finding over the listed files.
-sibling_findings() {
-  local f
-  while IFS= read -r f; do compose_findings "$f"; done < <(compose_files "$@")
-  while IFS= read -r f; do [[ -n "$f" ]] && sibling_run_findings "$f"; done <<<"$(candidates "$@")"
-  rust_sibling_findings "$@"
-}
-
 
 # Lists the self-test's fixture tree the way `git ls-files` lists the repo.
 tracked_fixtures() { find . -type f | sed 's|^\./||'; }
