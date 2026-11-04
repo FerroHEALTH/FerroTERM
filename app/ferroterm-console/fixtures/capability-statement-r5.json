@@ -1,5 +1,5 @@
 {
-  "date": "2026-11-04T08:41:38.452129Z",
+  "date": "2026-11-04T10:54:21.1508Z",
   "extension": [
     {
       "extension": [
@@ -9,7 +9,7 @@
         },
         {
           "url": "value",
-          "valueCode": "0.3.3"
+          "valueCode": "0.4.0"
         }
       ],
       "url": "http://hl7.org/fhir/uv/application-feature/StructureDefinition/feature"
@@ -271,10 +271,10 @@
   "software": {
     "name": "FerroTERM",
     "releaseDate": "2026-11-04",
-    "version": "0.3.3"
+    "version": "0.4.0"
   },
   "status": "active",
   "title": "FerroTERM terminology server (R5)",
   "url": "https://ferroterm.eu/fhir/CapabilityStatement/ferroterm-r5",
-  "version": "0.3.3"
+  "version": "0.4.0"
 }

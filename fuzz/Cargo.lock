@@ -448,7 +448,7 @@ checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 
 [[package]]
 name = "ferroterm-build"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -488,7 +488,7 @@ dependencies = [
 
 [[package]]
 name = "ferroterm-testkit"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "classification",
  "concept-graph",
