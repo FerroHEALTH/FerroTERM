@@ -49,10 +49,10 @@ updates:
     labels:
       - "dependencies"
     # Daily, so a release of a FerroHEALTH family crate reaches a pull request
-    # the day its cooldown ends. A group takes its entry's schedule, and two
-    # cargo entries may not share a directory (the Dependabot options
-    # reference), so the whole entry runs daily; the cooldown below still
-    # holds every crate back for its days.
+    # the next day. A group takes its entry's schedule, and two cargo entries
+    # may not share a directory (the Dependabot options reference), so the
+    # whole entry runs daily; the cooldown below still holds every other
+    # crate back for its days.
     schedule:
       interval: "daily"
     # Longer than actions: a compromised crate executes in the build AND ships
@@ -61,6 +61,20 @@ updates:
     cooldown:
       default-days: 7
       semver-major-days: 14
+      # The family's own crates, published through Trusted Publishing: no wait.
+      exclude:
+        - "ferrohealth-*"
+        - "openehr-*"
+        - "ferrobridge-*"
+        - "fhir-types"
+        - "hl7v2-types"
+        - "fhirconnect"
+        - "eehrxf"
+        - "ihe-*"
+        - "nl-generic-functions"
+        - "sct-*"
+        - "fhir-terminology"
+        - "ehds-logging"
     open-pull-requests-limit: 10
     groups:
       # The FHIR model is a product surface, not a routine dependency: it is
