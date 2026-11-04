@@ -1,1 +1,0 @@
-- An ECL expression whose numeric or time comparison meets a value that does not convert, in the expression or in the edition's data, is refused with a typed error instead of selecting nothing; an empty time value `""` is refused as unsupported.
