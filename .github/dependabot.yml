@@ -23,17 +23,16 @@ updates:
     # A delay between a release being published and this bot proposing it, so a
     # compromised or yanked release has a window to be caught before it reaches
     # a pull request (the OWASP CI/CD Security Cheat Sheet's third-party-code
-    # control). Shorter than cargo: an action runs in CI but does not ship in
-    # the product, and every action here is digest-pinned, so a bump is a
-    # reviewed change of digest.
+    # control). Seven days is the floor zizmor's `dependabot-cooldown` audit
+    # enforces; cargo waits longer, because a crate also ships in the binary.
     #
     # SECURITY updates are exempt by design — Dependabot applies no cooldown to
     # advisory-driven bumps, so an advisory still arrives immediately. That is
     # what makes a cooldown safe rather than a delay on getting fixes.
     # `semver-major-days` is not accepted for this ecosystem (Dependabot
-    # rejected the file with it); the 3-day default covers every bump.
+    # rejected the file with it); the 7-day default covers every bump.
     cooldown:
-      default-days: 3
+      default-days: 7
     groups:
       # ONE weekly PR for every minor/patch action bump (one codeql-action
       # release alone opens three PRs, one per sub-action). MAJORS stay
