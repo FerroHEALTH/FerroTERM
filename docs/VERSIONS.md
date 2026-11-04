@@ -121,7 +121,7 @@ the browser its journeys drive.
 
 | Item | Pin |
 |---|---|
-| Chrome for Testing | 155.0.8059.79 with its chromedriver, installed by `browser-actions/setup-chrome` in the `ui-e2e` job of `ci.yml`, and on a developer machine by `scripts/release/journey-tools.sh`, which checks each zip against its SHA-256 |
+| Chrome for Testing | 156.0.8078.80 with its chromedriver, installed by `browser-actions/setup-chrome` in the `ui-e2e` job of `ci.yml`, and on a developer machine by `scripts/release/journey-tools.sh`, which checks each zip against its SHA-256 |
 
 ## CI tools
 
