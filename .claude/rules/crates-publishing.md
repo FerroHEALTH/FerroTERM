@@ -56,9 +56,12 @@ and the push hook `.claude/hooks/crate_version_bump_guard.sh`.
 
 ## The publish lane is per crate, resumable, and verified
 
-`scripts/release/publish-crates.sh` (`publish` / `verify` / `version`)
-uploads the members one at a time in dependency order, counts "already exists"
-as done, and reads the registry back before reporting success. Two lanes call
+`scripts/release/publish-crates.sh` (`publish` / `verify` / `version` /
+`order` / `self-test`) uploads the members one at a time in dependency order,
+waits before each upload until every published sibling it depends on is on
+the crates.io sparse index at the crate-line version (bounded, exit 4 when it
+never shows), counts "already exists" as done, and reads the registry back
+before reporting success. Two lanes call
 it: the `crates` leg of `release.yml` on a `v*` tag (the primary path, paused
 by the `crates-io` environment's required reviewer) and `publish-crates.yml`
 on a manual dispatch (a dry run by default; `publish = true` is the recovery
@@ -87,7 +90,10 @@ first publish, and again whenever the line graduates past `0.x`.
 ## The one published list
 
 The `CRATES` array in `scripts/release/publish-crates.sh` is the published
-list, in upload order. `scripts/checks/versions.sh` reads it: a `crates/*`
+list. It names the members and nothing else: the script derives the upload
+order from `cargo metadata` (`publish-crates.sh order` prints it), and the
+`publish-dry-run` CI job runs its offline `self-test`.
+`scripts/checks/versions.sh` reads it: a `crates/*`
 member in the list needs README, LICENSE, `publish = true`, and the lockstep
 version; a member outside it must say `publish = false` and carry a
 `# NOTE: unpublished: <reason>` line in its manifest. A name in the list with
