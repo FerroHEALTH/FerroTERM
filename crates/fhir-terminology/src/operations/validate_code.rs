@@ -89,7 +89,7 @@ fn unserved(
         .map(|p| p.identity().version.clone())
         .collect();
     let (canonical, issue) =
-        super::unknown_system(url, version, super::at(expression, "system"), &valid);
+        super::unserved::system(url, version, super::at(expression, "system"), &valid);
     ValidationOutcome {
         normalized_code: None,
         result: false,
