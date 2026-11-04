@@ -108,7 +108,8 @@ method must come from the console's own origin. The session cookie is
 `__Host-`, `Secure`, `HttpOnly` and `SameSite=Lax`; a sign-out ends the
 session, revokes its token at the provider when it publishes a revocation
 endpoint (RFC 7009 §2.1), and follows the provider's end-session endpoint
-(OpenID Connect RP-Initiated Logout 1.0 §2).
+when the session holds an ID Token (OpenID Connect RP-Initiated Logout 1.0
+§2); otherwise it lands on the signed-out page.
 
 ## 6. Testing
 

@@ -116,7 +116,8 @@ stays `/auth/callback`.
 
 **Sign out** ends the session, revokes its token where the provider publishes
 a revocation endpoint (RFC 7009), and takes you to the provider's end-session
-endpoint when one is configured.
+endpoint when one is configured and the session holds an ID Token. A Basic
+sign-in holds none, so its sign-out lands on the signed-out page.
 
 ## The screens
 
