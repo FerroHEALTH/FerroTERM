@@ -385,6 +385,13 @@ pub fn validate_code(
         )));
     }
     if let Some(code) = input.code.as_deref() {
+        // NOTE: "If a code is provided, a system or a context must be provided"
+        // (<https://hl7.org/fhir/R4B/valueset-operation-validate-code.html>, `code`); `inferSystem` asks for it.
+        if input.system.is_none() && !policy.infer_system {
+            return Err(OperationError::Invalid(String::from(
+                "a `code` needs a `system`, or `inferSystem` to infer one from the value set",
+            )));
+        }
         let subject = Subject {
             system: input.system.as_deref(),
             version: input.system_version.as_deref(),

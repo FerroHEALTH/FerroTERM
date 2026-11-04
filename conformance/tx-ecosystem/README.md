@@ -331,9 +331,20 @@ its own issue, a server fix or the specification text that decides it:
   the `tx-resource` it carries (#1070) and on `reset`, which no `$closure`
   `OperationDefinition` declares, as `dispose` is not either (#1068); the
   nine `closure-add-*` and `closure-resync-*` cases need the table it creates.
-- **`validation` (17) and `batch/batch-validate-bad`**: incomplete codings and
-  codeable concepts, a request error here and a validation outcome in the
-  cases (#1063).
+- **`validation` (17) and `batch/batch-validate-bad`** (#1063). An
+  incomplete coding is a validation outcome (`result` false), since
+  `Coding.system` and `Coding.code` are both 0..1, and a bare `code` with no
+  system and no `inferSystem` is a request error: "If a code is provided, a
+  system or a context must be provided"
+  (<https://hl7.org/fhir/R4B/valueset-operation-validate-code.html>,
+  `code`). Seven cases stay unpassed as known differences that no
+  specification text decides: `-vs-coding-display-only`, `-vs-cc-no-system`
+  and `-vs-cc-no-system-infer` want a different issue roster;
+  `-cs-nothing`, `-cs-url-no-code` and `-cs-code-no-url` forbid the
+  `diagnostics` an `OperationOutcome` issue may carry
+  (<https://hl7.org/fhir/R4B/operationoutcome-definitions.html#OperationOutcome.issue.diagnostics>);
+  and `batch-validate-bad` wants its own wording for an undeclared
+  `codingX`.
 - **`batch/cs-batch-validate`, `-bad` and `-codings`**: `CodeSystem/$batch-validate-code`
   reads its `url` as a value set (#1061).
 - **`simple-lookup-unknown-property` and `-only-unknown-property`**: a

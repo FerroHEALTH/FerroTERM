@@ -557,9 +557,15 @@ fn validate_code_answers_the_membership_the_echo_and_the_issues() {
         code: Some(String::from("kitten")),
         ..ValueSetValidateInput::default()
     };
-    let validation =
-        value_set_validate_code::validate_code(&world.sources(), &inferred).expect("validates");
-    assert!(validation.result, "one system: inferred");
+    // "If a code is provided, a system or a context must be provided"
+    // (<https://hl7.org/fhir/R4B/valueset-operation-validate-code.html>, `code`).
+    assert!(
+        matches!(
+            value_set_validate_code::validate_code(&world.sources(), &inferred),
+            Err(OperationError::Invalid(_))
+        ),
+        "a bare code with no system and no inferSystem is a request error"
+    );
     let outside = ValueSetValidateInput {
         url: Some(VS_PETS.to_owned()),
         coding: Some(CodingRef {
@@ -899,12 +905,12 @@ fn validate_code_refuses_malformed_requests() {
         code: Some(String::from("cat")),
         ..ValueSetValidateInput::default()
     };
-    let validation =
-        value_set_validate_code::validate_code(&world.sources(), &ambiguous).expect("validates");
-    assert!(!validation.result);
-    // The ecosystem's shape: not in the value set, then the system undetermined.
-    let kinds: Vec<&str> = validation.issues.iter().map(|i| i.kind).collect();
-    assert_eq!(kinds, ["not-in-vs", "cannot-infer"]);
+    // A bare code needs a system, or `inferSystem` to infer one
+    // (<https://hl7.org/fhir/R4B/valueset-operation-validate-code.html>, `code`).
+    assert!(matches!(
+        value_set_validate_code::validate_code(&world.sources(), &ambiguous),
+        Err(OperationError::Invalid(_))
+    ));
 }
 
 // NOTE: R5 `$expand` `property` asks for concept properties on each `contains`,
@@ -1142,11 +1148,13 @@ fn validate_code_infers_the_system_by_membership_and_can_be_lenient_on_displays(
         dodo.message.as_deref(),
         Some(format!("The System URI could not be determined for the code 'dodo' in the ValueSet '{VS_ENUMERATED}|1.0'; The provided code '#dodo' was not found in the value set '{VS_ENUMERATED}|1.0'").as_str())
     );
-    // Without inferSystem a bare code over two systems cannot be placed.
-    let ambiguous = value_set_validate_code::validate_code(&world.sources(), &bare("cat", None))
-        .expect("a false result");
-    assert!(!ambiguous.result);
-    assert_eq!(ambiguous.issues[1].kind, "cannot-infer");
+    // Without inferSystem a bare code is a request error: "If a code is
+    // provided, a system or a context must be provided"
+    // (<https://hl7.org/fhir/R4B/valueset-operation-validate-code.html>, `code`).
+    assert!(matches!(
+        value_set_validate_code::validate_code(&world.sources(), &bare("cat", None)),
+        Err(OperationError::Invalid(_))
+    ));
     let wrong_display = |lenient: Option<bool>| ValueSetValidateInput {
         url: Some(VS_PETS.to_owned()),
         code: Some(String::from("kitten")),
