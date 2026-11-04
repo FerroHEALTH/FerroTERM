@@ -930,7 +930,7 @@ async fn the_typed_preferences_are_kept_on_change_and_keep_their_focus() {
             journey
                 .press(By::Css("#page-size"), "the page size field")
                 .await?;
-            journey.type_here("\u{e009}a").await?;
+            journey.select_all().await?;
             journey.type_here("50\u{e007}").await?;
             journey
                 .element(
@@ -944,7 +944,7 @@ async fn the_typed_preferences_are_kept_on_change_and_keep_their_focus() {
             journey
                 .press(By::Css("#display-language"), "the display language field")
                 .await?;
-            journey.type_here("\u{e009}a").await?;
+            journey.select_all().await?;
             journey.type_here("nl").await?;
             journey.tab(1).await?;
             journey

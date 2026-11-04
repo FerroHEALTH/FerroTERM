@@ -66,6 +66,33 @@ impl Journey {
         .await
     }
 
+    /// Selects the whole text of the field the keyboard is on, with the
+    /// select-all chord of the platform the browser runs on: Command on
+    /// macOS, where Control and A moves to the start of the line, and Control
+    /// elsewhere. The browser runs on this host, so the test's platform is its.
+    ///
+    /// # Errors
+    ///
+    /// Returns the WebDriver error when the browser refused the keys.
+    pub async fn select_all(&self) -> WebDriverResult<()> {
+        self.ready().await;
+        let chain = self.driver.action_chain();
+        let chord = if cfg!(target_os = "macos") {
+            Key::Meta
+        } else {
+            Key::Control
+        };
+        self.acting("the text selected", || async move {
+            chain
+                .key_down(chord.clone())
+                .send_keys("a")
+                .key_up(chord)
+                .perform()
+                .await
+        })
+        .await
+    }
+
     /// Waits until the keyboard is on the control `wanted` names, as a page
     /// that gives a field the focus back puts it there once its module runs.
     pub async fn focus_becoming(&self, wanted: &str, what: &str) {

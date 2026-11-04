@@ -220,7 +220,7 @@ async fn the_typed_preferences_are_kept_by_their_forms_with_no_script() {
                 journey
                     .press(By::Css(format!("#{name}")), &format!("the {name} field"))
                     .await?;
-                journey.type_here("\u{e009}a").await?;
+                journey.select_all().await?;
                 journey.type_here(value).await?;
                 journey
                     .press(
