@@ -17,6 +17,26 @@ fragments here under the version and its date.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-04
+
+### Changed
+
+- The server, the sync service and the console run on the newest
+  FerroHEALTH family releases: `ferrohealth-config` 0.2.8, which masks a
+  refused configuration value of any type in its message,
+  `ferrohealth-server` 0.4.3, `ferrohealth-telemetry` 0.2.4, whose panic
+  line names the request id and whose exported request span is named
+  `{method} {route}`, `ferrohealth-session` 0.2.2, `ferrohealth-smart`
+  0.8.8 and FerroUI 0.6.6 (#1120).
+- The console's **Sign out** takes you to the provider's end-session
+  endpoint only when the session holds an ID Token (OpenID Connect
+  RP-Initiated Logout 1.0 §2), as `ferrohealth-session` 0.2.1 does; a
+  sign-out with no such session lands on the signed-out page (#1120).
+- The concept graph and the designation index are built on `roaring`
+  0.12.0, which writes the portable Roaring format faster on little-endian
+  machines. The bytes are the same, so an index built before this release
+  is read unchanged (#1128).
+
 ## [0.4.0] - 2026-11-04
 
 ### Added
@@ -2539,7 +2559,8 @@ binary answers `GET /health` only.
 - No existing Rust terminology or FHIR crate is a dependency; the README
   records the evaluation and the reasons.
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.1...v0.3.2
