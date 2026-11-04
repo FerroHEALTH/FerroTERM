@@ -1788,6 +1788,67 @@ fn a_draft_experimental_deprecated_or_withdrawn_resource_earns_a_status_note() {
     assert_eq!(noted.message, None, "notes carry no message");
 }
 
+// NOTE: "The server returns true if one of the coding values is in the value
+// set" (`codeableConcept`, <https://hl7.org/fhir/R4B/valueset-operation-validate-code.html>).
+#[test]
+fn validate_code_passes_a_codeable_concept_whose_other_coding_names_an_unknown_system() {
+    let world = World::load();
+    let nowhere = "http://example.org/fhir/CodeSystem/nowhere";
+    let coding = |system: &str, code: &str| CodingRef {
+        system: Some(system.to_owned()),
+        version: None,
+        code: Some(code.to_owned()),
+        display: None,
+    };
+    let validation = value_set_validate_code::validate_code(
+        &world.sources(),
+        &ValueSetValidateInput {
+            url: Some(VS_ENUMERATED.to_owned()),
+            codeable_concept: Some(codeable(vec![
+                coding(nowhere, "cat"),
+                coding(ANIMALS, "cat"),
+            ])),
+            ..ValueSetValidateInput::default()
+        },
+    )
+    .expect("validates");
+    assert!(validation.result, "{validation:?}");
+    assert_eq!(validation.code.as_deref(), Some("cat"));
+    assert_eq!(validation.system.as_deref(), Some(ANIMALS));
+    let shape: Vec<(&str, &str, &str, Option<&str>)> = validation
+        .issues
+        .iter()
+        .map(|i| (i.severity, i.kind, i.message_id(), i.expression.as_deref()))
+        .collect();
+    assert_eq!(
+        shape,
+        [
+            (
+                "information",
+                "this-code-not-in-vs",
+                "None_of_the_provided_codes_are_in_the_value_set_one",
+                Some("CodeableConcept.coding[0].code")
+            ),
+            (
+                "warning",
+                "not-found",
+                "UNKNOWN_CODESYSTEM_CODING_NOT_CHECKED",
+                Some("CodeableConcept.coding[0].system")
+            ),
+        ]
+    );
+    assert!(validation.x_unknown_systems.is_empty(), "{validation:?}");
+    assert!(validation.unknown_systems.is_empty(), "{validation:?}");
+    assert!(
+        validation
+            .message
+            .as_deref()
+            .is_some_and(|m| m.contains(nowhere)),
+        "{:?}",
+        validation.message
+    );
+}
+
 // NOTE: every issue carries the ecosystem's message id, the message joins the
 // errors in the ecosystem's order, and an unknown system fails with the
 // membership issue first (the ecosystem's test cases, #189).

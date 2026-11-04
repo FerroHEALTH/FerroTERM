@@ -15,6 +15,7 @@ pub mod expand;
 pub mod lookup;
 pub mod subsumes;
 pub mod translate;
+pub mod unserved;
 pub mod validate_code;
 pub mod value_set_validate_code;
 
@@ -435,6 +436,9 @@ pub enum MessageId {
     UnknownCodeSystemVersionNone,
     /// A code system is unknown.
     UnknownCodeSystem,
+    /// A code system one coding of a `CodeableConcept` names is unknown, and
+    /// another coding decided the answer, so that coding was not checked.
+    UnknownCodeSystemCodingNotChecked,
     /// The versionless include's default version differs from the coding's.
     ValueSetValueMismatchDefault,
     /// The include's version, once resolved, differs from the coding's.
@@ -512,6 +516,7 @@ impl MessageId {
             Self::UnknownCodeSystemVersion => "UNKNOWN_CODESYSTEM_VERSION",
             Self::UnknownCodeSystemVersionNone => "UNKNOWN_CODESYSTEM_VERSION_NONE",
             Self::UnknownCodeSystem => "UNKNOWN_CODESYSTEM",
+            Self::UnknownCodeSystemCodingNotChecked => "UNKNOWN_CODESYSTEM_CODING_NOT_CHECKED",
             Self::ValueSetValueMismatchDefault => "VALUESET_VALUE_MISMATCH_DEFAULT",
             Self::ValueSetValueMismatchChanged => "VALUESET_VALUE_MISMATCH_CHANGED",
             Self::ValueSetValueMismatch => "VALUESET_VALUE_MISMATCH",
@@ -565,73 +570,6 @@ impl Issue {
     pub const fn message_id(&self) -> &'static str {
         self.message.key()
     }
-}
-
-/// A system the server does not serve, as `x-caused-by-unknown-system` names it.
-///
-/// Returns the canonical (`url` or `url|version`) and the issue that says so;
-/// the wording is the ecosystem's
-/// (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>, the
-/// `$validate-code` return parameters).
-#[must_use]
-pub fn unknown_system(
-    url: &str,
-    version: Option<&str>,
-    expression: Option<String>,
-    valid: &[String],
-) -> (String, Issue) {
-    let (canonical, message, text) = match version {
-        Some(version) => (
-            format!("{url}|{version}"),
-            MessageId::UnknownCodeSystemVersion,
-            format!(
-                "A definition for CodeSystem '{url}' version '{version}' could not be found, so the code cannot be validated{}",
-                valid_versions(valid)
-            ),
-        ),
-        None => (
-            url.to_owned(),
-            MessageId::UnknownCodeSystem,
-            format!(
-                "A definition for CodeSystem '{url}' could not be found, so the code cannot be validated"
-            ),
-        ),
-    };
-    (
-        canonical,
-        Issue {
-            severity: "error",
-            code: "not-found",
-            kind: "not-found",
-            message,
-            text,
-            expression,
-        },
-    )
-}
-
-/// A coding that names a version of a system the server serves no version of:
-/// the `not-found` issue names the version asked for, and the canonical the
-/// answer reports unknown is the system's.
-#[must_use]
-pub fn unknown_system_version_none(
-    url: &str,
-    version: &str,
-    expression: Option<String>,
-) -> (String, Issue) {
-    (
-        url.to_owned(),
-        Issue {
-            severity: "error",
-            code: "not-found",
-            kind: "not-found",
-            message: MessageId::UnknownCodeSystemVersionNone,
-            text: format!(
-                "A definition for CodeSystem '{url}' version '{version}' could not be found, so the code cannot be validated. No version of this code system is served"
-            ),
-            expression,
-        },
-    )
 }
 
 /// The `issue.expression` of the element at `base` itself: a bare `coding`

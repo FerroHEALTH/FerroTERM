@@ -5,7 +5,7 @@
 //! a `CodeableConcept` carries: the first in the value set, else the version
 //! mismatch, the failed import, or none.
 
-use super::super::{CodingRef, Issue};
+use super::super::{CodingRef, Issue, MessageId};
 use super::refusal::{failed, named_code};
 use super::target::include_literal_for;
 use super::{Validation, message_of};
@@ -44,7 +44,7 @@ pub(super) fn this_code_not_in_vs(model: &ValueSetModel, coding: &CodingRef, bas
         severity: "information",
         code: "code-invalid",
         kind: "this-code-not-in-vs",
-        message: crate::operations::MessageId::NoneOfTheProvidedCodesAreInTheValueSetOne,
+        message: MessageId::NoneOfTheProvidedCodesAreInTheValueSetOne,
         text: format!(
             "The provided code '{}' was not found in the value set '{}'",
             named_code(
@@ -68,7 +68,7 @@ pub(super) fn no_valid_coding(model: &ValueSetModel) -> Validation {
             severity: "error",
             code: "code-invalid",
             kind: "not-in-vs",
-            message: crate::operations::MessageId::TxGeneralCcErrorMessage,
+            message: MessageId::TxGeneralCcErrorMessage,
             text: format!(
                 "No valid coding was found for the value set '{}'",
                 model.canonical()
@@ -157,7 +157,8 @@ pub(super) fn include_version_unserved(
 }
 
 /// The answer when a coding is in the value set: the first one answers the
-/// code outputs and every other coding's issues join it.
+/// code outputs and every other coding's issues join it, an unknown system the
+/// value set does not name as a warning that the coding went unchecked.
 pub(super) fn first_in_value_set(
     model: &ValueSetModel,
     judged: &[(&CodingRef, Validation)],
@@ -172,16 +173,28 @@ pub(super) fn first_in_value_set(
         if index == primary {
             continue;
         }
+        // NOTE: "The server returns true if one of the coding values is in the
+        // value set" (`codeableConcept`, R4B `ValueSet/$validate-code`), so a
+        // coding of an unreferenced unknown system is a warning that it went unchecked.
+        let unchecked = !other.x_unknown_systems.is_empty();
         for issue in &other.issues {
             if issue.kind == "not-in-vs" {
                 answer
                     .issues
                     .push(this_code_not_in_vs(model, coding, &base(index)));
+            } else if unchecked && issue.message == MessageId::UnknownCodeSystem {
+                answer.issues.push(Issue {
+                    severity: "warning",
+                    message: MessageId::UnknownCodeSystemCodingNotChecked,
+                    ..issue.clone()
+                });
             } else {
                 answer.issues.push(issue.clone());
             }
         }
-        take_unknown(other, &mut answer);
+        answer
+            .unknown_systems
+            .extend(other.unknown_systems.iter().cloned());
     }
     answer.result = !answer.issues.iter().any(|i| i.severity == "error");
     answer.message = message_of(&answer.issues);

@@ -3,7 +3,7 @@
 [package]
 name = "loinc"
 description = "LOINC release loader and typed row model"
-version = "0.1.140"
+version = "0.1.141"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

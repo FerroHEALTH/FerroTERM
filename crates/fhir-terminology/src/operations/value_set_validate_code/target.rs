@@ -199,7 +199,7 @@ pub(super) fn disagreement(
         issues.push(disagreement);
         return;
     }
-    let (canonical, not_found) = super::super::unknown_system(
+    let (canonical, not_found) = super::super::unserved::system(
         system,
         Some(sv),
         super::super::at(expression, "system"),
@@ -258,7 +258,7 @@ pub(super) fn unresolvable_include(
             expression,
         ));
     }
-    let (canonical, not_found) = super::super::unknown_system(
+    let (canonical, not_found) = super::super::unserved::system(
         system,
         Some(&bad),
         super::super::at(expression, "system"),
@@ -352,8 +352,8 @@ pub(super) fn unserved_subject(
     let version = subject.version.filter(|_| served);
     let at = super::super::at(subject.expression, "system");
     let (canonical, not_found) = match subject.version {
-        Some(asked) if !served => super::super::unknown_system_version_none(system, asked, at),
-        _ => super::super::unknown_system(system, version, at, valid),
+        Some(asked) if !served => super::super::unserved::version_none(system, asked, at),
+        _ => super::super::unserved::system(system, version, at, valid),
     };
     let referenced = model
         .compose
