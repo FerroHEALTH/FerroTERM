@@ -432,6 +432,7 @@ validation/validation-simple-codeableconcept-good
 validation/validation-simple-codeableconcept-good-display
 validation/validation-simple-codeableconcept-good-language
 validation/validation-simple-codeableconcept-good-language-none
+validation/validation-simple-codeableconcept-unknown-system
 validation/validation-simple-coding-bad-code
 validation/validation-simple-coding-bad-code-inactive
 validation/validation-simple-coding-bad-display

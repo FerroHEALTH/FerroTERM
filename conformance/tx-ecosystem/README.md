@@ -25,9 +25,9 @@ count is two above the suite's own. The `snomed`, `icd-11`, `tx.fhir.org`,
 
 | mode | surface | pass list | passed of ran | needs | open failures |
 |---|---|---|---|---|---|
-| `general` | `/r4b` | `passing.txt` | 659 of 764 | nothing | #995, #507, #1061 to #1070 |
-| `general` | `/r4` | `passing-r4.txt` | 671 of 764 | nothing | #995, #507, #1061 to #1070 |
-| `general` | `/r5` | `passing-r5.txt` | 672 of 764 | nothing | #995, #507, #1061 to #1070 |
+| `general` | `/r4b` | `passing.txt` | 660 of 764 | nothing | #995, #507, #1061 to #1070, #1106, #1107 |
+| `general` | `/r4` | `passing-r4.txt` | 672 of 764 | nothing | #995, #507, #1061 to #1070, #1106, #1107 |
+| `general` | `/r5` | `passing-r5.txt` | 673 of 764 | nothing | #995, #507, #1061 to #1070, #1106, #1107 |
 | `snomed` | `/r4b` | `passing-snomed.txt` | 2 of 170 | a SNOMED CT edition | #344, #352, #349 |
 | `icd-11` | `/r4b` | `passing-icd-11.txt` | 44 of 52 | the three ICD-11 artifacts | #350, #349, #117 |
 | `tx.fhir.org` | `/r4b` | `passing-tx.fhir.org.txt` | 57 of 227 | a LOINC release | #420, #421, #305, #349 |
