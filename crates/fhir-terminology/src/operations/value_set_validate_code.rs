@@ -864,7 +864,8 @@ fn message_of(issues: &[Issue]) -> Option<String> {
         "display-comment",
         "invalid-display",
     ];
-    const WARNINGS: [&str; 4] = [
+    const WARNINGS: [&str; 5] = [
+        "not-found",
         "invalid-data",
         "code-comment",
         "display-comment",

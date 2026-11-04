@@ -349,8 +349,21 @@ its own issue, a server fix or the specification text that decides it:
   reads its `url` as a value set (#1061).
 - **`simple-lookup-unknown-property` and `-only-unknown-property`**: a
   property the code system does not define is refused (#1062).
-- **Seven `$expand` cases** want the requested properties and the extensions
-  a supplement carries (#1064).
+- **Six `$expand` cases want extension values the request did not name.**
+  The two `properties/expand-with-valueset.compose.property-*` cases pass on
+  `/r5`, where `ValueSet.compose.property` exists. `extensions-echo-all`,
+  `extensions-echo-enumerated`, `parameters-expand-supplement-good`,
+  `-supplement-none`, `-enum-definitions3` and `deprecated/vs-deprecation`
+  stay unpassed on two grounds. Part of what they want is the echo the IG's
+  §Extensions list asks for ("echo in value set if defined in code system or
+  value set" for `itemWeight`, `rendering-*`, `valueset-label` and
+  `valueset-conceptOrder`, and the `standards-status` rule for an inactive
+  designation), which `$expand` does not do yet (#1106). The rest goes beyond
+  the published definitions: `label`, `order` and `weight` as concept
+  properties, where `concept-properties` (HL7 Terminology 7.3.0) defines no
+  `label` or `order`, and `valueset-deprecated` and `standards-status` on
+  `expansion.contains`, which neither extension's context admits (FHIR
+  Extensions Pack 5.4.0). #1107 holds that upstream report.
 - **`extensions/validate-supplement-nolang-*` and
   `validate-supplements-grandchild-wrong-display`** send `useSupplement` on
   `CodeSystem/$validate-code`, which no version declares (#1068).
@@ -360,9 +373,12 @@ its own issue, a server fix or the specification text that decides it:
 - **`case-insensitive-code1-2`, `-code1-3` and
   `version-simple-codeableconcept-bad-version2`**: the message leaves out the
   version it is about (#1065).
-- **`vs-deprecation`, `deprecating-validate-2`, `vs-expand-v-mixed-force`,
-  `validation-simple-codeableconcept-unknown-system` and, on `/r4b`,
-  `validation-contained-nested`** each differ on one point (#1066).
+- **`simple-expand-contained-nested` and `validation-contained-nested`
+  compare against an unsubstituted placeholder on `/r4b`.** Both pass on `/r4`
+  and `/r5`. On `/r4b` the expected answer carries the literal `$version$` as
+  the version of `http://hl7.org/fhir/administrative-gender`, which the
+  runner leaves as written there, and the server correctly states `4.3.0`.
+  Same family as the `exclude` cases above.
 - **`simple-subsumes-no-system`, `-no-system-coding` and
   `validation-missing-cs-code-no-url`** want `issue.code` `invalid` where the
   server answers `required` for a missing input. The IG accepts more than one

@@ -435,6 +435,9 @@ pub enum MessageId {
     UnknownCodeSystemVersionNone,
     /// A code system is unknown.
     UnknownCodeSystem,
+    /// A code system one coding of a `CodeableConcept` names is unknown, and
+    /// another coding decided the answer, so that coding was not checked.
+    UnknownCodeSystemCodingNotChecked,
     /// The versionless include's default version differs from the coding's.
     ValueSetValueMismatchDefault,
     /// The include's version, once resolved, differs from the coding's.
@@ -512,6 +515,7 @@ impl MessageId {
             Self::UnknownCodeSystemVersion => "UNKNOWN_CODESYSTEM_VERSION",
             Self::UnknownCodeSystemVersionNone => "UNKNOWN_CODESYSTEM_VERSION_NONE",
             Self::UnknownCodeSystem => "UNKNOWN_CODESYSTEM",
+            Self::UnknownCodeSystemCodingNotChecked => "UNKNOWN_CODESYSTEM_CODING_NOT_CHECKED",
             Self::ValueSetValueMismatchDefault => "VALUESET_VALUE_MISMATCH_DEFAULT",
             Self::ValueSetValueMismatchChanged => "VALUESET_VALUE_MISMATCH_CHANGED",
             Self::ValueSetValueMismatch => "VALUESET_VALUE_MISMATCH",
