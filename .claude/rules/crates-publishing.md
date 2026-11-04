@@ -42,8 +42,9 @@ and the push hook `.claude/hooks/crate_version_bump_guard.sh`.
   crate line in the same PR.** Packaged content is what the crate's `include`
   ships: `src/**`, `data/**`, `README.md`, `LICENSE`, and `Cargo.toml`. Tests,
   benches, `CLAUDE.md`, and the vendored grammar are not packaged and need no
-  bump. A root `[workspace.dependencies]` entry a member consumes is packaged
-  content too, because `cargo package` renders the concrete requirement.
+  bump. A root `[workspace.dependencies]` entry a published member consumes
+  is packaged content too, because `cargo package` renders the concrete
+  requirement; one only `publish = false` members consume is not.
 - **Bumps are lockstep:** every member's `version` and every internal
   requirement move to the same new `0.x` in one sweep, and `Cargo.lock` is
   refreshed in the same PR (`cargo update -w`). The guard fails a split bump

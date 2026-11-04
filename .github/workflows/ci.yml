@@ -787,6 +787,8 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+      - name: Crate-version guard self-test
+        run: bash scripts/checks/crate-version-guard.sh --self-test
       - name: Packaged crate content moved with its version
         env:
           GH_TOKEN: ${{ github.token }}
