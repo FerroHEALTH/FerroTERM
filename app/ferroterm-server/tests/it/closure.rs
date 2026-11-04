@@ -379,3 +379,41 @@ async fn r5_states_the_relationship_in_its_own_vocabulary() {
         "R5 has no `specializes`, and the animal is broader than the cat: {body}"
     );
 }
+
+// A code system the request supplies as a `tx-resource` is in the scope the
+// closure is computed over, as for every other operation
+// (<https://build.fhir.org/ig/HL7/fhir-tx-ecosystem-ig/requirements.html>).
+#[tokio::test]
+async fn a_closure_over_a_code_system_supplied_as_a_tx_resource() {
+    let server = Server::start_persisting();
+    let system = "http://example.org/fhir/CodeSystem/closure-supplied";
+    let supplied = json!({"name": "tx-resource", "resource": {
+        "resourceType": "CodeSystem", "url": system, "version": "1", "status": "active",
+        "content": "complete", "hierarchyMeaning": "is-a",
+        "concept": [{"code": "parent", "display": "Parent", "concept": [{"code": "child", "display": "Child"}]}]
+    }});
+    let with_supplied = |mut call: Value| {
+        if let Some(parameter) = call.get_mut("parameter").and_then(Value::as_array_mut) {
+            parameter.push(supplied.clone());
+        }
+        call
+    };
+    let request = |codes: &[&str]| {
+        let mut parameter = vec![json!({"name": "name", "valueString": "supplied"})];
+        for code in codes {
+            parameter
+                .push(json!({"name": "concept", "valueCoding": {"system": system, "code": code}}));
+        }
+        with_supplied(json!({"resourceType": "Parameters", "parameter": parameter}))
+    };
+    let (status, body) = server.post("/r4b/$closure", &request(&[])).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let (status, body) = server
+        .post("/r4b/$closure", &request(&["parent", "child"]))
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(
+        !edges(&body).is_empty(),
+        "the supplied hierarchy relates the two codes: {body}"
+    );
+}

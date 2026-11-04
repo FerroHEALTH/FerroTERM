@@ -77,6 +77,11 @@ jobs:
         with:
           persist-credentials: false
 
+      # trivy-action would install Trivy through setup-trivy, whose download
+      # host no longer resolves (#1089), so every scan step skips it.
+      - name: Install Trivy from its GitHub release, checked by sha256
+        run: bash scripts/release/install-trivy.sh "$TRIVY_VERSION" "$RUNNER_TEMP/trivy-bin"
+
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ${{ env.REGISTRY }}
@@ -92,6 +97,7 @@ jobs:
           TRIVY_PLATFORM: linux/amd64
         with:
           version: v${{ env.TRIVY_VERSION }}
+          skip-setup-trivy: true
           scan-type: image
           image-ref: ${{ inputs.server-image }}@${{ inputs.server-digest }}
           scanners: vuln
@@ -106,6 +112,7 @@ jobs:
           TRIVY_PLATFORM: linux/arm64
         with:
           version: v${{ env.TRIVY_VERSION }}
+          skip-setup-trivy: true
           scan-type: image
           image-ref: ${{ inputs.server-image }}@${{ inputs.server-digest }}
           scanners: vuln
@@ -120,6 +127,7 @@ jobs:
           TRIVY_PLATFORM: linux/amd64
         with:
           version: v${{ env.TRIVY_VERSION }}
+          skip-setup-trivy: true
           scan-type: image
           image-ref: ${{ inputs.sync-image }}@${{ inputs.sync-digest }}
           scanners: vuln
@@ -134,6 +142,7 @@ jobs:
           TRIVY_PLATFORM: linux/arm64
         with:
           version: v${{ env.TRIVY_VERSION }}
+          skip-setup-trivy: true
           scan-type: image
           image-ref: ${{ inputs.sync-image }}@${{ inputs.sync-digest }}
           scanners: vuln
@@ -148,6 +157,7 @@ jobs:
           TRIVY_PLATFORM: linux/amd64
         with:
           version: v${{ env.TRIVY_VERSION }}
+          skip-setup-trivy: true
           scan-type: image
           image-ref: ${{ inputs.console-image }}@${{ inputs.console-digest }}
           scanners: vuln
@@ -162,6 +172,7 @@ jobs:
           TRIVY_PLATFORM: linux/arm64
         with:
           version: v${{ env.TRIVY_VERSION }}
+          skip-setup-trivy: true
           scan-type: image
           image-ref: ${{ inputs.console-image }}@${{ inputs.console-digest }}
           scanners: vuln

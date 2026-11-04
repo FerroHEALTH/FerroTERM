@@ -376,6 +376,19 @@ else
   note "no console crate yet — skipped"
 fi
 
+echo "== trivy (TRIVY_VERSION in the scanning workflows <-> scripts/release/install-trivy.sh)"
+trivy_pins="$(sed -nE 's|^[[:space:]]*TRIVY_VERSION:[[:space:]]*"([^"]+)".*|\1|p' \
+  .github/workflows/release.yml .github/workflows/scan-and-tag.yml .github/workflows/image-scan.yml | sort -u)"
+if [[ -z "$trivy_pins" ]]; then
+  bad "no scanning workflow sets TRIVY_VERSION"
+elif [[ "$(printf '%s\n' "$trivy_pins" | wc -l | tr -d '[:space:]')" != "1" ]]; then
+  bad "trivy: the workflows disagree ($(printf '%s' "$trivy_pins" | tr '\n' ' '))"
+elif bash scripts/release/install-trivy.sh --sha256 "$trivy_pins" >/dev/null 2>&1; then
+  note "OK: trivy $trivy_pins, pinned by sha256 in scripts/release/install-trivy.sh"
+else
+  bad "trivy: scripts/release/install-trivy.sh pins no sha256 for $trivy_pins"
+fi
+
 echo
 if [[ "$fail" -ne 0 ]]; then
   echo "versions: DRIFT detected (see above)." >&2
