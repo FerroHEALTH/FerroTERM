@@ -820,6 +820,9 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
         with:
           cache: false
+      # The upload order derived from the dependency graph, the refusals, and
+      # the bounded sparse-index wait, offline (#1114).
+      - run: bash scripts/release/publish-crates.sh self-test
       - run: cargo publish --workspace --dry-run --locked
 
   # The latency bars, measured over the generated edition so the lane needs no

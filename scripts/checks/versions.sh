@@ -279,8 +279,8 @@ fi
 echo "== published crates (crates/*/Cargo.toml <-> README, LICENSE, root requirements)"
 if ls crates/*/Cargo.toml >/dev/null 2>&1; then
   line="$(awk -F'"' '/^\[package\]/{p=1} p && /^version = /{print $2; exit}' crates/rf2/Cargo.toml || true)"
-  # The one published list is the CRATES array of scripts/release/publish-crates.sh
-  # (dependency order for the upload). A crates/* member is published when it
+  # The one published list is the CRATES array of scripts/release/publish-crates.sh,
+  # which derives the upload order itself. A crates/* member is published when it
   # is in that list; a member outside it must say `publish = false` and carry
   # a `# NOTE: unpublished:` reason line, so a forgotten member and a held-out
   # member can never look alike.
