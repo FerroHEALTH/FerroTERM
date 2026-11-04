@@ -21,7 +21,7 @@ use fhir_terminology::operations::{
     Invocation, OperationError, Sources, closure, lookup, subsumes, validate_code,
     value_set_validate_code,
 };
-use fhir_terminology::provider::compose::{Compose, ConceptRef, Include, SystemRef};
+use fhir_terminology::provider::compose::{Compose, ConceptRef, Echoes, Include, SystemRef};
 use fhir_terminology::provider::concept_map::Relationship;
 use fhir_terminology::registry::Registry;
 use fhir_terminology::snomed::{SYSTEM, SnomedProvider};
@@ -634,11 +634,13 @@ fn exclude_post_coordinated_drops_an_enumerated_expression_from_an_expansion() {
                     code: refined(CAT, COVERING, FUR),
                     display: None,
                     deprecated: false,
+                    echoes: Echoes::default(),
                 },
                 ConceptRef {
                     code: code(DOG),
                     display: None,
                     deprecated: false,
+                    echoes: Echoes::default(),
                 },
             ],
             ..Include::default()

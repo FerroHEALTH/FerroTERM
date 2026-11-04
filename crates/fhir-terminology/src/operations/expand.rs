@@ -10,6 +10,8 @@
 //! neutral items with their designations; the wire layer of each version
 //! renders the `ValueSet` resource with its `expansion`.
 
+mod echo;
+
 use std::collections::BTreeSet;
 
 use super::{OperationError, Sources};
@@ -173,7 +175,7 @@ pub fn expand(
     } else {
         &input.property
     };
-    let contains = contains(sources, &expansion, input, asked)?;
+    let contains = contains(sources, &expansion, &model.compose, input, asked)?;
     let properties = expansion_properties(sources, &contains)?;
     // The message says what is wrong; the conversion error adds nothing to it.
     let Ok(offset) = u64::try_from(expansion.offset) else {
@@ -454,15 +456,17 @@ fn parameters(
 fn contains(
     sources: &Sources<'_>,
     expansion: &Expansion,
+    compose: &Compose,
     input: &ExpandInput,
     property: &[String],
 ) -> Result<Vec<Contains>, OperationError> {
+    let definitions = property.iter().any(|p| p == "definition" || p == "*");
     let include_designations = input.include_designations.unwrap_or(false);
     let wanted: Vec<&str> = input.designation.iter().map(String::as_str).collect();
     let mut out: Vec<(usize, Contains)> = Vec::with_capacity(expansion.items.len());
     for item in &expansion.items {
         let designations = if include_designations {
-            designations_of(sources, item, &wanted)?
+            echo::mark_inactive(designations_of(sources, item, &wanted)?)
         } else {
             Vec::new()
         };
@@ -499,6 +503,7 @@ fn contains(
                 inactive: item.inactive,
                 designations,
                 properties,
+                echoes: echo::echoes_of(sources, compose, item, definitions)?,
                 contains: Vec::new(),
             },
         ));

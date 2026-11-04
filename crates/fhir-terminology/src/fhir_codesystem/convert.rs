@@ -213,6 +213,11 @@ macro_rules! convert_code_system {
                         standards_status: standards_status(&concept.extension),
                         properties,
                         parents,
+                        echoes: crate::provider::compose::Echoes::read(
+                            crate::provider::compose::Origin::CodeSystem,
+                            concept.extension.iter().map(|x| crate::provider::compose::stated!($module, x)),
+                            concept.display.iter().flat_map(|d| &d.extension).map(|x| crate::provider::compose::stated!($module, x)),
+                        ),
                     });
                     flatten(&concept.concept, Some(&code), out)?;
                 }

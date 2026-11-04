@@ -125,6 +125,11 @@ macro_rules! convert_value_set {
                                     _ => false,
                                 }
                             }),
+                            echoes: crate::provider::compose::Echoes::read(
+                                crate::provider::compose::Origin::ValueSet,
+                                c.extension.iter().map(|x| crate::provider::compose::stated!($module, x)),
+                                c.display.iter().flat_map(|d| &d.extension).map(|x| crate::provider::compose::stated!($module, x)),
+                            ),
                         })
                         .collect(),
                     filters,

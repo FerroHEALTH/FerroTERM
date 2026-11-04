@@ -3,7 +3,7 @@
 [package]
 name = "concept-store"
 description = "The disk-backed columnar concept and description store"
-version = "0.1.141"
+version = "0.1.142"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

@@ -354,16 +354,18 @@ its own issue, a server fix or the specification text that decides it:
   `/r5`, where `ValueSet.compose.property` exists. `extensions-echo-all`,
   `extensions-echo-enumerated`, `parameters-expand-supplement-good`,
   `-supplement-none`, `-enum-definitions3` and `deprecated/vs-deprecation`
-  stay unpassed on two grounds. Part of what they want is the echo the IG's
-  §Extensions list asks for ("echo in value set if defined in code system or
-  value set" for `itemWeight`, `rendering-*`, `valueset-label` and
-  `valueset-conceptOrder`, and the `standards-status` rule for an inactive
-  designation), which `$expand` does not do yet (#1106). The rest goes beyond
-  the published definitions: `label`, `order` and `weight` as concept
-  properties, where `concept-properties` (HL7 Terminology 7.3.0) defines no
-  `label` or `order`, and `valueset-deprecated` and `standards-status` on
-  `expansion.contains`, which neither extension's context admits (FHIR
-  Extensions Pack 5.4.0). #1107 holds that upstream report.
+  stay unpassed. `$expand` echoes the extensions the IG's §Extensions list
+  asks for where their contexts admit an expansion element (FHIR Extensions
+  Pack 5.4.0): `rendering-style`, `valueset-label`, `valueset-conceptOrder`
+  and, when definitions are asked, `valueset-concept-definition` on
+  `contains`, and `rendering-xhtml` on `contains.display`. An inactive
+  designation takes the SNOMED CT inactive use code (#1106). What the cases
+  want beyond that goes past the published definitions: `label`, `order` and
+  `weight` as concept properties, where `concept-properties` (HL7 Terminology
+  7.3.0) defines no `label` or `order`; `valueset-deprecated` on `contains`
+  and `standards-status` on `contains.designation`, which neither
+  extension's context admits; and the label and order as concept properties
+  in place of the extensions the IG lists. #1107 holds that upstream report.
 - **`extensions/validate-supplement-nolang-*` and
   `validate-supplements-grandchild-wrong-display`** send `useSupplement` on
   `CodeSystem/$validate-code`, which no version declares (#1068).

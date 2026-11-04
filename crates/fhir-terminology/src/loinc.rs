@@ -433,9 +433,8 @@ impl StoredSystem for Loinc {
                         concepts: concepts
                             .into_iter()
                             .map(|code| ConceptRef {
-                                deprecated: false,
                                 code,
-                                display: None,
+                                ..ConceptRef::default()
                             })
                             .collect(),
                         ..Include::default()

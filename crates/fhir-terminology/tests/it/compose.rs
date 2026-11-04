@@ -6,7 +6,7 @@
 
 use fhir_terminology::compose::{ComposeError, Expander, Expansion, Options, ValueSetResolver};
 use fhir_terminology::provider::ProviderError;
-use fhir_terminology::provider::compose::{Compose, ConceptRef, Include, SystemRef};
+use fhir_terminology::provider::compose::{Compose, ConceptRef, Echoes, Include, SystemRef};
 use fhir_terminology::provider::filter::{Filter, FilterOperator};
 use fhir_terminology::registry::ResolveError;
 
@@ -34,6 +34,7 @@ fn concepts(codes: &[&str]) -> Vec<ConceptRef> {
             deprecated: false,
             code: (*code).to_owned(),
             display: None,
+            echoes: Echoes::default(),
         })
         .collect()
 }
@@ -241,6 +242,7 @@ fn order_follows_the_compose_and_displays_can_be_overridden() {
                     deprecated: false,
                     code: String::from("cat"),
                     display: Some(String::from("Tabby")),
+                    echoes: Echoes::default(),
                 }],
                 ..Include::default()
             },
