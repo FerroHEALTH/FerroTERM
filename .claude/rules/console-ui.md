@@ -183,7 +183,7 @@ versioned assets are cached for a year, and no answer is compressed.
 - The journeys wait for FerroUI's loader mark, `html[data-fui-script]`,
   and for every element that asks for a module to carry `data-fui-ready`
   before they act, and a press waits for the new document it loads
-  (`e2e/tests/it/harness.rs`). `Journey::open_without_scripts` refuses the
+  (`e2e/tests/it/harness/`). `Journey::open_without_scripts` refuses the
   browser every module: `no_script` holds every page to its content, its
   links and its forms, `navigation` the tree's in-place folds over a
   reload, and `reflow` every screen at 320 px with the modules loaded and
