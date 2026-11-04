@@ -431,6 +431,8 @@ pub enum MessageId {
     UnknownCodeSystemVersionExp,
     /// A code system version is unknown.
     UnknownCodeSystemVersion,
+    /// A code system version is unknown, and so is every version of the system.
+    UnknownCodeSystemVersionNone,
     /// A code system is unknown.
     UnknownCodeSystem,
     /// The versionless include's default version differs from the coding's.
@@ -508,6 +510,7 @@ impl MessageId {
             Self::UnableToResolveValueSet => "Unable_to_resolve_value_Set_",
             Self::UnknownCodeSystemVersionExp => "UNKNOWN_CODESYSTEM_VERSION_EXP",
             Self::UnknownCodeSystemVersion => "UNKNOWN_CODESYSTEM_VERSION",
+            Self::UnknownCodeSystemVersionNone => "UNKNOWN_CODESYSTEM_VERSION_NONE",
             Self::UnknownCodeSystem => "UNKNOWN_CODESYSTEM",
             Self::ValueSetValueMismatchDefault => "VALUESET_VALUE_MISMATCH_DEFAULT",
             Self::ValueSetValueMismatchChanged => "VALUESET_VALUE_MISMATCH_CHANGED",
@@ -602,6 +605,30 @@ pub fn unknown_system(
             kind: "not-found",
             message,
             text,
+            expression,
+        },
+    )
+}
+
+/// A coding that names a version of a system the server serves no version of:
+/// the `not-found` issue names the version asked for, and the canonical the
+/// answer reports unknown is the system's.
+#[must_use]
+pub fn unknown_system_version_none(
+    url: &str,
+    version: &str,
+    expression: Option<String>,
+) -> (String, Issue) {
+    (
+        url.to_owned(),
+        Issue {
+            severity: "error",
+            code: "not-found",
+            kind: "not-found",
+            message: MessageId::UnknownCodeSystemVersionNone,
+            text: format!(
+                "A definition for CodeSystem '{url}' version '{version}' could not be found, so the code cannot be validated. No version of this code system is served"
+            ),
             expression,
         },
     )

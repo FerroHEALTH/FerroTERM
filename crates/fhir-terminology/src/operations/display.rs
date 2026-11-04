@@ -374,11 +374,22 @@ pub fn case_note(
         kind: "code-rule",
         message: super::MessageId::CodeCaseDifference,
         text: format!(
-            "The code '{given}' differs from the correct code '{located}' by case. Although the code system '{}' is case insensitive, implementers are strongly encouraged to use the correct case anyway",
-            provider.identity().url
+            "The code '{given}' differs from the correct code '{located}' by case. Although the code system {} is case insensitive, implementers are strongly encouraged to use the correct case anyway",
+            named_system(provider.as_ref())
         ),
         expression,
     })
+}
+
+/// The code system as a message names it: its URL, quoted, and its version
+/// when it states one.
+fn named_system(provider: &dyn CodeSystemProvider) -> String {
+    let identity = provider.identity();
+    if identity.version.is_empty() {
+        format!("'{}'", identity.url)
+    } else {
+        format!("'{}' version '{}'", identity.url, identity.version)
+    }
 }
 
 /// The `invalid-code` message and text for a code the system does not have.

@@ -348,15 +348,13 @@ pub(super) fn unserved_subject(
     if let Some(supplement_version) = registry.supplement_named(system) {
         return supplement_as_system(system, supplement_version.version.as_deref(), subject);
     }
-    let version = subject
-        .version
-        .filter(|_| registry.resolve(system, None).is_ok());
-    let (canonical, not_found) = super::super::unknown_system(
-        system,
-        version,
-        super::super::at(subject.expression, "system"),
-        valid,
-    );
+    let served = registry.resolve(system, None).is_ok();
+    let version = subject.version.filter(|_| served);
+    let at = super::super::at(subject.expression, "system");
+    let (canonical, not_found) = match subject.version {
+        Some(asked) if !served => super::super::unknown_system_version_none(system, asked, at),
+        _ => super::super::unknown_system(system, version, at, valid),
+    };
     let referenced = model
         .compose
         .include
