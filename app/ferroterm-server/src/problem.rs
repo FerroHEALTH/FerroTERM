@@ -29,7 +29,7 @@ pub enum Kind {
 static REGISTRY: LazyLock<Registry<Kind>> = LazyLock::new(Registry::new);
 
 impl ferroterm_problem::Kind for Kind {
-    const ALL: &'static [Self] = &[Self::ReloadFailed];
+    const ALL: &[Self] = &[Self::ReloadFailed];
 
     fn definition(self) -> (&'static str, &'static str, StatusCode) {
         match self {

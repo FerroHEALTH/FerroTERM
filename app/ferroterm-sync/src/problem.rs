@@ -25,7 +25,7 @@ pub enum Kind {
 static REGISTRY: LazyLock<Registry<Kind>> = LazyLock::new(Registry::new);
 
 impl ferroterm_problem::Kind for Kind {
-    const ALL: &'static [Self] = &[Self::RunNotFound, Self::RecordsUnreadable];
+    const ALL: &[Self] = &[Self::RunNotFound, Self::RecordsUnreadable];
 
     fn definition(self) -> (&'static str, &'static str, StatusCode) {
         match self {

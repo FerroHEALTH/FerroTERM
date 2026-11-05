@@ -6,7 +6,14 @@
 use ferrohealth_secret::secret::Secret;
 use ferrohealth_session::record::SignedIn;
 
-use super::*;
+use http::StatusCode;
+
+use crate::fhir::FhirClient;
+use crate::fhir::concept::LookupRequest;
+use crate::fhir::error::FhirError;
+use crate::fhir::translate::TranslateRequest;
+use crate::fhir::validation::{self, SubsumesRequest, ValidateRequest};
+use crate::fhir::version::FhirVersion;
 
 /// The root readers reach the server at, which every address is built on.
 const ROOT: &str = "https://tx.example.org";

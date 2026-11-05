@@ -26,7 +26,7 @@ pub const BASE: &str = "https://ferroterm.eu/docs/operate/problems.html#";
 /// The problem types of one service, each defined once under [`BASE`].
 pub trait Kind: Copy + Ord + fmt::Debug + Send + Sync + 'static {
     /// Every kind, in the order the book lists them.
-    const ALL: &'static [Self];
+    const ALL: &[Self];
 
     /// The slug, the fragment of the type under [`BASE`], its title and its
     /// status.
@@ -123,7 +123,7 @@ pub enum Access {
 static ACCESS: LazyLock<Registry<Access>> = LazyLock::new(Registry::new);
 
 impl Kind for Access {
-    const ALL: &'static [Self] = &[
+    const ALL: &[Self] = &[
         Self::Unauthenticated,
         Self::NotPermitted,
         Self::AuthorizationUnavailable,
