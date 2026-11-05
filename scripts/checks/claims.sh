@@ -21,7 +21,8 @@ cd "$(dirname "$0")/../.."
 # letter, a colon and a digit, so an address such as 127.0.0.1:8080 is no
 # citation.
 line_citations() {
-  grep -nE '[A-Za-z0-9_./-]+\.[A-Za-z][A-Za-z0-9]*:[0-9]+' "$1" || true
+  local doc="$1"
+  grep -nE '[A-Za-z0-9_./-]+\.[A-Za-z][A-Za-z0-9]*:[0-9]+' "$doc" || true
 }
 
 # Every citation of $1 that does not resolve, one error line each.

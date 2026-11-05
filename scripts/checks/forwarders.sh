@@ -73,28 +73,32 @@ detect() {
 # The keys the baseline file $1 carries, one per line, without its comments
 # and reasons.
 carried_keys() {
-  [[ -f "$1" ]] || return 0
-  awk -F'\t' '/^[[:space:]]*(#|$)/ { next } { print $1 }' "$1"
+  local baseline_file="$1"
+  [[ -f "$baseline_file" ]] || return 0
+  awk -F'\t' '/^[[:space:]]*(#|$)/ { next } { print $1 }' "$baseline_file"
 }
 
 # Each forwarder of the listing $1 as it reads, with NEW in front of one whose
 # key the baseline file $2 does not carry. A key that stands twice in the
 # listing needs two lines in the baseline.
 marked() {
-  [[ -n "$1" ]] || return 0
+  local listing="$1" baseline_file="$2"
+  [[ -n "$listing" ]] || return 0
   awk -F'\t' '
     FILENAME == ARGV[1] { carried[$0]++; next }
     { if (carried[$1] > 0) { carried[$1]--; print $1 " (" $2 ")" } else { print "NEW " $1 " (" $2 ")" } }
-  ' <(carried_keys "$2") - <<<"$1"
+  ' <(carried_keys "$baseline_file") - <<<"$listing"
 }
 
 # The committed count in the file $1, or nothing when it holds none.
 committed_count() {
-  [[ -f "$1" ]] || return 0
-  awk '/^[[:space:]]*(#|$)/ { next } { print; exit }' "$1" | tr -d '[:space:]'
+  local count_path="$1"
+  [[ -f "$count_path" ]] || return 0
+  awk '/^[[:space:]]*(#|$)/ { next } { print; exit }' "$count_path" | tr -d '[:space:]'
 }
 
 write_count() {
+  local count_path="$1" count="$2"
   {
     # REUSE-IgnoreStart
     printf '# SPDX-FileCopyrightText: Cadasto B.V.\n'
@@ -104,15 +108,16 @@ write_count() {
     printf '# app/*/src/, crates/*/src/ and tools/*/src/. It may fall and never rise;\n'
     printf '# --update writes a lower one, and a higher one is a hand edit that says\n'
     printf '# why.\n'
-    printf '%s\n' "$2"
-  } >"$1"
+    printf '%s\n' "$count"
+  } >"$count_path"
 }
 
 # Writes the keys of the listing $2 to the baseline $1, each with the reason
 # the old baseline gave it, if any.
 write_baseline() {
+  local baseline_file="$1" listing="$2"
   local reasons
-  reasons="$(awk -F'\t' '/^[[:space:]]*(#|$)/ { next } NF > 1 { print }' "$1" 2>/dev/null || true)"
+  reasons="$(awk -F'\t' '/^[[:space:]]*(#|$)/ { next } NF > 1 { print }' "$baseline_file" 2>/dev/null || true)"
   {
     # REUSE-IgnoreStart
     printf '# SPDX-FileCopyrightText: Cadasto B.V.\n'
@@ -121,22 +126,23 @@ write_baseline() {
     printf '# The key of every forwarder scripts/checks/forwarders.sh counts, written\n'
     printf '# by --update: the path, the owner and the call it makes. A tab and a\n'
     printf '# reason after a key record why that forwarder stays.\n'
-    if [[ -n "$2" ]]; then
-      cut -f1 <<<"$2" | sort | awk -F'\t' '
+    if [[ -n "$listing" ]]; then
+      cut -f1 <<<"$listing" | sort | awk -F'\t' '
         FILENAME == ARGV[1] { reason[$1] = $2; next }
         { if ($0 in reason) { print $0 "\t" reason[$0] } else { print } }
       ' <(printf '%s\n' "$reasons") -
     fi
-  } >"$1.new"
-  mv "$1.new" "$1"
+  } >"$baseline_file.new"
+  mv "$baseline_file.new" "$baseline_file"
 }
 
 # Prints each line of $1 two spaces in, without its NEW mark.
 indented() {
+  local listing="$1"
   local line
   while IFS= read -r line; do
     printf '  %s\n' "${line#NEW }"
-  done <<<"$1"
+  done <<<"$listing"
 }
 
 # Measures the tree $1 against the count file $2 and the baseline $3. With
@@ -238,8 +244,9 @@ self_test() {
     exit 1
   }
   run() {
+    local mode="$1"
     local status=0
-    ratchet "$tree" "$count_file" "$baseline" "$1" >"$work/answer" 2>&1 || status=$?
+    ratchet "$tree" "$count_file" "$baseline" "$mode" >"$work/answer" 2>&1 || status=$?
     printf '%s\n' "$status"
   }
 

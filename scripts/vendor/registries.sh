@@ -24,7 +24,8 @@ mkdir -p "$data/iana/media-types" "$data/cldr"
 # The pin of the docs/VERSIONS.md row named $1: the first word of its second
 # cell. CLDR_REF and UCUM_REF override them for a one-off fetch.
 pin() {
-  awk -F'|' -v want="$1" '{ label = $2; gsub(/^[[:space:]]+|[[:space:]]+$/, "", label) }
+  local wanted_label="$1"
+  awk -F'|' -v want="$wanted_label" '{ label = $2; gsub(/^[[:space:]]+|[[:space:]]+$/, "", label) }
     label == want { v = $3; gsub(/^[[:space:]]+/, "", v); split(v, w, /[[:space:]]/); print w[1]; exit }' docs/VERSIONS.md
 }
 CLDR_REF=${CLDR_REF:-$(pin 'Unicode CLDR')}

@@ -75,12 +75,14 @@ repo_relative() {
 
 # True when the repository path $1 is a file the budget measures.
 in_scope() {
-  [[ "$1" =~ $SCOPE ]]
+  local path="$1"
+  [[ "$path" =~ $SCOPE ]]
 }
 
 # True when the file $1 opens with the generated banner.
 generated() {
-  [[ "$(head -n 1 "$1" 2>/dev/null)" == '// @generated'* ]]
+  local path="$1"
+  [[ "$(head -n 1 "$path" 2>/dev/null)" == '// @generated'* ]]
 }
 
 # The length of the file $1 in lines, as wc -l counts them.
@@ -130,9 +132,10 @@ measured_of() {
 # sorted: FIT, UNLISTED, GREW, HELD, SHRANK, UNDER or GONE, then the path,
 # the length measured and the length listed.
 verdicts() {
+  local entries="$1" measure="$2"
   {
-    awk 'NF == 2 { print "L", $0 }' <<<"$1"
-    awk 'NF == 2 { print "M", $0 }' <<<"$2"
+    awk 'NF == 2 { print "L", $0 }' <<<"$entries"
+    awk 'NF == 2 { print "M", $0 }' <<<"$measure"
   } | awk -v budget="$BUDGET" '
     $1 == "L" { listed[$2] = $3; next }
     $1 == "M" { measured[$2] = $3; next }
@@ -159,6 +162,7 @@ verdicts() {
 }
 
 write_list() {
+  local list_file="$1" entries="$2"
   {
     # REUSE-IgnoreStart
     printf '# SPDX-FileCopyrightText: Cadasto B.V.\n'
@@ -169,10 +173,10 @@ write_list() {
     printf '# scripts/checks/file-size.sh admits, each with the length it may not\n'
     printf '# pass. An entry may fall and never rise; --update lowers and removes\n'
     printf '# entries.\n'
-    if [[ -n "$2" ]]; then
-      printf '%s\n' "$2"
+    if [[ -n "$entries" ]]; then
+      printf '%s\n' "$entries"
     fi
-  } >"$1"
+  } >"$list_file"
 }
 
 # Measures the checkout $1 against the list $2. With $3 = update it first
@@ -225,6 +229,7 @@ ratchet() {
       GONE)
         echo "file-size: note: $path: $list lists it with $entry lines and the tree no longer tracks it; the scheduled ratchet-tighten workflow removes the entry"
         ;;
+      *) ;;
     esac
   done <<<"$table"
   if [[ "$status" -eq 0 ]]; then
@@ -278,15 +283,18 @@ self_test() {
   }
   # Writes a Rust file of $2 lines at $1 that rustfmt leaves as it is.
   lines() {
-    awk -v n="$2" 'BEGIN { for (i = 1; i <= n; i++) printf "pub fn f%d() {}\n", i }' >"$1"
+    local path="$1" count="$2"
+    awk -v n="$count" 'BEGIN { for (i = 1; i <= n; i++) printf "pub fn f%d() {}\n", i }' >"$path"
   }
   run() {
+    local mode="$1"
     status=0
-    ratchet "$tree" "$list" "$1" >"$work/answer" 2>&1 || status=$?
+    ratchet "$tree" "$list" "$mode" >"$work/answer" 2>&1 || status=$?
     printf '%s\n' "$status"
   }
   entry() {
-    awk -v path="$1" '$1 == path { print $2 }' "$list"
+    local path="$1"
+    awk -v path="$path" '$1 == path { print $2 }' "$list"
   }
 
   lines "$tree/app/demo/src/big.rs" 900
