@@ -42,7 +42,7 @@ pub trait Kind: Copy + Ord + fmt::Debug + Send + Sync + 'static {
 
     /// A problem of this kind with `detail`.
     fn problem(self, detail: impl Into<String>) -> Problem {
-        self.problem_type().problem().with_detail(detail)
+        Problem::of(self.problem_type()).with_detail(detail)
     }
 }
 
