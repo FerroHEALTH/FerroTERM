@@ -228,7 +228,8 @@ The keys of `[auth]`, in the configuration file or as
 | `realm` | The realm every challenge names. | `fhir.base_url`, else `FerroTERM` |
 | `scopes_supported` | The scopes the discovery document lists. List only scopes the server honours: "the server SHALL support all scopes listed here". | none (the member is omitted) |
 | `capabilities` | SMART capabilities the discovery document adds to the ones it derives. | none |
-| `scopeless_subjects` | The exact `sub` values granted every write without a scope. | none |
+| `scopeless_subjects` | The exact `sub` values granted every write without a scope. Beside several issuers each entry is written `<issuer>#<sub>`, the issuer exactly as its `[[auth.issuer]]` entry names it, and admits that issuer's tokens alone, since a `sub` is unique only within its issuer (RFC 7519 §4.1.2); a bare entry, or one naming an issuer the section does not trust, refuses the start. | none |
+| `role_claims` | The claims a token's roles are read from, each a dotted path. The server grants nothing by role, so the roles a token carries change no answer. Beside several issuers each entry is written `<issuer>#<path>` and a bare one refuses the start, the default included: set `role_claims = []` there. | `roles`, `groups`, `entitlements` |
 | `[[auth.basic.users]]` | HTTP Basic users (RFC 7617) for machine callers: `user`, `password_hash` or `password_hash_file` (an Argon2id PHC string), and `scopes`, which decide what the user reaches as a token's scopes would. | none (no Basic) |
 | `[auth.basic] cache_ttl_seconds` | How long a Basic credential that verified is kept, so a repeat request skips the Argon2id key derivation. `0` verifies every request. | `300` |
 

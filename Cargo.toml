@@ -72,9 +72,9 @@ toml = { version = "1.1.6", default-features = false, features = ["std", "parse"
 # The FerroHEALTH SMART and OAuth 2.0 resource-server crate: the token check,
 # the SMART scopes, the Basic users and the client credentials token of the
 # server and the sync service. Pinned exactly, as every family crate is.
-# 0.8.8 adds `client::Reach`, which ferrohealth-session 0.2 builds on.
-# Verified against crates.io on 2026-10-28.
-ferrohealth-smart = { version = "=0.8.8", features = ["axum"] }
+# 0.8.9 holds `scopeless_subjects` and `role_claims` per issuer
+# (GHSA-pfgx-xq28-2629). Verified against crates.io on 2026-11-05.
+ferrohealth-smart = { version = "=0.8.9", features = ["axum"] }
 # The FerroHEALTH console sign-in and session: the authorization code flow
 # with PKCE over ferrohealth-smart's relying party, the session store with
 # its idle and absolute lifetimes, and the four sign-in routes. Pinned
