@@ -38,10 +38,10 @@ usage() {
 base=""
 all=false
 dry=false
-while [ $# -gt 0 ]; do
+while [[ $# -gt 0 ]]; do
   case "$1" in
     --base)
-      [ $# -ge 2 ] || usage
+      [[ $# -ge 2 ]] || usage
       base="$2"
       shift 2
       ;;
@@ -70,8 +70,8 @@ packages_and_dirs="$(jq -r --arg root "$root/" '
   | @tsv
 ' <<<"$metadata")"
 
-if [ "$all" = false ]; then
-  if [ -z "$base" ]; then
+if [[ "$all" = false ]]; then
+  if [[ -z "$base" ]]; then
     base="$(git merge-base origin/main HEAD)" || {
       echo "fast: no merge base with origin/main; fetch it or pass --base <rev>" >&2
       exit 1
@@ -83,12 +83,12 @@ if [ "$all" = false ]; then
   } | sort -u)"
   touched=""
   while IFS= read -r file; do
-    [ -n "$file" ] || continue
+    [[ -n "$file" ]] || continue
     owner="$(awk -F'\t' -v file="$file" '
       index(file, $2 "/") == 1 && length($2) > best { best = length($2); name = $1 }
       END { print name }
     ' <<<"$packages_and_dirs")"
-    if [ -n "$owner" ]; then
+    if [[ -n "$owner" ]]; then
       touched="$touched $owner"
       continue
     fi
@@ -102,7 +102,7 @@ if [ "$all" = false ]; then
   done <<<"$changed"
 fi
 
-if [ "$all" = true ]; then
+if [[ "$all" = true ]]; then
   reached="$(cut -f1 <<<"$packages_and_dirs" | sort -u | tr '\n' ' ')"
 else
   # The touched packages and every workspace package that depends on one, to
@@ -121,7 +121,7 @@ else
   ' <<<"$metadata")"
 fi
 
-if [ -z "${reached// /}" ]; then
+if [[ -z "${reached// /}" ]]; then
   echo "fast: the change reaches no package; nothing to run"
   exit 0
 fi
@@ -129,7 +129,7 @@ echo "fast: reached: $reached"
 
 run() {
   echo "+ $*"
-  if [ "$dry" = false ]; then
+  if [[ "$dry" = false ]]; then
     "$@"
   fi
 }
@@ -151,7 +151,7 @@ docs=()
 for package in $reached; do
   case "$libraries" in *" $package "*) docs+=(-p "$package") ;; esac
 done
-if [ "${#docs[@]}" -gt 0 ]; then
+if [[ "${#docs[@]}" -gt 0 ]]; then
   run cargo test --doc --locked "${docs[@]}"
 fi
 # The fuzz crate sits outside the workspace (fuzz/Cargo.toml), so the steps
@@ -167,7 +167,7 @@ for package in $reached; do
       ;;
   esac
 done
-if [ "$dry" = true ]; then
+if [[ "$dry" = true ]]; then
   echo "fast: dry run, nothing ran"
 else
   echo "fast: every step passed"

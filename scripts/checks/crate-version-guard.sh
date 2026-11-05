@@ -48,12 +48,13 @@ self_test() {
   }
   # case NAME EXPECTED: commits the working tree and runs the guard on it.
   case_() {
+    local name="$1" want_rc="$2"
     git -C "$dir/repo" add -A
     git -C "$dir/repo" -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit -qm head
     rc=0
     "$dir/repo/scripts/checks/crate-version-guard.sh" HEAD~1 HEAD >/dev/null 2>&1 || rc=$?
-    if [[ "$rc" -ne "$2" ]]; then
-      echo "self-test: case '$1' exited $rc, expected $2" >&2
+    if [[ "$rc" -ne "$want_rc" ]]; then
+      echo "self-test: case '$name' exited $rc, expected $want_rc" >&2
       exit 1
     fi
   }

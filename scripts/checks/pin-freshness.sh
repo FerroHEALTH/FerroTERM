@@ -62,7 +62,8 @@ readonly CHROME_FEED=https://googlechromelabs.github.io/chrome-for-testing/last-
 # The second cell of the matrix row whose first cell is $1, both with their
 # backticks stripped.
 matrix_cell() {
-  awk -F'|' -v want="$1" '
+  local wanted_label="$1"
+  awk -F'|' -v want="$wanted_label" '
     NF >= 3 {
       label = $2; value = $3
       gsub(/`/, "", label); gsub(/^[ \t]+|[ \t]+$/, "", label)
@@ -117,9 +118,9 @@ unreadable=0
 # read from SOURCE, with the reason HELD gives for keeping it behind.
 report() {
   local label=$1 pinned=$2 latest=$3 source=$4 held=$5
-  if [ "$pinned" = "$latest" ]; then
+  if [[ "$pinned" = "$latest" ]]; then
     printf 'current    %s %s (%s)\n' "$label" "$pinned" "$source"
-  elif [ -n "$held" ]; then
+  elif [[ -n "$held" ]]; then
     printf 'HELD       %s: pinned %s, newest upstream %s, held: %s (%s)\n' "$label" "$pinned" "$latest" "$held" "$source"
   else
     printf 'STALE      %s: pinned %s, newest upstream %s (%s)\n' "$label" "$pinned" "$latest" "$source"
@@ -135,8 +136,9 @@ unreadable_pin() {
 self_test() {
   local failures=0 got
   expect() {
-    if [ "$2" != "$1" ]; then
-      printf 'pin-freshness: self-test: %s gave "%s", wanted "%s"\n' "$3" "$2" "$1" >&2
+    local wanted="$1" got="$2" what="$3"
+    if [[ "$got" != "$wanted" ]]; then
+      printf 'pin-freshness: self-test: %s gave "%s", wanted "%s"\n' "$what" "$got" "$wanted" >&2
       failures=$((failures + 1))
     fi
   }
@@ -163,15 +165,15 @@ self_test() {
     *) expect "a four-part version" "$got" "the Chrome for Testing row of $MATRIX" ;;
   esac
   for label in "$SUITE_LABEL" "$R6_LABEL"; do
-    [ -n "$(matrix_cell "$label")" ] || expect "a row" "" "the $label row of $MATRIX"
+    [[ -n "$(matrix_cell "$label")" ]] || expect "a row" "" "the $label row of $MATRIX"
   done
   while IFS=$'\t' read -r label _; do
-    [ -n "$(matrix_cell "$label")" ] || expect "a row" "" "the $label row of $MATRIX"
+    [[ -n "$(matrix_cell "$label")" ]] || expect "a row" "" "the $label row of $MATRIX"
   done <<< "$WATCHED_COMMITS"
   while IFS=$'\t' read -r label _; do
-    [ -n "$(matrix_cell "$label")" ] || expect "a row" "" "the $label row of $MATRIX"
+    [[ -n "$(matrix_cell "$label")" ]] || expect "a row" "" "the $label row of $MATRIX"
   done <<< "$WATCHED_RELEASES"
-  if [ "$failures" -gt 0 ]; then
+  if [[ "$failures" -gt 0 ]]; then
     echo "pin-freshness: self-test: $failures check(s) failed" >&2
     exit 1
   fi
@@ -191,10 +193,10 @@ case "${1:-}" in
 esac
 
 while IFS=$'\t' read -r label repo; do
-  [ -n "$label" ] || continue
+  [[ -n "$label" ]] || continue
   cell="$(matrix_cell "$label")"
   pinned="$(cell_version <<< "$cell")"
-  if [ -z "$pinned" ]; then
+  if [[ -z "$pinned" ]]; then
     unreadable_pin "$label" "no pin row in $MATRIX"
     continue
   fi
@@ -206,10 +208,10 @@ while IFS=$'\t' read -r label repo; do
 done <<< "$WATCHED_RELEASES"
 
 while IFS=$'\t' read -r label repo branch; do
-  [ -n "$label" ] || continue
+  [[ -n "$label" ]] || continue
   cell="$(matrix_cell "$label")"
   pinned="$(cell_commit <<< "$cell" || true)"
-  if [ -z "$pinned" ]; then
+  if [[ -z "$pinned" ]]; then
     unreadable_pin "$label" "no commit pin in $MATRIX"
     continue
   fi
@@ -222,7 +224,7 @@ done <<< "$WATCHED_COMMITS"
 
 cell="$(matrix_cell "$SUITE_LABEL")"
 pinned="$(cell_suite_version <<< "$cell")"
-if [ -z "$pinned" ]; then
+if [[ -z "$pinned" ]]; then
   unreadable_pin "$SUITE_LABEL" "no (test cases X) version in $MATRIX"
 elif ! latest="$(curl --proto '=https' --tlsv1.2 -fsSL "$SUITE_PACKAGE" | registry_latest 2>&1)"; then
   unreadable_pin "$SUITE_LABEL" "could not read the latest version at $SUITE_PACKAGE ($latest)"
@@ -232,7 +234,7 @@ fi
 
 cell="$(matrix_cell "$R6_LABEL")"
 pinned="$(cell_version <<< "$cell")"
-if [ -z "$pinned" ]; then
+if [[ -z "$pinned" ]]; then
   unreadable_pin "$R6_LABEL" "no pin row in $MATRIX"
 elif ! latest="$(curl --proto '=https' --tlsv1.2 -fsSL "$R6_PACKAGE" | registry_latest 2>&1)"; then
   unreadable_pin "$R6_LABEL" "could not read the latest version at $R6_PACKAGE ($latest)"
@@ -242,7 +244,7 @@ fi
 
 cell="$(matrix_cell "$CHROME_LABEL")"
 pinned="$(cell_version <<< "$cell")"
-if [ -z "$pinned" ]; then
+if [[ -z "$pinned" ]]; then
   unreadable_pin "$CHROME_LABEL" "no pin row in $MATRIX"
 elif ! latest="$(curl --proto '=https' --tlsv1.2 -fsSL "$CHROME_FEED" | chrome_stable 2>&1)"; then
   unreadable_pin "$CHROME_LABEL" "could not read the newest Stable release from $CHROME_FEED ($latest)"
@@ -250,5 +252,5 @@ else
   report "$CHROME_LABEL" "$pinned" "$latest" "$CHROME_FEED" "$(cell_held <<< "$cell")"
 fi
 
-[ "$unreadable" -eq 0 ] || exit 2
+[[ "$unreadable" -eq 0 ]] || exit 2
 exit "$stale"

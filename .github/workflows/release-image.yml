@@ -140,6 +140,7 @@ jobs:
             case "$arch" in
               amd64) target=x86_64-unknown-linux-musl ;;
               arm64) target=aarch64-unknown-linux-musl ;;
+              *) echo "::error::no Rust target for ${arch}"; exit 1 ;;
             esac
             tarball="tarballs/${arch}/ferroterm-${TAG}-${target}.tar.gz"
             gh attestation verify "$tarball" \

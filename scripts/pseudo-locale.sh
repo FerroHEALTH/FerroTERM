@@ -95,10 +95,11 @@ EOF
   pseudo "$scratch/en.ftl" "$scratch/out.ftl"
   # expect NAME WANT_LINE
   expect() {
-    if grep -qxF -- "$2" "$scratch/out.ftl"; then
-      echo "ok: $1"
+    local what="$1" line="$2"
+    if grep -qxF -- "$line" "$scratch/out.ftl"; then
+      echo "ok: $what"
     else
-      echo "FAIL: $1: no line '$2' in:" >&2
+      echo "FAIL: $what: no line '$line' in:" >&2
       cat "$scratch/out.ftl" >&2
       fails=$((fails + 1))
     fi

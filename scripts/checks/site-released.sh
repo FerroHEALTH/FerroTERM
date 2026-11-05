@@ -111,8 +111,9 @@ self_test() {
   # by tag; a missing key is a release that does not exist.
   # shellcheck disable=SC2329 # the functions under test call it in place of gh
   gh() {
-    if [[ "$1 $2" == "release view" && "$4 $5" == "--repo o/r" ]]; then
-      jq -e --arg t "$3" '.[$t] // empty' <<<"$STUB_RELEASES" || return 1
+    local cmd="$1" sub="$2" tag="$3" flag="$4" repo="$5"
+    if [[ "$cmd $sub" == "release view" && "$flag $repo" == "--repo o/r" ]]; then
+      jq -e --arg t "$tag" '.[$t] // empty' <<<"$STUB_RELEASES" || return 1
     else
       echo "stub gh: unexpected call: $*" >&2
       return 1
