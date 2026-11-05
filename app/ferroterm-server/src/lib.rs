@@ -230,12 +230,13 @@ where
 /// container's `HEALTHCHECK`.
 pub async fn healthcheck(section: &ServerSection) -> Outcome {
     use ferrohealth_server::healthcheck::{check, check_tls, target};
+    use ferrohealth_server::tls::{HealthcheckTls, TlsKeys};
 
     let address = target(section.listen);
     let base = section.base_path.as_str();
     match &section.tls {
         None => check(address, base, HEALTHCHECK_TIMEOUT).await,
-        Some(tls) => match ferrohealth_server::tls::HealthcheckTls::read(tls) {
+        Some(tls) => match HealthcheckTls::read_of(tls, TlsKeys::SERVER) {
             Ok(pinned) => check_tls(address, base, HEALTHCHECK_TIMEOUT, &pinned).await,
             Err(error) => Outcome::Failed(format!("the TLS files do not read: {error}")),
         },
