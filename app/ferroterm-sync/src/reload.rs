@@ -8,17 +8,16 @@
 //! binds, and answers with the systems it now serves. A reload it refuses
 //! leaves the old set answering, which is what makes a failed run harmless.
 //!
-//! The call carries the credential `[server_admin_credentials]` names: HTTP
-//! Basic (RFC 7617) or an OAuth 2.0 client credentials token (RFC 6749 §4.4)
-//! that `ferrohealth-smart` fetches, caches and renews once on a `401`.
+//! The call carries the credential `[server_admin_credentials.oauth]` names:
+//! an OAuth 2.0 client credentials token (RFC 6749 §4.4) that
+//! `ferrohealth-smart` fetches, caches and renews once on a `401`.
 //!
 //! No FHIR specification governs the call: our own design.
 
 use std::sync::Arc;
 
 use ferrohealth_smart::client::cache::TokenSource;
-use ferrohealth_smart::client::{CallError, RenewalError, TokenError};
-use ferrohealth_smart::config::Outbound;
+use ferrohealth_smart::client::{CallError, ClientCredentials, RenewalError, TokenError};
 use reqwest::header::HeaderValue;
 
 use crate::record::ReloadReply;
@@ -70,8 +69,6 @@ pub enum ReloadError {
 enum Credential {
     /// None: the server authenticates no caller.
     None,
-    /// The `Authorization` value of an HTTP Basic credential.
-    Basic(HeaderValue),
     /// The client credentials token.
     Token(TokenSource),
 }
@@ -96,18 +93,15 @@ impl AdminClient {
         }
     }
 
-    /// This client calling with `outbound`, the credential
-    /// `[server_admin_credentials]` resolved to.
+    /// This client calling under `grant`, the client credentials grant
+    /// `[server_admin_credentials.oauth]` resolved to.
     ///
     /// # Errors
     ///
     /// Returns [`TokenError`] when the client credentials grant cannot build
     /// its token client.
-    pub fn with_credentials(mut self, outbound: Outbound) -> Result<Self, TokenError> {
-        self.credential = match outbound {
-            Outbound::Basic(credential) => Credential::Basic(credential.header_value()),
-            Outbound::Oauth(grant) => Credential::Token(TokenSource::new(*grant)?),
-        };
+    pub fn with_credentials(mut self, grant: ClientCredentials) -> Result<Self, TokenError> {
+        self.credential = Credential::Token(TokenSource::new(grant)?);
         Ok(self)
     }
 
@@ -148,10 +142,6 @@ impl AdminClient {
         };
         let response = match &self.credential {
             Credential::None => self.send(&url, None).await.map_err(request)?,
-            Credential::Basic(value) => self
-                .send(&url, Some(value.clone()))
-                .await
-                .map_err(request)?,
             Credential::Token(source) => source
                 .call(|header| self.send(&url, Some(header)))
                 .await

@@ -35,8 +35,8 @@ async fn introspecting_issuer() -> MockServer {
 /// client secret.
 fn introspecting(issuer: &str) -> SmartSetup {
     let mut setup = SmartSetup::for_issuer(issuer);
-    setup.auth.mode = AuthMode::Introspection;
-    setup.auth.introspection = Some(IntrospectionSection {
+    setup.issuer_mut().mode = AuthMode::Introspection;
+    setup.issuer_mut().introspection = Some(IntrospectionSection {
         client: Some(OauthSection {
             client_id: String::from("ferroterm"),
             client_secret: Some(SecretString::from("a-synthetic-secret")),
@@ -191,7 +191,7 @@ async fn an_issuer_without_an_audience_refuses_the_start() {
     let mock = issuer(&key).await;
     let dir = tempfile::tempdir().expect("tempdir");
     let mut setup = SmartSetup::for_issuer(&mock.uri());
-    setup.auth.audience = Vec::new();
+    setup.issuer_mut().audience = Vec::new();
     setup.base_url = Some(String::from(PROXIED));
     let config = Server::smart_config(dir.path(), setup);
     let error = Smart::start(&config)

@@ -18,7 +18,7 @@ use crate::fixture::{self, Server, SmartSetup};
 async fn proxied(issuer: &str, audience: Option<&str>) -> Server {
     let mut setup = SmartSetup::for_issuer(issuer);
     if let Some(audience) = audience {
-        setup.auth.audience = vec![audience.to_owned()];
+        setup.issuer_mut().audience = vec![audience.to_owned()];
     }
     setup.base_url = Some(String::from(PROXIED));
     Server::start_persisting_with_smart_setup(setup).await

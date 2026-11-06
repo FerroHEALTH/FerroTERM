@@ -98,12 +98,26 @@ identity provider with the authorization code flow and PKCE and keeps the
 session on its own server, behind one cookie the browser cannot read; the
 browser never holds a token. Register the console as a client at the provider
 with the redirect address `https://your-console/auth/callback` and the scopes
-above, and point the terminology server at the same issuer with
-`FERROTERM__AUTH__ISSUER` and the audience the provider puts in the console's
-tokens with `FERROTERM__AUTH__AUDIENCE`
-([Configuration](configuration.md#authentication)), so it accepts the tokens
-the console presents. A provider that types its access tokens `JWT` rather
-than `at+jwt` (RFC 9068) needs `FERROTERM__AUTH__TOKEN_PROFILE=jwt`. A role that
+above, and point the terminology server at the same issuer with an
+`[[auth.issuer]]` table of `kind = "persons"` that lists the console's client
+in `first_party_clients` and names the audience the provider puts in the
+console's tokens ([Configuration](configuration.md#authentication)), so it
+accepts the tokens the console presents on your behalf:
+
+```toml
+[[auth.issuer]]
+issuer = "https://auth.example.org/realms/tx"
+kind = "persons"
+audience = ["https://tx.example.org"]
+first_party_clients = ["ferroterm-console"]
+```
+
+A `persons` issuer also admits a backend client's client credentials token,
+such as the synchronisation service's, when its profile calls the token
+app-only: under the default `rfc9068` profile, a token whose `sub` is its
+`client_id`. A Keycloak realm takes `profile = "keycloak"`, which reads its
+`JWT`-typed tokens and its `azp` client, and lists the subjects of its service
+accounts in `app_only = [{ subjects = ["…"] }]`. A role that
 gets none of the three `user/` scopes reads the server and changes nothing;
 the menu under your name says what you may edit.
 

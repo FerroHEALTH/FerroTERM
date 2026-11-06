@@ -72,14 +72,14 @@ toml = { version = "1.1.6", default-features = false, features = ["std", "parse"
 # The FerroHEALTH SMART and OAuth 2.0 resource-server crate: the token check,
 # the SMART scopes, the Basic users and the client credentials token of the
 # server and the sync service. Pinned exactly, as every family crate is.
-# 0.8.9 holds `scopeless_subjects` and `role_claims` per issuer
-# (GHSA-pfgx-xq28-2629). Verified against crates.io on 2026-11-05.
-ferrohealth-smart = { version = "=0.8.9", features = ["axum"] }
+# 0.9.0 classifies every caller by its issuer's kind and profile and admits
+# a machine by token alone. Verified against crates.io on 2026-11-06.
+ferrohealth-smart = { version = "=0.9.0", features = ["axum"] }
 # The FerroHEALTH console sign-in and session: the authorization code flow
 # with PKCE over ferrohealth-smart's relying party, the session store with
 # its idle and absolute lifetimes, and the four sign-in routes. Pinned
-# exactly. Verified against crates.io on 2026-11-03.
-ferrohealth-session = { version = "=0.2.3", features = ["axum"] }
+# exactly. Verified against crates.io on 2026-11-06.
+ferrohealth-session = { version = "=0.3.0", features = ["axum"] }
 # The FerroHEALTH health family: the readiness document, the indicator
 # registry and the process lifecycle, and the HTTP plumbing whose `health`
 # module serves `/health`, `/health/liveness` and `/health/readiness` over

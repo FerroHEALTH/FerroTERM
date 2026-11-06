@@ -312,7 +312,7 @@ fn base_url_of(value: &str) -> Option<String> {
 mod tests {
     use std::collections::BTreeMap;
 
-    use ferrohealth_smart::config::IssuerKey;
+    use ferrohealth_smart::kind::IssuerKind;
     use ferrohealth_telemetry::section::Format;
 
     use super::{Config, ConfigError, base_url_of};
@@ -427,11 +427,10 @@ mod tests {
 
     #[test]
     fn the_file_holds_the_tree_and_the_environment_goes_over_it() {
-        let text = "[terminology]\nindex = [\"/a\", \"/b\"]\n\n[auth]\nissuer = \"https://as.example.org\"\naudience = [\"ferroterm\"]\n\n[[auth.basic.users]]\nuser = \"sync\"\npassword_hash_file = \"/run/secrets/sync\"\nscopes = [\"__ferroterm.admin\"]\n";
+        let text = "[terminology]\nindex = [\"/a\", \"/b\"]\n\n[[auth.issuer]]\nissuer = \"https://as.example.org\"\nkind = \"machines\"\naudience = [\"ferroterm\"]\n\n[[auth.basic.users]]\nuser = \"operator\"\npassword_hash_file = \"/run/secrets/operator\"\nscopes = [\"__ferroterm.admin\"]\n";
         let config = Config::from_sources(
             Some(text),
             &environment(&[
-                ("FERROTERM__AUTH__AUDIENCE", "a,b"),
                 ("FERROTERM__AUTH__PRODUCT_SCOPE", "__ferroterm.reload"),
                 ("FERROTERM__TELEMETRY__FORMAT", "json"),
                 ("RUST_LOG", "debug"),
@@ -446,15 +445,16 @@ mod tests {
             ]
         );
         let auth = &config.auth;
-        assert!(
-            matches!(&auth.issuer, IssuerKey::Flat(issuer) if issuer == "https://as.example.org")
-        );
+        let [issuer] = auth.issuers() else {
+            panic!("one [[auth.issuer]] table, not {:?}", auth.issuers());
+        };
+        assert_eq!(issuer.issuer, "https://as.example.org");
+        assert_eq!(issuer.kind, Some(IssuerKind::Machines));
+        assert_eq!(issuer.audience, ["ferroterm"]);
         assert_eq!(
-            auth.audience,
-            ["a", "b"],
+            auth.product_scope, "__ferroterm.reload",
             "the environment wins over the file"
         );
-        assert_eq!(auth.product_scope, "__ferroterm.reload");
         let users = auth.basic.as_ref().expect("the Basic table").users.len();
         assert_eq!(users, 1);
         assert!(auth.enabled, "authentication is on unless it is turned off");
@@ -470,7 +470,7 @@ mod tests {
     fn no_file_and_no_override_is_the_default_tree() {
         let config = Config::from_sources(None, &BTreeMap::new()).expect("reads");
         assert!(config.auth.enabled, "the default fails closed");
-        assert!(matches!(&config.auth.issuer, IssuerKey::Flat(issuer) if issuer.is_empty()));
+        assert!(config.auth.issuers().is_empty(), "no issuer is named");
         assert_eq!(config.server.listen.to_string(), "127.0.0.1:8080");
         assert_eq!(config.terminology.default_language, "en");
         let off =
@@ -520,10 +520,7 @@ mod tests {
                 "127.0.0.1:8080",
                 "{foreign}"
             );
-            assert!(
-                matches!(&config.auth.issuer, IssuerKey::Flat(issuer) if issuer.is_empty()),
-                "{foreign}"
-            );
+            assert!(config.auth.issuers().is_empty(), "{foreign}");
         }
     }
 
