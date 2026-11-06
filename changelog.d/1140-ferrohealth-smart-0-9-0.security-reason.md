@@ -1,0 +1,1 @@
+Shipped with functional changes because: the ferrohealth-smart 0.9.0 move replaces the per-issuer form that the 0.8.9 fix introduced, so a security-only release would teach deployments a configuration that the next release removes.
