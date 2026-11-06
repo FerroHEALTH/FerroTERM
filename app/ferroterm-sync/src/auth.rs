@@ -83,16 +83,6 @@ pub enum AuthError {
         #[source]
         source: Box<ResourceError>,
     },
-    /// A `[[auth.basic.users]]` entry is granted a `system/` scope: a Basic
-    /// credential is a person's, and a machine authenticates with a client
-    /// credentials token (RFC 6749 §4.4).
-    #[error(
-        "the Basic user {user} is granted a system/ scope; a Basic user is a person, so give a machine a client credentials client of a machines issuer"
-    )]
-    BasicMachine {
-        /// The user-id.
-        user: String,
-    },
 }
 
 /// The started guard of the admin listener.
@@ -117,8 +107,7 @@ impl AdminAuth {
     ///
     /// Returns [`AuthError::Config`] for a section that breaks a rule, an
     /// enabled one admitting no credential and the removed flat `issuer`
-    /// among them, [`AuthError::BasicMachine`] for a Basic user granted a
-    /// `system/` scope,
+    /// and a Basic user granted a `system/` scope among them,
     /// [`AuthError::Introspector`] for an introspecting issuer that cannot be
     /// set up, and
     /// [`AuthError::Issuer`] for an issuer whose metadata or key set could
@@ -130,9 +119,6 @@ impl AdminAuth {
         let resolved = section.resolve().map_err(|source| AuthError::Config {
             source: Box::new(source),
         })?;
-        if let Some(user) = basic_machine(section) {
-            return Err(AuthError::BasicMachine { user });
-        }
         let realm = resolved.realm.unwrap_or_else(|| String::from(REALM));
         let mut gate = Gate::open().with_realm(realm.clone());
         if !resolved.issuers.is_empty() || !resolved.introspection.is_empty() {
@@ -203,17 +189,6 @@ impl AdminAuth {
         };
         router.layer(AuthLayer::new(self.gate.clone(), classify).with_render(render))
     }
-}
-
-/// The first `[[auth.basic.users]]` entry granted a `system/` scope, which
-/// only a machine holds (SMART App Launch 2.2.0, Scopes and Launch Context).
-fn basic_machine(section: &AuthSection) -> Option<String> {
-    section
-        .basic
-        .iter()
-        .flat_map(|basic| &basic.users)
-        .find(|user| user.scopes.iter().any(|scope| scope.starts_with("system/")))
-        .map(|user| user.user.clone())
 }
 
 /// The route template the audit line records for `path`.

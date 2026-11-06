@@ -13,9 +13,10 @@ use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use base64::Engine as _;
+use ferrohealth_smart::basic::StoreError;
 use ferrohealth_smart::config::{
-    AuthMode, AuthSection, BasicSection, BasicUser, IntrospectionSection, IssuerEntry, IssuerKey,
-    OauthSection,
+    AuthMode, AuthSection, BasicSection, BasicUser, ConfigError, IntrospectionSection, IssuerEntry,
+    IssuerKey, OauthSection,
 };
 use ferrohealth_smart::kind::IssuerKind;
 use ferroterm_sync::auth::{AdminAuth, AuthError, SYNC_SCOPE};
@@ -492,8 +493,9 @@ async fn an_issuer_without_a_kind_refuses_the_start_naming_the_key() {
 }
 
 // A Basic credential is a person's, and a `system/` scope is a backend
-// service's grant (SMART App Launch 2.2.0, Scopes and Launch Context), so a
-// machine authenticates with a client credentials token (RFC 6749 §4.4).
+// service's grant (SMART App Launch 2.2.0, Scopes and Launch Context), so
+// `ferrohealth-smart` 0.9.1 refuses a Basic user granted one when the section
+// loads (GHSA-jhg2-jwjp-hq74), and the start carries that refusal.
 #[tokio::test]
 async fn a_basic_user_with_a_system_scope_refuses_the_start_naming_the_user() {
     let machine = AuthSection {
@@ -511,6 +513,20 @@ async fn a_basic_user_with_a_system_scope_refuses_the_start_naming_the_user() {
         }),
         ..AuthSection::default()
     };
+    let error = AdminAuth::start(&machine)
+        .await
+        .expect_err("the start is refused");
+    let AuthError::Config { source } = &error else {
+        panic!("the section's load refuses the start: {error:?}");
+    };
+    let ConfigError::Basic {
+        source: StoreError::SystemScope { username, scope },
+    } = source.as_ref()
+    else {
+        panic!("the crate refuses the Basic user's system scope: {source:?}");
+    };
+    assert_eq!(username, "batch-loader");
+    assert_eq!(scope, "system/CodeSystem.rs");
     let reason = refusal(&machine).await;
     assert!(reason.contains("batch-loader"), "{reason}");
     assert!(reason.contains("system/"), "{reason}");

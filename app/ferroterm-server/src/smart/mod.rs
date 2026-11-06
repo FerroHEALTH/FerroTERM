@@ -29,7 +29,7 @@ use std::sync::Arc;
 use axum::body::Body;
 use axum::response::{IntoResponse, Response};
 use ferrohealth_smart::basic::PasswordStore;
-use ferrohealth_smart::config::{AuthSection, ConfigError, IssuerKey};
+use ferrohealth_smart::config::{ConfigError, IssuerKey};
 use ferrohealth_smart::extract::HeaderOnly;
 use ferrohealth_smart::guard::{Gate, Render};
 use ferrohealth_smart::metadata::ServerMetadata;
@@ -120,16 +120,6 @@ pub enum StartError {
         /// The issuer identifier.
         issuer: String,
     },
-    /// A `[[auth.basic.users]]` entry is granted a `system/` scope: a Basic
-    /// credential is a person's, and a machine authenticates with a client
-    /// credentials token (RFC 6749 §4.4).
-    #[error(
-        "the Basic user {user} is granted a system/ scope; a Basic user is a person, so give a machine a client credentials client of a machines issuer"
-    )]
-    BasicMachine {
-        /// The user-id.
-        user: String,
-    },
 }
 
 /// The started resource server: the gates in front of the write routes and
@@ -171,9 +161,8 @@ impl Smart {
     ///
     /// Returns [`StartError::Unconfigured`] for a guarded surface without an
     /// issuer, [`StartError::Auth`] for a section that breaks a rule (the
-    /// removed flat `issuer` among them), [`StartError::BasicMachine`] for a
-    /// Basic user granted a `system/` scope,
-    /// [`StartError::Introspector`] for an introspecting issuer that cannot be
+    /// removed flat `issuer` and a Basic user granted a `system/` scope among
+    /// them), [`StartError::Introspector`] for an introspecting issuer that cannot be
     /// set up,
     /// [`StartError::Issuer`] for an issuer whose metadata or key set could
     /// not be read, and [`StartError::NoTokenEndpoint`] when the first issuer
@@ -194,9 +183,6 @@ impl Smart {
         let resolved = auth.resolve().map_err(|source| StartError::Auth {
             source: Box::new(source),
         })?;
-        if let Some(user) = basic_machine(auth) {
-            return Err(StartError::BasicMachine { user });
-        }
         let bases = version_bases(config.base_url().as_deref());
         let admin_listens = config.admin_listen().is_some();
         let mut fhir = IssuerSet::new();
@@ -429,16 +415,6 @@ fn gate_of(verifier: Arc<dyn Verifier>, basic: Option<&Arc<PasswordStore>>, real
         Some(store) => gate.with_basic(Arc::clone(store)),
         None => gate,
     }
-}
-
-/// The first `[[auth.basic.users]]` entry granted a `system/` scope, which
-/// only a machine holds (SMART App Launch 2.2.0, Scopes and Launch Context).
-fn basic_machine(auth: &AuthSection) -> Option<String> {
-    auth.basic
-        .iter()
-        .flat_map(|section| &section.users)
-        .find(|user| user.scopes.iter().any(|scope| scope.starts_with("system/")))
-        .map(|user| user.user.clone())
 }
 
 /// The guarded surfaces `config` turns on, each named with its variable.
