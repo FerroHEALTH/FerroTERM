@@ -17,6 +17,85 @@ fragments here under the version and its date.
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-11-06
+
+### Changed
+
+- The server, the synchronisation service and the console take
+  `ferrohealth-smart` 0.9.0 and `ferrohealth-session` 0.3.0. Every issuer of
+  `[auth]` is an `[[auth.issuer]]` table of its own, with a required `kind`
+  (`machines` for backend services, `persons` for people signing in to an
+  app such as the console, which the table lists in `first_party_clients`),
+  an optional `profile` (`rfc9068` by default, or `keycloak`, `entra`,
+  `okta`) and the issuer's `audience`, `algorithms`, `mode`,
+  `[auth.issuer.introspection]`, `role_claims` and key set settings. Every
+  token is classified by its issuer's kind, and one that matches no caller of
+  that kind answers `401`. Upgrade step: move `issuer`, `audience` and every
+  other issuer setting from `[auth]` onto an `[[auth.issuer]]` table with its
+  `kind`, in the configuration file, since a table cannot be a variable;
+  write each `scopeless_subjects` entry as `{ issuer = "…", sub = "…" }`. The
+  old shape refuses the start, naming the key and the table it moves to, and
+  an issuer without `kind` refuses it naming `auth.issuer.kind` (#1140).
+- A `[[auth.basic.users]]` entry is a person, on the server and on the
+  synchronisation service's admin listener: a user granted a `system/` scope
+  refuses the start, naming the user, and a machine calls with a client
+  credentials token (RFC 6749 §4.4) of a `machines` or `persons` issuer.
+  Upgrade step: give each machine that used Basic a client at the
+  authorization server, and keep Basic for people (#1140).
+- `compose.sync.yaml` mounts the server's configuration file
+  (`FERROTERM_SERVER_CONFIG`, `./ferroterm.toml` by default), which holds its
+  `[[auth.issuer]]` table or `[auth] enabled = false`, and no longer passes
+  `FERROTERM__AUTH__ISSUER` and `FERROTERM__AUTH__AUDIENCE` through (#1140).
+- The crate line moves to 0.1.144, and two published crates move public
+  items into child modules of the module that held them. In
+  `fhir-terminology`, `ProviderError`, `InvalidValue` and
+  `MalformedValueSet` move to `provider::error`, `operations::Sources` to
+  `operations::sources`, and `snomed::Footprint` to `snomed::edition`. In
+  `rf2`, `refset::RefsetKind` moves to `refset::kind`, and the function
+  `refset::kind` is now `refset::kind::read`. Upgrade step: import each item
+  from its new path. No answer on the wire changes (#1147).
+
+### Removed
+
+- The HTTP Basic form of the synchronisation service's
+  `[server_admin_credentials]` (`user`, `password`, `password_file`): the
+  reload is a machine's call, and the server admits a Basic user as a person
+  only. Upgrade step: create a client for the service at the authorization
+  server the server trusts and name it under
+  `[server_admin_credentials.oauth]` (`issuer` or `token_endpoint`,
+  `client_id`, `client_secret_file`, `scope = "__ferroterm.admin"`); a file
+  that still sets the Basic keys fails to load, naming `oauth` (#1140).
+- The flat `[auth] issuer = "…"` key, `[auth] token_profile`, the
+  section-level issuer settings, and with them the variables
+  `FERROTERM__AUTH__ISSUER`, `FERROTERM__AUTH__AUDIENCE` and
+  `FERROTERM__AUTH__TOKEN_PROFILE`. Upgrade step: see the `[[auth.issuer]]`
+  table under Changed; an issuer that mints plain JWTs takes
+  `token_types = ["JWT"]` on its table (#1140).
+
+### Security
+
+Shipped with functional changes because: the ferrohealth-smart 0.9.0 move replaces the per-issuer form that the 0.8.9 fix introduced, so a security-only release would teach deployments a configuration that the next release removes.
+
+- `[auth] scopeless_subjects` and `role_claims` hold per issuer
+  (GHSA-pfgx-xq28-2629, CWE-863, CWE-639). Before, beside several
+  `[[auth.issuer]]` entries both lists applied to every trusted issuer's
+  tokens: a token from any of them whose `sub` was listed was granted every
+  write without a scope. Through `ferrohealth-smart` 0.9.0 a
+  `scopeless_subjects` entry is a table `{ issuer = "…", sub = "…" }` that
+  admits a `System` caller of that issuer alone, an entry naming an issuer
+  the section does not trust refuses the start, and `role_claims` is a key of
+  each `[[auth.issuer]]` table, read from that issuer's tokens only. Upgrade
+  step: write each `scopeless_subjects` entry as `{ issuer, sub }`, and set
+  `role_claims` on the issuer tables that need other claims than the default
+  (the server grants nothing by role) (#1138).
+- A Basic user is refused a `system/` scope by `ferrohealth-smart` 0.9.1
+  (GHSA-jhg2-jwjp-hq74, CWE-269, CWE-863). An `[[auth.basic.users]]` entry
+  granted one fails to load in the server and in the sync service, naming
+  the user and the scope, and a Basic caller is never handed a `system/`
+  scope, the reach of a backend service. FerroTERM refused such a user at
+  start with its own check before, which is removed now that the crate
+  holds the rule. Upgrade step: none for a configuration that starts today (#1145).
+
 ## [0.4.1] - 2026-11-04
 
 ### Changed
@@ -2559,7 +2638,8 @@ binary answers `GET /health` only.
 - No existing Rust terminology or FHIR crate is a dependency; the README
   records the evaluation and the reasons.
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.2...v0.3.3

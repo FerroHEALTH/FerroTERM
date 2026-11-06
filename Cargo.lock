@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "addon-nts"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "ferrohealth-secret",
  "jiff",
@@ -1334,7 +1334,7 @@ dependencies = [
 
 [[package]]
 name = "ferroterm-bench"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -1352,7 +1352,7 @@ dependencies = [
 
 [[package]]
 name = "ferroterm-build"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -1379,7 +1379,7 @@ dependencies = [
 
 [[package]]
 name = "ferroterm-console"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -1423,7 +1423,7 @@ dependencies = [
 
 [[package]]
 name = "ferroterm-server"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "argon2",
@@ -1465,7 +1465,7 @@ dependencies = [
 
 [[package]]
 name = "ferroterm-sync"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "addon-nts",
  "anyhow",
@@ -1499,7 +1499,7 @@ dependencies = [
 
 [[package]]
 name = "ferroterm-testkit"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "classification",
  "concept-graph",
@@ -1676,7 +1676,7 @@ dependencies = [
 
 [[package]]
 name = "forwarders"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "proc-macro2",
