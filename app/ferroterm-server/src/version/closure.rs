@@ -27,7 +27,7 @@ macro_rules! closure {
             use http::{HeaderMap, StatusCode};
 
             use crate::outcome::Failure;
-            use crate::persistence::{Closure, ClosureEdge, ClosureMember};
+            use crate::persistence::closure::{Closure, ClosureEdge, ClosureMember};
             use fhir_terminology::registry::Registry;
 
             use crate::scope::scope_of;

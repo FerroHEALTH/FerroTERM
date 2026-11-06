@@ -6,7 +6,8 @@
 //! designation (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>,
 //! Extensions and Inactive, Deprecated and Not-Selectable Codes).
 
-use super::super::{OperationError, Sources};
+use super::super::OperationError;
+use super::super::sources::Sources;
 use crate::compose::Item;
 use crate::provider::compose::{Compose, Echoes};
 use crate::provider::{Designation, DesignationUse};

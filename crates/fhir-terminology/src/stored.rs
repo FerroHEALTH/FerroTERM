@@ -25,7 +25,7 @@ use std::path::{Path, PathBuf};
 use concept_graph::csr::CsrError;
 use concept_store::store::StoreError;
 
-use crate::provider::ProviderError;
+use crate::provider::error::ProviderError;
 
 /// The manifest version every stored system reads: the store beside the
 /// hierarchy and the designation index as their own files.

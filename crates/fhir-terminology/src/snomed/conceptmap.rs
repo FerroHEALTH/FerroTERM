@@ -28,7 +28,7 @@ use concept_graph::refsets::{Table, ValueRef};
 use crate::provider::concept_map::{
     ConceptMapModel, DependsOn, Element, Group, Relationship, Target,
 };
-use crate::provider::{CodeSystemProvider, Concept, MapSelection, ProviderError, Successor};
+use crate::provider::{CodeSystemProvider, Concept, MapSelection, Successor, error::ProviderError};
 use crate::snomed::{FHIR_CM, FHIR_VS, SYSTEM, SnomedProvider};
 
 /// The reference set field an association member points through.

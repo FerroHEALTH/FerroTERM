@@ -7,7 +7,7 @@
 //! (<https://hl7.org/fhir/R5/conceptmap-operation-translate.html>).
 
 use super::{Match, MatchOrigin, Product, Subject, in_source_scope};
-use crate::operations::{CodingRef, OperationError, Sources};
+use crate::operations::{CodingRef, OperationError, sources::Sources};
 use crate::provider::concept_map::{
     ConceptMapModel, DependsOn, Element, Group, Relationship, Target, Unmapped, UnmappedMode,
 };

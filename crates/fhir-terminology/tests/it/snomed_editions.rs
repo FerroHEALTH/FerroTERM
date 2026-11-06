@@ -16,7 +16,7 @@ use fhir_terminology::operations::Invocation;
 use fhir_terminology::operations::expand::{ExpandInput, expand};
 use fhir_terminology::operations::lookup::{LookupInput, lookup};
 use fhir_terminology::operations::translate::{TranslateInput, translate};
-use fhir_terminology::operations::{OperationError, Sources};
+use fhir_terminology::operations::{OperationError, sources::Sources};
 use fhir_terminology::registry::{Registry, ResolveError};
 use fhir_terminology::snomed::{SYSTEM, SnomedProvider};
 use fhir_terminology::valueset::store::ValueSetStore;

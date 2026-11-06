@@ -3,6 +3,7 @@
 
 //! The Synchronisation screens' tests.
 
+use super::summary::{activation_line, left_line, revalidation_line, source_lines, taken_lines};
 use super::*;
 
 /// The English locale the tests read the words in.

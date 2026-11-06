@@ -9,7 +9,8 @@ use super::{SYSTEM, SnomedProvider};
 use crate::provider::declaration::{ImplicitArgument, ImplicitForm};
 use crate::provider::filter::{Filter, FilterOperator};
 use crate::provider::{
-    CodeSystemProvider, ConceptSet, InvalidValue, MalformedValueSet, ProviderError,
+    CodeSystemProvider, ConceptSet,
+    error::{InvalidValue, MalformedValueSet, ProviderError},
 };
 use rf2::id::ConceptId;
 use sct_ecl::ast::ExpressionConstraint;
@@ -231,4 +232,57 @@ pub(super) fn implicit_forms() -> Vec<ImplicitForm> {
             ImplicitArgument::Expression,
         ),
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{implicit_parts, percent_decode};
+    use crate::snomed::{FHIR_CM, FHIR_VS};
+
+    #[test]
+    fn percent_encoding_decodes_and_a_stray_percent_is_refused() {
+        assert_eq!(
+            percent_decode("%3C%3C%20404684003%20%7Cfinding%7C").as_deref(),
+            Some("<< 404684003 |finding|")
+        );
+        assert_eq!(percent_decode("<< 1").as_deref(), Some("<< 1"));
+        assert_eq!(percent_decode("%3"), None);
+        assert_eq!(percent_decode("%zz"), None);
+    }
+
+    #[test]
+    fn implicit_urls_split_into_base_and_form() {
+        assert_eq!(
+            implicit_parts("http://snomed.info/sct?fhir_vs", FHIR_VS),
+            Some(("http://snomed.info/sct", ""))
+        );
+        assert_eq!(
+            implicit_parts(
+                "http://snomed.info/sct/11000146104/version/20260630?fhir_vs=isa/1",
+                FHIR_VS
+            ),
+            Some((
+                "http://snomed.info/sct/11000146104/version/20260630",
+                "isa/1"
+            ))
+        );
+        assert_eq!(
+            implicit_parts("http://snomed.info/sct?fhir_cm=1", FHIR_CM),
+            Some(("http://snomed.info/sct", "1"))
+        );
+        assert_eq!(
+            implicit_parts("http://snomed.info/sct?fhir_cm=1", FHIR_VS),
+            None,
+            "one key never reads the other's URI"
+        );
+        assert_eq!(
+            implicit_parts("http://snomed.info/sct?fhir_vs", FHIR_CM),
+            None
+        );
+        assert_eq!(implicit_parts("http://loinc.org/vs", FHIR_VS), None);
+        assert_eq!(
+            implicit_parts("http://snomed.info/sct?fhir_vsx", FHIR_VS),
+            None
+        );
+    }
 }

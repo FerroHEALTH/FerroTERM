@@ -29,7 +29,7 @@ use roaring::RoaringBitmap;
 use sct_scg::ast;
 
 use crate::normal_form;
-use crate::provider::{Concept, Property, PropertyValue, ProviderError};
+use crate::provider::{Concept, Property, PropertyValue, error::ProviderError};
 use crate::snomed::SnomedProvider;
 use crate::stored::storage;
 

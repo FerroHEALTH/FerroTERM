@@ -17,7 +17,7 @@ use crate::provider::filter::Filter;
 use crate::provider::source::Source;
 use crate::provider::{
     CodeSystemProvider, Concept, ConceptSet, Designation, DesignationUse, Hierarchy, Identity,
-    ImplicitMetadata, Located, MapSelection, Property, ProviderError, Status, Successor,
+    ImplicitMetadata, Located, MapSelection, Property, Status, Successor, error::ProviderError,
 };
 
 /// One stored system behind a [`StoredProvider`]: what its specification

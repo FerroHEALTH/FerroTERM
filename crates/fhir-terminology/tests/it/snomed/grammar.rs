@@ -10,7 +10,7 @@ use fhir_terminology::capabilities::Summary;
 use fhir_terminology::operations::{Invocation, OperationError, lookup, validate_code};
 use fhir_terminology::provider::declaration::Compositional;
 use fhir_terminology::provider::filter::{Filter, FilterOperator};
-use fhir_terminology::provider::{CodeSystemProvider, ProviderError};
+use fhir_terminology::provider::{CodeSystemProvider, error::ProviderError};
 use fhir_terminology::registry::Registry;
 use fhir_terminology::snomed::SYSTEM;
 use std::sync::Arc;

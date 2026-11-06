@@ -34,7 +34,7 @@ use crate::provider::declaration::{
 use crate::provider::filter::{Filter, FilterOperator};
 use crate::provider::source::Source;
 use crate::provider::{
-    Concept, ConceptSet, Identity, Located, Property, PropertyValue, ProviderError, Status,
+    Concept, ConceptSet, Identity, Located, Property, PropertyValue, Status, error::ProviderError,
 };
 use crate::stored::artifact::{Artifact, Layout};
 use crate::stored::system::{StoredProvider, StoredSystem};

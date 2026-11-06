@@ -278,7 +278,7 @@ fn concept_sections(locale: &Locale, concept: &Concept) -> Html {
     );
     Html::join([
         display,
-        crate::pages::browse::designations(locale, concept).unwrap_or_default(),
-        crate::pages::browse::properties(locale, concept).unwrap_or_default(),
+        crate::pages::browse::facts::designations(locale, concept).unwrap_or_default(),
+        crate::pages::browse::facts::properties(locale, concept).unwrap_or_default(),
     ])
 }

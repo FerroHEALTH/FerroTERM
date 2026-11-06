@@ -6,7 +6,8 @@
 //! import that failed.
 
 use super::super::{Issue, OperationError};
-use super::{Context, InactivePolicy, Policy, Subject, Validation, inactive_outputs, message_of};
+use super::conclusion::inactive_outputs;
+use super::{Context, InactivePolicy, Policy, Subject, Validation, message_of};
 use crate::provider::declaration::ContentMode;
 use crate::provider::{CodeSystemProvider, Located};
 use crate::valueset::model::ValueSetModel;

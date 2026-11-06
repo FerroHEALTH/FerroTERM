@@ -22,7 +22,7 @@ use rf2::component::{
 use rf2::constants;
 use rf2::file::{ContentType, FieldKind, Release, ReleaseFile};
 use rf2::id::{ConceptId, DescriptionId, RefsetId};
-use rf2::refset::{FieldValue, LanguageMember, Members, RefsetKind};
+use rf2::refset::{FieldValue, LanguageMember, Members, kind::RefsetKind};
 use rf2::time::EffectiveTime;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -279,7 +279,7 @@ pub(super) fn refset_of(
     wanted: RefsetKind,
 ) -> Result<Option<&ReleaseFile>, Error> {
     for file in release.refsets() {
-        if rf2::refset::kind(&file.path)? == wanted {
+        if rf2::refset::kind::read(&file.path)? == wanted {
             return Ok(Some(file));
         }
     }
@@ -292,7 +292,7 @@ pub(super) fn refset_of(
 ///
 /// Returns [`Error`] when the file cannot be read.
 pub(super) fn refset_kind(file: &ReleaseFile) -> Result<RefsetKind, Error> {
-    Ok(rf2::refset::kind(&file.path)?)
+    Ok(rf2::refset::kind::read(&file.path)?)
 }
 
 /// The language reference sets (by ordinal) and, per designation, its

@@ -19,7 +19,7 @@ use sct_ecl::ast::{Acceptability, Equality, Sctid, TypedSearchTerm};
 use sct_ecl::eval::{ConceptPredicate, DescriptionPredicate, EvalError, Model, term_matches};
 
 use super::SnomedProvider;
-use crate::provider::{CodeSystemProvider, ProviderError};
+use crate::provider::{CodeSystemProvider, error::ProviderError};
 
 fn storage(error: &StoreError) -> EvalError {
     EvalError::Storage(error.to_string())

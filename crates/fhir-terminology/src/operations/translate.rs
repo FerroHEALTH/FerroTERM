@@ -19,7 +19,8 @@ mod groups;
 
 use std::sync::Arc;
 
-use super::{CodeableConceptRef, CodingRef, OperationError, Sources};
+use super::sources::Sources;
+use super::{CodeableConceptRef, CodingRef, OperationError};
 use crate::compose::ValueSetResolver;
 use crate::provider::MapSelection;
 use crate::provider::concept_map::{ConceptMapModel, ModelError, Relationship};

@@ -11,7 +11,7 @@ use ferroterm_testkit::fhir::write_code_systems;
 use fhir_terminology::conceptmap::store::ConceptMapStore;
 use fhir_terminology::fhir_codesystem::load::{FhirVersion, load_dir};
 use fhir_terminology::fhir_codesystem::provider::FhirCodeSystem;
-use fhir_terminology::operations::Sources;
+use fhir_terminology::operations::sources::Sources;
 use fhir_terminology::operations::{CodeableConceptRef, CodingRef};
 use fhir_terminology::registry::Registry;
 use fhir_terminology::valueset;

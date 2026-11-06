@@ -6,7 +6,7 @@
 //! layers below it that become one.
 
 use super::{OperationError, Refused, RefusedInput};
-use crate::provider::ProviderError;
+use crate::provider::error::ProviderError;
 use crate::registry::ResolveError;
 use http::StatusCode;
 

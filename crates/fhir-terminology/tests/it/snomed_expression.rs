@@ -18,7 +18,7 @@ use fhir_terminology::conceptmap::store::ConceptMapStore;
 use fhir_terminology::fhir_codesystem::load::FhirVersion;
 use fhir_terminology::operations::value_set_validate_code::ValueSetValidateInput;
 use fhir_terminology::operations::{
-    Invocation, OperationError, Sources, closure, lookup, subsumes, validate_code,
+    Invocation, OperationError, closure, lookup, sources::Sources, subsumes, validate_code,
     value_set_validate_code,
 };
 use fhir_terminology::provider::compose::{Compose, ConceptRef, Echoes, Include, SystemRef};

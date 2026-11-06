@@ -22,7 +22,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use fhir_terminology::compose::{Expander, Options};
 use fhir_terminology::conceptmap::store::ConceptMapStore;
 use fhir_terminology::operations::{
-    Invocation, Sources, lookup, subsumes, translate, validate_code,
+    Invocation, lookup, sources::Sources, subsumes, translate, validate_code,
 };
 use fhir_terminology::registry::Registry;
 use fhir_terminology::snomed::SnomedProvider;

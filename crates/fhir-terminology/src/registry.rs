@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::provider::compose::Compose;
-use crate::provider::{CodeSystemProvider, ProviderError};
+use crate::provider::{CodeSystemProvider, error::ProviderError};
 
 /// A failure to resolve a system or version.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

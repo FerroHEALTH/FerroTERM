@@ -12,7 +12,7 @@ use fhir_terminology::fhir_codesystem::provider::FhirCodeSystem;
 use fhir_terminology::operations::{Invocation, OperationError, lookup, validate_code};
 use fhir_terminology::provider::declaration::{Capability, ContentMode};
 use fhir_terminology::provider::filter::{Filter, FilterOperator};
-use fhir_terminology::provider::{CodeSystemProvider, PropertyValue, ProviderError};
+use fhir_terminology::provider::{CodeSystemProvider, PropertyValue, error::ProviderError};
 use fhir_terminology::registry::Registry;
 use fhir_terminology::supplement::{Additions, Supplement, Supplemented};
 
@@ -694,7 +694,7 @@ fn a_fragment_expansion_states_its_reason_and_names_its_used_fragment() {
         .expect("registers");
     let value_sets = fhir_terminology::valueset::store::ValueSetStore::default();
     let concept_maps = fhir_terminology::conceptmap::store::ConceptMapStore::default();
-    let sources = fhir_terminology::operations::Sources {
+    let sources = fhir_terminology::operations::sources::Sources {
         registry: &registry,
         value_sets: &value_sets,
         concept_maps: &concept_maps,

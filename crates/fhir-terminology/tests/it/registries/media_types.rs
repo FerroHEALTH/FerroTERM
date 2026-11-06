@@ -6,9 +6,9 @@
 use concept_graph::subsumption::Outcome;
 use fhir_terminology::conceptmap::store::ConceptMapStore;
 use fhir_terminology::operations::expand::ExpandInput;
-use fhir_terminology::operations::{Sources, expand};
+use fhir_terminology::operations::{expand, sources::Sources};
 use fhir_terminology::provider::filter::FilterOperator;
-use fhir_terminology::provider::{CodeSystemProvider, ProviderError};
+use fhir_terminology::provider::{CodeSystemProvider, error::ProviderError};
 use fhir_terminology::registries::bcp13;
 use fhir_terminology::valueset::store::ValueSetStore;
 

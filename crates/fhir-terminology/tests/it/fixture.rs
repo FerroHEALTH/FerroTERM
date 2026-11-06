@@ -15,7 +15,7 @@ use fhir_terminology::provider::declaration::{
 use fhir_terminology::provider::filter::{Filter, FilterOperator};
 use fhir_terminology::provider::{
     CodeSystemProvider, Concept, ConceptSet, Designation, DesignationUse, Hierarchy, Identity,
-    Located, Property, PropertyValue, ProviderError, Status,
+    Located, Property, PropertyValue, Status, error::ProviderError,
 };
 use fhir_terminology::registry::Registry;
 

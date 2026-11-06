@@ -8,7 +8,9 @@ use ferroterm_testkit::icd11::{BLOCK, CHOLERA, RELEASE, SEPSIS, VIBRIO, write_ar
 use fhir_terminology::icd11::{Icd11Provider, OpenError};
 use fhir_terminology::provider::declaration::{Compositional, HierarchyMeaning};
 use fhir_terminology::provider::filter::{Filter, FilterOperator};
-use fhir_terminology::provider::{CodeSystemProvider, Concept, PropertyValue, ProviderError};
+use fhir_terminology::provider::{
+    CodeSystemProvider, Concept, PropertyValue, error::ProviderError,
+};
 
 const MMS: &str = "http://id.who.int/icd/release/11/mms";
 
@@ -341,7 +343,7 @@ fn a_codeless_grouper_expands_abstract_and_is_refused_when_abstract_is_not_allow
     use fhir_terminology::conceptmap::store::ConceptMapStore;
     use fhir_terminology::operations::expand::ExpandInput;
     use fhir_terminology::operations::value_set_validate_code::ValueSetValidateInput;
-    use fhir_terminology::operations::{Sources, expand, value_set_validate_code};
+    use fhir_terminology::operations::{expand, sources::Sources, value_set_validate_code};
     use fhir_terminology::registry::Registry;
     use fhir_terminology::valueset::store::ValueSetStore;
     use fhir_types::r4b::value_set::{
@@ -461,7 +463,7 @@ fn the_exclude_flags_drop_a_postcoordinated_expression_and_a_codeless_grouper() 
 
     use fhir_terminology::conceptmap::store::ConceptMapStore;
     use fhir_terminology::operations::expand::ExpandInput;
-    use fhir_terminology::operations::{Sources, expand};
+    use fhir_terminology::operations::{expand, sources::Sources};
     use fhir_terminology::registry::Registry;
     use fhir_terminology::valueset::store::ValueSetStore;
     use fhir_types::r4b::value_set::{
@@ -540,7 +542,7 @@ fn the_composes_spelling_survives_an_include_merge_and_a_value_set_import() {
 
     use fhir_terminology::conceptmap::store::ConceptMapStore;
     use fhir_terminology::operations::expand::ExpandInput;
-    use fhir_terminology::operations::{Sources, expand};
+    use fhir_terminology::operations::{expand, sources::Sources};
     use fhir_terminology::registry::Registry;
     use fhir_terminology::valueset::store::ValueSetStore;
     use fhir_types::r4b::value_set::{

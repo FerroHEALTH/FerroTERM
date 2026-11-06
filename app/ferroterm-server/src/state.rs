@@ -21,7 +21,7 @@ use fhir_terminology::icd11;
 use fhir_terminology::loinc;
 use fhir_terminology::provider::code_system::CodeSystemModel;
 use fhir_terminology::provider::concept_map::ConceptMapModel;
-use fhir_terminology::provider::{CodeSystemProvider, ProviderError};
+use fhir_terminology::provider::{CodeSystemProvider, error::ProviderError};
 use fhir_terminology::registries::iso3166;
 use fhir_terminology::registry::{RegisterError, Resolved};
 use fhir_terminology::rxnorm;

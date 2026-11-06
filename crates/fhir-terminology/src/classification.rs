@@ -25,7 +25,7 @@ use crate::provider::declaration::{
 use crate::provider::filter::FilterOperator;
 use crate::provider::source::Source;
 use crate::provider::{
-    CodeSystemProvider, Concept, Identity, Located, Property, ProviderError, Status,
+    CodeSystemProvider, Concept, Identity, Located, Property, Status, error::ProviderError,
 };
 use crate::stored;
 use crate::stored::artifact::{Artifact, Layout};
