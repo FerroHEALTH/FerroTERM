@@ -156,6 +156,8 @@ jobs:
             done
           } | { grep -zc . >/dev/null && xargs -0 -r shellcheck --severity=style; } \
             || echo "no shell files to check"
+      - name: The performance gate reads its schedule and holds the sync plans' idle tables equal
+        run: bash scripts/perf/gate.sh --self-test
 
   # comment-style: the RFC 505 / RFC 1574 comment budgets over every
   # hand-written .rs file. The per-edit hook runs the same script on the files
@@ -401,10 +403,14 @@ jobs:
       contents: read
     outputs:
       cargo: ${{ steps.check.outputs.cargo }}
+      perf: ${{ steps.perf.outputs.perf }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The first parent of a pull request's merge commit and of a merge
+          # group's commit is its base, which the perf probe diffs against.
+          fetch-depth: 2
       - id: check
         run: |
           set -euo pipefail
@@ -415,6 +421,22 @@ jobs:
             echo "cargo=false" >> "$GITHUB_OUTPUT"
             echo "No Cargo.toml — the Rust lanes are skipped (repository in discovery)."
           fi
+      # The performance gate runs on a push to main, on a dispatch, and on a
+      # pull request or merge group that changes what the two services are
+      # built from or what the gate reads (#1151).
+      - id: perf
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          perf=true
+          if [ "$EVENT" = "pull_request" ] || [ "$EVENT" = "merge_group" ]; then
+            changed="$(git diff --name-only HEAD^1 HEAD)"
+            if ! grep -qE '^(app/ferroterm-server/|app/ferroterm-sync/|addons/|crates/|tools/ferroterm-testkit/|e2e/fixtures/codesystems/|perf/|scripts/perf/|Cargo\.toml$|Cargo\.lock$|rust-toolchain\.toml$|docs/VERSIONS\.md$|\.github/workflows/(ci|perf)\.yml$|\.github/actions/setup-rust/)' <<< "$changed"; then
+              perf=false
+            fi
+          fi
+          echo "perf=$perf" >> "$GITHUB_OUTPUT"
 
   fmt:
     name: rustfmt
@@ -880,6 +902,20 @@ jobs:
   # The HL7 terminology ecosystem suite against a release build, with the
   # committed pass list as the gate (conformance/tx-ecosystem/README.md). The
   # runner is the FHIR Validator, a JVM in CI only; the server never has one.
+  # The performance gate (#1151): the idle and load phases of
+  # ferrohealth-perf against the release builds of the server and the sync
+  # service, in perf.yml, which the release lane calls on the release commit
+  # too.
+  perf:
+    name: perf
+    needs: detect
+    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.perf == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/perf.yml
+    with:
+      update: true
+
   tx-ecosystem:
     name: tx-ecosystem
     needs: detect
@@ -998,6 +1034,7 @@ jobs:
       - msrv
       - bench-bars
       - tx-ecosystem
+      - perf
       - dependency-review
       - conflict-markers
     if: always()

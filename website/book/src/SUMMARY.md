@@ -43,3 +43,4 @@
 
 - [Build and test](contribute/build-and-test.md)
 - [The FHIR model](contribute/codegen.md)
+- [The performance gate](contribute/performance-gate.md)

@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+
+# The plan of the performance gate for ferroterm-sync (ferrohealth-perf,
+# FerroHEALTH/FerroSYS#249), run by scripts/perf/gate.sh. The service runs
+# with a daily schedule whose next run is twelve hours away, so the idle
+# phase measures it waiting between two scheduled runs; the load phase reads
+# its admin listener. The service holds no database, so the idle phase
+# judges its CPU alone. No specification governs this: our own design.
+
+[idle]
+duration_secs = 60
+max_cpu_percent = 2.0
+
+[load]
+rate = 50.0
+warmup_secs = 10
+duration_secs = 60
+
+[[requests]]
+group = "runs"
+method = "GET"
+path = "/runs"
+status = 200
+
+[[requests]]
+group = "readiness"
+method = "GET"
+path = "/health/readiness"
+status = 200
