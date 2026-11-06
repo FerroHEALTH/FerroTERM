@@ -73,8 +73,9 @@ toml = { version = "1.1.6", default-features = false, features = ["std", "parse"
 # the SMART scopes, the Basic users and the client credentials token of the
 # server and the sync service. Pinned exactly, as every family crate is.
 # 0.9.0 classifies every caller by its issuer's kind and profile and admits
-# a machine by token alone. Verified against crates.io on 2026-11-06.
-ferrohealth-smart = { version = "=0.9.0", features = ["axum"] }
+# a machine by token alone; 0.9.1 refuses a Basic user granted a system/
+# scope at load (GHSA-jhg2-jwjp-hq74). Verified against crates.io on 2026-11-06.
+ferrohealth-smart = { version = "=0.9.1", features = ["axum"] }
 # The FerroHEALTH console sign-in and session: the authorization code flow
 # with PKCE over ferrohealth-smart's relying party, the session store with
 # its idle and absolute lifetimes, and the four sign-in routes. Pinned
