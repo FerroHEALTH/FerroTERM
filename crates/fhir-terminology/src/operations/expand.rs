@@ -14,7 +14,8 @@ mod echo;
 
 use std::collections::BTreeSet;
 
-use super::{OperationError, Sources};
+use super::OperationError;
+use super::sources::Sources;
 use crate::compose::negotiation::{Negotiation, canonicals};
 use crate::compose::{Expansion, Item, Options};
 use crate::provider::compose::{Compose, Include};

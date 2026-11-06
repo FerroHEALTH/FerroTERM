@@ -21,7 +21,7 @@ use crate::provider::declaration::{
 use crate::provider::filter::Filter;
 use crate::provider::{
     CodeSystemProvider, Concept, ConceptSet, Designation, Hierarchy, Identity, Located, Property,
-    PropertyValue, ProviderError, Status,
+    PropertyValue, Status, error::ProviderError,
 };
 use crate::text_match;
 

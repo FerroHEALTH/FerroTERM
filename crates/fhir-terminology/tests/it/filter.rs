@@ -5,7 +5,7 @@
 //! (<https://hl7.org/fhir/R5/codesystem-filter-operator.html>).
 
 use fhir_terminology::provider::filter::{Filter, FilterOperator};
-use fhir_terminology::provider::{CodeSystemProvider, ProviderError};
+use fhir_terminology::provider::{CodeSystemProvider, error::ProviderError};
 
 use crate::fixture::{Fixture, codes};
 

@@ -18,8 +18,8 @@ use super::interned::Interned;
 use crate::provider::declaration::Declaration;
 use crate::provider::filter::Filter;
 use crate::provider::{
-    CodeSystemProvider, Concept, ConceptSet, Designation, Identity, Located, Property,
-    ProviderError, Status,
+    CodeSystemProvider, Concept, ConceptSet, Designation, Identity, Located, Property, Status,
+    error::ProviderError,
 };
 
 /// What one grammar system decides about its codes.

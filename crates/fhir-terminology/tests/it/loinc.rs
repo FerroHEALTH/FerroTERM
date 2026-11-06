@@ -10,7 +10,7 @@ use ferroterm_testkit::loinc::{
 };
 use fhir_terminology::loinc::{LoincProvider, OpenError, SYSTEM};
 use fhir_terminology::provider::filter::{Filter, FilterOperator};
-use fhir_terminology::provider::{CodeSystemProvider, Concept, ProviderError};
+use fhir_terminology::provider::{CodeSystemProvider, Concept, error::ProviderError};
 
 fn provider() -> (tempfile::TempDir, LoincProvider) {
     let dir = tempfile::tempdir().expect("tempdir");

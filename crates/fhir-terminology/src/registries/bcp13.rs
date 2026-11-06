@@ -21,7 +21,7 @@ use crate::provider::declaration::{
 };
 use crate::provider::filter::{Filter, FilterOperator};
 use crate::provider::{
-    Concept, ConceptSet, Identity, Property, PropertyValue, ProviderError, Status,
+    Concept, ConceptSet, Identity, Property, PropertyValue, Status, error::ProviderError,
 };
 
 /// The system URI (<https://hl7.org/fhir/R4B/terminologies-systems.html>).

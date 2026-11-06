@@ -13,6 +13,7 @@
 //! store. Reads are point reads and bitmap lookups; nothing walks the graph
 //! per request.
 
+pub mod edition;
 mod implicit;
 mod open;
 mod selection;
@@ -27,7 +28,6 @@ pub mod expression;
 use concept_graph::attributes::{Attributes, AttributesError};
 use concept_graph::identifiers::{Identifiers, IdentifiersError};
 use concept_graph::members::{MembersError, Memberships};
-use concept_graph::ordinal::Ordinal;
 use concept_graph::refsets::{RefsetMembers, RefsetsError};
 use concept_store::record;
 use concept_store::store::StoreError;
@@ -42,7 +42,7 @@ use crate::provider::declaration::PropertyKind;
 use crate::provider::filter::{Filter, FilterOperator};
 use crate::provider::{
     CodeSystemProvider, Concept, ConceptSet, DesignationUse, Located, Property, PropertyValue,
-    ProviderError, Status,
+    Status, error::ProviderError,
 };
 use crate::stored::system::{StoredProvider, StoredSystem};
 use crate::stored::{self, primary_subtag, storage};
@@ -213,157 +213,6 @@ impl std::fmt::Debug for Snomed {
 
 /// One SNOMED CT edition version behind the seam.
 pub type SnomedProvider = StoredProvider<Snomed>;
-
-/// What each structure of a served edition holds in memory, in bytes.
-///
-/// No FHIR or SNOMED CT specification governs this: our own design, and the
-/// figures are what the structures count rather than what a process reports.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Footprint {
-    /// The resident columns of the store, by column name.
-    pub store_columns: [(&'static str, usize); 4],
-    /// The child-to-parent adjacency.
-    pub is_a: usize,
-    /// The ancestor and descendant bitmaps.
-    pub closure: usize,
-    /// The parent-to-child adjacency, transposed when the edition opens.
-    pub children: usize,
-    /// The designation dictionary and its postings.
-    pub text: usize,
-    /// The reference set member tables.
-    pub member_tables: usize,
-    /// The attribute rows.
-    pub attributes: usize,
-    /// The attribute inverted index, derived when the edition opens.
-    pub attributes_inverted: usize,
-    /// The reference set membership bitmaps.
-    pub memberships: usize,
-    /// The alternate identifier table.
-    pub identifiers: usize,
-}
-
-impl SnomedProvider {
-    /// The edition URI (`http://snomed.info/sct/{module}`), the version URI
-    /// without its date.
-    #[must_use]
-    pub fn edition_uri(&self) -> &str {
-        &self.system().edition
-    }
-
-    /// What every structure of this edition holds in memory.
-    ///
-    /// Each figure is the structure's own count of the heap its allocations
-    /// hold, so a served edition's memory is accounted for structure by
-    /// structure. The caches an operation fills later
-    /// (the root, leaf, defined, and inactive sets, and the parsed expression
-    /// constraints) are not here: they are empty until a request asks for one.
-    #[must_use]
-    pub fn footprint(&self) -> Footprint {
-        Footprint {
-            store_columns: self.stored().store.column_sizes(),
-            is_a: self.stored().tree.graph.is_a.size_in_bytes(),
-            closure: self.stored().tree.graph.closure.size_in_bytes(),
-            children: self.stored().tree.children.size_in_bytes(),
-            text: self.stored().text.size_in_bytes(),
-            member_tables: self.system().member_tables.size_in_bytes(),
-            attributes: self.system().attributes.rows_size_in_bytes(),
-            attributes_inverted: self.system().attributes.inverted_size_in_bytes(),
-            memberships: self.system().memberships.size_in_bytes(),
-            identifiers: self.system().identifiers.size_in_bytes(),
-        }
-    }
-
-    /// The attribute relationships of the edition, with their role groups.
-    #[expect(
-        clippy::same_name_method,
-        reason = "the ECL evaluator's trait exposes the same graph part; this is the crate's own accessor"
-    )]
-    #[must_use]
-    pub fn attributes(&self) -> &Attributes {
-        &self.system().attributes
-    }
-
-    /// The active reference set member rows of the edition, with their fields.
-    #[must_use]
-    pub fn member_tables(&self) -> &RefsetMembers {
-        &self.system().member_tables
-    }
-
-    /// The alternate identifiers of the edition.
-    #[expect(
-        clippy::same_name_method,
-        reason = "the ECL evaluator's trait exposes the same graph part; this is the crate's own accessor"
-    )]
-    #[must_use]
-    pub fn identifiers(&self) -> &Identifiers {
-        &self.system().identifiers
-    }
-
-    /// The language reference sets of the edition, as SCTIDs.
-    #[must_use]
-    pub fn language_refsets(&self) -> Vec<&str> {
-        self.system()
-            .keys
-            .refsets
-            .iter()
-            .map(|(_, s)| s.as_str())
-            .collect()
-    }
-
-    fn ordinal(concept: Concept) -> Ordinal {
-        Ordinal::new(concept.index())
-    }
-
-    /// The preferred synonym of `concept` in `language`, by the first language
-    /// reference set (in store order) whose preferred synonym is in that
-    /// language.
-    fn preferred_in(
-        &self,
-        ordinal: Ordinal,
-        language: &str,
-    ) -> Result<Option<String>, ProviderError> {
-        let refsets = self.system().keys.refsets.iter().map(|(refset, _)| *refset);
-        self.stored()
-            .store
-            .display(ordinal, refsets, |found| primary_subtag(found) == language)
-            .map_err(storage)
-    }
-
-    /// The display for `language` (or the base language), by the SNOMED rule:
-    /// the preferred term of the language reference set; then, our own fallback
-    /// order (no spec governs it): an active synonym in the language, the
-    /// preferred term in the base language, the FSN, any designation.
-    fn choose_display(
-        &self,
-        ordinal: Ordinal,
-        language: Option<&str>,
-    ) -> Result<Option<String>, ProviderError> {
-        let wanted = language.map_or_else(|| self.system().base_language.clone(), primary_subtag);
-        if let Some(term) = self.preferred_in(ordinal, &wanted)? {
-            return Ok(Some(term));
-        }
-        let designations = self.stored().store.designations(ordinal).map_err(storage)?;
-        if let Some(synonym) = designations.iter().find(|d| {
-            d.active
-                && d.use_ordinal == self.system().keys.synonym
-                && primary_subtag(&d.language) == wanted
-        }) {
-            return Ok(Some(synonym.term.clone()));
-        }
-        if wanted != self.system().base_language
-            && let Some(term) = self.preferred_in(ordinal, &self.system().base_language)?
-        {
-            return Ok(Some(term));
-        }
-        if let Some(fsn) = designations
-            .iter()
-            .find(|d| d.active && d.use_ordinal == self.system().keys.fsn)
-        {
-            return Ok(Some(fsn.term.clone()));
-        }
-        Ok(designations.first().map(|d| d.term.clone()))
-    }
-}
 
 impl StoredSystem for Snomed {
     // NOTE: the edition URI names a distribution, and the service "may default to
@@ -912,57 +761,5 @@ impl StoredSystem for Snomed {
             description,
             copyright: Some(String::from(TEMPLATE_COPYRIGHT)),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{FHIR_CM, FHIR_VS, implicit_parts, percent_decode};
-
-    #[test]
-    fn percent_encoding_decodes_and_a_stray_percent_is_refused() {
-        assert_eq!(
-            percent_decode("%3C%3C%20404684003%20%7Cfinding%7C").as_deref(),
-            Some("<< 404684003 |finding|")
-        );
-        assert_eq!(percent_decode("<< 1").as_deref(), Some("<< 1"));
-        assert_eq!(percent_decode("%3"), None);
-        assert_eq!(percent_decode("%zz"), None);
-    }
-
-    #[test]
-    fn implicit_urls_split_into_base_and_form() {
-        assert_eq!(
-            implicit_parts("http://snomed.info/sct?fhir_vs", FHIR_VS),
-            Some(("http://snomed.info/sct", ""))
-        );
-        assert_eq!(
-            implicit_parts(
-                "http://snomed.info/sct/11000146104/version/20260630?fhir_vs=isa/1",
-                FHIR_VS
-            ),
-            Some((
-                "http://snomed.info/sct/11000146104/version/20260630",
-                "isa/1"
-            ))
-        );
-        assert_eq!(
-            implicit_parts("http://snomed.info/sct?fhir_cm=1", FHIR_CM),
-            Some(("http://snomed.info/sct", "1"))
-        );
-        assert_eq!(
-            implicit_parts("http://snomed.info/sct?fhir_cm=1", FHIR_VS),
-            None,
-            "one key never reads the other's URI"
-        );
-        assert_eq!(
-            implicit_parts("http://snomed.info/sct?fhir_vs", FHIR_CM),
-            None
-        );
-        assert_eq!(implicit_parts("http://loinc.org/vs", FHIR_VS), None);
-        assert_eq!(
-            implicit_parts("http://snomed.info/sct?fhir_vsx", FHIR_VS),
-            None
-        );
     }
 }

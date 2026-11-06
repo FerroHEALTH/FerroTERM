@@ -8,7 +8,7 @@
 use super::{EXPRESSIONS, SnomedProvider};
 use crate::normal_form;
 use crate::provider::filter::{Filter, FilterOperator};
-use crate::provider::{CodeSystemProvider, Concept, ConceptSet, ProviderError};
+use crate::provider::{CodeSystemProvider, Concept, ConceptSet, error::ProviderError};
 use crate::stored::storage;
 use concept_graph::ordinal::Ordinal;
 use concept_store::record;

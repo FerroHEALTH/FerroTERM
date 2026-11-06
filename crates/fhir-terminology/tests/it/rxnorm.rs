@@ -10,7 +10,7 @@ use ferroterm_testkit::rxnorm::{
 };
 use fhir_terminology::provider::declaration::{Capability, ContentMode};
 use fhir_terminology::provider::filter::{Filter, FilterOperator};
-use fhir_terminology::provider::{CodeSystemProvider, Concept, ProviderError};
+use fhir_terminology::provider::{CodeSystemProvider, Concept, error::ProviderError};
 use fhir_terminology::rxnorm::{OpenError, RxNormProvider, SYSTEM};
 
 fn provider() -> (tempfile::TempDir, RxNormProvider) {

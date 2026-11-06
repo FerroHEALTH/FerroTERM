@@ -13,7 +13,7 @@ use ferroterm_testkit::classification::{
 use fhir_terminology::classification::{ClassificationProvider, OpenError};
 use fhir_terminology::provider::declaration::{Capability, ContentMode, HierarchyMeaning};
 use fhir_terminology::provider::filter::{Filter, FilterOperator};
-use fhir_terminology::provider::{CodeSystemProvider, Concept, ProviderError};
+use fhir_terminology::provider::{CodeSystemProvider, Concept, error::ProviderError};
 
 fn claml() -> (tempfile::TempDir, ClassificationProvider) {
     let dir = tempfile::tempdir().expect("tempdir");

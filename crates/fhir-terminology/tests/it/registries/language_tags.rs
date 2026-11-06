@@ -6,10 +6,10 @@
 use concept_graph::subsumption::Outcome;
 use fhir_terminology::conceptmap::store::ConceptMapStore;
 use fhir_terminology::operations::expand::ExpandInput;
-use fhir_terminology::operations::{Invocation, OperationError, Sources, expand};
+use fhir_terminology::operations::{Invocation, OperationError, expand, sources::Sources};
 use fhir_terminology::provider::declaration::ContentMode;
 use fhir_terminology::provider::filter::FilterOperator;
-use fhir_terminology::provider::{CodeSystemProvider, ProviderError};
+use fhir_terminology::provider::{CodeSystemProvider, error::ProviderError};
 use fhir_terminology::registries::bcp47::{Analysis, Bcp47Provider};
 use fhir_terminology::registries::{bcp13, bcp47, subtags};
 use fhir_terminology::valueset::expansion::ParameterValue;

@@ -19,7 +19,7 @@ use crate::provider::declaration::{
 use crate::provider::filter::{Filter, FilterOperator};
 use crate::provider::{
     CodeSystemProvider, Concept, ConceptSet, Designation, DesignationUse, Hierarchy, Identity,
-    Located, Property, PropertyValue, ProviderError, Status,
+    Located, Property, PropertyValue, Status, error::ProviderError,
 };
 use crate::registries::interned::Interned;
 

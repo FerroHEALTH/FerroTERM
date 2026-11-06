@@ -7,7 +7,7 @@
 use std::collections::BTreeMap;
 use std::sync::{PoisonError, RwLock};
 
-use crate::provider::{Concept, ProviderError};
+use crate::provider::{Concept, error::ProviderError};
 
 /// The codes a grammar system has met, by canonical spelling, each with the
 /// ordinal it answers on.

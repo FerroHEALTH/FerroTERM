@@ -9,7 +9,9 @@ use std::sync::Arc;
 use fhir_terminology::fhir_core::CoreTerminology;
 
 use crate::artefact::ReadError;
-use crate::persistence::{Closure, HistoryEntry, Method, Record, ResourceType, StoreError};
+use crate::persistence::{
+    HistoryEntry, Method, Record, ResourceType, StoreError, closure::Closure,
+};
 use crate::state::AppState;
 use crate::state::duplicate::{duplicate_canonicals, in_write_order, same_canonical};
 use crate::state::ids::canonical;

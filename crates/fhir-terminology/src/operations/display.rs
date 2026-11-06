@@ -13,7 +13,7 @@ use std::sync::Arc;
 use super::Issue;
 use crate::language;
 use crate::provider::declaration::ContentMode;
-use crate::provider::{CodeSystemProvider, Concept, ProviderError};
+use crate::provider::{CodeSystemProvider, Concept, error::ProviderError};
 use crate::text_match;
 
 /// One display a concept accepts, with the language it is in.

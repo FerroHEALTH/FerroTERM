@@ -3,7 +3,7 @@
 [package]
 name = "sct-scg"
 description = "The SNOMED CT Compositional Grammar lexer, parser, and printer"
-version = "0.1.143"
+version = "0.1.144"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

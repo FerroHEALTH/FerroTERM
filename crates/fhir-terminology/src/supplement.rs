@@ -13,7 +13,7 @@ use crate::provider::compose::Compose;
 use crate::provider::declaration::Declaration;
 use crate::provider::{
     CodeSystemProvider, Concept, ConceptSet, Designation, Hierarchy, Identity, ImplicitMetadata,
-    Located, MapSelection, Property, ProviderError, Standing, Status, Successor,
+    Located, MapSelection, Property, Standing, Status, Successor, error::ProviderError,
 };
 
 /// What a supplement adds to one concept.

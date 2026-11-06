@@ -171,7 +171,7 @@ fn run_labcodeset(cli: &Cli, out: &Path) -> Result<Option<labcodeset::Report>, R
         .is_some_and(|e| e.eq_ignore_ascii_case("zip"))
     {
         scratch = tempfile::tempdir().map_err(RunError::Scratch)?;
-        archive::unpack_labcodeset(labcodeset, scratch.path())?
+        archive::sources::unpack_labcodeset(labcodeset, scratch.path())?
     } else {
         labcodeset.clone()
     };
@@ -222,7 +222,7 @@ fn run_rxnorm(cli: &Cli, out: &Path) -> Result<Option<rxnorm::Report>, RunError>
     let scratch;
     let root = if rxnorm.is_file() {
         scratch = tempfile::tempdir().map_err(RunError::Scratch)?;
-        archive::unpack_rxnorm(rxnorm, scratch.path())?
+        archive::sources::unpack_rxnorm(rxnorm, scratch.path())?
     } else {
         rxnorm.clone()
     };
@@ -250,7 +250,7 @@ fn run_loinc(cli: &Cli, out: &Path) -> Result<Option<loinc::Report>, RunError> {
     let scratch;
     let root = if loinc.is_file() {
         scratch = tempfile::tempdir().map_err(RunError::Scratch)?;
-        archive::unpack_loinc(loinc, scratch.path())?
+        archive::sources::unpack_loinc(loinc, scratch.path())?
     } else {
         loinc.clone()
     };
@@ -298,7 +298,7 @@ fn run_classification(cli: &Cli, out: &Path) -> Result<Option<classification::Re
             .is_some_and(|e| e.eq_ignore_ascii_case("zip"))
         {
             scratch = tempfile::tempdir().map_err(RunError::Scratch)?;
-            archive::unpack_claml(claml, scratch.path())?
+            archive::sources::unpack_claml(claml, scratch.path())?
         } else {
             claml.clone()
         };
@@ -321,7 +321,7 @@ fn run_classification(cli: &Cli, out: &Path) -> Result<Option<classification::Re
                     || String::from("delivery"),
                     |n| n.trim_end_matches(".zip").to_owned(),
                 );
-            archive::unpack_dhd(dhd, &scratch.path().join(name))?
+            archive::sources::unpack_dhd(dhd, &scratch.path().join(name))?
         } else {
             dhd.clone()
         };
@@ -353,7 +353,7 @@ fn run_classification(cli: &Cli, out: &Path) -> Result<Option<classification::Re
     for (i, path) in cli.icd10cm.iter().enumerate() {
         if path.is_file() {
             let into = scratch.path().join(i.to_string());
-            roots.push(archive::unpack_icd10cm(path, &into)?);
+            roots.push(archive::sources::unpack_icd10cm(path, &into)?);
         } else {
             roots.push(path.clone());
         }

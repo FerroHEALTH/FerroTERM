@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use fhir_terminology::fhir_codesystem::provider::FhirCodeSystem;
-use fhir_terminology::operations::{OperationError, Sources};
+use fhir_terminology::operations::{OperationError, sources::Sources};
 use fhir_terminology::provider::declaration::ContentMode;
 use fhir_terminology::registry::Registry;
 use fhir_terminology::supplement::Supplement;

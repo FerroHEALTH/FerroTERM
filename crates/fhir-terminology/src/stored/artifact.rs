@@ -21,7 +21,7 @@ use super::{MANIFEST_VERSION, OpenError, primary_subtag, side_file, storage};
 use crate::artifact::MANIFEST_FILE;
 use crate::provider::{
     Concept, ConceptSet, Designation, DesignationUse, Hierarchy, Located, Property, PropertyValue,
-    ProviderError,
+    error::ProviderError,
 };
 
 /// Whether an artifact carries a hierarchy file.

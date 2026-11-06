@@ -8,7 +8,7 @@ use ferroterm_testkit::snomed::{
     ANIMAL, CAT, DOG, EDITION, FUR, Item, MODULE_CONCEPT, PETS, VERSION, item, sctid,
 };
 use fhir_terminology::provider::filter::{Filter, FilterOperator};
-use fhir_terminology::provider::{CodeSystemProvider, ProviderError};
+use fhir_terminology::provider::{CodeSystemProvider, error::ProviderError};
 use fhir_terminology::snomed::SYSTEM;
 
 use super::provider;

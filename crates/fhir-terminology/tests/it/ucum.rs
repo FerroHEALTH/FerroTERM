@@ -11,10 +11,10 @@ use fhir_terminology::conceptmap::store::ConceptMapStore;
 use fhir_terminology::operations::expand::ExpandInput;
 use fhir_terminology::operations::value_set_validate_code::ValueSetValidateInput;
 use fhir_terminology::operations::{
-    Invocation, OperationError, Sources, expand, subsumes, value_set_validate_code,
+    Invocation, OperationError, expand, sources::Sources, subsumes, value_set_validate_code,
 };
 use fhir_terminology::provider::filter::{Filter, FilterOperator};
-use fhir_terminology::provider::{CodeSystemProvider, ProviderError};
+use fhir_terminology::provider::{CodeSystemProvider, error::ProviderError};
 use fhir_terminology::registries::ucum::essence::ESSENCE_DATA;
 use fhir_terminology::registries::ucum::grammar::{GrammarError, parse};
 use fhir_terminology::registries::ucum::provider::{URL, UcumProvider};

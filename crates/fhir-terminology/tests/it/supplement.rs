@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use fhir_terminology::provider::filter::{Filter, FilterOperator};
 use fhir_terminology::provider::{
-    CodeSystemProvider, Designation, MapSelection, Property, PropertyValue, ProviderError,
+    CodeSystemProvider, Designation, MapSelection, Property, PropertyValue, error::ProviderError,
 };
 use fhir_terminology::registries::bcp13::Bcp13Provider;
 use fhir_terminology::snomed::{SYSTEM, SnomedProvider};

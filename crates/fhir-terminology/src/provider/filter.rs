@@ -11,7 +11,7 @@
 
 use regex::Regex;
 
-use crate::provider::{CodeSystemProvider, Concept, ConceptSet, Hierarchy, ProviderError};
+use crate::provider::{CodeSystemProvider, Concept, ConceptSet, Hierarchy, error::ProviderError};
 
 /// `ValueSet.compose.include.filter.op`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -8,7 +8,7 @@ use super::{ComposeError, Gathered, Item, Options, Page, STATUS_SCAN_LIMIT, Sele
 use crate::language;
 use crate::provider::compose::Compose;
 use crate::provider::filter::{Filter, FilterOperator};
-use crate::provider::{CodeSystemProvider, Concept, ConceptSet, Hierarchy, ProviderError};
+use crate::provider::{CodeSystemProvider, Concept, ConceptSet, Hierarchy, error::ProviderError};
 
 /// The page `options` asks for, over the order the compose stated.
 ///

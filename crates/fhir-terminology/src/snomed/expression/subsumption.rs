@@ -6,7 +6,7 @@
 //! requirement of one met by the other.
 
 use super::{Attribute, Expanded, Subject, Term, Value};
-use crate::provider::{Concept, ProviderError};
+use crate::provider::{Concept, error::ProviderError};
 use crate::snomed::SnomedProvider;
 use crate::stored::storage;
 use concept_graph::attributes::ValueRef;
