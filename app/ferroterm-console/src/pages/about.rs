@@ -15,8 +15,10 @@ use crate::pages::parts::{failure, refusal_of};
 use crate::request::Request;
 use crate::shell::{PRODUCT, VERSION};
 
-/// The library the console is drawn with, at the version its manifest pins.
-pub(crate) const FERROUI: &str = "ferrohealth-ui 0.6.7";
+/// Names the library the console is drawn with, at the version it was built against.
+fn ferroui() -> String {
+    format!("ferrohealth-ui {}", ferrohealth_ui::serve::VERSION)
+}
 
 /// The id of the self-description's Copy button.
 const COPY_ID: &str = "about-copy";
@@ -95,7 +97,7 @@ pub(crate) async fn page(request: Request) -> Html {
             versions: vec![
                 (tr(locale, Msg::AboutServer), Html::text(server)),
                 (tr(locale, Msg::AboutFhirRoots), Html::text(roots())),
-                (tr(locale, Msg::AboutFerroui), Html::text(FERROUI)),
+                (tr(locale, Msg::AboutFerroui), Html::text(ferroui())),
             ],
             manufacturer: Manufacturer {
                 licence: tr(locale, Msg::AboutLicence),
@@ -123,7 +125,7 @@ const BOOK: &str = "https://ferroterm.eu/docs/";
 
 #[cfg(test)]
 mod tests {
-    use super::FERROUI;
+    use super::ferroui;
 
     #[test]
     fn about_names_the_library_version_the_manifest_pins() {
@@ -136,6 +138,6 @@ mod tests {
             .and_then(|rest| rest.split_once("\"=").map(|(_, pinned)| pinned))
             .and_then(|pinned| pinned.split_once('"').map(|(version, _)| version))
             .expect("the manifest pins ferrohealth-ui exactly");
-        assert_eq!(format!("ferrohealth-ui {pin}"), FERROUI);
+        assert_eq!(format!("ferrohealth-ui {pin}"), ferroui());
     }
 }
