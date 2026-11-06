@@ -5,9 +5,10 @@
 //!
 //! The service validates a presented credential and issues none: the crate
 //! reads each `[auth]` issuer's metadata and key set, checks every access
-//! token under RFC 9068 (or, under `mode = "introspection"`, at the issuer's
-//! introspection endpoint, RFC 7662) and every `[[auth.basic.users]]`
-//! credential, answers
+//! token under RFC 9068 (or, for an issuer whose `[[auth.issuer]]` table says
+//! `mode = "introspection"`, at its introspection endpoint, RFC 7662),
+//! classifies the caller by its issuer's `kind`, and checks every
+//! `[[auth.basic.users]]` credential, a person's alone, and answers
 //! the status and challenge of a refusal (RFC 6750 §3.1) and writes the audit
 //! line. Every route but `GET /health` requires the product scope, which
 //! `[auth] product_scope` names and which defaults to [`SYNC_SCOPE`]. A
@@ -55,16 +56,16 @@ pub enum AuthError {
     /// The section breaks a rule, an enabled section naming no issuer and no
     /// Basic user among them.
     #[error(
-        "[auth] is refused; the admin listener needs an issuer and an audience, or Basic users, or `[auth] enabled = false` on a network only trusted callers reach"
+        "[auth] is refused; the admin listener needs an [[auth.issuer]] table with its issuer, kind and audience, or Basic users, or `[auth] enabled = false` on a network only trusted callers reach"
     )]
     Config {
         /// The rule.
         #[source]
         source: Box<ConfigError>,
     },
-    /// The introspecting issuer's metadata could not be read, names no
-    /// introspection endpoint, or the `[auth.introspection]` settings break a
-    /// rule.
+    /// An introspecting issuer's metadata could not be read, names no
+    /// introspection endpoint, or its `[auth.issuer.introspection]` table
+    /// breaks a rule.
     #[error("the introspection endpoint of {issuer} could not be set up")]
     Introspector {
         /// The issuer identifier.
@@ -81,6 +82,16 @@ pub enum AuthError {
         /// What the resource server reported.
         #[source]
         source: Box<ResourceError>,
+    },
+    /// A `[[auth.basic.users]]` entry is granted a `system/` scope: a Basic
+    /// credential is a person's, and a machine authenticates with a client
+    /// credentials token (RFC 6749 §4.4).
+    #[error(
+        "the Basic user {user} is granted a system/ scope; a Basic user is a person, so give a machine a client credentials client of a machines issuer"
+    )]
+    BasicMachine {
+        /// The user-id.
+        user: String,
     },
 }
 
@@ -105,7 +116,9 @@ impl AdminAuth {
     /// # Errors
     ///
     /// Returns [`AuthError::Config`] for a section that breaks a rule, an
-    /// enabled one admitting no credential among them,
+    /// enabled one admitting no credential and the removed flat `issuer`
+    /// among them, [`AuthError::BasicMachine`] for a Basic user granted a
+    /// `system/` scope,
     /// [`AuthError::Introspector`] for an introspecting issuer that cannot be
     /// set up, and
     /// [`AuthError::Issuer`] for an issuer whose metadata or key set could
@@ -117,9 +130,12 @@ impl AdminAuth {
         let resolved = section.resolve().map_err(|source| AuthError::Config {
             source: Box::new(source),
         })?;
+        if let Some(user) = basic_machine(section) {
+            return Err(AuthError::BasicMachine { user });
+        }
         let realm = resolved.realm.unwrap_or_else(|| String::from(REALM));
         let mut gate = Gate::open().with_realm(realm.clone());
-        if !resolved.issuers.is_empty() {
+        if !resolved.issuers.is_empty() || !resolved.introspection.is_empty() {
             let mut issuers = IssuerSet::new();
             for settings in resolved.issuers {
                 let issuer = settings.issuer.clone();
@@ -131,17 +147,17 @@ impl AdminAuth {
                 })?;
                 issuers = issuers.with(Arc::new(server));
             }
+            for settings in resolved.introspection {
+                let issuer = settings.issuer.clone();
+                let checker = Introspector::discover(settings).await.map_err(|source| {
+                    AuthError::Introspector {
+                        issuer,
+                        source: Box::new(source),
+                    }
+                })?;
+                issuers = issuers.with_introspector(Arc::new(checker));
+            }
             gate = gate.with_bearer(Arc::new(issuers));
-        }
-        if let Some(settings) = resolved.introspection {
-            let issuer = settings.issuer.clone();
-            let checker = Introspector::discover(settings).await.map_err(|source| {
-                AuthError::Introspector {
-                    issuer,
-                    source: Box::new(source),
-                }
-            })?;
-            gate = gate.with_bearer(Arc::new(checker));
         }
         if let Some(store) = resolved.basic {
             gate = gate.with_basic(Arc::new(store));
@@ -187,6 +203,17 @@ impl AdminAuth {
         };
         router.layer(AuthLayer::new(self.gate.clone(), classify).with_render(render))
     }
+}
+
+/// The first `[[auth.basic.users]]` entry granted a `system/` scope, which
+/// only a machine holds (SMART App Launch 2.2.0, Scopes and Launch Context).
+fn basic_machine(section: &AuthSection) -> Option<String> {
+    section
+        .basic
+        .iter()
+        .flat_map(|basic| &basic.users)
+        .find(|user| user.scopes.iter().any(|scope| scope.starts_with("system/")))
+        .map(|user| user.user.clone())
 }
 
 /// The route template the audit line records for `path`.

@@ -40,7 +40,7 @@ async fn rotating_issuer(mock: &MockServer, first: &SigningKey, second: &Signing
 /// `interval_seconds`.
 async fn with_refresh_interval(mock: &MockServer, interval_seconds: u64) -> Server {
     let mut setup = SmartSetup::for_issuer(&mock.uri());
-    setup.auth.jwks_refresh_interval_seconds = interval_seconds;
+    setup.issuer_mut().jwks_refresh_interval_seconds = interval_seconds;
     Server::start_persisting_with_smart_setup(setup).await
 }
 
@@ -163,6 +163,6 @@ async fn a_guarded_surface_without_an_issuer_refuses_the_start() {
             .expect_err("the start is refused");
         let reason = error.to_string();
         assert!(reason.contains(named), "{reason}");
-        assert!(reason.contains("FERROTERM__AUTH__ISSUER"), "{reason}");
+        assert!(reason.contains("[[auth.issuer]]"), "{reason}");
     }
 }

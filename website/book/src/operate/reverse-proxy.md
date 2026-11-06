@@ -157,13 +157,19 @@ The server takes the SMART App Launch resource-server role
 FerroHEALTH crate `ferrohealth-smart`. It issues no tokens of its own: your
 authorization server does that, and FerroTERM only reads its public metadata.
 A server that names `FERROTERM__TERMINOLOGY__RESOURCES` or `FERROTERM__ADMIN__LISTEN` refuses to
-start until `[auth]` names the issuer and an audience, or turns authentication
-off ([Configuration](configuration.md#authentication)).
+start until `[auth]` names the issuer in an `[[auth.issuer]]` table with its
+kind and an audience, or turns authentication off
+([Configuration](configuration.md#authentication)). The table lives in the
+configuration file:
 
-```
-FERROTERM__FHIR__BASE_URL=https://tx.example.org
-FERROTERM__AUTH__ISSUER=https://auth.example.org/realms/tx
-FERROTERM__AUTH__AUDIENCE='["https://tx.example.org"]'
+```toml
+[fhir]
+base_url = "https://tx.example.org"
+
+[[auth.issuer]]
+issuer = "https://auth.example.org/realms/tx"
+kind = "machines"
+audience = ["https://tx.example.org"]
 ```
 
 At start the server reads the issuer's metadata, at
@@ -228,9 +234,12 @@ The token is an RFC 9068 JWT access token signed by the issuer with an
 asymmetric algorithm. The server checks the signature against the key set,
 `iss`, `exp`, `nbf` and `iat` within the clock skew, the audience as described
 below, the `typ` header, which must be `at+jwt` (RFC 9068 §4), and the claims
-RFC 9068 §2.2 requires (`sub`, `client_id`, `jti`). An issuer that mints plain
-JWTs is admitted with `[auth] token_profile = "jwt"`, which still refuses a
-token typed as another kind (an ID token, for example).
+RFC 9068 §2.2 requires (`sub`, `client_id`, `jti`), as the issuer's profile
+sets them. An issuer that mints plain JWTs is admitted with `token_types =
+["JWT"]` on its `[[auth.issuer]]` table, or the preset of its server (such as
+`profile = "keycloak"`). Every token is then classified by the issuer's `kind`:
+a `machines` issuer admits only the client credentials tokens of its backend
+clients, and a token that matches no caller of that kind answers `401`.
 
 ### The audience a token carries
 
@@ -243,7 +252,7 @@ that mints the claim from that request. Both are this server.
 
 The write routes accept every served version's base derived from
 `FERROTERM__FHIR__BASE_URL`, with and without a trailing slash, plus every
-`[auth] audience`. With
+`audience` of the issuer's `[[auth.issuer]]` table. With
 `FERROTERM__FHIR__BASE_URL=https://tx.example.org` the server accepts
 `https://tx.example.org/r4`, `/r4b`, `/r5`, and `/r6` under that host. A token
 passes when its `aud` holds any of them, which RFC 7519 §4.1.3 asks of a
@@ -262,24 +271,24 @@ and a value that differs from the one the console sends refuses every write
 from a reader who signed in successfully.
 
 The root URL is not in the set: the server serves no FHIR base there. Name it
-in `[auth] audience` when your issuer mints it anyway.
+in the issuer's `audience` when your issuer mints it anyway.
 
 The admin listener is not a FHIR endpoint, so no version base is an audience
-for it: it accepts `[auth] audience` alone.
+for it: it accepts the issuer's `audience` alone.
 
-`[auth] audience` is required with an issuer, so every token is checked for an
-audience of this server (RFC 9068 §4); a server that names an issuer and no
-audience refuses to start. Set `FERROTERM__FHIR__BASE_URL` in any deployment behind a
+An `audience` is required on every `[[auth.issuer]]` table, so every token is
+checked for an audience of this server (RFC 9068 §4); a server that names an
+issuer and no audience refuses to start. Set `FERROTERM__FHIR__BASE_URL` in any deployment behind a
 proxy as well: it is what the capability statements publish.
 
 A server-to-server client obtains its token through SMART Backend Services,
 which is the flow a sync service uses
 (<https://hl7.org/fhir/smart-app-launch/backend-services.html>):
 `client_credentials` with `private_key_jwt`, the `system/` scopes above, and
-the token presented as `Authorization: Bearer`. A machine caller that has no
-client at the authorization server authenticates with HTTP Basic as one of the
-`[[auth.basic.users]]` instead; its configured scopes decide what it reaches.
-The server accepts no static token.
+the token presented as `Authorization: Bearer`. Every machine caller takes a
+client at the authorization server: a Basic user is a person, and the server
+refuses to start on a Basic user granted a `system/` scope. The server accepts
+no static token.
 
 A browser client holds no secret, so it runs the standalone launch as a public
 client: the authorization code flow with PKCE

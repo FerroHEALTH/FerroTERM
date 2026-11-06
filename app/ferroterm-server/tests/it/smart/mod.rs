@@ -33,6 +33,7 @@ mod discovery;
 mod introspection;
 mod keys;
 mod scopes;
+mod shape;
 mod tokens;
 
 pub(super) const COLOURS: &str = "http://ferroterm.test/CodeSystem/colours";

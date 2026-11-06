@@ -26,12 +26,12 @@ fn random_bytes() -> [u8; 16] {
 }
 
 /// A password generated for this test run.
-fn password() -> String {
+pub(super) fn password() -> String {
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(random_bytes())
 }
 
 /// The Argon2id PHC string of `password` under a salt generated for the run.
-fn phc(password: &str) -> SecretString {
+pub(super) fn phc(password: &str) -> SecretString {
     let hash = Argon2::default()
         .hash_password_with_salt(password.as_bytes(), &random_bytes())
         .expect("hashes");
@@ -44,26 +44,27 @@ fn basic(user: &str, password: &str) -> String {
     format!("Basic {encoded}")
 }
 
-// Machine-to-machine callers authenticate with HTTP Basic (RFC 7617) as a
-// `[[auth.basic.users]]` entry beside the bearer tokens; the user's scopes
-// decide what it reaches, as a token's would.
+// A person authenticates with HTTP Basic (RFC 7617) as a `[[auth.basic.users]]`
+// entry beside the bearer tokens; the user's `user/` scopes and the product
+// scope decide what the person reaches, as a token's would. A machine takes a
+// client credentials token instead (RFC 6749 §4.4).
 #[tokio::test]
 async fn a_basic_user_writes_and_reloads_with_its_configured_scopes() {
     let key = SigningKey::generate("k1");
     let mock = issuer(&key).await;
-    let (editor, sync, wrong) = (password(), password(), password());
+    let (editor, operator, wrong) = (password(), password(), password());
     let mut setup = SmartSetup::for_issuer(&mock.uri());
     setup.auth.basic = Some(BasicSection {
         users: vec![
             BasicUser {
                 user: String::from("editor"),
                 password_hash: Some(phc(&editor)),
-                scopes: vec![String::from("system/CodeSystem.cud")],
+                scopes: vec![String::from("user/CodeSystem.cud")],
                 ..BasicUser::default()
             },
             BasicUser {
-                user: String::from("sync"),
-                password_hash: Some(phc(&sync)),
+                user: String::from("operator"),
+                password_hash: Some(phc(&operator)),
                 scopes: vec![String::from("__ferroterm.admin")],
                 ..BasicUser::default()
             },
@@ -94,7 +95,7 @@ async fn a_basic_user_writes_and_reloads_with_its_configured_scopes() {
         StatusCode::UNAUTHORIZED,
         "a wrong password"
     );
-    let response = server.send(write(basic("sync", &sync))).await;
+    let response = server.send(write(basic("operator", &operator))).await;
     assert_eq!(response.status(), StatusCode::FORBIDDEN, "no write scope");
     let response = server.send(write(basic("editor", &editor))).await;
     assert_eq!(response.status(), StatusCode::CREATED);
@@ -106,7 +107,7 @@ async fn a_basic_user_writes_and_reloads_with_its_configured_scopes() {
         .expect("response");
     assert_eq!(response.status(), StatusCode::FORBIDDEN, "no admin scope");
     let response = admin
-        .oneshot(reload(Some(basic("sync", &sync))))
+        .oneshot(reload(Some(basic("operator", &operator))))
         .await
         .expect("response");
     assert_eq!(response.status(), StatusCode::OK);

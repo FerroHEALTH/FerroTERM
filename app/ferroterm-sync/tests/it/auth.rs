@@ -14,8 +14,10 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use base64::Engine as _;
 use ferrohealth_smart::config::{
-    AuthMode, AuthSection, BasicSection, BasicUser, IntrospectionSection, IssuerKey, OauthSection,
+    AuthMode, AuthSection, BasicSection, BasicUser, IntrospectionSection, IssuerEntry, IssuerKey,
+    OauthSection,
 };
+use ferrohealth_smart::kind::IssuerKind;
 use ferroterm_sync::auth::{AdminAuth, AuthError, SYNC_SCOPE};
 use secrecy::SecretString;
 use tower::ServiceExt as _;
@@ -56,7 +58,7 @@ fn section() -> AuthSection {
                 BasicUser {
                     user: String::from("reader"),
                     password_hash: Some(phc()),
-                    scopes: vec![String::from("system/CodeSystem.rs")],
+                    scopes: vec![String::from("user/CodeSystem.rs")],
                     ..BasicUser::default()
                 },
             ],
@@ -212,17 +214,21 @@ async fn introspecting_issuer() -> MockServer {
 /// An `[auth]` introspecting the tokens of `issuer` under a client secret.
 fn introspecting(issuer: &str) -> AuthSection {
     AuthSection {
-        issuer: IssuerKey::Flat(issuer.to_owned()),
-        audience: vec![String::from(AUDIENCE)],
-        mode: AuthMode::Introspection,
-        introspection: Some(IntrospectionSection {
-            client: Some(OauthSection {
-                client_id: String::from("ferroterm-sync"),
-                client_secret: Some(SecretString::from("a-synthetic-secret")),
-                ..OauthSection::default()
+        issuer: IssuerKey::List(vec![IssuerEntry {
+            issuer: issuer.to_owned(),
+            kind: Some(IssuerKind::Machines),
+            audience: vec![String::from(AUDIENCE)],
+            mode: AuthMode::Introspection,
+            introspection: Some(IntrospectionSection {
+                client: Some(OauthSection {
+                    client_id: String::from("ferroterm-sync"),
+                    client_secret: Some(SecretString::from("a-synthetic-secret")),
+                    ..OauthSection::default()
+                }),
+                ..IntrospectionSection::default()
             }),
-            ..IntrospectionSection::default()
-        }),
+            ..IssuerEntry::default()
+        }]),
         ..AuthSection::default()
     }
 }
@@ -441,4 +447,71 @@ async fn every_refusal_and_error_is_a_problem_that_quotes_nothing_it_was_sent() 
     ] {
         assert!(!bodies.contains(sent), "{bodies}");
     }
+}
+
+/// The reason the listener refuses to start under `section`, with its causes.
+async fn refusal(section: &AuthSection) -> String {
+    let error = AdminAuth::start(section)
+        .await
+        .expect_err("the start is refused");
+    let mut reason = error.to_string();
+    let mut source = std::error::Error::source(&error);
+    while let Some(cause) = source {
+        reason.push_str(": ");
+        reason.push_str(&cause.to_string());
+        source = cause.source();
+    }
+    reason
+}
+
+// No specification governs the configuration: our own design over
+// `ferrohealth-smart` 0.9.0, whose `[auth]` names every issuer in its own
+// `[[auth.issuer]]` table with its kind (#1140).
+#[tokio::test]
+async fn the_flat_issuer_of_the_old_shape_refuses_the_start_naming_the_table() {
+    let flat = AuthSection {
+        issuer: IssuerKey::Flat(String::from("https://as.example.org")),
+        ..AuthSection::default()
+    };
+    let reason = refusal(&flat).await;
+    assert!(reason.contains("auth.issuer = "), "{reason}");
+    assert!(reason.contains("[[auth.issuer]]"), "{reason}");
+}
+
+#[tokio::test]
+async fn an_issuer_without_a_kind_refuses_the_start_naming_the_key() {
+    let issuer = MockServer::start().await;
+    let mut section = introspecting(&issuer.uri());
+    if let IssuerKey::List(entries) = &mut section.issuer {
+        for entry in entries.iter_mut() {
+            entry.kind = None;
+        }
+    }
+    let reason = refusal(&section).await;
+    assert!(reason.contains("auth.issuer.kind"), "{reason}");
+}
+
+// A Basic credential is a person's, and a `system/` scope is a backend
+// service's grant (SMART App Launch 2.2.0, Scopes and Launch Context), so a
+// machine authenticates with a client credentials token (RFC 6749 §4.4).
+#[tokio::test]
+async fn a_basic_user_with_a_system_scope_refuses_the_start_naming_the_user() {
+    let machine = AuthSection {
+        basic: Some(BasicSection {
+            users: vec![BasicUser {
+                user: String::from("batch-loader"),
+                password_hash: Some(phc()),
+                scopes: vec![
+                    String::from("system/CodeSystem.rs"),
+                    String::from(SYNC_SCOPE),
+                ],
+                ..BasicUser::default()
+            }],
+            ..BasicSection::default()
+        }),
+        ..AuthSection::default()
+    };
+    let reason = refusal(&machine).await;
+    assert!(reason.contains("batch-loader"), "{reason}");
+    assert!(reason.contains("system/"), "{reason}");
 }

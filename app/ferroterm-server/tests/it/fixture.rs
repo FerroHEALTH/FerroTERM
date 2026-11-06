@@ -8,7 +8,8 @@ use std::sync::Arc;
 use axum::Router;
 use axum::body::Body;
 use ferrohealth_server::section::ServerSection;
-use ferrohealth_smart::config::{AuthSection, IssuerKey};
+use ferrohealth_smart::config::{AuthSection, IssuerEntry, IssuerKey};
+use ferrohealth_smart::kind::IssuerKind;
 use ferrohealth_telemetry::section::TelemetrySection;
 use ferrohealth_telemetry::telemetry::{Service, Telemetry};
 use ferroterm_server::config::{AdminSection, Config, FhirSection, TerminologySection};
@@ -36,16 +37,28 @@ pub(crate) struct SmartSetup {
 }
 
 impl SmartSetup {
-    /// The `[auth]` table of `issuer` with the audience [`AUDIENCE`], and
-    /// everything else at its default.
+    /// The `[auth]` table of `issuer`, a `machines` issuer with the audience
+    /// [`AUDIENCE`], and everything else at its default.
     pub(crate) fn for_issuer(issuer: &str) -> Self {
         Self {
             auth: AuthSection {
-                issuer: IssuerKey::Flat(issuer.to_owned()),
-                audience: vec![String::from(AUDIENCE)],
+                issuer: IssuerKey::List(vec![IssuerEntry {
+                    issuer: issuer.to_owned(),
+                    kind: Some(IssuerKind::Machines),
+                    audience: vec![String::from(AUDIENCE)],
+                    ..IssuerEntry::default()
+                }]),
                 ..AuthSection::default()
             },
             base_url: None,
+        }
+    }
+
+    /// The one `[[auth.issuer]]` table [`SmartSetup::for_issuer`] wrote.
+    pub(crate) fn issuer_mut(&mut self) -> &mut IssuerEntry {
+        match &mut self.auth.issuer {
+            IssuerKey::List(entries) => entries.first_mut().expect("the issuer table"),
+            IssuerKey::Flat(_) => panic!("the setup writes the table form"),
         }
     }
 }
@@ -266,7 +279,7 @@ impl Server {
     ) -> Self {
         let mut setup = SmartSetup::for_issuer(issuer);
         if let Some(audience) = audience {
-            setup.auth.audience = vec![audience.to_owned()];
+            setup.issuer_mut().audience = vec![audience.to_owned()];
         }
         if let Some(scope) = admin_scope {
             setup.auth.product_scope = scope.to_owned();

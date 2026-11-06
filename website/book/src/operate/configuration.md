@@ -52,8 +52,9 @@ format = "json"
 state_dir = "/data/state"
 deployment = "binary"
 
-[auth]
+[[auth.issuer]]
 issuer = "https://auth.example.org/realms/tx"
+kind = "machines"
 audience = ["https://tx.example.org"]
 ```
 
@@ -70,9 +71,9 @@ audience = ["https://tx.example.org"]
 | `server.listen` (`FERROTERM__SERVER__LISTEN`) | The socket address to bind, an IP address and a port; a host name is refused. | `127.0.0.1:8080` (the container image sets `0.0.0.0:8080`) |
 | `[server]` (`FERROTERM__SERVER__<KEY>`) | The request timeout, the body limit, the drain, the overload bound, the trusted proxies, compression and TLS of both listeners (see [The HTTP server](#the-http-server)). | see [The HTTP server](#the-http-server) |
 | `admin.listen` (`FERROTERM__ADMIN__LISTEN`) | The socket address of the admin listener, which serves `POST /reload` and nothing else (see [Reloading the served set](#reloading-the-served-set)). Every route on it requires the admin scope (see [Authentication](#authentication)), and the server refuses to start with it until `[auth]` names an issuer or turns authentication off. Unset or empty, the server binds no second listener and `SIGHUP` is the only reload trigger. | none (no admin listener) |
-| `fhir.base_url` (`FERROTERM__FHIR__BASE_URL`) | The URL clients reach this server at, without a version prefix (`https://tx.example.org`); a trailing slash is dropped. Each version states it as `implementation.url` in its capability statements, so a client behind a reverse proxy learns the address it should use rather than the socket the process bound. Setting it also adds every served version's base under this URL to the audiences the write routes accept, beside `[auth] audience` (see [Behind a reverse proxy](reverse-proxy.md#the-audience-a-token-carries)). A deployment that names none states no URL. | none |
+| `fhir.base_url` (`FERROTERM__FHIR__BASE_URL`) | The URL clients reach this server at, without a version prefix (`https://tx.example.org`); a trailing slash is dropped. Each version states it as `implementation.url` in its capability statements, so a client behind a reverse proxy learns the address it should use rather than the socket the process bound. Setting it also adds every served version's base under this URL to the audiences the write routes accept, beside each issuer's `audience` (see [Behind a reverse proxy](reverse-proxy.md#the-audience-a-token-carries)). A deployment that names none states no URL. | none |
 | `fhir.security_services` (`FERROTERM__FHIR__SECURITY_SERVICES`) | The authentication in front of the server, as codes of the FHIR `restful-security-service` value set (`OAuth`, `SMART-on-FHIR`, `Basic`, `Certificates`, `Kerberos`, `NTLM`). The codes declare what a proxy enforces, in `CapabilityStatement.rest.security.service`; with an `[auth]` issuer, `SMART-on-FHIR` is added to whatever you declare here. Any other code refuses the start. | none |
-| `[auth]` (`FERROTERM__AUTH__<KEY>`) | Who may write and reach the admin listener (see [Authentication](#authentication)). Several issuers, `[[auth.basic.users]]` and the token rules belong in the file; a single key can be a variable, such as `FERROTERM__AUTH__ISSUER` or `FERROTERM__AUTH__ENABLED`. | see [Authentication](#authentication) |
+| `[auth]` (`FERROTERM__AUTH__<KEY>`) | Who may write and reach the admin listener (see [Authentication](#authentication)). Every issuer is an `[[auth.issuer]]` table in the file, beside `[[auth.basic.users]]`; a key of `[auth]` itself can be a variable, such as `FERROTERM__AUTH__ENABLED` or `FERROTERM__AUTH__PRODUCT_SCOPE`. | see [Authentication](#authentication) |
 | `usage_report.enabled` (`FERROTERM__USAGE_REPORT__ENABLED`) | Whether the server sends the [usage report](usage-report.md) to FerroPULSE, `true` or `false`. `true` cannot override CI detection: with `GITHUB_ACTIONS` or `CI` set to `true` or `1`, the report is off. | `true` |
 | `usage_report.endpoint` (`FERROTERM__USAGE_REPORT__ENDPOINT`) | The collector the usage report is posted to: an `https` URL without credentials, or plain `http` to a loopback host. The server refuses to start on anything else. | `https://report.ferropulse.eu/v1/report` |
 | `usage_report.state_dir` (`FERROTERM__USAGE_REPORT__STATE_DIR`) | A writable directory where the server keeps its own state: the usage report's instance id and the time of its last start report. Without one, or with one the server cannot write, the usage report is off. | none (the compose file sets `/data/state`, on a named volume; the container image sets none) |
@@ -195,57 +196,77 @@ surface stays open. The write routes (`POST`, `PUT` and `DELETE` on
 route of the admin listener require a credential.
 
 Authentication is on by default and fails closed: a server that names
-`terminology.resources` or `admin.listen` refuses to start until
-`[auth]` names an issuer and an audience, or says `enabled = false`. A
+`terminology.resources` or `admin.listen` refuses to start until `[auth]`
+names an issuer in an `[[auth.issuer]]` table, or says `enabled = false`. A
 read-only server with neither starts without `[auth]`.
 
-```sh
-FERROTERM__AUTH__ISSUER=https://auth.example.org/realms/tx
-FERROTERM__AUTH__AUDIENCE='["https://tx.example.org"]'
-# or, on a network only trusted callers reach:
-FERROTERM__AUTH__ENABLED=false
+Each issuer is a table of its own in the configuration file, with its kind and
+its audience. A table cannot be written as a variable, so a deployment that
+authenticates its callers mounts a configuration file; on a network only
+trusted callers reach, `FERROTERM__AUTH__ENABLED=false` turns authentication
+off instead.
+
+```toml
+[[auth.issuer]]
+issuer = "https://auth.example.org/realms/tx"
+kind = "machines"
+audience = ["https://tx.example.org"]
 ```
 
-The keys of `[auth]`, in the configuration file or as
+The keys of each `[[auth.issuer]]` table:
+
+| Key | Meaning | Default |
+|---|---|---|
+| `issuer` | The issuer identifier of the authorization server whose access tokens are accepted, an `https` URL (plain `http` on a loopback host only). The server reads its metadata (RFC 8414, with OpenID Connect Discovery as the fallback) and its key set before it binds, and refuses to start when either does not answer. | none (required) |
+| `kind` | Whose tokens the issuer signs: `machines` for backend services under the client credentials grant, `persons` for people signing in to an app, or `patients`. Every token is classified by it, and one that matches no caller of that kind is refused. A `persons` token is admitted only through a client the table lists in `first_party_clients` or `delegates`. | none (required) |
+| `profile` | What the issuer's tokens look like: `rfc9068`, or the preset of a known authorization server (`keycloak`, `entra`, `okta`), each overridable key by key on the table. | `rfc9068` |
+| `audience` | The `aud` values a token may carry; one of them is required (RFC 9068 §4). The write routes also accept every served version's base under `fhir.base_url`; the admin listener accepts this list alone. | none (required) |
+| `algorithms` | The signature algorithms accepted; an HMAC algorithm refuses the start. | `RS256`, `RS384`, `PS256`, `PS384`, `ES256`, `ES384` |
+| `clock_skew_seconds` | The skew allowed on `exp`, `nbf` and `iat`, at most 300. | `60` |
+| `jwks_max_age_seconds` | How long a key set is used before it is read again. | `600` |
+| `jwks_refresh_interval_seconds` | The shortest time between two reads of the key set, so an unknown `kid` reads it at most once per interval. | `60` |
+| `jwks_file` | A key set file handed over out of band, read in place of the issuer's `jwks_uri`. | none |
+| `timeout_ms` | How long one call to the authorization server may take. | `10000` |
+| `mode` | How a bearer token is checked: `jwt`, as an RFC 9068 JWT against the issuer's key set, or `introspection`, by posting it to the issuer's introspection endpoint (RFC 7662), for an authorization server that issues tokens the server cannot read. | `jwt` |
+| `[auth.issuer.introspection]` | The introspection check under `mode = "introspection"`: `endpoint` (the issuer metadata's `introspection_endpoint` when empty), `cache_max_age_seconds` (how long an active response is used, at most until its `exp`; `60`), `cache_capacity` (`10000`), and exactly one of `client` (the client authentication of the call, with the keys of a client credentials grant: `client_id`, `client_auth`, `client_secret` or `client_secret_file`, `private_key_file`) and `bearer` (a client credentials grant whose token authorizes the call). | none |
+| `role_claims` | The claims the issuer's tokens carry roles in, each a dotted path. The server grants nothing by role, so the roles a token carries change no answer. | `roles`, `groups`, `entitlements` |
+
+The keys of `[auth]` itself, in the configuration file or as
 `FERROTERM__AUTH__<KEY>`:
 
 | Key | Meaning | Default |
 |---|---|---|
 | `enabled` | Whether the write routes and the admin listener authenticate their callers. | `true` |
-| `issuer` | The issuer identifier of the authorization server whose access tokens are accepted, an `https` URL (plain `http` on a loopback host only). The server reads its metadata (RFC 8414, with OpenID Connect Discovery as the fallback) and its key set before it binds, and refuses to start when either does not answer. `[[auth.issuer]]` entries name several issuers, each with any of the keys below that differ. | none |
-| `audience` | The `aud` values a token may carry; one of them is required (RFC 9068 §4). The write routes also accept every served version's base under `fhir.base_url`; the admin listener accepts this list alone. | none (required with an issuer) |
 | `product_scope` | The scope the admin listener requires, a string starting with `__` or a full URI (SMART App Launch 2.2.0, Scopes and Launch Context, §Extensibility). Anything else refuses the start. | `__ferroterm.admin` |
-| `algorithms` | The signature algorithms accepted; an HMAC algorithm refuses the start. | `RS256`, `RS384`, `PS256`, `PS384`, `ES256`, `ES384` |
-| `token_profile` | `rfc9068`, which requires the `at+jwt` type and the RFC 9068 claims (`iss`, `sub`, `aud`, `exp`, `iat`, `jti`, `client_id`), or `jwt` for an issuer that mints plain JWTs. | `rfc9068` |
-| `clock_skew_seconds` | The skew allowed on `exp`, `nbf` and `iat`, at most 300. | `60` |
-| `jwks_max_age_seconds` | How long a key set is used before it is read again. | `600` |
-| `jwks_refresh_interval_seconds` | The shortest time between two reads of the key set, so an unknown `kid` reads it at most once per interval. | `60` |
-| `jwks_file` | A key set file handed over out of band, read in place of the issuer's `jwks_uri`. | none |
-| `ca_file` | A PEM file of trust roots added to the platform's for every issuer's discovery document and key set, and under `mode = "introspection"` for the metadata, introspection and token calls too, for an issuer behind a private certificate authority. A file that cannot be read or holds no certificate refuses the start. | none (the platform's roots) |
-| `timeout_ms` | How long one call to the authorization server may take. | `10000` |
-| `mode` | How a bearer token is checked: `jwt`, as an RFC 9068 JWT against the issuer's key set, or `introspection`, by posting it to the issuer's introspection endpoint (RFC 7662), for an authorization server that issues tokens the server cannot read. `introspection` takes one flat `issuer` and no `jwks_file`. | `jwt` |
-| `[auth.introspection]` | The introspection check under `mode = "introspection"`: `endpoint` (the issuer metadata's `introspection_endpoint` when empty), `cache_max_age_seconds` (how long an active response is used, at most until its `exp`; `60`), `cache_capacity` (`10000`), and exactly one of `client` (the client authentication of the call, with the keys of a client credentials grant: `client_id`, `client_auth`, `client_secret` or `client_secret_file`, `private_key_file`) and `bearer` (a client credentials grant whose token authorizes the call). | none |
+| `ca_file` | A PEM file of trust roots added to the platform's for every issuer's discovery document and key set, and for an introspecting issuer's metadata, introspection and token calls too, for an issuer behind a private certificate authority. A file that cannot be read or holds no certificate refuses the start. | none (the platform's roots) |
 | `realm` | The realm every challenge names. | `fhir.base_url`, else `FerroTERM` |
 | `scopes_supported` | The scopes the discovery document lists. List only scopes the server honours: "the server SHALL support all scopes listed here". | none (the member is omitted) |
 | `capabilities` | SMART capabilities the discovery document adds to the ones it derives. | none |
-| `scopeless_subjects` | The exact `sub` values granted every write without a scope. Beside several issuers each entry is written `<issuer>#<sub>`, the issuer exactly as its `[[auth.issuer]]` entry names it, and admits that issuer's tokens alone, since a `sub` is unique only within its issuer (RFC 7519 §4.1.2); a bare entry, or one naming an issuer the section does not trust, refuses the start. | none |
-| `role_claims` | The claims a token's roles are read from, each a dotted path. The server grants nothing by role, so the roles a token carries change no answer. Beside several issuers each entry is written `<issuer>#<path>` and a bare one refuses the start, the default included: set `role_claims = []` there. | `roles`, `groups`, `entitlements` |
-| `[[auth.basic.users]]` | HTTP Basic users (RFC 7617) for machine callers: `user`, `password_hash` or `password_hash_file` (an Argon2id PHC string), and `scopes`, which decide what the user reaches as a token's scopes would. | none (no Basic) |
+| `scopeless_subjects` | The machines granted every write without a scope, each a table `{ issuer = "…", sub = "…" }` naming the issuer exactly as its `[[auth.issuer]]` table does, since a `sub` is unique only within its issuer (RFC 7519 §4.1.2). An entry admits a `System` caller of that issuer alone; one naming an issuer the section does not trust refuses the start. | none |
+| `[[auth.basic.users]]` | HTTP Basic users (RFC 7617), each a person: `user`, `password_hash` or `password_hash_file` (an Argon2id PHC string), and `scopes`, which decide what the user reaches as a token's scopes would. A user granted a `system/` scope refuses the start, naming the user. | none (no Basic) |
 | `[auth.basic] cache_ttl_seconds` | How long a Basic credential that verified is kept, so a repeat request skips the Argon2id key derivation. `0` verifies every request. | `300` |
 
-A machine caller authenticates with HTTP Basic as one of those users or with an
-access token it obtained with the OAuth 2.0 client credentials grant; the
-server accepts no static token. A configuration file holding a Basic user:
+The server refuses to start on the earlier `[auth]` shape: a
+flat `issuer = "…"` key, or `audience`, `algorithms`, `mode`,
+`[auth.introspection]` or another issuer setting on `[auth]` itself, each
+named with the table it moves to.
+
+A machine caller, such as the synchronisation service, authenticates with an
+access token it obtained with the OAuth 2.0 client credentials grant (RFC 6749
+§4.4) from a `machines` issuer; the server accepts no static token, and a Basic
+user is always a person. A configuration file with a machines issuer and a
+person on Basic:
 
 ```toml
-[auth]
+[[auth.issuer]]
 issuer = "https://auth.example.org/realms/tx"
+kind = "machines"
 audience = ["https://tx.example.org"]
 
 [[auth.basic.users]]
-user = "ferroterm-sync"
-password_hash_file = "/run/secrets/sync-password-hash"
-scopes = ["__ferroterm.admin"]
+user = "terminologist"
+password_hash_file = "/run/secrets/terminologist-password-hash"
+scopes = ["user/CodeSystem.cud", "__ferroterm.admin"]
 ```
 
 An authorization server whose access tokens are opaque is read through its
@@ -257,12 +278,13 @@ held until its `exp` and at most `cache_max_age_seconds`; an inactive one
 answers `401`, and an endpoint that cannot answer `503`:
 
 ```toml
-[auth]
+[[auth.issuer]]
 issuer = "https://auth.example.org/realms/tx"
+kind = "machines"
 audience = ["https://tx.example.org"]
 mode = "introspection"
 
-[auth.introspection.client]
+[auth.issuer.introspection.client]
 client_id = "ferroterm"
 client_secret_file = "/run/secrets/introspection-secret"
 ```

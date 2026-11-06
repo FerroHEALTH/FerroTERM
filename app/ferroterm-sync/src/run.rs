@@ -120,15 +120,15 @@ impl Service {
             .build()
             .map_err(|source| ServiceError::Client { source })?;
         let mut admin = AdminClient::new(client.clone(), &config.server_admin_url);
-        let outbound = config
+        let grant = config
             .server_admin_credentials
             .resolve()
             .map_err(|source| ServiceError::Credentials {
                 source: Box::new(source),
             })?;
-        if let Some(outbound) = outbound {
+        if let Some(grant) = grant {
             admin = admin
-                .with_credentials(outbound)
+                .with_credentials(grant)
                 .map_err(|source| ServiceError::Token {
                     source: Box::new(source),
                 })?;

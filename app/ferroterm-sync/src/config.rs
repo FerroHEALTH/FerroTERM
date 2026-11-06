@@ -22,7 +22,8 @@ use std::path::{Path, PathBuf};
 use ferrohealth_config::loader::{Loaded, Loader};
 use ferrohealth_secret::file::{SecretError, read_secret};
 use ferrohealth_secret::secret::Secret;
-use ferrohealth_smart::config::{AuthSection, CredentialsSection};
+use ferrohealth_smart::client::ClientCredentials;
+use ferrohealth_smart::config::{AuthSection, OauthSection};
 use ferrohealth_telemetry::section::TelemetrySection;
 
 /// The environment prefix: `FERROTERM_SYNC__SCHEDULE__EVERY` sets
@@ -179,9 +180,9 @@ pub struct Config {
     /// When a run starts by itself.
     pub schedule: ScheduleConfig,
     /// The credential the reload call to the server's admin listener carries:
-    /// HTTP Basic with `user` and `password`, or the client credentials grant
-    /// under `oauth`; none when the table is empty.
-    pub server_admin_credentials: CredentialsSection,
+    /// the client credentials grant under `oauth`, none when the table is
+    /// empty.
+    pub server_admin_credentials: AdminCredentials,
     /// The credentials the admin listener admits: the issuers whose access
     /// tokens it accepts, the Basic users, and the product scope every route
     /// but `GET /health` requires ([`crate::auth`]).
@@ -214,10 +215,40 @@ impl Default for Config {
             schedule: ScheduleConfig::default(),
             source: Vec::new(),
             nts: NtsSection::default(),
-            server_admin_credentials: CredentialsSection::default(),
+            server_admin_credentials: AdminCredentials::default(),
             auth: AuthSection::default(),
             telemetry: TelemetrySection::default(),
         }
+    }
+}
+
+/// The `[server_admin_credentials]` table: the OAuth 2.0 client credentials
+/// grant (RFC 6749 §4.4) the reload call is made under, in
+/// `[server_admin_credentials.oauth]`.
+///
+/// The reload is a machine's call, so the table takes no HTTP Basic `user`
+/// and `password`, which a `ferrohealth-smart` 0.9.0 server admits as a
+/// person: a file that still sets them fails to load naming `oauth` (no
+/// specification governs the table: our own design).
+#[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct AdminCredentials {
+    /// The client credentials grant; absent for a call with no credential.
+    pub oauth: Option<OauthSection>,
+}
+
+impl AdminCredentials {
+    /// The grant the table names, its secrets read; `None` when it names
+    /// none.
+    ///
+    /// # Errors
+    ///
+    /// Returns the `ferrohealth-smart` refusal of a table that breaks a rule,
+    /// such as a secret set inline and through its file.
+    pub fn resolve(
+        &self,
+    ) -> Result<Option<ClientCredentials>, ferrohealth_smart::config::ConfigError> {
+        self.oauth.as_ref().map(OauthSection::resolve).transpose()
     }
 }
 

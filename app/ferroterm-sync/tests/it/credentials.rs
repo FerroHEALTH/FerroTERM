@@ -1,13 +1,17 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The credential of the reload call: none, HTTP Basic (RFC 7617), or an
-//! OAuth 2.0 client credentials token (RFC 6749 §4.4) that `ferrohealth-smart`
-//! fetches and renews once when the server answers `401`.
+//! The credential of the reload call: none, or an OAuth 2.0 client
+//! credentials token (RFC 6749 §4.4) that `ferrohealth-smart` fetches and
+//! renews once when the server answers `401`. The reload is a machine's call,
+//! so HTTP Basic, a person's credential, is refused at load.
 //!
 //! No specification governs the reload call: our own design (#750).
 
-use ferrohealth_smart::config::{CredentialsSection, OauthSection};
+use std::collections::BTreeMap;
+
+use ferrohealth_smart::config::OauthSection;
+use ferroterm_sync::config::{AdminCredentials, Config};
 use ferroterm_sync::reload::{AdminClient, ReloadError};
 use secrecy::SecretString;
 use wiremock::matchers::{body_string_contains, header, method, path};
@@ -28,19 +32,19 @@ async fn issues(server: &MockServer, token: &str) {
 }
 
 /// The admin client of `server` under `section`.
-fn client(server: &MockServer, section: &CredentialsSection) -> AdminClient {
-    let outbound = section
+fn client(server: &MockServer, section: &AdminCredentials) -> AdminClient {
+    let grant = section
         .resolve()
         .expect("the table resolves")
         .expect("the table names a credential");
     AdminClient::new(reqwest::Client::new(), &server.uri())
-        .with_credentials(outbound)
+        .with_credentials(grant)
         .expect("the token client builds")
 }
 
 /// The client credentials table against the token endpoint of `server`.
-fn oauth(server: &MockServer) -> CredentialsSection {
-    CredentialsSection {
+fn oauth(server: &MockServer) -> AdminCredentials {
+    AdminCredentials {
         oauth: Some(OauthSection {
             token_endpoint: format!("{}/token", server.uri()),
             client_id: String::from("ferroterm-sync"),
@@ -48,7 +52,6 @@ fn oauth(server: &MockServer) -> CredentialsSection {
             scope: String::from("__ferroterm.admin"),
             ..OauthSection::default()
         }),
-        ..CredentialsSection::default()
     }
 }
 
@@ -129,52 +132,45 @@ async fn a_token_endpoint_that_refuses_is_a_failed_reload() {
     assert_eq!(reloads, 0, "the server is never asked without a token");
 }
 
-#[tokio::test]
-async fn the_reload_carries_a_basic_credential() {
-    let server = MockServer::start().await;
-    // RFC 7617 §2: `sync:synthetic-password` in base64.
-    Mock::given(method("POST"))
-        .and(path("/reload"))
-        .and(header(
-            "authorization",
-            "Basic c3luYzpzeW50aGV0aWMtcGFzc3dvcmQ=",
-        ))
-        .respond_with(ResponseTemplate::new(200))
-        .expect(1)
-        .mount(&server)
-        .await;
+/// The refusal of the sync configuration `text`, rendered.
+fn refused(text: &str) -> String {
+    Config::from_sources(Some(text), &BTreeMap::new())
+        .expect_err("the table is refused at load")
+        .to_string()
+}
 
-    let section = CredentialsSection {
-        user: String::from("sync"),
-        password: Some(SecretString::from("synthetic-password")),
-        ..CredentialsSection::default()
-    };
-    client(&server, &section)
-        .reload()
-        .await
-        .expect("the server reloads");
+// The reload is a machine's call, so it carries a client credentials token
+// (RFC 6749 §4.4); the Basic form of earlier releases, a person's credential,
+// is refused at load naming the one key the table takes (#1140).
+#[test]
+fn the_basic_form_is_refused_at_load_naming_oauth() {
+    for text in [
+        "[server_admin_credentials]\nuser = \"sync\"\npassword = \"synthetic-password\"\n",
+        "[server_admin_credentials]\npassword_file = \"/run/secrets/sync\"\n",
+    ] {
+        let reason = refused(text);
+        assert!(reason.contains("oauth"), "{text}: {reason}");
+    }
 }
 
 #[test]
-fn basic_and_oauth_together_or_a_secret_twice_are_refused() {
-    let both = CredentialsSection {
-        user: String::from("sync"),
-        password: Some(SecretString::from("synthetic-password")),
-        oauth: Some(OauthSection::default()),
-        ..CredentialsSection::default()
-    };
-    assert!(both.resolve().is_err(), "the two modes exclude each other");
-    let twice = CredentialsSection {
-        user: String::from("sync"),
-        password: Some(SecretString::from("synthetic-password")),
-        password_file: Some(std::path::PathBuf::from("/run/secrets/sync")),
-        ..CredentialsSection::default()
-    };
-    assert!(
-        twice.resolve().is_err(),
-        "exactly one of the secret and its file"
-    );
-    let parsed: Result<ferroterm_sync::config::Config, _> =
-        toml::from_str("[server_admin_credentials]\ntoken = \"static\"\n");
-    assert!(parsed.is_err(), "a static bearer token is no credential");
+fn a_static_bearer_token_is_no_credential() {
+    let reason = refused("[server_admin_credentials]\ntoken = \"static\"\n");
+    assert!(reason.contains("oauth"), "{reason}");
+}
+
+#[test]
+fn the_client_credentials_table_reads_from_the_file() {
+    let config = Config::from_sources(
+        Some(
+            "[server_admin_credentials.oauth]\ntoken_endpoint = \"https://as.example.org/token\"\nclient_id = \"ferroterm-sync\"\nclient_secret_file = \"/run/secrets/sync\"\n",
+        ),
+        &BTreeMap::new(),
+    )
+    .expect("the table loads");
+    let oauth = config
+        .server_admin_credentials
+        .oauth
+        .expect("the client credentials table");
+    assert_eq!(oauth.client_id, "ferroterm-sync");
 }

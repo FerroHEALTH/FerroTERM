@@ -83,8 +83,9 @@ mounts the whole tree and writes to it as uid 65532.
 The overlay also sets `FERROTERM__ADMIN__LISTEN` on the server, because
 `POST /reload` on that listener is how the sync asks for the new release to be
 served. That listener is a guarded surface, so the server starts only once
-`[auth]` names an issuer, with `[server_admin_credentials]` in the sync
-configuration, or turns authentication off (see
+`[auth]` names an issuer in an `[[auth.issuer]]` table, with
+`[server_admin_credentials.oauth]` in the sync configuration, or turns
+authentication off (see
 [Configuration](configuration.md#authentication)).
 
 `ferroterm-sync run-once` performs a single run and exits, which is what a
@@ -116,7 +117,7 @@ prints every key with where it came from, every secret as `***`.
 | `webhook_url` | none | where one JSON summary per run is posted |
 | `timezone` | `UTC` | the zone a daily schedule is read in |
 | `build_command` | `ferroterm-build` | the offline build, on `PATH` or by path |
-| `[server_admin_credentials]` | none | the credential of the reload call (see [below](#the-credential-of-the-reload-call)) |
+| `[server_admin_credentials.oauth]` | none | the client credentials grant of the reload call (see [below](#the-credential-of-the-reload-call)) |
 | `[auth]` | on, no issuer | the credentials the admin listener admits (see [The admin listener](#the-admin-listener)) |
 | `[nts]` | no account | the account the NTS add-on authenticates with (see [Credentials](#credentials)) |
 | `[telemetry]` | `auto` format, no export | the console log's `format` and `filter` (`RUST_LOG` sets the filter too), and the OTLP export of the service's metrics, the same section the server reads (see [Telemetry](configuration.md#telemetry)) |
@@ -152,26 +153,19 @@ default; the NTS block takes `fhir_api = false` to keep a run to the feed and
 
 The file needs no secret in clear. The NTS account's secrets can each be a
 mounted file (`password_file`, `client_secret_file`) or a variable, and the
-reload call reads its own from the files `[server_admin_credentials]` names,
-so the file can stay safe to commit and safe to show.
+reload call reads its own from the file `[server_admin_credentials.oauth]`
+names, so the file can stay safe to commit and safe to show.
 
 ### The credential of the reload call
 
 The server's admin listener requires a credential carrying its admin scope
 ([Configuration](configuration.md#authentication)), and
-`[server_admin_credentials]` names the one the sync presents. It is HTTP Basic
-(RFC 7617), a user of the server's `[[auth.basic.users]]`:
-
-```toml
-[server_admin_credentials]
-user = "ferroterm-sync"
-password_file = "/run/secrets/sync-password"
-```
-
-or a token of the OAuth 2.0 client credentials grant (RFC 6749 §4.4) from the
-authorization server the server trusts, fetched before the call, kept until
-shortly before it expires, and fetched once more when the server answers
-`401`:
+`[server_admin_credentials.oauth]` names the one the sync presents: a token of
+the OAuth 2.0 client credentials grant (RFC 6749 §4.4) from an authorization
+server the server trusts, fetched before the call, kept until shortly before it
+expires, and fetched once more when the server answers `401`. The reload is a
+machine's call and a Basic user is a person, so the sync takes no Basic
+credential:
 
 ```toml
 [server_admin_credentials.oauth]
@@ -183,7 +177,6 @@ scope = "__ferroterm.admin"
 
 | Key | Meaning | Default |
 |---|---|---|
-| `user`, `password` or `password_file` | the Basic credential; exactly one of the two secrets | none |
 | `oauth.issuer` or `oauth.token_endpoint` | where the token endpoint is read from, or the endpoint itself; exactly one | none |
 | `oauth.client_id` | the client at the authorization server | none |
 | `oauth.client_auth` | `client_secret_basic`, `client_secret_post` or `private_key_jwt` | `client_secret_basic` |
@@ -193,9 +186,10 @@ scope = "__ferroterm.admin"
 | `oauth.refresh_margin_ms` | how long before the token expires a new one is fetched | `30000` |
 | `oauth.timeout_ms` | how long one call to the authorization server may take | `10000` |
 
-Basic and `oauth` exclude each other. With the table empty the call carries no
-credential, which only a server with `[auth]` turned off accepts. There is no
-static token.
+With the table empty the call carries no credential, which only a server with
+`[auth]` turned off accepts. There is no static token, and the Basic `user`,
+`password` and `password_file` of earlier releases fail to load, naming
+`oauth`.
 
 ## The schedule
 
@@ -285,26 +279,32 @@ The service binds `listen` and serves six routes:
 Every route but the three health routes requires a credential carrying the product
 scope, `__ferroterm.sync` unless `[auth] product_scope` names another. The
 `[auth]` table is the one the server reads ([Configuration](configuration.md#authentication)):
-an `issuer` and an `audience` for the access tokens it accepts (checked as
-JWTs, or at the issuer's introspection endpoint under `mode =
-"introspection"`), Basic users
-under `[[auth.basic.users]]`, or both. A refused request answers `401` with a
-challenge naming the realm `ferroterm-sync` (or `[auth] realm`), or `403` for a
-credential without the scope, with a JSON `error` body.
+an `[[auth.issuer]]` table with its `kind` and `audience` for each issuer whose
+access tokens it accepts (checked as JWTs, or at the issuer's introspection
+endpoint under `mode = "introspection"`), people under `[[auth.basic.users]]`,
+or both. A machine, such as a monitor, calls with a client credentials token,
+and a Basic user granted a `system/` scope refuses the start. A refused
+request answers `401` with a challenge naming the realm `ferroterm-sync` (or
+`[auth] realm`), or `403` for a credential without the scope, with a JSON
+`error` body.
 
 The service refuses to start while `[auth]` admits no credential, unless the
 file says `enabled = false`, which only a network that trusted callers alone
 reach should:
 
 ```toml
-[auth]
+# The console signs people in at this issuer and calls with their tokens;
+# a monitor calls with its own client credentials token.
+[[auth.issuer]]
 issuer = "https://auth.example.org/realms/tx"
+kind = "persons"
 audience = ["ferroterm-sync"]
+first_party_clients = ["ferroterm-console"]
 
-# or a machine caller with HTTP Basic, the hash an Argon2id PHC string:
+# or a person with HTTP Basic, the hash an Argon2id PHC string:
 [[auth.basic.users]]
-user = "monitor"
-password_hash_file = "/run/secrets/monitor.phc"
+user = "operator"
+password_hash_file = "/run/secrets/operator.phc"
 scopes = ["__ferroterm.sync"]
 ```
 
