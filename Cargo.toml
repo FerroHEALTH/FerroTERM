@@ -85,7 +85,7 @@ ferrohealth-session = { version = "=0.3.0", features = ["axum"] }
 # module serves `/health`, `/health/liveness` and `/health/readiness` over
 # them. Pinned exactly. Verified against crates.io on 2026-10-26.
 ferrohealth-health = { version = "=0.1.1", features = ["registry"] }
-ferrohealth-server = { version = "=0.5.0" }
+ferrohealth-server = { version = "=0.5.1" }
 # The FerroHEALTH configuration loader and its secrets: one TOML tree per
 # binary under `--config` or `<PREFIX>_CONFIG`, `<PREFIX>__SECTION__KEY`
 # overrides, `--set`, strict refusals and provenance, and the `<key>_file`
@@ -133,7 +133,7 @@ uuid = { version = "1.26.0", features = ["v4"] }
 # its components from Askama templates and serves its stylesheet, themes and
 # script modules through its own router. Verified against crates.io on
 # 2026-11-04 (0.6.6).
-ferrohealth-ui = "=0.6.6"
+ferrohealth-ui = "=0.6.7"
 # The console's string catalogs: Project Fluent messages embedded at build
 # time from app/ferroterm-console/locales/, the crate and version
 # ferrohealth-ui catalogs its own words with, so one locale drives both.
