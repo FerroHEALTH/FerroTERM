@@ -16,6 +16,8 @@
 #       fail on idle CPU. --update writes both baselines from runs that
 #       pass. Exit 0 when all three hold, 1 when a gate fails or the busy
 #       service passes, 2 when a run cannot be judged or set up.
+#   scripts/perf/gate.sh build
+#       Builds the services and the fixture writer the gate runs.
 #   scripts/perf/gate.sh --self-test
 #       Proves the schedule time and the agreement of the sync plans' idle
 #       limits offline.
@@ -206,10 +208,15 @@ self_test() {
 }
 
 case "${1:-}" in
+  build)
+    cd "$root"
+    cargo build --release --locked -p ferroterm-server -p ferroterm-sync -p ferroterm-testkit \
+      --bin ferroterm --bin ferroterm-sync --bin ferroterm-fixture
+    ;;
   run)
     shift
     run "$@"
     ;;
   --self-test) self_test ;;
-  *) die "usage: gate.sh run [--update] | --self-test" ;;
+  *) die "usage: gate.sh build | run [--update] | --self-test" ;;
 esac

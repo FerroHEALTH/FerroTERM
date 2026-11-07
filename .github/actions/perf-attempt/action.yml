@@ -1,0 +1,106 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+name: One attempt of the performance gate
+description: >-
+  Installs ferrohealth-perf, builds what scripts/perf/gate.sh measures, runs
+  the gate once and uploads its reports. The step never fails on the gate's
+  verdict: it reports the exit code, the runner's CPU model and whether a
+  retry on a fresh runner may help, and the perf workflow's verdict job
+  decides. A retry may help only when the gate ended with exit 1 or 2 on a
+  CPU model the workflow lists as stall-prone. The calling job checks out
+  the repository and installs the Rust toolchain first. No specification
+  governs this: our own design.
+inputs:
+  attempt:
+    description: The attempt, 1 for the first run and 2 and 3 for the retries.
+    required: true
+  update:
+    description: '"true" to write the baseline from a run that passes.'
+    required: false
+    default: "false"
+  version:
+    description: The ferrohealth-perf version to install, exactly.
+    required: true
+  stall-prone:
+    description: The CPU models whose runners stall the gate, one per line.
+    required: true
+outputs:
+  code:
+    description: The gate's exit code.
+    value: ${{ steps.gate.outputs.code }}
+  model:
+    description: The runner's CPU model.
+    value: ${{ steps.gate.outputs.model }}
+  retryable:
+    description: '"true" when a retry on a fresh runner may help.'
+    value: ${{ steps.gate.outputs.retryable }}
+runs:
+  using: composite
+  steps:
+    - name: Install ferrohealth-perf
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+      run: cargo install ferrohealth-perf --version "=${VERSION}" --locked
+    - name: Build what the gate measures
+      shell: bash
+      run: bash scripts/perf/gate.sh build
+    - name: Gate the performance
+      id: gate
+      shell: bash
+      env:
+        ATTEMPT: ${{ inputs.attempt }}
+        UPDATE: ${{ inputs.update }}
+        STALL_PRONE: ${{ inputs.stall-prone }}
+      run: |
+        set -uo pipefail
+        code=0
+        if [ "$UPDATE" = "true" ]; then
+          bash scripts/perf/gate.sh run --update || code=$?
+        else
+          bash scripts/perf/gate.sh run || code=$?
+        fi
+        model="$(find target/perf -name latest.json -not -path '*busy-loop*' -print -quit \
+          | xargs -r jq -r '.host.cpu_model // ""')"
+        prone=false
+        while IFS= read -r listed; do
+          if [ -n "$listed" ] && [ "$listed" = "$model" ]; then prone=true; fi
+        done <<< "$STALL_PRONE"
+        retryable=false
+        if { [ "$code" = 1 ] || [ "$code" = 2 ]; } && [ "$prone" = true ]; then
+          retryable=true
+        fi
+        case "$code" in
+          0) verdict="passed" ;;
+          1) verdict="failed (exit 1, a breach)" ;;
+          2) verdict="could not be judged (exit 2)" ;;
+          *) verdict="ended with exit $code" ;;
+        esac
+        if [ "$retryable" = true ]; then
+          why="a retry runs on a fresh runner, since ${model} is listed as stall-prone"
+        elif [ "$code" = 0 ]; then
+          why="no retry is needed"
+        else
+          why="no retry runs, since ${model:-the runner's model} is not listed as stall-prone"
+        fi
+        {
+          echo "## Performance gate, attempt ${ATTEMPT}"
+          echo
+          echo "On \`${model:-an unnamed CPU}\` the gate ${verdict}; ${why}."
+          echo
+        } >> "$GITHUB_STEP_SUMMARY"
+        {
+          echo "code=$code"
+          echo "model=$model"
+          echo "retryable=$retryable"
+        } >> "$GITHUB_OUTPUT"
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      if: always()
+      with:
+        name: perf-report-attempt-${{ inputs.attempt }}
+        path: |
+          target/perf/
+          target/perf-run/*.log
+          perf/
+        if-no-files-found: ignore
+        retention-days: 30
