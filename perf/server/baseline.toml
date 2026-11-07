@@ -1,11 +1,11 @@
 # The performance baseline of ferrohealth-perf, one [[baseline]] per CPU model.
 # `ferrohealth-perf run --update` writes or lowers the entry of the runner's
 # model; a raise is a hand edit in a change that says why.
-schema = 2
+schema = 3
 
 [[baseline]]
-tool = "0.2.0"
-written = "2026-11-07T00:28:19.945073576Z"
+tool = "0.3.0"
+written = "2026-11-07T08:25:52.558198551Z"
 
 [baseline.plan]
 rate = 50.0
@@ -30,53 +30,53 @@ transactions = 0.1
 
 [baseline.metrics]
 throughput_rps = 50.0
-peak_memory_bytes = 102539264.0
-cpu_per_request_ms = 0.68
-"ecl.p50_ms" = 1.383
-"ecl.p95_ms" = 1.86
-"ecl.p99_ms" = 1.97
-"expand-filter.p50_ms" = 3.843
-"expand-filter.p95_ms" = 4.447
-"expand-filter.p99_ms" = 4.635
-"lookup.p50_ms" = 1.204
-"lookup.p95_ms" = 1.679
-"lookup.p99_ms" = 1.797
-"subsumes.p50_ms" = 1.189
-"subsumes.p95_ms" = 1.673
-"subsumes.p99_ms" = 1.769
-"translate.p50_ms" = 1.399
-"translate.p95_ms" = 1.84
-"translate.p99_ms" = 1.953
-"validate-code.p50_ms" = 1.282
-"validate-code.p95_ms" = 1.725
-"validate-code.p99_ms" = 1.864
+peak_memory_bytes = 101990400.0
+cpu_per_request_ms = 0.5533333333333335
+"ecl.p50_ms" = 1.781
+"ecl.p95_ms" = 2.265
+"ecl.p99_ms" = 2.331
+"expand-filter.p50_ms" = 3.963
+"expand-filter.p95_ms" = 4.475
+"expand-filter.p99_ms" = 4.603
+"lookup.p50_ms" = 1.631
+"lookup.p95_ms" = 2.109
+"lookup.p99_ms" = 2.185
+"subsumes.p50_ms" = 1.587
+"subsumes.p95_ms" = 2.079
+"subsumes.p99_ms" = 2.127
+"translate.p50_ms" = 1.827
+"translate.p95_ms" = 2.239
+"translate.p99_ms" = 2.311
+"validate-code.p50_ms" = 1.671
+"validate-code.p95_ms" = 2.163
+"validate-code.p99_ms" = 2.257
 
 [baseline.noise]
 throughput_rps = 1.0
-peak_memory_bytes = 1.0037149476711673
-cpu_per_request_ms = 1.0294117647058822
-"ecl.p50_ms" = 1.535068691250904
-"ecl.p95_ms" = 1.3940860215053763
-"ecl.p99_ms" = 1.3710659898477158
-"expand-filter.p50_ms" = 1.2175383814728078
-"expand-filter.p95_ms" = 1.178097593883517
-"expand-filter.p99_ms" = 1.1786407766990292
-"lookup.p50_ms" = 1.6486710963455151
-"lookup.p95_ms" = 1.4371649791542582
-"lookup.p99_ms" = 1.4095715080690039
-"subsumes.p50_ms" = 1.5820016820857863
-"subsumes.p95_ms" = 1.427973699940227
-"subsumes.p99_ms" = 1.3900508762012438
-"translate.p50_ms" = 1.527519656897784
-"translate.p95_ms" = 1.4233695652173914
-"translate.p99_ms" = 1.3696876600102406
-"validate-code.p50_ms" = 1.5741029641185647
-"validate-code.p95_ms" = 1.4556521739130435
-"validate-code.p99_ms" = 1.4007510729613735
+peak_memory_bytes = 1.0000803212851406
+cpu_per_request_ms = 1.0060240963855418
+"ecl.p50_ms" = 1.1830432341381247
+"ecl.p95_ms" = 1.1527593818984547
+"ecl.p99_ms" = 1.145002145002145
+"expand-filter.p50_ms" = 1.086802927075448
+"expand-filter.p95_ms" = 1.070614525139665
+"expand-filter.p99_ms" = 1.0660438844232023
+"lookup.p50_ms" = 1.21704475781729
+"lookup.p95_ms" = 1.1697486960644856
+"lookup.p99_ms" = 1.1565217391304348
+"subsumes.p50_ms" = 1.2318840579710146
+"subsumes.p95_ms" = 1.173160173160173
+"subsumes.p99_ms" = 1.1720733427362484
+"translate.p50_ms" = 1.19376026272578
+"translate.p95_ms" = 1.150960250111657
+"translate.p99_ms" = 1.154045867589788
+"validate-code.p50_ms" = 1.220227408737283
+"validate-code.p95_ms" = 1.1655108645399908
+"validate-code.p99_ms" = 1.156845369960124
 
 [[baseline]]
-tool = "0.2.0"
-written = "2026-11-07T00:14:16.622181992Z"
+tool = "0.3.0"
+written = "2026-11-07T08:47:01.180034854Z"
 
 [baseline.plan]
 rate = 50.0
@@ -101,53 +101,53 @@ transactions = 0.1
 
 [baseline.metrics]
 throughput_rps = 50.0
-peak_memory_bytes = 102391808.0
-cpu_per_request_ms = 0.48
-"ecl.p50_ms" = 1.451
-"ecl.p95_ms" = 1.933
-"ecl.p99_ms" = 2.063
-"expand-filter.p50_ms" = 2.649
-"expand-filter.p95_ms" = 3.165
-"expand-filter.p99_ms" = 3.777
-"lookup.p50_ms" = 1.344
-"lookup.p95_ms" = 1.814
-"lookup.p99_ms" = 1.947
-"subsumes.p50_ms" = 1.294
-"subsumes.p95_ms" = 1.795
-"subsumes.p99_ms" = 1.861
-"translate.p50_ms" = 1.464
-"translate.p95_ms" = 1.909
-"translate.p99_ms" = 2.0
-"validate-code.p50_ms" = 1.37
-"validate-code.p95_ms" = 1.858
-"validate-code.p99_ms" = 1.975
+peak_memory_bytes = 102092800.0
+cpu_per_request_ms = 0.51
+"ecl.p50_ms" = 1.466
+"ecl.p95_ms" = 1.952
+"ecl.p99_ms" = 2.031
+"expand-filter.p50_ms" = 2.771
+"expand-filter.p95_ms" = 3.251
+"expand-filter.p99_ms" = 3.357
+"lookup.p50_ms" = 1.293
+"lookup.p95_ms" = 1.755
+"lookup.p99_ms" = 1.907
+"subsumes.p50_ms" = 1.239
+"subsumes.p95_ms" = 1.718
+"subsumes.p99_ms" = 1.784
+"translate.p50_ms" = 1.4
+"translate.p95_ms" = 1.886
+"translate.p99_ms" = 2.153
+"validate-code.p50_ms" = 1.32
+"validate-code.p95_ms" = 1.805
+"validate-code.p99_ms" = 1.946
 
 [baseline.noise]
 throughput_rps = 1.0
-peak_memory_bytes = 1.0002400192015362
-cpu_per_request_ms = 1.0212765957446808
-"ecl.p50_ms" = 1.0522117476432198
-"ecl.p95_ms" = 1.0697288323187604
-"ecl.p99_ms" = 1.0823714585519413
-"expand-filter.p50_ms" = 1.0541185833664943
-"expand-filter.p95_ms" = 1.0595915634415802
-"expand-filter.p99_ms" = 1.2395799146701674
-"lookup.p50_ms" = 1.1079967023907666
-"lookup.p95_ms" = 1.080405002977963
-"lookup.p99_ms" = 1.1087699316628703
-"subsumes.p50_ms" = 1.1817351598173516
-"subsumes.p95_ms" = 1.0885385081867798
-"subsumes.p99_ms" = 1.0832363213038416
-"translate.p50_ms" = 1.1296296296296295
-"translate.p95_ms" = 1.0688689809630458
-"translate.p99_ms" = 1.0735373054213635
-"validate-code.p50_ms" = 1.080441640378549
-"validate-code.p95_ms" = 1.0808609656777195
-"validate-code.p99_ms" = 1.0827850877192982
+peak_memory_bytes = 1.0039317953861584
+cpu_per_request_ms = 1.0784313725490198
+"ecl.p50_ms" = 1.330150068212824
+"ecl.p95_ms" = 1.2587090163934427
+"ecl.p99_ms" = 1.2530773018217625
+"expand-filter.p50_ms" = 1.1840490797546013
+"expand-filter.p95_ms" = 1.1796370347585359
+"expand-filter.p99_ms" = 1.3246946678582068
+"lookup.p50_ms" = 1.4354215003866977
+"lookup.p95_ms" = 1.316809116809117
+"lookup.p99_ms" = 1.2653382275825904
+"subsumes.p50_ms" = 1.4826472962066182
+"subsumes.p95_ms" = 1.3183934807916182
+"subsumes.p99_ms" = 1.314461883408072
+"translate.p50_ms" = 1.3757142857142857
+"translate.p95_ms" = 1.3027571580063626
+"translate.p99_ms" = 1.192289828146772
+"validate-code.p50_ms" = 1.4568181818181818
+"validate-code.p95_ms" = 1.298060941828255
+"validate-code.p99_ms" = 1.2780061664953752
 
 [[baseline]]
-tool = "0.1.1"
-written = "2026-11-06T21:23:03.793817208Z"
+tool = "0.3.0"
+written = "2026-11-07T08:03:54.141228103Z"
 
 [baseline.plan]
 rate = 50.0
@@ -172,46 +172,188 @@ transactions = 0.1
 
 [baseline.metrics]
 throughput_rps = 50.0
-peak_memory_bytes = 102150144.0
-cpu_per_request_ms = 0.68
-"ecl.p50_ms" = 2.371
-"ecl.p95_ms" = 2.829
-"ecl.p99_ms" = 2.903
-"expand-filter.p50_ms" = 4.339
-"expand-filter.p95_ms" = 4.767
-"expand-filter.p99_ms" = 4.859
-"lookup.p50_ms" = 2.187
-"lookup.p95_ms" = 2.681
-"lookup.p99_ms" = 2.745
-"subsumes.p50_ms" = 2.137
-"subsumes.p95_ms" = 2.603
-"subsumes.p99_ms" = 2.683
-"translate.p50_ms" = 2.353
-"translate.p95_ms" = 2.837
-"translate.p99_ms" = 2.897
-"validate-code.p50_ms" = 2.213
-"validate-code.p95_ms" = 2.739
-"validate-code.p99_ms" = 2.815
+peak_memory_bytes = 102301696.0
+cpu_per_request_ms = 0.5266666666666666
+"ecl.p50_ms" = 1.651
+"ecl.p95_ms" = 2.109
+"ecl.p99_ms" = 2.313
+"expand-filter.p50_ms" = 3.207
+"expand-filter.p95_ms" = 3.671
+"expand-filter.p99_ms" = 3.969
+"lookup.p50_ms" = 1.541
+"lookup.p95_ms" = 1.98
+"lookup.p99_ms" = 2.117
+"subsumes.p50_ms" = 1.478
+"subsumes.p95_ms" = 1.981
+"subsumes.p99_ms" = 2.077
+"translate.p50_ms" = 1.663
+"translate.p95_ms" = 2.115
+"translate.p99_ms" = 2.195
+"validate-code.p50_ms" = 1.6
+"validate-code.p95_ms" = 2.075
+"validate-code.p99_ms" = 2.223
 
 [baseline.noise]
 throughput_rps = 1.0
-peak_memory_bytes = 1.0
-cpu_per_request_ms = 1.0
-"ecl.p50_ms" = 1.2935079105291871
-"ecl.p95_ms" = 1.2230869001297018
-"ecl.p99_ms" = 1.2161709258483453
-"expand-filter.p50_ms" = 1.1481873511510983
-"expand-filter.p95_ms" = 1.1245576786978062
-"expand-filter.p99_ms" = 1.1281634548409565
-"lookup.p50_ms" = 1.3002378121284186
-"lookup.p95_ms" = 1.2417786012042613
-"lookup.p99_ms" = 1.2248995983935742
-"subsumes.p50_ms" = 1.3381340012523482
-"subsumes.p95_ms" = 1.2424821002386635
-"subsumes.p99_ms" = 1.221210741920801
-"translate.p50_ms" = 1.2850901146914255
-"translate.p95_ms" = 1.2470329670329672
-"translate.p99_ms" = 1.2187631468237274
-"validate-code.p50_ms" = 1.2806712962962963
-"validate-code.p95_ms" = 1.231011235955056
-"validate-code.p99_ms" = 1.2180874080484638
+peak_memory_bytes = 1.0000400384368995
+cpu_per_request_ms = 1.069620253164557
+"ecl.p50_ms" = 1.3900666262870987
+"ecl.p95_ms" = 1.3176861071597914
+"ecl.p99_ms" = 1.249891915261565
+"expand-filter.p50_ms" = 1.189585282195198
+"expand-filter.p95_ms" = 1.1678016889131027
+"expand-filter.p99_ms" = 1.2060972537163013
+"lookup.p50_ms" = 1.3828682673588577
+"lookup.p95_ms" = 1.3429292929292929
+"lookup.p99_ms" = 1.295701464336325
+"subsumes.p50_ms" = 1.4323410013531799
+"subsumes.p95_ms" = 1.3160020191822313
+"subsumes.p99_ms" = 1.2802118440057775
+"translate.p50_ms" = 1.3716175586289838
+"translate.p95_ms" = 1.3167848699763594
+"translate.p99_ms" = 1.4036446469248292
+"validate-code.p50_ms" = 1.3718749999999997
+"validate-code.p95_ms" = 1.3055421686746986
+"validate-code.p99_ms" = 1.2753036437246965
+
+[[baseline]]
+tool = "0.3.0"
+written = "2026-11-07T09:52:07.471805912Z"
+
+[baseline.plan]
+rate = 50.0
+warmup_secs = 10
+duration_secs = 60
+requests = 9
+groups = ["ecl", "expand-filter", "lookup", "subsumes", "translate", "validate-code"]
+
+[baseline.host]
+arch = "x86_64"
+os = "linux"
+available_parallelism = 4
+cpu_model = "INTEL(R) XEON(R) PLATINUM 8573C"
+total_memory_bytes = 16758394880
+
+[baseline.tolerance]
+latency = 0.25
+throughput = 0.2
+memory = 0.2
+cpu = 0.25
+transactions = 0.1
+
+[baseline.metrics]
+throughput_rps = 50.0
+peak_memory_bytes = 102076416.0
+cpu_per_request_ms = 0.46
+"ecl.p50_ms" = 1.442
+"ecl.p95_ms" = 1.926
+"ecl.p99_ms" = 2.014
+"expand-filter.p50_ms" = 3.363
+"expand-filter.p95_ms" = 3.825
+"expand-filter.p99_ms" = 3.921
+"lookup.p50_ms" = 1.343
+"lookup.p95_ms" = 1.818
+"lookup.p99_ms" = 1.914
+"subsumes.p50_ms" = 1.353
+"subsumes.p95_ms" = 1.822
+"subsumes.p99_ms" = 1.914
+"translate.p50_ms" = 1.432
+"translate.p95_ms" = 1.949
+"translate.p99_ms" = 2.049
+"validate-code.p50_ms" = 1.354
+"validate-code.p95_ms" = 1.865
+"validate-code.p99_ms" = 1.964
+
+[baseline.noise]
+throughput_rps = 1.0
+peak_memory_bytes = 1.0038120460655673
+cpu_per_request_ms = 1.0072463768115945
+"ecl.p50_ms" = 1.257975034674064
+"ecl.p95_ms" = 1.1895119418483904
+"ecl.p99_ms" = 1.1931479642502485
+"expand-filter.p50_ms" = 1.104668450787987
+"expand-filter.p95_ms" = 1.1040522875816992
+"expand-filter.p99_ms" = 1.1361897475133895
+"lookup.p50_ms" = 1.2889054355919585
+"lookup.p95_ms" = 1.205170517051705
+"lookup.p99_ms" = 1.2021943573667713
+"subsumes.p50_ms" = 1.2335550628233556
+"subsumes.p95_ms" = 1.1915477497255762
+"subsumes.p99_ms" = 1.1677115987460815
+"translate.p50_ms" = 1.3100558659217878
+"translate.p95_ms" = 1.1959979476654694
+"translate.p99_ms" = 1.1913128355295266
+"validate-code.p50_ms" = 1.297636632200886
+"validate-code.p95_ms" = 1.2016085790884719
+"validate-code.p99_ms" = 1.2133401221995928
+
+[[baseline]]
+tool = "0.3.0"
+written = "2026-11-07T09:30:36.7287254Z"
+
+[baseline.plan]
+rate = 50.0
+warmup_secs = 10
+duration_secs = 60
+requests = 9
+groups = ["ecl", "expand-filter", "lookup", "subsumes", "translate", "validate-code"]
+
+[baseline.host]
+arch = "x86_64"
+os = "linux"
+available_parallelism = 4
+cpu_model = "Intel(R) Xeon(R) 6973P-C"
+total_memory_bytes = 16758403072
+
+[baseline.tolerance]
+latency = 0.25
+throughput = 0.2
+memory = 0.2
+cpu = 0.25
+transactions = 0.1
+
+[baseline.metrics]
+throughput_rps = 50.0
+peak_memory_bytes = 102752256.0
+cpu_per_request_ms = 0.46333333333333343
+"ecl.p50_ms" = 1.525
+"ecl.p95_ms" = 2.007
+"ecl.p99_ms" = 2.145
+"expand-filter.p50_ms" = 3.395
+"expand-filter.p95_ms" = 3.885
+"expand-filter.p99_ms" = 4.005
+"lookup.p50_ms" = 1.441
+"lookup.p95_ms" = 1.929
+"lookup.p99_ms" = 2.109
+"subsumes.p50_ms" = 1.418
+"subsumes.p95_ms" = 1.952
+"subsumes.p99_ms" = 2.179
+"translate.p50_ms" = 1.563
+"translate.p95_ms" = 2.095
+"translate.p99_ms" = 2.285
+"validate-code.p50_ms" = 1.474
+"validate-code.p95_ms" = 1.984
+"validate-code.p99_ms" = 2.245
+
+[baseline.noise]
+throughput_rps = 1.0
+peak_memory_bytes = 1.000279040102049
+cpu_per_request_ms = 1.0143884892086328
+"ecl.p50_ms" = 1.1691803278688524
+"ecl.p95_ms" = 1.1584454409566518
+"ecl.p99_ms" = 1.1948717948717948
+"expand-filter.p50_ms" = 1.089543446244477
+"expand-filter.p95_ms" = 1.0746460746460746
+"expand-filter.p99_ms" = 1.119350811485643
+"lookup.p50_ms" = 1.1845940319222763
+"lookup.p95_ms" = 1.1565578019699325
+"lookup.p99_ms" = 1.1365576102418207
+"subsumes.p50_ms" = 1.1530324400564176
+"subsumes.p95_ms" = 1.0968237704918034
+"subsumes.p99_ms" = 1.0927030748049564
+"translate.p50_ms" = 1.2124120281509918
+"translate.p95_ms" = 1.0916467780429593
+"translate.p99_ms" = 1.1619256017505468
+"validate-code.p50_ms" = 1.187924016282225
+"validate-code.p95_ms" = 1.1365927419354838
+"validate-code.p99_ms" = 1.106904231625835

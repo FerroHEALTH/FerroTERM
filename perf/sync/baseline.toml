@@ -1,11 +1,11 @@
 # The performance baseline of ferrohealth-perf, one [[baseline]] per CPU model.
 # `ferrohealth-perf run --update` writes or lowers the entry of the runner's
 # model; a raise is a hand edit in a change that says why.
-schema = 2
+schema = 3
 
 [[baseline]]
-tool = "0.2.0"
-written = "2026-11-07T00:32:13.065687969Z"
+tool = "0.3.0"
+written = "2026-11-07T08:33:49.162620908Z"
 
 [baseline.plan]
 rate = 50.0
@@ -30,29 +30,29 @@ transactions = 0.1
 
 [baseline.metrics]
 throughput_rps = 50.0
-peak_memory_bytes = 16154624.0
-cpu_per_request_ms = 0.27666666666666667
-"readiness.p50_ms" = 1.138
-"readiness.p95_ms" = 1.64
-"readiness.p99_ms" = 1.73
-"runs.p50_ms" = 1.163
-"runs.p95_ms" = 1.674
-"runs.p99_ms" = 1.759
+peak_memory_bytes = 16113664.0
+cpu_per_request_ms = 0.17
+"readiness.p50_ms" = 1.038
+"readiness.p95_ms" = 1.514
+"readiness.p99_ms" = 1.566
+"runs.p50_ms" = 1.061
+"runs.p95_ms" = 1.54
+"runs.p99_ms" = 1.61
 
 [baseline.noise]
 throughput_rps = 1.0
-peak_memory_bytes = 1.0005070993914806
-cpu_per_request_ms = 1.064102564102564
-"readiness.p50_ms" = 1.6221441124780318
-"readiness.p95_ms" = 1.4396341463414637
-"readiness.p99_ms" = 1.3982658959537573
-"runs.p50_ms" = 1.6354256233877902
-"runs.p95_ms" = 1.425925925925926
-"runs.p99_ms" = 1.3979533826037522
+peak_memory_bytes = 1.0
+cpu_per_request_ms = 1.0196078431372548
+"readiness.p50_ms" = 1.1262042389210019
+"readiness.p95_ms" = 1.0852047556142668
+"readiness.p99_ms" = 1.0970625798212004
+"runs.p50_ms" = 1.1442035815268614
+"runs.p95_ms" = 1.0915584415584416
+"runs.p99_ms" = 1.0819875776397514
 
 [[baseline]]
-tool = "0.2.0"
-written = "2026-11-07T00:18:09.872207579Z"
+tool = "0.3.0"
+written = "2026-11-07T08:54:57.679718402Z"
 
 [baseline.plan]
 rate = 50.0
@@ -77,29 +77,29 @@ transactions = 0.1
 
 [baseline.metrics]
 throughput_rps = 50.0
-peak_memory_bytes = 16273408.0
-cpu_per_request_ms = 0.17666666666666667
-"readiness.p50_ms" = 1.37
-"readiness.p95_ms" = 1.819
-"readiness.p99_ms" = 1.89
-"runs.p50_ms" = 1.366
-"runs.p95_ms" = 1.858
-"runs.p99_ms" = 1.923
+peak_memory_bytes = 16756736.0
+cpu_per_request_ms = 0.20666666666666667
+"readiness.p50_ms" = 1.444
+"readiness.p95_ms" = 1.91
+"readiness.p99_ms" = 1.974
+"runs.p50_ms" = 1.506
+"runs.p95_ms" = 1.949
+"runs.p99_ms" = 2.013
 
 [baseline.noise]
 throughput_rps = 1.0
 peak_memory_bytes = 1.0
-cpu_per_request_ms = 1.0188679245283019
-"readiness.p50_ms" = 1.1620016963528415
-"readiness.p95_ms" = 1.122146822948797
-"readiness.p99_ms" = 1.122994652406417
-"runs.p50_ms" = 1.1450125733445096
-"runs.p95_ms" = 1.109916367980884
-"runs.p99_ms" = 1.1096364685516444
+cpu_per_request_ms = 1.0483870967741935
+"readiness.p50_ms" = 1.3137119113573408
+"readiness.p95_ms" = 1.2287958115183246
+"readiness.p99_ms" = 1.2345491388044578
+"runs.p50_ms" = 1.2682602921646746
+"runs.p95_ms" = 1.228835300153925
+"runs.p99_ms" = 1.2364629905613511
 
 [[baseline]]
-tool = "0.1.1"
-written = "2026-11-06T21:26:56.914095367Z"
+tool = "0.3.0"
+written = "2026-11-07T08:11:50.769767248Z"
 
 [baseline.plan]
 rate = 50.0
@@ -124,22 +124,116 @@ transactions = 0.1
 
 [baseline.metrics]
 throughput_rps = 50.0
-peak_memory_bytes = 16408576.0
-cpu_per_request_ms = 0.27666666666666667
-"readiness.p50_ms" = 1.669
-"readiness.p95_ms" = 2.129
-"readiness.p99_ms" = 2.223
-"runs.p50_ms" = 1.704
-"runs.p95_ms" = 2.167
-"runs.p99_ms" = 2.253
+peak_memory_bytes = 15753216.0
+cpu_per_request_ms = 0.18
+"readiness.p50_ms" = 1.262
+"readiness.p95_ms" = 1.706
+"readiness.p99_ms" = 1.846
+"runs.p50_ms" = 1.246
+"runs.p95_ms" = 1.718
+"runs.p99_ms" = 1.88
+
+[baseline.noise]
+throughput_rps = 1.0
+peak_memory_bytes = 1.000260010400416
+cpu_per_request_ms = 1.3148148148148149
+"readiness.p50_ms" = 1.3748019017432647
+"readiness.p95_ms" = 1.325322391559203
+"readiness.p99_ms" = 1.2941495124593714
+"runs.p50_ms" = 1.4751203852327448
+"runs.p95_ms" = 1.3323632130384169
+"runs.p99_ms" = 1.3047872340425533
+
+[[baseline]]
+tool = "0.3.0"
+written = "2026-11-07T10:00:03.900536636Z"
+
+[baseline.plan]
+rate = 50.0
+warmup_secs = 10
+duration_secs = 60
+requests = 2
+groups = ["readiness", "runs"]
+
+[baseline.host]
+arch = "x86_64"
+os = "linux"
+available_parallelism = 4
+cpu_model = "INTEL(R) XEON(R) PLATINUM 8573C"
+total_memory_bytes = 16758394880
+
+[baseline.tolerance]
+latency = 0.25
+throughput = 0.2
+memory = 0.2
+cpu = 0.25
+transactions = 0.1
+
+[baseline.metrics]
+throughput_rps = 50.0
+peak_memory_bytes = 15847424.0
+cpu_per_request_ms = 0.12666666666666668
+"readiness.p50_ms" = 1.17
+"readiness.p95_ms" = 1.622
+"readiness.p99_ms" = 1.723
+"runs.p50_ms" = 1.171
+"runs.p95_ms" = 1.629
+"runs.p99_ms" = 1.746
 
 [baseline.noise]
 throughput_rps = 1.0
 peak_memory_bytes = 1.0
-cpu_per_request_ms = 1.064102564102564
-"readiness.p50_ms" = 1.542513863216266
-"readiness.p95_ms" = 1.3664955070603337
-"readiness.p99_ms" = 1.3367408298256163
-"runs.p50_ms" = 1.5119787045252884
-"runs.p95_ms" = 1.3493150684931505
-"runs.p99_ms" = 1.3355068168346176
+cpu_per_request_ms = 1.026315789473684
+"readiness.p50_ms" = 1.1256410256410256
+"readiness.p95_ms" = 1.0906288532675708
+"readiness.p99_ms" = 1.0922809053975622
+"runs.p50_ms" = 1.1323654995730146
+"runs.p95_ms" = 1.094536525475752
+"runs.p99_ms" = 1.0876288659793814
+
+[[baseline]]
+tool = "0.3.0"
+written = "2026-11-07T09:38:33.257296291Z"
+
+[baseline.plan]
+rate = 50.0
+warmup_secs = 10
+duration_secs = 60
+requests = 2
+groups = ["readiness", "runs"]
+
+[baseline.host]
+arch = "x86_64"
+os = "linux"
+available_parallelism = 4
+cpu_model = "Intel(R) Xeon(R) 6973P-C"
+total_memory_bytes = 16758403072
+
+[baseline.tolerance]
+latency = 0.25
+throughput = 0.2
+memory = 0.2
+cpu = 0.25
+transactions = 0.1
+
+[baseline.metrics]
+throughput_rps = 50.0
+peak_memory_bytes = 16670720.0
+cpu_per_request_ms = 0.12
+"readiness.p50_ms" = 1.601
+"readiness.p95_ms" = 2.103
+"readiness.p99_ms" = 2.309
+"runs.p50_ms" = 1.631
+"runs.p95_ms" = 2.159
+"runs.p99_ms" = 2.423
+
+[baseline.noise]
+throughput_rps = 1.0
+peak_memory_bytes = 1.0
+cpu_per_request_ms = 1.0833333333333335
+"readiness.p50_ms" = 1.0718301061836353
+"readiness.p95_ms" = 1.0722776985259153
+"readiness.p99_ms" = 1.0892161108705067
+"runs.p50_ms" = 1.0674432863274066
+"runs.p95_ms" = 1.043538675312645
+"runs.p99_ms" = 1.0198101527032604
