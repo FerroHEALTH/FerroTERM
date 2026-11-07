@@ -58,10 +58,11 @@ reported and not judged, and the run exits 2.
 Some runners stall every route for a whole job: on an AMD EPYC 9V74 the
 tails reach 100 to 300 ms while the p50 holds
 ([FerroPIX #511](https://github.com/FerroHEALTH/FerroPIX/issues/511)). An
-attempt that ends with exit 1 or 2 on a CPU model the perf workflow lists in
-`STALL_PRONE` runs again on a fresh runner, at most twice, and the gate
-passes when the last attempt passed. A breach on any other model fails at
-once. The job summary names each attempt's CPU model, its verdict and why a
+attempt that ends with exit 2 runs again on a fresh runner on any CPU model,
+since a run that cannot be judged says nothing about the code. An attempt
+that ends with exit 1 runs again only on a CPU model the perf workflow lists
+in `STALL_PRONE`. At most two retries run, and the gate passes when the last
+attempt passed. A breach on any other model fails at once. The job summary names each attempt's CPU model, its verdict and why a
 retry ran, and each attempt uploads its reports as `perf-report-attempt-<n>`.
 
 The job summary holds one report per service: the outcome, every breach
