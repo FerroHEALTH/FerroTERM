@@ -15,4 +15,5 @@ rules:
       - ci.yml
       - differential.yml
       - docs.yml
+      - perf.yml
       - release.yml

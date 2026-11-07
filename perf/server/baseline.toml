@@ -1,0 +1,217 @@
+# The performance baseline of ferrohealth-perf, one [[baseline]] per CPU model.
+# `ferrohealth-perf run --update` writes or lowers the entry of the runner's
+# model; a raise is a hand edit in a change that says why.
+schema = 2
+
+[[baseline]]
+tool = "0.2.0"
+written = "2026-11-07T00:28:19.945073576Z"
+
+[baseline.plan]
+rate = 50.0
+warmup_secs = 10
+duration_secs = 60
+requests = 9
+groups = ["ecl", "expand-filter", "lookup", "subsumes", "translate", "validate-code"]
+
+[baseline.host]
+arch = "x86_64"
+os = "linux"
+available_parallelism = 4
+cpu_model = "AMD EPYC 7763 64-Core Processor"
+total_memory_bytes = 16759439360
+
+[baseline.tolerance]
+latency = 0.25
+throughput = 0.2
+memory = 0.2
+cpu = 0.25
+transactions = 0.1
+
+[baseline.metrics]
+throughput_rps = 50.0
+peak_memory_bytes = 102539264.0
+cpu_per_request_ms = 0.68
+"ecl.p50_ms" = 1.383
+"ecl.p95_ms" = 1.86
+"ecl.p99_ms" = 1.97
+"expand-filter.p50_ms" = 3.843
+"expand-filter.p95_ms" = 4.447
+"expand-filter.p99_ms" = 4.635
+"lookup.p50_ms" = 1.204
+"lookup.p95_ms" = 1.679
+"lookup.p99_ms" = 1.797
+"subsumes.p50_ms" = 1.189
+"subsumes.p95_ms" = 1.673
+"subsumes.p99_ms" = 1.769
+"translate.p50_ms" = 1.399
+"translate.p95_ms" = 1.84
+"translate.p99_ms" = 1.953
+"validate-code.p50_ms" = 1.282
+"validate-code.p95_ms" = 1.725
+"validate-code.p99_ms" = 1.864
+
+[baseline.noise]
+throughput_rps = 1.0
+peak_memory_bytes = 1.0037149476711673
+cpu_per_request_ms = 1.0294117647058822
+"ecl.p50_ms" = 1.535068691250904
+"ecl.p95_ms" = 1.3940860215053763
+"ecl.p99_ms" = 1.3710659898477158
+"expand-filter.p50_ms" = 1.2175383814728078
+"expand-filter.p95_ms" = 1.178097593883517
+"expand-filter.p99_ms" = 1.1786407766990292
+"lookup.p50_ms" = 1.6486710963455151
+"lookup.p95_ms" = 1.4371649791542582
+"lookup.p99_ms" = 1.4095715080690039
+"subsumes.p50_ms" = 1.5820016820857863
+"subsumes.p95_ms" = 1.427973699940227
+"subsumes.p99_ms" = 1.3900508762012438
+"translate.p50_ms" = 1.527519656897784
+"translate.p95_ms" = 1.4233695652173914
+"translate.p99_ms" = 1.3696876600102406
+"validate-code.p50_ms" = 1.5741029641185647
+"validate-code.p95_ms" = 1.4556521739130435
+"validate-code.p99_ms" = 1.4007510729613735
+
+[[baseline]]
+tool = "0.2.0"
+written = "2026-11-07T00:14:16.622181992Z"
+
+[baseline.plan]
+rate = 50.0
+warmup_secs = 10
+duration_secs = 60
+requests = 9
+groups = ["ecl", "expand-filter", "lookup", "subsumes", "translate", "validate-code"]
+
+[baseline.host]
+arch = "x86_64"
+os = "linux"
+available_parallelism = 4
+cpu_model = "AMD EPYC 9V45 96-Core Processor"
+total_memory_bytes = 16759439360
+
+[baseline.tolerance]
+latency = 0.25
+throughput = 0.2
+memory = 0.2
+cpu = 0.25
+transactions = 0.1
+
+[baseline.metrics]
+throughput_rps = 50.0
+peak_memory_bytes = 102391808.0
+cpu_per_request_ms = 0.48
+"ecl.p50_ms" = 1.451
+"ecl.p95_ms" = 1.933
+"ecl.p99_ms" = 2.063
+"expand-filter.p50_ms" = 2.649
+"expand-filter.p95_ms" = 3.165
+"expand-filter.p99_ms" = 3.777
+"lookup.p50_ms" = 1.344
+"lookup.p95_ms" = 1.814
+"lookup.p99_ms" = 1.947
+"subsumes.p50_ms" = 1.294
+"subsumes.p95_ms" = 1.795
+"subsumes.p99_ms" = 1.861
+"translate.p50_ms" = 1.464
+"translate.p95_ms" = 1.909
+"translate.p99_ms" = 2.0
+"validate-code.p50_ms" = 1.37
+"validate-code.p95_ms" = 1.858
+"validate-code.p99_ms" = 1.975
+
+[baseline.noise]
+throughput_rps = 1.0
+peak_memory_bytes = 1.0002400192015362
+cpu_per_request_ms = 1.0212765957446808
+"ecl.p50_ms" = 1.0522117476432198
+"ecl.p95_ms" = 1.0697288323187604
+"ecl.p99_ms" = 1.0823714585519413
+"expand-filter.p50_ms" = 1.0541185833664943
+"expand-filter.p95_ms" = 1.0595915634415802
+"expand-filter.p99_ms" = 1.2395799146701674
+"lookup.p50_ms" = 1.1079967023907666
+"lookup.p95_ms" = 1.080405002977963
+"lookup.p99_ms" = 1.1087699316628703
+"subsumes.p50_ms" = 1.1817351598173516
+"subsumes.p95_ms" = 1.0885385081867798
+"subsumes.p99_ms" = 1.0832363213038416
+"translate.p50_ms" = 1.1296296296296295
+"translate.p95_ms" = 1.0688689809630458
+"translate.p99_ms" = 1.0735373054213635
+"validate-code.p50_ms" = 1.080441640378549
+"validate-code.p95_ms" = 1.0808609656777195
+"validate-code.p99_ms" = 1.0827850877192982
+
+[[baseline]]
+tool = "0.1.1"
+written = "2026-11-06T21:23:03.793817208Z"
+
+[baseline.plan]
+rate = 50.0
+warmup_secs = 10
+duration_secs = 60
+requests = 9
+groups = ["ecl", "expand-filter", "lookup", "subsumes", "translate", "validate-code"]
+
+[baseline.host]
+arch = "x86_64"
+os = "linux"
+available_parallelism = 4
+cpu_model = "AMD EPYC 9V74 80-Core Processor"
+total_memory_bytes = 16759439360
+
+[baseline.tolerance]
+latency = 0.25
+throughput = 0.2
+memory = 0.2
+cpu = 0.25
+transactions = 0.1
+
+[baseline.metrics]
+throughput_rps = 50.0
+peak_memory_bytes = 102150144.0
+cpu_per_request_ms = 0.68
+"ecl.p50_ms" = 2.371
+"ecl.p95_ms" = 2.829
+"ecl.p99_ms" = 2.903
+"expand-filter.p50_ms" = 4.339
+"expand-filter.p95_ms" = 4.767
+"expand-filter.p99_ms" = 4.859
+"lookup.p50_ms" = 2.187
+"lookup.p95_ms" = 2.681
+"lookup.p99_ms" = 2.745
+"subsumes.p50_ms" = 2.137
+"subsumes.p95_ms" = 2.603
+"subsumes.p99_ms" = 2.683
+"translate.p50_ms" = 2.353
+"translate.p95_ms" = 2.837
+"translate.p99_ms" = 2.897
+"validate-code.p50_ms" = 2.213
+"validate-code.p95_ms" = 2.739
+"validate-code.p99_ms" = 2.815
+
+[baseline.noise]
+throughput_rps = 1.0
+peak_memory_bytes = 1.0
+cpu_per_request_ms = 1.0
+"ecl.p50_ms" = 1.2935079105291871
+"ecl.p95_ms" = 1.2230869001297018
+"ecl.p99_ms" = 1.2161709258483453
+"expand-filter.p50_ms" = 1.1481873511510983
+"expand-filter.p95_ms" = 1.1245576786978062
+"expand-filter.p99_ms" = 1.1281634548409565
+"lookup.p50_ms" = 1.3002378121284186
+"lookup.p95_ms" = 1.2417786012042613
+"lookup.p99_ms" = 1.2248995983935742
+"subsumes.p50_ms" = 1.3381340012523482
+"subsumes.p95_ms" = 1.2424821002386635
+"subsumes.p99_ms" = 1.221210741920801
+"translate.p50_ms" = 1.2850901146914255
+"translate.p95_ms" = 1.2470329670329672
+"translate.p99_ms" = 1.2187631468237274
+"validate-code.p50_ms" = 1.2806712962962963
+"validate-code.p95_ms" = 1.231011235955056
+"validate-code.p99_ms" = 1.2180874080484638

@@ -1,0 +1,78 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+
+# The plan of the performance gate for ferroterm-server (ferrohealth-perf,
+# FerroHEALTH/FerroSYS#249), run by scripts/perf/gate.sh. The server reads
+# the scaled synthetic SNOMED CT edition of ferroterm-testkit, 50,000
+# invented concepts written by `ferroterm-fixture snomed-scaled`, and the
+# e2e CodeSystem fixtures. Every code below is a concept of that edition:
+# concept 0 (the root), 5 and 42, read through the R4 base. The server
+# holds no database, so the idle phase judges its CPU alone. No
+# specification governs this: our own design.
+
+[idle]
+duration_secs = 60
+max_cpu_percent = 2.0
+
+[load]
+rate = 50.0
+warmup_secs = 10
+duration_secs = 60
+
+[[requests]]
+group = "lookup"
+method = "GET"
+path = "/r4/CodeSystem/$lookup?system=http%3A%2F%2Fsnomed.info%2Fsct&code=100431234567106"
+status = 200
+
+[[requests]]
+group = "lookup"
+method = "GET"
+path = "/r4/CodeSystem/$lookup?system=https%3A%2F%2Fferroterm.eu%2Ffhir%2FCodeSystem%2Fe2e-taxonomy&code=aa-root"
+status = 200
+
+[[requests]]
+group = "validate-code"
+method = "GET"
+path = "/r4/CodeSystem/$validate-code?url=http%3A%2F%2Fsnomed.info%2Fsct&code=100431234567106"
+status = 200
+
+# $validate-code against the implicit value set of an ECL constraint.
+[[requests]]
+group = "validate-code"
+method = "GET"
+path = "/r4/ValueSet/$validate-code?url=http%3A%2F%2Fsnomed.info%2Fsct%3Ffhir_vs%3Decl%2F%3C%3C100061234567106&system=http%3A%2F%2Fsnomed.info%2Fsct&code=100431234567106"
+status = 200
+
+# $expand over the designation index.
+[[requests]]
+group = "expand-filter"
+method = "GET"
+path = "/r4/ValueSet/$expand?url=http%3A%2F%2Fsnomed.info%2Fsct%3Ffhir_vs&filter=synthetic%20concept%2042&count=10"
+status = 200
+
+# ECL: the descendants of concept 5, and the same less those of concept 42.
+[[requests]]
+group = "ecl"
+method = "GET"
+path = "/r4/ValueSet/$expand?url=http%3A%2F%2Fsnomed.info%2Fsct%3Ffhir_vs%3Decl%2F%3C%3C100061234567106&count=20"
+status = 200
+
+[[requests]]
+group = "ecl"
+method = "GET"
+path = "/r4/ValueSet/$expand?url=http%3A%2F%2Fsnomed.info%2Fsct%3Ffhir_vs%3Decl%2F%28%3C%3C100061234567106%29%20MINUS%20%28%3C%3C100431234567106%29&count=20"
+status = 200
+
+# $translate over the implicit concept map of the ICD-10 map reference set.
+[[requests]]
+group = "translate"
+method = "GET"
+path = "/r4/ConceptMap/$translate?url=http%3A%2F%2Fsnomed.info%2Fsct%3Ffhir_cm%3D447562003&system=http%3A%2F%2Fsnomed.info%2Fsct&code=100431234567106"
+status = 200
+
+[[requests]]
+group = "subsumes"
+method = "GET"
+path = "/r4/CodeSystem/$subsumes?system=http%3A%2F%2Fsnomed.info%2Fsct&codeA=100011234567109&codeB=100431234567106"
+status = 200

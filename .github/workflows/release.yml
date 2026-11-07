@@ -6,8 +6,11 @@
 # ONE workflow owns the `v*` tag, and every ordering in it is a `needs` edge.
 # The graph:
 #
-#   plan ── github-release (draft) ─┬─ build-binaries ── build-image ─┬─ vulnerability-record ── scan-and-tag ── finalize-release (publish) ── crates ── milestone
-#                                   └─ build-console ─────────────────┘
+#   plan ── perf ── github-release (draft) ─┬─ build-binaries ── build-image ─┬─ vulnerability-record ── scan-and-tag ── finalize-release (publish) ── crates ── milestone
+#                                           └─ build-console ─────────────────┘
+#
+# `perf` runs the performance gate on the tagged commit (#1151, perf.yml), so
+# a release the gate fails is never drafted.
 #
 # Both images are pushed by digest with no tag. `vulnerability-record` scans
 # them and the server's glibc tarballs with every severity, fixed or not, and
@@ -132,9 +135,17 @@ jobs:
           path: release-notes.md
 
   # ── github-release: create the release as a DRAFT ───────────────────────────
+  # ── perf: the performance gate on the release commit ───────────────────────
+  perf:
+    name: perf
+    needs: plan
+    permissions:
+      contents: read
+    uses: ./.github/workflows/perf.yml
+
   github-release:
     name: github release (draft)
-    needs: plan
+    needs: [plan, perf]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

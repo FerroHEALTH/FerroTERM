@@ -8,8 +8,9 @@
 # CSS and the Dockerfiles. JSON and other comment-less data carry none.
 #
 # Skipped: every directory that holds a PROVENANCE.md (vendored trees keep
-# their upstream terms) and the changelog fragments under changelog.d/, whose
-# text moves into CHANGELOG.md.
+# their upstream terms), the changelog fragments under changelog.d/, whose
+# text moves into CHANGELOG.md, and the performance baselines under perf/,
+# which `ferrohealth-perf run --update` writes whole.
 #
 # The two lines sit in the head of the file: within its first eight lines,
 # after a Markdown file's front matter, which must stay on line 1 for the
@@ -75,7 +76,7 @@ fi
 
 cd "$(dirname "$0")/../.."
 
-excludes=(':(exclude)changelog.d/[0-9]*.md')
+excludes=(':(exclude)changelog.d/[0-9]*.md' ':(exclude)perf/*/baseline.toml')
 while IFS= read -r provenance; do
   excludes+=(":(exclude)$(dirname "$provenance")/**")
 done < <(git ls-files '*PROVENANCE.md')
