@@ -3,38 +3,50 @@
 
 # The performance gate (#1151), called by ci.yml on a change that reaches
 # the server or the sync service and by release.yml on the release commit.
-# It builds ferroterm-server, ferroterm-sync and the testkit's
+# Each attempt job builds ferroterm-server, ferroterm-sync and the testkit's
 # ferroterm-fixture in release mode, installs ferrohealth-perf
-# (FerroHEALTH/FerroSYS#249) at its docs/VERSIONS.md pin, and runs
-# scripts/perf/gate.sh: for each service the idle phase and the load phase
-# judged against its perf/<service>/baseline.toml, and the sync service
-# whose schedule never waits, which the idle phase must fail. The reports and
-# the baselines are uploaded whatever the outcome, so a baseline written
-# with `update` is taken from the artifact. No specification governs this:
-# our own design.
+# (FerroHEALTH/FerroSYS#249) at its pin and runs scripts/perf/gate.sh once
+# through .github/actions/perf-attempt: for each service the idle phase and
+# the load phase judged against its perf/<service>/baseline.toml, and the
+# sync service whose schedule never waits, which the idle phase must fail.
+# Some runners stall the gate for a whole job (FerroHEALTH/FerroPIX#511), so
+# an attempt that ends with exit 1 or 2 on a CPU model STALL_PRONE lists is
+# retried on a fresh runner, at most twice (#1156). The verdict job passes
+# the gate when the last attempt that ran passed; a breach on any other model
+# fails at once, with no retry. No specification governs this: our own
+# design.
 name: Perf
 
 on:
   workflow_call:
     inputs:
       update:
-        description: Write the baselines under perf/ from runs that pass.
+        description: Write the entry of the runner's host shape in the baselines from a run that passes.
         required: false
         default: false
         type: boolean
 
 permissions: {}
 
+env:
+  FERROHEALTH_PERF_VERSION: 0.4.2
+  FERROTERM__USAGE_REPORT__ENABLED: "false"
+  # The CPU models whose runners stall every route for 100 to 300 ms for a
+  # whole job (FerroHEALTH/FerroPIX#511), one per line. Only an attempt on
+  # one of them is retried.
+  STALL_PRONE: |
+    AMD EPYC 9V74 80-Core Processor
+
 jobs:
   perf:
-    name: perf
+    name: perf (attempt 1)
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
       contents: read
-    env:
-      FERROHEALTH_PERF_VERSION: 0.4.1
-      FERROTERM__USAGE_REPORT__ENABLED: "false"
+    outputs:
+      code: ${{ steps.attempt.outputs.code }}
+      retryable: ${{ steps.attempt.outputs.retryable }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -42,27 +54,92 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           cache-key: perf
-      - name: Install ferrohealth-perf
-        run: cargo install ferrohealth-perf --version "=${FERROHEALTH_PERF_VERSION}" --locked
-      - name: Build the services and the fixture writer
-        run: cargo build --release --locked -p ferroterm-server -p ferroterm-sync -p ferroterm-testkit --bin ferroterm --bin ferroterm-sync --bin ferroterm-fixture
-      - name: Gate the performance
+      - id: attempt
+        uses: ./.github/actions/perf-attempt
+        with:
+          attempt: "1"
+          update: ${{ inputs.update }}
+          version: ${{ env.FERROHEALTH_PERF_VERSION }}
+          stall-prone: ${{ env.STALL_PRONE }}
+
+  perf-retry:
+    name: perf (attempt 2)
+    needs: perf
+    if: needs.perf.outputs.retryable == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    outputs:
+      code: ${{ steps.attempt.outputs.code }}
+      retryable: ${{ steps.attempt.outputs.retryable }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-rust
+        with:
+          cache-key: perf
+      - id: attempt
+        uses: ./.github/actions/perf-attempt
+        with:
+          attempt: "2"
+          update: ${{ inputs.update }}
+          version: ${{ env.FERROHEALTH_PERF_VERSION }}
+          stall-prone: ${{ env.STALL_PRONE }}
+
+  perf-retry-2:
+    name: perf (attempt 3)
+    needs: perf-retry
+    if: needs.perf-retry.outputs.retryable == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    outputs:
+      code: ${{ steps.attempt.outputs.code }}
+      retryable: ${{ steps.attempt.outputs.retryable }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-rust
+        with:
+          cache-key: perf
+      - id: attempt
+        uses: ./.github/actions/perf-attempt
+        with:
+          attempt: "3"
+          update: ${{ inputs.update }}
+          version: ${{ env.FERROHEALTH_PERF_VERSION }}
+          stall-prone: ${{ env.STALL_PRONE }}
+
+  # The gate passes when the last attempt that ran passed; an attempt job
+  # that did not finish fails it.
+  verdict:
+    name: perf verdict
+    needs: [perf, perf-retry, perf-retry-2]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: The last attempt passed
         env:
-          UPDATE: ${{ inputs.update }}
+          RESULTS: ${{ needs.perf.result }} ${{ needs.perf-retry.result }} ${{ needs.perf-retry-2.result }}
+          CODES: ${{ needs.perf.outputs.code }} ${{ needs.perf-retry.outputs.code }} ${{ needs.perf-retry-2.outputs.code }}
         run: |
           set -euo pipefail
-          if [ "$UPDATE" = "true" ]; then
-            bash scripts/perf/gate.sh run --update
-          else
-            bash scripts/perf/gate.sh run
+          echo "attempt results: ${RESULTS}; exit codes: ${CODES}"
+          case " ${RESULTS} " in
+            *" failure "* | *" cancelled "*)
+              echo "::error title=Performance gate::an attempt did not finish"
+              exit 1
+              ;;
+          esac
+          last="$(awk '{ print $NF }' <<< "${CODES}")"
+          if [ "$last" != "0" ]; then
+            echo "::error title=Performance gate::the last attempt ended with exit ${last}"
+            exit 1
           fi
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always()
-        with:
-          name: perf-report
-          path: |
-            target/perf/
-            perf/server/baseline.toml
-            perf/sync/baseline.toml
-          if-no-files-found: ignore
-          retention-days: 30
+          echo "the last attempt passed"

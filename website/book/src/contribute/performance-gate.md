@@ -55,12 +55,21 @@ every run; the check says in how many runs it breached. A phase where every
 route's p99 is over ten times its p50 at once is a stalled runner: it is
 reported and not judged, and the run exits 2.
 
+Some runners stall every route for a whole job: on an AMD EPYC 9V74 the
+tails reach 100 to 300 ms while the p50 holds
+([FerroPIX #511](https://github.com/FerroHEALTH/FerroPIX/issues/511)). An
+attempt that ends with exit 1 or 2 on a CPU model the perf workflow lists in
+`STALL_PRONE` runs again on a fresh runner, at most twice, and the gate
+passes when the last attempt passed. A breach on any other model fails at
+once. The job summary names each attempt's CPU model, its verdict and why a
+retry ran, and each attempt uploads its reports as `perf-report-attempt-<n>`.
+
 The job summary holds one report per service: the outcome, every breach
 with the metric, the baseline, the measured value and the allowed
 threshold, every check, and the latency of each group with its 95 %
 interval. A metric fails when it is worse than the baseline by more than the
 larger of its tolerance (latency and CPU 25 %, throughput 20 %, memory 20 %)
-and the noise floor the baseline recorded. The `perf-report` artifact holds
+and the noise floor the baseline recorded. The `perf-report-attempt-<n>` artifacts hold
 the JSON reports under `target/perf/` with the histograms, so
 `ferrohealth-perf compare --report target/perf/server/latest.json --baseline
 perf/server/baseline.toml` judges a report again without a server.
