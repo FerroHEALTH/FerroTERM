@@ -1,0 +1,72 @@
+# The performance baseline of ferrohealth-perf. `ferrohealth-perf run --update`
+# lowers it; a raise is a hand edit in a change that says why.
+schema = 1
+tool = "0.1.1"
+written = "2026-11-06T21:23:03.793817208Z"
+
+[plan]
+rate = 50.0
+warmup_secs = 10
+duration_secs = 60
+requests = 9
+groups = ["ecl", "expand-filter", "lookup", "subsumes", "translate", "validate-code"]
+
+[host]
+arch = "x86_64"
+os = "linux"
+available_parallelism = 4
+cpu_model = "AMD EPYC 9V74 80-Core Processor"
+total_memory_bytes = 16759439360
+
+[tolerance]
+latency = 0.25
+throughput = 0.2
+memory = 0.2
+cpu = 0.25
+transactions = 0.1
+
+[metrics]
+throughput_rps = 50.0
+peak_memory_bytes = 102150144.0
+cpu_per_request_ms = 0.68
+"ecl.p50_ms" = 2.371
+"ecl.p95_ms" = 2.829
+"ecl.p99_ms" = 2.903
+"expand-filter.p50_ms" = 4.339
+"expand-filter.p95_ms" = 4.767
+"expand-filter.p99_ms" = 4.859
+"lookup.p50_ms" = 2.187
+"lookup.p95_ms" = 2.681
+"lookup.p99_ms" = 2.745
+"subsumes.p50_ms" = 2.137
+"subsumes.p95_ms" = 2.603
+"subsumes.p99_ms" = 2.683
+"translate.p50_ms" = 2.353
+"translate.p95_ms" = 2.837
+"translate.p99_ms" = 2.897
+"validate-code.p50_ms" = 2.213
+"validate-code.p95_ms" = 2.739
+"validate-code.p99_ms" = 2.815
+
+[noise]
+throughput_rps = 1.0
+peak_memory_bytes = 1.0
+cpu_per_request_ms = 1.0
+"ecl.p50_ms" = 1.2935079105291871
+"ecl.p95_ms" = 1.2230869001297018
+"ecl.p99_ms" = 1.2161709258483453
+"expand-filter.p50_ms" = 1.1481873511510983
+"expand-filter.p95_ms" = 1.1245576786978062
+"expand-filter.p99_ms" = 1.1281634548409565
+"lookup.p50_ms" = 1.3002378121284186
+"lookup.p95_ms" = 1.2417786012042613
+"lookup.p99_ms" = 1.2248995983935742
+"subsumes.p50_ms" = 1.3381340012523482
+"subsumes.p95_ms" = 1.2424821002386635
+"subsumes.p99_ms" = 1.221210741920801
+"translate.p50_ms" = 1.2850901146914255
+"translate.p95_ms" = 1.2470329670329672
+"translate.p99_ms" = 1.2187631468237274
+"validate-code.p50_ms" = 1.2806712962962963
+"validate-code.p95_ms" = 1.231011235955056
+"validate-code.p99_ms" = 1.2180874080484638

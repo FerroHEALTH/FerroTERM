@@ -1,0 +1,48 @@
+# The performance baseline of ferrohealth-perf. `ferrohealth-perf run --update`
+# lowers it; a raise is a hand edit in a change that says why.
+schema = 1
+tool = "0.1.1"
+written = "2026-11-06T21:26:56.914095367Z"
+
+[plan]
+rate = 50.0
+warmup_secs = 10
+duration_secs = 60
+requests = 2
+groups = ["readiness", "runs"]
+
+[host]
+arch = "x86_64"
+os = "linux"
+available_parallelism = 4
+cpu_model = "AMD EPYC 9V74 80-Core Processor"
+total_memory_bytes = 16759439360
+
+[tolerance]
+latency = 0.25
+throughput = 0.2
+memory = 0.2
+cpu = 0.25
+transactions = 0.1
+
+[metrics]
+throughput_rps = 50.0
+peak_memory_bytes = 16408576.0
+cpu_per_request_ms = 0.27666666666666667
+"readiness.p50_ms" = 1.669
+"readiness.p95_ms" = 2.129
+"readiness.p99_ms" = 2.223
+"runs.p50_ms" = 1.704
+"runs.p95_ms" = 2.167
+"runs.p99_ms" = 2.253
+
+[noise]
+throughput_rps = 1.0
+peak_memory_bytes = 1.0
+cpu_per_request_ms = 1.064102564102564
+"readiness.p50_ms" = 1.542513863216266
+"readiness.p95_ms" = 1.3664955070603337
+"readiness.p99_ms" = 1.3367408298256163
+"runs.p50_ms" = 1.5119787045252884
+"runs.p95_ms" = 1.3493150684931505
+"runs.p99_ms" = 1.3355068168346176
