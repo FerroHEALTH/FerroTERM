@@ -5,19 +5,3 @@
 # scripts/checks/file-size.sh admits, each with the length it may not
 # pass. An entry may fall and never rise; --update lowers and removes
 # entries.
-app/ferroterm-console/src/fhir/terminology.rs 814
-app/ferroterm-console/src/pages/browse.rs 841
-app/ferroterm-console/src/pages/sync.rs 827
-app/ferroterm-server/src/persistence.rs 843
-crates/fhir-terminology/src/compose.rs 951
-crates/fhir-terminology/src/icd11.rs 957
-crates/fhir-terminology/src/operations/mod.rs 852
-crates/fhir-terminology/src/operations/value_set_validate_code.rs 847
-crates/fhir-terminology/src/provider.rs 883
-crates/fhir-terminology/src/snomed.rs 968
-crates/labcodeset/src/lib.rs 925
-crates/rf2/src/refset.rs 859
-crates/sct-ecl/src/eval.rs 857
-tools/ferroterm-bench/src/main.rs 824
-tools/ferroterm-build/src/archive.rs 833
-tools/ferroterm-build/src/pipeline.rs 824
