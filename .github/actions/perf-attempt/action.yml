@@ -81,7 +81,7 @@ runs:
         elif [ "$code" = 0 ]; then
           why="no retry is needed"
         else
-          why="no retry runs, since ${model:-the runner's model} is not listed as stall-prone"
+          why="no retry runs, since ${model:-an unnamed CPU} is not listed as stall-prone"
         fi
         {
           echo "## Performance gate, attempt ${ATTEMPT}"
