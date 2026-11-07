@@ -913,6 +913,8 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/perf.yml
+    with:
+      update: true
 
   tx-ecosystem:
     name: tx-ecosystem
