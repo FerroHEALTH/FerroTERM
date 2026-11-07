@@ -1,11 +1,11 @@
-# The performance baseline of ferrohealth-perf, one [[baseline]] per CPU model.
+# The performance baseline of ferrohealth-perf, one [[baseline]] per host shape.
 # `ferrohealth-perf run --update` writes or lowers the entry of the runner's
 # model; a raise is a hand edit in a change that says why.
 schema = 3
 
 [[baseline]]
-tool = "0.3.0"
-written = "2026-11-07T08:25:52.558198551Z"
+tool = "0.4.1"
+written = "2026-11-07T12:31:25.798195Z"
 
 [baseline.plan]
 rate = 50.0
@@ -30,53 +30,53 @@ transactions = 0.1
 
 [baseline.metrics]
 throughput_rps = 50.0
-peak_memory_bytes = 101990400.0
-cpu_per_request_ms = 0.5533333333333335
-"ecl.p50_ms" = 1.781
-"ecl.p95_ms" = 2.265
-"ecl.p99_ms" = 2.331
-"expand-filter.p50_ms" = 3.963
-"expand-filter.p95_ms" = 4.475
-"expand-filter.p99_ms" = 4.603
-"lookup.p50_ms" = 1.631
-"lookup.p95_ms" = 2.109
-"lookup.p99_ms" = 2.185
-"subsumes.p50_ms" = 1.587
-"subsumes.p95_ms" = 2.079
-"subsumes.p99_ms" = 2.127
-"translate.p50_ms" = 1.827
-"translate.p95_ms" = 2.239
-"translate.p99_ms" = 2.311
-"validate-code.p50_ms" = 1.671
-"validate-code.p95_ms" = 2.163
-"validate-code.p99_ms" = 2.257
+peak_memory_bytes = 102320128.0
+cpu_per_request_ms = 0.56
+"ecl.p50_ms" = 1.5865
+"ecl.p95_ms" = 2.067
+"ecl.p99_ms" = 2.129
+"expand-filter.p50_ms" = 3.862
+"expand-filter.p95_ms" = 4.355
+"expand-filter.p99_ms" = 4.519
+"lookup.p50_ms" = 1.4385
+"lookup.p95_ms" = 1.907
+"lookup.p99_ms" = 1.9809999999999999
+"subsumes.p50_ms" = 1.416
+"subsumes.p95_ms" = 1.8780000000000001
+"subsumes.p99_ms" = 1.938
+"translate.p50_ms" = 1.6059999999999999
+"translate.p95_ms" = 2.0575
+"translate.p99_ms" = 2.1355
+"validate-code.p50_ms" = 1.4845000000000002
+"validate-code.p95_ms" = 1.9809999999999999
+"validate-code.p99_ms" = 2.0655
 
 [baseline.noise]
 throughput_rps = 1.0
-peak_memory_bytes = 1.0000803212851406
-cpu_per_request_ms = 1.0060240963855418
-"ecl.p50_ms" = 1.1830432341381247
-"ecl.p95_ms" = 1.1527593818984547
-"ecl.p99_ms" = 1.145002145002145
-"expand-filter.p50_ms" = 1.086802927075448
-"expand-filter.p95_ms" = 1.070614525139665
-"expand-filter.p99_ms" = 1.0660438844232023
-"lookup.p50_ms" = 1.21704475781729
-"lookup.p95_ms" = 1.1697486960644856
-"lookup.p99_ms" = 1.1565217391304348
-"subsumes.p50_ms" = 1.2318840579710146
-"subsumes.p95_ms" = 1.173160173160173
-"subsumes.p99_ms" = 1.1720733427362484
-"translate.p50_ms" = 1.19376026272578
-"translate.p95_ms" = 1.150960250111657
-"translate.p99_ms" = 1.154045867589788
-"validate-code.p50_ms" = 1.220227408737283
-"validate-code.p95_ms" = 1.1655108645399908
-"validate-code.p99_ms" = 1.156845369960124
+peak_memory_bytes = 1.0032225135605772
+cpu_per_request_ms = 1.0176470588235293
+"ecl.p50_ms" = 1.4360632183908049
+"ecl.p95_ms" = 1.321027287319422
+"ecl.p99_ms" = 1.3227815256875972
+"expand-filter.p50_ms" = 1.1568731720287158
+"expand-filter.p95_ms" = 1.142621015348288
+"expand-filter.p99_ms" = 1.1181510710259301
+"lookup.p50_ms" = 1.4943820224719102
+"lookup.p95_ms" = 1.3648093841642228
+"lookup.p99_ms" = 1.3556555993247046
+"subsumes.p50_ms" = 1.4714859437751002
+"subsumes.p95_ms" = 1.3613595706618962
+"subsumes.p99_ms" = 1.3544882790165809
+"translate.p50_ms" = 1.419494584837545
+"translate.p95_ms" = 1.2926439232409381
+"translate.p99_ms" = 1.2923469387755102
+"validate-code.p50_ms" = 1.458397534668721
+"validate-code.p95_ms" = 1.3446359088382436
+"validate-code.p99_ms" = 1.3495197438633937
 
 [[baseline]]
-tool = "0.3.0"
-written = "2026-11-07T08:47:01.180034854Z"
+tool = "0.4.1"
+written = "2026-11-07T12:31:25.798195Z"
 
 [baseline.plan]
 rate = 50.0
@@ -101,31 +101,31 @@ transactions = 0.1
 
 [baseline.metrics]
 throughput_rps = 50.0
-peak_memory_bytes = 102092800.0
-cpu_per_request_ms = 0.51
-"ecl.p50_ms" = 1.466
-"ecl.p95_ms" = 1.952
-"ecl.p99_ms" = 2.031
-"expand-filter.p50_ms" = 2.771
-"expand-filter.p95_ms" = 3.251
-"expand-filter.p99_ms" = 3.357
-"lookup.p50_ms" = 1.293
-"lookup.p95_ms" = 1.755
-"lookup.p99_ms" = 1.907
-"subsumes.p50_ms" = 1.239
-"subsumes.p95_ms" = 1.718
-"subsumes.p99_ms" = 1.784
-"translate.p50_ms" = 1.4
-"translate.p95_ms" = 1.886
-"translate.p99_ms" = 2.153
-"validate-code.p50_ms" = 1.32
-"validate-code.p95_ms" = 1.805
-"validate-code.p99_ms" = 1.946
+peak_memory_bytes = 102303744.0
+cpu_per_request_ms = 0.41666666666666663
+"ecl.p50_ms" = 1.5815000000000001
+"ecl.p95_ms" = 2.0854999999999997
+"ecl.p99_ms" = 2.175
+"expand-filter.p50_ms" = 2.8529999999999998
+"expand-filter.p95_ms" = 3.3659999999999997
+"expand-filter.p99_ms" = 3.5090000000000003
+"lookup.p50_ms" = 1.4315
+"lookup.p95_ms" = 1.917
+"lookup.p99_ms" = 2.069
+"subsumes.p50_ms" = 1.396
+"subsumes.p95_ms" = 1.8915
+"subsumes.p99_ms" = 1.9885000000000002
+"translate.p50_ms" = 1.549
+"translate.p95_ms" = 2.0455
+"translate.p99_ms" = 2.249
+"validate-code.p50_ms" = 1.4675
+"validate-code.p95_ms" = 1.9609999999999999
+"validate-code.p99_ms" = 2.1225
 
 [baseline.noise]
 throughput_rps = 1.0
 peak_memory_bytes = 1.0039317953861584
-cpu_per_request_ms = 1.0784313725490198
+cpu_per_request_ms = 1.288659793814433
 "ecl.p50_ms" = 1.330150068212824
 "ecl.p95_ms" = 1.2587090163934427
 "ecl.p99_ms" = 1.2530773018217625
@@ -146,8 +146,8 @@ cpu_per_request_ms = 1.0784313725490198
 "validate-code.p99_ms" = 1.2780061664953752
 
 [[baseline]]
-tool = "0.3.0"
-written = "2026-11-07T08:03:54.141228103Z"
+tool = "0.4.1"
+written = "2026-11-07T12:31:25.798195Z"
 
 [baseline.plan]
 rate = 50.0
@@ -172,53 +172,53 @@ transactions = 0.1
 
 [baseline.metrics]
 throughput_rps = 50.0
-peak_memory_bytes = 102301696.0
-cpu_per_request_ms = 0.5266666666666666
-"ecl.p50_ms" = 1.651
-"ecl.p95_ms" = 2.109
-"ecl.p99_ms" = 2.313
-"expand-filter.p50_ms" = 3.207
-"expand-filter.p95_ms" = 3.671
-"expand-filter.p99_ms" = 3.969
-"lookup.p50_ms" = 1.541
-"lookup.p95_ms" = 1.98
-"lookup.p99_ms" = 2.117
-"subsumes.p50_ms" = 1.478
-"subsumes.p95_ms" = 1.981
-"subsumes.p99_ms" = 2.077
-"translate.p50_ms" = 1.663
-"translate.p95_ms" = 2.115
-"translate.p99_ms" = 2.195
-"validate-code.p50_ms" = 1.6
-"validate-code.p95_ms" = 2.075
-"validate-code.p99_ms" = 2.223
+peak_memory_bytes = 102457344.0
+cpu_per_request_ms = 0.4833333333333333
+"ecl.p50_ms" = 1.443
+"ecl.p95_ms" = 1.903
+"ecl.p99_ms" = 2.0675
+"expand-filter.p50_ms" = 2.977
+"expand-filter.p95_ms" = 3.44
+"expand-filter.p99_ms" = 3.625
+"lookup.p50_ms" = 1.333
+"lookup.p95_ms" = 1.7810000000000001
+"lookup.p99_ms" = 1.8895
+"subsumes.p50_ms" = 1.2945
+"subsumes.p95_ms" = 1.7735
+"subsumes.p99_ms" = 1.8780000000000001
+"translate.p50_ms" = 1.4445000000000001
+"translate.p95_ms" = 1.9075000000000002
+"translate.p99_ms" = 2.0305
+"validate-code.p50_ms" = 1.381
+"validate-code.p95_ms" = 1.8645
+"validate-code.p99_ms" = 1.971
 
 [baseline.noise]
 throughput_rps = 1.0
-peak_memory_bytes = 1.0000400384368995
-cpu_per_request_ms = 1.069620253164557
-"ecl.p50_ms" = 1.3900666262870987
-"ecl.p95_ms" = 1.3176861071597914
-"ecl.p99_ms" = 1.249891915261565
-"expand-filter.p50_ms" = 1.189585282195198
-"expand-filter.p95_ms" = 1.1678016889131027
+peak_memory_bytes = 1.0015191492764053
+cpu_per_request_ms = 1.089655172413793
+"ecl.p50_ms" = 1.5417004048582994
+"ecl.p95_ms" = 1.395992928697702
+"ecl.p99_ms" = 1.3572996706915477
+"expand-filter.p50_ms" = 1.2446305060065526
+"expand-filter.p95_ms" = 1.206294795886569
 "expand-filter.p99_ms" = 1.2060972537163013
-"lookup.p50_ms" = 1.3828682673588577
-"lookup.p95_ms" = 1.3429292929292929
-"lookup.p99_ms" = 1.295701464336325
-"subsumes.p50_ms" = 1.4323410013531799
-"subsumes.p95_ms" = 1.3160020191822313
-"subsumes.p99_ms" = 1.2802118440057775
-"translate.p50_ms" = 1.3716175586289838
-"translate.p95_ms" = 1.3167848699763594
+"lookup.p50_ms" = 1.5866666666666667
+"lookup.p95_ms" = 1.422882427307206
+"lookup.p99_ms" = 1.3989169675090254
+"subsumes.p50_ms" = 1.593159315931593
+"subsumes.p95_ms" = 1.425925925925926
+"subsumes.p99_ms" = 1.3966646813579513
+"translate.p50_ms" = 1.5358890701468189
+"translate.p95_ms" = 1.401764705882353
 "translate.p99_ms" = 1.4036446469248292
-"validate-code.p50_ms" = 1.3718749999999997
-"validate-code.p95_ms" = 1.3055421686746986
-"validate-code.p99_ms" = 1.2753036437246965
+"validate-code.p50_ms" = 1.570567986230637
+"validate-code.p95_ms" = 1.4020556227327692
+"validate-code.p99_ms" = 1.39674229203025
 
 [[baseline]]
-tool = "0.3.0"
-written = "2026-11-07T09:52:07.471805912Z"
+tool = "0.4.1"
+written = "2026-11-07T12:31:25.798195Z"
 
 [baseline.plan]
 rate = 50.0
@@ -288,8 +288,8 @@ cpu_per_request_ms = 1.0072463768115945
 "validate-code.p99_ms" = 1.2133401221995928
 
 [[baseline]]
-tool = "0.3.0"
-written = "2026-11-07T09:30:36.7287254Z"
+tool = "0.4.1"
+written = "2026-11-07T12:31:25.798195Z"
 
 [baseline.plan]
 rate = 50.0

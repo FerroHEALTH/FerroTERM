@@ -48,6 +48,13 @@ catches a background worker that never waits.
 
 ## Reading the report
 
+A load metric that breaches is judged again on up to two fresh load
+phases, each after its own warm-up, and the gate fails only when it breaches
+in most of the runs, so a one-off stall clears and a real regression fails
+every run; the check says in how many runs it breached. A phase where every
+route's p99 is over ten times its p50 at once is a stalled runner: it is
+reported and not judged, and the run exits 2.
+
 The job summary holds one report per service: the outcome, every breach
 with the metric, the baseline, the measured value and the allowed
 threshold, every check, and the latency of each group with its 95 %
@@ -65,25 +72,30 @@ window whose second half differs from its first.
 
 ## Updating the baselines
 
-GitHub's hosted runners mix CPU generations, and the same commit measures
-25 to 45 % slower on one than on another, so `baseline.toml` holds one
-`[[baseline]]` entry per CPU model, keyed by the model name in
-`/proc/cpuinfo`. A run is judged against the entry of its runner's model.
-A runner whose model has no entry cannot be judged: the job exits 2 and
-names the model, and the idle limits still judge the run.
+GitHub's hosted runners mix CPU generations and memory sizes, and the same
+commit measures 25 to 45 % slower on one than on another, so `baseline.toml`
+holds one `[[baseline]]` entry per host shape, keyed by the CPU model in
+`/proc/cpuinfo` and the memory size to the GiB. A run is judged against the
+entry of its runner's shape. A runner whose shape has no entry cannot be
+judged: the job exits 2 and names the shape, and the idle limits still judge
+the run.
 
-The entries are measured on the CI runners, never on a workstation. An update measures five load phases, each after its own warm-up, and
-writes each metric as their median and its noise floor as how far the
-worst phase strayed from it, so a tail that moves from run to run is
-judged against the movement it showed. To
-write or add one, set `update: true` on the `perf` job's call of
-`.github/workflows/perf.yml` in `ci.yml` on a branch, take
-`perf/server/baseline.toml` and `perf/sync/baseline.toml` from the
-`perf-report` artifact, commit them and set `update` back; each file holds
-the committed entries and the run's own. Re-run the job until every CPU
-model the runners serve has its entry. On the same plan an update only
-moves each metric of the runner's entry to the better of the entry and the
-run, and leaves the other entries as they were, so every entry is a
-ratchet. A change to a plan's rate, windows or request set writes the
-entry afresh. Raising a metric is a hand edit in a pull request that says
-why.
+The entries are measured on the CI runners, never on a workstation. An
+update measures five load phases, each after its own warm-up, and writes
+each metric as their median and its noise floor as how far the worst phase
+strayed from it, so a tail that moves from run to run is judged against the
+movement it showed. To write or add one, set `update: true` on the `perf`
+job's call of `.github/workflows/perf.yml` in `ci.yml` on a branch, take
+`perf/server/baseline.toml` and `perf/sync/baseline.toml` from the `perf-
+report` artifact, commit them and set `update` back; each file holds the
+committed entries and the run's own. Re-run the job until every host shape
+the runners serve has its entry. On the same plan an update only moves each
+metric of the runner's entry to the better of the entry and the run, and
+leaves the other entries as they were, so every entry is a ratchet. A change
+to a plan's rate, windows or request set writes the entry afresh. Raising a
+metric is a hand edit in a pull request that says why.
+
+Machines of one shape still differ from each other, so re-run the update job
+several times and fold the runs into the committed file with
+`ferrohealth-perf merge --baseline <file> <job>...`: each entry then takes the median
+over the jobs, and its noise floor the spread between them.

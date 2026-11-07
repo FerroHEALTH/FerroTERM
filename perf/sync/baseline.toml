@@ -1,11 +1,11 @@
-# The performance baseline of ferrohealth-perf, one [[baseline]] per CPU model.
+# The performance baseline of ferrohealth-perf, one [[baseline]] per host shape.
 # `ferrohealth-perf run --update` writes or lowers the entry of the runner's
 # model; a raise is a hand edit in a change that says why.
 schema = 3
 
 [[baseline]]
-tool = "0.3.0"
-written = "2026-11-07T08:33:49.162620908Z"
+tool = "0.4.1"
+written = "2026-11-07T12:31:26.426859Z"
 
 [baseline.plan]
 rate = 50.0
@@ -30,29 +30,29 @@ transactions = 0.1
 
 [baseline.metrics]
 throughput_rps = 50.0
-peak_memory_bytes = 16113664.0
-cpu_per_request_ms = 0.17
-"readiness.p50_ms" = 1.038
-"readiness.p95_ms" = 1.514
-"readiness.p99_ms" = 1.566
-"runs.p50_ms" = 1.061
-"runs.p95_ms" = 1.54
-"runs.p99_ms" = 1.61
+peak_memory_bytes = 16103424.0
+cpu_per_request_ms = 0.16833333333333333
+"readiness.p50_ms" = 1.0955
+"readiness.p95_ms" = 1.5630000000000002
+"readiness.p99_ms" = 1.6165
+"runs.p50_ms" = 1.1225
+"runs.p95_ms" = 1.585
+"runs.p99_ms" = 1.654
 
 [baseline.noise]
 throughput_rps = 1.0
-peak_memory_bytes = 1.0
-cpu_per_request_ms = 1.0196078431372548
-"readiness.p50_ms" = 1.1262042389210019
-"readiness.p95_ms" = 1.0852047556142668
-"readiness.p99_ms" = 1.0970625798212004
-"runs.p50_ms" = 1.1442035815268614
-"runs.p95_ms" = 1.0915584415584416
-"runs.p99_ms" = 1.0819875776397514
+peak_memory_bytes = 1.0006358896095637
+cpu_per_request_ms = 1.0200000000000002
+"readiness.p50_ms" = 1.629661751951431
+"readiness.p95_ms" = 1.4323821339950373
+"readiness.p99_ms" = 1.4199160167966407
+"runs.p50_ms" = 1.5760135135135136
+"runs.p95_ms" = 1.4300613496932515
+"runs.p99_ms" = 1.405771495877503
 
 [[baseline]]
-tool = "0.3.0"
-written = "2026-11-07T08:54:57.679718402Z"
+tool = "0.4.1"
+written = "2026-11-07T12:31:26.426859Z"
 
 [baseline.plan]
 rate = 50.0
@@ -77,19 +77,19 @@ transactions = 0.1
 
 [baseline.metrics]
 throughput_rps = 50.0
-peak_memory_bytes = 16756736.0
-cpu_per_request_ms = 0.20666666666666667
-"readiness.p50_ms" = 1.444
-"readiness.p95_ms" = 1.91
-"readiness.p99_ms" = 1.974
-"runs.p50_ms" = 1.506
-"runs.p95_ms" = 1.949
-"runs.p99_ms" = 2.013
+peak_memory_bytes = 16369664.0
+cpu_per_request_ms = 0.14166666666666666
+"readiness.p50_ms" = 1.4129999999999998
+"readiness.p95_ms" = 1.869
+"readiness.p99_ms" = 1.9715
+"runs.p50_ms" = 1.451
+"runs.p95_ms" = 1.8995000000000002
+"runs.p99_ms" = 2.0055
 
 [baseline.noise]
 throughput_rps = 1.0
-peak_memory_bytes = 1.0
-cpu_per_request_ms = 1.0483870967741935
+peak_memory_bytes = 1.0236456899787314
+cpu_per_request_ms = 1.4588235294117646
 "readiness.p50_ms" = 1.3137119113573408
 "readiness.p95_ms" = 1.2287958115183246
 "readiness.p99_ms" = 1.2345491388044578
@@ -98,8 +98,8 @@ cpu_per_request_ms = 1.0483870967741935
 "runs.p99_ms" = 1.2364629905613511
 
 [[baseline]]
-tool = "0.3.0"
-written = "2026-11-07T08:11:50.769767248Z"
+tool = "0.4.1"
+written = "2026-11-07T12:31:26.426859Z"
 
 [baseline.plan]
 rate = 50.0
@@ -124,29 +124,29 @@ transactions = 0.1
 
 [baseline.metrics]
 throughput_rps = 50.0
-peak_memory_bytes = 15753216.0
-cpu_per_request_ms = 0.18
-"readiness.p50_ms" = 1.262
-"readiness.p95_ms" = 1.706
-"readiness.p99_ms" = 1.846
-"runs.p50_ms" = 1.246
-"runs.p95_ms" = 1.718
-"runs.p99_ms" = 1.88
+peak_memory_bytes = 15824896.0
+cpu_per_request_ms = 0.16999999999999998
+"readiness.p50_ms" = 1.1455
+"readiness.p95_ms" = 1.5985
+"readiness.p99_ms" = 1.7065000000000001
+"runs.p50_ms" = 1.157
+"runs.p95_ms" = 1.623
+"runs.p99_ms" = 1.7625
 
 [baseline.noise]
 throughput_rps = 1.0
-peak_memory_bytes = 1.000260010400416
+peak_memory_bytes = 1.00452957163194
 cpu_per_request_ms = 1.3148148148148149
-"readiness.p50_ms" = 1.3748019017432647
-"readiness.p95_ms" = 1.325322391559203
-"readiness.p99_ms" = 1.2941495124593714
-"runs.p50_ms" = 1.4751203852327448
-"runs.p95_ms" = 1.3323632130384169
-"runs.p99_ms" = 1.3047872340425533
+"readiness.p50_ms" = 1.8250728862973762
+"readiness.p95_ms" = 1.5647216633132126
+"readiness.p99_ms" = 1.5641352903637524
+"runs.p50_ms" = 1.7818352059925093
+"runs.p95_ms" = 1.5530104712041886
+"runs.p99_ms" = 1.5130699088145896
 
 [[baseline]]
-tool = "0.3.0"
-written = "2026-11-07T10:00:03.900536636Z"
+tool = "0.4.1"
+written = "2026-11-07T12:31:26.426859Z"
 
 [baseline.plan]
 rate = 50.0
@@ -192,8 +192,8 @@ cpu_per_request_ms = 1.026315789473684
 "runs.p99_ms" = 1.0876288659793814
 
 [[baseline]]
-tool = "0.3.0"
-written = "2026-11-07T09:38:33.257296291Z"
+tool = "0.4.1"
+written = "2026-11-07T12:31:26.426859Z"
 
 [baseline.plan]
 rate = 50.0
