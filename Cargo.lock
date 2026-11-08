@@ -1158,9 +1158,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-config"
-version = "0.2.9"
+version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43fce09cf320e16a77da56adef2b2f4a12a197380a1248edd68d30efde101509"
+checksum = "b43a5b1b1feb60993918bccfc6146c9e8555ee8c0191808404a75a761f8bcc4f"
 dependencies = [
  "ferrohealth-secret",
  "percent-encoding",
@@ -1224,9 +1224,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-session"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3473fca1276c6fff2a4efeaa6f81288cc00134806590053d9bdfec028b7fc83"
+checksum = "73271088c9cb8d7d059becf3299c3e049b014773c60b045f821ccf0d987758e0"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -1248,9 +1248,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-smart"
-version = "0.9.1"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fee5a70dfd6d43a71ac78bd92b2cedc202179526ac31ce1279ef71aefa49872c"
+checksum = "232346ffcc26de7032743ce1eca1f01ffc87b70819ff3a884041ad5157a14324"
 dependencies = [
  "argon2",
  "aws-lc-rs",
