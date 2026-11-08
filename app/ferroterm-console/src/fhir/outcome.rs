@@ -117,6 +117,34 @@ impl Classification {
     }
 }
 
+/// The `issues` outcome of a `$validate-code` answer, as `ferrobridge-term`
+/// read it.
+impl From<&ferrobridge_term::error::Outcome> for Outcome {
+    fn from(outcome: &ferrobridge_term::error::Outcome) -> Self {
+        Self {
+            issues: outcome
+                .issues
+                .iter()
+                .map(|issue| OutcomeIssue {
+                    severity: Some(issue.severity.clone()),
+                    code: Some(issue.code.clone()),
+                    details_text: issue.details.clone(),
+                    diagnostics: issue.diagnostics.clone(),
+                    classifications: issue
+                        .codings
+                        .iter()
+                        .map(|coding| Classification {
+                            code: coding.code.clone().unwrap_or_default(),
+                            system: coding.system.clone().unwrap_or_default(),
+                        })
+                        .collect(),
+                    expressions: issue.expression.clone(),
+                })
+                .collect(),
+        }
+    }
+}
+
 /// Reads the `OperationOutcome` of the `fhir-types` module `$module`.
 macro_rules! reads_outcome {
     ($module:ident) => {

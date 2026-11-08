@@ -19,8 +19,8 @@ pub mod exchange;
 pub(crate) mod expansion;
 pub(crate) mod facts;
 pub(crate) mod named;
+pub(crate) mod operation;
 pub(crate) mod outcome;
-pub(crate) mod parameters;
 pub(crate) mod problem;
 pub(crate) mod release;
 pub(crate) mod searchset;
@@ -337,15 +337,17 @@ impl FhirClient {
     /// (<https://hl7.org/fhir/R4B/valueset-operation-expand.html>), and every
     /// one of them is percent-encoded, so an implicit canonical carrying its
     /// own query string stays inside the parameter it belongs to.
-    pub(crate) fn expand_url(&self, version: FhirVersion, request: &ExpandRequest) -> String {
-        request
-            .append(
-                RequestUrl::default()
-                    .segment(version.segment())
-                    .segment("ValueSet")
-                    .segment("$expand"),
-            )
-            .render(&self.root)
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FhirError::Unwritten`] when `version` cannot carry the run.
+    pub(crate) fn expand_url(
+        &self,
+        version: FhirVersion,
+        request: &ExpandRequest,
+    ) -> Result<String, FhirError> {
+        self.operation(version, request.request())
+            .map(|operation| operation.url().to_owned())
     }
 
     /// Runs `ValueSet/$expand` and reads the expansion it answers.
@@ -361,8 +363,9 @@ impl FhirClient {
         version: FhirVersion,
         request: &ExpandRequest,
     ) -> Result<ExpandedValueSet, FhirError> {
-        self.get_answer(version, &self.expand_url(version, request))
-            .await
+        let operation = self.operation(version, request.request())?;
+        let document = self.operate(version, &operation).await?;
+        ExpandedValueSet::read(document.value, operation.url(), version)
     }
 
     /// The address of a RESTful search over one resource type.
@@ -414,15 +417,17 @@ impl FhirClient {
     /// (<https://hl7.org/fhir/R4B/codesystem-operation-lookup.html>), and each
     /// one is percent-encoded, so a code carrying a separator stays inside the
     /// parameter it belongs to.
-    pub(crate) fn lookup_url(&self, version: FhirVersion, request: &LookupRequest) -> String {
-        request
-            .append(
-                RequestUrl::default()
-                    .segment(version.segment())
-                    .segment("CodeSystem")
-                    .segment("$lookup"),
-            )
-            .render(&self.root)
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FhirError::Unwritten`] when `version` cannot carry the run.
+    pub(crate) fn lookup_url(
+        &self,
+        version: FhirVersion,
+        request: &LookupRequest,
+    ) -> Result<String, FhirError> {
+        self.operation(version, request.request())
+            .map(|operation| operation.url().to_owned())
     }
 
     /// Reads one concept with `CodeSystem/$lookup`.
@@ -437,8 +442,12 @@ impl FhirClient {
         version: FhirVersion,
         request: &LookupRequest,
     ) -> Result<Document<Concept>, FhirError> {
-        self.get_answer_document(version, &self.lookup_url(version, request))
-            .await
+        let operation = self.operation(version, request.request())?;
+        let document = self.operate(version, &operation).await?;
+        Ok(Document {
+            value: Concept::read(document.value, operation.url(), version)?,
+            text: document.text,
+        })
     }
 
     /// The address a `ValueSet/$expand` sent as a `POST` is addressed to.
@@ -464,12 +473,9 @@ impl FhirClient {
         version: FhirVersion,
         query: &ConceptQuery,
     ) -> Result<ExpandedValueSet, FhirError> {
-        self.post_answer(
-            version,
-            &self.expand_post_url(version),
-            &query.body(version),
-        )
-        .await
+        let operation = self.operation(version, query.request())?;
+        let document = self.operate(version, &operation).await?;
+        ExpandedValueSet::read(document.value, operation.url(), version)
     }
 
     /// Searches the `ValueSet` resources this root holds.
@@ -541,20 +547,18 @@ impl FhirClient {
     /// puts the resource id in the path as one encoded segment, which is what
     /// the read interaction does with an id
     /// (<https://hl7.org/fhir/R4B/http.html#read>).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FhirError::Unwritten`] when `version` cannot carry the run,
+    /// or a value set run names no system for its code.
     pub(crate) fn validate_code_url(
         &self,
         version: FhirVersion,
         request: &ValidateRequest,
-    ) -> String {
-        let mut url = RequestUrl::default()
-            .segment(version.segment())
-            .segment(request.on.resource_type());
-        if request.instance() {
-            url = url.segment(&request.id);
-        }
-        request
-            .append(url.segment("$validate-code"))
-            .render(&self.root)
+    ) -> Result<String, FhirError> {
+        self.validation(version, request)
+            .map(|operation| operation.url().to_owned())
     }
 
     /// Runs `$validate-code` and reads the `Parameters` it answers.
@@ -570,22 +574,29 @@ impl FhirClient {
         version: FhirVersion,
         request: &ValidateRequest,
     ) -> Result<Document<ValidationAnswer>, FhirError> {
-        self.get_answer_document(version, &self.validate_code_url(version, request))
-            .await
+        let operation = self.validation(version, request)?;
+        let document = self.operate(version, &operation).await?;
+        Ok(Document {
+            value: ValidationAnswer::read(document.value, operation.url(), version)?,
+            text: document.text,
+        })
     }
 
     /// The address one `CodeSystem/$subsumes` run reads.
     ///
     /// `$subsumes` takes its parameters in the query of a `GET`
     /// (<https://hl7.org/fhir/R4B/codesystem-operation-subsumes.html>).
-    pub(crate) fn subsumes_url(&self, version: FhirVersion, request: &SubsumesRequest) -> String {
-        let mut url = RequestUrl::default()
-            .segment(version.segment())
-            .segment(CODE_SYSTEM);
-        if request.instance() {
-            url = url.segment(&request.id);
-        }
-        request.append(url.segment("$subsumes")).render(&self.root)
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FhirError::Unwritten`] when `version` cannot carry the run.
+    pub(crate) fn subsumes_url(
+        &self,
+        version: FhirVersion,
+        request: &SubsumesRequest,
+    ) -> Result<String, FhirError> {
+        self.operation(version, request.request())
+            .map(|operation| operation.url().to_owned())
     }
 
     /// Runs `CodeSystem/$subsumes` and reads the `Parameters` it answers.
@@ -600,8 +611,12 @@ impl FhirClient {
         version: FhirVersion,
         request: &SubsumesRequest,
     ) -> Result<Document<SubsumesAnswer>, FhirError> {
-        self.get_answer_document(version, &self.subsumes_url(version, request))
-            .await
+        let operation = self.operation(version, request.request())?;
+        let document = self.operate(version, &operation).await?;
+        Ok(Document {
+            value: SubsumesAnswer::read(&document.value, operation.url(), version)?,
+            text: document.text,
+        })
     }
 
     /// The address one `ConceptMap/$translate` run reads.
@@ -610,16 +625,17 @@ impl FhirClient {
     /// (<https://hl7.org/fhir/R4B/conceptmap-operation-translate.html>), under
     /// the names the target version's own `OperationDefinition` declares, and
     /// every one of them is percent-encoded.
-    pub(crate) fn translate_url(&self, version: FhirVersion, request: &TranslateRequest) -> String {
-        request
-            .append(
-                RequestUrl::default()
-                    .segment(version.segment())
-                    .segment(CONCEPT_MAP)
-                    .segment("$translate"),
-                version,
-            )
-            .render(&self.root)
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FhirError::Unwritten`] when `version` cannot carry the run.
+    pub(crate) fn translate_url(
+        &self,
+        version: FhirVersion,
+        request: &TranslateRequest,
+    ) -> Result<String, FhirError> {
+        self.operation(version, request.request())
+            .map(|operation| operation.url().to_owned())
     }
 
     /// Runs `ConceptMap/$translate` and reads the `Parameters` it answers.
@@ -634,8 +650,12 @@ impl FhirClient {
         version: FhirVersion,
         request: &TranslateRequest,
     ) -> Result<Document<TranslateAnswer>, FhirError> {
-        self.get_answer_document(version, &self.translate_url(version, request))
-            .await
+        let operation = self.operation(version, request.request())?;
+        let document = self.operate(version, &operation).await?;
+        Ok(Document {
+            value: TranslateAnswer::read(document.value, operation.url(), version)?,
+            text: document.text,
+        })
     }
 }
 

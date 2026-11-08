@@ -36,9 +36,10 @@ ferrohealth-smart.workspace = true
 ferrohealth-telemetry = { workspace = true, features = ["axum", "prometheus", "otlp"] }
 jiff = { workspace = true, features = ["serde"] }
 opentelemetry.workspace = true
-# `query` carries the operation parameters: the revalidation reads the FHIR
-# API with `$validate-code` and `$expand` as GET requests.
-reqwest = { workspace = true, features = ["query"] }
+# The revalidation's `$validate-code` and `$expand`, sent as GET requests
+# through the FerroBRIDGE terminology client.
+ferrobridge-term.workspace = true
+reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 terminology-syndication.workspace = true
@@ -46,6 +47,8 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["fs", "io-util", "process", "sync", "time"] }
 toml.workspace = true
 tracing.workspace = true
+# The FHIR base the revalidation parses for the release it names.
+url.workspace = true
 
 [dev-dependencies]
 # The Argon2id hashes of the Basic users the admin guard tests configure, and

@@ -28,7 +28,7 @@ use crate::fhir::expansion::{ExpandRequest, Expansion};
 use crate::locale::{Msg, message, tr, tr_with};
 use crate::pages::operations::published;
 use crate::pages::operations::{
-    Op, before, choices, frame, options, run, select, sent, text, verdict,
+    Op, before, choices, frame, options, refused, run, select, sent, text, verdict,
 };
 use crate::pages::parts::{failure, name_of};
 use crate::prefs::MAX_COUNT;
@@ -204,40 +204,30 @@ pub(crate) async fn page(request: Request) -> Html {
 async fn answer(request: &Request, asked: &Asked, set: &str) -> Html {
     let locale = &request.locale;
     let sent_request = asked.request(&request.prefs.display_language);
-    let url = request.client.expand_url(request.version, &sent_request);
+    let url = match request.client.expand_url(request.version, &sent_request) {
+        Ok(url) => url,
+        Err(error) => return panel_section(locale, None, failure(locale, &error)),
+    };
     match request.client.expand(request.version, &sent_request).await {
-        Err(error) => Html::join([
-            panel_section(locale, None, failure(locale, &error)),
-            sent(locale, &url, None),
-        ]),
-        Ok(expanded) => match expanded.expansion() {
-            None => Html::join([
+        Err(error) => refused(locale, &error),
+        Ok(expanded) => {
+            let expansion = expanded.expansion();
+            let names = match crate::pages::parts::system_names(request).await {
+                Ok(names) => names,
+                Err(error) => return panel_section(locale, None, failure(locale, &error)),
+            };
+            Html::join([
                 verdict(
                     locale,
-                    Outcome::Warn,
-                    Html::text(tr(locale, Msg::ValueSetNoExpansion)),
+                    Outcome::Ok,
+                    title(locale, &expansion, asked, set),
                     None,
                 ),
+                concepts(request, &expansion, asked, &names),
+                applied(locale, &expansion).unwrap_or_default(),
                 sent(locale, &url, None),
-            ]),
-            Some(expansion) => {
-                let names = match crate::pages::parts::system_names(request).await {
-                    Ok(names) => names,
-                    Err(error) => return panel_section(locale, None, failure(locale, &error)),
-                };
-                Html::join([
-                    verdict(
-                        locale,
-                        Outcome::Ok,
-                        title(locale, &expansion, asked, set),
-                        None,
-                    ),
-                    concepts(request, &expansion, asked, &names),
-                    applied(locale, &expansion).unwrap_or_default(),
-                    sent(locale, &url, None),
-                ])
-            }
-        },
+            ])
+        }
     }
 }
 

@@ -18,35 +18,18 @@
 //! Reading lives here, outside every component, so the screen renders values
 //! plain unit tests can pin.
 
+use ferrobridge_term::outcome::{BatchOutcome, SubsumesOutcome, ValidateOutcome};
+use ferrobridge_term::request::{
+    CodeSystemValidation, Coded, Request, Subsumption, Target, Validation as Asked,
+};
+
 use crate::fhir::CODE_SYSTEM;
 use crate::fhir::VALUE_SET;
-use crate::fhir::concept::CODE_PARAMETER;
-use crate::fhir::concept::SYSTEM_PARAMETER;
-use crate::fhir::concept::VERSION_PARAMETER;
-use crate::fhir::expansion::DISPLAY_LANGUAGE_PARAMETER;
-use crate::fhir::expansion::URL_PARAMETER;
+use crate::fhir::error::FhirError;
+use crate::fhir::operation::{Coding, ConceptEcho, mismatched};
 use crate::fhir::outcome::{Classification, Outcome};
-use crate::fhir::parameters::{ConceptEcho, Parameter};
+use crate::fhir::version::FhirVersion;
 use crate::locale::{Msg, tr_with};
-use crate::url::RequestUrl;
-
-/// The `$validate-code` parameter carrying the display the client asserts.
-pub(crate) const DISPLAY_PARAMETER: &str = "display";
-
-/// The `ValueSet/$validate-code` parameter carrying the value set's version.
-pub(crate) const VALUE_SET_VERSION_PARAMETER: &str = "valueSetVersion";
-
-/// The `ValueSet/$validate-code` parameter carrying the code system's version.
-///
-/// A value set run names two versions: `valueSetVersion` for the value set and
-/// `systemVersion` for the code system the code belongs to.
-pub(crate) const SYSTEM_VERSION_PARAMETER: &str = "systemVersion";
-
-/// The `$subsumes` parameter carrying the first code.
-pub(crate) const CODE_A_PARAMETER: &str = "codeA";
-
-/// The `$subsumes` parameter carrying the second code.
-pub(crate) const CODE_B_PARAMETER: &str = "codeB";
 
 /// Which resource type a `$validate-code` run is invoked on.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -115,46 +98,53 @@ impl ValidateRequest {
         !self.id.is_empty()
     }
 
-    /// Appends every parameter that was set, under the operation's own names.
+    /// The resource the run checks against: the stored one when the run
+    /// names an id, the canonical otherwise.
+    fn target(&self) -> Target {
+        if self.instance() {
+            Target::Instance(self.id.clone())
+        } else {
+            Target::Canonical(self.url.clone())
+        }
+    }
+
+    /// The operation this run asks for, `None` for a value set run that
+    /// names no system for its code.
     ///
     /// A parameter the reader left empty is left out, so the server's own
     /// default applies to it rather than an empty string the viewer invented.
     /// The canonical is left out of an instance-level run, where the address
     /// itself names the resource.
-    pub(crate) fn append(&self, url: RequestUrl) -> RequestUrl {
-        let mut url = url;
-        let named: [(&str, &str); 6] = match self.on {
-            ValidateOn::CodeSystem => [
-                (URL_PARAMETER, &self.url),
-                (VERSION_PARAMETER, &self.resource_version),
-                ("", ""),
-                ("", ""),
-                (CODE_PARAMETER, &self.code),
-                (DISPLAY_PARAMETER, &self.display),
-            ],
-            ValidateOn::ValueSet => [
-                (URL_PARAMETER, &self.url),
-                (VALUE_SET_VERSION_PARAMETER, &self.resource_version),
-                (SYSTEM_PARAMETER, &self.system),
-                (SYSTEM_VERSION_PARAMETER, &self.system_version),
-                (CODE_PARAMETER, &self.code),
-                (DISPLAY_PARAMETER, &self.display),
-            ],
-        };
-        for (name, value) in named {
-            if name.is_empty() || value.is_empty() {
-                continue;
-            }
-            if name == URL_PARAMETER && self.instance() {
-                continue;
-            }
-            url = url.query(name, value);
+    pub(crate) fn request(&self) -> Option<Request> {
+        match self.on {
+            ValidateOn::CodeSystem => Some(Request::CodeSystemValidateCode(CodeSystemValidation {
+                version: named(&self.resource_version),
+                display: named(&self.display),
+                display_language: named(&self.display_language),
+                ..CodeSystemValidation::new(self.target(), self.code.as_str())
+            })),
+            ValidateOn::ValueSet => (!self.system.is_empty()).then(|| {
+                Request::ValidateCode(Asked {
+                    value_set: self.target(),
+                    value_set_version: named(&self.resource_version),
+                    date: None,
+                    coded: Coded::Code {
+                        system: self.system.clone(),
+                        code: self.code.clone(),
+                        version: named(&self.system_version),
+                        display: named(&self.display),
+                    },
+                    display_language: named(&self.display_language),
+                    active_only: None,
+                })
+            }),
         }
-        if !self.display_language.is_empty() {
-            url = url.query(DISPLAY_LANGUAGE_PARAMETER, &self.display_language);
-        }
-        url
     }
+}
+
+/// `value`, unless the reader left it empty.
+fn named(value: &str) -> Option<String> {
+    (!value.is_empty()).then(|| value.to_owned())
 }
 
 /// The parameters one `CodeSystem/$subsumes` run sends.
@@ -189,28 +179,22 @@ impl SubsumesRequest {
         !self.id.is_empty()
     }
 
-    /// Appends every parameter that was set, under the operation's own names.
-    pub(crate) fn append(&self, url: RequestUrl) -> RequestUrl {
-        let mut url = url;
-        if !self.instance() && !self.system.is_empty() {
-            url = url.query(SYSTEM_PARAMETER, &self.system);
-        }
-        for (name, value) in [
-            (VERSION_PARAMETER, &self.version),
-            (CODE_A_PARAMETER, &self.code_a),
-            (CODE_B_PARAMETER, &self.code_b),
-        ] {
-            if !value.is_empty() {
-                url = url.query(name, value);
-            }
-        }
-        url
+    /// The operation this run asks for.
+    pub(crate) fn request(&self) -> Request {
+        let code_system = if self.instance() {
+            Target::Instance(self.id.clone())
+        } else {
+            Target::Canonical(self.system.clone())
+        };
+        Request::Subsumes(Subsumption {
+            version: named(&self.version),
+            ..Subsumption::on(code_system, self.code_a.as_str(), self.code_b.as_str())
+        })
     }
 }
 
-/// What `$validate-code` answered, read from the `Parameters` its release
-/// decoded: the answer, and the `issues` outcome a reader is shown in their
-/// own language.
+/// What `$validate-code` answered: the answer, and the `issues` outcome a
+/// reader is shown in their own language.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct ValidationAnswer {
     /// The answer, without its issues.
@@ -219,8 +203,7 @@ pub(crate) struct ValidationAnswer {
     issues: Option<Outcome>,
 }
 
-/// What `CodeSystem/$subsumes` answered, read from the `Parameters` its
-/// release decoded.
+/// What `CodeSystem/$subsumes` answered.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct SubsumesAnswer {
     /// `outcome`, the relation the server found.
@@ -277,42 +260,67 @@ pub(crate) struct Validation {
     pub(crate) issues: Vec<ValidationIssue>,
 }
 
-impl From<Vec<Parameter>> for ValidationAnswer {
-    /// The `$validate-code` answer, read in one pass over the parameters.
-    ///
-    /// A repeated parameter keeps its first value, except the two that are
-    /// declared as repeating, which keep every one in the order they arrived.
-    fn from(parameters: Vec<Parameter>) -> Self {
-        let mut read = Validation::default();
-        let mut issues = None;
-        for parameter in parameters {
-            match parameter.name.as_str() {
-                "result" => set(&mut read.result, parameter.flag),
-                "message" => set(&mut read.message, parameter.text),
-                "display" => set(&mut read.display, parameter.text),
-                "code" => set(&mut read.code, parameter.text),
-                "normalized-code" => set(&mut read.normalized_code, parameter.text),
-                "system" => set(&mut read.system, parameter.text),
-                "version" => set(&mut read.version, parameter.text),
-                "inactive" => set(&mut read.inactive, parameter.flag),
-                "status" => set(&mut read.status, parameter.text),
-                // Both name a code system the server does not hold: the first
-                // for the code that was checked, the second for a coding of a
-                // `codeableConcept` input. A reader needs the canonical either
-                // way, so the two lists render as one.
-                "x-caused-by-unknown-system" | "x-unknown-system" => {
-                    read.unknown_systems.extend(parameter.text);
-                }
-                "codeableConcept" => set(&mut read.concept, parameter.concept),
-                "issues" => replace_empty(&mut issues, parameter.outcome),
-                _other => {}
-            }
-        }
-        Self { read, issues }
-    }
-}
-
 impl ValidationAnswer {
+    /// The answer `outcome` carries, the reading of the run sent to `url` at
+    /// `version`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FhirError::Decode`] for an answer that is not a
+    /// `$validate-code` answer.
+    pub(crate) fn read(
+        outcome: BatchOutcome,
+        url: &str,
+        version: FhirVersion,
+    ) -> Result<Self, FhirError> {
+        let (BatchOutcome::ValidateCode(outcome) | BatchOutcome::CodeSystemValidateCode(outcome)) =
+            outcome
+        else {
+            return Err(mismatched(url, version));
+        };
+        let result = outcome.is_valid();
+        let (display, message, issues, details) = match outcome {
+            ValidateOutcome::Valid {
+                display,
+                message,
+                outcome,
+                details,
+            }
+            | ValidateOutcome::Invalid {
+                display,
+                message,
+                outcome,
+                details,
+            } => (display, message, outcome, *details),
+            _ => return Err(mismatched(url, version)),
+        };
+        // NOTE: both lists name a code system the server does not hold, the first for
+        // the code checked and the second for a coding of a `codeableConcept`; a
+        // reader needs the canonical either way, so they render as one.
+        let mut unknown_systems = details.caused_by_unknown_systems;
+        unknown_systems.extend(details.unknown_systems);
+        Ok(Self {
+            read: Validation {
+                result: Some(result),
+                message,
+                display,
+                code: details.code,
+                normalized_code: details.normalized_code,
+                system: details.system,
+                version: details.version,
+                inactive: details.inactive,
+                status: details.status,
+                unknown_systems,
+                concept: details.codeable_concept.map(|concept| ConceptEcho {
+                    codings: concept.coding.into_iter().map(Coding::from).collect(),
+                    text: concept.text,
+                }),
+                issues: Vec::new(),
+            },
+            issues: issues.as_ref().map(Outcome::from),
+        })
+    }
+
     /// The `$validate-code` answer, its issues worded for `locale`.
     pub(crate) fn validation(&self, locale: &ferrohealth_ui::i18n::Locale) -> Validation {
         Validation {
@@ -326,35 +334,30 @@ impl ValidationAnswer {
     }
 }
 
-impl From<Vec<Parameter>> for SubsumesAnswer {
-    fn from(parameters: Vec<Parameter>) -> Self {
-        Self {
-            outcome: parameters
-                .into_iter()
-                .find(|parameter| parameter.name == "outcome")
-                .and_then(|parameter| parameter.text),
+impl SubsumesAnswer {
+    /// The answer `outcome` carries, the reading of the run sent to `url` at
+    /// `version`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FhirError::Decode`] for an answer that is not a `$subsumes`
+    /// answer.
+    pub(crate) fn read(
+        outcome: &BatchOutcome,
+        url: &str,
+        version: FhirVersion,
+    ) -> Result<Self, FhirError> {
+        match outcome {
+            BatchOutcome::Subsumes(subsumption) => Ok(Self {
+                outcome: Some(SubsumesOutcome::as_str(*subsumption).to_owned()),
+            }),
+            _ => Err(mismatched(url, version)),
         }
     }
-}
 
-impl SubsumesAnswer {
     /// `outcome`, the `$subsumes` answer, when the server sent one.
     pub(crate) fn subsumption(&self) -> Option<String> {
         self.outcome.clone()
-    }
-}
-
-/// Keeps the first `issues` outcome that carries an issue.
-fn replace_empty(slot: &mut Option<Outcome>, outcome: Option<Outcome>) {
-    if slot.as_ref().is_none_or(|held| held.issues().is_empty()) {
-        *slot = outcome;
-    }
-}
-
-/// Keeps the first value a repeated parameter carried.
-fn set<T>(slot: &mut Option<T>, value: Option<T>) {
-    if slot.is_none() {
-        *slot = value;
     }
 }
 
@@ -427,344 +430,4 @@ pub(crate) fn subsumption_sentence(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    use crate::fhir::parameters::Coding;
-    use crate::fhir::release::Decodes;
-    use crate::fhir::version::FhirVersion;
-
-    /// `json`, decoded as the R4B `Parameters` it completes with its
-    /// `resourceType`.
-    fn decoded<A: Decodes>(json: &str) -> A {
-        let mut document: serde_json::Map<String, serde_json::Value> =
-            serde_json::from_str(json).expect("the fixture is a JSON object");
-        document
-            .entry("resourceType")
-            .or_insert_with(|| serde_json::Value::from("Parameters"));
-        FhirVersion::R4B
-            .decode(&serde_json::Value::Object(document).to_string())
-            .expect("the fixture is a valid Parameters at R4B")
-    }
-
-    /// `json`, read as the answer of `$validate-code`.
-    fn parse(json: &str) -> ValidationAnswer {
-        decoded(json)
-    }
-
-    /// `json`, read as the answer of `$subsumes`.
-    fn subsumed(json: &str) -> SubsumesAnswer {
-        decoded(json)
-    }
-
-    fn code_system_run() -> ValidateRequest {
-        ValidateRequest {
-            on: ValidateOn::CodeSystem,
-            url: "https://terminology.example/animals".to_owned(),
-            resource_version: "2.0".to_owned(),
-            code: "cat".to_owned(),
-            display: "Dog".to_owned(),
-            ..ValidateRequest::default()
-        }
-    }
-
-    #[test]
-    fn a_code_system_run_sends_the_names_that_operation_declares() {
-        assert_eq!(
-            code_system_run().append(RequestUrl::default()).render(""),
-            "?url=https%3A%2F%2Fterminology.example%2Fanimals&version=2.0&code=cat&display=Dog",
-            "the code system's own version travels as `version`"
-        );
-    }
-
-    #[test]
-    fn a_value_set_run_names_two_versions_under_their_own_parameters() {
-        let request = ValidateRequest {
-            on: ValidateOn::ValueSet,
-            url: "https://terminology.example/vs".to_owned(),
-            resource_version: "1.2".to_owned(),
-            system: "https://terminology.example/animals".to_owned(),
-            system_version: "2.0".to_owned(),
-            code: "cat".to_owned(),
-            display_language: "nl-NL".to_owned(),
-            ..ValidateRequest::default()
-        };
-        assert_eq!(
-            request.append(RequestUrl::default()).render(""),
-            "?url=https%3A%2F%2Fterminology.example%2Fvs&valueSetVersion=1.2\
-             &system=https%3A%2F%2Fterminology.example%2Fanimals&systemVersion=2.0\
-             &code=cat&displayLanguage=nl-NL",
-            "the value set's version and the code system's version are two parameters"
-        );
-    }
-
-    #[test]
-    fn an_instance_run_leaves_the_canonical_out_of_the_query() {
-        let request = ValidateRequest {
-            id: "animals".to_owned(),
-            ..code_system_run()
-        };
-        assert!(request.instance());
-        assert_eq!(
-            request.append(RequestUrl::default()).render(""),
-            "?version=2.0&code=cat&display=Dog",
-            "the address names the resource, so naming it again in `url` would be a second claim"
-        );
-    }
-
-    #[test]
-    fn a_half_named_run_is_not_sent_at_all() {
-        assert!(!ValidateRequest::default().runnable(), "nothing was named");
-        assert!(
-            !ValidateRequest {
-                code: String::new(),
-                ..code_system_run()
-            }
-            .runnable(),
-            "a system with no code asks nothing"
-        );
-        assert!(
-            !ValidateRequest {
-                on: ValidateOn::ValueSet,
-                system: String::new(),
-                ..code_system_run()
-            }
-            .runnable(),
-            "a code alone does not say which system it is from"
-        );
-        assert!(code_system_run().runnable());
-    }
-
-    #[test]
-    fn a_subsumes_run_sends_both_codes_and_the_system_they_are_from() {
-        let request = SubsumesRequest {
-            system: "https://terminology.example/animals".to_owned(),
-            version: "2.0".to_owned(),
-            code_a: "cat".to_owned(),
-            code_b: "kitten".to_owned(),
-            ..SubsumesRequest::default()
-        };
-        assert!(request.runnable());
-        assert_eq!(
-            request.append(RequestUrl::default()).render(""),
-            "?system=https%3A%2F%2Fterminology.example%2Fanimals&version=2.0&codeA=cat&codeB=kitten"
-        );
-        assert!(
-            !SubsumesRequest {
-                code_b: String::new(),
-                ..request.clone()
-            }
-            .runnable(),
-            "one code is not a comparison"
-        );
-        assert_eq!(
-            SubsumesRequest {
-                id: "animals".to_owned(),
-                system: String::new(),
-                ..request
-            }
-            .append(RequestUrl::default())
-            .render(""),
-            "?version=2.0&codeA=cat&codeB=kitten",
-            "an instance run takes the system from the address"
-        );
-    }
-
-    #[test]
-    fn a_wrong_display_comes_back_corrected_with_its_classification() {
-        let answer = parse(
-            r#"{"resourceType":"Parameters","parameter":[
-                {"name":"result","valueBoolean":false},
-                {"name":"message","valueString":"Wrong display name"},
-                {"name":"display","valueString":"Cat"},
-                {"name":"code","valueCode":"cat"},
-                {"name":"system","valueUri":"https://terminology.example/animals"},
-                {"name":"version","valueString":"2.0"},
-                {"name":"issues","resource":{"resourceType":"OperationOutcome","issue":[
-                  {"severity":"error","code":"invalid",
-                   "details":{"coding":[{"system":"https://example.org/tx-issue-type",
-                     "code":"invalid-display"}],"text":"Wrong display name"},
-                   "expression":["Coding.display"]}]}}]}"#,
-        );
-        let read = answer.validation(&ferrohealth_ui::i18n::Locale::default());
-        assert_eq!(read.result, Some(false));
-        assert_eq!(
-            read.display.as_deref(),
-            Some("Cat"),
-            "the display the system prefers comes back beside the refusal"
-        );
-        assert_eq!(read.version.as_deref(), Some("2.0"));
-        assert_eq!(
-            read.issues,
-            vec![ValidationIssue {
-                severity: "error".to_owned(),
-                classifications: vec![Classification {
-                    code: "invalid-display".to_owned(),
-                    system: "https://example.org/tx-issue-type".to_owned(),
-                }],
-                issue_code: "invalid".to_owned(),
-                text: "Wrong display name".to_owned(),
-                expressions: vec!["Coding.display".to_owned()],
-            }],
-            "the coding leads, and the IssueType code travels beside it"
-        );
-    }
-
-    #[test]
-    fn an_inactive_concept_is_an_answer_rather_than_a_failure() {
-        let read = parse(
-            r#"{"parameter":[{"name":"result","valueBoolean":true},
-                {"name":"code","valueCode":"dodo"},
-                {"name":"inactive","valueBoolean":true},
-                {"name":"status","valueCode":"retired"},
-                {"name":"message","valueString":"The concept is retired."}]}"#,
-        )
-        .validation(&ferrohealth_ui::i18n::Locale::default());
-        assert_eq!(read.result, Some(true));
-        assert_eq!(read.inactive, Some(true));
-        assert_eq!(read.status.as_deref(), Some("retired"));
-    }
-
-    #[test]
-    fn every_unknown_system_the_answer_names_is_kept_in_order() {
-        let read = parse(
-            r#"{"parameter":[{"name":"result","valueBoolean":false},
-                {"name":"x-caused-by-unknown-system","valueCanonical":"https://a.example"},
-                {"name":"x-unknown-system","valueCanonical":"https://b.example"},
-                {"name":"x-caused-by-unknown-system","valueCanonical":"https://c.example"}]}"#,
-        )
-        .validation(&ferrohealth_ui::i18n::Locale::default());
-        assert_eq!(
-            read.unknown_systems,
-            vec![
-                "https://a.example".to_owned(),
-                "https://b.example".to_owned(),
-                "https://c.example".to_owned(),
-            ],
-            "a validator is told every system this server does not hold"
-        );
-    }
-
-    #[test]
-    fn a_codeable_concept_answer_keeps_its_text_and_its_codings() {
-        let read = parse(
-            r#"{"parameter":[{"name":"result","valueBoolean":true},
-                {"name":"codeableConcept","valueCodeableConcept":{
-                   "text":"a cat",
-                   "coding":[{"system":"https://terminology.example/animals","version":"2.0",
-                              "code":"cat","display":"Cat"}]}}]}"#,
-        )
-        .validation(&ferrohealth_ui::i18n::Locale::default());
-        let concept = read.concept.expect("the answer echoed the concept");
-        assert_eq!(concept.text.as_deref(), Some("a cat"));
-        assert_eq!(
-            concept.codings.first().map(Coding::rendered),
-            Some("https://terminology.example/animals|cat (Cat)".to_owned())
-        );
-        assert_eq!(
-            concept
-                .codings
-                .first()
-                .and_then(|coding| coding.version.clone()),
-            Some("2.0".to_owned()),
-            "the version the coding was validated in is kept"
-        );
-    }
-
-    #[test]
-    fn an_answer_with_no_issues_reads_as_an_empty_list_rather_than_a_failure() {
-        let read = parse(r#"{"parameter":[{"name":"result","valueBoolean":true}]}"#)
-            .validation(&ferrohealth_ui::i18n::Locale::default());
-        assert_eq!(read.issues, Vec::<ValidationIssue>::new());
-    }
-
-    #[test]
-    fn an_answer_the_viewer_cannot_read_states_that_rather_than_inventing_one() {
-        let read = parse(r#"{"resourceType":"Parameters"}"#)
-            .validation(&ferrohealth_ui::i18n::Locale::default());
-        assert_eq!(read, Validation::default());
-    }
-
-    #[test]
-    fn an_issue_with_no_wording_still_produces_a_line() {
-        let read = parse(
-            r#"{"parameter":[{"name":"issues","resource":{"resourceType":"OperationOutcome",
-                "issue":[{"severity":"error","code":"processing"}]}}]}"#,
-        )
-        .validation(&ferrohealth_ui::i18n::Locale::default());
-        assert_eq!(
-            read.issues,
-            vec![ValidationIssue {
-                severity: "error".to_owned(),
-                classifications: Vec::new(),
-                issue_code: "processing".to_owned(),
-                text: "the server sent no diagnostic".to_owned(),
-                expressions: Vec::new(),
-            }],
-            "a refusal never renders as nothing"
-        );
-    }
-
-    #[test]
-    fn every_subsumption_outcome_is_a_sentence_as_well_as_a_code() {
-        assert_eq!(
-            subsumption_sentence(
-                &ferrohealth_ui::i18n::Locale::default(),
-                "equivalent",
-                "a",
-                "b"
-            ),
-            "a and b are the same concept."
-        );
-        assert_eq!(
-            subsumption_sentence(
-                &ferrohealth_ui::i18n::Locale::default(),
-                "subsumes",
-                "a",
-                "b"
-            ),
-            "a subsumes b: b is a descendant of a."
-        );
-        assert_eq!(
-            subsumption_sentence(
-                &ferrohealth_ui::i18n::Locale::default(),
-                "subsumed-by",
-                "a",
-                "b"
-            ),
-            "a is subsumed by b: a is a descendant of b."
-        );
-        assert_eq!(
-            subsumption_sentence(
-                &ferrohealth_ui::i18n::Locale::default(),
-                "not-subsumed",
-                "a",
-                "b"
-            ),
-            "Neither a nor b subsumes the other."
-        );
-        assert_eq!(
-            subsumption_sentence(
-                &ferrohealth_ui::i18n::Locale::default(),
-                "mystery",
-                "a",
-                "b"
-            ),
-            "The server answered the outcome `mystery`, which is not one of the four this console has wording for.",
-            "an answer the viewer does not know is stated rather than guessed at"
-        );
-    }
-
-    #[test]
-    fn the_subsumption_outcome_is_read_from_the_parameter_that_carries_it() {
-        assert_eq!(
-            subsumed(r#"{"parameter":[{"name":"outcome","valueCode":"subsumes"}]}"#).subsumption(),
-            Some("subsumes".to_owned())
-        );
-        assert_eq!(
-            subsumed(r#"{"parameter":[{"name":"result","valueBoolean":true}]}"#).subsumption(),
-            None,
-            "an answer carrying no outcome is stated rather than read as one"
-        );
-    }
-}
+mod tests;

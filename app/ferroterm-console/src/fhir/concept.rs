@@ -18,31 +18,18 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::fhir::expansion::COUNT_PARAMETER;
-use crate::fhir::expansion::DISPLAY_LANGUAGE_PARAMETER;
+use ferrobridge_term::concept::{Designation, Property, PropertyValue};
+use ferrobridge_term::outcome::{BatchOutcome, LookupOutcome};
+use ferrobridge_term::request::{
+    Expansion, Filter, Include, InlineValueSet, Request, ValueSetSource,
+};
+
+use crate::fhir::error::FhirError;
 use crate::fhir::expansion::DesignationRow;
-use crate::fhir::expansion::FILTER_PARAMETER;
-use crate::fhir::parameters::Parameter;
-use crate::fhir::release::Writes;
+use crate::fhir::operation::{coding_of, mismatched, primitive_text};
 use crate::fhir::terminology::SystemCard;
 use crate::fhir::terminology::VersionRow;
 use crate::fhir::version::FhirVersion;
-use crate::url::RequestUrl;
-
-/// The `$lookup` parameter naming the code system.
-pub(crate) const SYSTEM_PARAMETER: &str = "system";
-
-/// The `$lookup` parameter naming the code.
-pub(crate) const CODE_PARAMETER: &str = "code";
-
-/// The `$lookup` parameter naming the code system version.
-pub(crate) const VERSION_PARAMETER: &str = "version";
-
-/// The `$lookup` output carrying one designation of the concept.
-const DESIGNATION_OUTPUT: &str = "designation";
-
-/// The `$lookup` output carrying one property of the concept.
-const PROPERTY_OUTPUT: &str = "property";
 
 /// The concept property naming a direct parent of a concept.
 ///
@@ -75,18 +62,6 @@ const HIERARCHY_OPERATORS: [&str; 6] = [
     "is-a",
     "is-not-a",
 ];
-
-/// The `$expand` parameter carrying the value set to expand.
-pub(crate) const VALUE_SET_PARAMETER: &str = "valueSet";
-
-/// The `$expand` parameter that asks for a flat answer.
-///
-/// `excludeNested` controls whether the expansion nests codes under
-/// `expansion.contains.contains`
-/// (<https://hl7.org/fhir/R4B/valueset-operation-expand.html>). The browser
-/// asks for one level at a time and reads the answer as a list, so a nested
-/// answer would hide a concept behind a parent the reader never opened.
-const EXCLUDE_NESTED_PARAMETER: &str = "excludeNested";
 
 /// What one served version declares about walking its hierarchy.
 ///
@@ -190,21 +165,18 @@ pub(crate) struct LookupRequest {
 }
 
 impl LookupRequest {
-    /// Appends every parameter that was set to the operation's address.
+    /// The operation this read asks for.
     ///
     /// No `property` is sent, so the server answers the properties it holds
     /// rather than the ones this screen thought to ask for.
-    pub(crate) fn append(&self, url: RequestUrl) -> RequestUrl {
-        let mut url = url
-            .query(SYSTEM_PARAMETER, &self.system)
-            .query(CODE_PARAMETER, &self.code);
-        if let Some(version) = &self.system_version {
-            url = url.query(VERSION_PARAMETER, version);
+    pub(crate) fn request(&self) -> Request {
+        Request::Lookup {
+            system: self.system.clone(),
+            code: self.code.clone(),
+            version: self.system_version.clone(),
+            date: None,
+            display_language: self.display_language.clone(),
         }
-        if let Some(language) = &self.display_language {
-            url = url.query(DISPLAY_LANGUAGE_PARAMETER, language);
-        }
-        url
     }
 }
 
@@ -225,7 +197,7 @@ pub(crate) struct ConceptQuery {
     /// The BCP 47 tag displays are wanted in.
     pub(crate) display_language: Option<String>,
     /// How many concepts one answer may hold.
-    pub(crate) count: i32,
+    pub(crate) count: u32,
 }
 
 /// The direct children of one code, as a `compose.include.filter`.
@@ -238,126 +210,42 @@ pub(crate) struct ChildOf {
 }
 
 impl ConceptQuery {
-    /// The `Parameters` body this selection sends, written as the
-    /// `Parameters` of `version`.
+    /// The operation this selection asks for: an expansion of the value set
+    /// it describes, sent inline as one include over one system.
     ///
-    /// `Parameters` is the body of an operation invoked by `POST`
-    /// (<https://hl7.org/fhir/R4B/operations.html#request>), and the value set
-    /// travels in it as a resource rather than as a canonical, so no code
-    /// system's own implicit form is named.
-    pub(crate) fn body(&self, version: FhirVersion) -> String {
-        version.encode(self)
+    /// The value set travels as the `valueSet` input, a resource, so the
+    /// request is a `POST` (<https://hl7.org/fhir/R4B/operations.html#request>)
+    /// and no code system's own implicit form is named. `excludeNested` asks
+    /// for a flat answer
+    /// (<https://hl7.org/fhir/R4B/valueset-operation-expand.html>): the
+    /// browser asks for one level at a time and reads the answer as a list,
+    /// so a nested answer would hide a concept behind a parent the reader
+    /// never opened.
+    pub(crate) fn request(&self) -> Request {
+        let include = Include {
+            system: self.system.clone(),
+            version: self.system_version.clone(),
+            filters: self
+                .child_of
+                .iter()
+                .map(|child| Filter {
+                    property: child.property.clone(),
+                    op: CHILD_OF_OPERATOR.to_owned(),
+                    value: child.code.clone(),
+                })
+                .collect(),
+        };
+        Request::Expand(Expansion {
+            filter: self.filter.clone(),
+            count: Some(self.count),
+            exclude_nested: Some(true),
+            display_language: self.display_language.clone(),
+            ..Expansion::of(ValueSetSource::Inline(InlineValueSet {
+                include: vec![include],
+            }))
+        })
     }
 }
-
-/// Writes a selection as the `Parameters` of the `fhir-types` module
-/// `$module`.
-macro_rules! writes_query {
-    ($module:ident) => {
-        mod $module {
-            use fhir_types::$module::parameters::{
-                Parameters, ParametersParameter, ParametersParameterValue,
-            };
-            use fhir_types::$module::primitives;
-            use fhir_types::$module::resource::Resource;
-            use fhir_types::$module::value_set::{
-                ValueSet, ValueSetCompose, ValueSetComposeInclude, ValueSetComposeIncludeFilter,
-            };
-
-            use super::{
-                CHILD_OF_OPERATOR, COUNT_PARAMETER, ConceptQuery, DISPLAY_LANGUAGE_PARAMETER,
-                EXCLUDE_NESTED_PARAMETER, FILTER_PARAMETER, VALUE_SET_PARAMETER, Writes,
-            };
-
-            /// One parameter named `name` carrying `value`.
-            fn valued(name: &str, value: ParametersParameterValue) -> ParametersParameter {
-                ParametersParameter {
-                    name: name.into(),
-                    value: Some(value),
-                    ..ParametersParameter::default()
-                }
-            }
-
-            /// The value set `query` selects, as one include over one system.
-            fn value_set(query: &ConceptQuery) -> ValueSet {
-                let include = ValueSetComposeInclude {
-                    system: Some(query.system.as_str().into()),
-                    version: query
-                        .system_version
-                        .as_deref()
-                        .map(primitives::String::from),
-                    filter: query
-                        .child_of
-                        .iter()
-                        .map(|child| ValueSetComposeIncludeFilter {
-                            property: child.property.as_str().into(),
-                            op: CHILD_OF_OPERATOR.into(),
-                            value: From::from(primitives::String::from(child.code.as_str())),
-                            ..ValueSetComposeIncludeFilter::default()
-                        })
-                        .collect(),
-                    ..ValueSetComposeInclude::default()
-                };
-                ValueSet {
-                    // NOTE: `ValueSet.status` is 1..1, so the inline resource carries the
-                    // one status a request-scoped value set can have
-                    // (<https://hl7.org/fhir/R4B/valueset.html>).
-                    status: "active".into(),
-                    compose: Some(ValueSetCompose {
-                        include: vec![include],
-                        ..ValueSetCompose::default()
-                    }),
-                    ..ValueSet::default()
-                }
-            }
-
-            impl Writes<ConceptQuery> for Parameters {
-                fn written(query: &ConceptQuery) -> Self {
-                    let mut parameter = vec![ParametersParameter {
-                        name: VALUE_SET_PARAMETER.into(),
-                        resource: Some(Resource::ValueSet(Box::new(value_set(query)))),
-                        ..ParametersParameter::default()
-                    }];
-                    if let Some(filter) = &query.filter {
-                        parameter.push(valued(
-                            FILTER_PARAMETER,
-                            ParametersParameterValue::String(filter.as_str().into()),
-                        ));
-                    }
-                    parameter.push(valued(
-                        COUNT_PARAMETER,
-                        ParametersParameterValue::Integer(primitives::Integer {
-                            value: Some(query.count),
-                            ..primitives::Integer::default()
-                        }),
-                    ));
-                    parameter.push(valued(
-                        EXCLUDE_NESTED_PARAMETER,
-                        ParametersParameterValue::Boolean(primitives::Boolean {
-                            value: Some(true),
-                            ..primitives::Boolean::default()
-                        }),
-                    ));
-                    if let Some(language) = &query.display_language {
-                        parameter.push(valued(
-                            DISPLAY_LANGUAGE_PARAMETER,
-                            ParametersParameterValue::Code(language.as_str().into()),
-                        ));
-                    }
-                    Self {
-                        parameter,
-                        ..Self::default()
-                    }
-                }
-            }
-        }
-    };
-}
-
-writes_query!(r4);
-writes_query!(r4b);
-writes_query!(r5);
-writes_query!(r6);
 
 /// One concept, as the browser draws it.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -385,26 +273,38 @@ pub(crate) struct PropertyRow {
     pub(crate) description: Option<String>,
 }
 
-/// The concept `$lookup` answered, from the parameters its release decoded.
-impl From<Vec<Parameter>> for Concept {
-    fn from(parameters: Vec<Parameter>) -> Self {
-        let named = |name: &'static str| {
-            parameters
-                .iter()
-                .filter(move |parameter| parameter.name == name)
-        };
-        let first = |name: &'static str| named(name).find_map(value);
-        Self {
-            name: first("name"),
-            version: first(VERSION_PARAMETER),
-            display: first("display"),
-            designations: named(DESIGNATION_OUTPUT).map(designation).collect(),
-            properties: named(PROPERTY_OUTPUT).map(property).collect(),
+impl Concept {
+    /// The concept `outcome` carries, the reading of the read sent to `url`
+    /// at `version`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FhirError::Decode`] for an answer that is not a `$lookup`
+    /// answer.
+    pub(crate) fn read(
+        outcome: BatchOutcome,
+        url: &str,
+        version: FhirVersion,
+    ) -> Result<Self, FhirError> {
+        match outcome {
+            BatchOutcome::Lookup(LookupOutcome::Found {
+                name,
+                version: system_version,
+                display,
+                designations,
+                properties,
+                ..
+            }) => Ok(Self {
+                name: Some(name),
+                version: system_version,
+                display: Some(display),
+                designations: designations.into_iter().map(designation).collect(),
+                properties: properties.into_iter().map(property).collect(),
+            }),
+            _ => Err(mismatched(url, version)),
         }
     }
-}
 
-impl Concept {
     /// Every value the server answered for the property `code`.
     pub(crate) fn property_values(&self, code: &str) -> Vec<String> {
         self.properties
@@ -415,47 +315,31 @@ impl Concept {
     }
 }
 
-/// The value of `parameter`, from whichever `value[x]` the server used; a
-/// coding reads as its display, or as the bare code where it has none.
-fn value(parameter: &Parameter) -> Option<String> {
-    parameter
-        .text
-        .clone()
-        .or_else(|| parameter.flag.map(|flag| flag.to_string()))
-        .or_else(|| parameter.number.map(|number| number.to_string()))
-        .or_else(|| parameter.decimal.clone())
-        .or_else(|| {
-            parameter
-                .coding
-                .as_ref()
-                .and_then(|coding| coding.display.clone().or_else(|| coding.code.clone()))
-        })
+/// A property value as one line: a coding reads as its display, or as the
+/// bare code where it has none.
+fn value(value: &PropertyValue) -> Option<String> {
+    primitive_text(value)
+        .or_else(|| coding_of(value).and_then(|coding| coding.display.or(coding.code)))
 }
 
-/// The value of the part of `parameter` named `name`, when it carried one.
-fn part(parameter: &Parameter, name: &str) -> Option<String> {
-    parameter
-        .parts
-        .iter()
-        .filter(|part| part.name == name)
-        .find_map(value)
-}
-
-/// `parameter` as a designation line.
-fn designation(parameter: &Parameter) -> DesignationRow {
+/// A designation as a line; a use reads as its display, or as its code where
+/// it has none.
+pub(crate) fn designation(designation: Designation) -> DesignationRow {
     DesignationRow {
-        language: part(parameter, "language"),
-        usage: part(parameter, "use"),
-        value: part(parameter, "value").unwrap_or_default(),
+        language: designation.language,
+        usage: designation
+            .usage
+            .and_then(|usage| usage.display.or(usage.code)),
+        value: designation.value,
     }
 }
 
-/// `parameter` as a property line.
-fn property(parameter: &Parameter) -> PropertyRow {
+/// A property as a line.
+fn property(property: Property) -> PropertyRow {
     PropertyRow {
-        code: part(parameter, "code").unwrap_or_default(),
-        value: part(parameter, "value"),
-        description: part(parameter, "description"),
+        code: property.code,
+        value: property.value.as_ref().and_then(value),
+        description: property.description,
     }
 }
 

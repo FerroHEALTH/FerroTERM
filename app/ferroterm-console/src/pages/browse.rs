@@ -61,10 +61,10 @@ const LANGUAGE_PARAM: &str = "displayLanguage";
 const OPEN_PARAM: &str = "open";
 
 /// How many matches one search reads.
-const MATCHES: i32 = 25;
+const MATCHES: u32 = 25;
 
 /// How many children one level of the tree reads.
-const LEVEL: i32 = 100;
+const LEVEL: u32 = 100;
 
 /// How far the path above a concept is walked before it stops.
 const DEPTH: usize = 16;
@@ -356,10 +356,7 @@ async fn search(
         count: MATCHES,
     };
     let expanded = client.expand_inline(fhir, &query).await?;
-    Ok(expanded
-        .expansion()
-        .map(|expansion| expansion.concepts)
-        .unwrap_or_default())
+    Ok(expanded.expansion().concepts)
 }
 
 /// The concept the address reads, when it names one.
@@ -486,12 +483,7 @@ async fn children(
         .expand_inline(fhir, &query)
         .await
         .ok()
-        .map(|expanded| {
-            expanded
-                .expansion()
-                .map(|expansion| expansion.concepts)
-                .unwrap_or_default()
-        })
+        .map(|expanded| expanded.expansion().concepts)
 }
 
 /// The codes above `concept`, from its top ancestor down to its parent,

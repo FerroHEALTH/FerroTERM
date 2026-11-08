@@ -5,6 +5,8 @@
 //! the editors open, the value set composer's preview, create, update,
 //! delete, and the version history.
 
+use ferrobridge_term::request::{Expansion, InlineValueSet, Request, ValueSetSource};
+
 use super::answer::{decoded, failure, status_of, transport};
 use super::{CONCEPT_MAP, FHIR_JSON, FhirClient, VALUE_SET};
 use crate::fhir::compose::stored::StoredValueSet;
@@ -67,7 +69,19 @@ impl FhirClient {
         let body = draft
             .preview_body(version, page)
             .map_err(|error| FhirError::undecoded(&url, version, &error))?;
-        self.post_answer(version, &url, &body).await
+        let exchange =
+            Exchange::new(Method::Post, self.path_of(&url)?, FHIR_JSON).with_body(FHIR_JSON, body);
+        let answer = self
+            .exchange(exchange)
+            .await
+            .map_err(|error| transport(&url, &error))?;
+        // NOTE: no specification governs this: our own design; the preview's value set
+        // carries more than an inline request can, and its answer reads alike.
+        let request = Request::Expand(Expansion::of(ValueSetSource::Inline(
+            InlineValueSet::default(),
+        )));
+        let document = self.answered(version, &request, &url, &answer)?;
+        ExpandedValueSet::read(document.value, &url, version)
     }
 }
 

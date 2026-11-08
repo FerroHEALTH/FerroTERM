@@ -20,7 +20,7 @@ use crate::locale::{Msg, tr, tr_with};
 use crate::markup::{p, strong};
 use crate::pages::operations::published;
 use crate::pages::operations::{
-    Op, before, choices, frame, options, run, select, sent, text, verdict,
+    Op, before, choices, frame, options, refused, run, select, sent, text, verdict,
 };
 use crate::pages::parts::failure;
 use crate::request::Request;
@@ -190,12 +190,12 @@ fn versions(
 /// The answer to `asked`: the concept found, or the refusal.
 async fn answer(request: &Request, asked: &LookupRequest, name: Option<String>) -> Html {
     let locale = &request.locale;
-    let url = request.client.lookup_url(request.version, asked);
+    let url = match request.client.lookup_url(request.version, asked) {
+        Ok(url) => url,
+        Err(error) => return panel_section(locale, None, failure(locale, &error)),
+    };
     match request.client.lookup(request.version, asked).await {
-        Err(error) => Html::join([
-            panel_section(locale, None, failure(locale, &error)),
-            sent(locale, &url, None),
-        ]),
+        Err(error) => refused(locale, &error),
         Ok(document) => {
             let concept = document.value;
             let system = name

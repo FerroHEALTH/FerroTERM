@@ -6,9 +6,20 @@
 //! it.
 
 use super::{Clause, Draft, Preview};
-use crate::fhir::concept::VALUE_SET_PARAMETER;
-use crate::fhir::expansion::{COUNT_PARAMETER, FILTER_PARAMETER, OFFSET_PARAMETER};
 use crate::fhir::release::{Previews, Rewrites};
+
+/// The `$expand` input carrying the value set to expand
+/// (<https://hl7.org/fhir/R4B/valueset-operation-expand.html>).
+const VALUE_SET_PARAMETER: &str = "valueSet";
+
+/// The `$expand` input carrying the text filter.
+const FILTER_PARAMETER: &str = "filter";
+
+/// The `$expand` input carrying the page size.
+const COUNT_PARAMETER: &str = "count";
+
+/// The `$expand` input carrying the offset of the page.
+const OFFSET_PARAMETER: &str = "offset";
 
 impl Draft {
     /// The clauses of one side, included or excluded, in the order the

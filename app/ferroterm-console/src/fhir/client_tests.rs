@@ -221,7 +221,7 @@ async fn a_lookup_reads_the_concept_the_server_answers() {
     .await
     .expect("an answer");
     assert_eq!(
-        Some("system=https%3A%2F%2Fterminology.example%2Fcolours&code=red"),
+        Some("code=red&system=https%3A%2F%2Fterminology.example%2Fcolours"),
         the_request(&server).await.url.query()
     );
     assert_eq!(Some(String::from("Red")), document.value.display);
