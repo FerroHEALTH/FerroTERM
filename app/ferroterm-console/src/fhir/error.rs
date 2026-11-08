@@ -45,6 +45,16 @@ pub(crate) enum FhirError {
         /// The first part of the body, so a reader sees what arrived.
         body: String,
     },
+    /// The request could not be written in the release that serves it, so
+    /// nothing was sent.
+    #[error("the request to {url} could not be written: {message}")]
+    Unwritten {
+        /// The address of the operation, without the inputs it could not
+        /// carry.
+        url: String,
+        /// What the writer reported.
+        message: String,
+    },
     /// The answer was a success but did not parse as the expected resource.
     #[error("the answer from {url} did not parse: {message}")]
     Decode {
@@ -71,7 +81,8 @@ impl FhirError {
             Self::Transport { url, .. }
             | Self::Refused { url, .. }
             | Self::Status { url, .. }
-            | Self::Decode { url, .. } => url,
+            | Self::Decode { url, .. }
+            | Self::Unwritten { url, .. } => url,
         }
     }
 
@@ -79,7 +90,7 @@ impl FhirError {
     pub(crate) fn status(&self) -> Option<StatusCode> {
         match self {
             Self::Refused { status, .. } | Self::Status { status, .. } => Some(*status),
-            Self::Transport { .. } | Self::Decode { .. } => None,
+            Self::Transport { .. } | Self::Decode { .. } | Self::Unwritten { .. } => None,
         }
     }
 
@@ -87,7 +98,10 @@ impl FhirError {
     pub(crate) fn outcome(&self) -> Option<&Outcome> {
         match self {
             Self::Refused { outcome, .. } => Some(outcome),
-            Self::Transport { .. } | Self::Status { .. } | Self::Decode { .. } => None,
+            Self::Transport { .. }
+            | Self::Status { .. }
+            | Self::Decode { .. }
+            | Self::Unwritten { .. } => None,
         }
     }
 }

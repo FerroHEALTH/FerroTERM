@@ -25,7 +25,7 @@ use crate::markup::{code, p, strong};
 use crate::pages::lookup::CODE_PARAM;
 use crate::pages::operations::published;
 use crate::pages::operations::{
-    Op, before, choices, frame, options, run, select, sent, text, verdict,
+    Op, before, choices, frame, options, refused, run, select, sent, text, verdict,
 };
 use crate::pages::parts::{failure, name_of};
 use crate::request::Request;
@@ -177,23 +177,35 @@ async fn membership_tab(
     if !asked.runnable() {
         return (form, before(locale, tr(locale, Msg::CheckNeedsSystem)));
     }
-    let sent_url = request.client.validate_code_url(request.version, &asked);
-    let answer = match request.client.validate_code(request.version, &asked).await {
-        Err(error) => Html::join([
-            panel_section(locale, None, failure(locale, &error)),
-            sent(locale, &sent_url, None),
-        ]),
+    let set = name_of(&set_names, &url);
+    let answer = membership_answer(request, &asked, &set, system_names).await;
+    (form, answer)
+}
+
+/// The answer to `asked`, whether its code is in the value set named `set`.
+async fn membership_answer(
+    request: &Request,
+    asked: &ValidateRequest,
+    set: &str,
+    system_names: &BTreeMap<String, String>,
+) -> Html {
+    let locale = &request.locale;
+    let sent_url = match request.client.validate_code_url(request.version, asked) {
+        Ok(url) => url,
+        Err(error) => return panel_section(locale, None, failure(locale, &error)),
+    };
+    match request.client.validate_code(request.version, asked).await {
+        Err(error) => refused(locale, &error),
         Ok(document) => {
             let validation = document.value.validation(locale);
-            let set = name_of(&set_names, &url);
             Html::join([
                 verdict(
                     locale,
                     outcome(&validation),
-                    membership_title(locale, &validation, &code, &set),
+                    membership_title(locale, &validation, &asked.code, set),
                     None,
                 ),
-                concept(locale, &validation, &code, system_names).unwrap_or_default(),
+                concept(locale, &validation, &asked.code, system_names).unwrap_or_default(),
                 issues(locale, &validation).unwrap_or_default(),
                 sent(
                     locale,
@@ -202,8 +214,7 @@ async fn membership_tab(
                 ),
             ])
         }
-    };
-    (form, answer)
+    }
 }
 
 /// How a membership answer went: valid, valid but inactive, or not valid.
@@ -396,12 +407,12 @@ async fn relation_tab(
     if !asked.runnable() {
         return (form, before(locale, tr(locale, Msg::CheckRelationBefore)));
     }
-    let sent_url = request.client.subsumes_url(request.version, &asked);
+    let sent_url = match request.client.subsumes_url(request.version, &asked) {
+        Ok(url) => url,
+        Err(error) => return (form, panel_section(locale, None, failure(locale, &error))),
+    };
     let answer = match request.client.subsumes(request.version, &asked).await {
-        Err(error) => Html::join([
-            panel_section(locale, None, failure(locale, &error)),
-            sent(locale, &sent_url, None),
-        ]),
+        Err(error) => refused(locale, &error),
         Ok(document) => {
             let said = document.value.subsumption().map_or_else(
                 || tr(locale, Msg::CheckNoOutcome),

@@ -396,6 +396,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "backon"
+version = "1.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cffb0e931875b666fc4fcb20fee52e9bbd1ef836fd9e9e04ec21555f9f85f7ef"
+dependencies = [
+ "fastrand",
+ "gloo-timers",
+ "tokio",
+]
+
+[[package]]
 name = "base64"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1157,6 +1168,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "ferrobridge-term"
+version = "0.1.146"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "40563b8ac50d523b5e525c51bcc3e33ead5635b852a1b407def0ff09ffcd59ed"
+dependencies = [
+ "async-trait",
+ "backon",
+ "fhir-types",
+ "http",
+ "reqwest",
+ "secrecy",
+ "serde_json",
+ "thiserror",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "ferrohealth-config"
 version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1385,6 +1414,7 @@ dependencies = [
  "axum",
  "base64 0.23.1",
  "clap",
+ "ferrobridge-term",
  "ferrohealth-config",
  "ferrohealth-health",
  "ferrohealth-secret",
@@ -1473,6 +1503,7 @@ dependencies = [
  "axum",
  "base64 0.23.1",
  "clap",
+ "ferrobridge-term",
  "ferrohealth-config",
  "ferrohealth-health",
  "ferrohealth-secret",
@@ -1494,6 +1525,7 @@ dependencies = [
  "toml",
  "tower",
  "tracing",
+ "url",
  "wiremock",
 ]
 
@@ -1853,6 +1885,18 @@ checksum = "f0d8a4362ccb29cb0b265253fb0a2728f592895ee6854fd9bc13f2ffda266ff1"
 dependencies = [
  "opaque-debug",
  "polyval",
+]
+
+[[package]]
+name = "gloo-timers"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbb143cf96099802033e0d4f4963b19fd2e0b728bcf076cd9cf7f6634f092994"
+dependencies = [
+ "futures-channel",
+ "futures-core",
+ "js-sys",
+ "wasm-bindgen",
 ]
 
 [[package]]

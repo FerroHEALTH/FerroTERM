@@ -28,7 +28,7 @@ use crate::pages::concept_map::relationship;
 use crate::pages::lookup::CODE_PARAM;
 use crate::pages::operations::published;
 use crate::pages::operations::{
-    Op, before, choices, frame, options, run, select, sent, text, verdict,
+    Op, before, choices, frame, options, refused, run, select, sent, text, verdict,
 };
 use crate::pages::parts::{failure, name_of};
 use crate::request::Request;
@@ -136,12 +136,12 @@ async fn answer(
     names: &BTreeMap<String, String>,
 ) -> Html {
     let locale = &request.locale;
-    let url = request.client.translate_url(request.version, asked);
+    let url = match request.client.translate_url(request.version, asked) {
+        Ok(url) => url,
+        Err(error) => return panel_section(locale, None, failure(locale, &error)),
+    };
     match request.client.translate(request.version, asked).await {
-        Err(error) => Html::join([
-            panel_section(locale, None, failure(locale, &error)),
-            sent(locale, &url, None),
-        ]),
+        Err(error) => refused(locale, &error),
         Ok(document) => {
             let answer = &document.value;
             let used = answer.used_maps();
@@ -307,7 +307,7 @@ mod tests {
     use ferrohealth_ui::table::mapping::Relationship;
 
     use super::related;
-    use crate::fhir::parameters::Coding;
+    use crate::fhir::operation::Coding;
     use crate::fhir::translate::TranslationMatch;
     use crate::fhir::version::FhirVersion;
 

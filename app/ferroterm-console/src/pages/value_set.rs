@@ -567,8 +567,7 @@ fn expansion_panel(
     );
     let body = match expansion.as_ref().map(ExpandedValueSet::expansion) {
         Err(error) => failure(locale, error),
-        Ok(None) => section_intro(tr(locale, Msg::ValueSetNoExpansion)),
-        Ok(Some(expanded)) => {
+        Ok(expanded) => {
             let columns = [
                 Column::text("concept", tr(locale, Msg::ValueSetConcept)).role(Role::Title),
                 Column::text("system", tr(locale, Msg::ValueSetSystem)).role(Role::Quiet),

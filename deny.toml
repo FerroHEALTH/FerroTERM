@@ -84,6 +84,10 @@ exceptions = [
   { allow = ["BUSL-1.1"], crate = "ferrohealth-config" },
   # The FerroHEALTH usage report to FerroPULSE, the same licensor and licence.
   { allow = ["BUSL-1.1"], crate = "ferrohealth-usage-report" },
+  # The FHIR terminology client the console and the sync service send their
+  # operations through, published by the FerroBRIDGE repository under the same
+  # Licensor and licence.
+  { allow = ["BUSL-1.1"], crate = "ferrobridge-term" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-build" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-bench" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-testkit" },

@@ -102,9 +102,11 @@ fn an_expansion_address_carries_an_implicit_canonical_whole() {
         ..ExpandRequest::default()
     };
     assert_eq!(
-        client.expand_url(FhirVersion::R4B, &request),
+        client
+            .expand_url(FhirVersion::R4B, &request)
+            .expect("R4B writes the run"),
         "https://tx.example.org/r4b/ValueSet/$expand\
-         ?url=http%3A%2F%2Fsnomed.info%2Fsct%3Ffhir_vs%3Disa%2F404684003&count=20&offset=40",
+         ?url=http%3A%2F%2Fsnomed.info%2Fsct%3Ffhir_vs%3Disa%2F404684003&offset=40&count=20",
         "the operation name survives the path and the canonical survives the query"
     );
 }
@@ -118,9 +120,11 @@ fn a_lookup_address_is_the_one_a_reader_would_type() {
         ..LookupRequest::default()
     };
     assert_eq!(
-        client.lookup_url(FhirVersion::R5, &request),
+        client
+            .lookup_url(FhirVersion::R5, &request)
+            .expect("R5 writes the run"),
         "https://tx.example.org/r5/CodeSystem/$lookup\
-         ?system=http%3A%2F%2Fsnomed.info%2Fsct&code=404684003",
+         ?code=404684003&system=http%3A%2F%2Fsnomed.info%2Fsct",
         "the operation name survives the path and the canonical survives the query"
     );
 }
@@ -177,14 +181,18 @@ fn a_translation_sends_the_names_the_target_version_declares() {
         ..TranslateRequest::default()
     };
     assert_eq!(
-        client.translate_url(FhirVersion::R4B, &request),
+        client
+            .translate_url(FhirVersion::R4B, &request)
+            .expect("R4B writes the run"),
         "https://tx.example.org/r4b/ConceptMap/$translate\
-         ?system=http%3A%2F%2Fsnomed.info%2Fsct&code=404684003"
+         ?code=404684003&system=http%3A%2F%2Fsnomed.info%2Fsct"
     );
     assert_eq!(
-        client.translate_url(FhirVersion::R6, &request),
+        client
+            .translate_url(FhirVersion::R6, &request)
+            .expect("R6 writes the run"),
         "https://tx.example.org/r6/ConceptMap/$translate\
-         ?sourceSystem=http%3A%2F%2Fsnomed.info%2Fsct&sourceCode=404684003",
+         ?sourceCode=404684003&sourceSystem=http%3A%2F%2Fsnomed.info%2Fsct",
         "the R6 ballot renamed `system` and `code`"
     );
 }
@@ -198,21 +206,27 @@ fn a_validation_addresses_the_resource_type_it_is_invoked_on() {
         ..ValidateRequest::default()
     };
     assert_eq!(
-        client.validate_code_url(FhirVersion::R4B, &request),
+        client
+            .validate_code_url(FhirVersion::R4B, &request)
+            .expect("R4B writes the run"),
         "https://tx.example.org/r4b/CodeSystem/$validate-code\
          ?url=https%3A%2F%2Fterminology.example%2Fx%3Fedition%3D2031&code=cat",
         "the operation name survives the path and the canonical survives the query"
     );
     assert_eq!(
-        client.validate_code_url(
-            FhirVersion::R5,
-            &ValidateRequest {
-                on: validation::ValidateOn::ValueSet,
-                id: "a/b".to_owned(),
-                ..request
-            }
-        ),
-        "https://tx.example.org/r5/ValueSet/a%2Fb/$validate-code?code=cat",
+        client
+            .validate_code_url(
+                FhirVersion::R5,
+                &ValidateRequest {
+                    on: validation::ValidateOn::ValueSet,
+                    id: "a/b".to_owned(),
+                    system: "https://terminology.example/x".to_owned(),
+                    ..request
+                }
+            )
+            .expect("R5 writes the run"),
+        "https://tx.example.org/r5/ValueSet/a%2Fb/$validate-code\
+         ?code=cat&system=https%3A%2F%2Fterminology.example%2Fx",
         "an id a reader typed cannot reach a route the viewer did not mean to ask for"
     );
 }
@@ -227,19 +241,23 @@ fn a_subsumption_addresses_the_code_system_and_carries_both_codes() {
         ..SubsumesRequest::default()
     };
     assert_eq!(
-        client.subsumes_url(FhirVersion::R6, &request),
+        client
+            .subsumes_url(FhirVersion::R6, &request)
+            .expect("R6 writes the run"),
         "https://tx.example.org/r6/CodeSystem/$subsumes\
-         ?system=http%3A%2F%2Fsnomed.info%2Fsct&codeA=404684003&codeB=64572001"
+         ?codeA=404684003&codeB=64572001&system=http%3A%2F%2Fsnomed.info%2Fsct"
     );
     assert_eq!(
-        client.subsumes_url(
-            FhirVersion::R4,
-            &SubsumesRequest {
-                id: "animals".to_owned(),
-                system: String::new(),
-                ..request
-            }
-        ),
+        client
+            .subsumes_url(
+                FhirVersion::R4,
+                &SubsumesRequest {
+                    id: "animals".to_owned(),
+                    system: String::new(),
+                    ..request
+                }
+            )
+            .expect("R4 writes the run"),
         "https://tx.example.org/r4/CodeSystem/animals/$subsumes?codeA=404684003&codeB=64572001",
         "an instance run names the system in the path and nowhere else"
     );

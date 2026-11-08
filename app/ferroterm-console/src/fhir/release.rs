@@ -21,16 +21,11 @@ use crate::fhir::capability::Capabilities;
 use crate::fhir::code_system::PublishedCodeSystem;
 use crate::fhir::compose;
 use crate::fhir::compose::stored::StoredValueSet;
-use crate::fhir::concept::{Concept, ConceptQuery};
 use crate::fhir::concept_map::PublishedConceptMap;
-use crate::fhir::expansion::ExpandedValueSet;
 use crate::fhir::named::NamedSearch;
 use crate::fhir::outcome::Outcome;
-use crate::fhir::parameters::Parameter;
 use crate::fhir::searchset::Found;
 use crate::fhir::terminology::TerminologyCapabilities;
-use crate::fhir::translate::TranslateAnswer;
-use crate::fhir::validation::{SubsumesAnswer, ValidationAnswer};
 use crate::fhir::value_set::PublishedValueSet;
 use crate::fhir::version::FhirVersion;
 use crate::fhir::write::{History, Stamp, Stored};
@@ -41,13 +36,11 @@ pub(crate) trait Release {
     type CapabilityStatement: DeserializeOwned + Reads<Capabilities>;
     /// The release's `TerminologyCapabilities`.
     type TerminologyCapabilities: DeserializeOwned + Reads<TerminologyCapabilities>;
-    /// The release's `ValueSet`, read as published and as `$expand`
-    /// answered it.
+    /// The release's `ValueSet`, read as published and as stored.
     type ValueSet: DeserializeOwned
         + Serialize
         + Default
         + Reads<PublishedValueSet>
-        + Reads<ExpandedValueSet>
         + Reads<StoredValueSet>
         + Rewrites<compose::Draft>;
     /// The release's `Bundle`, read for the resources a `searchset` carries.
@@ -69,14 +62,9 @@ pub(crate) trait Release {
         + Reads<PublishedConceptMap>
         + Reads<MapDraft>
         + Rewrites<MapDraft>;
-    /// The release's `Parameters`, walked as an operation answered them and
-    /// written as the concept browser's inline `$expand` and the composer's
-    /// preview send them.
-    type Parameters: DeserializeOwned
-        + Serialize
-        + Reads<Vec<Parameter>>
-        + Writes<ConceptQuery>
-        + Previews<ValueSet = Self::ValueSet>;
+    /// The release's `Parameters`, written as the composer's preview sends
+    /// them.
+    type Parameters: Serialize + Previews<ValueSet = Self::ValueSet>;
     /// The release's `CodeSystem`, opened in the code system editor and
     /// written over by its save.
     type CodeSystem: DeserializeOwned
@@ -93,12 +81,6 @@ pub(crate) trait Release {
 pub(crate) trait Reads<V> {
     /// What a page draws of this resource.
     fn read(&self) -> V;
-}
-
-/// A resource of one release, written from what a page sends.
-pub(crate) trait Writes<V> {
-    /// `value`, as this resource.
-    fn written(value: &V) -> Self;
 }
 
 /// A resource of one release, with what a page authored written over it.
@@ -211,12 +193,6 @@ impl Decodes for PublishedValueSet {
     }
 }
 
-impl Decodes for ExpandedValueSet {
-    fn decode<R: Release>(body: &str) -> Result<Self, serde_json::Error> {
-        serde_json::from_str::<R::ValueSet>(body).map(|value_set| value_set.read())
-    }
-}
-
 impl Decodes for StoredValueSet {
     fn decode<R: Release>(body: &str) -> Result<Self, serde_json::Error> {
         serde_json::from_str::<R::ValueSet>(body).map(|value_set| value_set.read())
@@ -239,19 +215,6 @@ impl Decodes for Outcome {
     fn decode<R: Release>(body: &str) -> Result<Self, serde_json::Error> {
         serde_json::from_str::<R::OperationOutcome>(body).map(|outcome| outcome.read())
     }
-}
-
-/// Implements [`Decodes`] for `$answer`, an operation's answer read from the
-/// parameters of the release's `Parameters`.
-macro_rules! decodes_parameters {
-    ($answer:ty) => {
-        impl Decodes for $answer {
-            fn decode<R: Release>(body: &str) -> Result<Self, serde_json::Error> {
-                serde_json::from_str::<R::Parameters>(body)
-                    .map(|parameters| Self::from(parameters.read()))
-            }
-        }
-    };
 }
 
 impl Decodes for code_system::Draft {
@@ -307,11 +270,6 @@ impl Decodes for Found<MapDraft> {
         serde_json::from_str::<R::Bundle>(body).map(|bundle| bundle.read())
     }
 }
-
-decodes_parameters!(TranslateAnswer);
-decodes_parameters!(Concept);
-decodes_parameters!(ValidationAnswer);
-decodes_parameters!(SubsumesAnswer);
 
 impl Decodes for Found<PublishedConceptMap> {
     fn decode<R: Release>(body: &str) -> Result<Self, serde_json::Error> {
@@ -408,27 +366,6 @@ impl FhirVersion {
             Self::R6 => previewed::<R6>(base, draft, page),
         }
     }
-
-    /// `query`, written as the `Parameters` of this version.
-    pub(crate) fn encode(self, query: &ConceptQuery) -> String {
-        match self {
-            Self::R4 => encoded::<R4>(query),
-            Self::R4B => encoded::<R4B>(query),
-            Self::R5 => encoded::<R5>(query),
-            Self::R6 => encoded::<R6>(query),
-        }
-    }
-}
-
-/// `query`, written as the `Parameters` of the release `R`.
-#[expect(
-    clippy::expect_used,
-    reason = "fhir_types::codec::EncodeError names a decimal with no JSON form and an unknown \
-              resource; the selection's Parameters hold neither, and its map keys are strings"
-)]
-fn encoded<R: Release>(query: &ConceptQuery) -> String {
-    serde_json::to_string(&R::Parameters::written(query))
-        .expect("a selection's Parameters should always have a JSON form")
 }
 
 /// What the readers' tests share: a fixture written with only the elements

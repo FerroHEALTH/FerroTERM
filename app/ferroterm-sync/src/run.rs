@@ -665,8 +665,13 @@ impl Service {
             ));
             return;
         };
-        let client = crate::revalidate::FhirClient::new(self.client.clone(), base_url);
-        match crate::revalidate::revalidate(&client, &record.activation.activated).await {
+        let checked = match crate::revalidate::FhirClient::new(self.client.clone(), base_url) {
+            Ok(client) => {
+                crate::revalidate::revalidate(&client, &record.activation.activated).await
+            }
+            Err(error) => Err(error),
+        };
+        match checked {
             Ok(report) => {
                 for finding in &report.findings {
                     tracing::warn!(

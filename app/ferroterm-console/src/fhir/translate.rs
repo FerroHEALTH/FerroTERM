@@ -1,71 +1,26 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! `ConceptMap/$translate`: the request each version takes, and its answer.
+//! `ConceptMap/$translate`: the request a screen asks, and its answer.
 //!
-//! The operation is spelled differently in every release this server mounts,
-//! and the four `OperationDefinition`s are the authority for which name goes
-//! on the wire (<https://hl7.org/fhir/R4B/conceptmap-operation-translate.html>,
-//! <https://hl7.org/fhir/R5/conceptmap-operation-translate.html>). R4 and R4B
-//! take `code`, `system`, `version`, and `targetsystem`; R5 renamed the code
-//! to `sourceCode` and the target system to `targetSystem`; the R6 ballot
-//! renamed `system` and `version` to `sourceSystem` and `sourceVersion`
-//! (<https://hl7.org/fhir/6.0.0-ballot5/conceptmap-operation-translate.html>).
+//! The operation is spelled differently in every release this server mounts
+//! (<https://hl7.org/fhir/R4B/conceptmap-operation-translate.html>,
+//! <https://hl7.org/fhir/R5/conceptmap-operation-translate.html>,
+//! <https://hl7.org/fhir/6.0.0-ballot5/conceptmap-operation-translate.html>),
+//! and `ferrobridge-term` writes each release's names and reads each
+//! release's answer.
 //!
-//! The answer differs the same way. R4 and R4B report a `match.equivalence`
-//! and R5 and the R6 ballot a `match.relationship`, over two different code
-//! systems of values, so the reader below keeps them apart and never renders
-//! one as the other.
+//! R4 and R4B report a `match.equivalence` and R5 and the R6 ballot a
+//! `match.relationship`, over two different code systems of values, so the
+//! answer below keeps them apart and never renders one as the other.
 
-use crate::fhir::parameters::{Coding, Parameter};
+use ferrobridge_term::concept::{Match, MatchValue};
+use ferrobridge_term::outcome::{BatchOutcome, TranslateOutcome};
+use ferrobridge_term::request::{Request, Translation};
+
+use crate::fhir::error::FhirError;
+use crate::fhir::operation::{Coding, coding_of, mismatched, primitive_text};
 use crate::fhir::version::FhirVersion;
-use crate::url::RequestUrl;
-
-/// The `$translate` parameter naming the concept map to translate through.
-const URL_PARAMETER: &str = "url";
-
-/// The `$translate` parameter carrying the concept map's business version.
-const MAP_VERSION_PARAMETER: &str = "conceptMapVersion";
-
-/// The names one FHIR version gives the parameters of `$translate`.
-///
-/// Every name here is read from that version's own `OperationDefinition`, so
-/// a request is what the version defines rather than what another one does.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct Spelling {
-    /// The parameter carrying the code to translate.
-    code: &'static str,
-    /// The parameter carrying the code system that code belongs to.
-    system: &'static str,
-    /// The parameter carrying that code system's version.
-    system_version: &'static str,
-    /// The parameter naming the code system an answer is wanted in.
-    target_system: &'static str,
-}
-
-/// How `version` spells the parameters of `$translate`.
-fn spelling(version: FhirVersion) -> Spelling {
-    match version {
-        FhirVersion::R4 | FhirVersion::R4B => Spelling {
-            code: "code",
-            system: "system",
-            system_version: "version",
-            target_system: "targetsystem",
-        },
-        FhirVersion::R5 => Spelling {
-            code: "sourceCode",
-            system: "system",
-            system_version: "version",
-            target_system: "targetSystem",
-        },
-        FhirVersion::R6 => Spelling {
-            code: "sourceCode",
-            system: "sourceSystem",
-            system_version: "sourceVersion",
-            target_system: "targetSystem",
-        },
-    }
-}
 
 /// The parameters one run of `$translate` sends.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -84,6 +39,11 @@ pub(crate) struct TranslateRequest {
     pub(crate) target_system: String,
 }
 
+/// `value`, unless the reader left it empty.
+fn named(value: &str) -> Option<String> {
+    (!value.is_empty()).then(|| value.to_owned())
+}
+
 impl TranslateRequest {
     /// Whether the request names enough for the operation to run.
     ///
@@ -95,31 +55,22 @@ impl TranslateRequest {
         !self.code.is_empty() && !self.system.is_empty()
     }
 
-    /// Appends every parameter that was set, under `version`'s own names.
+    /// The operation this run asks for.
     ///
     /// A parameter the reader left empty is left out, so the server's own
     /// default applies to it rather than an empty string the viewer invented.
-    pub(crate) fn append(&self, url: RequestUrl, version: FhirVersion) -> RequestUrl {
-        let names = spelling(version);
-        let mut url = url;
-        for (name, value) in [
-            (URL_PARAMETER, &self.concept_map),
-            (MAP_VERSION_PARAMETER, &self.concept_map_version),
-            (names.system, &self.system),
-            (names.system_version, &self.system_version),
-            (names.code, &self.code),
-            (names.target_system, &self.target_system),
-        ] {
-            if !value.is_empty() {
-                url = url.query(name, value);
-            }
-        }
-        url
+    pub(crate) fn request(&self) -> Request {
+        Request::Translate(Translation {
+            version: named(&self.system_version),
+            concept_map_url: named(&self.concept_map),
+            concept_map_version: named(&self.concept_map_version),
+            target_system: named(&self.target_system),
+            ..Translation::new(self.system.as_str(), self.code.as_str())
+        })
     }
 }
 
-/// What `$translate` answered, read from the `Parameters` its release
-/// decoded.
+/// What `$translate` answered, as the screen draws it.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct TranslateAnswer {
     /// `result`, whether the server found a translation.
@@ -170,6 +121,42 @@ pub(crate) struct NamedValue {
 }
 
 impl TranslateAnswer {
+    /// The answer `outcome` carries, the reading of the run sent to `url` at
+    /// `version`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FhirError::Decode`] for an answer that is not a
+    /// `$translate` answer.
+    pub(crate) fn read(
+        outcome: BatchOutcome,
+        url: &str,
+        version: FhirVersion,
+    ) -> Result<Self, FhirError> {
+        let BatchOutcome::Translate(outcome) = outcome else {
+            return Err(mismatched(url, version));
+        };
+        let (result, matches, message, used_maps) = match outcome {
+            TranslateOutcome::Translated {
+                matches,
+                message,
+                used_maps,
+            } => (true, matches, message, used_maps),
+            TranslateOutcome::NoMatch {
+                message,
+                matches,
+                used_maps,
+            } => (false, matches, message, used_maps),
+            _ => return Err(mismatched(url, version)),
+        };
+        Ok(Self {
+            result: Some(result),
+            message,
+            used_maps,
+            matches: matches.into_iter().map(translation_match).collect(),
+        })
+    }
+
     /// `result`, whether the server found a translation.
     pub(crate) fn result(&self) -> Option<bool> {
         self.result
@@ -191,63 +178,34 @@ impl TranslateAnswer {
     }
 }
 
-/// The answer the top-level parameters `read` make.
-fn answer(read: &[Parameter]) -> TranslateAnswer {
-    let first = |name: &str| read.iter().find(|parameter| parameter.name == name);
-    TranslateAnswer {
-        result: first("result").and_then(|parameter| parameter.flag),
-        message: first("message").and_then(|parameter| parameter.text.clone()),
-        used_maps: read
-            .iter()
-            .filter(|parameter| parameter.name == "used-conceptmap")
-            .filter_map(|parameter| parameter.text.clone())
-            .collect(),
-        matches: read
-            .iter()
-            .filter(|parameter| parameter.name == "match")
-            .map(read_match)
-            .collect(),
+/// One match, as the screen draws it.
+fn translation_match(found: Match) -> TranslationMatch {
+    TranslationMatch {
+        equivalence: found.equivalence.map(|code| code.as_str().to_owned()),
+        relationship: found.relationship.map(|code| code.as_str().to_owned()),
+        no_map: found.no_map.unwrap_or_default(),
+        target: found.concept.map(Coding::from),
+        source_concept: found.source_concept.map(Coding::from),
+        // NOTE: <https://hl7.org/fhir/R5/conceptmap-operation-translate.html>: R4 and R4B
+        // name it `source` and R5 renamed it `originMap`, both the map's canonical.
+        origin_map: found.origin_map.or(found.source),
+        source_comment: found.source_comment,
+        target_comment: found.target_comment,
+        products: found.products.into_iter().map(named_value).collect(),
+        depends_on: found.depends_on.into_iter().map(named_value).collect(),
+        properties: found.properties.into_iter().map(named_value).collect(),
     }
 }
 
-fn read_match(parameter: &Parameter) -> TranslationMatch {
-    let mut found = TranslationMatch::default();
-    for part in &parameter.parts {
-        match part.name.as_str() {
-            "equivalence" => found.equivalence.clone_from(&part.text),
-            "relationship" => found.relationship.clone_from(&part.text),
-            "noMap" => found.no_map = part.flag.unwrap_or_default(),
-            "concept" => found.target.clone_from(&part.coding),
-            "sourceConcept" => found.source_concept.clone_from(&part.coding),
-            // NOTE: <https://hl7.org/fhir/R5/conceptmap-operation-translate.html>: R4 and R4B
-            // name it `source` and R5 renamed it `originMap`, both the map's canonical.
-            "originMap" | "source" => found.origin_map.clone_from(&part.text),
-            "sourceComment" => found.source_comment.clone_from(&part.text),
-            "targetComment" => found.target_comment.clone_from(&part.text),
-            "product" => found.products.push(read_named_value(part)),
-            "dependsOn" => found.depends_on.push(read_named_value(part)),
-            "property" => found.properties.push(read_named_value(part)),
-            _other => {}
-        }
-    }
-    found
-}
-
-fn read_named_value(parameter: &Parameter) -> NamedValue {
-    let mut found = NamedValue::default();
-    for part in &parameter.parts {
-        match part.name.as_str() {
-            "element" | "attribute" | "uri" => found.name = part.text.clone().unwrap_or_default(),
-            "concept" | "value" => found.value = part.rendered(),
-            _other => {}
-        }
-    }
-    found
-}
-
-impl From<Vec<Parameter>> for TranslateAnswer {
-    fn from(parameters: Vec<Parameter>) -> Self {
-        answer(&parameters)
+/// One named value: a coding as its rendered line, a primitive as its text.
+fn named_value(value: MatchValue) -> NamedValue {
+    NamedValue {
+        name: value.name.unwrap_or_default(),
+        value: value.value.as_ref().and_then(|value| {
+            coding_of(value)
+                .map(|coding| coding.rendered())
+                .or_else(|| primitive_text(value))
+        }),
     }
 }
 
@@ -255,23 +213,18 @@ impl From<Vec<Parameter>> for TranslateAnswer {
 mod tests {
     use super::*;
 
-    /// `json`, decoded as the R4B `Parameters` it completes with its
+    /// `json`, read as the R4B `$translate` answer it completes with its
     /// `resourceType`.
     fn parse(json: &str) -> TranslateAnswer {
-        parse_at(FhirVersion::R4B, json)
+        parse_at(FhirVersion::R4B, json).expect("the fixture is a valid answer at its version")
     }
 
-    /// `json`, decoded as the `Parameters` of `version` it completes with its
-    /// `resourceType`.
-    fn parse_at(version: FhirVersion, json: &str) -> TranslateAnswer {
-        let mut document: serde_json::Map<String, serde_json::Value> =
-            serde_json::from_str(json).expect("the fixture is a JSON object");
-        document
-            .entry("resourceType")
-            .or_insert_with(|| serde_json::Value::from("Parameters"));
-        version
-            .decode(&serde_json::Value::Object(document).to_string())
-            .expect("the fixture is a valid Parameters at its version")
+    /// `json`, read as the `$translate` answer of `version` it completes with
+    /// its `resourceType`.
+    fn parse_at(version: FhirVersion, json: &str) -> Result<TranslateAnswer, FhirError> {
+        let request = request().request();
+        let outcome = crate::fhir::operation::tests::read(version, &request, json)?;
+        TranslateAnswer::read(outcome, "", version)
     }
 
     fn request() -> TranslateRequest {
@@ -286,7 +239,14 @@ mod tests {
     }
 
     fn address(version: FhirVersion) -> String {
-        request().append(RequestUrl::default(), version).render("")
+        address_of(version, &request())
+    }
+
+    fn address_of(version: FhirVersion, request: &TranslateRequest) -> String {
+        crate::fhir::FhirClient::new(String::new())
+            .translate_url(version, request)
+            .expect("every release writes the run")
+            .replace(&format!("/{}/ConceptMap/$translate", version.segment()), "")
     }
 
     /// An R4 or R4B answer, as `map_r4` writes one.
@@ -318,7 +278,7 @@ mod tests {
     #[test]
     fn r4_and_r4b_send_the_names_their_operation_definition_declares() {
         let expected = "?url=https%3A%2F%2Fterminology.example%2FConceptMap%2Fm\
-             &system=https%3A%2F%2Fterminology.example%2Fa&version=2031&code=x\
+             &code=x&system=https%3A%2F%2Fterminology.example%2Fa&version=2031\
              &targetsystem=https%3A%2F%2Fterminology.example%2Fb";
         assert_eq!(address(FhirVersion::R4), expected);
         assert_eq!(
@@ -333,7 +293,7 @@ mod tests {
         assert_eq!(
             address(FhirVersion::R5),
             "?url=https%3A%2F%2Fterminology.example%2FConceptMap%2Fm\
-             &system=https%3A%2F%2Fterminology.example%2Fa&version=2031&sourceCode=x\
+             &sourceCode=x&system=https%3A%2F%2Fterminology.example%2Fa&version=2031\
              &targetSystem=https%3A%2F%2Fterminology.example%2Fb",
             "R5 keeps `system` and `version` and renames `code` and `targetsystem`"
         );
@@ -344,7 +304,7 @@ mod tests {
         assert_eq!(
             address(FhirVersion::R6),
             "?url=https%3A%2F%2Fterminology.example%2FConceptMap%2Fm\
-             &sourceSystem=https%3A%2F%2Fterminology.example%2Fa&sourceVersion=2031&sourceCode=x\
+             &sourceCode=x&sourceSystem=https%3A%2F%2Fterminology.example%2Fa&sourceVersion=2031\
              &targetSystem=https%3A%2F%2Fterminology.example%2Fb",
             "the R6 ballot renamed `system` and `version`"
         );
@@ -358,10 +318,8 @@ mod tests {
             ..TranslateRequest::default()
         };
         assert_eq!(
-            sparse
-                .append(RequestUrl::default(), FhirVersion::R5)
-                .render(""),
-            "?system=https%3A%2F%2Fterminology.example%2Fa&sourceCode=x",
+            address_of(FhirVersion::R5, &sparse),
+            "?sourceCode=x&system=https%3A%2F%2Fterminology.example%2Fa",
             "the server's own default applies to a parameter the reader did not set"
         );
     }
@@ -381,8 +339,9 @@ mod tests {
 
     #[test]
     fn both_shapes_carry_the_same_target_coding() {
-        let target = |json: &str| {
-            parse(json)
+        let target = |version: FhirVersion, json: &str| {
+            parse_at(version, json)
+                .expect("the fixture is a valid answer at its version")
                 .matches()
                 .first()
                 .and_then(|found| found.target.clone())
@@ -393,9 +352,9 @@ mod tests {
             code: Some("y".to_owned()),
             display: Some("Why".to_owned()),
         });
-        assert_eq!(target(R4_ANSWER), expected);
+        assert_eq!(target(FhirVersion::R4B, R4_ANSWER), expected);
         assert_eq!(
-            target(R5_ANSWER),
+            target(FhirVersion::R5, R5_ANSWER),
             expected,
             "`match.concept` is the target in every version"
         );
@@ -403,8 +362,9 @@ mod tests {
 
     #[test]
     fn a_product_reads_under_both_spellings_of_its_parts() {
-        let product = |json: &str| {
-            parse(json)
+        let product = |version: FhirVersion, json: &str| {
+            parse_at(version, json)
+                .expect("the fixture is a valid answer at its version")
                 .matches()
                 .first()
                 .and_then(|found| found.products.first().cloned())
@@ -414,12 +374,12 @@ mod tests {
             value: Some("p".to_owned()),
         });
         assert_eq!(
-            product(R4_ANSWER),
+            product(FhirVersion::R4B, R4_ANSWER),
             expected,
             "R4 names the parts `element` and `concept`"
         );
         assert_eq!(
-            product(R5_ANSWER),
+            product(FhirVersion::R5, R5_ANSWER),
             expected,
             "R5 names them `attribute` and `value`"
         );
@@ -427,19 +387,20 @@ mod tests {
 
     #[test]
     fn the_map_a_match_came_from_reads_under_both_spellings() {
-        let origin = |json: &str| {
-            parse(json)
+        let origin = |version: FhirVersion, json: &str| {
+            parse_at(version, json)
+                .expect("the fixture is a valid answer at its version")
                 .matches()
                 .first()
                 .and_then(|found| found.origin_map.clone())
         };
         assert_eq!(
-            origin(R4_ANSWER),
+            origin(FhirVersion::R4B, R4_ANSWER),
             Some("https://terminology.example/ConceptMap/m|1".to_owned()),
             "R4 names it `source`"
         );
         assert_eq!(
-            origin(R5_ANSWER),
+            origin(FhirVersion::R5, R5_ANSWER),
             Some("https://terminology.example/ConceptMap/m|1".to_owned()),
             "R5 names it `originMap`"
         );
@@ -447,7 +408,7 @@ mod tests {
 
     #[test]
     fn the_top_level_parameters_are_read_by_name() {
-        let answer = parse(R5_ANSWER);
+        let answer = parse_at(FhirVersion::R5, R5_ANSWER).expect("a valid R5 answer");
         assert_eq!(answer.result(), Some(true));
         assert_eq!(answer.message(), Some("one map was consulted".to_owned()));
         assert_eq!(
@@ -476,7 +437,7 @@ mod tests {
     #[test]
     fn the_matches_are_kept_in_the_order_the_server_reported_them() {
         let answer = parse(
-            r#"{"parameter":[
+            r#"{"parameter":[{"name":"result","valueBoolean":true},
                 {"name":"match","part":[{"name":"concept","valueCoding":{"code":"b"}}]},
                 {"name":"match","part":[{"name":"concept","valueCoding":{"code":"a"}}]}]}"#,
         );
@@ -494,13 +455,15 @@ mod tests {
 
     #[test]
     fn a_dependency_and_a_property_are_read_where_a_version_answers_them() {
-        let answer = parse(
-            r#"{"parameter":[{"name":"match","part":[
+        let answer = parse_at(
+            FhirVersion::R5,
+            r#"{"parameter":[{"name":"result","valueBoolean":true},{"name":"match","part":[
                 {"name":"dependsOn","part":[{"name":"attribute","valueUri":"https://x.example/d"},
                   {"name":"value","valueString":"left"}]},
                 {"name":"property","part":[{"name":"uri","valueUri":"https://x.example/p"},
                   {"name":"value","valueBoolean":true}]}]}]}"#,
-        );
+        )
+        .expect("a valid R5 answer");
         let matches = answer.matches();
         let first = matches.first().expect("the answer carries one match");
         assert_eq!(
@@ -521,11 +484,13 @@ mod tests {
 
     #[test]
     fn a_value_shape_the_viewer_draws_no_text_for_states_the_absence() {
-        let answer = parse(
-            r#"{"parameter":[{"name":"match","part":[
+        let answer = parse_at(
+            FhirVersion::R5,
+            r#"{"parameter":[{"name":"result","valueBoolean":true},{"name":"match","part":[
                 {"name":"product","part":[{"name":"attribute","valueUri":"https://x.example/q"},
                   {"name":"value","valueQuantity":{"value":3,"unit":"mg"}}]}]}]}"#,
-        );
+        )
+        .expect("a valid R5 answer");
         assert_eq!(
             answer
                 .matches()
@@ -564,13 +529,12 @@ mod tests {
     }
 
     #[test]
-    fn an_answer_carrying_no_parameter_reads_as_no_match() {
-        let answer = parse(r#"{"resourceType":"Parameters"}"#);
-        assert_eq!(answer.matches(), Vec::<TranslationMatch>::new());
-        assert_eq!(
-            answer.result(),
-            None,
-            "the screen states the absence rather than reading it as a refusal"
+    fn an_answer_carrying_no_result_is_no_answer_at_all() {
+        let unread = parse_at(FhirVersion::R4B, r#"{"resourceType":"Parameters"}"#);
+        assert!(
+            matches!(unread, Err(FhirError::Decode { .. })),
+            "`result` is 1..1, so an answer without it is refused, never read as no match: \
+             {unread:?}"
         );
     }
 }

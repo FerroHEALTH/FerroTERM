@@ -284,7 +284,10 @@ pub(crate) fn issues(locale: &Locale, outcome: &Outcome) -> Vec<Issue> {
 fn problem_of(error: &FhirError) -> Option<Problem> {
     match error {
         FhirError::Status { body, .. } => Problem::read(body),
-        FhirError::Refused { .. } | FhirError::Transport { .. } | FhirError::Decode { .. } => None,
+        FhirError::Refused { .. }
+        | FhirError::Transport { .. }
+        | FhirError::Decode { .. }
+        | FhirError::Unwritten { .. } => None,
     }
 }
 
@@ -310,6 +313,7 @@ pub(crate) fn refusal_of(locale: &Locale, error: &FhirError) -> Refusal {
             }
             FhirError::Transport { .. } => tr(locale, Msg::RequestGotNoAnswer),
             FhirError::Decode { .. } => tr(locale, Msg::AnswerDidNotRead),
+            FhirError::Unwritten { .. } => tr(locale, Msg::RequestNotWritten),
         },
         issues: error
             .outcome()
@@ -320,9 +324,9 @@ pub(crate) fn refusal_of(locale: &Locale, error: &FhirError) -> Refusal {
         evidence: match error {
             FhirError::Status { .. } if problem_of(error).is_some() => None,
             FhirError::Status { body, .. } if !body.is_empty() => Some(body.clone()),
-            FhirError::Transport { message, .. } | FhirError::Decode { message, .. } => {
-                Some(message.clone())
-            }
+            FhirError::Transport { message, .. }
+            | FhirError::Decode { message, .. }
+            | FhirError::Unwritten { message, .. } => Some(message.clone()),
             FhirError::Status { .. } | FhirError::Refused { .. } => None,
         },
     }

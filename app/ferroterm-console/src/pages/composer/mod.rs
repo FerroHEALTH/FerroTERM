@@ -451,45 +451,43 @@ fn preview_card(
     let body = match preview {
         None => transform_quiet(tr(locale, Msg::EditorPreviewBefore)),
         Some(Err(error)) => failure(locale, &error),
-        Some(Ok(expanded)) => match expanded.expansion() {
-            None => transform_quiet(tr(locale, Msg::ValueSetNoExpansion)),
-            Some(expansion) => {
-                let total = expansion.total.map_or_else(
-                    || {
-                        tr_with(
-                            locale,
-                            Msg::ValueSetShown,
-                            &[("shown", expansion.listed().into())],
-                        )
-                    },
-                    |total| {
-                        tr_with(
-                            locale,
-                            Msg::ValueSetShownOf,
-                            &[
-                                ("shown", expansion.listed().into()),
-                                ("total", total.into()),
-                            ],
-                        )
-                    },
-                );
-                let rows = Html::join(expansion.concepts.iter().map(|concept| {
-                    let drawn = Coding::new(
-                        concept.code.clone(),
-                        concept.display.clone().unwrap_or_default(),
+        Some(Ok(expanded)) => {
+            let expansion = expanded.expansion();
+            let total = expansion.total.map_or_else(
+                || {
+                    tr_with(
+                        locale,
+                        Msg::ValueSetShown,
+                        &[("shown", expansion.listed().into())],
                     )
-                    .system(name_of(names, &concept.system));
-                    Html::raw(format!(
-                        "<li>{}</li>",
-                        coding(locale, drawn, Layout::Stacked)
-                    ))
-                }));
-                Html::join([
-                    section_intro(total),
-                    Html::raw(format!(r#"<ul class="fui-match-list">{rows}</ul>"#)),
-                ])
-            }
-        },
+                },
+                |total| {
+                    tr_with(
+                        locale,
+                        Msg::ValueSetShownOf,
+                        &[
+                            ("shown", expansion.listed().into()),
+                            ("total", total.into()),
+                        ],
+                    )
+                },
+            );
+            let rows = Html::join(expansion.concepts.iter().map(|concept| {
+                let drawn = Coding::new(
+                    concept.code.clone(),
+                    concept.display.clone().unwrap_or_default(),
+                )
+                .system(name_of(names, &concept.system));
+                Html::raw(format!(
+                    "<li>{}</li>",
+                    coding(locale, drawn, Layout::Stacked)
+                ))
+            }));
+            Html::join([
+                section_intro(total),
+                Html::raw(format!(r#"<ul class="fui-match-list">{rows}</ul>"#)),
+            ])
+        }
     };
     panel_sections_card(
         tr(locale, Msg::EditorPreview),

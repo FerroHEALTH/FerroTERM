@@ -41,6 +41,7 @@ software = Software
 not-served = not served
 answer-did-not-read = The answer did not read
 request-got-no-answer = The request got no answer
+request-not-written = The request could not be written in this FHIR version
 server-refused-request = The server refused the request
 
 description-2 = Description
@@ -551,7 +552,6 @@ value-set-selects = What the definition selects
 value-set-no-compose = The value set carries no definition, so what it holds is whatever the server built for it.
 value-set-loaded-note = Read from a resource directory when the server starts, so the console cannot edit it and it keeps no history.
 value-set-open-in-operations = Open in Operations
-value-set-no-expansion = The server answered without an expansion.
 value-set-concept = Concept
 value-set-system = System
 value-set-first-page = The first page of the expansion

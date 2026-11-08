@@ -8,40 +8,13 @@
 //! answer lives here, outside every component, so the screen is a rendering of
 //! a value that plain unit tests can pin.
 
-use crate::fhir::release::Reads;
+use ferrobridge_term::outcome::{BatchOutcome, ExpandOutcome, Expanded, ExpansionContains};
+use ferrobridge_term::request::{Expansion as Asked, Request};
 
-use crate::url::RequestUrl;
-
-/// The `$expand` parameter naming the value set to expand.
-pub(crate) const URL_PARAMETER: &str = "url";
-
-/// The `$expand` parameter carrying the text filter.
-pub(crate) const FILTER_PARAMETER: &str = "filter";
-
-/// The `$expand` parameter carrying the page size.
-pub(crate) const COUNT_PARAMETER: &str = "count";
-
-/// The `$expand` parameter carrying the offset of the page.
-pub(crate) const OFFSET_PARAMETER: &str = "offset";
-
-/// The `$expand` parameter carrying the language displays are wanted in.
-pub(crate) const DISPLAY_LANGUAGE_PARAMETER: &str = "displayLanguage";
-
-/// The `$expand` parameter that drops inactive concepts.
-pub(crate) const ACTIVE_ONLY_PARAMETER: &str = "activeOnly";
-
-/// The `$expand` parameter that asks for the designations of every concept.
-pub(crate) const INCLUDE_DESIGNATIONS_PARAMETER: &str = "includeDesignations";
-
-/// The extension marking an expansion that leaves out codes the value set
-/// admits (<https://hl7.org/fhir/R4B/extension-valueset-unclosed.html>).
-const UNCLOSED_EXTENSION: &str = "http://hl7.org/fhir/StructureDefinition/valueset-unclosed";
-
-/// The extension stating in words why an expansion is unclosed.
-// NOTE: no published `StructureDefinition` defines it; the terminology
-// ecosystem suite is the source (<https://github.com/HL7/fhir-tx-ecosystem-ig>).
-const UNCLOSED_REASON_EXTENSION: &str =
-    "http://hl7.org/fhir/StructureDefinition/valueset-unclosed-reason";
+use crate::fhir::concept::designation;
+use crate::fhir::error::FhirError;
+use crate::fhir::operation::{mismatched, primitive_text};
+use crate::fhir::version::FhirVersion;
 
 /// The parameters one run of `$expand` sends.
 ///
@@ -66,41 +39,29 @@ pub(crate) struct ExpandRequest {
 }
 
 impl ExpandRequest {
-    /// Appends every parameter that was set to the operation's address.
+    /// The operation this run asks for.
     ///
     /// The canonical goes through the same encoder as everything else, which
     /// is what keeps an implicit form carrying its own query string inside the
     /// value it belongs to.
-    pub(crate) fn append(&self, url: RequestUrl) -> RequestUrl {
-        let mut url = url.query(URL_PARAMETER, &self.url);
-        if let Some(filter) = &self.filter {
-            url = url.query(FILTER_PARAMETER, filter);
-        }
-        if let Some(count) = self.count {
-            url = url.query(COUNT_PARAMETER, &count.to_string());
-        }
-        if let Some(offset) = self.offset {
-            url = url.query(OFFSET_PARAMETER, &offset.to_string());
-        }
-        if let Some(language) = &self.display_language {
-            url = url.query(DISPLAY_LANGUAGE_PARAMETER, language);
-        }
-        if let Some(active_only) = self.active_only {
-            url = url.query(ACTIVE_ONLY_PARAMETER, &active_only.to_string());
-        }
-        if let Some(designations) = self.include_designations {
-            url = url.query(INCLUDE_DESIGNATIONS_PARAMETER, &designations.to_string());
-        }
-        url
+    pub(crate) fn request(&self) -> Request {
+        Request::Expand(Asked {
+            filter: self.filter.clone(),
+            count: self.count,
+            offset: self.offset,
+            display_language: self.display_language.clone(),
+            active_only: self.active_only,
+            include_designations: self.include_designations,
+            ..Asked::new(self.url.as_str())
+        })
     }
 }
 
-/// What `ValueSet/$expand` answered, read from the `ValueSet` its release
-/// decoded.
+/// What `ValueSet/$expand` answered.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct ExpandedValueSet {
-    /// `ValueSet.expansion`, absent when the answer carried none.
-    expansion: Option<Expansion>,
+    /// `ValueSet.expansion`.
+    expansion: Expansion,
 }
 
 /// One expansion, as the runner draws it.
@@ -180,201 +141,121 @@ pub(crate) struct DesignationRow {
 }
 
 impl ExpandedValueSet {
+    /// The expansion `outcome` carries, the reading of the run sent to `url`
+    /// at `version`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FhirError::Decode`] for an answer that is not an `$expand`
+    /// answer.
+    pub(crate) fn read(
+        outcome: BatchOutcome,
+        url: &str,
+        version: FhirVersion,
+    ) -> Result<Self, FhirError> {
+        match outcome {
+            BatchOutcome::Expand(ExpandOutcome::Expanded(expanded)) => Ok(Self {
+                expansion: expansion(expanded),
+            }),
+            _ => Err(mismatched(url, version)),
+        }
+    }
+
     /// The expansion the answer carried.
-    pub(crate) fn expansion(&self) -> Option<Expansion> {
+    pub(crate) fn expansion(&self) -> Expansion {
         self.expansion.clone()
     }
 }
 
-/// The unclosed mark and its stated reasons, from `(url, valueBoolean,
-/// valueString)` of each extension, when the server sent the mark.
-///
-/// A reason without the mark says nothing on its own, so the reasons are read
-/// only once the mark is there.
-fn unclosed_of(extensions: &[(String, Option<bool>, Option<String>)]) -> Option<Unclosed> {
-    let marked = extensions
-        .iter()
-        .any(|(url, flag, _)| url == UNCLOSED_EXTENSION && flag.unwrap_or_default());
-    marked.then(|| Unclosed {
-        reasons: extensions
-            .iter()
-            .filter(|(url, _, _)| url == UNCLOSED_REASON_EXTENSION)
-            .filter_map(|(_, _, reason)| reason.clone())
+/// The expansion as a page draws it.
+fn expansion(expanded: Expanded) -> Expansion {
+    Expansion {
+        total: expanded.total.and_then(|total| u32::try_from(total).ok()),
+        offset: expanded
+            .offset
+            .and_then(|offset| u32::try_from(offset).ok()),
+        parameters: expanded
+            .parameters
+            .into_iter()
+            .map(|parameter| ParameterLine {
+                value: parameter
+                    .value
+                    .as_ref()
+                    .and_then(primitive_text)
+                    .unwrap_or_default(),
+                name: parameter.name,
+            })
             .collect(),
-    })
+        concepts: rows(expanded.contains),
+        unclosed: expanded.unclosed.map(|unclosed| Unclosed {
+            reasons: unclosed.reasons,
+        }),
+    }
 }
 
-/// Reads `$expand`'s answer, the `ValueSet` of the `fhir-types` module
-/// `$module`, whose expansion has the same shape at every release.
-macro_rules! reads_expansion {
-    ($module:ident) => {
-        mod $module {
-            use fhir_types::$module::extension::ExtensionValue;
-            use fhir_types::$module::value_set::{
-                ValueSetExpansion, ValueSetExpansionContains, ValueSetExpansionParameter,
-                ValueSetExpansionParameterValue,
-            };
-
-            use super::{
-                ConceptRow, DesignationRow, ExpandedValueSet, Expansion, ParameterLine, Reads,
-                unclosed_of,
-            };
-
-            /// One entry of `contains`, at `depth` below the top.
-            fn row(entry: &ValueSetExpansionContains, depth: u32) -> ConceptRow {
-                ConceptRow {
-                    system: entry
-                        .system
-                        .as_ref()
-                        .and_then(|system| system.value.clone())
-                        .unwrap_or_default(),
-                    version: entry
-                        .version
-                        .as_ref()
-                        .and_then(|version| version.value.clone()),
-                    code: entry
-                        .code
-                        .as_ref()
-                        .and_then(|code| code.value.clone())
-                        .unwrap_or_default(),
-                    display: entry
-                        .display
-                        .as_ref()
-                        .and_then(|display| display.value.clone()),
-                    inactive: entry
-                        .inactive
-                        .as_ref()
-                        .and_then(|flag| flag.value)
-                        .unwrap_or_default(),
-                    abstract_concept: entry
-                        .r#abstract
-                        .as_ref()
-                        .and_then(|flag| flag.value)
-                        .unwrap_or_default(),
-                    designations: entry
-                        .designation
-                        .iter()
-                        .map(|designation| DesignationRow {
-                            language: designation
-                                .language
-                                .as_ref()
-                                .and_then(|language| language.value.clone()),
-                            // NOTE: no specification governs this: our own design; a use with
-                            // no display is named by its code.
-                            usage: designation.r#use.as_ref().and_then(|usage| {
-                                usage
-                                    .display
-                                    .as_ref()
-                                    .and_then(|display| display.value.clone())
-                                    .or_else(|| {
-                                        usage.code.as_ref().and_then(|code| code.value.clone())
-                                    })
-                            }),
-                            value: designation.value.value.clone().unwrap_or_default(),
-                        })
-                        .collect(),
-                    depth,
-                }
-            }
-
-            /// Every entry, nested ones included, in the order the server wrote them.
-            fn rows(contains: &[ValueSetExpansionContains]) -> Vec<ConceptRow> {
-                // NOTE: no specification governs this: our own design; the walk keeps its
-                // own stack, so a deeply nested answer cannot exhaust the thread's.
-                let mut rows = Vec::with_capacity(contains.len());
-                let mut pending: Vec<(&ValueSetExpansionContains, u32)> =
-                    contains.iter().rev().map(|entry| (entry, 0_u32)).collect();
-                while let Some((entry, depth)) = pending.pop() {
-                    rows.push(row(entry, depth));
-                    pending.extend(
-                        entry
-                            .contains
-                            .iter()
-                            .rev()
-                            .map(|nested| (nested, depth.saturating_add(1))),
-                    );
-                }
-                rows
-            }
-
-            /// One echoed parameter, its value as text whichever type carried it.
-            fn parameter(parameter: &ValueSetExpansionParameter) -> ParameterLine {
-                let value = match &parameter.value {
-                    Some(ValueSetExpansionParameterValue::String(value)) => value.value.clone(),
-                    Some(ValueSetExpansionParameterValue::Uri(value)) => value.value.clone(),
-                    Some(ValueSetExpansionParameterValue::Code(value)) => value.value.clone(),
-                    Some(ValueSetExpansionParameterValue::DateTime(value)) => value.value.clone(),
-                    Some(ValueSetExpansionParameterValue::Decimal(value)) => value.value.clone(),
-                    Some(ValueSetExpansionParameterValue::Boolean(value)) => {
-                        value.value.map(|flag| flag.to_string())
-                    }
-                    Some(ValueSetExpansionParameterValue::Integer(value)) => {
-                        value.value.map(|number| number.to_string())
-                    }
-                    None => None,
-                };
-                ParameterLine {
-                    name: parameter.name.value.clone().unwrap_or_default(),
-                    value: value.unwrap_or_default(),
-                }
-            }
-
-            /// The expansion as a page draws it.
-            fn expansion(expansion: &ValueSetExpansion) -> Expansion {
-                let extensions: Vec<(String, Option<bool>, Option<String>)> = expansion
-                    .extension
-                    .iter()
-                    .map(|extension| match &extension.value {
-                        Some(ExtensionValue::Boolean(flag)) => {
-                            (extension.url.clone(), flag.value, None)
-                        }
-                        Some(ExtensionValue::String(text)) => {
-                            (extension.url.clone(), None, text.value.clone())
-                        }
-                        _ => (extension.url.clone(), None, None),
-                    })
-                    .collect();
-                Expansion {
-                    total: expansion
-                        .total
-                        .as_ref()
-                        .and_then(|total| total.value)
-                        .and_then(|total| u32::try_from(total).ok()),
-                    offset: expansion
-                        .offset
-                        .as_ref()
-                        .and_then(|offset| offset.value)
-                        .and_then(|offset| u32::try_from(offset).ok()),
-                    parameters: expansion.parameter.iter().map(parameter).collect(),
-                    concepts: rows(&expansion.contains),
-                    unclosed: unclosed_of(&extensions),
-                }
-            }
-
-            impl Reads<ExpandedValueSet> for fhir_types::$module::value_set::ValueSet {
-                fn read(&self) -> ExpandedValueSet {
-                    ExpandedValueSet {
-                        expansion: self.expansion.as_ref().map(expansion),
-                    }
-                }
-            }
-        }
-    };
+/// Every entry, nested ones included, in the order the server wrote them.
+fn rows(contains: Vec<ExpansionContains>) -> Vec<ConceptRow> {
+    // NOTE: no specification governs this: our own design; the walk keeps its
+    // own stack, so a deeply nested answer cannot exhaust the thread's.
+    let mut rows = Vec::with_capacity(contains.len());
+    let mut pending: Vec<(ExpansionContains, u32)> = contains
+        .into_iter()
+        .rev()
+        .map(|entry| (entry, 0_u32))
+        .collect();
+    while let Some((mut entry, depth)) = pending.pop() {
+        let nested = std::mem::take(&mut entry.contains);
+        pending.extend(
+            nested
+                .into_iter()
+                .rev()
+                .map(|nested| (nested, depth.saturating_add(1))),
+        );
+        rows.push(ConceptRow {
+            system: entry.system.unwrap_or_default(),
+            version: entry.version,
+            code: entry.code.unwrap_or_default(),
+            display: entry.display,
+            inactive: entry.inactive.unwrap_or_default(),
+            abstract_concept: entry.r#abstract.unwrap_or_default(),
+            designations: entry.designations.into_iter().map(designation).collect(),
+            depth,
+        });
+    }
+    rows
 }
-
-reads_expansion!(r4);
-reads_expansion!(r4b);
-reads_expansion!(r5);
-reads_expansion!(r6);
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// The extension marking an expansion that leaves out codes the value
+    /// set admits (<https://hl7.org/fhir/R4B/extension-valueset-unclosed.html>).
+    const UNCLOSED_EXTENSION: &str = "http://hl7.org/fhir/StructureDefinition/valueset-unclosed";
+
+    /// The extension stating in words why an expansion is unclosed.
+    const UNCLOSED_REASON_EXTENSION: &str =
+        "http://hl7.org/fhir/StructureDefinition/valueset-unclosed-reason";
+
     fn parse(json: &str) -> ExpandedValueSet {
-        crate::fhir::version::FhirVersion::R4B
-            .decode(&crate::fhir::release::fixture::completed("ValueSet", json))
-            .expect("the fixture is a valid R4B ValueSet")
+        read(
+            FhirVersion::R4B,
+            &crate::fhir::release::fixture::completed("ValueSet", json),
+        )
+        .expect("the fixture is a valid R4B ValueSet")
+    }
+
+    /// `json`, the `ValueSet` an `$expand` answered at `version`, read as the
+    /// console reads it.
+    fn read(version: FhirVersion, json: &str) -> Result<ExpandedValueSet, FhirError> {
+        let request = ExpandRequest::default().request();
+        let outcome = crate::fhir::operation::tests::read(version, &request, json)?;
+        ExpandedValueSet::read(outcome, "", version)
+    }
+
+    /// The query `request` is sent with at R4B.
+    fn query(request: &ExpandRequest) -> String {
+        crate::fhir::operation::tests::query(FhirVersion::R4B, request.request())
     }
 
     #[test]
@@ -385,7 +266,7 @@ mod tests {
             ..ExpandRequest::default()
         };
         assert_eq!(
-            request.append(RequestUrl::default()).render(""),
+            query(&request),
             "?url=https%3A%2F%2Fterminology.example%2FValueSet%2Fall&count=20",
             "an unset parameter leaves the server's own default in force"
         );
@@ -403,9 +284,9 @@ mod tests {
             include_designations: Some(false),
         };
         assert_eq!(
-            request.append(RequestUrl::default()).render(""),
-            "?url=https%3A%2F%2Fterminology.example%2FValueSet%2Fall&filter=fever&count=20\
-             &offset=40&displayLanguage=nl-NL&activeOnly=true&includeDesignations=false",
+            query(&request),
+            "?url=https%3A%2F%2Fterminology.example%2FValueSet%2Fall&filter=fever&offset=40\
+             &count=20&includeDesignations=false&activeOnly=true&displayLanguage=nl-NL",
             "the boolean parameters are sent as the FHIR literals"
         );
     }
@@ -419,7 +300,7 @@ mod tests {
             count: Some(20),
             ..ExpandRequest::default()
         };
-        let rendered = request.append(RequestUrl::default()).render("");
+        let rendered = query(&request);
         assert_eq!(
             rendered, "?url=http%3A%2F%2Fsnomed.info%2Fsct%3Ffhir_vs%3Disa%2F404684003&count=20",
             "the canonical's own query string is escaped into the value"
@@ -439,7 +320,7 @@ mod tests {
             ..ExpandRequest::default()
         };
         assert_eq!(
-            request.append(RequestUrl::default()).render(""),
+            query(&request),
             "?url=https%3A%2F%2Fterminology.example%2FValueSet%2Fall&filter=a%26count%3D1",
             "a typed value cannot smuggle in a parameter of its own"
         );
@@ -452,18 +333,21 @@ mod tests {
                 "timestamp":"2026-09-07T00:00:00Z","total":173,"offset":20,
                 "contains":[{"system":"https://terminology.example/x","code":"a","display":"A"}]}}"#,
         )
-        .expansion()
-        .expect("the answer carries an expansion");
+        .expansion();
         assert_eq!((expansion.total, expansion.offset), (Some(173), Some(20)));
         assert_eq!(expansion.concepts.len(), 1);
     }
 
     #[test]
-    fn a_value_set_with_no_expansion_reads_as_no_expansion() {
-        assert_eq!(
-            parse(r#"{"resourceType":"ValueSet","status":"active"}"#).expansion(),
-            None,
-            "the screen states that rather than drawing an empty table"
+    fn a_value_set_with_no_expansion_is_no_answer_at_all() {
+        let unread = read(
+            FhirVersion::R4B,
+            r#"{"resourceType":"ValueSet","status":"active"}"#,
+        );
+        assert!(
+            matches!(unread, Err(FhirError::Decode { .. })),
+            "`$expand` returns the value set with its expansion, so an answer without one \
+             is refused: {unread:?}"
         );
     }
 
@@ -476,8 +360,7 @@ mod tests {
                   "code":"900","display":"Preferred"},"value":"Aa"},
                  {"language":"cy","value":"Ah"}]}]}}"#,
         )
-        .expansion()
-        .expect("the answer carries an expansion");
+        .expansion();
         let concept = expansion.concepts.first().expect("one concept was sent");
         assert_eq!(concept.version.as_deref(), Some("2.0"));
         assert!(
@@ -504,8 +387,7 @@ mod tests {
             r#"{"expansion":{"contains":[{"code":"a",
                 "designation":[{"use":{"code":"900"},"value":"Aa"}]}]}}"#,
         )
-        .expansion()
-        .expect("the answer carries an expansion");
+        .expansion();
         assert_eq!(
             expansion
                 .concepts
@@ -524,8 +406,7 @@ mod tests {
                 {"code":"a","contains":[{"code":"a1"},{"code":"a2","contains":[{"code":"a2i"}]}]},
                 {"code":"b"}]}}"#,
         )
-        .expansion()
-        .expect("the answer carries an expansion");
+        .expansion();
         assert_eq!(
             expansion
                 .concepts
@@ -556,8 +437,7 @@ mod tests {
     fn a_flat_answer_is_counted_the_same_way_and_says_it_is_flat() {
         let expansion =
             parse(r#"{"expansion":{"total":2,"contains":[{"code":"a"},{"code":"b"}]}}"#)
-                .expansion()
-                .expect("the answer carries an expansion");
+                .expansion();
         assert_eq!(expansion.listed(), 2);
         assert!(
             !expansion.concepts.iter().any(|concept| concept.depth > 0),
@@ -573,8 +453,7 @@ mod tests {
                 {{"url":"{UNCLOSED_REASON_EXTENSION}","valueString":"the grammar admits more"}},
                 {{"url":"{UNCLOSED_REASON_EXTENSION}","valueString":"the fragment holds part"}}]}}}}"#
         ))
-        .expansion()
-        .expect("the answer carries an expansion");
+        .expansion();
         assert_eq!(
             expansion.unclosed,
             Some(Unclosed {
@@ -589,9 +468,7 @@ mod tests {
 
     #[test]
     fn a_closed_expansion_carries_no_mark() {
-        let expansion = parse(r#"{"expansion":{"total":2,"contains":[{"code":"a"}]}}"#)
-            .expansion()
-            .expect("the answer carries an expansion");
+        let expansion = parse(r#"{"expansion":{"total":2,"contains":[{"code":"a"}]}}"#).expansion();
         assert_eq!(
             expansion.unclosed, None,
             "an expansion that lists everything says nothing about being unclosed"
@@ -604,8 +481,7 @@ mod tests {
             r#"{{"expansion":{{"extension":[
                 {{"url":"{UNCLOSED_REASON_EXTENSION}","valueString":"orphaned"}}]}}}}"#
         ))
-        .expansion()
-        .expect("the answer carries an expansion");
+        .expansion();
         assert_eq!(
             expansion.unclosed, None,
             "the mark is the boolean, and a reason alone claims nothing"
@@ -618,8 +494,7 @@ mod tests {
             r#"{{"expansion":{{"extension":[
                 {{"url":"{UNCLOSED_EXTENSION}","valueBoolean":false}}]}}}}"#
         ))
-        .expansion()
-        .expect("the answer carries an expansion");
+        .expansion();
         assert_eq!(
             expansion.unclosed, None,
             "the mark is false, so the expansion lists everything"
@@ -639,8 +514,7 @@ mod tests {
                 {"name":"date","valueDateTime":"2026-09-07"},
                 {"name":"version"}]}}"#,
         )
-        .expansion()
-        .expect("the answer carries an expansion");
+        .expansion();
         assert_eq!(
             expansion
                 .parameters
@@ -666,9 +540,7 @@ mod tests {
 
     #[test]
     fn a_negative_total_reads_as_absent_rather_than_wrapping() {
-        let expansion = parse(r#"{"expansion":{"total":-1,"offset":-5}}"#)
-            .expansion()
-            .expect("the answer carries an expansion");
+        let expansion = parse(r#"{"expansion":{"total":-1,"offset":-5}}"#).expansion();
         assert_eq!(
             (expansion.total, expansion.offset),
             (None, None),
@@ -682,19 +554,16 @@ mod tests {
             "meta":{"lastUpdated":"2026-09-07T00:00:00Z"},
             "expansion":{"identifier":"urn:uuid:2","timestamp":"2026-09-07T00:00:00Z",
             "property":[{"code":"parent"}],"contains":[{"code":"a"}]}}"#;
-        let expansion = crate::fhir::version::FhirVersion::R5
-            .decode::<ExpandedValueSet>(answer)
+        let expansion = read(FhirVersion::R5, answer)
             .expect("R5 defines `expansion.property`")
-            .expansion()
-            .expect("the answer carries an expansion");
+            .expansion();
         assert_eq!(
             expansion.concepts.len(),
             1,
             "the reader ignores the elements it does not draw"
         );
-        let refused = crate::fhir::version::FhirVersion::R4B
-            .decode::<ExpandedValueSet>(answer)
-            .expect_err("R4B defines no `expansion.property`");
+        let refused =
+            read(FhirVersion::R4B, answer).expect_err("R4B defines no `expansion.property`");
         assert!(refused.to_string().contains("property"), "{refused}");
     }
 }

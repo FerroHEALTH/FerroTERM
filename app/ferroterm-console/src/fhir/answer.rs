@@ -78,28 +78,11 @@ impl FhirClient {
             text: pretty(&answer.body),
         })
     }
-
-    /// Sends a FHIR JSON `POST` and decodes the resource it answers at
-    /// `version`, the release that serves it.
-    pub(super) async fn post_answer<A: Decodes>(
-        &self,
-        version: FhirVersion,
-        url: &str,
-        body: &str,
-    ) -> Result<A, FhirError> {
-        let exchange = Exchange::new(Method::Post, self.path_of(url)?, FHIR_JSON)
-            .with_body(FHIR_JSON, body.to_owned());
-        let answer = self
-            .exchange(exchange)
-            .await
-            .map_err(|error| transport(url, &error))?;
-        decoded(&self.locale, version, &answer, url)
-    }
 }
 
 /// A JSON document indented two spaces a level, for a reader; a body that is
 /// no JSON (which `read_json` has already refused) stays as it came.
-fn pretty(body: &str) -> String {
+pub(super) fn pretty(body: &str) -> String {
     serde_json::from_str::<serde_json::Value>(body)
         .ok()
         .and_then(|value| serde_json::to_string_pretty(&value).ok())

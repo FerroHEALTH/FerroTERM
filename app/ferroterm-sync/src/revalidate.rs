@@ -14,12 +14,19 @@
 //! `ValueSet/$validate-code` and `ValueSet/$expand`, both of which take
 //! `activeOnly` from the terminology ecosystem's requirements
 //! (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>), so it sees
-//! exactly what a client sees and needs no access to the engine.
+//! exactly what a client sees and needs no access to the engine. Both
+//! operations go through `ferrobridge-term` as `GET` requests, which writes
+//! them and reads their answers as the base's FHIR release defines them.
 //!
-//! The service reads two fields out of a resource it never writes back, so it
-//! models no FHIR: the resources stay whatever the server's version emits.
+//! The service reads two fields out of a searched resource it never writes
+//! back, so it models no FHIR resource of its own.
 
 use std::collections::BTreeSet;
+
+use ferrobridge_term::client::Client;
+use ferrobridge_term::config::{Config, Form, WireVersion};
+use ferrobridge_term::outcome::{ExpandOutcome, ExpansionContains};
+use ferrobridge_term::request::{Coded, Expansion, Validation};
 
 use crate::record::{Activated, Finding, FindingKind, Revalidation};
 
@@ -30,11 +37,27 @@ use crate::record::{Activated, Finding, FindingKind, Revalidation};
 pub const MAX_CODES: usize = 1000;
 
 /// How many members of an expansion are compared.
-pub const MAX_EXPANSION: usize = 1000;
+pub const MAX_EXPANSION: u32 = 1000;
 
 /// A check that could not be performed.
 #[derive(Debug, thiserror::Error)]
 pub enum RevalidateError {
+    /// The configured FHIR base is no URL, or names no FHIR release the
+    /// server mounts as its last segment.
+    #[error("the FHIR base {base_url} names no served FHIR release (r4, r4b, r5 or r6)")]
+    Base {
+        /// The configured base.
+        base_url: String,
+    },
+    /// The terminology client could not be built.
+    #[error("the FHIR client for {base_url} could not be built")]
+    Client {
+        /// The configured base.
+        base_url: String,
+        /// Why the client was refused.
+        #[source]
+        source: Box<ferrobridge_term::error::Error>,
+    },
     /// The request never reached the server.
     #[error("the request to {url} failed")]
     Request {
@@ -61,24 +84,75 @@ pub enum RevalidateError {
         #[source]
         source: reqwest::Error,
     },
+    /// A terminology operation was refused, or its answer did not read.
+    #[error("{operation} on the value set {value_set} did not answer")]
+    Operation {
+        /// The operation, as `Resource/$code`.
+        operation: &'static str,
+        /// The canonical of the value set it ran on.
+        value_set: String,
+        /// The refusal, with the upstream status and body.
+        #[source]
+        source: Box<ferrobridge_term::error::Error>,
+    },
+    /// A terminology operation answered in a form this service does not read.
+    #[error(
+        "{operation} on the value set {value_set} answered in a form this service does not read"
+    )]
+    Unread {
+        /// The operation, as `Resource/$code`.
+        operation: &'static str,
+        /// The canonical of the value set it ran on.
+        value_set: String,
+    },
+    /// `$expand` answered that the server does not know the value set.
+    #[error("the server does not know the value set {value_set}")]
+    UnknownValueSet {
+        /// The canonical of the value set.
+        value_set: String,
+    },
 }
 
 /// The server's FHIR API, as this service reads it.
 #[derive(Debug, Clone)]
 pub struct FhirClient {
-    client: reqwest::Client,
+    http: reqwest::Client,
     base_url: String,
+    terminology: Client,
 }
 
 impl FhirClient {
     /// The client for the FHIR base at `base_url`, such as
-    /// `http://ferroterm:8080/r4b`.
-    #[must_use]
-    pub fn new(client: reqwest::Client, base_url: &str) -> Self {
-        Self {
-            client,
-            base_url: base_url.trim_end_matches('/').to_owned(),
-        }
+    /// `http://ferroterm:8080/r4b`, whose last segment names the FHIR
+    /// release the operations are written in.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RevalidateError::Base`] when `base_url` is no URL or its last
+    /// segment names no release the server mounts, and
+    /// [`RevalidateError::Client`] when the terminology client is refused.
+    pub fn new(http: reqwest::Client, base_url: &str) -> Result<Self, RevalidateError> {
+        let base_url = base_url.trim_end_matches('/').to_owned();
+        let refused = || RevalidateError::Base {
+            base_url: base_url.clone(),
+        };
+        let parsed = url::Url::parse(&base_url).map_err(|_unparsed| refused())?;
+        let release = parsed
+            .path_segments()
+            .and_then(|mut segments| segments.next_back())
+            .and_then(release)
+            .ok_or_else(refused)?;
+        let config = Config::new(parsed, release).with_form(Form::Get);
+        let terminology =
+            Client::with_http(config, http.clone()).map_err(|source| RevalidateError::Client {
+                base_url: base_url.clone(),
+                source: Box::new(source),
+            })?;
+        Ok(Self {
+            http,
+            base_url,
+            terminology,
+        })
     }
 
     /// The resources of `resource_type` the server holds in its write store.
@@ -92,7 +166,7 @@ impl FhirClient {
         resource_type: &str,
     ) -> Result<Vec<serde_json::Value>, RevalidateError> {
         let url = format!("{}/{resource_type}", self.base_url);
-        let bundle = self.get(&url, &[]).await?;
+        let bundle = self.get(&url).await?;
         Ok(bundle
             .get("entry")
             .and_then(serde_json::Value::as_array)
@@ -109,8 +183,8 @@ impl FhirClient {
     ///
     /// # Errors
     ///
-    /// Returns [`RevalidateError`] when the operation does not answer or does
-    /// not read.
+    /// Returns [`RevalidateError::Operation`] when the operation is refused
+    /// or its answer does not read.
     pub async fn validates(
         &self,
         url: &str,
@@ -118,64 +192,75 @@ impl FhirClient {
         code: &str,
         active_only: bool,
     ) -> Result<bool, RevalidateError> {
-        let endpoint = format!("{}/ValueSet/$validate-code", self.base_url);
-        let mut query = vec![("url", url), ("system", system), ("code", code)];
-        if active_only {
-            query.push(("activeOnly", "true"));
-        }
-        let parameters = self.get(&endpoint, &query).await?;
-        Ok(parameter(&parameters, "result")
-            .and_then(|value| value.get("valueBoolean"))
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(false))
+        let validation = Validation {
+            active_only: active_only.then_some(true),
+            ..Validation::new(
+                url,
+                Coded::Code {
+                    system: system.to_owned(),
+                    code: code.to_owned(),
+                    version: None,
+                    display: None,
+                },
+            )
+        };
+        self.terminology
+            .validate(&validation)
+            .await
+            .map(|outcome| outcome.is_valid())
+            .map_err(|source| RevalidateError::Operation {
+                operation: ferrobridge_term::VALIDATE_CODE,
+                value_set: url.to_owned(),
+                source: Box::new(source),
+            })
     }
 
-    /// The members of the expansion of the value set `url`.
+    /// The members of the expansion of the value set `url`, the entries at
+    /// its top level.
     ///
     /// # Errors
     ///
-    /// Returns [`RevalidateError`] when the operation does not answer or does
-    /// not read.
+    /// Returns [`RevalidateError::Operation`] when the operation is refused
+    /// or its answer does not read, and [`RevalidateError::UnknownValueSet`]
+    /// when the server does not know the value set.
     pub async fn expansion(
         &self,
         url: &str,
         active_only: bool,
     ) -> Result<BTreeSet<(String, String)>, RevalidateError> {
-        let endpoint = format!("{}/ValueSet/$expand", self.base_url);
-        let count = MAX_EXPANSION.to_string();
-        let mut query = vec![("url", url), ("count", count.as_str())];
-        if active_only {
-            query.push(("activeOnly", "true"));
-        }
-        let expanded = self.get(&endpoint, &query).await?;
-        let Some(contains) = expanded
-            .get("expansion")
-            .and_then(|expansion| expansion.get("contains"))
-            .and_then(serde_json::Value::as_array)
-        else {
-            return Ok(BTreeSet::new());
+        let expansion = Expansion {
+            count: Some(MAX_EXPANSION),
+            active_only: active_only.then_some(true),
+            ..Expansion::new(url)
         };
-        Ok(contains
-            .iter()
-            .filter_map(|item| {
-                Some((
-                    item.get("system")?.as_str()?.to_owned(),
-                    item.get("code")?.as_str()?.to_owned(),
-                ))
-            })
-            .collect())
+        let outcome = self
+            .terminology
+            .expand(&expansion)
+            .await
+            .map_err(|source| RevalidateError::Operation {
+                operation: ferrobridge_term::EXPAND,
+                value_set: url.to_owned(),
+                source: Box::new(source),
+            })?;
+        match outcome {
+            ExpandOutcome::Expanded(expanded) => {
+                Ok(expanded.contains.into_iter().filter_map(member).collect())
+            }
+            ExpandOutcome::NotFound { .. } => Err(RevalidateError::UnknownValueSet {
+                value_set: url.to_owned(),
+            }),
+            _ => Err(RevalidateError::Unread {
+                operation: ferrobridge_term::EXPAND,
+                value_set: url.to_owned(),
+            }),
+        }
     }
 
     /// One `GET` against the FHIR API, read as JSON.
-    async fn get(
-        &self,
-        url: &str,
-        query: &[(&str, &str)],
-    ) -> Result<serde_json::Value, RevalidateError> {
+    async fn get(&self, url: &str) -> Result<serde_json::Value, RevalidateError> {
         let response = self
-            .client
+            .http
             .get(url)
-            .query(query)
             .header("accept", "application/fhir+json")
             .send()
             .await
@@ -200,13 +285,24 @@ impl FhirClient {
     }
 }
 
-/// One named parameter of a `Parameters` resource.
-fn parameter<'a>(parameters: &'a serde_json::Value, name: &str) -> Option<&'a serde_json::Value> {
-    parameters
-        .get("parameter")?
-        .as_array()?
-        .iter()
-        .find(|item| item.get("name").and_then(serde_json::Value::as_str) == Some(name))
+/// The FHIR release a base's last segment names, as the server mounts it.
+// NOTE: no specification governs this: our own design; the server mounts each
+// release at `/r4`, `/r4b`, `/r5` and `/r6`.
+fn release(segment: &str) -> Option<WireVersion> {
+    match segment.to_ascii_lowercase().as_str() {
+        "r4" => Some(WireVersion::R4),
+        "r4b" => Some(WireVersion::R4B),
+        "r5" => Some(WireVersion::R5),
+        "r6" => Some(WireVersion::R6),
+        _ => None,
+    }
+}
+
+/// The system and code of one expansion entry.
+// NOTE: <https://hl7.org/fhir/R4B/valueset-definitions.html#ValueSet.expansion.contains>:
+// an entry with no code only groups its children, so it names no member.
+fn member(entry: ExpansionContains) -> Option<(String, String)> {
+    Some((entry.system?, entry.code?))
 }
 
 /// One string field of a JSON object.

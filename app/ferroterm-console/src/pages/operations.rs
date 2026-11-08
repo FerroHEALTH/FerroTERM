@@ -27,7 +27,7 @@ use ferrohealth_ui::view::transform::{
 use crate::fhir::error::FhirError;
 use crate::fhir::named::NamedSearch;
 use crate::locale::{Msg, tr};
-use crate::pages::parts::heading;
+use crate::pages::parts::{failure, heading};
 use crate::pages::shortcuts::RUN_KEYS;
 use crate::request::Request;
 use crate::routes::{
@@ -267,6 +267,15 @@ pub(crate) fn verdict(
             action,
         }),
     )
+}
+
+/// A run the server refused, or that got no answer, with the request it was
+/// sent as.
+pub(crate) fn refused(locale: &Locale, error: &FhirError) -> Html {
+    Html::join([
+        panel_section(locale, None, failure(locale, error)),
+        sent(locale, error.url(), None),
+    ])
 }
 
 /// The request an answer came from, `GET url`, with Copy, and the answer

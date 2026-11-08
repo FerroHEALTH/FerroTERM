@@ -42,9 +42,29 @@ fn hierarchy_of(root: &str, document: &str, system: &str) -> Hierarchy {
 
 /// `json`, decoded as the R4B `Parameters` `$lookup` answers.
 fn answer(json: &str) -> Concept {
-    FhirVersion::R4B
-        .decode(json)
-        .expect("the fixture is a valid Parameters at R4B")
+    read(json).expect("the fixture is a valid answer at R4B")
+}
+
+/// `json`, read as the R4B answer of `$lookup`.
+fn read(json: &str) -> Result<Concept, FhirError> {
+    let request = LookupRequest {
+        system: String::from("https://terminology.example/x"),
+        code: String::from("a"),
+        ..LookupRequest::default()
+    }
+    .request();
+    let outcome = crate::fhir::operation::tests::read(FhirVersion::R4B, &request, json)?;
+    Concept::read(outcome, "", FhirVersion::R4B)
+}
+
+/// The query `request` is sent with at R4B.
+fn query(request: &LookupRequest) -> String {
+    crate::fhir::operation::tests::query(FhirVersion::R4B, request.request())
+}
+
+/// The body `query` is sent with at R4B.
+fn body(query: &ConceptQuery) -> serde_json::Value {
+    crate::fhir::operation::tests::body(FhirVersion::R4B, query.request())
 }
 
 /// The roots whose `filter-operator` value set defines `child-of`.
@@ -225,8 +245,8 @@ fn a_lookup_address_carries_the_code_and_the_system_encoded() {
         display_language: Some(String::from("nl-NL")),
     };
     assert_eq!(
-        request.append(RequestUrl::default()).render(""),
-        "?system=https%3A%2F%2Fterminology.example%2Fx%3Fedition%3D2031&code=m%2Fs2\
+        query(&request),
+        "?code=m%2Fs2&system=https%3A%2F%2Fterminology.example%2Fx%3Fedition%3D2031\
          &version=2.0&displayLanguage=nl-NL",
         "a code carrying a separator stays inside the parameter it belongs to"
     );
@@ -240,8 +260,8 @@ fn a_lookup_address_sends_only_what_the_address_names() {
         ..LookupRequest::default()
     };
     assert_eq!(
-        request.append(RequestUrl::default()).render(""),
-        "?system=https%3A%2F%2Fterminology.example%2Fx&code=a",
+        query(&request),
+        "?code=a&system=https%3A%2F%2Fterminology.example%2Fx",
         "an unset parameter leaves the server's own default in force"
     );
 }
@@ -257,8 +277,11 @@ fn a_search_body_sends_the_system_as_an_inline_value_set() {
         count: 20,
     };
     assert_eq!(
-        query.body(FhirVersion::R4B),
-        r#"{"parameter":[{"name":"valueSet","resource":{"compose":{"include":[{"system":"https://terminology.example/x","version":"2.0"}]},"resourceType":"ValueSet","status":"active"}},{"name":"filter","valueString":"fever"},{"name":"count","valueInteger":20},{"name":"excludeNested","valueBoolean":true},{"name":"displayLanguage","valueCode":"nl"}],"resourceType":"Parameters"}"#,
+        body(&query),
+        serde_json::from_str::<serde_json::Value>(
+            r#"{"parameter":[{"name":"valueSet","resource":{"compose":{"include":[{"system":"https://terminology.example/x","version":"2.0"}]},"resourceType":"ValueSet","status":"active"}},{"name":"filter","valueString":"fever"},{"name":"count","valueInteger":20},{"name":"excludeNested","valueBoolean":true},{"name":"displayLanguage","valueCode":"nl"}],"resourceType":"Parameters"}"#
+        )
+        .expect("JSON"),
         "the selection names the system and no value set canonical"
     );
 }
@@ -274,12 +297,11 @@ fn a_child_body_sends_the_declared_property_and_the_child_operator() {
         count: 100,
         ..ConceptQuery::default()
     };
-    assert!(
-        query
-            .body(FhirVersion::R4B)
-            .contains(r#""filter":[{"op":"child-of","property":"concept","value":"root"}]"#),
-        "the walk sends the property the version declared: {}",
-        query.body(FhirVersion::R4B)
+    let sent = body(&query);
+    assert_eq!(
+        sent.pointer("/parameter/0/resource/compose/include/0/filter"),
+        Some(&serde_json::json!([{"op":"child-of","property":"concept","value":"root"}])),
+        "the walk sends the property the version declared: {sent}"
     );
 }
 
@@ -325,6 +347,8 @@ fn a_lookup_answer_reads_the_display_and_the_designations() {
 fn a_lookup_answer_reads_every_value_type_a_property_carries() {
     let concept = answer(
         r#"{"parameter":[
+            {"name":"name","valueString":"Animals"},
+            {"name":"display","valueString":"Cat"},
             {"name":"property","part":[
                 {"name":"code","valueCode":"inactive"},
                 {"name":"value","valueBoolean":false},
@@ -361,6 +385,8 @@ fn a_lookup_answer_reads_every_value_type_a_property_carries() {
 fn the_hierarchy_links_are_read_from_the_standard_concept_properties() {
     let concept = answer(
         r#"{"parameter":[
+            {"name":"name","valueString":"Animals"},
+            {"name":"display","valueString":"Cat"},
             {"name":"property","part":[{"name":"code","valueCode":"parent"},
                 {"name":"value","valueCode":"a"}]},
             {"name":"property","part":[{"name":"code","valueCode":"parent"},
@@ -380,11 +406,10 @@ fn the_hierarchy_links_are_read_from_the_standard_concept_properties() {
 }
 
 #[test]
-fn an_answer_that_carries_nothing_reads_as_a_concept_that_declares_nothing() {
-    let concept = answer(r#"{"resourceType":"Parameters"}"#);
-    assert_eq!(concept, Concept::default());
+fn an_answer_that_carries_nothing_is_no_concept_at_all() {
+    let unread = read(r#"{"resourceType":"Parameters"}"#);
     assert!(
-        concept.property_values(PARENT_PROPERTY).is_empty(),
-        "the screen states the absence"
+        matches!(unread, Err(FhirError::Decode { .. })),
+        "`name` and `display` are 1..1, so an answer without them is refused: {unread:?}"
     );
 }

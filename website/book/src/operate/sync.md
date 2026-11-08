@@ -230,8 +230,10 @@ It reports and never edits. A finding is a decision for a terminologist, and
 the service changes nothing in your content, ever.
 
 Set `fhir_base_url` to the server's FHIR base, such as
-`http://ferroterm:8080/r4b`, to turn the check on. Without it the run record
-says the check did not run. The check reads the server's public FHIR API,
+`http://ferroterm:8080/r4b`, to turn the check on. Its last segment (`r4`,
+`r4b`, `r5` or `r6`) names the FHIR release the check writes its requests in;
+a base whose last segment names none leaves the check not run. Without a base
+the run record says the check did not run. The check reads the server's public FHIR API,
 `ValueSet/$validate-code` and `ValueSet/$expand`, both with `activeOnly`, so it
 sees exactly what any client sees:
 
