@@ -4,33 +4,40 @@
 # The performance gate (#1151), called by ci.yml on a change that reaches
 # the server or the sync service and by release.yml on the release commit.
 # Each attempt job builds ferroterm-server, ferroterm-sync and the testkit's
-# ferroterm-fixture in release mode, installs ferrohealth-perf
-# (FerroHEALTH/FerroSYS#249) at its pin and runs scripts/perf/gate.sh once
-# through .github/actions/perf-attempt: for each service the idle phase and
-# the load phase judged against its perf/<service>/baseline.toml, and the
-# sync service whose schedule never waits, which the idle phase must fail.
-# An attempt that ends with exit 2 could not be judged and says nothing about
-# the code, so it is retried on a fresh runner on any CPU model. Some runners
-# stall the gate for a whole job (FerroHEALTH/FerroPIX#511), so an attempt
-# that ends with exit 1 on a CPU model STALL_PRONE lists is retried too. At
-# most two retries run (#1156). The verdict job passes the gate when the last
-# attempt that ran passed; a breach on any other model fails at once, with no
-# retry. No specification governs this: our own design.
+# ferroterm-fixture in release mode for the commit and for its base, installs
+# ferrohealth-perf (FerroHEALTH/FerroSYS#249) at its pin and runs
+# scripts/perf/gate.sh once through .github/actions/perf-attempt: the tool's
+# A/B mode for each service (#1160), the head's idle phase held to absolute
+# limits, then pairs of load phases against the base and the head on the
+# same runner, the head judged over the base, and the sync service whose
+# schedule never waits, which the idle phase must fail. The base is the
+# merge base of the commit with the `base` input, or with none the previous
+# release. An attempt that ends with exit 2 could not be judged and says
+# nothing about the code, so it is retried on a fresh runner on any CPU
+# model. Some runners stall the gate for a whole job
+# (FerroHEALTH/FerroPIX#511), so an attempt that ends with exit 1 on a CPU
+# model STALL_PRONE lists is retried too. At most two retries run (#1156).
+# The verdict job passes the gate when the last attempt that ran passed; a
+# breach on any other model fails at once, with no retry. No specification
+# governs this: our own design.
 name: Perf
 
 on:
   workflow_call:
     inputs:
-      update:
-        description: Write the entry of the runner's host shape in the baselines from a run that passes.
+      base:
+        description: >-
+          The commit or ref the base is the merge base with: the pull
+          request's base, the merge group's, or the commit before a push.
+          Empty takes the previous release.
         required: false
-        default: false
-        type: boolean
+        default: ""
+        type: string
 
 permissions: {}
 
 env:
-  FERROHEALTH_PERF_VERSION: 0.4.2
+  FERROHEALTH_PERF_VERSION: 0.5.0
   FERROTERM__USAGE_REPORT__ENABLED: "false"
   # The CPU models whose runners stall every route for 100 to 300 ms for a
   # whole job (FerroHEALTH/FerroPIX#511), one per line. A breach is retried
@@ -42,7 +49,7 @@ jobs:
   perf:
     name: perf (attempt 1)
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     permissions:
       contents: read
     outputs:
@@ -52,6 +59,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The base is built from history, so every commit is fetched.
+          fetch-depth: 0
       - uses: ./.github/actions/setup-rust
         with:
           cache-key: perf
@@ -59,7 +68,7 @@ jobs:
         uses: ./.github/actions/perf-attempt
         with:
           attempt: "1"
-          update: ${{ inputs.update }}
+          base: ${{ inputs.base }}
           version: ${{ env.FERROHEALTH_PERF_VERSION }}
           stall-prone: ${{ env.STALL_PRONE }}
 
@@ -68,7 +77,7 @@ jobs:
     needs: perf
     if: needs.perf.outputs.retryable == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     permissions:
       contents: read
     outputs:
@@ -78,6 +87,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The base is built from history, so every commit is fetched.
+          fetch-depth: 0
       - uses: ./.github/actions/setup-rust
         with:
           cache-key: perf
@@ -85,7 +96,7 @@ jobs:
         uses: ./.github/actions/perf-attempt
         with:
           attempt: "2"
-          update: ${{ inputs.update }}
+          base: ${{ inputs.base }}
           version: ${{ env.FERROHEALTH_PERF_VERSION }}
           stall-prone: ${{ env.STALL_PRONE }}
 
@@ -94,7 +105,7 @@ jobs:
     needs: perf-retry
     if: needs.perf-retry.outputs.retryable == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     permissions:
       contents: read
     outputs:
@@ -104,6 +115,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The base is built from history, so every commit is fetched.
+          fetch-depth: 0
       - uses: ./.github/actions/setup-rust
         with:
           cache-key: perf
@@ -111,7 +124,7 @@ jobs:
         uses: ./.github/actions/perf-attempt
         with:
           attempt: "3"
-          update: ${{ inputs.update }}
+          base: ${{ inputs.base }}
           version: ${{ env.FERROHEALTH_PERF_VERSION }}
           stall-prone: ${{ env.STALL_PRONE }}
 

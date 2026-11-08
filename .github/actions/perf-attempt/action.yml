@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: BUSL-1.1
 name: One attempt of the performance gate
 description: >-
-  Installs ferrohealth-perf, builds what scripts/perf/gate.sh measures, runs
-  the gate once and uploads its reports. The step never fails on the gate's
+  Installs ferrohealth-perf, builds the release services of the commit and
+  of its base, runs scripts/perf/gate.sh once and uploads its reports. The step never fails on the gate's
   verdict: it reports the exit code, the runner's CPU model and whether a
   retry on a fresh runner may help, and the perf workflow's verdict job
   decides. A retry may help when the gate ended with exit 2, a run that
@@ -15,10 +15,10 @@ inputs:
   attempt:
     description: The attempt, 1 for the first run and 2 and 3 for the retries.
     required: true
-  update:
-    description: '"true" to write the baseline from a run that passes.'
+  base:
+    description: The commit or ref the base is the merge base with; empty takes the previous release.
     required: false
-    default: "false"
+    default: ""
   version:
     description: The ferrohealth-perf version to install, exactly.
     required: true
@@ -43,24 +43,21 @@ runs:
       env:
         VERSION: ${{ inputs.version }}
       run: cargo install ferrohealth-perf --version "=${VERSION}" --locked
-    - name: Build what the gate measures
+    - name: Build the base and the head
       shell: bash
-      run: bash scripts/perf/gate.sh build
+      env:
+        BASE: ${{ inputs.base }}
+      run: bash scripts/perf/gate.sh build "$BASE"
     - name: Gate the performance
       id: gate
       shell: bash
       env:
         ATTEMPT: ${{ inputs.attempt }}
-        UPDATE: ${{ inputs.update }}
         STALL_PRONE: ${{ inputs.stall-prone }}
       run: |
         set -uo pipefail
         code=0
-        if [ "$UPDATE" = "true" ]; then
-          bash scripts/perf/gate.sh run --update || code=$?
-        else
-          bash scripts/perf/gate.sh run || code=$?
-        fi
+        bash scripts/perf/gate.sh run || code=$?
         latest="$(find target/perf -name latest.json -not -path '*busy-loop*' -print -quit 2>/dev/null || true)"
         model=""
         if [ -n "$latest" ]; then
@@ -113,6 +110,6 @@ runs:
         path: |
           target/perf/
           target/perf-run/*.log
-          perf/
+          target/perf-base/rev
         if-no-files-found: ignore
         retention-days: 30

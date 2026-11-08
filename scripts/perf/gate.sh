@@ -3,36 +3,47 @@
 # SPDX-License-Identifier: BUSL-1.1
 #
 # The performance gate of ferroterm-server and ferroterm-sync (#1151):
-# ferrohealth-perf (FerroHEALTH/FerroSYS#249) against the release builds.
+# ferrohealth-perf (FerroHEALTH/FerroSYS#249) in its A/B mode, the head of a
+# change judged against its base measured beside it on the same runner, each
+# service the release build of its own tree over its own data.
 #
-#   scripts/perf/gate.sh run [--update]
-#       Writes the scaled synthetic SNOMED CT edition with ferroterm-fixture,
-#       starts target/release/ferroterm over it and the e2e CodeSystem
-#       fixtures with its admin listener on, and target/release/ferroterm-sync
-#       with its next scheduled run twelve hours away, and runs
-#       perf/server/plan.toml and perf/sync/plan.toml, each against its
-#       baseline.toml. Then it starts a second ferroterm-sync whose schedule
-#       never waits and runs perf/sync/busy-loop.toml against it, which must
-#       fail on idle CPU. --update writes both baselines from runs that
-#       pass. Exit 0 when all three hold, 1 when a gate fails or the busy
-#       service passes, 2 when a run cannot be judged or set up.
-#   scripts/perf/gate.sh build
-#       Builds the services and the fixture writer the gate runs.
+#   scripts/perf/gate.sh build [BASE]
+#       Builds the services and the fixture writer of the checkout, the
+#       head, and of its base: the merge base of HEAD with BASE, a commit or
+#       ref, or with no BASE the newest v* tag before HEAD, else HEAD's first
+#       parent. The base is built from `git archive` of that commit under
+#       target/, with its own toolchain pin, into the same target directory,
+#       so the dependencies build once.
+#   scripts/perf/gate.sh run
+#       Writes the scaled synthetic SNOMED CT edition with each side's
+#       ferroterm-fixture, starts each side's ferroterm over it and its own
+#       e2e CodeSystem fixtures with the admin listener on (the head on 8080
+#       and 8081, the base on 8090 and 8091), and each side's ferroterm-sync
+#       with its next scheduled run twelve hours away (the head on 8181, the
+#       base on 8191), and runs `ferrohealth-perf ab` over
+#       perf/server/plan.toml and perf/sync/plan.toml: the head's idle phase,
+#       then pairs of load phases in turn. Then it starts a head
+#       ferroterm-sync whose schedule never waits and runs
+#       perf/sync/busy-loop.toml against it, which must fail on idle CPU.
+#       Exit 0 when all three hold, 1 when a gate fails or the busy service
+#       passes, 2 when a run cannot be judged or set up.
 #   scripts/perf/gate.sh --self-test
-#       Proves the schedule time and the agreement of the sync plans' idle
-#       limits offline.
+#       Proves the schedule time, the agreement of the sync plans' idle
+#       limits and the base resolution offline.
 #
-# Needs curl and ferrohealth-perf on PATH, and the release builds of
-# ferroterm-server, ferroterm-sync and ferroterm-testkit's ferroterm-fixture,
-# on Linux, where the tool reads CPU and memory from /proc. Neither service
-# holds a database, so no transactions are counted. No specification governs
-# this: our own design.
+# Needs curl, git and ferrohealth-perf on PATH, on Linux, where the tool
+# reads CPU and memory from /proc. Neither service holds a database, so no
+# transactions are counted. No specification governs this: our own design.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 readonly WORK=target/perf-run
-readonly SERVER=http://127.0.0.1:8080
-readonly SYNC=http://127.0.0.1:8181
+readonly BASE_TREE=target/perf-base
+readonly BINARIES=(ferroterm ferroterm-sync ferroterm-fixture)
+readonly HEAD_SERVER=http://127.0.0.1:8080
+readonly BASE_SERVER=http://127.0.0.1:8090
+readonly HEAD_SYNC=http://127.0.0.1:8181
+readonly BASE_SYNC=http://127.0.0.1:8191
 readonly BUSY=http://127.0.0.1:8183
 # The concepts of the scaled edition the server plan's codes come from.
 readonly CONCEPTS=50000
@@ -64,6 +75,47 @@ wait_for() {
   die "$what did not come up"
 }
 
+# base_rev [BASE] [AT]: the commit the base is built from, as `build` names
+# it, resolved from AT (HEAD by default).
+base_rev() {
+  local base="${1:-}" at="${2:-HEAD}" tag
+  # The commit before the push that created a branch is all zeros.
+  [[ "$base" =~ ^0+$ ]] && base=""
+  if [[ -n "$base" ]]; then
+    git -C "$root" merge-base "$at" "$base"
+  elif tag="$(git -C "$root" describe --tags --abbrev=0 --match 'v*' "$at^" 2> /dev/null)"; then
+    git -C "$root" rev-parse "$tag^{commit}"
+  else
+    git -C "$root" rev-parse "$at^1"
+  fi
+}
+
+# cargo_build: the release services and fixture writer of the tree in the
+# working directory.
+cargo_build() {
+  cargo build --release --locked -p ferroterm-server -p ferroterm-sync -p ferroterm-testkit \
+    --bin ferroterm --bin ferroterm-sync --bin ferroterm-fixture "$@"
+}
+
+# build [BASE]: the base's binaries into target/perf-base/, then the head's
+# into target/release/.
+build() {
+  local rev binary
+  cd "$root"
+  rev="$(base_rev "${1:-}")" || die "the base of ${1:-the previous release} cannot be resolved"
+  echo "perf-gate: the base is $rev"
+  rm -rf "$BASE_TREE"
+  mkdir -p "$BASE_TREE/src"
+  git archive "$rev" | tar -x -C "$BASE_TREE/src"
+  printf '%s\n' "$rev" > "$BASE_TREE/rev"
+  # From inside the base's tree, so its own toolchain pin builds it.
+  (cd "$BASE_TREE/src" && cargo_build --target-dir "$root/target")
+  for binary in "${BINARIES[@]}"; do
+    cp "target/release/$binary" "$BASE_TREE/$binary"
+  done
+  cargo_build
+}
+
 pids=()
 cleanup() {
   local pid
@@ -73,65 +125,83 @@ cleanup() {
   done
 }
 
-# start_sync NAME LISTEN [VAR=VALUE...]: starts ferroterm-sync over its own tree
-# under $WORK/NAME, and prints its process id.
+# start_sync NAME BIN LISTEN ADMIN [VAR=VALUE...]: starts BIN/ferroterm-sync
+# over its own tree under $WORK/NAME against the server admin listener at
+# ADMIN, and prints its process id.
 start_sync() {
-  local name="$1" listen="$2" dir
-  shift 2
+  local name="$1" bin="$2" listen="$3" admin="$4" dir
+  shift 4
   dir="$WORK/$name"
   mkdir -p "$dir/index" "$dir/codesystems" "$dir/staging" "$dir/records" "$dir/state"
   env FERROTERM_SYNC__LISTEN="$listen" \
-    FERROTERM_SYNC__SERVER_ADMIN_URL=http://127.0.0.1:8081 \
+    FERROTERM_SYNC__SERVER_ADMIN_URL="$admin" \
     FERROTERM_SYNC__INDEX_ROOT="$dir/index" \
     FERROTERM_SYNC__RESOURCES="$dir/codesystems" \
     FERROTERM_SYNC__STAGING="$dir/staging" \
     FERROTERM_SYNC__RECORDS="$dir/records" \
     FERROTERM_SYNC__STATE="$dir/state" \
     FERROTERM_SYNC__AUTH__ENABLED=false \
-    "$@" target/release/ferroterm-sync serve > "$dir.log" 2>&1 &
+    "$@" "$bin/ferroterm-sync" serve > "$dir.log" 2>&1 &
+  echo $!
+}
+
+# start_server NAME BIN TREE PORT ADMIN: writes the scaled edition with
+# BIN/ferroterm-fixture and starts BIN/ferroterm over it and TREE's e2e
+# CodeSystem fixtures under $WORK/NAME, and prints its process id.
+start_server() {
+  local name="$1" bin="$2" tree="$3" port="$4" admin="$5" dir
+  dir="$WORK/$name"
+  mkdir -p "$dir"
+  "$bin/ferroterm-fixture" snomed-scaled "$dir/index/snomed" "$CONCEPTS" > "$dir/fixture.log"
+  FERROTERM__USAGE_REPORT__ENABLED=false \
+    FERROTERM__SERVER__LISTEN="127.0.0.1:$port" \
+    FERROTERM__ADMIN__LISTEN="127.0.0.1:$admin" \
+    FERROTERM__AUTH__ENABLED=false \
+    FERROTERM__TERMINOLOGY__INDEX="$dir/index/snomed" \
+    FERROTERM__TERMINOLOGY__CODE_SYSTEMS="$tree/e2e/fixtures/codesystems" \
+    FERROTERM__TERMINOLOGY__RESOURCES="$dir/resources.redb" \
+    "$bin/ferroterm" > "$dir.log" 2>&1 &
   echo $!
 }
 
 start() {
-  local binary pid
-  for binary in ferroterm ferroterm-sync ferroterm-fixture; do
+  local binary at
+  for binary in "${BINARIES[@]}"; do
     [[ -x "target/release/$binary" ]] || die "target/release/$binary is not built"
+    [[ -x "$BASE_TREE/$binary" ]] || die "$BASE_TREE/$binary is not built: run gate.sh build first"
   done
   rm -rf "$WORK"
   mkdir -p "$WORK"
-  target/release/ferroterm-fixture snomed-scaled "$WORK/index/snomed" "$CONCEPTS"
 
-  FERROTERM__USAGE_REPORT__ENABLED=false \
-    FERROTERM__SERVER__LISTEN=127.0.0.1:8080 \
-    FERROTERM__ADMIN__LISTEN=127.0.0.1:8081 \
-    FERROTERM__AUTH__ENABLED=false \
-    FERROTERM__TERMINOLOGY__INDEX="$WORK/index/snomed" \
-    FERROTERM__TERMINOLOGY__CODE_SYSTEMS=e2e/fixtures/codesystems \
-    FERROTERM__TERMINOLOGY__RESOURCES="$WORK/resources.redb" \
-    target/release/ferroterm > "$WORK/server.log" 2>&1 &
-  server_pid=$!
-  pids+=("$server_pid")
-  wait_for "the server" 120 curl --fail --silent "$SERVER/health"
+  head_server="$(start_server head-server target/release . 8080 8081)"
+  pids+=("$head_server")
+  base_server="$(start_server base-server "$BASE_TREE" "$BASE_TREE/src" 8090 8091)"
+  pids+=("$base_server")
+  wait_for "the head server" 120 curl --fail --silent "$HEAD_SERVER/health"
+  wait_for "the base server" 120 curl --fail --silent "$BASE_SERVER/health"
 
-  pid="$(start_sync sync 127.0.0.1:8181 FERROTERM_SYNC__SCHEDULE__AT="$(twelve_hours_on "$(date -u +%H)")")"
-  sync_pid="$pid"
-  pids+=("$sync_pid")
-  wait_for "the sync service" 60 curl --fail --silent "$SYNC/health/readiness"
+  at="FERROTERM_SYNC__SCHEDULE__AT=$(twelve_hours_on "$(date -u +%H)")"
+  head_sync="$(start_sync head-sync target/release 127.0.0.1:8181 http://127.0.0.1:8081 "$at")"
+  pids+=("$head_sync")
+  base_sync="$(start_sync base-sync "$BASE_TREE" 127.0.0.1:8191 http://127.0.0.1:8091 "$at")"
+  pids+=("$base_sync")
+  wait_for "the head sync service" 60 curl --fail --silent "$HEAD_SYNC/health/readiness"
+  wait_for "the base sync service" 60 curl --fail --silent "$BASE_SYNC/health/readiness"
 }
 
-# gate NAME PID BASE [--update]: runs perf/NAME/plan.toml against PID.
+# gate NAME BASE_PID BASE_URL HEAD_PID HEAD_URL: runs the A/B mode of
+# perf/NAME/plan.toml against the two sides.
 gate() {
-  local name="$1" pid="$2" base="$3"
-  shift 3
-  ferrohealth-perf run --plan "perf/$name/plan.toml" --pid "$pid" --base-url "$base" \
-    --baseline "perf/$name/baseline.toml" --out-dir "target/perf/$name" "$@"
+  ferrohealth-perf ab --plan "perf/$1/plan.toml" \
+    --base-url "$3" --base-pid "$2" --head-url "$5" --head-pid "$4" \
+    --out-dir "target/perf/$1"
 }
 
-# busy_loop: a sync whose schedule never waits must fail the idle phase on
-# its CPU.
+# busy_loop: a head sync whose schedule never waits must fail the idle phase
+# on its CPU.
 busy_loop() {
   local code=0 summary="$WORK/busy-loop.md" breaches pid
-  pid="$(start_sync busy 127.0.0.1:8183 FERROTERM_SYNC__SCHEDULE__EVERY=0s)"
+  pid="$(start_sync busy target/release 127.0.0.1:8183 http://127.0.0.1:8081 FERROTERM_SYNC__SCHEDULE__EVERY=0s)"
   pids+=("$pid")
   wait_for "the busy sync service" 60 curl --fail --silent "$BUSY/health"
   GITHUB_STEP_SUMMARY='' ferrohealth-perf run --plan perf/sync/busy-loop.toml --pid "$pid" \
@@ -159,20 +229,19 @@ report_busy_loop() {
 }
 
 run() {
-  local update=()
-  case "${1:-}" in
-    --update) update=(--update) ;;
-    "") ;;
-    *) die "usage: gate.sh run [--update]" ;;
-  esac
+  [[ $# -eq 0 ]] || die "usage: gate.sh run"
   cd "$root"
   command -v ferrohealth-perf > /dev/null || die "ferrohealth-perf is not on PATH"
   trap cleanup EXIT
   start
+  if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+    printf "The base is \`%s\`.\n\n" "$(< "$BASE_TREE/rev")" >> "$GITHUB_STEP_SUMMARY"
+  fi
   local code=0 step
-  for step in "server $server_pid $SERVER" "sync $sync_pid $SYNC"; do
-    # shellcheck disable=SC2086 # the three words of the step
-    gate $step ${update[@]+"${update[@]}"} || {
+  for step in "server $base_server $BASE_SERVER $head_server $HEAD_SERVER" \
+    "sync $base_sync $BASE_SYNC $head_sync $HEAD_SYNC"; do
+    # shellcheck disable=SC2086 # the five words of the step
+    gate $step || {
       step=$?
       [[ "$code" -eq 1 ]] || code="$step"
     }
@@ -180,13 +249,16 @@ run() {
   busy_loop || { [[ "$code" -ne 0 ]] || code=1; }
   if [[ "$code" -ne 0 ]]; then
     echo "perf-gate: the server and sync logs follow" >&2
-    tail -n 30 "$WORK/server.log" "$WORK/sync.log" >&2
+    tail -n 30 "$WORK/head-server.log" "$WORK/base-server.log" "$WORK/head-sync.log" "$WORK/base-sync.log" >&2
   fi
   exit "$code"
 }
 
 self_test() {
-  local n=0 failed=0
+  local work n=0 failed=0
+  work="$(mktemp -d)"
+  # shellcheck disable=SC2064 # expand $work now
+  trap "rm -r -- '$work'" EXIT
   check() {
     n=$((n + 1))
     if [[ "$2" != "$3" ]]; then
@@ -203,20 +275,41 @@ self_test() {
     echo "  FAIL: perf/sync/plan.toml holds no [idle] table" >&2
     failed=1
   }
+  local repo="$work/repo" saved_root="$root"
+  git init --quiet "$repo"
+  commit() { git -C "$repo" -c user.name=t -c user.email=t@t -c commit.gpgsign=false -c tag.gpgsign=false commit --quiet --allow-empty -m "$1"; }
+  commit one
+  commit two
+  git -C "$repo" -c tag.gpgsign=false tag v0.0.1
+  commit three
+  git -C "$repo" branch side
+  commit four
+  git -C "$repo" checkout --quiet side
+  commit side-only
+  git -C "$repo" checkout --quiet -
+  root="$repo"
+  check "with no BASE the base is the newest tag before HEAD" \
+    "$(git -C "$repo" rev-parse v0.0.1)" "$(base_rev "")"
+  check "a BASE names its merge base with HEAD" \
+    "$(git -C "$repo" rev-parse HEAD~1)" "$(base_rev side)"
+  check "an all-zero BASE takes the previous release" \
+    "$(git -C "$repo" rev-parse v0.0.1)" "$(base_rev 0000000000000000000000000000000000000000)"
+  check "with no tag before it the base is the first parent" \
+    "$(git -C "$repo" rev-parse v0.0.1~1)" "$(base_rev "" v0.0.1)"
+  root="$saved_root"
   [[ "$failed" -eq 0 ]] || exit 1
   echo "perf-gate: self-test OK ($n checks)."
 }
 
 case "${1:-}" in
   build)
-    cd "$root"
-    cargo build --release --locked -p ferroterm-server -p ferroterm-sync -p ferroterm-testkit \
-      --bin ferroterm --bin ferroterm-sync --bin ferroterm-fixture
+    shift
+    build "$@"
     ;;
   run)
     shift
     run "$@"
     ;;
   --self-test) self_test ;;
-  *) die "usage: gate.sh build | run [--update] | --self-test" ;;
+  *) die "usage: gate.sh build [BASE] | run | --self-test" ;;
 esac

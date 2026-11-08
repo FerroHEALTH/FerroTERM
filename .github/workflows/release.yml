@@ -9,8 +9,9 @@
 #   plan ── perf ── github-release (draft) ─┬─ build-binaries ── build-image ─┬─ vulnerability-record ── scan-and-tag ── finalize-release (publish) ── crates ── milestone
 #                                           └─ build-console ─────────────────┘
 #
-# `perf` runs the performance gate on the tagged commit (#1151, perf.yml), so
-# a release the gate fails is never drafted.
+# `perf` runs the performance gate on the tagged commit (#1151, perf.yml),
+# judged against the previous release built beside it, so a release the gate
+# fails is never drafted.
 #
 # Both images are pushed by digest with no tag. `vulnerability-record` scans
 # them and the server's glibc tarballs with every severity, fixed or not, and
