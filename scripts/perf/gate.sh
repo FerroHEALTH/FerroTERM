@@ -22,7 +22,7 @@
 #       with its next scheduled run twelve hours away (the head on 8181, the
 #       base on 8191), and runs `ferrohealth-perf ab` over
 #       perf/server/plan.toml and perf/sync/plan.toml: the head's idle phase,
-#       then pairs of load phases in turn. Then it starts a head
+#       then pairs of load phases side by side. Then it starts a head
 #       ferroterm-sync whose schedule never waits and runs
 #       perf/sync/busy-loop.toml against it, which must fail on idle CPU.
 #       Exit 0 when all three hold, 1 when a gate fails or the busy service
