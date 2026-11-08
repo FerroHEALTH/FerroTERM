@@ -55,10 +55,13 @@ service:
 1. **Idle.** No request for 60 seconds. The head's CPU time must stay under
    2 % of one core. The limit is absolute and compared with nothing.
    Neither service holds a database, so the gate counts no transactions.
-2. **Load, in pairs.** Three pairs of load phases, each phase 50 requests a
+2. **Load, in pairs.** Four pairs of load phases, each phase 50 requests a
    second for 60 seconds after a 10-second warm-up, open loop, against one
-   side: the base first in the first pair, the head first in the second,
-   the base first in the third. For the server (`perf/server/plan.toml`):
+   side. The two phases of a pair run at once, the arrivals of one side half
+   an interval after the other's, so both sides meet the runner in the same
+   state; run one after the other, the runner's speed moved by up to a third
+   between phases and put an unchanged head up to a third off its base
+   (#1162). For the server (`perf/server/plan.toml`):
    `$lookup`, `$validate-code` on a code system and on an ECL value set,
    `$expand` with a text filter, two ECL expansions, `$translate` over the
    implicit ICD-10 map and `$subsumes`, through the R4 base. For the sync
@@ -74,7 +77,7 @@ catches a background worker that never waits.
 ## Reading the report
 
 Each load metric (throughput, latency p50, p95 and p99 per group, peak
-memory and CPU time per request) is the median of a side's three phases.
+memory and CPU time per request) is the median of a side's four phases.
 Its noise floor is the worse of the two sides' spread, how far a side's
 worst phase strayed from its median. A metric breaches when the head's
 median is worse than the base's by more than the larger of its tolerance
