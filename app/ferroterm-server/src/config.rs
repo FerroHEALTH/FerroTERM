@@ -467,6 +467,39 @@ mod tests {
     }
 
     #[test]
+    fn an_issuer_is_declared_through_the_environment_by_element_index() {
+        let config = Config::from_sources(
+            None,
+            &environment(&[
+                (
+                    "FERROTERM__AUTH__ISSUER__0__ISSUER",
+                    "https://as.example.org",
+                ),
+                ("FERROTERM__AUTH__ISSUER__0__KIND", "machines"),
+                ("FERROTERM__AUTH__ISSUER__0__AUDIENCE", "ferroterm"),
+            ]),
+        )
+        .expect("reads");
+        let [issuer] = config.auth.issuers() else {
+            panic!("one [[auth.issuer]] table, not {:?}", config.auth.issuers());
+        };
+        assert_eq!(issuer.issuer, "https://as.example.org");
+        assert_eq!(issuer.kind, Some(IssuerKind::Machines));
+        assert_eq!(issuer.audience, ["ferroterm"]);
+        assert!(
+            Config::from_sources(
+                None,
+                &environment(&[(
+                    "FERROTERM__AUTH__ISSUER__1__ISSUER",
+                    "https://as.example.org"
+                )]),
+            )
+            .is_err(),
+            "an index that skips an element is refused"
+        );
+    }
+
+    #[test]
     fn no_file_and_no_override_is_the_default_tree() {
         let config = Config::from_sources(None, &BTreeMap::new()).expect("reads");
         assert!(config.auth.enabled, "the default fails closed");
