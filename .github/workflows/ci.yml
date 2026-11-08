@@ -156,7 +156,7 @@ jobs:
             done
           } | { grep -zc . >/dev/null && xargs -0 -r shellcheck --severity=style; } \
             || echo "no shell files to check"
-      - name: The performance gate reads its schedule and holds the sync plans' idle tables equal
+      - name: The performance gate reads its schedule, holds the sync plans' idle tables equal and resolves its base
         run: bash scripts/perf/gate.sh --self-test
 
   # comment-style: the RFC 505 / RFC 1574 comment budgets over every
@@ -902,10 +902,12 @@ jobs:
   # The HL7 terminology ecosystem suite against a release build, with the
   # committed pass list as the gate (conformance/tx-ecosystem/README.md). The
   # runner is the FHIR Validator, a JVM in CI only; the server never has one.
-  # The performance gate (#1151): the idle and load phases of
-  # ferrohealth-perf against the release builds of the server and the sync
-  # service, in perf.yml, which the release lane calls on the release commit
-  # too.
+  # The performance gate (#1151, #1160): ferrohealth-perf's A/B mode, the
+  # release builds of the server and the sync service judged against the
+  # builds of their base on the same runner, in perf.yml, which the release
+  # lane calls on the release commit too. The base is the pull request's
+  # base, the merge group's, or the commit before a push; a dispatch takes
+  # the previous release.
   perf:
     name: perf
     needs: detect
@@ -913,6 +915,8 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/perf.yml
+    with:
+      base: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
 
   tx-ecosystem:
     name: tx-ecosystem
