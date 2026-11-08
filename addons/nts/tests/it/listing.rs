@@ -15,7 +15,7 @@ use crate::support;
 async fn service() -> MockServer {
     let server = MockServer::start().await;
     support::mount_discovery(&server).await;
-    support::token_mock("password")
+    support::token_mock("client_credentials")
         .respond_with(support::issued("access-first", 300, "refresh-first"))
         .mount(&server)
         .await;
@@ -33,8 +33,8 @@ async fn service() -> MockServer {
 #[tokio::test]
 async fn the_listing_is_read_with_the_token_the_service_issued() {
     let server = service().await;
-    let clock = support::TestClock::at("2026-09-22T09:00:00Z");
-    let source = support::source(&server, support::password_account(), clock);
+    let clock = support::TestClock::start();
+    let source = support::source(&server, support::client_account(), clock);
 
     let feed = source.list().await.expect("the listing is served");
     assert_eq!(feed.entries.len(), 5, "every entry is read");
@@ -48,8 +48,8 @@ async fn the_listing_is_read_with_the_token_the_service_issued() {
 #[tokio::test]
 async fn an_unsubscribed_system_is_reported_as_skipped() {
     let server = service().await;
-    let clock = support::TestClock::at("2026-09-22T09:00:00Z");
-    let source = support::source(&server, support::password_account(), clock);
+    let clock = support::TestClock::start();
+    let source = support::source(&server, support::client_account(), clock);
     let feed = source.list().await.expect("the listing is served");
 
     let selection = source.select(&feed, &Holdings::default());
@@ -81,8 +81,8 @@ async fn an_unsubscribed_system_is_reported_as_skipped() {
 #[tokio::test]
 async fn a_system_offered_only_as_the_binary_index_is_not_syndicable() {
     let server = service().await;
-    let clock = support::TestClock::at("2026-09-22T09:00:00Z");
-    let source = support::source(&server, support::password_account(), clock);
+    let clock = support::TestClock::start();
+    let source = support::source(&server, support::client_account(), clock);
     let feed = source.list().await.expect("the listing is served");
 
     let refused = source.not_syndicable(&feed);
@@ -123,8 +123,8 @@ async fn a_system_offered_only_as_the_binary_index_is_not_syndicable() {
 #[tokio::test]
 async fn the_subscribed_releases_are_taken() {
     let server = service().await;
-    let clock = support::TestClock::at("2026-09-22T09:00:00Z");
-    let source = support::source(&server, support::password_account(), clock);
+    let clock = support::TestClock::start();
+    let source = support::source(&server, support::client_account(), clock);
     let feed = source.list().await.expect("the listing is served");
 
     let selection = source.select(&feed, &Holdings::default());
@@ -143,8 +143,8 @@ async fn the_subscribed_releases_are_taken() {
 #[tokio::test]
 async fn a_release_already_served_is_not_taken_again() {
     let server = service().await;
-    let clock = support::TestClock::at("2026-09-22T09:00:00Z");
-    let source = support::source(&server, support::password_account(), clock);
+    let clock = support::TestClock::start();
+    let source = support::source(&server, support::client_account(), clock);
     let feed = source.list().await.expect("the listing is served");
 
     let mut holdings = Holdings::default();

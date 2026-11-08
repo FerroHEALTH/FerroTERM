@@ -16,17 +16,19 @@ correction its files need.
 
 ## What it does
 
-- **Reads the token endpoint from the service**, at
-  `<base>/fhir/.well-known/smart-configuration`, so a realm move needs no code
-  change.
-- **Logs in with the documented grant.** The password grant with the
-  `cli_client` client and a personal account is what the manual describes. A
-  deployment holding a client secret gets the client-credentials grant first,
-  with the password grant as the fallback.
-- **Keeps the token fresh.** The access token is refreshed inside a 60 second
-  margin, and a refused refresh, which is what a spent 24 hour refresh token
-  gives, becomes a fresh login from the stored credentials. A run on any day
-  succeeds with nobody present.
+- **Authenticates as a client.** The add-on uses the OAuth 2.0 client
+  credentials grant (RFC 6749 §4.4) through `ferrohealth-smart`'s
+  `TokenSource`, with a confidential client Nictiz issues. The service's
+  issuer publishes the grant, and its own examples use it
+  (<https://github.com/terminologieserver/ontoserver_authentication_examples>).
+  The password grant the manual describes for a personal account is not used:
+  RFC 9700 §2.4 says it MUST NOT be.
+- **Reads the token endpoint from the issuer**, the `issuer` key (by default
+  the service's realm), through its OpenID Connect Discovery metadata, so a
+  move of the token endpoint needs no code change.
+- **Keeps the token fresh.** The token is cached and a new one is fetched
+  inside a 60 second margin before it expires, so a run on any day succeeds
+  with nobody present.
 - **Subscribes by canonical identifier.** An entry for a system outside the
   subscription is reported as skipped, and a system the service offers only as
   Ontoserver's binary index is reported as not syndicable, both with the
@@ -38,11 +40,11 @@ correction its files need.
 
 ## Credentials
 
-The account is the deployment's, and it never enters the add-on's
+The client is the deployment's, and it never enters the add-on's
 configuration block. The synchronisation service reads it from its own
-`[nts]` section (`FERROTERM_SYNC__NTS__USERNAME`, `FERROTERM_SYNC__NTS__PASSWORD`,
-`FERROTERM_SYNC__NTS__CLIENT_ID`, `FERROTERM_SYNC__NTS__CLIENT_SECRET`, each
-secret also as a mounted `_file`) and hands it to `NtsSource::new`. The
+`[nts]` section (`FERROTERM_SYNC__NTS__CLIENT_ID`,
+`FERROTERM_SYNC__NTS__CLIENT_SECRET`, the secret also as a mounted `_file`)
+and hands it to `NtsSource::new`. The
 secrets are held in `ferrohealth-secret`'s `Secret`, so no rendering of the
 configuration, the credentials, or the source prints one.
 

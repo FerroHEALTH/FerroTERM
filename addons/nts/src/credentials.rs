@@ -1,98 +1,57 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The account the add-on authenticates with, handed in by the service.
+//! The client the add-on authenticates as, handed in by the service.
 //!
-//! The service issues a personal account, so the secret is the deployment's to
-//! hold. The synchronisation service reads it from its own configuration,
-//! inline or from a mounted `<key>_file`, and hands it over; no rendering of
-//! these types prints it.
+//! The service issues a confidential client for the client credentials grant
+//! (RFC 6749 §4.4), so the secret is the deployment's to hold. The
+//! synchronisation service reads it from its own configuration, inline or
+//! from a mounted `<key>_file`, and hands it over; no rendering of these types
+//! prints it.
 
 use core::fmt;
 
 use ferrohealth_secret::secret::Secret;
 
-/// The client identifier the service documents for a command-line client.
-///
-/// Nictiz documents the password grant with this client for a personal
-/// account
-/// (<https://www.nictiz.nl/publicaties/nationale-terminologie-server-handleiding-voor-nieuwe-gebruikers/>).
-pub const DEFAULT_CLIENT_ID: &str = "cli_client";
-
 /// Credentials the add-on cannot authenticate with.
 #[derive(Debug, thiserror::Error)]
 pub enum CredentialError {
-    /// Neither grant the service admits is fully configured.
-    #[error("no usable grant: configure a client secret, or an account name and password")]
-    NoUsableGrant,
+    /// The client identifier or the client secret is empty.
+    #[error("no usable client: configure a client identifier and a client secret")]
+    NoUsableClient,
 }
 
-/// The account the add-on authenticates with.
+/// The client the add-on authenticates as.
 ///
-/// The `Debug` rendering names which grants are configured and never a secret,
-/// so the whole source can be logged.
+/// The `Debug` rendering names the client and never the secret, so the whole
+/// source can be logged.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Credentials {
-    /// The OAuth 2 client identifier.
+    /// The OAuth 2 client identifier (RFC 6749 §2.2).
     pub client_id: String,
-    /// The client secret, when the deployment has one.
-    pub client_secret: Option<Secret>,
-    /// The account name for the password grant.
-    pub username: Option<String>,
-    /// The account password for the password grant.
-    pub password: Option<Secret>,
-}
-
-impl Default for Credentials {
-    fn default() -> Self {
-        Self {
-            client_id: String::from(DEFAULT_CLIENT_ID),
-            client_secret: None,
-            username: None,
-            password: None,
-        }
-    }
+    /// The client secret (RFC 6749 §2.3.1).
+    pub client_secret: Secret,
 }
 
 impl Credentials {
-    /// Returns the credentials when at least one grant is fully configured.
+    /// Returns the credentials when both the identifier and the secret are
+    /// set.
     ///
     /// # Errors
     ///
-    /// Returns [`CredentialError::NoUsableGrant`] when neither grant is fully
-    /// configured.
+    /// Returns [`CredentialError::NoUsableClient`] when either is empty.
     pub fn usable(self) -> Result<Self, CredentialError> {
-        if self.has_client_credentials() || self.has_password_grant() {
-            Ok(self)
+        if self.client_id.is_empty() || self.client_secret.is_empty() {
+            Err(CredentialError::NoUsableClient)
         } else {
-            Err(CredentialError::NoUsableGrant)
+            Ok(self)
         }
-    }
-
-    /// Whether the client-credentials grant can be attempted.
-    #[must_use]
-    pub fn has_client_credentials(&self) -> bool {
-        self.client_secret
-            .as_ref()
-            .is_some_and(|secret| !secret.is_empty())
-    }
-
-    /// Whether the password grant can be attempted.
-    #[must_use]
-    pub fn has_password_grant(&self) -> bool {
-        self.username.as_ref().is_some_and(|name| !name.is_empty()) && self.password.is_some()
     }
 }
 
 impl fmt::Debug for Credentials {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Credentials(client_id={}, client_credentials={}, password={})",
-            self.client_id,
-            self.has_client_credentials(),
-            self.has_password_grant()
-        )
+        write!(f, "Credentials(client_id={})", self.client_id)
     }
 }
 
@@ -104,71 +63,39 @@ mod tests {
 
     fn filled() -> Credentials {
         Credentials {
-            client_id: String::from("cli_client"),
-            client_secret: Some(Secret::new("a-client-secret")),
-            username: Some(String::from("an-account")),
-            password: Some(Secret::new("a-password")),
+            client_id: String::from("a-client"),
+            client_secret: Secret::new("a-client-secret"),
         }
     }
 
     #[test]
-    fn debug_names_the_grants_and_no_secret() {
+    fn debug_names_the_client_and_no_secret() {
         let rendered = format!("{:?}", filled());
         assert!(
             !rendered.contains("a-client-secret"),
             "the client secret must never be rendered"
         );
-        assert!(
-            !rendered.contains("a-password"),
-            "the password must never be rendered"
-        );
-        assert!(
-            !rendered.contains("an-account"),
-            "the account name must never be rendered"
-        );
-        assert!(
-            rendered.contains("client_credentials=true"),
-            "the rendering states which grants are configured: {rendered}"
-        );
+        assert!(rendered.contains("client_id=a-client"), "{rendered}");
     }
 
     #[test]
-    fn an_empty_secret_is_no_client_credentials_grant() {
-        let credentials = Credentials {
-            client_secret: Some(Secret::new("")),
-            ..filled()
-        };
-        assert!(
-            !credentials.has_client_credentials(),
-            "an empty secret configures nothing"
-        );
-        assert!(
-            credentials.has_password_grant(),
-            "the password grant is still configured"
-        );
-    }
-
-    #[test]
-    fn credentials_without_a_full_grant_are_refused() {
-        let credentials = Credentials {
-            username: Some(String::from("an-account")),
-            password: Some(Secret::new("a-password")),
-            ..Credentials::default()
-        };
-        assert_eq!(
-            credentials.client_id, "cli_client",
-            "the documented client identifier is the default"
-        );
-        assert!(credentials.has_password_grant());
-        assert!(!credentials.has_client_credentials());
-        assert!(credentials.usable().is_ok());
+    fn an_empty_secret_or_identifier_is_refused() {
+        assert!(filled().usable().is_ok());
         assert!(matches!(
             Credentials {
-                username: Some(String::from("an-account")),
-                ..Credentials::default()
+                client_secret: Secret::new(""),
+                ..filled()
             }
             .usable(),
-            Err(CredentialError::NoUsableGrant)
+            Err(CredentialError::NoUsableClient)
+        ));
+        assert!(matches!(
+            Credentials {
+                client_id: String::new(),
+                ..filled()
+            }
+            .usable(),
+            Err(CredentialError::NoUsableClient)
         ));
     }
 }

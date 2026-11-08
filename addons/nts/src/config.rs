@@ -25,13 +25,12 @@ pub const FEED_PATH: &str = "/synd/syndication.xml";
 /// answer here.
 pub const FHIR_API_PATH: &str = "/fhir";
 
-/// The path of the SMART configuration document under the base URL.
+/// The issuer identifier of the service's authorization server.
 ///
-/// The document is served beside the FHIR endpoint, which is where SMART App
-/// Launch places it: "the well-known URI `.well-known/smart-configuration` of
-/// the FHIR base URL"
-/// (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
-pub const DISCOVERY_PATH: &str = "/fhir/.well-known/smart-configuration";
+/// The client reads the token endpoint from this issuer's metadata
+/// (OpenID Connect Discovery 1.0 §4), whose `issuer` member names this value
+/// exactly (measured 2026-11-08).
+pub const NTS_ISSUER: &str = "https://terminologieserver.nl/authorisation/auth/realms/nictiz";
 
 /// The canonical identifiers of the systems the service publishes.
 ///
@@ -99,6 +98,9 @@ pub struct NtsConfig {
     pub name: String,
     /// The service's base URL, without a trailing slash.
     pub base_url: String,
+    /// The issuer identifier of the authorization server the tokens come
+    /// from.
+    pub issuer: String,
     /// The feed's address, when it is not [`FEED_PATH`] under the base URL.
     pub feed_url: Option<String>,
     /// The FHIR endpoint's address, when it is not [`FHIR_API_PATH`] under
@@ -117,6 +119,7 @@ impl Default for NtsConfig {
         Self {
             name: String::from("nts"),
             base_url: String::from(NTS_BASE_URL),
+            issuer: String::from(NTS_ISSUER),
             feed_url: None,
             fhir_api_url: None,
             fhir_api: true,
@@ -158,12 +161,6 @@ impl NtsConfig {
         })
     }
 
-    /// The address of the SMART configuration document.
-    #[must_use]
-    pub fn discovery_url(&self) -> String {
-        format!("{}{DISCOVERY_PATH}", self.base_url.trim_end_matches('/'))
-    }
-
     /// The subscription the configuration describes.
     #[must_use]
     pub fn subscription(&self) -> Subscription {
@@ -201,9 +198,8 @@ mod tests {
             "the default feed is the one the service publishes"
         );
         assert_eq!(
-            config.discovery_url(),
-            "https://terminologieserver.nl/fhir/.well-known/smart-configuration",
-            "discovery sits beside the FHIR endpoint"
+            config.issuer, "https://terminologieserver.nl/authorisation/auth/realms/nictiz",
+            "the tokens come from the service's own issuer"
         );
         assert_eq!(
             config.fhir_api_url().as_deref(),
@@ -232,9 +228,9 @@ mod tests {
             "a second deployment is this add-on pointed elsewhere"
         );
         assert_eq!(
-            config.discovery_url(),
-            "https://apps.example.invalid/ontoserver/fhir/.well-known/smart-configuration",
-            "discovery follows the base URL"
+            config.fhir_api_url().as_deref(),
+            Some("https://apps.example.invalid/ontoserver/fhir"),
+            "the FHIR endpoint follows the base URL"
         );
     }
 

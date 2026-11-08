@@ -64,6 +64,10 @@ pub enum Authorization {
         /// The account's secret.
         password: String,
     },
+    /// The request carries this `Authorization` field value as given
+    /// (RFC 9110 §11.6.2), such as the bearer token an OAuth 2.0 client
+    /// rendered.
+    Field(reqwest::header::HeaderValue),
 }
 
 impl Authorization {
@@ -73,6 +77,7 @@ impl Authorization {
             Self::Open => request,
             Self::Bearer(token) => request.bearer_auth(token),
             Self::Basic { user, password } => request.basic_auth(user, Some(password)),
+            Self::Field(value) => request.header(reqwest::header::AUTHORIZATION, value.clone()),
         }
     }
 
@@ -83,6 +88,7 @@ impl Authorization {
             Self::Open => "open",
             Self::Bearer(_) => "bearer",
             Self::Basic { .. } => "basic",
+            Self::Field(_) => "field",
         }
     }
 }

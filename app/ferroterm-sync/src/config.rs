@@ -82,44 +82,30 @@ pub struct SourceConfig {
     pub config: toml::Table,
 }
 
-/// `[nts]`: the account the Nationale Terminologie Server add-on
-/// authenticates with.
+/// `[nts]`: the client the Nationale Terminologie Server add-on authenticates
+/// as with the client credentials grant (RFC 6749 §4.4).
 ///
 /// Each secret is set inline or through its `<key>_file` sibling, which names
 /// a mounted file, never both.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[expect(
+    clippy::struct_field_names,
+    reason = "the keys are the OAuth 2.0 client parameters, named as RFC 6749 §2.3.1 names them"
+)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct NtsSection {
     /// The OAuth 2 client identifier.
     pub client_id: String,
-    /// The client secret, when the deployment has one.
+    /// The client secret.
     pub client_secret: Option<Secret>,
     /// A file holding the client secret.
     pub client_secret_file: Option<PathBuf>,
-    /// The account name for the password grant.
-    pub username: Option<String>,
-    /// The account password for the password grant.
-    pub password: Option<Secret>,
-    /// A file holding the account password.
-    pub password_file: Option<PathBuf>,
-}
-
-impl Default for NtsSection {
-    fn default() -> Self {
-        Self {
-            client_id: String::from(addon_nts::credentials::DEFAULT_CLIENT_ID),
-            client_secret: None,
-            client_secret_file: None,
-            username: None,
-            password: None,
-            password_file: None,
-        }
-    }
 }
 
 impl NtsSection {
-    /// The account this section names, every secret read inline or from its
-    /// file.
+    /// The client this section names, its secret read inline or from its
+    /// file; an absent secret reads as empty, which the add-on refuses as no
+    /// usable client.
     ///
     /// # Errors
     ///
@@ -132,13 +118,8 @@ impl NtsSection {
                 "nts.client_secret",
                 self.client_secret.clone(),
                 self.client_secret_file.as_deref(),
-            )?,
-            username: self.username.clone(),
-            password: read_secret(
-                "nts.password",
-                self.password.clone(),
-                self.password_file.as_deref(),
-            )?,
+            )?
+            .unwrap_or_default(),
         })
     }
 }
@@ -362,7 +343,7 @@ impl Config {
 mod tests {
     use std::collections::BTreeMap;
 
-    use super::{Activation, Config, ConfigError, Secret};
+    use super::{Activation, Config, ConfigError};
 
     fn environment(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
         pairs
@@ -459,30 +440,29 @@ base_url = "https://example.invalid"
     }
 
     #[test]
-    fn the_nts_account_reads_inline_or_from_a_file_never_both()
+    fn the_nts_client_secret_reads_inline_or_from_a_file_never_both()
     -> Result<(), Box<dyn core::error::Error>> {
         let dir = tempfile::tempdir()?;
-        let path = dir.path().join("password");
-        std::fs::write(&path, "a-password\n")?;
+        let path = dir.path().join("client-secret");
+        std::fs::write(&path, "a-client-secret\n")?;
         let config = Config::from_sources(
-            Some("[nts]\nusername = \"an-account\"\n"),
+            Some("[nts]\nclient_id = \"a-client\"\n"),
             &environment(&[(
-                "FERROTERM_SYNC__NTS__PASSWORD_FILE",
+                "FERROTERM_SYNC__NTS__CLIENT_SECRET_FILE",
                 path.to_str().ok_or("a UTF-8 path")?,
             )]),
         )?;
         let credentials = config.nts.credentials()?;
-        assert_eq!(credentials.client_id, "cli_client");
+        assert_eq!(credentials.client_id, "a-client");
         assert_eq!(
-            credentials.password.as_ref().map(Secret::expose),
-            Some("a-password"),
+            credentials.client_secret.expose(),
+            "a-client-secret",
             "the trailing line ending of the file is not part of the secret"
         );
-        assert!(credentials.has_password_grant());
         let both = Config::from_sources(
-            Some("[nts]\npassword = \"inline\"\n"),
+            Some("[nts]\nclient_secret = \"inline\"\n"),
             &environment(&[(
-                "FERROTERM_SYNC__NTS__PASSWORD_FILE",
+                "FERROTERM_SYNC__NTS__CLIENT_SECRET_FILE",
                 path.to_str().ok_or("a UTF-8 path")?,
             )]),
         )?;
@@ -491,8 +471,22 @@ base_url = "https://example.invalid"
             "a secret set inline and through its file is refused"
         );
         let rendered = format!("{:?}", config.nts);
-        assert!(!rendered.contains("a-password"), "{rendered}");
+        assert!(!rendered.contains("a-client-secret"), "{rendered}");
         Ok(())
+    }
+
+    #[test]
+    fn the_password_grant_keys_are_refused() {
+        for key in [
+            "username = \"an-account\"",
+            "password = \"a-password\"",
+            "password_file = \"/run/secrets/nts\"",
+        ] {
+            assert!(
+                Config::from_sources(Some(&format!("[nts]\n{key}\n")), &BTreeMap::new()).is_err(),
+                "the add-on takes no password grant: {key}"
+            );
+        }
     }
 
     #[test]

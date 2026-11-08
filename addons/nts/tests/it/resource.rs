@@ -21,7 +21,7 @@ const CLEAN_CODE_SYSTEM: &str =
 async fn service(body: &'static str) -> MockServer {
     let server = MockServer::start().await;
     support::mount_discovery(&server).await;
-    support::token_mock("password")
+    support::token_mock("client_credentials")
         .respond_with(support::issued("access-first", 300, "refresh-first"))
         .mount(&server)
         .await;
@@ -49,8 +49,8 @@ fn link(server: &MockServer, body: &str) -> ContentLink {
 #[tokio::test]
 async fn a_string_experimental_is_corrected_and_recorded() {
     let server = service(MAP_WITH_STRING).await;
-    let clock = support::TestClock::at("2026-09-22T09:00:00Z");
-    let source = support::source(&server, support::password_account(), clock);
+    let clock = support::TestClock::start();
+    let source = support::source(&server, support::client_account(), clock);
     let directory = tempfile::tempdir().expect("a temporary directory");
     let destination = directory.path().join("ConceptMap-a-map.json");
 
@@ -92,8 +92,8 @@ async fn a_string_experimental_is_corrected_and_recorded() {
 #[tokio::test]
 async fn a_resource_that_needs_nothing_lands_byte_identical() {
     let server = service(CLEAN_CODE_SYSTEM).await;
-    let clock = support::TestClock::at("2026-09-22T09:00:00Z");
-    let source = support::source(&server, support::password_account(), clock);
+    let clock = support::TestClock::start();
+    let source = support::source(&server, support::client_account(), clock);
     let directory = tempfile::tempdir().expect("a temporary directory");
     let destination = directory.path().join("CodeSystem-a-system.json");
 
@@ -117,8 +117,8 @@ async fn a_resource_that_needs_nothing_lands_byte_identical() {
 #[tokio::test]
 async fn a_resource_whose_digest_does_not_match_never_lands() {
     let server = service(MAP_WITH_STRING).await;
-    let clock = support::TestClock::at("2026-09-22T09:00:00Z");
-    let source = support::source(&server, support::password_account(), clock);
+    let clock = support::TestClock::start();
+    let source = support::source(&server, support::client_account(), clock);
     let directory = tempfile::tempdir().expect("a temporary directory");
     let destination = directory.path().join("ConceptMap-a-map.json");
 
