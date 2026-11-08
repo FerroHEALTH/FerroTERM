@@ -119,7 +119,7 @@ prints every key with where it came from, every secret as `***`.
 | `build_command` | `ferroterm-build` | the offline build, on `PATH` or by path |
 | `[server_admin_credentials.oauth]` | none | the client credentials grant of the reload call (see [below](#the-credential-of-the-reload-call)) |
 | `[auth]` | on, no issuer | the credentials the admin listener admits (see [The admin listener](#the-admin-listener)) |
-| `[nts]` | no account | the account the NTS add-on authenticates with (see [Credentials](#credentials)) |
+| `[nts]` | no client | the client the NTS add-on authenticates as (see [Credentials](#credentials)) |
 | `[telemetry]` | `auto` format, no export | the console log's `format` and `filter` (`RUST_LOG` sets the filter too), and the OTLP export of the service's metrics, the same section the server reads (see [Telemetry](configuration.md#telemetry)) |
 
 A `[[source]]` entry names the add-on that reads a service and carries that
@@ -395,36 +395,36 @@ for.
 
 ### Credentials
 
-The service hands the add-on the account its `[nts]` section names. Each
-secret is set inline or through its `_file` sibling, which names a mounted
-file whose trailing line ending is dropped; setting both refuses the start.
-Keep the secrets out of the file you commit: set them as variables or mount
-them.
+The add-on authenticates with the OAuth 2.0 client credentials grant
+(RFC 6749 §4.4), as a confidential client Nictiz issues to your deployment;
+ask Nictiz for one beside your account. The NTS realm publishes the grant, and
+Nictiz's own authentication examples use it
+(<https://github.com/terminologieserver/ontoserver_authentication_examples>).
+The password grant the Nictiz manual describes for a personal account is not
+supported: RFC 9700 §2.4 says it MUST NOT be used.
+
+The service hands the add-on the client its `[nts]` section names. The secret
+is set inline or through its `_file` sibling, which names a mounted file whose
+trailing line ending is dropped; setting both refuses the start. Keep the
+secret out of the file you commit: set it as a variable or mount it.
 
 | Key (variable) | What it holds |
 |---|---|
-| `nts.client_id` (`FERROTERM_SYNC__NTS__CLIENT_ID`) | The OAuth 2 client, `cli_client` by default |
-| `nts.client_secret` (`FERROTERM_SYNC__NTS__CLIENT_SECRET`), or `nts.client_secret_file` | A client secret, when your deployment has one |
-| `nts.username` (`FERROTERM_SYNC__NTS__USERNAME`) | Your account name |
-| `nts.password` (`FERROTERM_SYNC__NTS__PASSWORD`), or `nts.password_file` | Your account password |
+| `nts.client_id` (`FERROTERM_SYNC__NTS__CLIENT_ID`) | The OAuth 2 client identifier Nictiz issued |
+| `nts.client_secret` (`FERROTERM_SYNC__NTS__CLIENT_SECRET`), or `nts.client_secret_file` | Its client secret |
 
 ```toml
 [nts]
-username = "your-account"
-password_file = "/run/secrets/nts-password"
+client_id = "your-client"
+client_secret_file = "/run/secrets/nts-client-secret"
 ```
 
-The add-on reads the token endpoint from
-`https://terminologieserver.nl/fhir/.well-known/smart-configuration`, which
-redirects (`301`) to the Keycloak discovery document at
-`https://terminologieserver.nl/authorisation/auth/realms/nictiz/.well-known/openid-configuration`,
-and logs in with the grant Nictiz documents: the password grant with
-`cli_client`. If you configured a client secret, the client-credentials grant
-is tried first and falls back to the password grant when the realm refuses it.
-The realm issues an access token and a refresh token that both live 24 hours
-(`expires_in` and `refresh_expires_in` of 86400, measured 2026-09-25). The
-access token is refreshed a minute before it expires, and a refused refresh
-logs in again from the stored credentials. An unattended run on any day needs
+The add-on reads the token endpoint from the realm's OpenID Connect Discovery
+document, at
+`https://terminologieserver.nl/authorisation/auth/realms/nictiz/.well-known/openid-configuration`
+(the `issuer` key of the `[[source]]` block, which defaults to that realm),
+through `ferrohealth-smart`'s token source. The token is cached and a new one
+is fetched a minute before it expires, so an unattended run on any day needs
 no person.
 
 ### The first run
@@ -472,8 +472,10 @@ run made available.
 ### What is verified so far
 
 The feed hop ran against the live service on 2026-09-25 with a personal
-account (the record is on issue #602): discovery, the password grant, the
-token lifetimes, and the listing are confirmed as described above. The run
+account (the record is on issue #602): the token endpoint, the token
+lifetimes, and the listing were confirmed with the password grant the add-on
+then used. The client credentials grant it uses now has not yet run against
+the live service. The run
 also showed that the feed carries only the SNOMED CT binary index, so the RF2
 lane takes nothing from the NTS until Nictiz publishes RF2 there; the FHIR
 resources are taken through the API lane instead.

@@ -19,7 +19,9 @@ use terminology_syndication::model::{CategoryTerm, ContentLink, Feed};
 use terminology_syndication::select::{Holdings, Selection, Subscription};
 use terminology_syndication::source::{Authorization, BoxFuture, Source, SourceError};
 
-use crate::auth::{Authenticator, Clock, SystemClock};
+use ferrohealth_smart::client::cache::{Clock, SystemClock};
+
+use crate::auth::{AuthError, Authenticator};
 use crate::config::NtsConfig;
 use crate::credentials::{CredentialError, Credentials};
 use crate::fixup::{Fixup, FixupError};
@@ -30,6 +32,9 @@ pub enum NtsError {
     /// The credentials could not be read.
     #[error("the credentials could not be read")]
     Credentials(#[from] CredentialError),
+    /// The token source could not be built.
+    #[error("the token source could not be built")]
+    Auth(#[from] AuthError),
     /// The HTTP client could not be built.
     #[error("the HTTP client could not be built")]
     Client {
@@ -100,38 +105,33 @@ impl NtsSource {
     ///
     /// # Errors
     ///
-    /// Returns [`NtsError::Credentials`] when the credentials configure no
-    /// usable grant, and [`NtsError::Client`] when the HTTP client cannot be
-    /// built.
+    /// Returns [`NtsError::Credentials`] when the credentials name no usable
+    /// client, [`NtsError::Client`] when the HTTP client cannot be built, and
+    /// [`NtsError::Auth`] when the token source cannot be.
     pub fn new(config: &NtsConfig, credentials: Credentials) -> Result<Self, NtsError> {
-        let credentials = credentials.usable()?;
         let client = reqwest::Client::builder()
             .build()
             .map_err(|source| NtsError::Client { source })?;
-        Ok(Self::with_parts(
-            config,
-            credentials,
-            client,
-            Arc::new(SystemClock),
-        ))
+        Self::with_parts(config, credentials, client, Arc::new(SystemClock))
     }
 
-    /// The add-on with its HTTP client, credentials, and clock supplied.
-    #[must_use]
+    /// The add-on with its HTTP client, credentials, and the clock its token
+    /// expiry is read against supplied.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NtsError::Credentials`] when the credentials name no usable
+    /// client, and [`NtsError::Auth`] when the token source cannot be built.
     pub fn with_parts(
         config: &NtsConfig,
         credentials: Credentials,
         client: reqwest::Client,
         clock: Arc<dyn Clock>,
-    ) -> Self {
-        let authenticator = Authenticator::new(
-            config.name.clone(),
-            config.discovery_url(),
-            client.clone(),
-            credentials,
-            clock,
-        );
-        Self {
+    ) -> Result<Self, NtsError> {
+        let credentials = credentials.usable()?;
+        let authenticator =
+            Authenticator::new(config.name.clone(), &config.issuer, &credentials, clock)?;
+        Ok(Self {
             name: config.name.clone(),
             feed_url: config.feed_url(),
             fhir_api_url: config.fhir_api_url(),
@@ -139,7 +139,7 @@ impl NtsSource {
             authenticator,
             subscription: config.subscription(),
             yields: config.yields(),
-        }
+        })
     }
 
     /// The subscription this source runs under.
@@ -228,13 +228,13 @@ impl NtsSource {
     /// The bearer token every request to this service carries.
     fn bearer(&self) -> BoxFuture<'_, Result<Authorization, SourceError>> {
         Box::pin(async move {
-            let token = self.authenticator.access_token().await.map_err(|source| {
+            let field = self.authenticator.authorization().await.map_err(|source| {
                 SourceError::Authentication {
                     source_name: self.name.clone(),
                     source: Box::new(source),
                 }
             })?;
-            Ok(Authorization::Bearer(token))
+            Ok(Authorization::Field(field))
         })
     }
 }
