@@ -21,6 +21,7 @@ mod admin;
 mod api;
 mod auth;
 mod credentials;
+mod exit;
 mod failure;
 mod lanes;
 mod manual;

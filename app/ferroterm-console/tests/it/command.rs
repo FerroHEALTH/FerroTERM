@@ -10,7 +10,11 @@ use std::fmt;
 use std::path::Path;
 use std::process::ExitCode;
 
-use ferroterm_console::command::{EXIT_CONFIG, chain, run};
+use ferrohealth_server::run::chain;
+use ferroterm_console::command::run;
+
+/// The exit code of a configuration the console refuses.
+const EX_CONFIG: u8 = ferrohealth_server::run::EXIT_CONFIG.get();
 
 /// Runs the binary with `args` after its name.
 fn exit(args: &[&str]) -> ExitCode {
@@ -52,11 +56,11 @@ fn a_configuration_that_does_not_resolve_exits_with_ex_config() {
     let dir = tempfile::tempdir().expect("a directory");
     let path = config_file(dir.path(), "[ferroterm]\ntimeout = \"0s\"\n");
     assert_eq!(
-        ExitCode::from(EXIT_CONFIG),
+        ExitCode::from(EX_CONFIG),
         exit(&["--config", &path, "config", "check"])
     );
     assert_eq!(
-        ExitCode::from(EXIT_CONFIG),
+        ExitCode::from(EX_CONFIG),
         exit(&["--config", &path, "serve"]),
         "serve refuses it before it binds anything"
     );
@@ -67,7 +71,7 @@ fn a_configuration_file_that_does_not_parse_exits_with_ex_config() {
     let dir = tempfile::tempdir().expect("a directory");
     let path = config_file(dir.path(), "[server]\nunknown_key = 1\n");
     assert_eq!(
-        ExitCode::from(EXIT_CONFIG),
+        ExitCode::from(EX_CONFIG),
         exit(&["--config", &path, "config", "check"])
     );
 }
@@ -77,7 +81,7 @@ fn a_configuration_file_that_cannot_be_read_exits_with_ex_config() {
     let dir = tempfile::tempdir().expect("a directory");
     let missing = dir.path().join("absent.toml");
     assert_eq!(
-        ExitCode::from(EXIT_CONFIG),
+        ExitCode::from(EX_CONFIG),
         exit(&["--config", &missing.to_string_lossy(), "config", "check"])
     );
 }
