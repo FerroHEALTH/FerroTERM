@@ -17,6 +17,60 @@ fragments here under the version and its date.
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-11-09
+
+### Changed
+
+- `SECURITY.md` and the post-market record name `security@cadasto.com` as
+  the email route for a vulnerability report, in place of
+  `info@cadasto.com`, which stays the address for licensing and other
+  business questions (#1175).
+- The server, the synchronisation service and the console read every span of
+  time as a duration and every amount of data as a size (ferrohealth-config
+  0.3): a whole number and a UCUM unit (`"500ms"`, `"30s"`, `"10min"`,
+  `"12h"`, `"7d"`) or an IEC binary unit (`"1MiB"`). A key that holds one no
+  longer names its unit, and in 0.4.4 alone the old key refuses the start,
+  all of them at once, each naming its replacement. Upgrade step: in `[server]`, write
+  `request_timeout`, `header_read_timeout`, `idle_timeout`, `body_limit`,
+  `drain_delay`, `shutdown_timeout`, `retry_after`, `compression_min_size`
+  and `[server.tls] reload_interval` for the keys ending in `_ms`, `_s` or
+  `_bytes`; on each `[[auth.issuer]]`, `clock_skew`, `jwks_max_age`,
+  `jwks_refresh_interval`, `timeout` and `introspection.cache_max_age`; in
+  `[auth.basic]`, `cache_ttl`; on `[server_admin_credentials.oauth]`,
+  `refresh_margin` and `timeout`; in the console, `[ferroterm] timeout`,
+  `[oidc] timeout` and `[session] sign_in_timeout`, `idle_timeout` and
+  `absolute_timeout`. The `FERROTERM__…`, `FERROTERM_SYNC__…` and
+  `FERROTERM_CONSOLE__…` variables follow the keys (#1182).
+- `[schedule] every` of the synchronisation service is a duration of the
+  same form, so `"24h"` and `"90min"` read as before, while the ISO 8601
+  `"PT24H"`, a compound such as `"1h 30m"` and `m` for minutes refuse the
+  start. Upgrade step: write one whole number and one unit, `min` for
+  minutes (#1182).
+- Every outbound TLS table takes the same keys (`trust_roots_file`,
+  `client_identity_file` or `client_identity`, `min_version`), read once at
+  start through ferrohealth-server: `[auth.tls]` replaces `auth.ca_file`,
+  `[telemetry.otlp.tls]` replaces `telemetry.otlp.trust_roots_file` and
+  `client_identity_file`, a client credentials grant's `tls` table replaces
+  its `ca_file`, `client_certificate_file` and `client_key_file`, and the
+  console's `[oidc.tls]` replaces `oidc.ca_file` and `[oidc.tls]
+  client_certificate`, `client_key` and `client_key_file`. In 0.4.4 alone,
+  each old key refuses the start naming its replacement. Upgrade step: move each file
+  under the table's `tls` key, and join a separate certificate and key into
+  one PEM for `client_identity_file` (#1182).
+
+### Security
+
+Shipped with functional changes because: the fixes arrive in ferrohealth-smart 0.13, whose line FerroTERM takes at 0.14 together with the configuration types that release requires, so the advisories and the key changes cannot ship apart.
+
+- ferrohealth-smart moves from 0.10.1 to 0.14.0. A token, a key set, a token
+  endpoint answer or an introspection or metadata body the server, the
+  synchronisation service or the console refused could reach their log
+  through the error that refused it: the JSON reader's error quoted the
+  value it stopped at (GHSA-mhv7-3975-6xq3, fixed in 0.13.0), and a refused
+  key set, introspection or metadata answer kept its body up to 1 MiB in an
+  error whose `Debug` printed it (GHSA-5qm7-v4fw-p2v9, fixed in 0.13.1).
+  Affected: every FerroTERM release up to 0.4.2 (CWE-532, CWE-209) (#1182).
+
 ## [0.4.3] - 2026-11-09
 
 ### Changed
@@ -2667,7 +2721,8 @@ binary answers `GET /health` only.
 - No existing Rust terminology or FHIR crate is a dependency; the README
   records the evaluation and the reasons.
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.3...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.4...HEAD
+[0.4.4]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.0...v0.4.1
