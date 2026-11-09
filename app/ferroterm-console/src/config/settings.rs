@@ -9,7 +9,6 @@ use std::time::Duration;
 
 use ferrohealth_config::loader::Loaded;
 use ferrohealth_config::provenance::{Provenance, Source};
-use ferrohealth_config::removed::Removals;
 use ferrohealth_session::config::{OidcSection, OidcSettings, SessionSection, SessionSettings};
 use ferrohealth_smart::config::ServerTls;
 use ferrohealth_telemetry::section::TelemetrySection;
@@ -107,8 +106,7 @@ impl Config {
     /// Checks every value and reads every `_file` secret.
     ///
     /// # Errors
-    /// Returns [`Error::Removed`] for a key the console no longer reads,
-    /// [`Error::Address`] for a listen address that does not parse,
+    /// Returns [`Error::Address`] for a listen address that does not parse,
     /// [`Error::Locale`] for a `server.locale` that is no language tag,
     /// [`Error::Missing`], [`Error::Url`] and [`Error::UrlShape`] for a URL
     /// that is absent, does not parse or is not one its key admits,
@@ -118,14 +116,6 @@ impl Config {
     /// `session.secure_cookie = false` on a console that is not `http` on
     /// loopback.
     pub fn resolve(&self) -> Result<Settings, Error> {
-        // TODO(#1184): the refusal ships in 0.4.4 alone; delete it in 0.4.5.
-        let mut removals = Removals::new();
-        removals.replaced(
-            self.ferroterm.timeout_ms,
-            "ferroterm.timeout_ms",
-            "ferroterm.timeout",
-        );
-        removals.finish()?;
         let listen = self
             .server
             .listen
@@ -385,19 +375,11 @@ mod tests {
     }
 
     #[test]
-    fn a_key_the_console_retired_is_refused_naming_its_replacement() {
-        let config =
+    fn a_retired_key_is_an_unknown_key_and_a_zero_timeout_is_refused() {
+        let refused =
             Config::from_sources(Some("[ferroterm]\ntimeout_ms = 30000\n"), &BTreeMap::new())
-                .expect("the strict load still reads a retired key");
-        let Err(Error::Removed(refused)) = config.resolve() else {
-            panic!("`ferroterm.timeout_ms` is refused");
-        };
-        assert!(
-            refused
-                .to_string()
-                .starts_with("ferroterm.timeout_ms was replaced by ferroterm.timeout"),
-            "{refused}"
-        );
+                .expect_err("the strict load refuses a key the console does not read");
+        assert!(matches!(refused, Error::Load(_)), "{refused:?}");
         assert!(
             Config::from_sources(Some("[ferroterm]\ntimeout = \"0s\"\n"), &BTreeMap::new())
                 .expect("reads")

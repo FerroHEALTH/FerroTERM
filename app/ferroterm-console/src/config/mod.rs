@@ -52,7 +52,6 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use ferrohealth_config::loader::{Loaded, Loader};
-use ferrohealth_config::removed::Removed;
 use ferrohealth_config::units::Duration;
 use ferrohealth_session::config::{OidcSection, SessionSection};
 use ferrohealth_telemetry::section::TelemetrySection;
@@ -166,9 +165,6 @@ pub struct Ferroterm {
     pub admin_url: Option<String>,
     /// How long one call to the server may take, a duration such as `30s`.
     pub timeout: Duration,
-    /// `timeout_ms`, which `timeout` replaced in 0.4.4: refused, naming it.
-    // TODO(#1184): the refusal ships in 0.4.4 alone; delete it in 0.4.5.
-    pub timeout_ms: Removed,
 }
 
 impl Default for Ferroterm {
@@ -179,7 +175,6 @@ impl Default for Ferroterm {
             sync_url: None,
             admin_url: None,
             timeout: Duration::from_secs(30),
-            timeout_ms: Removed::default(),
         }
     }
 }
