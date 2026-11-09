@@ -17,7 +17,7 @@ use crate::support;
 /// The `Authorization` field value a source would put on its next request.
 async fn authorization(source: &addon_nts::source::NtsSource) -> String {
     match source.listing_auth().await.expect("a token is issued") {
-        Authorization::Field(value) => value.to_str().expect("a visible value").to_owned(),
+        Authorization::Field(value) => value.expose().to_str().expect("a visible value").to_owned(),
         other => panic!("the service is challenged with a bearer token, not {other:?}"),
     }
 }

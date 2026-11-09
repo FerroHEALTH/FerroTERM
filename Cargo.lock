@@ -4087,6 +4087,7 @@ dependencies = [
 name = "terminology-syndication"
 version = "0.1.147"
 dependencies = [
+ "ferrohealth-secret",
  "jiff",
  "md-5",
  "quick-xml",

@@ -34,6 +34,9 @@ use core::future::Future;
 use core::pin::Pin;
 use std::path::Path;
 
+use ferrohealth_secret::redacted::Redacted;
+use ferrohealth_secret::secret::Secret;
+
 use crate::download::{DownloadError, Fetched};
 use crate::model::{CategoryTerm, ContentLink, Feed};
 use crate::parse::ParseError;
@@ -48,26 +51,27 @@ pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 /// What a request carries to prove it may read.
 ///
-/// The `Debug` rendering names the scheme and never the secret, so a source
-/// can be logged whole.
-#[derive(Clone, PartialEq, Eq, Default)]
+/// Every secret is held in a `ferrohealth-secret` type, so the `Debug`
+/// rendering names the scheme and never the secret, and a source can be
+/// logged whole.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum Authorization {
     /// The request carries nothing; the service is open.
     #[default]
     Open,
     /// The request carries an `Authorization: Bearer` token.
-    Bearer(String),
+    Bearer(Secret),
     /// The request carries HTTP basic credentials.
     Basic {
         /// The account name.
         user: String,
         /// The account's secret.
-        password: String,
+        password: Secret,
     },
     /// The request carries this `Authorization` field value as given
     /// (RFC 9110 §11.6.2), such as the bearer token an OAuth 2.0 client
     /// rendered.
-    Field(reqwest::header::HeaderValue),
+    Field(Redacted<reqwest::header::HeaderValue>),
 }
 
 impl Authorization {
@@ -75,9 +79,11 @@ impl Authorization {
     pub fn apply(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
         match self {
             Self::Open => request,
-            Self::Bearer(token) => request.bearer_auth(token),
-            Self::Basic { user, password } => request.basic_auth(user, Some(password)),
-            Self::Field(value) => request.header(reqwest::header::AUTHORIZATION, value.clone()),
+            Self::Bearer(token) => request.bearer_auth(token.expose()),
+            Self::Basic { user, password } => request.basic_auth(user, Some(password.expose())),
+            Self::Field(value) => {
+                request.header(reqwest::header::AUTHORIZATION, value.expose().clone())
+            }
         }
     }
 
@@ -90,12 +96,6 @@ impl Authorization {
             Self::Basic { .. } => "basic",
             Self::Field(_) => "field",
         }
-    }
-}
-
-impl fmt::Debug for Authorization {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Authorization({})", self.scheme())
     }
 }
 

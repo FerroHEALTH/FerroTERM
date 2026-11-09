@@ -9,6 +9,7 @@
 
 use std::path::Path;
 
+use ferrohealth_secret::secret::Secret;
 use terminology_syndication::download::Fetched;
 use terminology_syndication::model::{CategoryTerm, Checksum, ContentLink, Feed};
 use terminology_syndication::select::{Holdings, SkipReason, Subscription, unseen};
@@ -46,11 +47,11 @@ impl Source for ApiSource {
     }
 
     fn listing_auth(&self) -> BoxFuture<'_, Result<Authorization, SourceError>> {
-        Box::pin(async { Ok(Authorization::Bearer(String::from("a-token"))) })
+        Box::pin(async { Ok(Authorization::Bearer(Secret::new("a-token"))) })
     }
 
     fn download_auth(&self) -> BoxFuture<'_, Result<Authorization, SourceError>> {
-        Box::pin(async { Ok(Authorization::Bearer(String::from("a-token"))) })
+        Box::pin(async { Ok(Authorization::Bearer(Secret::new("a-token"))) })
     }
 }
 

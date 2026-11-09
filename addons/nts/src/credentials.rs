@@ -9,8 +9,6 @@
 //! from a mounted `<key>_file`, and hands it over; no rendering of these types
 //! prints it.
 
-use core::fmt;
-
 use ferrohealth_secret::secret::Secret;
 
 /// Credentials the add-on cannot authenticate with.
@@ -23,9 +21,9 @@ pub enum CredentialError {
 
 /// The client the add-on authenticates as.
 ///
-/// The `Debug` rendering names the client and never the secret, so the whole
-/// source can be logged.
-#[derive(Clone, PartialEq, Eq)]
+/// The secret is a [`Secret`], so the `Debug` rendering names the client and
+/// never the secret, and the whole source can be logged.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Credentials {
     /// The OAuth 2 client identifier (RFC 6749 §2.2).
     pub client_id: String,
@@ -49,12 +47,6 @@ impl Credentials {
     }
 }
 
-impl fmt::Debug for Credentials {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Credentials(client_id={})", self.client_id)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use ferrohealth_secret::secret::Secret;
@@ -75,7 +67,8 @@ mod tests {
             !rendered.contains("a-client-secret"),
             "the client secret must never be rendered"
         );
-        assert!(rendered.contains("client_id=a-client"), "{rendered}");
+        assert!(rendered.contains("client_id: \"a-client\""), "{rendered}");
+        assert!(rendered.contains("client_secret: \"***\""), "{rendered}");
     }
 
     #[test]
