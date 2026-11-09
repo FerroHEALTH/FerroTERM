@@ -64,8 +64,8 @@ Report privately, through either route:
   a GitHub account. It opens a private advisory visible only to you and the
   maintainer; GitHub documents the flow at
   <https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability>.
-- email to [info@cadasto.com](mailto:info@cadasto.com), the single point of
-  contact of Cadasto B.V., the manufacturer (CRA Art 13(17)), with "FerroTERM
+- email to [security@cadasto.com](mailto:security@cadasto.com), the security
+  address of Cadasto B.V., the manufacturer (CRA Art 13(17)), with "FerroTERM
   vulnerability" in the subject. No account is needed. The address has no
   published encryption key, so send the details you are comfortable sending by
   email and say that more is available; we will agree a channel for the rest.
