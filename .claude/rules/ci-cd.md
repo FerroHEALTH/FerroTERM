@@ -37,10 +37,14 @@ Scorecard) is in `docs/ci-cd.md`; this file is the enforceable discipline.
   and `conclusion` is the one required check. A job that reads the
   pull-request payload is gated on `github.event_name == 'pull_request'`, so
   it skips in the queue and `conclusion` counts the skip as a pass. A new
-  required job keeps that shape or runs on every event.
+  required job keeps that shape or runs on every event. A pull-request run
+  and a merge-group run each finish in under 20 minutes, queue included: the
+  performance gate skips the merge group, and the workflow-tier checks run
+  as steps of the `lint` and `guards` jobs, so a run waits for fewer
+  runners (`docs/ci-cd.md` §The merge queue).
 - **Tracker helpers and changelog fragments are checked on every event:** the
-  `tracker-helpers` job runs the `--self-test` of every `scripts/gh/` helper,
-  and the `changelog` job runs `scripts/release/changelog.sh --check` plus
+  `tracker-helpers` step of the `guards` job runs the `--self-test` of every
+  `scripts/gh/` helper, and its `changelog` step runs `scripts/release/changelog.sh --check` plus
   the self-tests, and holds the assembled `[Unreleased]` preview to the
   release section's rules (`changelog.sh --check-preview`:
   `changelog-structure.sh` and `changelog-security.sh`,

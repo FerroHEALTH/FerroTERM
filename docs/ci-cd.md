@@ -16,9 +16,10 @@ exist.
 
 | Workflow | Does | Active |
 |---|---|---|
-| `ci.yml` (workflows lane) | `actionlint`, `zizmor --min-severity=low` over `.github/workflows/`, `shellcheck` over tracked shell | now |
+| `ci.yml` (`lint` job) | `actionlint`, `zizmor --min-severity=low` over `.github/workflows/`, `shellcheck` over tracked shell and `hadolint`, one step each (#1189) | now |
+| `ci.yml` (`guards` job) | every committed guard and self-test of the workflow tier, one step each under `!cancelled()`, so one failing guard still lets every other report; hosted runners are shared across the organisation, and one job waits for one runner where fourteen jobs waited for fourteen (#1189) | now |
 | `ci.yml` (Rust lanes) | fmt, clippy `-D warnings`, nextest `--locked` + doctests, rustdoc `-D warnings`, `cargo deny` with no stale advisory exception (`advisory-exceptions.sh`) and every VEX statement's dependency path against the graph (`vex-reachability.sh`), MSRV (`cargo hack check --rust-version`), dependency-review (PR) | on workspace |
-| `ci.yml` (`versions` job) | `scripts/checks/versions.sh`, version-drift guard | now |
+| `ci.yml` (`versions` step of `guards`) | `scripts/checks/versions.sh`, version-drift guard | now |
 | `pr-guards.yml` | on a label change, re-runs the guard it affects (`changelog-guard`, `crate-version-guard`) in the head commit's CI run once that run completes | now |
 | `scorecard.yml` | OpenSSF Scorecard, results published, SARIF → code scanning | now |
 | `codeql.yml` | CodeQL: `actions` now, `rust` self-activates when the workspace lands | actions now |
@@ -28,14 +29,14 @@ exist.
 | `release-image.yml` | reusable SLSA Build L3 lane: the distroless static image from the attested musl binaries, pushed to GHCR by digest with provenance and SBOM attestations on the index and on each platform manifest | on tag |
 | `scan-and-tag.yml` | reusable: both pushed digests scanned with Trivy (HIGH/CRITICAL with a fix, `trivy.yaml`), and only then tagged | on tag |
 | `image-scan.yml` | weekly: the published `latest` images scanned with every `security/vex/` document as `--vex`, one tracking issue filed or updated on a finding | weekly |
-| `ci.yml` (`vex` job) | the Rust-advisory OpenVEX document regenerated from `deny.toml` and `security/vex/rust-advisories.toml` and diffed, every hand-written document well-formed (`scripts/checks/vex-advisories.sh`), and the release record's coverage check self-tested | always |
-| `ci.yml` (`hadolint` job) | `hadolint` over every `Dockerfile` in the tree, plus `docker/Dockerfile.sync` by name | now |
+| `ci.yml` (`vex` step of `guards`) | the Rust-advisory OpenVEX document regenerated from `deny.toml` and `security/vex/rust-advisories.toml` and diffed, every hand-written document well-formed (`scripts/checks/vex-advisories.sh`), and the release record's coverage check self-tested | always |
+| `ci.yml` (`hadolint` step of `lint`) | `hadolint` over every `Dockerfile` in the tree, plus `docker/Dockerfile.sync` by name | now |
 | `ci.yml` (`console-boundary` job) | the console's resolved dependency closure links no workspace crate (`scripts/checks/console-boundary.sh`) | on workspace |
 | `ci.yml` (`no-client-in-server` job) | the server binary's resolved dependency tree carries no HTTP client outside `ferrohealth-smart` and `ferrohealth-usage-report`, so its only outbound calls are the authorization server `[auth]` names and the usage report (`scripts/checks/no-client-in-server.sh`) | on workspace |
 | `ci.yml` (`addon-boundary` job) | only `app/ferroterm-sync` links an `addons/*` crate, and an add-on links the syndication client and the leaf crates the script names (`scripts/checks/addon-boundary.sh`, run with `--self-test` first) | on workspace |
-| `ci.yml` (`tree-guards` job) | every `scripts/vendor/*.sh` fetcher writes into the tree (`vendor-dests.sh`), every workspace member is named in the repo map and the architecture table (`repo-map.sh`), and every evidence citation in `docs/claims.md` resolves to a symbol or a test and names no line number (`claims.sh`), and every `https://ferroterm.eu/fhir/StructureDefinition/` canonical the Rust sources emit has its definition under `website/landing/fhir/StructureDefinition` (`extension-definitions.sh`) | always |
-| `ci.yml` (`comment-style` job) | the RFC 505 / RFC 1574 comment budgets over every hand-written `.rs` file (`scripts/checks/comment-style.sh --all`), the sweep the per-edit hook cannot give | now |
-| `ci.yml` (`duplication` and `file-size` jobs) | the duplicated lines of the hand-written Rust held to `scripts/checks/duplication.count` by jscpd, and every hand-written file within 800 lines or its entry in `scripts/checks/file-size.list` (`.claude/rules/rust-style.md`, Code is written once); a fall passes, a rise fails | now |
+| `ci.yml` (`tree-guards` step of `guards`) | every `scripts/vendor/*.sh` fetcher writes into the tree (`vendor-dests.sh`), every workspace member is named in the repo map and the architecture table (`repo-map.sh`), and every evidence citation in `docs/claims.md` resolves to a symbol or a test and names no line number (`claims.sh`), and every `https://ferroterm.eu/fhir/StructureDefinition/` canonical the Rust sources emit has its definition under `website/landing/fhir/StructureDefinition` (`extension-definitions.sh`) | always |
+| `ci.yml` (`comment-style` step of `guards`) | the RFC 505 / RFC 1574 comment budgets over every hand-written `.rs` file (`scripts/checks/comment-style.sh --all`), the sweep the per-edit hook cannot give | now |
+| `ci.yml` (`duplication` and `file-size` steps of `guards`) | the duplicated lines of the hand-written Rust held to `scripts/checks/duplication.count` by jscpd, and every hand-written file within 800 lines or its entry in `scripts/checks/file-size.list` (`.claude/rules/rust-style.md`, Code is written once); a fall passes, a rise fails | now |
 | `ci.yml` (`bench-bars` job) | the four operations timed over a generated edition, each median compared to the claim in `bench/bars.json` (`scripts/checks/bench-bars.sh`) | on workspace |
 | `fuzz.yml` | weekly: every parser a client or a release reaches, fed arbitrary bytes under `cargo-fuzz` on nightly (`fuzz/README.md`) | weekly |
 | `ci.yml` (`tx-ecosystem` job) | the HL7 terminology ecosystem suite (`general` mode) against a release build through the FHIR Validator's `txTests`, gated by the committed pass list `conformance/tx-ecosystem/passing.txt` (`scripts/checks/tx-ecosystem.sh`) | on workspace |
