@@ -12,6 +12,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError};
 
+use ferrohealth_config::units::Duration;
 use ferroterm_sync::clock::Clock;
 use ferroterm_sync::config::{Activation, Config, ScheduleConfig};
 use ferroterm_sync::run::Service;
@@ -463,9 +464,9 @@ pub(crate) fn subscription() -> Subscription {
 }
 
 /// The schedule `every`, with no daily time.
-pub(crate) fn every(interval: &str) -> ScheduleConfig {
+pub(crate) fn every(interval: Duration) -> ScheduleConfig {
     ScheduleConfig {
-        every: Some(interval.to_owned()),
+        every: Some(interval),
         at: None,
     }
 }

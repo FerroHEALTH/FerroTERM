@@ -40,9 +40,10 @@ async fn a_section_level_issuer_setting_of_the_old_shape_refuses_the_start_namin
     let key = SigningKey::generate("k1");
     let mock = issuer(&key).await;
     let mut setup = SmartSetup::for_issuer(&mock.uri());
-    setup.auth.audience = Some(serde_json::json!(["ferroterm"]));
+    setup.auth.audience = serde_json::from_value(serde_json::json!(["ferroterm"]))
+        .expect("a retired key reads any value");
     let reason = refused(setup).await;
-    assert!(reason.contains("auth.audience is removed"), "{reason}");
+    assert!(reason.contains("auth.audience was replaced"), "{reason}");
 }
 
 #[tokio::test]

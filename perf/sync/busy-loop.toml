@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BUSL-1.1
 
 # The self-test of the performance gate: scripts/perf/gate.sh starts a
-# second ferroterm-sync whose schedule is `every = "1ns"`, the shortest
+# second ferroterm-sync whose schedule is `every = "1ms"`, the shortest
 # interval it accepts, so its scheduler starts each run the moment the last
 # one ends and never waits (the shape of FerroPIX #490), and runs this
 # plan against it, which must fail on idle CPU. Its [idle] table is the

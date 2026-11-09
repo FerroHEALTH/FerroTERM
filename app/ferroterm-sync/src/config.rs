@@ -20,10 +20,12 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
 
 use ferrohealth_config::loader::{Loaded, Loader};
+use ferrohealth_config::units::Duration;
 use ferrohealth_secret::file::{SecretError, read_secret};
 use ferrohealth_secret::secret::Secret;
 use ferrohealth_smart::client::ClientCredentials;
-use ferrohealth_smart::config::{AuthSection, OauthSection};
+use ferrohealth_smart::config::credentials::OauthSection;
+use ferrohealth_smart::config::{AuthSection, ServerTls};
 use ferrohealth_telemetry::section::TelemetrySection;
 
 /// The environment prefix: `FERROTERM_SYNC__SCHEDULE__EVERY` sets
@@ -65,8 +67,9 @@ impl Activation {
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ScheduleConfig {
-    /// An interval measured from the end of the last run, such as `24h`.
-    pub every: Option<String>,
+    /// An interval measured from the end of the last run, a duration such
+    /// as `24h`.
+    pub every: Option<Duration>,
     /// A time of day in the configured zone, such as `03:00`.
     pub at: Option<String>,
 }
@@ -229,7 +232,10 @@ impl AdminCredentials {
     pub fn resolve(
         &self,
     ) -> Result<Option<ClientCredentials>, ferrohealth_smart::config::ConfigError> {
-        self.oauth.as_ref().map(OauthSection::resolve).transpose()
+        self.oauth
+            .as_ref()
+            .map(|oauth| oauth.resolve_with_tls(&ServerTls))
+            .transpose()
     }
 }
 
@@ -343,7 +349,7 @@ impl Config {
 mod tests {
     use std::collections::BTreeMap;
 
-    use super::{Activation, Config, ConfigError};
+    use super::{Activation, Config, ConfigError, Duration};
 
     fn environment(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
         pairs
@@ -491,16 +497,19 @@ base_url = "https://example.invalid"
 
     #[test]
     fn a_schedule_that_does_not_parse_is_refused() {
-        let config = Config {
-            schedule: super::ScheduleConfig {
-                every: Some(String::from("every other Tuesday")),
-                at: None,
-            },
-            ..Config::default()
-        };
-        assert!(
-            config.plan().is_err(),
-            "an interval that does not read is refused before the first run"
-        );
+        for every in ["every other Tuesday", "PT24H", "30", "90m"] {
+            assert!(
+                Config::from_sources(
+                    Some(&format!("[schedule]\nevery = \"{every}\"\n")),
+                    &BTreeMap::new()
+                )
+                .is_err(),
+                "an interval that is no duration of a whole number and a UCUM unit is refused at load: {every}"
+            );
+        }
+        let config =
+            Config::from_sources(Some("[schedule]\nevery = \"90min\"\n"), &BTreeMap::new())
+                .expect("a UCUM duration reads");
+        assert_eq!(config.schedule.every, Some(Duration::from_mins(90)));
     }
 }

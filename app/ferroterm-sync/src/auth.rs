@@ -25,7 +25,7 @@ use axum::body::Body;
 use axum::http::request::Parts;
 use axum::http::{Extensions, Method, Uri};
 use axum::response::Response;
-use ferrohealth_smart::config::{AuthSection, ConfigError};
+use ferrohealth_smart::config::{AuthSection, ConfigError, ServerTls};
 use ferrohealth_smart::extract::HeaderOnly;
 use ferrohealth_smart::guard::{AuthLayer, Gate, Render, Requirement, Target};
 use ferrohealth_smart::refusal::Refusal;
@@ -116,9 +116,12 @@ impl AdminAuth {
         if !section.enabled {
             return Ok(None);
         }
-        let resolved = section.resolve().map_err(|source| AuthError::Config {
-            source: Box::new(source),
-        })?;
+        let resolved =
+            section
+                .resolve_with_tls(&ServerTls)
+                .map_err(|source| AuthError::Config {
+                    source: Box::new(source),
+                })?;
         let realm = resolved.realm.unwrap_or_else(|| String::from(REALM));
         let mut gate = Gate::open().with_realm(realm.clone());
         if !resolved.issuers.is_empty() || !resolved.introspection.is_empty() {

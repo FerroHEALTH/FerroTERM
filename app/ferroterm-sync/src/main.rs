@@ -14,6 +14,7 @@ use std::sync::Arc;
 
 use clap::Parser;
 use ferrohealth_server::cli::{Common, ConfigCommand};
+use ferrohealth_server::telemetry::build as build_telemetry;
 use ferrohealth_telemetry::telemetry::{Console, Service, Telemetry};
 use ferroterm_sync::cli::{Cli, Command};
 use ferroterm_sync::config::Config;
@@ -70,7 +71,7 @@ async fn main() -> ExitCode {
 /// family's panic line.
 fn telemetry(config: &Config) -> Result<Arc<Telemetry>, ExitCode> {
     let service = Service::new("ferroterm-sync", env!("CARGO_PKG_VERSION"));
-    let telemetry = match Telemetry::new(&config.telemetry, service) {
+    let telemetry = match build_telemetry(&config.telemetry, service) {
         Ok(telemetry) => Arc::new(telemetry),
         Err(error) => {
             eprintln!("ferroterm-sync: cannot start: {error}");

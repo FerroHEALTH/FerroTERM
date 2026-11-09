@@ -25,7 +25,7 @@
 //! public_url = "https://terminology.example.org/"
 //! sync_url = "http://ferroterm-sync:8090/"
 //! admin_url = "http://ferroterm:8081/"
-//! timeout_ms = 30000
+//! timeout = "30s"
 //!
 //! [oidc]
 //! issuer = "https://idp.example.org/realms/ferroterm"
@@ -37,8 +37,8 @@
 //!
 //! [session]
 //! store = "memory"
-//! idle_timeout_s = 1800
-//! absolute_timeout_s = 43200
+//! idle_timeout = "30min"
+//! absolute_timeout = "12h"
 //! ```
 //!
 //! The `[oidc]` and `[session]` sections are `ferrohealth-session`'s
@@ -52,6 +52,8 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use ferrohealth_config::loader::{Loaded, Loader};
+use ferrohealth_config::removed::Removed;
+use ferrohealth_config::units::Duration;
 use ferrohealth_session::config::{OidcSection, SessionSection};
 use ferrohealth_telemetry::section::TelemetrySection;
 use serde::Deserialize;
@@ -162,8 +164,10 @@ pub struct Ferroterm {
     /// `POST /reload` the Server screen offers as Reload the served set; none
     /// when unset. The reader's token must carry `__ferroterm.admin`.
     pub admin_url: Option<String>,
-    /// How long one call to the server may take, in milliseconds.
-    pub timeout_ms: u64,
+    /// How long one call to the server may take, a duration such as `30s`.
+    pub timeout: Duration,
+    /// `timeout_ms`, which `timeout` replaced: refused, naming it.
+    pub timeout_ms: Removed,
 }
 
 impl Default for Ferroterm {
@@ -173,7 +177,8 @@ impl Default for Ferroterm {
             public_url: None,
             sync_url: None,
             admin_url: None,
-            timeout_ms: 30_000,
+            timeout: Duration::from_secs(30),
+            timeout_ms: Removed::default(),
         }
     }
 }

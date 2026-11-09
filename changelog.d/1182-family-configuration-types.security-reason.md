@@ -1,0 +1,1 @@
+Shipped with functional changes because: the fixes arrive in ferrohealth-smart 0.13, whose line FerroTERM takes at 0.14 together with the configuration types that release requires, so the advisories and the key changes cannot ship apart.

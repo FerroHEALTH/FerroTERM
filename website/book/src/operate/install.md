@@ -216,7 +216,7 @@ liveness probe at `GET /health/liveness` and the readiness probe at
 `GET /health/readiness`, set `runAsNonRoot: true`,
 `readOnlyRootFilesystem: true`, drop every capability, and mount the index
 root (not a single artifact) read-only at the path `FERROTERM__TERMINOLOGY__INDEX` names. The server stops
-cleanly on `SIGTERM`, within the bound `server.shutdown_timeout_ms` sets.
+cleanly on `SIGTERM`, within the bound `server.shutdown_timeout` sets.
 
 ## Run the binary
 

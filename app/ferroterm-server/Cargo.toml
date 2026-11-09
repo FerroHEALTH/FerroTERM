@@ -26,7 +26,7 @@ clap.workspace = true
 ferrohealth-config.workspace = true
 ferroterm-problem.workspace = true
 ferrohealth-health.workspace = true
-ferrohealth-server.workspace = true
+ferrohealth-server = { workspace = true, features = ["otlp"] }
 ferrohealth-smart.workspace = true
 ferrohealth-telemetry = { workspace = true, features = ["axum", "prometheus", "otlp"] }
 ferrohealth-usage-report = { workspace = true, features = ["telemetry"] }

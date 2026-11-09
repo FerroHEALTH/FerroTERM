@@ -183,8 +183,9 @@ scope = "__ferroterm.admin"
 | `oauth.client_secret` or `oauth.client_secret_file` | the client secret; exactly one | none |
 | `oauth.private_key_file`, `oauth.kid`, `oauth.assertion_alg` | the PEM key, `kid` and algorithm of a `private_key_jwt` assertion (RFC 7523) | the RFC 7638 thumbprint, the algorithm of the key |
 | `oauth.scope`, `oauth.resource`, `oauth.audience` | the token request's `scope`, RFC 8707 `resource` and `audience` parameters | none |
-| `oauth.refresh_margin_ms` | how long before the token expires a new one is fetched | `30000` |
-| `oauth.timeout_ms` | how long one call to the authorization server may take | `10000` |
+| `oauth.refresh_margin` | how long before the token expires a new one is fetched | `"30s"` |
+| `oauth.timeout` | how long one call to the authorization server may take | `"10s"` |
+| `[server_admin_credentials.oauth.tls]` | the outbound TLS table of the token calls (see [Configuration](configuration.md#telemetry)) | none |
 
 With the table empty the call carries no credential, which only a server with
 `[auth]` turned off accepts. There is no static token, and the Basic `user`,
@@ -195,12 +196,15 @@ With the table empty the call carries no credential, which only a server with
 
 Two shapes, and no cron syntax:
 
-- `every = "24h"` measures from the end of the last run.
+- `every = "24h"` measures from the end of the last run. It is a duration: a
+  whole number and a UCUM unit (`ms`, `s`, `min`, `h`, `d`), such as `"90min"`
+  or `"7d"`.
 - `at = "03:00"` is a time of day in `timezone`.
 
-An interval of zero or less (`"0s"`, `"PT0S"`, `"-1h"`) is refused at start,
-naming `schedule.every` and the value: each run would be due the moment the
-last one ends, and the service would never wait.
+An interval of zero (`"0s"`) is refused at start, naming `schedule.every`:
+each run would be due the moment the last one ends, and the service would
+never wait. A value that is no such duration, the ISO 8601 `"PT24H"` and the
+friendly `"1h 30m"` that earlier releases read among them, refuses the start too.
 
 With both, the earlier due time wins. With neither, the service runs only when
 you ask it to. The end of the last run is written to the state directory, so a

@@ -81,7 +81,8 @@ async fn manual_activation_stages_without_serving() {
 async fn an_activation_does_not_move_the_schedule() {
     let mut harness = Harness::new().await;
     harness.config.activation = Activation::Manual;
-    harness.config.schedule = crate::support::every("24h");
+    harness.config.schedule =
+        crate::support::every(ferrohealth_config::units::Duration::from_hours(24));
     harness
         .publish(&[Entry::rf2(
             "11000146104",

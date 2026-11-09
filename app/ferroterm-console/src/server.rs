@@ -426,8 +426,8 @@ pub async fn serve(
         router,
         lifecycle,
         shutdown,
-        section.drain_delay(),
-        section.shutdown_timeout(),
+        section.drain_delay.get(),
+        section.shutdown_timeout.get(),
     )
     .await
 }
