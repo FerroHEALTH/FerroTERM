@@ -65,9 +65,6 @@ pub enum Error {
         /// The key.
         key: String,
     },
-    /// Keys the console no longer reads, each named with its replacement.
-    #[error(transparent)]
-    Removed(#[from] ferrohealth_config::removed::RemovedKeys),
     /// An `[oidc]` or a `[session]` `ferrohealth-session` refuses, a client
     /// secret set both inline and through its file among them.
     #[error(transparent)]
