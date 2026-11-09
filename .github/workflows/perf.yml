@@ -149,7 +149,8 @@ jobs:
     permissions: {}
     steps:
       # The merge queue proves the merged tree; the gate ran on the pull
-      # request and runs again on the push to main (docs/ci-cd.md).
+      # request and runs again on the push to main. No specification governs
+      # this: our own design.
       - name: The gate is not run in a merge group
         if: inputs.skip
         run: |
