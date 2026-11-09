@@ -40,3 +40,5 @@ conflicts with `main` still needs a local signed rebase
 (`gh pr update-branch --rebase` strips the signature). The "FerroTERM Roadmap"
 board is a FerroHEALTH organisation project; the user-owned board never
 existed.
+
+**Commit-message lines (2026-11-09):** no line of a commit message may start with `-` or with a git header word (`tree`, `parent`, `author`, `committer`, `gpgsig`). The queue's squash commit then fails its signature check and the queue removes the PR with `branch_protection_failure` after a green run (FerroEHR #5233 and #5245). A conflicting branch is brought up to date by a local, signed merge of `origin/main` and a plain push, never a force-push. Never `--admin` ([[admin-bypass-stays]]).
