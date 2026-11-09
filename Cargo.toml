@@ -76,18 +76,18 @@ toml = { version = "1.1.6", default-features = false, features = ["std", "parse"
 # a machine by token alone; 0.9.1 refuses a Basic user granted a system/
 # scope at load (GHSA-jhg2-jwjp-hq74); 0.10 moves beside ferrohealth-session
 # 0.4, which carries its `oidc` types. Verified against crates.io on 2026-11-08.
-ferrohealth-smart = { version = "=0.10.1", features = ["axum"] }
+ferrohealth-smart = { version = "=0.13.1", features = ["axum"] }
 # The FerroHEALTH console sign-in and session: the authorization code flow
 # with PKCE over ferrohealth-smart's relying party, the session store with
 # its idle and absolute lifetimes, and the four sign-in routes. Pinned
 # exactly. Verified against crates.io on 2026-11-08.
-ferrohealth-session = { version = "=0.4.0", features = ["axum"] }
+ferrohealth-session = { version = "=0.7.0", features = ["axum"] }
 # The FerroHEALTH health family: the readiness document, the indicator
 # registry and the process lifecycle, and the HTTP plumbing whose `health`
 # module serves `/health`, `/health/liveness` and `/health/readiness` over
 # them. Pinned exactly. Verified against crates.io on 2026-10-26.
 ferrohealth-health = { version = "=0.1.1", features = ["registry"] }
-ferrohealth-server = { version = "=0.5.1" }
+ferrohealth-server = { version = "=0.6.4" }
 # The FerroHEALTH configuration loader and its secrets: one TOML tree per
 # binary under `--config` or `<PREFIX>_CONFIG`, `<PREFIX>__SECTION__KEY`
 # overrides, `--set`, strict refusals and provenance, and the `<key>_file`
@@ -135,7 +135,7 @@ uuid = { version = "1.26.0", features = ["v4"] }
 # its components from Askama templates and serves its stylesheet, themes and
 # script modules through its own router. Verified against crates.io on
 # 2026-11-04 (0.6.6).
-ferrohealth-ui = "=0.6.7"
+ferrohealth-ui = "=0.6.9"
 # The console's string catalogs: Project Fluent messages embedded at build
 # time from app/ferroterm-console/locales/, the crate and version
 # ferrohealth-ui catalogs its own words with, so one locale drives both.

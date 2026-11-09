@@ -1223,9 +1223,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-server"
-version = "0.5.1"
+version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86bd2ac04c00ff5697e78615cc674222f393707d4c63839a292c920d2c3b63a8"
+checksum = "ac282bdaaa52b13dffae03e9614b804ece736b713e728501020b76bd761ba641"
 dependencies = [
  "axum",
  "clap",
@@ -1253,9 +1253,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-session"
-version = "0.4.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "73271088c9cb8d7d059becf3299c3e049b014773c60b045f821ccf0d987758e0"
+checksum = "2a400b7ae519a6515e43a832d8c822b1b0f7b45f87615f09e3d411a5be8bc75f"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -1277,9 +1277,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-smart"
-version = "0.10.1"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "232346ffcc26de7032743ce1eca1f01ffc87b70819ff3a884041ad5157a14324"
+checksum = "7b3e32cbe2888a09fda90a076ba4f0cd6944cb9dd0f32d76860e33db717af184"
 dependencies = [
  "argon2",
  "aws-lc-rs",
@@ -1290,6 +1290,7 @@ dependencies = [
  "jiff",
  "jsonwebtoken",
  "reqwest",
+ "rustls",
  "secrecy",
  "serde",
  "serde_json",
@@ -1328,9 +1329,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-ui"
-version = "0.6.7"
+version = "0.6.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46857386901c5c15331e11b9310520d74353df1cd27222f1154f2d70dbe06a9a"
+checksum = "e8ceb285b787e15cf540a37db0202f7f3443b5063d2a609aabd1aad3bba2d387"
 dependencies = [
  "askama",
  "axum",
