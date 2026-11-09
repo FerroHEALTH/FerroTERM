@@ -17,6 +17,35 @@ fragments here under the version and its date.
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-11-09
+
+### Changed
+
+- The console's `$lookup`, `$validate-code`, `$subsumes`, `$translate` and
+  `$expand` requests and readings, and the sync service's revalidation, now
+  go through FerroBRIDGE's `ferrobridge-term` client, which writes each
+  input under the name the serving release's `OperationDefinition` gives it,
+  in the order it declares them. The address the console shows for a run
+  lists its parameters in that order, and an answer that leaves out a
+  required output (`result`, `outcome`, or a `$lookup` `name` or `display`)
+  is shown as an answer that did not read. The sync service takes the FHIR
+  release it writes in from the last segment of `fhir_base_url` (`r4`,
+  `r4b`, `r5` or `r6`), and reports the revalidation as not run when that
+  segment names none (#1164).
+- The NTS add-on obtains its token through `ferrohealth-smart`'s client credentials `TokenSource`, which reads the token endpoint from the realm's OpenID Connect Discovery metadata, caches the token and renews it a minute before it expires. A `[[source]]` block of the add-on takes `issuer`, which defaults to `https://terminologieserver.nl/authorisation/auth/realms/nictiz`, in place of reading `<base>/fhir/.well-known/smart-configuration`. `nts.client_id` has no default any more (#1165).
+- The server, the sync service, the console and the add-ons move to `ferrohealth-smart` 0.10.1, `ferrohealth-session` 0.4.0 and `ferrohealth-config` 0.2.10. An array of tables in the configuration, such as `[[auth.issuer]]`, can now be set from the environment by element index (`FERROTERM__AUTH__ISSUER__0__URL`) or with `--set auth.issuer.0.url=…`, so a deployment configured only through the environment can declare its issuers; an index with a leading zero or one that skips an element is refused at load (#1166).
+- The published crates move to 0.1.146 and require `fhir-types` with the `r4`, `r4b`, `r5`, `r6` and `terminology` features and no default features, so they no longer pull in the STU3 model. A crate consumer that read `fhir_types::stu3` through them names the `stu3` feature on its own `fhir-types` requirement. The server requires `ferrobridge-term` 0.1.148 with the same four FHIR releases (#1170).
+
+### Removed
+
+- The NTS add-on no longer logs in with the resource owner password grant or a refresh token, and the sync service's `[nts]` section no longer takes `username`, `password` or `password_file`; each is refused at load. RFC 9700 §2.4 says the password grant MUST NOT be used, and the NTS realm publishes the client credentials grant. Set `nts.client_id` and `nts.client_secret` (or `nts.client_secret_file`) to a confidential client Nictiz issues (#1165).
+
+### Fixed
+
+- `ferroterm-sync` refuses to start with a `schedule.every` interval of zero
+  or less and names the key and the value. It used to accept one and start
+  each run the moment the last one ended, writing a run record each time (#1152).
+
 ## [0.4.2] - 2026-11-06
 
 ### Changed
@@ -2638,7 +2667,8 @@ binary answers `GET /health` only.
 - No existing Rust terminology or FHIR crate is a dependency; the README
   records the evaluation and the reasons.
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.3...HEAD
+[0.4.3]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.3.3...v0.4.0
