@@ -188,9 +188,8 @@ scope = "__ferroterm.admin"
 | `[server_admin_credentials.oauth.tls]` | the outbound TLS table of the token calls (see [Configuration](configuration.md#telemetry)) | none |
 
 With the table empty the call carries no credential, which only a server with
-`[auth]` turned off accepts. There is no static token, and the Basic `user`,
-`password` and `password_file` of earlier releases fail to load, naming
-`oauth`.
+`[auth]` turned off accepts. There is no static token, and the table takes no
+Basic `user` or `password`.
 
 ## The schedule
 
@@ -204,7 +203,7 @@ Two shapes, and no cron syntax:
 An interval of zero (`"0s"`) is refused at start, naming `schedule.every`:
 each run would be due the moment the last one ends, and the service would
 never wait. A value that is no such duration, the ISO 8601 `"PT24H"` and the
-friendly `"1h 30m"` that earlier releases read among them, refuses the start too.
+friendly `"1h 30m"` among them, refuses the start too.
 
 With both, the earlier due time wins. With neither, the service runs only when
 you ask it to. The end of the last run is written to the state directory, so a

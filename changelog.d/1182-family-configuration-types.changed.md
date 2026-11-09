@@ -2,8 +2,8 @@
   time as a duration and every amount of data as a size (ferrohealth-config
   0.3): a whole number and a UCUM unit (`"500ms"`, `"30s"`, `"10min"`,
   `"12h"`, `"7d"`) or an IEC binary unit (`"1MiB"`). A key that holds one no
-  longer names its unit, and the old key refuses the start, all of them at
-  once, each naming its replacement. Upgrade step: in `[server]`, write
+  longer names its unit, and in 0.4.4 alone the old key refuses the start,
+  all of them at once, each naming its replacement. Upgrade step: in `[server]`, write
   `request_timeout`, `header_read_timeout`, `idle_timeout`, `body_limit`,
   `drain_delay`, `shutdown_timeout`, `retry_after`, `compression_min_size`
   and `[server.tls] reload_interval` for the keys ending in `_ms`, `_s` or
@@ -26,7 +26,7 @@
   `client_identity_file`, a client credentials grant's `tls` table replaces
   its `ca_file`, `client_certificate_file` and `client_key_file`, and the
   console's `[oidc.tls]` replaces `oidc.ca_file` and `[oidc.tls]
-  client_certificate`, `client_key` and `client_key_file`. Each old key
-  refuses the start naming its replacement. Upgrade step: move each file
+  client_certificate`, `client_key` and `client_key_file`. In 0.4.4 alone,
+  each old key refuses the start naming its replacement. Upgrade step: move each file
   under the table's `tls` key, and join a separate certificate and key into
   one PEM for `client_identity_file`.

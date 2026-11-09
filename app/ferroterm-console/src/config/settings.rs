@@ -118,6 +118,7 @@ impl Config {
     /// `session.secure_cookie = false` on a console that is not `http` on
     /// loopback.
     pub fn resolve(&self) -> Result<Settings, Error> {
+        // TODO(#1184): the refusal ships in 0.4.4 alone; delete it in 0.4.5.
         let mut removals = Removals::new();
         removals.replaced(
             self.ferroterm.timeout_ms,

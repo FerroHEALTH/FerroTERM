@@ -143,9 +143,9 @@ number and an IEC binary unit: `B`, `KiB`, `MiB` or `GiB`. A bare number is
 refused, and so are `m` (the metre in UCUM, so write `min`) and a decimal
 unit such as `MB`.
 
-The keys that named their unit in earlier releases (`request_timeout_ms`,
-`header_read_timeout_ms`, `idle_timeout_ms`, `body_limit_bytes`,
-`drain_delay_ms`, `shutdown_timeout_ms`, `retry_after_s`,
+In 0.4.4 alone, the keys that named their unit before it
+(`request_timeout_ms`, `header_read_timeout_ms`, `idle_timeout_ms`,
+`body_limit_bytes`, `drain_delay_ms`, `shutdown_timeout_ms`, `retry_after_s`,
 `compression_min_bytes` and `[server.tls] reload_interval_s`) refuse the start,
 all at once, each naming its replacement.
 
@@ -277,8 +277,8 @@ The keys of `[auth]` itself, in the configuration file or as
 The server refuses to start on the earlier `[auth]` shape: a
 flat `issuer = "…"` key, or `audience`, `algorithms`, `mode`,
 `[auth.introspection]` or another issuer setting on `[auth]` itself, each
-named with the table it moves to. It also refuses the keys that named their
-unit in earlier releases (`clock_skew_seconds`, `jwks_max_age_seconds`,
+named with the table it moves to. In 0.4.4 it also refuses the keys that
+named their unit before it (`clock_skew_seconds`, `jwks_max_age_seconds`,
 `jwks_refresh_interval_seconds`, `timeout_ms`, `cache_max_age_seconds`,
 `cache_ttl_seconds`) and `auth.ca_file`, all at once, each naming its
 replacement.

@@ -166,7 +166,8 @@ pub struct Ferroterm {
     pub admin_url: Option<String>,
     /// How long one call to the server may take, a duration such as `30s`.
     pub timeout: Duration,
-    /// `timeout_ms`, which `timeout` replaced: refused, naming it.
+    /// `timeout_ms`, which `timeout` replaced in 0.4.4: refused, naming it.
+    // TODO(#1184): the refusal ships in 0.4.4 alone; delete it in 0.4.5.
     pub timeout_ms: Removed,
 }
 

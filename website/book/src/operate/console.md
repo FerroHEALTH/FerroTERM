@@ -83,10 +83,11 @@ when it starts; set `authorization_endpoint`, `token_endpoint`, `jwks_uri`,
 `[oidc.tls] trust_roots_file` to trust a private certificate authority (the
 outbound TLS table of [Configuration](configuration.md#telemetry)).
 `config check` reads no provider, so it works offline. Spans of time are
-durations such as `"30s"` or `"8h"`; the keys that named their unit in
-earlier releases (`[ferroterm] timeout_ms`, `[session] sign_in_timeout_s`,
-`idle_timeout_s` and `absolute_timeout_s`, `[oidc] timeout_s`) and
-`oidc.ca_file` refuse the start, each naming its replacement.
+durations such as `"30s"` or `"8h"`. In 0.4.4 alone, the keys that named
+their unit before it (`[ferroterm] timeout_ms`, `[session]
+sign_in_timeout_s`, `idle_timeout_s` and `absolute_timeout_s`, `[oidc]
+timeout_s`) and `oidc.ca_file` refuse the start, each naming its
+replacement.
 `[session] store = "memory"` keeps the sessions in the console's process;
 `"sealed"` keeps each in one encrypted cookie, for a console that runs as
 several instances, and needs `key` or `key_file` (base64 of at least 64
