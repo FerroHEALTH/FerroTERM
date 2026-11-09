@@ -213,6 +213,17 @@ Conformance is measured against Snowstorm as the reference server (see
 
 ## IMPORTANT hard rules
 
+- **Family rules carried in `.claude/memory/` (index `MEMORY.md`).** A removal
+  aid (a named refusal of a removed or renamed config key, flag, env variable,
+  route or format) lives exactly one release and the next release deletes it
+  fully; no legacy support is ever kept (owner hard rule 2026-11-09,
+  `no-compat-shims.md`). Build the proper solution even when it breaks an API
+  and moves the minor version (owner 2026-11-08, `no-half-solutions.md`). A
+  production value map goes only through the terminology server, never an
+  embedded copy (owner 2026-11-09, `terminology-via-server.md`). Where the
+  EHDS Regulation conflicts with an openEHR or other standard's text, the
+  Regulation wins, and EHDS work is never reverted to pass a conformance row
+  (owner 2026-11-09, `ehds-above-openehr.md`).
 - **The FHIR and SNOMED specifications are the oracle.** Implement and review
   every spec-facing behaviour (the terminology operations, ECL, RF2 semantics,
   subsumption, value-set expansion) against the vendored FHIR definitions and the
