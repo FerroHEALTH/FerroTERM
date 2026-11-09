@@ -1,18 +1,15 @@
 ---
 name: ferroehr-no-worktrees
-description: "An agent sent into the FerroEHR clone follows that repository's owner rule of one checkout and no git worktrees"
-metadata: 
-  node_type: memory
+description: "Superseded: FerroEHR allows git worktrees since 2026-10-19, only at .claude/worktrees/<name>, each with its own target directory; a brief from here follows that repository's own rules"
+metadata:
   type: feedback
-  originSessionId: 72434f36-450a-494f-91d0-0892d1f31a75
-  modified: 2026-09-23T06:49:51.919Z
 ---
 
 <!-- SPDX-FileCopyrightText: Cadasto B.V. -->
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 
-The FerroEHR repository (`/Users/rubentalstra/RustroverProjects/FerroEHR`) carries an owner directive of 2026-08-06 in its own memory (`no-worktrees-single-checkout.md`): every change happens in the main checkout on the current branch, never in a `git worktree`, because the owner follows the work in one working directory. On 2026-09-23 a brief from this session told an agent to use a worktree there; the agent complied and flagged the conflict.
+FerroEHR banned worktrees on 2026-08-06 so the owner could follow the work in one directory, and a brief from this session that sent an agent into a worktree there broke that rule on 2026-09-23. The owner lifted the ban on 2026-10-19 (FerroEHR `worktrees-for-parallel-branches.md`), and the family rule of 2026-10-21 puts every worktree at `<repo>/.claude/worktrees/<name>` ([[worktrees-in-repo]]). Since 2026-11-09 each FerroEHR worktree builds into its own target directory, because a shared target lets one worktree overwrite another's workspace-member outputs.
 
-**Why:** each repository's owner rules outrank a brief written from the other repository.
+**Why:** each repository's owner rules outrank a brief written from another repository.
 
-**How to apply:** a brief for FerroEHR (or FerroBRIDGE) tells the agent to read that repository's CLAUDE.md and memory first and to follow them where they differ from FerroTERM's habits; for FerroEHR that means the main checkout, a branch, no worktree. See [[clean-up-agent-worktrees]] for the FerroTERM side.
+**How to apply:** a brief for FerroEHR, FerroBRIDGE or any sibling tells the agent to read that repository's CLAUDE.md and memory first and to follow them where they differ from FerroTERM's habits. See [[clean-up-agent-worktrees]] for the FerroTERM side.

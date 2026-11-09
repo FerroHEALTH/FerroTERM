@@ -1,6 +1,6 @@
 ---
 name: release-cut-cadence
-description: Cut the release the moment a milestone empties, bump the version EVERYWHERE, create the next milestone for stragglers, close the milestone by hand, and sign and push the tag yourself when the owner asks (done for v0.1.3 on 2026-09-12)
+description: Cut the release the moment a milestone empties, bump the version EVERYWHERE, create the next milestone for stragglers, close the milestone by hand, and sign and push the tag yourself, every time (owner 2026-09-12 for v0.1.3, standing since 2026-11-03)
 metadata:
   node_type: memory
   type: feedback
