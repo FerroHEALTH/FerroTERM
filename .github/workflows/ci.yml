@@ -30,7 +30,11 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # A pull request's runs share one group per ref, and a new commit cancels
+  # the run it replaces. Every other run gets a group of its own, because a
+  # group holds one pending run and a newer one cancels it whatever
+  # cancel-in-progress says, which dropped pushes to main (#1191).
+  group: ${{ github.event_name == 'pull_request' && format('ci-{0}', github.ref) || format('ci-run-{0}', github.run_id) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions: {}
