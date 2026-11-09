@@ -21,6 +21,7 @@ publish = false
 include = ["src/**", "README.md", "LICENSE"]
 
 [dependencies]
+ferrohealth-secret.workspace = true
 jiff.workspace = true
 md-5.workspace = true
 quick-xml.workspace = true
