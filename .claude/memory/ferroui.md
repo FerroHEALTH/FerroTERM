@@ -1,6 +1,6 @@
 ---
 name: ferroui
-description: "Every console draws in FerroUI, pinned exactly; one uniform design, shared components, all five consoles move in lockstep with every FerroUI release, screenshots read and reviewed, every console reactive; owner 2026-10-18 and 2026-10-25"
+description: "Every console draws in FerroUI, pinned exactly; one uniform design, shared components, all five consoles move in lockstep with every FerroUI release, screenshots read and reviewed, every console server-rendered since FerroUI 0.6; owner 2026-10-18 and 2026-10-29"
 metadata:
   type: project
 ---
@@ -12,7 +12,7 @@ Every FerroHEALTH console (FerroBRIDGE, FerroEHR, FerroFED, FerroPIX,
 FerroTERM; [[family-architecture]]) draws in FerroUI, the shared component
 library (`ferrohealth-ui` on crates.io, FerroHEALTH/FerroUI), pinned exactly
 (`=X.Y.Z`) from crates.io, never a submodule or a path dependency (owner,
-2026-10-18). Every console is reactive ([[reactive-console-ui]]).
+2026-10-18). Every console is server-rendered since FerroUI 0.6 (owner 2026-10-29, FerroUI #510, [[reactive-console-ui]]).
 
 - **One uniform design.** Each component takes the best of the
   products' versions on its merits and is restyled to one type scale,

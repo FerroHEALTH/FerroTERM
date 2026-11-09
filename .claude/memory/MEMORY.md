@@ -8,12 +8,12 @@
 - [Owner work style](owner-work-style.md), research-first and evidence-based; from-first-principles, skeptical of the legacy way others build CT servers; confirm foundational decisions before scaffolding; the graph model is right, but implemented as a materialized index, not a graph database or live traversal
 - [Official name FerroTERM](official-name-ferroterm.md), FerroTERM (ferroterm.eu) is the official name since 2026-09-02, Notio was the codename; FerroTERM in prose, `ferroterm` in identifiers
 - [Local SNOMED release](local-snomed-release.md), the owner's licensed data under data/ (NL edition 20260630, International edition 20260901, LOINC 2.83) and the built artifacts under artifacts/; never committed, fixtures stay synthetic
-- [Repo merge gates](repo-merge-gates.md), main needs signed commits and the `conclusion` check and merges through the merge queue since 2026-10-05; no rebase train; the Roadmap board is a FerroHEALTH org project
+- [Repo merge gates](repo-merge-gates.md), main needs signed commits and the `conclusion` check and merges through the merge queue since 2026-10-05; no rebase train; the Roadmap board is a FerroHEALTH org project; no commit-message line starts with "-" or a git header word (2026-11-09)
 - [CI under 20 minutes](ci-under-20-minutes.md), every pull-request and merge-group run of `ci.yml` under 20 minutes, queue included; the performance gate and other long non-functional gates run on the pull request and on `main`, never in the merge queue; owner 2026-11-09
-- [Release cut cadence](release-cut-cadence.md), cut the release PR the moment a milestone empties, bump the version EVERYWHERE (README, landing page, book, not only the manifests), run scripts/checks/versions.sh, create the next milestone for stragglers and close the emptied one by hand, and sign and push the tag yourself when the owner asks (v0.1.3, 2026-09-12); verify as a consumer afterwards
+- [Release cut cadence](release-cut-cadence.md), cut the release PR the moment a milestone empties, bump the version EVERYWHERE (README, landing page, book, not only the manifests), run scripts/checks/versions.sh, create the next milestone for stragglers and close the emptied one by hand, and sign and push the tag yourself, every time (standing since 2026-11-03); verify as a consumer afterwards
 - [Container image decisions](container-image-decisions.md), distroless static base pinned by digest, numeric user 65532, docker/Dockerfile with a root .dockerignore, reusable L3 image lane with syft SBOMs per platform and actions/attest, Linux-only release targets, GHCR quirks
 - [Post-release verification pause](post-release-verification-pause.md), after the v0.0.3 cut, stop and verify binaries, image, L3 provenance, SBOMs, signatures as a consumer before new work; the owner wants the supply chain proven
-- [Milestone autonomy](milestone-autonomy.md), owner directive: work milestones v0.0.4 through v0.0.7 end to end without pausing, cut each release when it empties, move stragglers forward, file new milestones for new issues; only the signed tag is the owner's
+- [Milestone autonomy](milestone-autonomy.md), owner directive: work milestones v0.0.4 through v0.0.7 end to end without pausing, cut each release when it empties, move stragglers forward, file new milestones for new issues; the session also merges the release PR, tags and approves crates.io (owner 2026-11-03)
 - [Performance bar](performance-bar.md), point reads and operations under 1 ms, NL ingest under 60 s, measured with criterion; never call a millisecond figure fine (#77)
 - [ICD-11 local deployment](icd11-local-deployment.md), the WHO ICD-API container flags, which language bundles exist per release, cache under data/icd11, artifacts under artifacts/icd11, clean up the containers afterwards
 - [Perl edit pitfalls](perl-edit-pitfalls.md), heredoc-quoted literals only, re-read after rustfmt, cargo clean -p on a stale rmeta
@@ -33,11 +33,38 @@
 - [openEHR archetype canonical thread](openehr-archetype-canonical-thread.md), the owner's 2026-09-12 discourse thread on the canonical URL of an archetype-local value set; Seref's answer backs the opaque-canonical stance of #547, Ian mints under openehr.org
 - [Forum replies short and plain](forum-replies-short-plain.md), anything the owner posts as themself stays near 100 to 150 words with none of the AI-tell words or hedges; a 408-word draft was rejected hard on 2026-09-12
 - [NTS sync program](nts-sync-program.md), owner decisions 2026-09-22: separate ferroterm-sync service, addons/ named after the service (nts first), native scheduler no cron, one way, v0.1.4 reserved for it and the old items moved to v0.1.5
-- [FerroEHR: no worktrees](ferroehr-no-worktrees.md), an agent sent into the FerroEHR clone works in its main checkout on a branch, never a git worktree (that repo's owner rule of 2026-08-06); a brief from here must not override it
+- [FerroEHR worktrees](ferroehr-no-worktrees.md), superseded: FerroEHR allows worktrees since 2026-10-19 at .claude/worktrees/<name>, each with its own target; a brief follows that repository's own rules
 - [Git -C absolute paths](git-c-absolute-paths.md), a `cd` in a compound command does not reliably set cwd for git; `git -C /abs/path` everywhere, and a force push checks the branch name in the same command (2026-09-24, PRs #674/#676 collided)
 - [NTS account facts](nts-account-facts.md), owner has an NTS account since 2026-09-25 (creds in ~/.ferroterm-nts.env); feed is SNOMED binary-only, FHIR content behind the API (#692), LOINC and NHG hidden until Nictiz grants those licences
 - [FerroHEALTH org move](ferrohealth-org-move.md), repo is FerroHEALTH/FerroTERM since 2026-10-01; attestations and the old GHCR package stay under rubentalstra, image path lowercase ghcr.io/ferrohealth, crates.io Trusted Publishing must name FerroHEALTH
 - [Native issue types and priority](native-issue-types-and-priority.md), type, priority and effort are the org's native issue type and Priority/Effort fields via scripts/gh/fields.sh since 2026-10-05 (#704); the owner runs migrate-fields.sh apply and labels.sh by hand
-- [FerroUI](ferroui.md), every console draws in FerroUI; uniform design, shared components, all five consoles move in lockstep with each FerroUI release, every console reactive
+- [FerroUI](ferroui.md), every console draws in FerroUI; uniform design, shared components, all five consoles move in lockstep with each FerroUI release, every console server-rendered since FerroUI 0.6
 - [Release closes milestone](release-closes-milestone.md), release.yml refuses a tag whose milestone is missing or not empty and closes it after every leg; check it after a manual or recovery release; owner 2026-10-19 (#758)
-- [Reactive console UI](reactive-console-ui.md): owner 2026-10-25, no full page reload for an interaction; WebAssembly is the normal path, the no-WebAssembly page the fallback (FerroUI #410)
+- [Console UI mode](reactive-console-ui.md): owner 2026-10-29 (FerroUI #510), server-rendered consoles with plain script modules and no WebAssembly; supersedes the reactive ruling of 2026-10-25
+
+## Family rules (carried in every FerroHEALTH repository, 2026-11-09)
+
+- [No compatibility shims](no-compat-shims.md): refactors break APIs freely and leave no deprecated item, alias, re-export or stub; a removal refusal lives ONE release, then is deleted fully; no legacy support ever; owner 2026-11-01, 2026-11-09
+- [No half solutions](no-half-solutions.md): build what the issue asks the proper way and validate the need against its consumer first; a breaking change moves the minor version, never shape a design to dodge semver; owner 2026-11-08
+- [EHDS above openEHR](ehds-above-openehr.md): where Regulation (EU) 2025/327 conflicts with a standard's text the Regulation wins; never revert EHDS behaviour to pass a conformance row; owner 2026-11-09
+- [Terminology via the server](terminology-via-server.md): every production value map goes through a FHIR terminology server over ferrobridge-term; embedded or offline maps are test-only; owner 2026-11-09
+- [Workers on Opus only](workers-on-opus-only.md): every subagent is model opus; never Fable, Sonnet or Haiku as a worker; owner 2026-10-30
+- [Ten worker slots](worker-cap-ten.md): up to 10 implementation workers at once across the family since 2026-11-03, replacing the cap of 5
+- [No workflows for workers](no-workflows-for-workers.md): start workers with the Agent tool only, since a workflow agent cannot be messaged; owner 2026-11-01
+- [Worker scratch subfolders](worker-scratch-subfolders.md): scratch files under the worker's own scratchpad subfolder, never the root; check a file is yours before --body-file and re-read the PR body; 2026-10-20
+- [Worker wait loops](worker-wait-loops.md): no self-matching pgrep waits, one wait per output, push a finished branch, stop a process by PID and never pkill; 2026-10-16
+- [Workers never idle on the merge queue](workers-never-idle-on-merge-queue.md): start the next independent issue in a fresh worktree while a PR waits in the queue; owner 2026-11-03
+- [Workers own every open PR](workers-own-every-open-pr.md): drive every PR you opened to merge; the orchestrator sweeps every open PR after each merge, red main first; owner 2026-11-01, 2026-11-03
+- [PR backlog discipline](pr-backlog-discipline.md): several open PRs are fine if each merges cleanly; disjoint files, no stacked PRs, every PR tracked to its merge; owner 2026-10-17
+- [Worktrees in the repo](worktrees-in-repo.md): every worktree at <repo>/.claude/worktrees/<name>, never a sibling folder or the scratchpad; owner 2026-10-21
+- [Admin bypass stays](admin-bypass-stays.md): the org-admin bypass on main stays in every family repo; nobody merges through it; owner 2026-10-21
+- [Decide, do not ask](decide-dont-ask.md): make tracker, design and release calls yourself and act; ask the owner only when a tool is refused; owner 2026-11-03
+- [Autonomous loop](autonomous-loop.md): never stop and never wait idle; keep working the issues while PRs drain; owner 2026-10-17
+- [Always a next milestone](next-milestone-always.md): every repo keeps a milestone with a due date after the active one; owner 2026-11-03
+- [One milestone at a time](one-milestone-at-a-time.md): every worker on the current milestone until it is cut; en-route issues join it and are fixed first; owner 2026-10-19
+- [Shared-crate blockers](shared-crate-blockers.md): every filed issue gets a milestone; a shared-crate defect goes in the owner repo's current milestone with a worker at once; no consumer workaround; owner 2026-11-07
+- [Release cuts run from the session](release-tag-and-approve-autonomously.md): merge the release PR, sign and push the tag and approve the crates-io gate yourself; owner 2026-09-13 to 2026-11-03
+- [Family toolchain](family-toolchain.md): newest stable Rust as toolchain, the toolchain minus one as MSRV; never lower an MSRV; owner 2026-10-21
+- [Memory lives in the repo](memory-lives-in-repo.md): every learning is a tracked file here, never a per-user note; owner 2026-09-04
+- [Subagent reports go to a file](subagent-reports-to-file.md): a long agent report is written to the agent's scratch subfolder and read from there; 2026-09-12
+- [Sibling projects](sibling-projects.md): the other family repositories are read-only prior art from here; a change there is made in its own checkout and PR
