@@ -201,7 +201,7 @@ gate() {
 # on its CPU.
 busy_loop() {
   local code=0 summary="$WORK/busy-loop.md" breaches pid
-  pid="$(start_sync busy target/release 127.0.0.1:8183 http://127.0.0.1:8081 FERROTERM_SYNC__SCHEDULE__EVERY=0s)"
+  pid="$(start_sync busy target/release 127.0.0.1:8183 http://127.0.0.1:8081 FERROTERM_SYNC__SCHEDULE__EVERY=1ns)"
   pids+=("$pid")
   wait_for "the busy sync service" 60 curl --fail --silent "$BUSY/health"
   GITHUB_STEP_SUMMARY='' ferrohealth-perf run --plan perf/sync/busy-loop.toml --pid "$pid" \
