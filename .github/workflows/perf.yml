@@ -4,7 +4,8 @@
 # The performance gate (#1151), called by ci.yml on a change that reaches
 # the server or the sync service and by release.yml on the release commit.
 # Each attempt job builds ferroterm-server, ferroterm-sync and the testkit's
-# ferroterm-fixture in release mode for the commit and for its base, installs
+# ferroterm-fixture in release mode for the commit and for its base (the
+# head's writer serves a base older than the writer, #1180), installs
 # ferrohealth-perf (FerroHEALTH/FerroSYS#249) at its pin and runs
 # scripts/perf/gate.sh once through .github/actions/perf-attempt: the tool's
 # A/B mode for each service (#1160), the head's idle phase held to absolute

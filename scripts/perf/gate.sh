@@ -13,10 +13,12 @@
 #       ref, or with no BASE the newest v* tag before HEAD, else HEAD's first
 #       parent. The base is built from `git archive` of that commit under
 #       target/, with its own toolchain pin, into the same target directory,
-#       so the dependencies build once.
+#       so the dependencies build once. The base must define both services;
+#       its fixture writer is built when its tree defines one (#1180).
 #   scripts/perf/gate.sh run
 #       Writes the scaled synthetic SNOMED CT edition with each side's
-#       ferroterm-fixture, starts each side's ferroterm over it and its own
+#       ferroterm-fixture, the head's for a base older than the writer,
+#       starts each side's ferroterm over it and its own
 #       e2e CodeSystem fixtures with the admin listener on (the head on 8080
 #       and 8081, the base on 8090 and 8091), and each side's ferroterm-sync
 #       with its next scheduled run twelve hours away (the head on 8181, the
@@ -29,9 +31,9 @@
 #       passes, 2 when a run cannot be judged or set up.
 #   scripts/perf/gate.sh --self-test
 #       Proves the schedule time, the agreement of the sync plans' idle
-#       limits and the base resolution offline.
+#       limits, the base resolution and the base's binaries offline.
 #
-# Needs curl, git and ferrohealth-perf on PATH, on Linux, where the tool
+# Needs curl, git, jq and ferrohealth-perf on PATH, on Linux, where the tool
 # reads CPU and memory from /proc. Neither service holds a database, so no
 # transactions are counted. No specification governs this: our own design.
 set -euo pipefail
@@ -40,6 +42,9 @@ root="$(cd "$(dirname "$0")/../.." && pwd)"
 readonly WORK=target/perf-run
 readonly BASE_TREE=target/perf-base
 readonly BINARIES=(ferroterm ferroterm-sync ferroterm-fixture)
+# The binaries the gate measures, which the base must define too.
+readonly SERVICES=(ferroterm ferroterm-sync)
+readonly FIXTURE=ferroterm-fixture
 readonly HEAD_SERVER=http://127.0.0.1:8080
 readonly BASE_SERVER=http://127.0.0.1:8090
 readonly HEAD_SYNC=http://127.0.0.1:8181
@@ -90,18 +95,57 @@ base_rev() {
   fi
 }
 
-# cargo_build: the release services and fixture writer of the tree in the
-# working directory.
+# bin_targets: the names of the binary targets in the `cargo metadata` JSON
+# on stdin, one per line, sorted.
+bin_targets() {
+  jq -r '.packages[].targets[] | select(.kind | index("bin")) | .name' | sort -u
+}
+
+# base_binaries: the binaries to build from a base whose binary targets are
+# the lines on stdin, in BINARIES order. Both services or nothing: a base
+# without one cannot be measured beside the head.
+base_binaries() {
+  local defined binary
+  defined="$(cat)"
+  for binary in "${SERVICES[@]}"; do
+    grep -qxF "$binary" <<< "$defined" || die "the base defines no $binary binary, so it cannot be measured"
+  done
+  for binary in "${BINARIES[@]}"; do
+    if grep -qxF "$binary" <<< "$defined"; then
+      echo "$binary"
+    fi
+  done
+}
+
+# fixture_writer BASE_DIR HEAD_DIR: the fixture writer that writes the
+# base's edition, the base's own when it has one, else the head's.
+fixture_writer() {
+  if [[ -x "$1/$FIXTURE" ]]; then
+    echo "$1/$FIXTURE"
+  else
+    echo "$2/$FIXTURE"
+  fi
+}
+
+# cargo_build BINARY... [-- CARGO_ARG...]: the release builds of BINARY of
+# the tree in the working directory.
 cargo_build() {
-  cargo build --release --locked -p ferroterm-server -p ferroterm-sync -p ferroterm-testkit \
-    --bin ferroterm --bin ferroterm-sync --bin ferroterm-fixture "$@"
+  local args=(--release --locked -p ferroterm-server -p ferroterm-sync)
+  while [[ $# -gt 0 && "$1" != "--" ]]; do
+    [[ "$1" != "$FIXTURE" ]] || args+=(-p ferroterm-testkit)
+    args+=(--bin "$1")
+    shift
+  done
+  [[ $# -eq 0 ]] || shift
+  cargo build "${args[@]}" "$@"
 }
 
 # build [BASE]: the base's binaries into target/perf-base/, then the head's
 # into target/release/.
 build() {
-  local rev binary
+  local rev binary binaries
   cd "$root"
+  command -v jq > /dev/null || die "jq is not on PATH"
   rev="$(base_rev "${1:-}")" || die "the base of ${1:-the previous release} cannot be resolved"
   echo "perf-gate: the base is $rev"
   rm -rf "$BASE_TREE"
@@ -109,14 +153,22 @@ build() {
   git archive "$rev" | tar -x -C "$BASE_TREE/src"
   printf '%s\n' "$rev" > "$BASE_TREE/rev"
   # From inside the base's tree, so its own toolchain pin builds it.
-  (cd "$BASE_TREE/src" && cargo_build --target-dir "$root/target")
-  for binary in "${BINARIES[@]}"; do
+  binaries="$(cd "$BASE_TREE/src" && cargo metadata --no-deps --locked --format-version 1 | bin_targets)" ||
+    die "the base's binary targets cannot be read"
+  binaries="$(base_binaries <<< "$binaries")"
+  read -r -d '' -a binaries <<< "$binaries" || true
+  if [[ " ${binaries[*]} " != *" $FIXTURE "* ]]; then
+    echo "perf-gate: the base defines no $FIXTURE, so the head's writes its edition"
+  fi
+  (cd "$BASE_TREE/src" && cargo_build "${binaries[@]}" -- --target-dir "$root/target")
+  for binary in "${binaries[@]}"; do
     cp "target/release/$binary" "$BASE_TREE/$binary"
   done
-  cargo_build
+  cargo_build "${BINARIES[@]}"
 }
 
 pids=()
+base_note=""
 cleanup() {
   local pid
   for pid in "${pids[@]}"; do
@@ -145,14 +197,14 @@ start_sync() {
   echo $!
 }
 
-# start_server NAME BIN TREE PORT ADMIN: writes the scaled edition with
-# BIN/ferroterm-fixture and starts BIN/ferroterm over it and TREE's e2e
-# CodeSystem fixtures under $WORK/NAME, and prints its process id.
+# start_server NAME BIN TREE PORT ADMIN WRITER: writes the scaled edition
+# with WRITER and starts BIN/ferroterm over it and TREE's e2e CodeSystem
+# fixtures under $WORK/NAME, and prints its process id.
 start_server() {
-  local name="$1" bin="$2" tree="$3" port="$4" admin="$5" dir
+  local name="$1" bin="$2" tree="$3" port="$4" admin="$5" writer="$6" dir
   dir="$WORK/$name"
   mkdir -p "$dir"
-  "$bin/ferroterm-fixture" snomed-scaled "$dir/index/snomed" "$CONCEPTS" > "$dir/fixture.log"
+  "$writer" snomed-scaled "$dir/index/snomed" "$CONCEPTS" > "$dir/fixture.log"
   FERROTERM__USAGE_REPORT__ENABLED=false \
     FERROTERM__SERVER__LISTEN="127.0.0.1:$port" \
     FERROTERM__ADMIN__LISTEN="127.0.0.1:$admin" \
@@ -165,17 +217,24 @@ start_server() {
 }
 
 start() {
-  local binary at
+  local binary at writer
   for binary in "${BINARIES[@]}"; do
     [[ -x "target/release/$binary" ]] || die "target/release/$binary is not built"
+  done
+  for binary in "${SERVICES[@]}"; do
     [[ -x "$BASE_TREE/$binary" ]] || die "$BASE_TREE/$binary is not built: run gate.sh build first"
   done
   rm -rf "$WORK"
   mkdir -p "$WORK"
 
-  head_server="$(start_server head-server target/release . 8080 8081)"
+  writer="$(fixture_writer "$BASE_TREE" target/release)"
+  if [[ "$writer" != "$BASE_TREE/$FIXTURE" ]]; then
+    base_note="The base defines no \`$FIXTURE\`, so the head's writes its edition."
+    echo "perf-gate: ${base_note//\`/}"
+  fi
+  head_server="$(start_server head-server target/release . 8080 8081 "target/release/$FIXTURE")"
   pids+=("$head_server")
-  base_server="$(start_server base-server "$BASE_TREE" "$BASE_TREE/src" 8090 8091)"
+  base_server="$(start_server base-server "$BASE_TREE" "$BASE_TREE/src" 8090 8091 "$writer")"
   pids+=("$base_server")
   wait_for "the head server" 120 curl --fail --silent "$HEAD_SERVER/health"
   wait_for "the base server" 120 curl --fail --silent "$BASE_SERVER/health"
@@ -235,7 +294,7 @@ run() {
   trap cleanup EXIT
   start
   if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
-    printf "The base is \`%s\`.\n\n" "$(< "$BASE_TREE/rev")" >> "$GITHUB_STEP_SUMMARY"
+    printf "The base is \`%s\`. %s\n\n" "$(< "$BASE_TREE/rev")" "${base_note:-}" >> "$GITHUB_STEP_SUMMARY"
   fi
   local code=0 step
   for step in "server $base_server $BASE_SERVER $head_server $HEAD_SERVER" \
@@ -297,6 +356,27 @@ self_test() {
   check "with no tag before it the base is the first parent" \
     "$(git -C "$repo" rev-parse v0.0.1~1)" "$(base_rev "" v0.0.1)"
   root="$saved_root"
+  local metadata='{"packages":[
+    {"targets":[{"kind":["lib"],"name":"ferroterm_server"},{"kind":["bin"],"name":"ferroterm"}]},
+    {"targets":[{"kind":["bin"],"name":"ferroterm-sync"},{"kind":["test"],"name":"it"}]},
+    {"targets":[{"kind":["lib"],"name":"ferroterm_testkit"},{"kind":["bin"],"name":"ferroterm-fixture"}]}]}'
+  check "the binary targets are read from cargo metadata" \
+    "$(printf '%s\n' ferroterm ferroterm-fixture ferroterm-sync)" "$(bin_targets <<< "$metadata")"
+  check "a base with the fixture writer builds all three" \
+    "$(printf '%s\n' "${BINARIES[@]}")" "$(bin_targets <<< "$metadata" | base_binaries)"
+  check "a base without the fixture writer builds the two services" \
+    "$(printf '%s\n' ferroterm ferroterm-sync)" "$(printf '%s\n' ferroterm ferroterm-sync bench | base_binaries)"
+  check "a base without the sync service cannot be measured" \
+    "2" "$( (printf '%s\n' ferroterm ferroterm-fixture | base_binaries) > /dev/null 2>&1 && echo 0 || echo $?)"
+  mkdir -p "$work/base" "$work/head"
+  : > "$work/head/$FIXTURE"
+  chmod +x "$work/head/$FIXTURE"
+  check "a base without the fixture writer has its edition written by the head's" \
+    "$work/head/$FIXTURE" "$(fixture_writer "$work/base" "$work/head")"
+  : > "$work/base/$FIXTURE"
+  chmod +x "$work/base/$FIXTURE"
+  check "a base with the fixture writer writes its own edition" \
+    "$work/base/$FIXTURE" "$(fixture_writer "$work/base" "$work/head")"
   [[ "$failed" -eq 0 ]] || exit 1
   echo "perf-gate: self-test OK ($n checks)."
 }
