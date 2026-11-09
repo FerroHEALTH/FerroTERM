@@ -19,11 +19,11 @@ advisories and its release lane.
 
 | Who | What |
 |---|---|
-| Cadasto B.V., the manufacturer | Receives reports at `info@cadasto.com`, decides whether a vulnerability is actively exploited, and signs every report to an authority (the FerroHEALTH procedure). |
-| The maintainer, Ruben Talstra | Reads FerroTERM's private vulnerability reports and the reports Cadasto B.V. forwards from `info@cadasto.com`, drafts the advisory, prepares the fixing release, and drafts the reports for Cadasto B.V. to send. |
+| Cadasto B.V., the manufacturer | Receives reports at `security@cadasto.com`, decides whether a vulnerability is actively exploited, and signs every report to an authority (the FerroHEALTH procedure). |
+| The maintainer, Ruben Talstra | Reads FerroTERM's private vulnerability reports and the reports Cadasto B.V. forwards from `security@cadasto.com`, drafts the advisory, prepares the fixing release, and drafts the reports for Cadasto B.V. to send. |
 
 FerroTERM's channels are GitHub private vulnerability reporting on this
-repository ([`SECURITY.md`](../SECURITY.md)) and `info@cadasto.com` with the
+repository ([`SECURITY.md`](../SECURITY.md)) and `security@cadasto.com` with the
 subject "FerroTERM vulnerability". An emailed vulnerability report gets a draft
 security advisory on this repository on receipt, exactly as a private GitHub
 report does, and the clocks run from the email's arrival.
