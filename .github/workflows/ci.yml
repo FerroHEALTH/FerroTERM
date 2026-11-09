@@ -43,25 +43,35 @@ env:
 jobs:
   # ── Tier 1: the workflow + shell checks (always run) ────────────────────────
 
-  # zizmor (docs.zizmor.sh) — static security analysis for GitHub Actions, the
-  # machine check behind three hard properties here: every `uses:` hash-pinned
-  # (unpinned-uses), no checkout persisting credentials without a recorded
-  # exception (artipacked), and no context value spliced into a shell
-  # (template-injection).
-  workflow-audit:
-    name: zizmor
+  # The workflow and container linters in one job: each linter is a step
+  # that runs whatever the step before it concluded, so one run reports
+  # every finding, and the job takes one runner where it took four (#1189).
+  # No specification governs this: our own design.
+  lint:
+    name: lint
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+
+      # ---- zizmor ------------------------------------------------------
+
+      # zizmor (docs.zizmor.sh) — static security analysis for GitHub Actions, the
+      # machine check behind three hard properties here: every `uses:` hash-pinned
+      # (unpinned-uses), no checkout persisting credentials without a recorded
+      # exception (artipacked), and no context value spliced into a shell
+      # (template-injection).
+      - name: zizmor
+        if: ${{ !cancelled() }}
+        uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
         with:
           tool: zizmor@1.30.1
-      - name: Audit .github/workflows
+      - name: zizmor / Audit .github/workflows
+        if: ${{ !cancelled() }}
         # GH_TOKEN enables the ONLINE audits: impostor-commit verifies that a
         # pinned commit really belongs to the repository named in front of it,
         # which it cannot do offline. --min-severity=low gates every actionable
@@ -88,20 +98,12 @@ jobs:
           done
           exit 1
 
-  # actionlint — the CORRECTNESS half of the pair: `${{ }}` expressions that
-  # cannot evaluate, `needs:` naming a job that does not exist, unknown runner
-  # labels, and shellcheck over every embedded `run:` block.
-  workflow-lint:
-    name: actionlint
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Lint .github/workflows
+      # ---- actionlint --------------------------------------------------
+      # actionlint — the CORRECTNESS half of the pair: `${{ }}` expressions that
+      # cannot evaluate, `needs:` naming a job that does not exist, unknown runner
+      # labels, and shellcheck over every embedded `run:` block.
+      - name: actionlint / Lint .github/workflows
+        if: ${{ !cancelled() }}
         # The OFFICIAL image, digest-pinned. actionlint is a Go binary (not a
         # crate), and its own README's alternative is `curl | bash` off main —
         # exactly the unpinned fetch this repository's pinning rule forbids.
@@ -118,28 +120,19 @@ jobs:
             rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 \
             -color
 
-  # shellcheck over the tracked shell scripts — every CI guard, vendor fetcher,
-  # and hook. `--severity=style` is the lowest floor, so everything gates: a
-  # finding is fixed, or carries a per-line `# shellcheck disable=SCnnnn`
-  # directive with its reason. No .shellcheckrc, deliberately — nothing may turn
-  # a code off tree-wide.
-  shellcheck:
-    name: shellcheck
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      # The upstream RELEASE binary, pinned by version — not the runner's distro
-      # package, which moves under us at every runner-image refresh. Fetched by
-      # the same SHA-pinned installer, which verifies the checksum.
-      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+      # ---- shellcheck --------------------------------------------------
+      # shellcheck over the tracked shell scripts — every CI guard, vendor fetcher,
+      # and hook. `--severity=style` is the lowest floor, so everything gates: a
+      # finding is fixed, or carries a per-line `# shellcheck disable=SCnnnn`
+      # directive with its reason. No .shellcheckrc, deliberately — nothing may turn
+      # a code off tree-wide.
+      - name: shellcheck
+        if: ${{ !cancelled() }}
+        uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
         with:
           tool: shellcheck@0.11.0
-      - name: Every tracked shell program is clean at severity=style
+      - name: shellcheck / Every tracked shell program is clean at severity=style
+        if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
           # Every tracked *.sh, plus every tracked extensionless file whose
@@ -156,169 +149,14 @@ jobs:
             done
           } | { grep -zc . >/dev/null && xargs -0 -r shellcheck --severity=style; } \
             || echo "no shell files to check"
-      - name: The performance gate reads its schedule, holds the sync plans' idle tables equal and resolves its base
+      - name: shellcheck / The performance gate reads its schedule, holds the sync plans' idle tables equal and resolves its base
+        if: ${{ !cancelled() }}
         run: bash scripts/perf/gate.sh --self-test
 
-  # comment-style: the RFC 505 / RFC 1574 comment budgets over every
-  # hand-written .rs file. The per-edit hook runs the same script on the files
-  # it just touched, which says nothing about a file an editor changed outside
-  # the hook, so the whole tree is swept here. It reads the checkout and needs
-  # no toolchain, which is why it sits in tier 1.
-  comment-style:
-    name: comment-style
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - run: bash scripts/checks/comment-style.sh --all
-
-  # stray-literals: a string the console draws belongs in its catalog under
-  # app/ferroterm-console/locales/, and a file holds no more stray literals
-  # than its baseline while the strings move (#749). A fall passes with a
-  # note, and ratchet-tighten.yml lowers the baseline on main (#954). It
-  # reads the checkout and needs no toolchain, so it sits in tier 1.
-  stray-literals:
-    name: stray-literals
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - run: bash scripts/checks/stray-literals.sh app/ferroterm-console/src
-
-  # The duplicated lines of the hand-written Rust may fall and never rise
-  # (#950, .claude/rules/rust-style.md, Code is written once). jscpd runs from
-  # its official image, pinned by digest in docs/VERSIONS.md, and the count
-  # and the key of every counted block are committed beside the guard. A rise
-  # fails and names the new blocks by both places; a fall passes, and
-  # ratchet-tighten.yml lowers the count on main.
-  duplication:
-    name: duplication
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Duplication ratchet self-test
-        run: bash scripts/checks/duplication.sh --self-test
-      - name: The duplicated lines have not risen
-        run: bash scripts/checks/duplication.sh
-
-  # A hand-written source file carries at most 800 lines, its inline tests
-  # included (#950). A file over it on the day the guard landed stands in
-  # scripts/checks/file-size.list with its length and may shrink and never
-  # grow; a shrink passes, and ratchet-tighten.yml lowers the entry on main.
-  file-size:
-    name: file-size
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: File-size ratchet self-test
-        run: bash scripts/checks/file-size.sh --self-test
-      - name: No file over the budget or past its entry
-        run: bash scripts/checks/file-size.sh
-
-  # No function only forwards to another (.claude/rules/rust-style.md,
-  # #972): the forwarders tools/forwarders finds in addons/*/src, app/*/src,
-  # crates/*/src and tools/*/src may fall and never rise. The count and the
-  # key of every counted forwarder are committed beside the guard. A rise
-  # fails and names each new forwarder with its target; a fall passes, and
-  # ratchet-tighten.yml lowers the count on main. No rust-cache: the tool
-  # builds proc-macro2, quote and syn alone.
-  forwarders:
-    name: forwarders
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
-        with:
-          cache: false
-      - name: Forwarder ratchet self-test
-        run: bash scripts/checks/forwarders.sh --self-test
-      - name: The forwarders have not risen
-        run: bash scripts/checks/forwarders.sh
-
-  # dockerfile-lint — hadolint over the container recipe. The image copies a
-  # prebuilt binary onto a digest-pinned base, so the rules that matter are
-  # the pinned FROM, the numeric non-root USER, and the exec-form ENTRYPOINT.
-  # The tree guards: every vendor fetcher writes into the tree, every
-  # workspace member is named in the repo map and the architecture table,
-  # every evidence citation in docs/claims.md resolves to a symbol or a test,
-  # every project extension the server writes has its StructureDefinition
-  # on the website, and every first-party file carries its SPDX header.
-  tree-guards:
-    name: tree-guards
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: vendor-dests
-        run: bash scripts/checks/vendor-dests.sh
-      - name: repo-map
-        run: bash scripts/checks/repo-map.sh
-      - name: claims
-        run: |
-          bash scripts/checks/claims.sh --self-test
-          bash scripts/checks/claims.sh
-      - name: extension-definitions
-        run: bash scripts/checks/extension-definitions.sh
-      # Every first-party file carries both SPDX lines, and every header
-      # names the Licensor. Each self-test runs first on a synthetic tree.
-      - name: spdx-headers
-        run: |
-          bash scripts/checks/spdx-headers.sh --self-test
-          bash scripts/checks/spdx-headers.sh
-      - name: copyright-holder
-        run: |
-          bash scripts/checks/copyright-holder.sh --self-test
-          bash scripts/checks/copyright-holder.sh
-      # Every launcher that starts the server switches the usage report off.
-      # The self-test runs first: it judges synthetic launchers.
-      - name: usage-report-off
-        run: |
-          bash scripts/checks/usage-report-off.sh --self-test
-          bash scripts/checks/usage-report-off.sh
-      # The weekly pin-freshness lane reads upstream; here only its readers
-      # run over fixtures and every pin row it reads is checked to exist.
-      - name: pin-freshness self-test
-        run: bash scripts/checks/pin-freshness.sh --self-test
-
-  dockerfile-lint:
-    name: hadolint
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      # Every Dockerfile in the tree, under the .hadolint.yaml configuration.
-      - uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
+      # ---- hadolint ----------------------------------------------------
+      - name: hadolint
+        if: ${{ !cancelled() }}
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
         with:
           dockerfile: Dockerfile
           recursive: true
@@ -326,70 +164,241 @@ jobs:
       # A recipe with a suffix is named on its own: the recursive pattern above
       # matches the name exactly, and a wildcard would also catch a
       # `.dockerignore` beside one, which is not a Dockerfile.
-      - uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
+      - name: hadolint
+        if: ${{ !cancelled() }}
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
         with:
           dockerfile: docker/Dockerfile.sync
           config: .hadolint.yaml
 
-  # versions — the version-drift guard. Runs NOW, before any Rust exists:
-  # scripts/checks/versions.sh compares every present config file against
-  # docs/VERSIONS.md and skips loudly for files that have not landed yet.
-  versions:
-    name: versions
+  # The committed guards in one job: each guard is a step that runs
+  # whatever the step before it concluded, so one run reports every
+  # finding, and the job takes one runner where it took fourteen (#1189).
+  # No specification governs this: our own design.
+  guards:
+    name: guards
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: bash scripts/checks/versions.sh
 
-  # brand — the brand palette's contrast, measured rather than remembered.
-  # scripts/checks/brand-contrast.sh reads assets/brand/tokens.css and fails when
-  # a token's `safe:` comment or the README's table stops matching the ratio the
-  # value actually has, so a colour safe for the mark is never quietly used for
-  # text (WCAG 2.2 asks 4.5:1 for body text and 3:1 for a graphic).
-  brand:
-    name: brand
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - run: bash scripts/checks/brand-contrast.sh
+      # ---- comment-style -----------------------------------------------
+      # comment-style: the RFC 505 / RFC 1574 comment budgets over every
+      # hand-written .rs file. The per-edit hook runs the same script on the files
+      # it just touched, which says nothing about a file an editor changed outside
+      # the hook, so the whole tree is swept here. It reads the checkout and needs
+      # no toolchain, which is why it sits in tier 1.
+      - name: comment-style
+        if: ${{ !cancelled() }}
+        run: bash scripts/checks/comment-style.sh --all
 
-  # code-systems — the served code systems are listed once: the book's table
-  # is the source, and the README and the landing page must name every row.
-  code-systems:
-    name: code-systems
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - run: bash scripts/checks/code-systems.sh
+      # ---- stray-literals ----------------------------------------------
+      # stray-literals: a string the console draws belongs in its catalog under
+      # app/ferroterm-console/locales/, and a file holds no more stray literals
+      # than its baseline while the strings move (#749). A fall passes with a
+      # note, and ratchet-tighten.yml lowers the baseline on main (#954). It
+      # reads the checkout and needs no toolchain, so it sits in tier 1.
+      - name: stray-literals
+        if: ${{ !cancelled() }}
+        run: bash scripts/checks/stray-literals.sh app/ferroterm-console/src
 
-  # bench-table: the README's speed and footprint table is rendered from the
-  # committed benchmark records, never typed by hand.
-  bench-table:
-    name: bench-table
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # ---- duplication -------------------------------------------------
+      # The duplicated lines of the hand-written Rust may fall and never rise
+      # (#950, .claude/rules/rust-style.md, Code is written once). jscpd runs from
+      # its official image, pinned by digest in docs/VERSIONS.md, and the count
+      # and the key of every counted block are committed beside the guard. A rise
+      # fails and names the new blocks by both places; a fall passes, and
+      # ratchet-tighten.yml lowers the count on main.
+      - name: duplication / Duplication ratchet self-test
+        if: ${{ !cancelled() }}
+        run: bash scripts/checks/duplication.sh --self-test
+      - name: duplication / The duplicated lines have not risen
+        if: ${{ !cancelled() }}
+        run: bash scripts/checks/duplication.sh
+
+      # ---- file-size ---------------------------------------------------
+      # A hand-written source file carries at most 800 lines, its inline tests
+      # included (#950). A file over it on the day the guard landed stands in
+      # scripts/checks/file-size.list with its length and may shrink and never
+      # grow; a shrink passes, and ratchet-tighten.yml lowers the entry on main.
+      - name: file-size / File-size ratchet self-test
+        if: ${{ !cancelled() }}
+        run: bash scripts/checks/file-size.sh --self-test
+      - name: file-size / No file over the budget or past its entry
+        if: ${{ !cancelled() }}
+        run: bash scripts/checks/file-size.sh
+
+      # ---- forwarders --------------------------------------------------
+      # No function only forwards to another (.claude/rules/rust-style.md,
+      # #972): the forwarders tools/forwarders finds in addons/*/src, app/*/src,
+      # crates/*/src and tools/*/src may fall and never rise. The count and the
+      # key of every counted forwarder are committed beside the guard. A rise
+      # fails and names each new forwarder with its target; a fall passes, and
+      # ratchet-tighten.yml lowers the count on main. No rust-cache: the tool
+      # builds proc-macro2, quote and syn alone.
+      - name: forwarders
+        if: ${{ !cancelled() }}
+        uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
         with:
-          persist-credentials: false
-      - run: bash scripts/checks/bench-table.sh check
+          cache: false
+      - name: forwarders / Forwarder ratchet self-test
+        if: ${{ !cancelled() }}
+        run: bash scripts/checks/forwarders.sh --self-test
+      - name: forwarders / The forwarders have not risen
+        if: ${{ !cancelled() }}
+        run: bash scripts/checks/forwarders.sh
+
+      # ---- tree-guards -------------------------------------------------
+      # dockerfile-lint — hadolint over the container recipe. The image copies a
+      # prebuilt binary onto a digest-pinned base, so the rules that matter are
+      # the pinned FROM, the numeric non-root USER, and the exec-form ENTRYPOINT.
+      # The tree guards: every vendor fetcher writes into the tree, every
+      # workspace member is named in the repo map and the architecture table,
+      # every evidence citation in docs/claims.md resolves to a symbol or a test,
+      # every project extension the server writes has its StructureDefinition
+      # on the website, and every first-party file carries its SPDX header.
+      - name: tree-guards / vendor-dests
+        if: ${{ !cancelled() }}
+        run: bash scripts/checks/vendor-dests.sh
+      - name: tree-guards / repo-map
+        if: ${{ !cancelled() }}
+        run: bash scripts/checks/repo-map.sh
+      - name: tree-guards / claims
+        if: ${{ !cancelled() }}
+        run: |
+          bash scripts/checks/claims.sh --self-test
+          bash scripts/checks/claims.sh
+      - name: tree-guards / extension-definitions
+        if: ${{ !cancelled() }}
+        run: bash scripts/checks/extension-definitions.sh
+      # Every first-party file carries both SPDX lines, and every header
+      # names the Licensor. Each self-test runs first on a synthetic tree.
+      - name: tree-guards / spdx-headers
+        if: ${{ !cancelled() }}
+        run: |
+          bash scripts/checks/spdx-headers.sh --self-test
+          bash scripts/checks/spdx-headers.sh
+      - name: tree-guards / copyright-holder
+        if: ${{ !cancelled() }}
+        run: |
+          bash scripts/checks/copyright-holder.sh --self-test
+          bash scripts/checks/copyright-holder.sh
+      # Every launcher that starts the server switches the usage report off.
+      # The self-test runs first: it judges synthetic launchers.
+      - name: tree-guards / usage-report-off
+        if: ${{ !cancelled() }}
+        run: |
+          bash scripts/checks/usage-report-off.sh --self-test
+          bash scripts/checks/usage-report-off.sh
+      # The weekly pin-freshness lane reads upstream; here only its readers
+      # run over fixtures and every pin row it reads is checked to exist.
+      - name: tree-guards / pin-freshness self-test
+        if: ${{ !cancelled() }}
+        run: bash scripts/checks/pin-freshness.sh --self-test
+
+      # ---- versions ----------------------------------------------------
+      # versions — the version-drift guard. Runs NOW, before any Rust exists:
+      # scripts/checks/versions.sh compares every present config file against
+      # docs/VERSIONS.md and skips loudly for files that have not landed yet.
+      - name: versions
+        if: ${{ !cancelled() }}
+        run: bash scripts/checks/versions.sh
+
+      # ---- brand -------------------------------------------------------
+      # brand — the brand palette's contrast, measured rather than remembered.
+      # scripts/checks/brand-contrast.sh reads assets/brand/tokens.css and fails when
+      # a token's `safe:` comment or the README's table stops matching the ratio the
+      # value actually has, so a colour safe for the mark is never quietly used for
+      # text (WCAG 2.2 asks 4.5:1 for body text and 3:1 for a graphic).
+      - name: brand
+        if: ${{ !cancelled() }}
+        run: bash scripts/checks/brand-contrast.sh
+
+      # ---- code-systems ------------------------------------------------
+      # code-systems — the served code systems are listed once: the book's table
+      # is the source, and the README and the landing page must name every row.
+      - name: code-systems
+        if: ${{ !cancelled() }}
+        run: bash scripts/checks/code-systems.sh
+
+      # ---- bench-table -------------------------------------------------
+      # bench-table: the README's speed and footprint table is rendered from the
+      # committed benchmark records, never typed by hand.
+      - name: bench-table
+        if: ${{ !cancelled() }}
+        run: bash scripts/checks/bench-table.sh check
+
+      # ---- vex ---------------------------------------------------------
+      # The Rust-advisory OpenVEX document is generated from deny.toml and
+      # security/vex/rust-advisories.toml; this regenerates it and fails on any
+      # difference, and checks every hand-written document is well-formed OpenVEX
+      # (no specification governs the pairing: our own design, FerroEHR's gate).
+      - name: vex / Install yq
+        if: ${{ !cancelled() }}
+        env:
+          YQ_VERSION: v4.53.3
+          YQ_SHA256: fa52a4e758c63d38299163fbdd1edfb4c4963247918bf9c1c5d31d84789eded4
+        run: |
+          set -euo pipefail
+          curl -fsSL --proto "=https" --proto-redir "=https" --tlsv1.2 --retry 3 --retry-delay 2 --retry-all-errors -o /tmp/yq "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
+          echo "${YQ_SHA256}  /tmp/yq" | sha256sum -c -
+          sudo install -m 0755 /tmp/yq /usr/local/bin/yq
+          yq --version
+      - name: vex / Every accepted advisory has a published VEX justification
+        if: ${{ !cancelled() }}
+        run: bash scripts/checks/vex-advisories.sh
+      - name: vex / The release record's coverage check refuses what it claims to refuse
+        if: ${{ !cancelled() }}
+        run: bash scripts/checks/vex-coverage.sh --self-test
+
+      # ---- tracker-helpers ---------------------------------------------
+      # The tracker helpers under scripts/gh/ (no specification governs them: our
+      # own design). Each drives itself against a stub gh, so the self-tests need
+      # no token and run on every event.
+      - name: tracker-helpers
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          bash scripts/gh/fields.sh --self-test
+          bash scripts/gh/labels.sh --self-test
+          bash scripts/gh/migrate-fields.sh --self-test
+          bash scripts/gh/rel.sh --self-test
+
+      # ---- changelog ---------------------------------------------------
+      # The changelog fragments under changelog.d/ (no specification governs
+      # them: our own design). Every fragment's name and content is checked on
+      # every event, so a malformed one never reaches the release cut that
+      # assembles them, and the assembled [Unreleased] preview is held to the
+      # release section's rules: Keep a Changelog types, and the Security reason
+      # and advisory (CRA Annex I Part II(2), (4) and (8)). The self-tests prove
+      # the checks, the assembly, the plan list and the pull-request guard below.
+      - name: changelog
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          bash scripts/release/changelog.sh --self-test
+          bash scripts/checks/changelog-guard.sh --self-test
+          bash scripts/release/changelog.sh --check
+          bash scripts/release/milestone.sh --self-test
+          bash scripts/checks/changelog-security.sh --self-test
+          bash scripts/checks/release-notes.sh --self-test
+          bash scripts/release/plan.sh --self-test
+          bash scripts/checks/changelog-structure.sh
+          bash scripts/release/changelog.sh --check-preview
+
+      # ---- conflict-markers --------------------------------------------
+      # No tracked file keeps an unresolved merge conflict (#1048; no
+      # specification governs the guard: our own design).
+      - name: conflict-markers / The guard refuses each marker and skips the vendored trees
+        if: ${{ !cancelled() }}
+        run: bash scripts/checks/conflict-markers.sh --self-test
+      - name: conflict-markers
+        if: ${{ !cancelled() }}
+        run: bash scripts/checks/conflict-markers.sh
 
   # ── Tier 2: the Rust lanes (guarded on the workspace existing) ──────────────
 
@@ -541,38 +550,6 @@ jobs:
       - name: Every VEX statement names the paths cargo resolves
         run: bash scripts/checks/vex-reachability.sh
 
-  # The Rust-advisory OpenVEX document is generated from deny.toml and
-  # security/vex/rust-advisories.toml; this regenerates it and fails on any
-  # difference, and checks every hand-written document is well-formed OpenVEX
-  # (no specification governs the pairing: our own design, FerroEHR's gate).
-  vex:
-    name: vex
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      # deny.toml and the prose file are TOML, which jq cannot read. Pinned by
-      # version and verified by checksum: this binary decides whether the gate
-      # passes.
-      - name: Install yq
-        env:
-          YQ_VERSION: v4.53.3
-          YQ_SHA256: fa52a4e758c63d38299163fbdd1edfb4c4963247918bf9c1c5d31d84789eded4
-        run: |
-          set -euo pipefail
-          curl -fsSL --proto "=https" --proto-redir "=https" --tlsv1.2 --retry 3 --retry-delay 2 --retry-all-errors -o /tmp/yq "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
-          echo "${YQ_SHA256}  /tmp/yq" | sha256sum -c -
-          sudo install -m 0755 /tmp/yq /usr/local/bin/yq
-          yq --version
-      - name: Every accepted advisory has a published VEX justification
-        run: bash scripts/checks/vex-advisories.sh
-      - name: The release record's coverage check refuses what it claims to refuse
-        run: bash scripts/checks/vex-coverage.sh --self-test
-
   # The console is a FHIR client and links no crate from this workspace, so
   # anything it can do a client can do. One dependency edge into the engine
   # would break that silently, so the resolved closure is walked here.
@@ -705,55 +682,6 @@ jobs:
           path: target/ui-e2e-failures
           if-no-files-found: ignore
           retention-days: 14
-
-  # The tracker helpers under scripts/gh/ (no specification governs them: our
-  # own design). Each drives itself against a stub gh, so the self-tests need
-  # no token and run on every event.
-  tracker-helpers:
-    name: tracker-helpers
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - run: |
-          set -euo pipefail
-          bash scripts/gh/fields.sh --self-test
-          bash scripts/gh/labels.sh --self-test
-          bash scripts/gh/migrate-fields.sh --self-test
-          bash scripts/gh/rel.sh --self-test
-
-  # The changelog fragments under changelog.d/ (no specification governs
-  # them: our own design). Every fragment's name and content is checked on
-  # every event, so a malformed one never reaches the release cut that
-  # assembles them, and the assembled [Unreleased] preview is held to the
-  # release section's rules: Keep a Changelog types, and the Security reason
-  # and advisory (CRA Annex I Part II(2), (4) and (8)). The self-tests prove
-  # the checks, the assembly, the plan list and the pull-request guard below.
-  changelog:
-    name: changelog
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - run: |
-          set -euo pipefail
-          bash scripts/release/changelog.sh --self-test
-          bash scripts/checks/changelog-guard.sh --self-test
-          bash scripts/release/changelog.sh --check
-          bash scripts/release/milestone.sh --self-test
-          bash scripts/checks/changelog-security.sh --self-test
-          bash scripts/checks/release-notes.sh --self-test
-          bash scripts/release/plan.sh --self-test
-          bash scripts/checks/changelog-structure.sh
-          bash scripts/release/changelog.sh --check-preview
 
   # A pull request records its user-visible effect as a fragment under
   # changelog.d/, or as an edit of CHANGELOG.md while pull requests opened
@@ -983,54 +911,23 @@ jobs:
 
   # ── The single required check ───────────────────────────────────────────────
 
-  # No tracked file keeps an unresolved merge conflict (#1048; no
-  # specification governs the guard: our own design).
-  conflict-markers:
-    name: conflict-markers
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: The guard refuses each marker and skips the vendored trees
-        run: bash scripts/checks/conflict-markers.sh --self-test
-      - run: bash scripts/checks/conflict-markers.sh
-
   conclusion:
     name: conclusion
     needs:
-      - workflow-audit
-      - workflow-lint
-      - shellcheck
-      - comment-style
-      - stray-literals
-      - duplication
-      - file-size
-      - forwarders
-      - tree-guards
-      - dockerfile-lint
-      - versions
-      - brand
-      - code-systems
-      - bench-table
+      - lint
+      - guards
       - detect
       - fmt
       - clippy
       - test
       - doc
       - cargo-deny
-      - vex
       - console-boundary
       - addon-boundary
       - console-tokens
       - no-client-in-server
       - ui-e2e
       - crate-version-guard
-      - tracker-helpers
-      - changelog
       - changelog-guard
       - publish-dry-run
       - msrv
@@ -1038,7 +935,6 @@ jobs:
       - tx-ecosystem
       - perf
       - dependency-review
-      - conflict-markers
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
