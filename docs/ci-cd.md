@@ -227,6 +227,20 @@ commit. The jobs that read a pull-request payload (`crate-version-guard`,
 group: each pull request passed them on its own before it joined the queue, and
 `conclusion` counts a skip as a pass.
 
+The merge queue proves the merged tree, never the performance. Every
+pull-request run and every merge-group run of `ci.yml` finishes in under 20
+minutes of wall time, runner queue included (owner, 2026-11-09). The
+functional gates (build, clippy, the tests, the guards, the tx-ecosystem pass
+list, the console journeys) run in the merge group. The performance gate
+runs on the pull request that reaches the server or the sync service and on
+every push to `main`; in a merge group `perf.yml` builds nothing and its
+`perf verdict` job passes with a step summary that says why (#1186). The
+fuzz and differential lanes never ran in a merge group. No gate is weakened:
+the thresholds, the phases and the retry rule are the same, and only the
+event the gate runs on changes. A regression two pull requests cause only
+together surfaces on the push to `main`, and its fix is a follow-up pull
+request. No specification governs this: our own design.
+
 The pull-request trigger lists `opened`, `synchronize` and `reopened` only, so
 a commit gets one CI run: a label event would start a second run on the same
 commit, the concurrency group would cancel the first, and its `conclusion`

@@ -906,8 +906,9 @@ jobs:
   # release builds of the server and the sync service judged against the
   # builds of their base on the same runner, in perf.yml, which the release
   # lane calls on the release commit too. The base is the pull request's
-  # base, the merge group's, or the commit before a push; a dispatch takes
-  # the previous release.
+  # base or the commit before a push; a dispatch takes the previous release.
+  # A merge group builds nothing for it and its verdict passes with a
+  # summary saying why (#1186).
   perf:
     name: perf
     needs: detect
@@ -917,6 +918,7 @@ jobs:
     uses: ./.github/workflows/perf.yml
     with:
       base: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+      skip: ${{ github.event_name == 'merge_group' }}
 
   tx-ecosystem:
     name: tx-ecosystem

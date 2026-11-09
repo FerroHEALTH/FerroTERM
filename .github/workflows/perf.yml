@@ -19,8 +19,9 @@
 # (FerroHEALTH/FerroPIX#511), so an attempt that ends with exit 1 on a CPU
 # model STALL_PRONE lists is retried too. At most two retries run (#1156).
 # The verdict job passes the gate when the last attempt that ran passed; a
-# breach on any other model fails at once, with no retry. No specification
-# governs this: our own design.
+# breach on any other model fails at once, with no retry. In a merge group
+# ci.yml passes `skip` and only the verdict job runs (#1186). No
+# specification governs this: our own design.
 name: Perf
 
 on:
@@ -34,6 +35,13 @@ on:
         required: false
         default: ""
         type: string
+      skip:
+        description: >-
+          Build and judge nothing, and pass the verdict with a summary saying
+          why; ci.yml passes true in a merge-group run.
+        required: false
+        default: false
+        type: boolean
 
 permissions: {}
 
@@ -49,6 +57,7 @@ env:
 jobs:
   perf:
     name: perf (attempt 1)
+    if: ${{ !inputs.skip }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
@@ -139,7 +148,21 @@ jobs:
     timeout-minutes: 5
     permissions: {}
     steps:
+      # The merge queue proves the merged tree; the gate ran on the pull
+      # request and runs again on the push to main. No specification governs
+      # this: our own design.
+      - name: The gate is not run in a merge group
+        if: inputs.skip
+        run: |
+          set -euo pipefail
+          {
+            echo "### Performance gate skipped"
+            echo
+            echo "A merge-group run proves the merged tree and builds nothing for the performance gate. The gate ran on the pull request and runs on the push to main with the same thresholds."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "performance gate skipped in the merge group"
       - name: The last attempt passed
+        if: ${{ !inputs.skip }}
         env:
           RESULTS: ${{ needs.perf.result }} ${{ needs.perf-retry.result }} ${{ needs.perf-retry-2.result }}
           CODES: ${{ needs.perf.outputs.code }} ${{ needs.perf-retry.outputs.code }} ${{ needs.perf-retry-2.outputs.code }}
