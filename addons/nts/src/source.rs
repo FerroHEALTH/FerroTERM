@@ -19,6 +19,7 @@ use terminology_syndication::model::{CategoryTerm, ContentLink, Feed};
 use terminology_syndication::select::{Holdings, Selection, Subscription};
 use terminology_syndication::source::{Authorization, BoxFuture, Source, SourceError};
 
+use ferrohealth_secret::redacted::Redacted;
 use ferrohealth_smart::client::cache::{Clock, SystemClock};
 
 use crate::auth::{AuthError, Authenticator};
@@ -234,7 +235,7 @@ impl NtsSource {
                     source: Box::new(source),
                 }
             })?;
-            Ok(Authorization::Field(field))
+            Ok(Authorization::Field(Redacted::new(field)))
         })
     }
 }

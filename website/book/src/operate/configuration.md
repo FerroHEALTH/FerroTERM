@@ -143,12 +143,6 @@ number and an IEC binary unit: `B`, `KiB`, `MiB` or `GiB`. A bare number is
 refused, and so are `m` (the metre in UCUM, so write `min`) and a decimal
 unit such as `MB`.
 
-In 0.4.4 alone, the keys that named their unit before it
-(`request_timeout_ms`, `header_read_timeout_ms`, `idle_timeout_ms`,
-`body_limit_bytes`, `drain_delay_ms`, `shutdown_timeout_ms`, `retry_after_s`,
-`compression_min_bytes` and `[server.tls] reload_interval_s`) refuse the start,
-all at once, each naming its replacement.
-
 `[server.caller_rate]` is refused: FerroTERM applies no per-caller rate limit.
 Bound the server with `max_concurrent_requests`, or limit callers at the
 reverse proxy.
@@ -257,6 +251,7 @@ The keys of each `[[auth.issuer]]` table:
 | `timeout` | How long one call to the authorization server may take. | `"10s"` |
 | `mode` | How a bearer token is checked: `jwt`, as an RFC 9068 JWT against the issuer's key set, or `introspection`, by posting it to the issuer's introspection endpoint (RFC 7662), for an authorization server that issues tokens the server cannot read. | `jwt` |
 | `[auth.issuer.introspection]` | The introspection check under `mode = "introspection"`: `endpoint` (the issuer metadata's `introspection_endpoint` when empty), `cache_max_age` (how long an active response is used, at most until its `exp`; `"60s"`), `cache_capacity` (`10000`), and exactly one of `client` (the client authentication of the call, with the keys of a client credentials grant: `client_id`, `client_auth`, `client_secret` or `client_secret_file`, `private_key_file`) and `bearer` (a client credentials grant whose token authorizes the call). | none |
+| `act_represents_patient` | On a `patients` issuer only: whether a patient's token that carries an RFC 8693 §4.1 `act` claim is the patient's representative, the actor in `act` acting for the patient its `sub` names. Without it such a token is refused as no caller of the issuer. A terminology resource sits in no patient's compartment, so the patient and the representative are both refused every write. The key on another kind of issuer refuses the start. | `false` |
 | `role_claims` | The claims the issuer's tokens carry roles in, each a dotted path. The server grants nothing by role, so the roles a token carries change no answer. | `roles`, `groups`, `entitlements` |
 
 The keys of `[auth]` itself, in the configuration file or as
@@ -277,11 +272,7 @@ The keys of `[auth]` itself, in the configuration file or as
 The server refuses to start on the earlier `[auth]` shape: a
 flat `issuer = "…"` key, or `audience`, `algorithms`, `mode`,
 `[auth.introspection]` or another issuer setting on `[auth]` itself, each
-named with the table it moves to. In 0.4.4 it also refuses the keys that
-named their unit before it (`clock_skew_seconds`, `jwks_max_age_seconds`,
-`jwks_refresh_interval_seconds`, `timeout_ms`, `cache_max_age_seconds`,
-`cache_ttl_seconds`) and `auth.ca_file`, all at once, each naming its
-replacement.
+named with the table it moves to.
 
 A machine caller, such as the synchronisation service, authenticates with an
 access token it obtained with the OAuth 2.0 client credentials grant (RFC 6749

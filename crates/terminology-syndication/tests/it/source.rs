@@ -7,6 +7,9 @@
 //! use: a bearer challenge on the listing itself, a public listing whose
 //! downloads are challenged, an open service, and affiliate credentials.
 
+use ferrohealth_secret::redacted::Redacted;
+use ferrohealth_secret::secret::Secret;
+use reqwest::header::HeaderValue;
 use terminology_syndication::model::{CategoryTerm, Checksum, ContentLink, LinkRel};
 use terminology_syndication::source::{Authorization, Source, SourceError};
 use wiremock::matchers::{header, method, path};
@@ -57,7 +60,7 @@ async fn a_listing_behind_a_bearer_challenge_is_read_with_the_listing_token() {
         "reference",
         &format!("{}/synd/syndication.xml", server.uri()),
     )
-    .with_listing_auth(Authorization::Bearer(String::from("listing-token")));
+    .with_listing_auth(Authorization::Bearer(Secret::new("listing-token")));
     let feed = source.list().await.expect("the listing is served");
     assert_eq!(feed.entries.len(), 13);
 }
@@ -82,7 +85,7 @@ async fn a_public_listing_is_read_without_a_token_and_its_download_carries_one()
         "reference",
         &format!("{}/synd/syndication.xml", server.uri()),
     )
-    .with_download_auth(Authorization::Bearer(String::from("download-token")));
+    .with_download_auth(Authorization::Bearer(Secret::new("download-token")));
     let feed = source.list().await.expect("the listing is public");
     assert_eq!(feed.entries.len(), 13);
 
@@ -153,7 +156,7 @@ async fn affiliate_credentials_travel_as_http_basic() {
     let source = ReferenceSource::open("reference", &format!("{}/api/feed", server.uri()))
         .with_listing_auth(Authorization::Basic {
             user: String::from("affiliate"),
-            password: String::from("secret"),
+            password: Secret::new("secret"),
         });
     assert_ne!(
         source.list().await.expect("the listing is served").entries,
@@ -181,8 +184,8 @@ async fn the_listing_and_the_download_authenticate_separately() {
         "reference",
         &format!("{}/synd/syndication.xml", server.uri()),
     )
-    .with_listing_auth(Authorization::Bearer(String::from("listing-token")))
-    .with_download_auth(Authorization::Bearer(String::from("download-token")));
+    .with_listing_auth(Authorization::Bearer(Secret::new("listing-token")))
+    .with_download_auth(Authorization::Bearer(Secret::new("download-token")));
     source.list().await.expect("the listing token is used");
     let directory = tempfile::tempdir().expect("a temporary directory");
     let destination = directory.path().join("item.zip");
@@ -334,12 +337,23 @@ fn a_caller_holds_its_configured_sources_as_trait_objects() {
 
 #[test]
 fn an_authorization_never_renders_its_secret() {
-    let bearer = Authorization::Bearer(String::from("super-secret-token"));
-    assert_eq!(format!("{bearer:?}"), "Authorization(bearer)");
+    let bearer = Authorization::Bearer(Secret::new("super-secret-token"));
+    assert_eq!(format!("{bearer:?}"), "Bearer(\"***\")");
     let basic = Authorization::Basic {
         user: String::from("affiliate"),
-        password: String::from("super-secret-password"),
+        password: Secret::new("super-secret-password"),
     };
-    assert_eq!(format!("{basic:?}"), "Authorization(basic)");
-    assert_eq!(format!("{:?}", Authorization::Open), "Authorization(open)");
+    assert_eq!(
+        format!("{basic:?}"),
+        "Basic { user: \"affiliate\", password: \"***\" }"
+    );
+    let field = Authorization::Field(Redacted::new(HeaderValue::from_static(
+        "Bearer super-secret-field",
+    )));
+    let shown = format!("{field:?}");
+    assert!(
+        shown.starts_with("Field(Redacted<") && !shown.contains("super-secret"),
+        "{shown}"
+    );
+    assert_eq!(format!("{:?}", Authorization::Open), "Open");
 }

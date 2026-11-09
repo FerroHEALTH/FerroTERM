@@ -32,6 +32,7 @@ mod basic;
 mod discovery;
 mod introspection;
 mod keys;
+mod patients;
 mod scopes;
 mod shape;
 mod tokens;
