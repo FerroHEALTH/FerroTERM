@@ -198,6 +198,10 @@ Two shapes, and no cron syntax:
 - `every = "24h"` measures from the end of the last run.
 - `at = "03:00"` is a time of day in `timezone`.
 
+An interval of zero or less (`"0s"`, `"PT0S"`, `"-1h"`) is refused at start,
+naming `schedule.every` and the value: each run would be due the moment the
+last one ends, and the service would never wait.
+
 With both, the earlier due time wins. With neither, the service runs only when
 you ask it to. The end of the last run is written to the state directory, so a
 restart between two runs does not replay the run that already happened: a

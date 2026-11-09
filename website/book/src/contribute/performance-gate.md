@@ -69,8 +69,8 @@ service:
    Every request must be answered with the status the plan names.
 
 Then the script starts a head sync service whose schedule is
-`every = "0s"`, so its scheduler starts each run the moment the last one
-ends, and runs the idle phase of `perf/sync/busy-loop.toml` against it. That
+`every = "1ns"`, the shortest interval the service accepts, so its
+scheduler starts each run the moment the last one ends, and runs the idle phase of `perf/sync/busy-loop.toml` against it. That
 run must fail on idle CPU, or the job fails: it proves the gate still
 catches a background worker that never waits.
 

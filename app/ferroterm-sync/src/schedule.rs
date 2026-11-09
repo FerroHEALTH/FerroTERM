@@ -29,6 +29,13 @@ pub enum ScheduleError {
         #[source]
         source: jiff::Error,
     },
+    /// The interval is zero or negative, so each run would be due the moment
+    /// the last one ends.
+    #[error("`schedule.every = \"{value}\"` is not longer than zero, so the runs would never wait")]
+    NotPositive {
+        /// The value the file carried.
+        value: String,
+    },
     /// The time of day is not a civil time.
     #[error("`{value}` is not a time of day such as `03:00`")]
     At {
@@ -70,17 +77,26 @@ impl Plan {
     /// # Errors
     ///
     /// Returns [`ScheduleError::Every`] when the interval is not a duration,
+    /// [`ScheduleError::NotPositive`] when it is zero or negative,
     /// [`ScheduleError::At`] when the time of day is not a time, and
     /// [`ScheduleError::Zone`] when the zone is not one the system knows.
     pub fn parse(config: &ScheduleConfig, timezone: &str) -> Result<Self, ScheduleError> {
         let every = match config.every.as_deref() {
             None => None,
-            Some(value) => Some(value.parse::<jiff::SignedDuration>().map_err(|source| {
-                ScheduleError::Every {
-                    value: value.to_owned(),
-                    source,
+            Some(value) => {
+                let every = value.parse::<jiff::SignedDuration>().map_err(|source| {
+                    ScheduleError::Every {
+                        value: value.to_owned(),
+                        source,
+                    }
+                })?;
+                if !every.is_positive() {
+                    return Err(ScheduleError::NotPositive {
+                        value: value.to_owned(),
+                    });
                 }
-            })?),
+                Some(every)
+            }
         };
         let at =
             match config.at.as_deref() {
@@ -299,6 +315,47 @@ mod tests {
             plan.next_after(Some(last), at("2026-09-22T12:00:00Z")?)?,
             Some(at("2026-09-23T03:00:00Z")?),
             "the daily time comes before the longer interval"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn an_interval_of_zero_or_less_is_refused_naming_the_key_and_the_value() {
+        for value in ["0s", "PT0S", "-1h", "-PT1S"] {
+            let parsed = Plan::parse(
+                &ScheduleConfig {
+                    every: Some(String::from(value)),
+                    at: None,
+                },
+                "UTC",
+            );
+            let Err(error) = parsed else {
+                panic!("`{value}` would start each run the moment the last one ends");
+            };
+            assert!(
+                matches!(error, super::ScheduleError::NotPositive { .. }),
+                "`{value}` is refused as an interval that never waits, not as one that does not read"
+            );
+            let message = error.to_string();
+            assert!(
+                message.contains("schedule.every") && message.contains(value),
+                "the refusal names the key and the value: {message}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_shortest_positive_interval_is_accepted() -> Result<(), Box<dyn core::error::Error>> {
+        let plan = Plan::parse(
+            &ScheduleConfig {
+                every: Some(String::from("1ns")),
+                at: None,
+            },
+            "UTC",
+        )?;
+        assert!(
+            !plan.is_empty(),
+            "an interval longer than zero is a schedule"
         );
         Ok(())
     }
