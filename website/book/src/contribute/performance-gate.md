@@ -42,9 +42,12 @@ The base is:
 
 `scripts/perf/gate.sh build` builds the release server, sync service and
 fixture writer of the base, from `git archive` of the base commit under
-`target/perf-base/`, and of the head. `scripts/perf/gate.sh run` writes the
+`target/perf-base/`, and of the head. A base must define the server and the
+sync service; a base older than the fixture writer, such as v0.4.2, builds
+the two services alone. `scripts/perf/gate.sh run` writes the
 scaled synthetic SNOMED CT edition of the testkit, 50,000 invented
-concepts, with each side's `ferroterm-fixture snomed-scaled`, and starts
+concepts, with each side's `ferroterm-fixture snomed-scaled`, the head's for
+a base without one, and starts
 each side's server over its own edition and its own e2e CodeSystem
 fixtures, with its admin listener on: the head on ports 8080 and 8081, the
 base on 8090 and 8091. It starts each side's sync service against its own
