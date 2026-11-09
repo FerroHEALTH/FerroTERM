@@ -333,11 +333,11 @@ fi
 # served FHIR model with nothing recording it. All three must name one version.
 echo "== FHIR model pin (docs/VERSIONS.md <-> Cargo.toml <-> Cargo.lock)"
 if [[ -f Cargo.toml ]] && [[ -f docs/VERSIONS.md ]] && [[ -f Cargo.lock ]]; then
-  req="$(sed -nE 's/^fhir-types = "([^"]+)".*/\1/p' Cargo.toml | head -n1)"
+  req="$(sed -nE 's/^fhir-types = (\{ *version = )?"([^"]+)".*/\2/p' Cargo.toml | head -n1)"
   pin="$(awk -F'|' '$2 ~ /^[[:space:]]*`fhir-types`[[:space:]]*$/ { v = $3; gsub(/^[[:space:]]+/, "", v); split(v, w, /[[:space:]]/); print w[1]; exit }' docs/VERSIONS.md)"
   locked="$(awk '$1 == "name" && $3 == "\"fhir-types\"" { hit = 1; next } hit && $1 == "version" { gsub(/"/, "", $3); print $3; exit }' Cargo.lock)"
   if [[ -z "$req" ]]; then
-    bad "root Cargo.toml has no 'fhir-types = \"<version>\"' requirement"
+    bad "root Cargo.toml has no fhir-types requirement naming a version"
   elif [[ -z "$pin" ]]; then
     bad "docs/VERSIONS.md has no \`fhir-types\` row"
   elif [[ "$req" != "$pin" ]]; then
