@@ -2,14 +2,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! The stack of `ferrohealth-server` around the FHIR routes: a panic, a
-//! request past `server.request_timeout_ms` and a body past
-//! `server.body_limit_bytes` each answer an `OperationOutcome`.
+//! request past `server.request_timeout` and a body past
+//! `server.body_limit` each answer an `OperationOutcome`.
 
 use std::time::Duration;
 
 use axum::Router;
 use axum::body::Body;
 use axum::routing::get;
+use ferrohealth_config::units::{self, ByteSize};
 use ferrohealth_server::section::ServerSection;
 use ferrohealth_server::stack;
 use http::{Request, StatusCode};
@@ -30,7 +31,7 @@ fn issue(body: &serde_json::Value) -> &serde_json::Value {
 async fn a_request_past_the_timeout_is_an_operation_outcome_408()
 -> Result<(), Box<dyn std::error::Error>> {
     let server = Server::start_with_server(ServerSection {
-        request_timeout_ms: 200,
+        request_timeout: units::Duration::from_millis(200),
         ..ServerSection::default()
     });
     let listener = TcpListener::bind("127.0.0.1:0").await?;
@@ -72,7 +73,7 @@ async fn a_request_past_the_timeout_is_an_operation_outcome_408()
 #[tokio::test]
 async fn a_body_past_the_limit_is_an_operation_outcome_413() {
     let server = Server::start_with_server(ServerSection {
-        body_limit_bytes: 64,
+        body_limit: ByteSize::from_bytes(64),
         ..ServerSection::default()
     });
     let body = serde_json::json!({

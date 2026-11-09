@@ -91,26 +91,26 @@ server runs. Each request gets the server's request id and one line of the
 request log, and the stack answers these refusals itself, under a FHIR base as
 an `OperationOutcome`:
 
-- a request still running after `request_timeout_ms` is answered `408`
+- a request still running after `request_timeout` is answered `408`
   (`timeout`);
-- a body larger than `body_limit_bytes` is answered `413` (`too-long`);
+- a body larger than `body_limit` is answered `413` (`too-long`);
 - past `max_concurrent_requests`, a request is answered `503` (`throttled`)
   with `Retry-After`, and the health routes are never refused;
 - a handler that fails unexpectedly is answered `500` (`exception`) with the
   request id, and the log line names the id and nothing of the failure.
 
 On `SIGTERM` or `SIGINT`, readiness turns `503` at once, both listeners keep
-accepting for `drain_delay_ms` so a load balancer stops sending requests,
-then close, and the requests in flight get `shutdown_timeout_ms` to finish. A
+accepting for `drain_delay` so a load balancer stops sending requests,
+then close, and the requests in flight get `shutdown_timeout` to finish. A
 connection still open then is dropped, and the server exits.
 
 ```toml
 [server]
 listen = "0.0.0.0:8080"
-request_timeout_ms = 30000
-body_limit_bytes = 1048576
-drain_delay_ms = 5000
-shutdown_timeout_ms = 10000
+request_timeout = "30s"
+body_limit = "1MiB"
+drain_delay = "5s"
+shutdown_timeout = "10s"
 max_concurrent_requests = 512
 trusted_proxies = ["10.0.0.0/8"]
 
@@ -123,19 +123,31 @@ key_file = "/etc/ferroterm/tls/server.key"
 |---|---|---|
 | `listen` | The socket address of the FHIR listener. | `127.0.0.1:8080` |
 | `base_path` | A path every route of both listeners is served under, such as `/terminology`: empty, or `/` followed by segments with no trailing `/`. The FHIR bases become `/terminology/r4` and the others, and the health probe follows. | empty |
-| `request_timeout_ms` | How long one request may take before it is answered `408`. | `30000` |
-| `header_read_timeout_ms` | How long a client may take to send a request head, counted from the head's first byte; a client that has not sent the whole head by then is disconnected. | `30000` |
-| `idle_timeout_ms` | How long a kept-alive HTTP/1.1 connection may wait for its next request, counted from accept or from its last response; past it the server closes the connection cleanly. | `120000` |
-| `body_limit_bytes` | The largest request body read before the request is answered `413`. | `1048576` (1 MiB) |
-| `drain_delay_ms` | How long readiness stays withdrawn on `SIGTERM` before the listeners close. | `0` |
-| `shutdown_timeout_ms` | How long the requests in flight may take once the listeners closed. Keep `drain_delay_ms` plus this below the grace period of the container runtime, so the server exits before it is killed. | `10000` |
+| `request_timeout` | How long one request may take before it is answered `408`. | `"30s"` |
+| `header_read_timeout` | How long a client may take to send a request head, counted from the head's first byte; a client that has not sent the whole head by then is disconnected. | `"30s"` |
+| `idle_timeout` | How long a kept-alive HTTP/1.1 connection may wait for its next request, counted from accept or from its last response; past it the server closes the connection cleanly. | `"2min"` |
+| `body_limit` | The largest request body read before the request is answered `413`. | `"1MiB"` |
+| `drain_delay` | How long readiness stays withdrawn on `SIGTERM` before the listeners close. | `"0s"` |
+| `shutdown_timeout` | How long the requests in flight may take once the listeners closed. Keep `drain_delay` plus this below the grace period of the container runtime, so the server exits before it is killed. | `"10s"` |
 | `max_concurrent_requests` | How many requests are served at once; past it a request is answered `503`. Unset, there is no bound. | none |
-| `retry_after_s` | The seconds a `503` past the bound tells the client to wait (`Retry-After`). | `1` |
+| `retry_after` | How long a `503` past the bound tells the client to wait (`Retry-After`), in whole seconds. | `"1s"` |
 | `trusted_proxies` | The reverse proxies, each an address or a CIDR block, whose forwarded client address the request log believes. Empty, every request is named by the connection's peer. | none |
 | `forwarded_header` | The header a trusted proxy names the client in: `forwarded` (RFC 7239) or `x-forwarded-for`. | `forwarded` |
 | `compression` | Whether a response is compressed with gzip or Brotli when the client accepts one. | `true` |
-| `compression_min_bytes` | The smallest response body that is compressed. | `1024` |
+| `compression_min_size` | The smallest response body that is compressed. | `"1KiB"` |
 | `[server.tls]` | TLS on both listeners (see below). Unset, they speak plain HTTP behind a proxy that terminates TLS. | none |
+
+A span of time is a whole number and a UCUM unit with no space: `ms`, `s`,
+`min`, `h` or `d`, as in `"30s"` or `"10min"`. An amount of data is a whole
+number and an IEC binary unit: `B`, `KiB`, `MiB` or `GiB`. A bare number is
+refused, and so are `m` (the metre in UCUM, so write `min`) and a decimal
+unit such as `MB`.
+
+In 0.4.4 alone, the keys that named their unit before it
+(`request_timeout_ms`, `header_read_timeout_ms`, `idle_timeout_ms`,
+`body_limit_bytes`, `drain_delay_ms`, `shutdown_timeout_ms`, `retry_after_s`,
+`compression_min_bytes` and `[server.tls] reload_interval_s`) refuse the start,
+all at once, each naming its replacement.
 
 `[server.caller_rate]` is refused: FerroTERM applies no per-caller rate limit.
 Bound the server with `max_concurrent_requests`, or limit callers at the
@@ -150,7 +162,7 @@ The `[server.tls]` table:
 | `min_version` | The oldest TLS version spoken, `"1.3"` or `"1.2"`. | `"1.3"` |
 | `client_auth` | Whether a client certificate is asked: `none`, `optional` or `required`. | `none` |
 | `client_ca_file` | The CA bundle a client certificate must chain to; required unless `client_auth` is `none`, and refused when `client_auth` is `none`, the default, so a deployment that sets a CA asks for client certificates. | none |
-| `reload_interval_s` | How often the files are read again. `SIGHUP` always reads them again. | none |
+| `reload_interval` | How often the files are read again, a span of time. `SIGHUP` always reads them again. | none |
 | `healthcheck_identity_file` | The client certificate chain and key, in one PEM, that `ferroterm healthcheck` presents to a listener that asks one. | none |
 
 `ferroterm healthcheck` asks `GET /health/readiness` over the same TLS and
@@ -171,6 +183,8 @@ endpoint = "https://collector.example.org:4317"
 traces = true
 metrics = true
 sample_ratio = 0.1
+
+[telemetry.otlp.tls]
 trust_roots_file = "/etc/ferroterm/collector-ca.pem"
 ```
 
@@ -180,8 +194,22 @@ trust_roots_file = "/etc/ferroterm/collector-ca.pem"
 | `traces` | Whether the spans are exported. | `true` |
 | `metrics` | Whether the metrics are pushed. | `true` |
 | `sample_ratio` | The share of the traces that are sampled, from `0` to `1`. | `1` |
-| `trust_roots_file` | A PEM file of trust roots the collector's certificate may chain to, beside the platform's. | none |
-| `client_identity_file` | A PEM file holding a client certificate chain and its key, for mutual TLS with the collector. | none |
+| `[telemetry.otlp.tls]` | The TLS to an `https://` collector, the outbound TLS table below. TLS material beside an endpoint that is not `https://` refuses the start. | none |
+
+`telemetry.otlp.trust_roots_file` and `telemetry.otlp.client_identity_file`
+are refused, naming `telemetry.otlp.tls.trust_roots_file` and
+`telemetry.otlp.tls.client_identity_file`.
+
+Every outbound TLS table (`[telemetry.otlp.tls]`, `[auth.tls]`, the `tls`
+table of a client credentials grant, and the console's `[oidc.tls]`) takes the
+same keys:
+
+| Key | Meaning | Default |
+|---|---|---|
+| `trust_roots_file` | A PEM file of trust roots the peer's certificate may chain to, beside the platform's. | none |
+| `client_identity_file` | A PEM file holding a client certificate chain and its key, for mutual TLS. | none |
+| `client_identity` | The same PEM inline, held as a secret; one of the two at most. | none |
+| `min_version` | The oldest TLS version spoken, `"1.3"` or `"1.2"`. | `"1.3"` |
 
 The synchronisation service and the console read the same `[telemetry]`
 section from their own files.
@@ -222,13 +250,13 @@ The keys of each `[[auth.issuer]]` table:
 | `profile` | What the issuer's tokens look like: `rfc9068`, or the preset of a known authorization server (`keycloak`, `entra`, `okta`), each overridable key by key on the table. | `rfc9068` |
 | `audience` | The `aud` values a token may carry; one of them is required (RFC 9068 §4). The write routes also accept every served version's base under `fhir.base_url`; the admin listener accepts this list alone. | none (required) |
 | `algorithms` | The signature algorithms accepted; an HMAC algorithm refuses the start. | `RS256`, `RS384`, `PS256`, `PS384`, `ES256`, `ES384` |
-| `clock_skew_seconds` | The skew allowed on `exp`, `nbf` and `iat`, at most 300. | `60` |
-| `jwks_max_age_seconds` | How long a key set is used before it is read again. | `600` |
-| `jwks_refresh_interval_seconds` | The shortest time between two reads of the key set, so an unknown `kid` reads it at most once per interval. | `60` |
+| `clock_skew` | The skew allowed on `exp`, `nbf` and `iat`, at most `"5min"`. | `"60s"` |
+| `jwks_max_age` | How long a key set is used before it is read again. | `"10min"` |
+| `jwks_refresh_interval` | The shortest time between two reads of the key set, so an unknown `kid` reads it at most once per interval. | `"60s"` |
 | `jwks_file` | A key set file handed over out of band, read in place of the issuer's `jwks_uri`. | none |
-| `timeout_ms` | How long one call to the authorization server may take. | `10000` |
+| `timeout` | How long one call to the authorization server may take. | `"10s"` |
 | `mode` | How a bearer token is checked: `jwt`, as an RFC 9068 JWT against the issuer's key set, or `introspection`, by posting it to the issuer's introspection endpoint (RFC 7662), for an authorization server that issues tokens the server cannot read. | `jwt` |
-| `[auth.issuer.introspection]` | The introspection check under `mode = "introspection"`: `endpoint` (the issuer metadata's `introspection_endpoint` when empty), `cache_max_age_seconds` (how long an active response is used, at most until its `exp`; `60`), `cache_capacity` (`10000`), and exactly one of `client` (the client authentication of the call, with the keys of a client credentials grant: `client_id`, `client_auth`, `client_secret` or `client_secret_file`, `private_key_file`) and `bearer` (a client credentials grant whose token authorizes the call). | none |
+| `[auth.issuer.introspection]` | The introspection check under `mode = "introspection"`: `endpoint` (the issuer metadata's `introspection_endpoint` when empty), `cache_max_age` (how long an active response is used, at most until its `exp`; `"60s"`), `cache_capacity` (`10000`), and exactly one of `client` (the client authentication of the call, with the keys of a client credentials grant: `client_id`, `client_auth`, `client_secret` or `client_secret_file`, `private_key_file`) and `bearer` (a client credentials grant whose token authorizes the call). | none |
 | `role_claims` | The claims the issuer's tokens carry roles in, each a dotted path. The server grants nothing by role, so the roles a token carries change no answer. | `roles`, `groups`, `entitlements` |
 
 The keys of `[auth]` itself, in the configuration file or as
@@ -238,18 +266,22 @@ The keys of `[auth]` itself, in the configuration file or as
 |---|---|---|
 | `enabled` | Whether the write routes and the admin listener authenticate their callers. | `true` |
 | `product_scope` | The scope the admin listener requires, a string starting with `__` or a full URI (SMART App Launch 2.2.0, Scopes and Launch Context, §Extensibility). Anything else refuses the start. | `__ferroterm.admin` |
-| `ca_file` | A PEM file of trust roots added to the platform's for every issuer's discovery document and key set, and for an introspecting issuer's metadata, introspection and token calls too, for an issuer behind a private certificate authority. A file that cannot be read or holds no certificate refuses the start. | none (the platform's roots) |
+| `[auth.tls]` | The outbound TLS table of every issuer's discovery document and key set, for an issuer behind a private certificate authority: `trust_roots_file` adds roots to the platform's. A file that cannot be read or holds no certificate refuses the start. An introspecting issuer's calls use the `tls` table of its own `client` or `bearer` grant. | none (the platform's roots) |
 | `realm` | The realm every challenge names. | `fhir.base_url`, else `FerroTERM` |
 | `scopes_supported` | The scopes the discovery document lists. List only scopes the server honours: "the server SHALL support all scopes listed here". | none (the member is omitted) |
 | `capabilities` | SMART capabilities the discovery document adds to the ones it derives. | none |
 | `scopeless_subjects` | The machines granted every write without a scope, each a table `{ issuer = "…", sub = "…" }` naming the issuer exactly as its `[[auth.issuer]]` table does, since a `sub` is unique only within its issuer (RFC 7519 §4.1.2). An entry admits a `System` caller of that issuer alone; one naming an issuer the section does not trust refuses the start. | none |
 | `[[auth.basic.users]]` | HTTP Basic users (RFC 7617), each a person: `user`, `password_hash` or `password_hash_file` (an Argon2id PHC string), and `scopes`, which decide what the user reaches as a token's scopes would. A user granted a `system/` scope refuses the start, naming the user. | none (no Basic) |
-| `[auth.basic] cache_ttl_seconds` | How long a Basic credential that verified is kept, so a repeat request skips the Argon2id key derivation. `0` verifies every request. | `300` |
+| `[auth.basic] cache_ttl` | How long a Basic credential that verified is kept, so a repeat request skips the Argon2id key derivation. `"0s"` verifies every request. | `"5min"` |
 
 The server refuses to start on the earlier `[auth]` shape: a
 flat `issuer = "…"` key, or `audience`, `algorithms`, `mode`,
 `[auth.introspection]` or another issuer setting on `[auth]` itself, each
-named with the table it moves to.
+named with the table it moves to. In 0.4.4 it also refuses the keys that
+named their unit before it (`clock_skew_seconds`, `jwks_max_age_seconds`,
+`jwks_refresh_interval_seconds`, `timeout_ms`, `cache_max_age_seconds`,
+`cache_ttl_seconds`) and `auth.ca_file`, all at once, each naming its
+replacement.
 
 A machine caller, such as the synchronisation service, authenticates with an
 access token it obtained with the OAuth 2.0 client credentials grant (RFC 6749
@@ -274,7 +306,7 @@ introspection endpoint instead. The server reads the issuer's metadata at the
 start, takes the endpoint from it (or from `endpoint`), and refuses to start
 when the issuer names none. An active response must carry `scope`,
 `client_id` and `exp` (SMART App Launch 2.2.0, Token Introspection) and is
-held until its `exp` and at most `cache_max_age_seconds`; an inactive one
+held until its `exp` and at most `cache_max_age`; an inactive one
 answers `401`, and an endpoint that cannot answer `503`:
 
 ```toml

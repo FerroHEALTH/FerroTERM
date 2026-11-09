@@ -10,7 +10,7 @@
 
 use std::collections::BTreeMap;
 
-use ferrohealth_smart::config::OauthSection;
+use ferrohealth_smart::config::credentials::OauthSection;
 use ferroterm_sync::config::{AdminCredentials, Config};
 use ferroterm_sync::reload::{AdminClient, ReloadError};
 use secrecy::SecretString;

@@ -80,7 +80,11 @@ async fn a_full_sign_in_pool_drops_its_oldest_and_never_touches_the_sessions() {
 #[tokio::test]
 async fn an_expired_sign_in_is_refused() {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "[session]\nsign_in_timeout_s = 1\n").await;
+    let state = console(
+        Some(provider.oidc()),
+        "[session]\nsign_in_timeout = \"1s\"\n",
+    )
+    .await;
     let started = start(&state, "/login").await;
     tokio::time::sleep(PAST_A_SECOND).await;
     let response = send(
@@ -94,7 +98,7 @@ async fn an_expired_sign_in_is_refused() {
 
 #[tokio::test]
 async fn a_session_past_its_idle_timeout_is_no_longer_live() {
-    let state = console(None, "[session]\nidle_timeout_s = 2\n").await;
+    let state = console(None, "[session]\nidle_timeout = \"2s\"\n").await;
     let cookie = state
         .sessions()
         .establish(
@@ -112,7 +116,7 @@ async fn a_session_past_its_idle_timeout_is_no_longer_live() {
 async fn a_session_past_its_absolute_lifetime_is_no_longer_live_whatever_its_activity() {
     let state = console(
         None,
-        "[session]\nidle_timeout_s = 3\nabsolute_timeout_s = 3\n",
+        "[session]\nidle_timeout = \"3s\"\nabsolute_timeout = \"3s\"\n",
     )
     .await;
     let cookie = state
@@ -136,7 +140,11 @@ async fn a_session_past_its_absolute_lifetime_is_no_longer_live_whatever_its_act
 #[tokio::test]
 async fn the_session_and_sign_in_cookies_are_host_bound_http_only_lax_and_secure() {
     let provider = Provider::start().await;
-    let state = console(Some(provider.oidc()), "[session]\nsign_in_timeout_s = 60\n").await;
+    let state = console(
+        Some(provider.oidc()),
+        "[session]\nsign_in_timeout = \"60s\"\n",
+    )
+    .await;
     let login = send(&state, get("/login", &[])).await;
     let sign_in = set_cookies(login.headers())
         .into_iter()

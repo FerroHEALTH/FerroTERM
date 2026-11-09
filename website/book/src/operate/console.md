@@ -57,13 +57,13 @@ public_url = "https://terminology.example.org/"
 sync_url = "http://ferroterm-sync:8090/"
 # The server's admin listener, which Reload the served set posts to.
 admin_url = "http://ferroterm:8081/"
-timeout_ms = 30000
+timeout = "30s"
 
 [session]
 store = "memory"
 secure_cookie = true
-idle_timeout_s = 1800
-absolute_timeout_s = 28800
+idle_timeout = "30min"
+absolute_timeout = "8h"
 max_sessions = 1000
 
 [oidc]
@@ -80,12 +80,18 @@ console reads (`ferrohealth-session`). The console reads the provider's
 endpoints from its metadata (`<issuer>/.well-known/openid-configuration`)
 when it starts; set `authorization_endpoint`, `token_endpoint`, `jwks_uri`,
 `end_session_endpoint` or `revocation_endpoint` to use another address, and
-`ca_file` to trust a private certificate authority. `config check` reads no
-provider, so it works offline. `[session] store = "memory"` keeps the
-sessions in the console's process; `"sealed"` keeps each in one encrypted
-cookie, for a console that runs as several instances, and needs `key` or
-`key_file` (base64 of at least 64 bytes, the same on every instance) and
-`offline_access` off.
+`[oidc.tls] trust_roots_file` to trust a private certificate authority (the
+outbound TLS table of [Configuration](configuration.md#telemetry)).
+`config check` reads no provider, so it works offline. Spans of time are
+durations such as `"30s"` or `"8h"`. In 0.4.4 alone, the keys that named
+their unit before it (`[ferroterm] timeout_ms`, `[session]
+sign_in_timeout_s`, `idle_timeout_s` and `absolute_timeout_s`, `[oidc]
+timeout_s`) and `oidc.ca_file` refuse the start, each naming its
+replacement.
+`[session] store = "memory"` keeps the sessions in the console's process;
+`"sealed"` keeps each in one encrypted cookie, for a console that runs as
+several instances, and needs `key` or `key_file` (base64 of at least 64
+bytes, the same on every instance) and `offline_access` off.
 
 ## Signing in
 

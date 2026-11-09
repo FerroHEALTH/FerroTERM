@@ -3,12 +3,13 @@
 
 //! The server stops when its shutdown future completes: readiness turns
 //! `503`, the requests in flight finish, and the server returns once
-//! `server.shutdown_timeout_ms` passes with one still open, so it decides its
+//! `server.shutdown_timeout` passes with one still open, so it decides its
 //! own exit.
 
 use std::net::SocketAddr;
 use std::time::Duration;
 
+use ferrohealth_config::units;
 use ferrohealth_server::section::ServerSection;
 use ferrohealth_server::serve::{Drained, ServeError};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -94,7 +95,7 @@ async fn serve_until_returns_once_the_shutdown_future_completes()
 #[tokio::test]
 async fn readiness_is_withdrawn_during_the_drain_delay() -> Result<(), Box<dyn std::error::Error>> {
     let server = Server::start_with_server(ServerSection {
-        drain_delay_ms: 600,
+        drain_delay: units::Duration::from_millis(600),
         ..ServerSection::default()
     });
     let running = serve(&server).await?;
@@ -119,7 +120,7 @@ async fn readiness_is_withdrawn_during_the_drain_delay() -> Result<(), Box<dyn s
 async fn the_server_returns_once_the_shutdown_bound_passes_with_a_request_open()
 -> Result<(), Box<dyn std::error::Error>> {
     let server = Server::start_with_server(ServerSection {
-        shutdown_timeout_ms: 300,
+        shutdown_timeout: units::Duration::from_millis(300),
         ..ServerSection::default()
     });
     let running = serve(&server).await?;

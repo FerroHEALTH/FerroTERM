@@ -29,7 +29,7 @@ use std::sync::Arc;
 use axum::body::Body;
 use axum::response::{IntoResponse, Response};
 use ferrohealth_smart::basic::PasswordStore;
-use ferrohealth_smart::config::{ConfigError, IssuerKey};
+use ferrohealth_smart::config::{ConfigError, IssuerKey, ServerTls};
 use ferrohealth_smart::extract::HeaderOnly;
 use ferrohealth_smart::guard::{Gate, Render};
 use ferrohealth_smart::metadata::ServerMetadata;
@@ -180,9 +180,11 @@ impl Smart {
             }
             return Err(StartError::Unconfigured { surfaces });
         }
-        let resolved = auth.resolve().map_err(|source| StartError::Auth {
-            source: Box::new(source),
-        })?;
+        let resolved = auth
+            .resolve_with_tls(&ServerTls)
+            .map_err(|source| StartError::Auth {
+                source: Box::new(source),
+            })?;
         let bases = version_bases(config.base_url().as_deref());
         let admin_listens = config.admin_listen().is_some();
         let mut fhir = IssuerSet::new();

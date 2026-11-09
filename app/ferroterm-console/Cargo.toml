@@ -39,9 +39,11 @@ ferrohealth-config.workspace = true
 # `[oidc]` and `[session]` sections, the store, and the four sign-in routes
 # with the middleware every page sits behind.
 ferrohealth-session.workspace = true
+# `config::ServerTls`, which reads `[oidc] tls` through ferrohealth-server.
+ferrohealth-smart.workspace = true
 ferrohealth-health.workspace = true
 ferrohealth-secret.workspace = true
-ferrohealth-server = { workspace = true, features = ["console"] }
+ferrohealth-server = { workspace = true, features = ["console", "otlp"] }
 # The console log and the panic line; `otlp` exports the console's spans
 # when `[telemetry.otlp]` names a collector.
 ferrohealth-telemetry = { workspace = true, features = ["otlp"] }
@@ -77,9 +79,6 @@ toml.workspace = true
 [dev-dependencies]
 # The test provider's signing key.
 aws-lc-rs.workspace = true
-# The relying party the console signs in through, whose exchange and refresh
-# the tests drive, and the ID Tokens the test provider signs.
-ferrohealth-smart.workspace = true
 jsonwebtoken.workspace = true
 tempfile.workspace = true
 # The router driven in-process with `ServiceExt::oneshot`.

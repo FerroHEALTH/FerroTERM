@@ -14,9 +14,10 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use base64::Engine as _;
 use ferrohealth_smart::basic::StoreError;
+use ferrohealth_smart::config::credentials::OauthSection;
 use ferrohealth_smart::config::{
     AuthMode, AuthSection, BasicSection, BasicUser, ConfigError, IntrospectionSection, IssuerEntry,
-    IssuerKey, OauthSection,
+    IssuerKey,
 };
 use ferrohealth_smart::kind::IssuerKind;
 use ferroterm_sync::auth::{AdminAuth, AuthError, SYNC_SCOPE};

@@ -3,7 +3,8 @@
 
 //! Token introspection for an issuer that publishes an endpoint.
 
-use ferrohealth_smart::config::{AuthMode, IntrospectionSection, OauthSection};
+use ferrohealth_smart::config::credentials::OauthSection;
+use ferrohealth_smart::config::{AuthMode, IntrospectionSection};
 use ferroterm_server::config::{AdminSection, Config, TerminologySection};
 use ferroterm_server::smart::{Smart, StartError};
 use http::StatusCode;

@@ -9,7 +9,7 @@
 //! [`router`] builds the `axum` application over it inside the stack of
 //! `ferrohealth-server`, and [`serve`] runs it and the admin listener on bound
 //! listeners until the process is asked to stop, then drains within
-//! `server.shutdown_timeout_ms`. `main.rs` only reads the configuration and
+//! `server.shutdown_timeout`. `main.rs` only reads the configuration and
 //! calls in.
 //!
 //! Every served FHIR version has its own path prefix (`/r4`, `/r4b`, `/r5`, `/r6`), and within it
@@ -194,8 +194,8 @@ pub async fn serve(
 /// Serves as [`serve`] does until `shutdown` completes.
 ///
 /// Readiness turns `503` at once, the listeners keep accepting for
-/// `server.drain_delay_ms`, then close, and the requests in flight get
-/// `server.shutdown_timeout_ms` to finish; a connection still open then is
+/// `server.drain_delay`, then close, and the requests in flight get
+/// `server.shutdown_timeout` to finish; a connection still open then is
 /// dropped and the result is [`Drained::Cut`]. Both listeners speak the TLS
 /// `[server.tls]` configures, when it is set.
 ///

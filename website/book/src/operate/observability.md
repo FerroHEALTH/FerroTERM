@@ -24,8 +24,8 @@ directory it was configured with is open, and refuses to start on a missing
 or damaged one, so a ready answer means the deployment serves what it was told
 to serve. On `SIGTERM` or `SIGINT` the process moves to `draining`:
 `/health` and `/health/readiness` answer `503` at once, the listeners keep
-accepting for `server.drain_delay_ms` so a load balancer stops sending new
-requests, and the requests in flight then get `server.shutdown_timeout_ms` to
+accepting for `server.drain_delay` so a load balancer stops sending new
+requests, and the requests in flight then get `server.shutdown_timeout` to
 finish before the server exits (see
 [The HTTP server](configuration.md#the-http-server)). `/health/liveness` keeps
 answering `200` throughout. The admin listener answers the same three routes.

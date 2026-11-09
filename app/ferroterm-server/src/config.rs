@@ -311,6 +311,7 @@ fn base_url_of(value: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
+    use std::time::Duration;
 
     use ferrohealth_smart::kind::IssuerKind;
     use ferrohealth_telemetry::section::Format;
@@ -384,14 +385,26 @@ mod tests {
     #[test]
     fn the_server_section_takes_the_family_keys_and_refuses_a_caller_rate() {
         let config = Config::from_sources(
-            Some("[server]\nlisten = \"0.0.0.0:9090\"\nrequest_timeout_ms = 5000\nbody_limit_bytes = 4096\nshutdown_timeout_ms = 2000\n"),
+            Some("[server]\nlisten = \"0.0.0.0:9090\"\nrequest_timeout = \"5s\"\nbody_limit = \"4KiB\"\nshutdown_timeout = \"2s\"\n"),
             &BTreeMap::new(),
         )
         .expect("reads");
         assert_eq!(config.server.listen.to_string(), "0.0.0.0:9090");
-        assert_eq!(config.server.request_timeout_ms, 5_000);
-        assert_eq!(config.server.body_limit_bytes, 4_096);
-        assert_eq!(config.server.shutdown_timeout_ms, 2_000);
+        assert_eq!(config.server.request_timeout.get(), Duration::from_secs(5));
+        assert_eq!(config.server.body_limit_bytes(), 4_096);
+        assert_eq!(config.server.shutdown_timeout.get(), Duration::from_secs(2));
+        let Err(ConfigError::Load(refused)) = Config::from_sources(
+            Some("[server]\nrequest_timeout_ms = 5000\nbody_limit_bytes = 4096\n"),
+            &BTreeMap::new(),
+        ) else {
+            panic!("a key ferrohealth-server 0.7 retired is refused");
+        };
+        let refused = refused.to_string();
+        assert!(
+            refused.contains("server.request_timeout_ms was replaced by server.request_timeout")
+                && refused.contains("server.body_limit_bytes was replaced by server.body_limit"),
+            "each retired key is named with its replacement, all at once: {refused}"
+        );
         assert!(
             matches!(
                 Config::from_sources(

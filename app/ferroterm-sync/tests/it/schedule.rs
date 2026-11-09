@@ -54,7 +54,7 @@ async fn a_scheduled_run_starts_at_its_due_time() {
 #[tokio::test]
 async fn a_restart_between_runs_does_not_replay() {
     let mut harness = Harness::new().await;
-    harness.config.schedule = every("24h");
+    harness.config.schedule = every(ferrohealth_config::units::Duration::from_hours(24));
     harness
         .publish(&[Entry::rf2(
             "11000146104",

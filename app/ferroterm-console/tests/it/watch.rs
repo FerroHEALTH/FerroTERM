@@ -49,7 +49,7 @@ async fn a_live_session_says_what_it_has_left_and_an_extension_restarts_its_idle
     let provider = Provider::start().await;
     let state = console(
         Some(provider.oidc()),
-        "[session]\nidle_timeout_s = 900\nabsolute_timeout_s = 28800\n",
+        "[session]\nidle_timeout = \"15min\"\nabsolute_timeout = \"8h\"\n",
     )
     .await;
     let session = signed_in(&state, &provider).await;

@@ -3,12 +3,11 @@
 
 //! When the next run is due.
 //!
-//! Two shapes are configured, an interval and a time of day, and both are read
-//! by `jiff`: an interval is a signed duration in the ISO 8601 or the friendly
-//! form (`24h`, `PT24H`), and a time of day is a civil time (`03:00`) read in
-//! the configured zone
-//! (<https://docs.rs/jiff/latest/jiff/struct.SignedDuration.html>). There is no
-//! cron syntax.
+//! Two shapes are configured, an interval and a time of day. An interval is a
+//! `ferrohealth-config` duration, a whole number and a UCUM unit (`24h`,
+//! `90min`), read when the configuration loads, and a time of day is a civil
+//! time (`03:00`) `jiff` reads in the configured zone. There is no cron
+//! syntax.
 //!
 //! The due time is computed from the end of the last run, which the service
 //! persists, so a restart between two runs does not replay the run that
@@ -20,21 +19,16 @@ use crate::config::ScheduleConfig;
 /// A schedule that does not read.
 #[derive(Debug, thiserror::Error)]
 pub enum ScheduleError {
-    /// The interval is not a duration.
-    #[error("`{value}` is not an interval such as `24h`")]
-    Every {
-        /// The value the file carried.
-        value: String,
-        /// Why it is not a duration.
+    /// The interval is zero, so each run would be due the moment the last
+    /// one ends.
+    #[error("`schedule.every = \"0s\"` is not longer than zero, so the runs would never wait")]
+    NotPositive,
+    /// The interval is longer than a timestamp can be moved by.
+    #[error("`schedule.every` is longer than the representable range")]
+    TooLong {
+        /// Why the duration does not convert.
         #[source]
         source: jiff::Error,
-    },
-    /// The interval is zero or negative, so each run would be due the moment
-    /// the last one ends.
-    #[error("`schedule.every = \"{value}\"` is not longer than zero, so the runs would never wait")]
-    NotPositive {
-        /// The value the file carried.
-        value: String,
     },
     /// The time of day is not a civil time.
     #[error("`{value}` is not a time of day such as `03:00`")]
@@ -76,27 +70,18 @@ impl Plan {
     ///
     /// # Errors
     ///
-    /// Returns [`ScheduleError::Every`] when the interval is not a duration,
-    /// [`ScheduleError::NotPositive`] when it is zero or negative,
+    /// Returns [`ScheduleError::NotPositive`] when the interval is zero,
+    /// [`ScheduleError::TooLong`] when it is past the range of a timestamp,
     /// [`ScheduleError::At`] when the time of day is not a time, and
     /// [`ScheduleError::Zone`] when the zone is not one the system knows.
     pub fn parse(config: &ScheduleConfig, timezone: &str) -> Result<Self, ScheduleError> {
-        let every = match config.every.as_deref() {
+        let every = match config.every {
             None => None,
-            Some(value) => {
-                let every = value.parse::<jiff::SignedDuration>().map_err(|source| {
-                    ScheduleError::Every {
-                        value: value.to_owned(),
-                        source,
-                    }
-                })?;
-                if !every.is_positive() {
-                    return Err(ScheduleError::NotPositive {
-                        value: value.to_owned(),
-                    });
-                }
-                Some(every)
-            }
+            Some(every) if every.is_zero() => return Err(ScheduleError::NotPositive),
+            Some(every) => Some(
+                jiff::SignedDuration::try_from(every.get())
+                    .map_err(|source| ScheduleError::TooLong { source })?,
+            ),
         };
         let at =
             match config.at.as_deref() {
@@ -178,6 +163,8 @@ impl Plan {
 #[cfg(test)]
 #[expect(clippy::panic_in_result_fn, reason = "test assertions")]
 mod tests {
+    use ferrohealth_config::units::Duration;
+
     use super::Plan;
     use crate::config::ScheduleConfig;
 
@@ -201,7 +188,7 @@ mod tests {
     fn an_interval_runs_from_the_end_of_the_last_run() -> Result<(), Box<dyn core::error::Error>> {
         let plan = Plan::parse(
             &ScheduleConfig {
-                every: Some(String::from("24h")),
+                every: Some(Duration::from_hours(24)),
                 at: None,
             },
             "UTC",
@@ -220,7 +207,7 @@ mod tests {
     {
         let plan = Plan::parse(
             &ScheduleConfig {
-                every: Some(String::from("6h")),
+                every: Some(Duration::from_hours(6)),
                 at: None,
             },
             "UTC",
@@ -238,7 +225,7 @@ mod tests {
     fn a_missed_window_is_due_at_once() -> Result<(), Box<dyn core::error::Error>> {
         let plan = Plan::parse(
             &ScheduleConfig {
-                every: Some(String::from("24h")),
+                every: Some(Duration::from_hours(24)),
                 at: None,
             },
             "UTC",
@@ -293,7 +280,7 @@ mod tests {
     fn both_shapes_take_the_earlier_due_time() -> Result<(), Box<dyn core::error::Error>> {
         let plan = Plan::parse(
             &ScheduleConfig {
-                every: Some(String::from("24h")),
+                every: Some(Duration::from_hours(24)),
                 at: Some(String::from("03:00")),
             },
             "UTC",
@@ -306,7 +293,7 @@ mod tests {
         );
         let plan = Plan::parse(
             &ScheduleConfig {
-                every: Some(String::from("36h")),
+                every: Some(Duration::from_hours(36)),
                 at: Some(String::from("03:00")),
             },
             "UTC",
@@ -320,35 +307,32 @@ mod tests {
     }
 
     #[test]
-    fn an_interval_of_zero_or_less_is_refused_naming_the_key_and_the_value() {
-        for value in ["0s", "PT0S", "-1h", "-PT1S"] {
-            let parsed = Plan::parse(
-                &ScheduleConfig {
-                    every: Some(String::from(value)),
-                    at: None,
-                },
-                "UTC",
-            );
-            let Err(error) = parsed else {
-                panic!("`{value}` would start each run the moment the last one ends");
-            };
-            assert!(
-                matches!(error, super::ScheduleError::NotPositive { .. }),
-                "`{value}` is refused as an interval that never waits, not as one that does not read"
-            );
-            let message = error.to_string();
-            assert!(
-                message.contains("schedule.every") && message.contains(value),
-                "the refusal names the key and the value: {message}"
-            );
-        }
+    fn an_interval_of_zero_is_refused_naming_the_key() {
+        let parsed = Plan::parse(
+            &ScheduleConfig {
+                every: Some(Duration::ZERO),
+                at: None,
+            },
+            "UTC",
+        );
+        let Err(error) = parsed else {
+            panic!("`0s` would start each run the moment the last one ends");
+        };
+        assert!(
+            matches!(error, super::ScheduleError::NotPositive),
+            "`0s` is refused as an interval that never waits"
+        );
+        assert!(
+            error.to_string().contains("schedule.every"),
+            "the refusal names the key: {error}"
+        );
     }
 
     #[test]
     fn the_shortest_positive_interval_is_accepted() -> Result<(), Box<dyn core::error::Error>> {
         let plan = Plan::parse(
             &ScheduleConfig {
-                every: Some(String::from("1ns")),
+                every: Some(Duration::from_millis(1)),
                 at: None,
             },
             "UTC",

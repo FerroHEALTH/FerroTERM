@@ -9,7 +9,9 @@ use std::time::Duration;
 
 use ferrohealth_config::loader::Loaded;
 use ferrohealth_config::provenance::{Provenance, Source};
+use ferrohealth_config::removed::Removals;
 use ferrohealth_session::config::{OidcSection, OidcSettings, SessionSection, SessionSettings};
+use ferrohealth_smart::config::ServerTls;
 use ferrohealth_telemetry::section::TelemetrySection;
 use ferrohealth_ui::i18n::Locale;
 use url::Url;
@@ -105,7 +107,8 @@ impl Config {
     /// Checks every value and reads every `_file` secret.
     ///
     /// # Errors
-    /// Returns [`Error::Address`] for a listen address that does not parse,
+    /// Returns [`Error::Removed`] for a key the console no longer reads,
+    /// [`Error::Address`] for a listen address that does not parse,
     /// [`Error::Locale`] for a `server.locale` that is no language tag,
     /// [`Error::Missing`], [`Error::Url`] and [`Error::UrlShape`] for a URL
     /// that is absent, does not parse or is not one its key admits,
@@ -115,6 +118,14 @@ impl Config {
     /// `session.secure_cookie = false` on a console that is not `http` on
     /// loopback.
     pub fn resolve(&self) -> Result<Settings, Error> {
+        // TODO(#1184): the refusal ships in 0.4.4 alone; delete it in 0.4.5.
+        let mut removals = Removals::new();
+        removals.replaced(
+            self.ferroterm.timeout_ms,
+            "ferroterm.timeout_ms",
+            "ferroterm.timeout",
+        );
+        removals.finish()?;
         let listen = self
             .server
             .listen
@@ -147,21 +158,24 @@ impl Config {
             .as_deref()
             .map(|text| base_url("ferroterm.admin_url", text))
             .transpose()?;
-        let timeout = positive("ferroterm.timeout_ms", self.ferroterm.timeout_ms)
-            .map(Duration::from_millis)?;
+        if self.ferroterm.timeout.is_zero() {
+            return Err(Error::Zero {
+                key: String::from("ferroterm.timeout"),
+            });
+        }
+        let timeout = self.ferroterm.timeout.get();
         let refused = |error| Error::SignIn(Box::new(error));
         let provider = self
             .oidc
             .as_ref()
-            .map(OidcSection::check)
-            .transpose()
-            .map_err(refused)?;
+            .map(|oidc| oidc.check_with_tls(&ServerTls).map_err(refused))
+            .transpose()?;
         let store = match &provider {
             Some(provider) => self.session.check(provider),
             None => self.session.check_with(false),
         }
         .map_err(refused)?;
-        // NOTE: `ferrohealth_session::config::OidcSection::check` parsed the
+        // NOTE: `ferrohealth_session::config::OidcSection::check_with_tls` parsed the
         // redirect URI, so a URL that does not parse here names no origin.
         let redirect = self
             .oidc
@@ -199,17 +213,6 @@ impl Config {
             provenance: Provenance::default(),
             telemetry: self.telemetry.clone(),
         })
-    }
-}
-
-/// Returns `value`, refusing zero.
-fn positive(key: &str, value: u64) -> Result<u64, Error> {
-    if value == 0 {
-        Err(Error::Zero {
-            key: key.to_owned(),
-        })
-    } else {
-        Ok(value)
     }
 }
 
@@ -273,6 +276,7 @@ fn is_loopback(url: &Url) -> bool {
 mod tests {
     use std::collections::BTreeMap;
     use std::path::Path;
+    use std::time::Duration;
 
     use ferrohealth_config::loader::Loader;
     use ferrohealth_config::provenance::Source;
@@ -371,12 +375,35 @@ mod tests {
             Source::Environment,
             settings.source_of("session.secure_cookie")
         );
-        assert_eq!(Source::Default, settings.source_of("ferroterm.timeout_ms"));
+        assert_eq!(Source::Default, settings.source_of("ferroterm.timeout"));
         assert_eq!(Source::File, settings.source_of("oidc.client_secret_file"));
         assert_eq!(
             Source::File,
             settings.source_of("oidc.client_secret"),
             "a secret set through its file counts as set"
+        );
+    }
+
+    #[test]
+    fn a_key_the_console_retired_is_refused_naming_its_replacement() {
+        let config =
+            Config::from_sources(Some("[ferroterm]\ntimeout_ms = 30000\n"), &BTreeMap::new())
+                .expect("the strict load still reads a retired key");
+        let Err(Error::Removed(refused)) = config.resolve() else {
+            panic!("`ferroterm.timeout_ms` is refused");
+        };
+        assert!(
+            refused
+                .to_string()
+                .starts_with("ferroterm.timeout_ms was replaced by ferroterm.timeout"),
+            "{refused}"
+        );
+        assert!(
+            Config::from_sources(Some("[ferroterm]\ntimeout = \"0s\"\n"), &BTreeMap::new())
+                .expect("reads")
+                .resolve()
+                .is_err_and(|error| matches!(error, Error::Zero { .. })),
+            "a zero timeout is refused"
         );
     }
 
@@ -413,8 +440,8 @@ mod tests {
     fn an_environment_value_reads_as_the_key_wants() {
         let environment = BTreeMap::from([
             (
-                String::from("FERROTERM_CONSOLE__FERROTERM__TIMEOUT_MS"),
-                String::from("5"),
+                String::from("FERROTERM_CONSOLE__FERROTERM__TIMEOUT"),
+                String::from("5s"),
             ),
             (
                 String::from("FERROTERM_CONSOLE__SESSION__SECURE_COOKIE"),
@@ -426,7 +453,7 @@ mod tests {
             ),
         ]);
         let config = Config::from_sources(None, &environment).expect("reads");
-        assert_eq!(5, config.ferroterm.timeout_ms);
+        assert_eq!(Duration::from_secs(5), config.ferroterm.timeout.get());
         assert!(!config.session.secure_cookie);
         assert_eq!("0.0.0.0:3000", config.server.listen);
     }

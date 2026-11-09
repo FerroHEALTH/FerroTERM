@@ -11,7 +11,8 @@ use std::process::ExitCode;
 use clap::Parser;
 
 use ferrohealth_server::cli::{Common, ConfigCommand};
-use ferrohealth_telemetry::telemetry::{Console, Service, Telemetry};
+use ferrohealth_server::telemetry::build as build_telemetry;
+use ferrohealth_telemetry::telemetry::{Console, Service};
 
 use crate::cli::Cli;
 use crate::config::Config;
@@ -148,11 +149,14 @@ async fn healthcheck(settings: &Settings) -> ExitCode {
 async fn serve(settings: Settings) -> ExitCode {
     let service = Service::new("ferroterm-console", env!("CARGO_PKG_VERSION"))
         .export_crate("ferroterm_console");
-    let installed = Telemetry::new(&settings.telemetry, service).and_then(|telemetry| {
-        telemetry
-            .install(&settings.telemetry, &Console::detect())
-            .map(|_filter| telemetry)
-    });
+    let installed = build_telemetry(&settings.telemetry, service)
+        .map_err(Box::<dyn Error>::from)
+        .and_then(|telemetry| {
+            telemetry
+                .install(&settings.telemetry, &Console::detect())
+                .map(|_filter| telemetry)
+                .map_err(Box::<dyn Error>::from)
+        });
     let telemetry = match installed {
         Ok(telemetry) => telemetry,
         Err(error) => {
