@@ -54,6 +54,13 @@ its technical details may wait, is the FerroHEALTH
    version filled in, and request a CVE through it where the vulnerability
    warrants one.
 
+A Security entry for a dependency bump may cite the advisory the upstream
+crate's repository already published, such as a FerroHEALTH family crate's.
+That id needs no draft here. This repository drafts an advisory only when
+FerroTERM itself was affected: when the release takes an upstream fix for a
+flaw FerroTERM already guarded against, the entry cites the upstream id
+alone, since an advisory here would state that FerroTERM was vulnerable.
+
 ## Vulnerabilities in integrated components
 
 A vulnerability the maintainer confirms in a component FerroTERM integrates (a

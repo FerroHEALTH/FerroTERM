@@ -22,9 +22,11 @@ editing `CHANGELOG.md`, so two pull requests never touch the same lines.
 ## Security entries
 
 A `security` fragment names its advisory itself: the `GHSA-xxxx-xxxx-xxxx` id
-of the repository advisory drafted for the fix, or the path of the OpenVEX
-statement under `security/vex/` that judges it, which must exist. The cut copies
-the fragment's text into the release notes, so the advisory reaches them.
+of the repository advisory drafted for the fix or of the advisory an upstream
+crate's repository already published (`docs/post-market.md`), or the path of
+the OpenVEX statement under `security/vex/` that judges it, which must exist.
+The cut copies the fragment's text into the release notes, so the advisory
+reaches them.
 
 When a release carries `security` fragments beside any other section, its
 `### Security` section opens with a reason line (CRA Annex I Part II(2) and

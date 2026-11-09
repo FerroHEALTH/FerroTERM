@@ -99,8 +99,10 @@ cut follows, in order.
 7. **The crate line is publishable**: the `crate-version-guard` and
    `publish-dry-run` jobs are green (`.claude/rules/crates-publishing.md`).
 8. **The advisories are drafted.** Every `GHSA-` id the section names is a
-   draft advisory on this repository, ready to publish with the release
-   (`docs/post-market.md`).
+   draft advisory on this repository, ready to publish with the release, or
+   an advisory an upstream crate's repository has already published, which
+   needs no draft here. This repository drafts an advisory only when
+   FerroTERM itself was affected (`docs/post-market.md`).
 9. **The preflight passes** at the commit you are about to tag (below).
 
 ## Preflight: the plan job, before the tag

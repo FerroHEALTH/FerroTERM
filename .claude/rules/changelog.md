@@ -53,9 +53,10 @@ the tag (`docs/release.md`).
   cut a security-only patch from the last release's state instead.
 - **Every `### Security` entry names its advisory** (Annex I Part II(4) and
   (8); `SECURITY.md` §Reporting a vulnerability). Each entry carries the
-  `GHSA-…` identifier of the repository advisory published with the release,
-  or, for a dependency bump that the OpenVEX documents show does not affect
-  any shipped artefact, the path of that VEX statement under `security/vex/`,
+  `GHSA-…` identifier of the repository advisory published with the release
+  or of the advisory an upstream crate's repository already published, or,
+  for a dependency bump that the OpenVEX documents show does not affect any
+  shipped artefact, the path of that VEX statement under `security/vex/`,
   which must exist. An entry with neither refuses the cut. Publishing the
   drafted advisories is a step of the cut, in the same hour the GitHub release
   is published (`docs/post-market.md`, "A fixed vulnerability's advisory").
