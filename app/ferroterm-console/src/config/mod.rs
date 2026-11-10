@@ -76,13 +76,17 @@ pub const PREFIX: &str = "FERROTERM_CONSOLE";
 /// `telemetry.filter`.
 pub const FILTER_ENV: &str = "RUST_LOG";
 
-/// The loader of the console's tree.
+/// The loader of the console's tree, with the product's
+/// `[ferroterm.server]` defaults layered under the file key by key, so a
+/// table written in part keeps the console's timeout.
 ///
 /// # Errors
 /// Returns the loader's error when the prefix is refused, which it never is
-/// for [`PREFIX`].
+/// for [`PREFIX`], or when the defaults do not serialize to a table.
 pub fn loader() -> Result<Loader, ferrohealth_config::error::ConfigError> {
-    Ok(Loader::new(PREFIX)?.alias(FILTER_ENV, "telemetry.filter"))
+    Loader::new(PREFIX)?
+        .alias(FILTER_ENV, "telemetry.filter")
+        .defaults("ferroterm.server", &*Ferroterm::default().server)
 }
 
 /// The configuration tree as written.

@@ -469,6 +469,25 @@ mod tests {
     }
 
     #[test]
+    fn a_server_table_written_with_only_its_url_keeps_the_console_timeout() {
+        let config = Config::from_sources(
+            Some("[ferroterm.server]\nurl = \"http://ferroterm:8080/\"\n"),
+            &BTreeMap::new(),
+        )
+        .expect("reads");
+        assert_eq!(
+            Duration::from_secs(30),
+            Duration::from(config.ferroterm.server.timeout),
+            "the console's 30 s timeout holds under a table that names only its url"
+        );
+        assert_eq!(
+            "http://ferroterm:8080/",
+            config.ferroterm.server.url.expose(),
+            "the url the file writes wins over the default"
+        );
+    }
+
+    #[test]
     fn an_endpoint_table_with_its_own_credential_is_refused() {
         let config = Config::from_sources(
             Some("[ferroterm.server]\nurl = \"http://ferroterm:8080/\"\n\n[ferroterm.server.credentials]\nuser = \"u\"\npassword = \"p\"\n"),
