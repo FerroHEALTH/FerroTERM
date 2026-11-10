@@ -36,7 +36,15 @@ and the push hook `.claude/hooks/crate_version_bump_guard.sh`.
   `[workspace.dependencies]` table. It never adopts the product version or a
   spec version; it is the crates' own SemVer line.
 
-## The bump rule
+## The bump rule: Cargo SemVer
+
+The crate line follows The Cargo Book, "SemVer Compatibility"
+(<https://doc.rust-lang.org/cargo/reference/semver.html>), and nothing
+else decides the step. While the line is `0.y.z`, a change in `y` is the
+major release and a change in `z` the minor one, because "only changes in
+the left-most non-zero component are considered incompatible". The judge is
+`cargo-semver-checks` (<https://github.com/obi1kenobi/cargo-semver-checks>),
+pinned in `docs/VERSIONS.md` and run by `scripts/checks/semver.sh`.
 
 - **A PR that changes any packaged content of any `crates/*` member bumps the
   crate line in the same PR.** Packaged content is what the crate's `include`
@@ -45,10 +53,29 @@ and the push hook `.claude/hooks/crate_version_bump_guard.sh`.
   bump. A root `[workspace.dependencies]` entry a published member consumes
   is packaged content too, because `cargo package` renders the concrete
   requirement; one only `publish = false` members consume is not.
+- **The step answers the change.** A change that keeps every public API
+  compatible moves the patch (`0.1.148` to `0.1.149`). A breaking change
+  moves the minor at patch 0 (`0.1.148` to `0.2.0`). Moving a public
+  dependency (`fhir-types`, `ferrobridge-term`, `ferrohealth-*`, or a sibling
+  whose types a published API exposes, `scripts/checks/lib/public-deps.sh`)
+  to another compatibility line is a breaking change the judge cannot see,
+  so it moves the minor too. A minor step with no breaking change, and a
+  minor step past the next one, are steps SemVer allows and pass.
+- **The judge runs three times.** The `crate-version-guard` job runs
+  `cargo semver-checks check-release` against the target branch
+  (`--baseline-rev`) on every pull request and merge-queue entry that moves
+  the line, for each of the published crates; the release plan
+  (`check_crate_semver` in `scripts/release/plan.sh`) runs it against each
+  crate's newest release on crates.io before any upload. Each run judges
+  the default feature selection and `--only-explicit-features`, what a
+  dependent built with `default-features = false` compiles against.
 - **Bumps are lockstep:** every member's `version` and every internal
-  requirement move to the same new `0.x` in one sweep, and `Cargo.lock` is
-  refreshed in the same PR (`cargo update -w`). The guard fails a split bump
-  and a stale lock.
+  requirement move to the same new version in one sweep, and `Cargo.lock` is
+  refreshed in the same PR (`cargo update -w`). One shared line moves
+  together, so a break in one crate moves the minor of all of them. The guard
+  fails a split bump, a stale lock, a version that does not move upward, a
+  minor step that keeps a patch, and a patch step under a public dependency
+  that moved to another line.
 - Escape: the `no-crate-bump` PR label, only when the diff provably alters no
   packaged bytes. Locally, `FERROTERM_SKIP_CRATE_BUMP_GUARD=1 git push`.
 - Not every bumped version is published; gaps in the published sequence are

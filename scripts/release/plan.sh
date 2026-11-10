@@ -207,6 +207,11 @@ check_notes_content() {
   fi
 }
 
+# Every crate the release publishes answers its change since its newest
+# release on crates.io with the step The Cargo Book's SemVer chapter asks for,
+# judged by cargo-semver-checks before any upload (#1208).
+check_crate_semver() { bash scripts/release/publish-crates.sh semver; }
+
 # The list: "<function> <title>", in the order the plan job has always run
 # them. A check that reads the notes comes after check_notes.
 list() {
@@ -218,6 +223,7 @@ check_changelog_security The Security section of the cut names its advisories an
 check_changelog_fragments No changelog fragment is left unassembled
 check_notes The changelog section for this tag becomes the release notes
 check_notes_content The release notes carry the CRA user information and the support period
+check_crate_semver Each crate the release publishes bumps the minor for a breaking change and the patch otherwise (cargo-semver-checks)
 EOF
 }
 
