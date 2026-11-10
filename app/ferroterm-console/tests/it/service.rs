@@ -6,6 +6,7 @@
 //! answer compressed, and the same-origin rule for every unsafe request.
 
 use axum::body::Body;
+use ferrohealth_secret::secret_url::SecretUrl;
 use ferrohealth_session::config::OidcSection;
 use ferrohealth_ui::serve::Assets;
 use ferrohealth_ui::style::Brand;
@@ -126,7 +127,9 @@ async fn the_policy_admits_a_form_redirect_to_the_end_session_endpoint_s_origin(
     let provider = Provider::start().await;
     let state = console(
         Some(OidcSection {
-            end_session_endpoint: Some(String::from("https://idp.example:8443/logout?x=1")),
+            end_session_endpoint: Some(SecretUrl::new(String::from(
+                "https://idp.example:8443/logout?x=1",
+            ))),
             ..provider.oidc()
         }),
         "",

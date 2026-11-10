@@ -6,6 +6,7 @@
 //! Connect Core 1.0 §3.1.2.1), and the redirect back that is held to it
 //! (RFC 6749 §10.12) before a session is begun.
 
+use ferrohealth_secret::secret_url::SecretUrl;
 use std::collections::BTreeMap;
 
 use base64::Engine as _;
@@ -188,7 +189,7 @@ async fn every_login_mints_its_own_state_and_nonce() {
 async fn login_keeps_the_query_the_authorization_endpoint_already_carries() {
     let provider = Provider::start().await;
     let oidc = OidcSection {
-        authorization_endpoint: Some(provider.url("/authorize?tenant=north")),
+        authorization_endpoint: Some(SecretUrl::new(provider.url("/authorize?tenant=north"))),
         ..provider.oidc()
     };
     let state = console(Some(oidc), "").await;
@@ -509,7 +510,7 @@ async fn a_token_endpoint_failing_on_its_side_shows_the_unreachable_sign_in_page
 async fn an_unreachable_token_endpoint_shows_the_unreachable_sign_in_page() {
     let provider = Provider::start().await;
     let oidc = OidcSection {
-        token_endpoint: Some(String::from("http://127.0.0.1:9/token")),
+        token_endpoint: Some(SecretUrl::new(String::from("http://127.0.0.1:9/token"))),
         ..provider.oidc()
     };
     let state = console(Some(oidc), "").await;

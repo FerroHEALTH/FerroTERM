@@ -49,7 +49,7 @@ fn client(server: &MockServer, credentials: CredentialsSection) -> AdminClient {
 fn oauth(server: &MockServer) -> CredentialsSection {
     CredentialsSection {
         oauth: Some(OauthSection {
-            token_endpoint: format!("{}/token", server.uri()),
+            token_endpoint: SecretUrl::new(format!("{}/token", server.uri())),
             client_id: String::from("ferroterm-sync"),
             client_secret: Some(SecretString::from("synthetic-secret")),
             scope: String::from("__ferroterm.admin"),

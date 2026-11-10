@@ -253,6 +253,8 @@ pub(crate) fn params_in(query: &str, name: &str) -> Vec<String> {
 mod tests {
     use ferrohealth_session::config::OidcSection;
 
+    use ferrohealth_secret::secret_url::SecretUrl;
+
     use super::{Request, param_in, params_in};
     use crate::auth::Operator;
     use crate::auth::scopes::Letter;
@@ -268,9 +270,9 @@ mod tests {
         if sign_in {
             config.oidc = Some(OidcSection {
                 issuer: String::from("https://idp.example"),
-                authorization_endpoint: Some(String::from("https://idp.example/authorize")),
-                token_endpoint: Some(String::from("https://idp.example/token")),
-                jwks_uri: Some(String::from("https://idp.example/jwks")),
+                authorization_endpoint: Some(SecretUrl::new("https://idp.example/authorize")),
+                token_endpoint: Some(SecretUrl::new("https://idp.example/token")),
+                jwks_uri: Some(SecretUrl::new("https://idp.example/jwks")),
                 client_id: String::from("ferroterm-console"),
                 redirect_uri: String::from("http://127.0.0.1:3000/auth/callback"),
                 ..OidcSection::default()

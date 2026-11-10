@@ -9,6 +9,7 @@
 //! (OpenID Connect Core 1.0 §2), and answers its token and revocation
 //! endpoints with whatever a test mounts.
 
+use ferrohealth_secret::secret_url::SecretUrl;
 use std::collections::BTreeMap;
 
 use aws_lc_rs::rand::SystemRandom;
@@ -135,9 +136,9 @@ impl Provider {
     pub(crate) fn oidc(&self) -> OidcSection {
         OidcSection {
             issuer: self.issuer(),
-            authorization_endpoint: Some(self.url("/authorize")),
-            token_endpoint: Some(self.url(TOKEN_PATH)),
-            jwks_uri: Some(self.url(JWKS_PATH)),
+            authorization_endpoint: Some(SecretUrl::new(self.url("/authorize"))),
+            token_endpoint: Some(SecretUrl::new(self.url(TOKEN_PATH))),
+            jwks_uri: Some(SecretUrl::new(self.url(JWKS_PATH))),
             client_id: String::from(CLIENT_ID),
             redirect_uri: String::from(REDIRECT_URI),
             scopes: vec![String::from("openid"), String::from("user/*.cruds")],

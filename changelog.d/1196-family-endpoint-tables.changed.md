@@ -1,5 +1,5 @@
 - Every outbound call of the console and the synchronisation service goes
-  through the family endpoint table of ferrohealth-smart 0.16: `url`,
+  through the family endpoint table of ferrohealth-smart: `url`,
   `timeout`, `connect_timeout`, `retry`, `tls` and, for the sync service,
   `credentials`. The client follows no redirect, and a call that did not
   connect, timed out or met a `5xx` is tried again as `retry` allows; the
@@ -17,8 +17,8 @@
   refuses the start, and the revalidation sends `$validate-code` and
   `$expand` as `POST`.
 - The server, the synchronisation service and the console take the family
-  round of 2026-11-09: ferrohealth-config 0.4.1, ferrohealth-telemetry 0.4,
-  ferrohealth-server 0.8.1, ferrohealth-usage-report 0.4,
-  ferrohealth-smart 0.16.3, ferrohealth-session 0.10, ferrobridge-term 0.3
-  and fhir-types 0.1.130, with the performance gate on ferrohealth-perf
-  0.8.
+  rounds of 2026-11-09 and 2026-11-10: ferrohealth-config 0.4.1,
+  ferrohealth-telemetry 0.4, ferrohealth-server 0.8.1,
+  ferrohealth-usage-report 0.4, ferrohealth-smart 0.17.0,
+  ferrohealth-session 0.11.0, ferrobridge-term 0.4.0 and fhir-types
+  0.1.130, with the performance gate on ferrohealth-perf 0.8.
