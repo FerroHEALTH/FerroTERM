@@ -17,6 +17,110 @@ fragments here under the version and its date.
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-11-10
+
+### Changed
+
+- Every outbound call of the console and the synchronisation service goes
+  through the family endpoint table of ferrohealth-smart: `url`,
+  `timeout`, `connect_timeout`, `retry`, `tls` and, for the sync service,
+  `credentials`. The client follows no redirect, and a call that did not
+  connect, timed out or met a `5xx` is tried again as `retry` allows; the
+  console sends a create once. In 0.4.5 alone each earlier key refuses the
+  start naming its replacement. Upgrade step for the console: write
+  `[ferroterm.server] url` and `timeout` for `[ferroterm] base_url` and
+  `timeout`, `[ferroterm.sync] url` for `sync_url` and `[ferroterm.admin]
+  url` for `admin_url` (`FERROTERM_CONSOLE__FERROTERM__SERVER__URL` and so
+  on); `public_url` stays, and an endpoint table takes no `credentials`.
+  Upgrade step for the sync service: write `[server_admin] url` for
+  `server_admin_url`, `[server_admin.credentials.oauth]` for
+  `[server_admin_credentials.oauth]`, `[fhir] url` for `fhir_base_url` and
+  `[webhook] url` for `webhook_url` (`FERROTERM_SYNC__SERVER_ADMIN__URL` and
+  so on). A `[fhir]` URL whose last segment names no served release now
+  refuses the start, and the revalidation sends `$validate-code` and
+  `$expand` as `POST` (#1196).
+- The server, the synchronisation service and the console take the family
+  rounds of 2026-11-09 and 2026-11-10: ferrohealth-config 0.4.1,
+  ferrohealth-telemetry 0.4, ferrohealth-server 0.8.1,
+  ferrohealth-usage-report 0.4, ferrohealth-smart 0.17.0,
+  ferrohealth-session 0.11.0, ferrobridge-term 0.4.0 and fhir-types
+  0.1.130, with the performance gate on ferrohealth-perf 0.8 (#1196).
+- A `patients` issuer may set `act_represents_patient = true` on its
+  `[[auth.issuer]]` table (ferrohealth-smart 0.14): a patient's token that
+  carries an RFC 8693 `act` claim is then the patient's representative.
+  Without the key such a token is refused `401` as no caller of the issuer,
+  and on another kind of issuer the key refuses the start. A terminology
+  resource sits in no patient's compartment, so the representative, like the
+  patient, is refused every write with `403`. Upgrade step: set
+  `act_represents_patient = true` on a `patients` issuer whose tokens name
+  the person acting for the patient in `act` (#1197).
+- The server and the synchronisation service exit with code 78
+  (`EX_CONFIG`, `sysexits(3)`) on a configuration they refuse, as the
+  console already did, so an orchestrator tells a bad configuration from a
+  failure to serve. `healthcheck` on a configuration that does not load
+  writes `<binary>: not up: <reason>` and exits 1. All three binaries run
+  through the family run path of ferrohealth-server 0.8.1: one
+  `<binary>: cannot start: <reason>` line with every cause on a refusal,
+  `config check` printing the running tree with every secret redacted, and
+  the telemetry started and flushed by the family. Upgrade step: a
+  supervisor or script that matched exit code 1 for a refused configuration
+  matches 78 (#1198).
+- The synchronisation service calls the Nationale Terminologie Server
+  through the family outbound client of ferrohealth-smart 0.17, built
+  from `[nts]`, which is now the family endpoint table: `url`, `timeout`
+  (`"1h"`, since a download of a whole edition is one call),
+  `connect_timeout` (`"30s"`), `retry`, `tls` and the client credentials
+  grant under `[nts.credentials.oauth]`, whose `issuer`, `client_auth =
+  "client_secret_post"` and `refresh_margin = "1m"` default to the
+  service's realm. A listing, a page of the FHIR API or a download that did
+  not connect, timed out or met a `5xx` is tried again as `retry` allows.
+  In 0.4.5 alone each earlier key refuses the start naming its
+  replacement. Upgrade step: write `[nts.credentials.oauth] client_id`,
+  `client_secret` and `client_secret_file` for `[nts] client_id`,
+  `client_secret` and `client_secret_file`
+  (`FERROTERM_SYNC__NTS__CREDENTIALS__OAUTH__CLIENT_ID` and so on), and
+  `[nts] url` and `[nts.credentials.oauth] issuer` for a `[[source]]`
+  block's `base_url` and `issuer` (#1203).
+- A key an endpoint table leaves out keeps the product's default for it.
+  The synchronisation service's `[server_admin]` keeps `timeout = "30min"`
+  and one try when the file writes only its `url`, and the console's
+  `[ferroterm.server]` keeps `timeout = "30s"`; `[fhir]`, `[webhook]`,
+  `[ferroterm.sync]` and `[ferroterm.admin]` take the family's defaults.
+  Upgrade step: none (#1206).
+- The published crates (`rf2`, `concept-graph`, `sct-ecl`,
+  `fhir-terminology` and the rest of the line) follow The Cargo Book's
+  SemVer rules, judged by cargo-semver-checks 0.51.0 on every pull request
+  and merge-queue entry that moves the line and again in the release plan
+  against crates.io: a compatible change moves the patch, and a breaking
+  change, a public dependency moved to another compatibility line included,
+  moves the minor at patch 0, so a caret requirement such as `rf2 = "0.1"`
+  never takes a break. Upgrade step: none (#1208).
+- A TLS refusal of an outbound endpoint table names the key under its own
+  `tls` table, `server_admin.tls.trust_roots_file` where 0.4.4 named
+  `server_admin.trust_roots_file` (ferrohealth-smart 0.17). Every OAuth and
+  OpenID Connect endpoint URL a table names, such as the console's
+  `[oidc] token_endpoint` and the sync service's
+  `[server_admin.credentials.oauth] token_endpoint`, renders with any
+  userinfo and query masked in `config check` and the logs. Upgrade step:
+  none (#1215).
+
+### Removed
+
+- The console no longer names `[ferroterm] timeout_ms` when it refuses the
+  key: the 0.4.4 refusal is gone, and the key is now an unknown key that the
+  strict load refuses like any other. Upgrade step: write `[ferroterm]
+  timeout` as a duration such as `"30s"` (#1184).
+- The named refusals of the keys 0.4.4 retired in the family crates are
+  gone, so each is now an unknown key that the strict load refuses: the
+  `[server]` keys that named their unit (`request_timeout_ms`,
+  `body_limit_bytes` and the rest), the `[auth]` and issuer keys that named
+  theirs (`clock_skew_seconds`, `timeout_ms` and the rest), `auth.ca_file`,
+  the console's `[session]` and `[oidc]` keys that named their unit,
+  `oidc.ca_file`, and `telemetry.otlp.trust_roots_file` and
+  `client_identity_file`. The earlier `[auth]` shape, a flat
+  `issuer = "…"` or an issuer setting on `[auth]` itself, is refused the
+  same way. Upgrade step: none for a configuration that started on 0.4.4 (#1196).
+
 ## [0.4.4] - 2026-11-09
 
 ### Changed
@@ -2721,7 +2825,8 @@ binary answers `GET /health` only.
 - No existing Rust terminology or FHIR crate is a dependency; the README
   records the evaluation and the reasons.
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.4...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.5...HEAD
+[0.4.5]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.1...v0.4.2
