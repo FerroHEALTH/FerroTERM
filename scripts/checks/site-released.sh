@@ -56,7 +56,9 @@ named_versions() {
   [[ -d "$root/website/landing" ]] && dirs+=("$root/website/landing")
   [[ "${#dirs[@]}" -gt 0 ]] || return 0
   {
-    if grep -rqF -- "$current" "${dirs[@]}"; then
+    # The landing page's badge names the workspace version through the
+    # {{version:ferroterm}} marker the assembly renders.
+    if grep -rqF -e "$current" -e '{{version:ferroterm}}' "${dirs[@]}"; then
       printf '%s\n' "$current"
     fi
     grep -rhoE -- '(ferroterm(-console|-sync)?:|ferroterm(-console)?-v|release download v)[0-9]+\.[0-9]+\.[0-9]+' "${dirs[@]}" |

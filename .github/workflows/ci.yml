@@ -190,6 +190,13 @@ jobs:
         with:
           persist-credentials: false
 
+      # ---- quickstart --------------------------------------------------
+      # The README's quick start is the anchored steps of the tour, which the
+      # quickstart job runs; the self-test holds each README copy to its anchor.
+      - name: quickstart
+        if: ${{ !cancelled() }}
+        run: bash scripts/quickstart/tour.sh --self-test
+
       # ---- comment-style -----------------------------------------------
       # comment-style: the RFC 505 / RFC 1574 comment budgets over every
       # hand-written .rs file. The per-edit hook runs the same script on the files
@@ -965,6 +972,35 @@ jobs:
 
   # ── The single required check ───────────────────────────────────────────────
 
+  # The README's quick start, run as written against the published image: the
+  # server starts with nothing loaded and answers a UCUM $lookup.
+  quickstart:
+    name: quickstart
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The image the README names is tagged only once its release is
+      # published, after the version bump reached main; until then there is
+      # nothing to pull, and the tour waits for the publish (site-released.sh
+      # holds the deployed site back over the same window).
+      - name: The README's quick start runs as written
+        run: |
+          set -euo pipefail
+          version="$(awk '/^\[workspace\.package\]/{f=1;next} /^\[/{f=0} f && /^version[[:space:]]*=/{gsub(/[" ]/,""); sub(/^version=/,""); print; exit}' Cargo.toml)"
+          if ! docker manifest inspect "ghcr.io/ferrohealth/ferroterm:$version" > /dev/null 2>&1; then
+            echo "::notice::ghcr.io/ferrohealth/ferroterm:$version is not published yet; the tour runs once release v$version is."
+            exit 0
+          fi
+          bash scripts/quickstart/tour.sh
+      - name: Stop the quickstart
+        if: always()
+        run: docker stop ferroterm || true
+
   conclusion:
     name: conclusion
     needs:
@@ -988,6 +1024,7 @@ jobs:
       - bench-bars
       - tx-ecosystem
       - perf
+      - quickstart
       - dependency-review
     if: always()
     runs-on: ubuntu-latest

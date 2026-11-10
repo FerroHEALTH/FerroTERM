@@ -18,6 +18,13 @@
 - [CRA risk assessment](evaluate/cra-risk-assessment.md)
 - [CRA information for users](evaluate/cra-user-information.md)
 
+# Integrate
+
+- [The FHIR terminology API](integrate/fhir-api.md)
+- [Value sets, implicit value sets, and ECL](integrate/ecl-value-sets.md)
+- [FHIR versions](integrate/fhir-versions.md)
+- [Worked examples](integrate/examples.md)
+
 # Operate
 
 - [Install and run](operate/install.md)
@@ -32,15 +39,12 @@
 - [Usage report](operate/usage-report.md)
 - [Verifying releases](operate/verifying-releases.md)
 
-# Integrate
-
-- [The FHIR terminology API](integrate/fhir-api.md)
-- [Value sets, implicit value sets, and ECL](integrate/ecl-value-sets.md)
-- [FHIR versions](integrate/fhir-versions.md)
-- [Worked examples](integrate/examples.md)
-
 # Contribute
 
 - [Build and test](contribute/build-and-test.md)
 - [The FHIR model](contribute/codegen.md)
 - [The performance gate](contribute/performance-gate.md)
+
+---
+
+[Changelog](changelog.md)

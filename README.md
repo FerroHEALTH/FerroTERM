@@ -8,7 +8,7 @@
 
 [Documentation](https://ferroterm.eu/docs/) ·
 [Quick start](#quick-start) ·
-[What ships today](#what-ships-today) ·
+[What it implements](#what-it-implements) ·
 [Licensing](https://ferroterm.eu/docs/evaluate/licensing.html)
 
 **Project**<br>
@@ -36,7 +36,8 @@
 
 </div>
 
-## What FerroTERM does
+
+## What FerroTERM is
 
 Health records are full of codes. A diagnosis is a SNOMED CT or ICD code, a
 lab result a LOINC code, a medicine a code from a national drug database.
@@ -45,68 +46,33 @@ systems agree that they mean the same thing. Every application that records
 or exchanges clinical data needs to look codes up, check them and search
 them.
 
-FerroTERM answers those questions for every application at once. It loads
-the code systems you are licensed for and serves them over FHIR, the
-standard interface health software uses for terminology: look up a code,
-check that a code belongs to a list, find every narrower term, translate a
-code from one system to another. It runs as one program, with no database
-or search engine to operate beside it.
+FerroTERM answers those questions for every application at once. It is a
+FHIR terminology server in pure Rust: it loads the code systems you are
+licensed for and serves them over the HL7 FHIR terminology API. Look up a
+code, check that a code belongs to a list, find every narrower term,
+translate a code from one system to another. It runs as one program over
+an index built once per release, with no JVM, database or search engine to
+operate beside it.
 
-### Who it is for
-
-- **Hospitals and national eHealth programmes** that need one terminology
-  service for all their applications.
-- **Software vendors and integrators** that need SNOMED CT, LOINC or ICD
-  in their products without running a heavy terminology stack.
-- **Terminology teams** that edit and publish value sets (curated lists of
-  codes) in the console.
-
-### Why you can trust what it claims
-
-Every release is signed and comes with a software bill of materials (the
-list of every component inside) and SLSA build provenance, so you can check
-that what you install is what was built here. The source is public, and
-every feature is in this repository: there is no paid edition with extra
-functions. The conformance badges come from the HL7 terminology test suite,
-run against every change, with a committed pass list per FHIR version, so
-you can check a result against the standard yourself.
-
-## Part of FerroHEALTH
-
-FerroTERM is one of five [FerroHEALTH](https://ferrohealth.eu) servers.
-Each does one job and reaches the others only over published standards:
-FerroEHR stores the record, FerroBRIDGE translates it to FHIR and the OMOP
-research model, FerroFED connects records across organisations and borders,
-FerroPIX matches patient identities, and FerroTERM serves the code systems.
-Any FHIR client can use FerroTERM, not only the FerroHEALTH products. Sign-in,
-the audit trail and the web consoles come from three shared libraries:
-FerroAUTH, FerroAUDIT and FerroUI.
+It is for hospitals and national eHealth programmes that need one
+terminology service for all their applications, for vendors and integrators
+that need SNOMED CT, LOINC or ICD in their products without a heavy
+terminology stack, and for terminology teams that edit and publish value
+sets in the console.
 
 <img src="website/book/src/operate/img/console/dashboard.png" alt="The FerroTERM console dashboard">
 
-## Quick start
+## What it implements
 
-The image serves UCUM, BCP 47, BCP 13 and ISO 3166-1 with no configuration,
-so the first call needs nothing beyond Docker:
+- [The FHIR terminology API](https://ferroterm.eu/docs/integrate/fhir-api.html): `$lookup`, `$validate-code`, `$subsumes`, `$expand`, `$translate` and `$closure`
+- [FHIR R4, R4B, R5 and the R6 ballot](https://ferroterm.eu/docs/integrate/fhir-versions.html), each in its own version's shapes, in JSON and XML
+- [Value sets, implicit value sets and ECL](https://ferroterm.eu/docs/integrate/ecl-value-sets.html), the SNOMED CT Expression Constraint Language
+- [Stored value sets, code systems and concept maps](https://ferroterm.eu/docs/integrate/fhir-api.html#persisted-resources) with history, when you name a database
+- [Syncing from a national terminology service](https://ferroterm.eu/docs/operate/sync.html), one way into a running server
+- [The console](https://ferroterm.eu/docs/operate/console.html), its own image: browse, look up, expand and translate, and compose value sets
 
-```sh
-docker run --rm -p 8080:8080 ghcr.io/ferrohealth/ferroterm:0.4.6
-```
-
-In a second terminal, look up a unit of measure:
-
-```sh
-curl 'http://localhost:8080/r4b/CodeSystem/$lookup?system=http://unitsofmeasure.org&code=mg/dL'
-```
-
-A clinical code system such as SNOMED CT is a release you hold a licence
-for. `ferroterm-build`, in the same image, turns it into an index once, and
-the server reads that index at startup.
-[Install and run](https://ferroterm.eu/docs/operate/install.html) and
-[loading code systems](https://ferroterm.eu/docs/operate/loading-snomed.html)
-continue from here.
-
-## What it serves
+It serves these code systems, each from the release you are licensed for,
+with UCUM and the registries built in:
 
 <!-- code-systems:begin -->
 SNOMED CT, LOINC, UCUM, BCP 47, BCP 13, ISO 3166-1, ICD-10 (WHO), ICD-10-NL,
@@ -119,28 +85,69 @@ systems load this way).
 
 The [code systems page](https://ferroterm.eu/docs/evaluate/code-systems.html)
 lists, per system, the versions handled, the build command and the licence
-position. You bring the release you are licensed for; UCUM and the
-registries are built in.
+position.
 
-## What ships today
+## Quick start
 
-### Terminology
+The image serves UCUM, BCP 47, BCP 13 and ISO 3166-1 with no configuration,
+so the first call needs nothing beyond Docker and `curl`. Start the server:
 
-- [The FHIR terminology API](https://ferroterm.eu/docs/integrate/fhir-api.html): `$lookup`, `$validate-code`, `$subsumes`, `$expand`, `$translate` and `$closure`
-- [FHIR R4, R4B, R5 and the R6 ballot](https://ferroterm.eu/docs/integrate/fhir-versions.html), each in its own version's shapes, in JSON and XML
-- [Value sets, implicit value sets and ECL](https://ferroterm.eu/docs/integrate/ecl-value-sets.html), the SNOMED CT expression language
-- [Stored value sets, code systems and concept maps](https://ferroterm.eu/docs/integrate/fhir-api.html#persisted-resources) with history, when you name a database
+<!-- tour:start -->
+```sh
+docker run --rm -d --name ferroterm -p 8080:8080 ghcr.io/ferrohealth/ferroterm:0.4.6
+```
 
-### Operations
+Look up a unit of measure:
 
-- [The console](https://ferroterm.eu/docs/operate/console.html): browse, look up, expand and translate, and compose value sets
-- [Syncing from a national terminology service](https://ferroterm.eu/docs/operate/sync.html), one way into a running server
-- [Health, metrics and request identifiers](https://ferroterm.eu/docs/operate/observability.html), and [hardware sizing](https://ferroterm.eu/docs/operate/hardware-sizing.html)
-- [Verifiable releases](https://ferroterm.eu/docs/operate/verifying-releases.html): images for amd64 and arm64 and release binaries, signed, with a software bill of materials
+<!-- tour:lookup -->
+```sh
+curl --fail-with-body -s 'http://localhost:8080/r4b/CodeSystem/$lookup?system=http://unitsofmeasure.org&code=mg/dL' \
+  | jq -e '.resourceType == "Parameters"'
+```
 
-### Libraries
+Both commands are steps of
+[`scripts/quickstart/tour.sh`](scripts/quickstart/tour.sh), which CI runs
+against the published image; `docker stop ferroterm` stops the server. A
+clinical code system such as SNOMED CT is a release you hold a licence for.
+`ferroterm-build`, in the same image, turns it into an index once, and the
+server reads that index at startup.
+[Install and run](https://ferroterm.eu/docs/operate/install.html) and
+[loading code systems](https://ferroterm.eu/docs/operate/loading-snomed.html)
+continue from here.
 
-- The SNOMED CT, LOINC, ICD, RxNorm and Dutch release readers and the terminology engine, published as Rust crates (listed below)
+## Deploy it
+
+Every release publishes, from one tag:
+
+- the server image `ghcr.io/ferrohealth/ferroterm`, the sync image
+  `ghcr.io/ferrohealth/ferroterm-sync` and the console image
+  `ghcr.io/ferrohealth/ferroterm-console`, for `linux/amd64` and
+  `linux/arm64`;
+- the `ferroterm`, `ferroterm-build` and `ferroterm-sync` binaries for
+  `x86_64` and `aarch64` Linux, on glibc and on musl, and the quickstart
+  `compose.yaml`, on the [GitHub release](https://github.com/FerroHEALTH/FerroTERM/releases).
+
+[Install and run](https://ferroterm.eu/docs/operate/install.html) covers
+compose and the container by hand,
+[hardware sizing](https://ferroterm.eu/docs/operate/hardware-sizing.html)
+the memory each code system needs, and
+[health, metrics and request identifiers](https://ferroterm.eu/docs/operate/observability.html)
+what an orchestrator reads.
+
+## Security and conformance
+
+- **What you install:** every release artifact carries signed SLSA Build
+  Level 3 provenance and an SBOM you verify before you run it
+  ([Verifying releases](https://ferroterm.eu/docs/operate/verifying-releases.html)).
+- **Conformance:** the conformance badges above come from the HL7
+  terminology ecosystem test suite, run against every change, with a
+  committed pass list per FHIR version
+  ([Conformance](https://ferroterm.eu/docs/evaluate/conformance.html)).
+- **Measured:** every figure below comes from a benchmark record committed
+  to the repository, and a check fails when a page and the records disagree.
+
+The source is public and every feature is in this repository; there is no
+paid edition with extra functions.
 
 <details>
 <summary><b>Speed and footprint</b>, measured per code system</summary>
@@ -161,8 +168,10 @@ Warm p50 over 200 HTTP round trips on one machine (Apple M2, 17.18 GB, macos/aar
 
 </details>
 
-<details>
-<summary><b>Published crates</b> (14)</summary>
+## Crates
+
+The SNOMED CT, LOINC, ICD, RxNorm and Dutch release readers and the
+terminology engine are published as Rust crates.
 
 | Crate | What it does | Version | Docs | Downloads |
 |---|---|---|---|---|
@@ -181,21 +190,41 @@ Warm p50 over 200 HTTP round trips on one machine (Apple M2, 17.18 GB, macos/aar
 | [`rxnorm-rrf`](https://crates.io/crates/rxnorm-rrf) | The RxNorm Rich Release Format reader and typed row model | [![crates.io](https://img.shields.io/crates/v/rxnorm-rrf?logo=rust&label=crates.io)](https://crates.io/crates/rxnorm-rrf) | [![docs.rs](https://img.shields.io/docsrs/rxnorm-rrf?logo=docsdotrs&label=docs.rs)](https://docs.rs/rxnorm-rrf) | [![downloads](https://img.shields.io/crates/d/rxnorm-rrf?logo=rust&label=downloads)](https://crates.io/crates/rxnorm-rrf) |
 | [`fhir-terminology`](https://crates.io/crates/fhir-terminology) | The FHIR terminology operations over the code system provider seam | [![crates.io](https://img.shields.io/crates/v/fhir-terminology?logo=rust&label=crates.io)](https://crates.io/crates/fhir-terminology) | [![docs.rs](https://img.shields.io/docsrs/fhir-terminology?logo=docsdotrs&label=docs.rs)](https://docs.rs/fhir-terminology) | [![downloads](https://img.shields.io/crates/d/fhir-terminology?logo=rust&label=downloads)](https://crates.io/crates/fhir-terminology) |
 
-</details>
+## Part of FerroHEALTH
 
-## Learn more
+FerroTERM is one of five [FerroHEALTH](https://ferrohealth.eu) servers.
+Each does one job and reaches the others only over published standards:
+FerroEHR stores the record, FerroBRIDGE translates it to FHIR and the OMOP
+research model, FerroFED connects records across organisations and borders,
+FerroPIX matches patient identities, and FerroTERM serves the code systems.
+Any FHIR client can use FerroTERM.
 
-- [Documentation](https://ferroterm.eu/docs/) and the [FerroHEALTH book](https://ferrohealth.eu/docs/)
-- [What FerroTERM is](https://ferroterm.eu/docs/evaluate/what-ferroterm-is.html), [architecture at a glance](https://ferroterm.eu/docs/evaluate/architecture.html) and [how it compares](https://ferroterm.eu/docs/evaluate/comparison.html)
-- [Conformance](https://ferroterm.eu/docs/evaluate/conformance.html) and [benchmarks](https://ferroterm.eu/docs/evaluate/benchmarks.html)
-- [Changelog](CHANGELOG.md) and [milestones](https://github.com/FerroHEALTH/FerroTERM/milestones)
-- [Security policy](SECURITY.md)
-- [Contributing](CONTRIBUTING.md), [code of conduct](CODE_OF_CONDUCT.md), [support](SUPPORT.md), [governance](GOVERNANCE.md), [maintainers](MAINTAINERS.md) and the [AI statement](AI_STATEMENT.md)
+## Documentation
+
+- [The FerroTERM book](https://ferroterm.eu/docs/): evaluate, integrate,
+  operate and contribute, and the
+  [FerroHEALTH book](https://ferrohealth.eu/docs/) for what the family
+  shares
+- [What FerroTERM is](https://ferroterm.eu/docs/evaluate/what-ferroterm-is.html),
+  [architecture at a glance](https://ferroterm.eu/docs/evaluate/architecture.html)
+  and [how it compares](https://ferroterm.eu/docs/evaluate/comparison.html)
+- [Benchmarks](https://ferroterm.eu/docs/evaluate/benchmarks.html), the
+  [changelog](CHANGELOG.md) and the
+  [GitHub releases](https://github.com/FerroHEALTH/FerroTERM/releases)
+
+## Support and contributing
+
+- [Support](SUPPORT.md) and the [security policy](SECURITY.md)
+- [Contributing](CONTRIBUTING.md), [code of conduct](CODE_OF_CONDUCT.md),
+  [governance](GOVERNANCE.md), [maintainers](MAINTAINERS.md) and the
+  [AI statement](AI_STATEMENT.md)
 
 ## Licence
 
-Business Source License 1.1 ([LICENSE](LICENSE)), with Apache License 2.0 as
-the Change License four years after each version; the `rf2` crate is
-Apache-2.0 today. The code systems keep their own licences, and the
+Business Source License 1.1 ([LICENSE](LICENSE)): free outside production
+and for non-commercial production use, a commercial licence from Cadasto
+B.V. for other production use, and Apache License 2.0 four years after each
+version; the `rf2` crate is Apache-2.0 today. The code systems keep their
+own licences, and the
 [licensing page](https://ferroterm.eu/docs/evaluate/licensing.html) says
-when you need a commercial licence from Cadasto B.V.
+which applies to you.

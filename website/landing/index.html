@@ -11,15 +11,25 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>FerroTERM: a pure-Rust FHIR terminology server for clinical code systems</title>
-  <meta name="description" content="FerroTERM serves SNOMED CT, LOINC, ICD-10, ICD-11, RxNorm, UCUM, and any FHIR CodeSystem through the HL7 FHIR terminology API from one binary over an index built once per release and read at startup. No JVM, no Elasticsearch. Business Source License 1.1. Every figure on this page is rendered from a committed benchmark record.">
-  <link rel="icon" type="image/svg+xml" href="./assets/logo-mark.svg">
+  <meta name="description" content="FerroTERM serves SNOMED CT, LOINC, ICD-10, ICD-11, RxNorm, UCUM, and any FHIR CodeSystem through the HL7 FHIR terminology API from one binary over an index built once per release and read at startup. No JVM, no Elasticsearch. Every figure on this page is rendered from a committed benchmark record.">
   <link rel="canonical" href="https://ferroterm.eu/">
-  <meta property="og:url" content="https://ferroterm.eu/">
-  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./style.css?v={{hash:style.css}}">
+  <link rel="icon" href="./assets/brand/favicon.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="./assets/brand/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="alternate icon" href="./assets/brand/favicon.ico" sizes="32x32 16x16">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="FerroTERM: a pure-Rust FHIR terminology server for clinical code systems">
-  <meta property="og:description" content="SNOMED CT, LOINC, ICD-10, ICD-11, RxNorm, UCUM, and any FHIR CodeSystem through the FHIR terminology API, from one binary over an index built once per release and read at startup. No JVM, no Elasticsearch. Business Source License 1.1.">
+  <meta property="og:url" content="https://ferroterm.eu/">
   <meta property="og:site_name" content="FerroTERM">
+  <meta property="og:title" content="FerroTERM: a pure-Rust FHIR terminology server for clinical code systems">
+  <meta property="og:description" content="SNOMED CT, LOINC, ICD-10, ICD-11, RxNorm, UCUM, and any FHIR CodeSystem through the FHIR terminology API, from one binary over an index built once per release and read at startup. No JVM, no Elasticsearch.">
+  <meta property="og:image" content="https://ferroterm.eu/assets/brand/ferroterm-social.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="The FerroTERM mark above the wordmark FerroTERM.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://ferroterm.eu/assets/brand/ferroterm-social.png">
+  <meta name="twitter:image:alt" content="The FerroTERM mark above the wordmark FerroTERM.">
 
   <!-- Structured data. Browsers never execute an application/ld+json data block
        (https://html.spec.whatwg.org/multipage/scripting.html#data-block), so
@@ -32,27 +42,30 @@
     "description": "A pure-Rust FHIR terminology server for SNOMED CT, LOINC, ICD-10, ICD-11, RxNorm, UCUM, and any FHIR CodeSystem. Serves the HL7 FHIR terminology API from a precomputed index read at startup, with no JVM and no Elasticsearch.",
     "codeRepository": "https://github.com/FerroHEALTH/FerroTERM",
     "programmingLanguage": "Rust",
-    "license": "https://spdx.org/licenses/BUSL-1.1.html",
+    "license": "https://github.com/FerroHEALTH/FerroTERM/blob/main/LICENSE",
     "applicationCategory": "HealthApplication",
-    "runtimePlatform": "Linux",
-    "version": "0.4.6"
+    "runtimePlatform": "Linux"
   }
   </script>
 </head>
 <body>
 
-  <!-- Nav: shared by the landing page, the benchmarks page, and the code
-       systems page in the book. -->
+  <!-- Nav: shared by the landing page, the benchmarks page, and the
+       comparison page. -->
   <header class="nav">
     <div class="wrap">
       <a class="brand" href="./">
-        <img src="./assets/logo-mark.svg" alt="" aria-hidden="true">
+        <picture>
+          <source srcset="./assets/brand/ferroterm-icon-dark.svg" media="(prefers-color-scheme: dark)">
+          <img src="./assets/brand/ferroterm-icon.svg" alt="" aria-hidden="true" width="28" height="28">
+        </picture>
         <span>FerroTERM</span>
       </a>
       <nav class="nav-links" aria-label="Primary">
         <a href="./docs/">Docs</a>
+        <a href="./docs/operate/install.html" class="hide-sm">Quickstart</a>
         <a href="./docs/evaluate/code-systems.html" class="hide-sm">Code systems</a>
-        <a href="./benchmarks.html">Benchmarks</a>
+        <a href="./benchmarks.html" class="hide-sm">Benchmarks</a>
         <a href="./comparison.html" class="hide-sm">Comparison</a>
         <a href="https://github.com/FerroHEALTH/FerroTERM" rel="noopener">GitHub</a>
       </nav>
@@ -61,33 +74,131 @@
 
   <main>
 
-    <!-- The top: what it is, what it serves, the figures -->
     <section class="hero">
       <div class="wrap">
-        <img class="hero-logo" src="./assets/logo-mark.svg" alt="FerroTERM" width="88" height="88">
-        <p class="status" role="note">v0.4.6 released. Linux binaries and a container image, signed.</p>
-        <h1>A pure-Rust FHIR terminology server for SNOMED CT, LOINC, ICD, RxNorm, and every FHIR code system, on ordinary hardware.</h1>
+        <picture>
+          <source srcset="./assets/brand/ferroterm-icon-dark.svg" media="(prefers-color-scheme: dark)">
+          <img class="hero-logo" src="./assets/brand/ferroterm-icon.svg" alt="FerroTERM" width="88" height="88">
+        </picture>
+        <!-- The version is rendered from the root Cargo.toml when the site is
+             assembled (scripts/site/assemble.sh), so it is always the release
+             main carries. -->
+        <a class="status" href="https://github.com/FerroHEALTH/FerroTERM/releases/latest" rel="noopener">v{{version:ferroterm}} released</a>
+        <h1>A FHIR terminology server for SNOMED CT, LOINC, ICD and every FHIR code system, on ordinary hardware.</h1>
         <p class="sub">
-          FerroTERM serves the HL7 FHIR terminology API on R4, R4B, R5, and the
+          FerroTERM serves the HL7 FHIR terminology API on R4, R4B, R5 and the
           R6 ballot from one binary over an index built once per release and
           read at startup. No JVM, no search cluster. You bring the release
           you are licensed for; the build tool turns it into an index; the
           server answers from it.
         </p>
         <div class="hero-cta">
-          <a class="btn btn-primary" href="./docs/operate/install.html">Install and run</a>
+          <a class="btn btn-primary" href="./docs/operate/install.html">Run the quickstart</a>
           <a class="btn btn-ghost" href="./benchmarks.html">See the benchmarks</a>
         </div>
         <p class="note">
-          Ferro for the Rust family FerroTERM shares with FerroEHR, TERM for
-          terminology.
+          A server image and a console image on GHCR and the
+          <code>ferroterm</code> and <code>ferroterm-build</code> binaries for
+          Linux, built at SLSA Build Level 3, and the release readers and the
+          terminology engine on crates.io.
         </p>
+      </div>
+    </section>
+
+    <section id="answers" class="surface">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="eyebrow">What it answers</span>
+          <h2>One seam, many code systems</h2>
+          <p>
+            Every code system reaches the FHIR operations through the same
+            provider seam, so nothing in an operation is a special case for
+            one system.
+          </p>
+        </div>
+        <div class="grid">
+
+          <a class="card" href="./docs/integrate/fhir-api.html">
+            <span class="tag">FHIR terminology API</span>
+            <h3>The terminology operations</h3>
+            <p>
+              <code>$lookup</code>, <code>$validate-code</code>,
+              <code>$subsumes</code>, <code>$expand</code>,
+              <code>$translate</code> and <code>$closure</code>, answered from
+              the index the server read at startup.
+            </p>
+          </a>
+
+          <a class="card" href="./docs/integrate/fhir-versions.html">
+            <span class="tag">R4, R4B, R5 and R6</span>
+            <h3>Every FHIR version in its own shapes</h3>
+            <p>
+              <code>/r4</code>, <code>/r4b</code>, <code>/r5</code> and
+              <code>/r6</code>, in JSON or XML, each version's parameter set
+              generated from HL7's own packages.
+            </p>
+          </a>
+
+          <a class="card" href="./docs/integrate/ecl-value-sets.html">
+            <span class="tag">ECL and implicit value sets</span>
+            <h3>Value sets</h3>
+            <p>
+              Value sets by composition, the implicit value sets of SNOMED CT,
+              LOINC, RxNorm and ICD-11, and the SNOMED CT Expression Constraint
+              Language over the inferred hierarchy.
+            </p>
+          </a>
+
+          <a class="card" href="./docs/evaluate/code-systems.html">
+            <span class="tag">Code systems</span>
+            <h3>The releases you license</h3>
+            <p>
+              SNOMED CT, LOINC, ICD-10 and ICD-11, RxNorm, the Dutch national
+              sets and any FHIR <code>CodeSystem</code>, each built from its own
+              release, with UCUM and the registries inside the binary.
+            </p>
+          </a>
+
+          <a class="card" href="./docs/integrate/fhir-api.html#persisted-resources">
+            <span class="tag">Stored resources</span>
+            <h3>Value sets you write</h3>
+            <p>
+              Code systems, value sets and concept maps written to the server
+              and kept with their history, when you name a database for them.
+            </p>
+          </a>
+
+          <a class="card" href="./docs/operate/sync.html">
+            <span class="tag">National terminology services</span>
+            <h3>Sync from upstream</h3>
+            <p>
+              The sync service reads a national terminology service's feed on
+              a schedule, builds what you subscribed to and asks the server to
+              reload, in one direction only.
+            </p>
+          </a>
+
+        </div>
+        <div class="prose">
+          <!-- code-systems:begin -->
+          <p class="systems">
+            SNOMED CT, LOINC, UCUM, BCP 47, BCP 13, ISO 3166-1, ICD-10 (WHO),
+            ICD-10-NL, ICD-10-CM, ICD-11 MMS, ICD-11 ICF, ICD-11 Foundation,
+            ATC/DDD, ICPC-2, RxNorm, the DHD Diagnosethesaurus and
+            Verrichtingenthesaurus, the G-Standaard, the Nederlandse Labcodeset,
+            the NHG ICPC-1 to SNOMED CT map, and any FHIR CodeSystem, ValueSet,
+            and ConceptMap resources. The
+            <a href="./docs/evaluate/code-systems.html">code systems page</a>
+            lists each with its URI, versions, build command, and licence.
+          </p>
+          <!-- code-systems:end -->
+        </div>
       </div>
     </section>
 
     <!-- Measured, never typed: rendered from bench/records by
          scripts/checks/bench-table.sh, checked in CI. -->
-    <section id="measured" class="surface">
+    <section id="measured">
       <div class="wrap">
         <div class="section-head">
           <span class="eyebrow">Measured, never typed</span>
@@ -115,124 +226,147 @@
       </div>
     </section>
 
-    <!-- What it serves -->
-    <section id="serves">
-      <div class="wrap">
-        <div class="section-head">
-          <span class="eyebrow">What it serves</span>
-          <h2>One seam, many code systems</h2>
-          <p>
-            Every code system reaches the FHIR operations through the same
-            provider seam, so nothing in an operation is a special case for one
-            system.
-          </p>
-          <!-- code-systems:begin -->
-          <p class="systems">
-            SNOMED CT, LOINC, UCUM, BCP 47, BCP 13, ISO 3166-1, ICD-10 (WHO),
-            ICD-10-NL, ICD-10-CM, ICD-11 MMS, ICD-11 ICF, ICD-11 Foundation,
-            ATC/DDD, ICPC-2, RxNorm, the DHD Diagnosethesaurus and
-            Verrichtingenthesaurus, the G-Standaard, the Nederlandse Labcodeset,
-            the NHG ICPC-1 to SNOMED CT map, and any FHIR CodeSystem, ValueSet,
-            and ConceptMap resources. The
-            <a href="./docs/evaluate/code-systems.html">code systems page</a>
-            lists each with its URI, versions, build command, and licence.
-          </p>
-          <!-- code-systems:end -->
-        </div>
-      </div>
-    </section>
-
-    <!-- The console, served by the same binary at /ui -->
-    <section id="console">
+    <section id="console" class="surface">
       <div class="wrap">
         <div class="section-head">
           <span class="eyebrow">The console</span>
-          <h2>A web UI, out of the same binary</h2>
+          <h2>Browse, look up, expand and translate</h2>
           <p>
-            The server serves a console at <code>/ui</code>, and
-            <code>/</code> redirects onto it. Start the server and it is
-            already there; there is nothing else to deploy and no second
-            process to run.
+            The console is its own program and image,
+            <code>ferroterm-console</code>, beside the server. It reaches the
+            server over the public FHIR API, so anything it does any FHIR
+            client can do, and it edits the resources your deployment writes.
           </p>
         </div>
-        <div class="prose">
+        <figure class="shot">
+          <img src="./docs/operate/img/console/dashboard.png" alt="The console's dashboard: what the deployment serves, its code systems, value sets and concept maps." width="1280" height="762" loading="lazy">
+          <figcaption>
+            The dashboard.
+            <a href="./docs/operate/console.html">Every page of the console</a>.
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section id="run">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="eyebrow">Run it</span>
+          <h2>One binary and an index directory</h2>
           <p>
-            It is a FHIR client and nothing more. It reaches the server over
-            the same public API any client uses, from the browser, same-origin,
-            so anything it does your own client can do. It depends on no other
-            crate in the workspace, which a check enforces.
+            The server and the build tool ship in one image and one tarball.
+            The registry systems need nothing loaded; every other code system
+            is an index you build once per release.
           </p>
-          <p>
-            <strong>Check a code</strong>, <strong>List a value set</strong>,
-            and <strong>Map a code</strong> run
-            <code>$lookup</code>, <code>$validate-code</code>,
-            <code>$subsumes</code>, <code>$expand</code>, and
-            <code>$translate</code>. Each control offers the code systems,
-            value sets, and concept maps this deployment publishes, with the
-            versions each canonical was published in beside it, so nothing
-            waits for a canonical to be typed. The overview reads a
-            twenty-system deployment as one sortable table.
-          </p>
-          <p>
-            <a href="./docs/operate/console.html">What the console does</a>
-          </p>
+        </div>
+        <div class="grid">
+
+          <a class="card" href="./docs/operate/install.html#the-first-call-with-nothing-to-load">
+            <span class="tag">Docker</span>
+            <h3>The first call</h3>
+            <p>
+              <code>docker run</code> of the published image serves UCUM,
+              BCP 47, BCP 13 and ISO 3166-1 with no configuration, and answers
+              a <code>$lookup</code> at once.
+            </p>
+          </a>
+
+          <a class="card" href="./docs/operate/install.html#run-with-docker-compose">
+            <span class="tag">Compose</span>
+            <h3>The quickstart</h3>
+            <p>
+              <code>compose.yaml</code> ships with every release. Point it at
+              the index directory you built; the <code>console</code> profile
+              adds the console.
+            </p>
+          </a>
+
+          <a class="card" href="./docs/operate/verifying-releases.html">
+            <span class="tag">OCI images</span>
+            <h3>The container images</h3>
+            <p>
+              <code>ghcr.io/ferrohealth/ferroterm</code> and
+              <code>ghcr.io/ferrohealth/ferroterm-console</code>, for amd64 and
+              arm64, each with SLSA provenance and an SBOM you verify before
+              you run it.
+            </p>
+          </a>
+
         </div>
       </div>
     </section>
 
-    <!-- One section per audience -->
-    <section id="audiences" class="surface">
+    <section id="family" class="surface">
       <div class="wrap">
         <div class="section-head">
-          <span class="eyebrow">Who it is for</span>
-          <h2>Four questions, four answers</h2>
+          <span class="eyebrow">In the family</span>
+          <h2>The product that serves the code systems</h2>
+          <p>
+            The FerroHEALTH products reach each other only over published
+            protocols, and any FHIR client can use FerroTERM. These are the
+            family's.
+          </p>
+        </div>
+        <div class="grid">
+
+          <article class="card">
+            <h3>FerroEHR</h3>
+            <p>
+              The openEHR CDR validates the coded text of a composition against
+              its terminology bindings through a FHIR terminology server.
+            </p>
+          </article>
+
+          <article class="card">
+            <h3>FerroBRIDGE</h3>
+            <p>
+              The bridge asks for code systems and value sets through
+              <code>$lookup</code>, <code>$translate</code> and
+              <code>$validate-code</code> while it maps openEHR to FHIR.
+            </p>
+          </article>
+
+          <article class="card">
+            <h3>FerroPIX</h3>
+            <p>
+              The patient index translates every HL7 v2 table value of its v2
+              face on a FHIR terminology server.
+            </p>
+          </article>
+
+        </div>
+      </div>
+    </section>
+
+    <section id="audiences">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="eyebrow">The documentation</span>
+          <h2>Four questions, four parts of the book</h2>
         </div>
         <div class="grid audiences">
 
-          <article class="card audience" id="clinician">
-            <span class="tag">Clinical informatics</span>
-            <h3>What does it serve, and how well?</h3>
+          <article class="card audience">
+            <span class="tag">Evaluate</span>
+            <h3>Does it fit my problem?</h3>
             <p>
-              The code systems above, each from the release you license, with
-              the inferred hierarchy, the preferred terms per language, and
-              inactive concepts served and marked. Conformance is measured
-              against the HL7 terminology ecosystem test suite per FHIR
-              version, and the result is recorded, not claimed.
+              What it serves and how well, how it compares to the reference
+              servers on the same machine, conformance per FHIR version, and
+              the licence.
             </p>
             <ul>
-              <li><a href="./docs/evaluate/code-systems.html">Code systems served</a></li>
-              <li><a href="./docs/evaluate/conformance.html">Conformance, per FHIR version</a></li>
-              <li><a href="./docs/integrate/ecl-value-sets.html">Value sets, implicit value sets, and ECL</a></li>
+              <li><a href="./docs/evaluate/what-ferroterm-is.html">What FerroTERM is</a></li>
+              <li><a href="./docs/evaluate/conformance.html">Conformance</a></li>
+              <li><a href="./docs/evaluate/comparison.html">How it compares</a></li>
             </ul>
           </article>
 
-          <article class="card audience" id="operator">
-            <span class="tag">Operations</span>
-            <h3>How do I run it, and what does it need?</h3>
-            <p>
-              One binary or a distroless container image, a directory of
-              artifacts built once per release, and the memory the figures
-              above show. Releases are built to SLSA Build Level 3 with signed
-              provenance and SBOMs you verify before you run them.
-            </p>
-            <ul>
-              <li><a href="./docs/operate/install.html">Install and run</a></li>
-              <li><a href="./docs/operate/hardware-sizing.html">Hardware sizing</a></li>
-              <li><a href="./docs/operate/loading-snomed.html">Loading code systems</a></li>
-              <li><a href="./docs/operate/verifying-releases.html">Verifying releases</a></li>
-            </ul>
-          </article>
-
-          <article class="card audience" id="integrator">
-            <span class="tag">Integration</span>
+          <article class="card audience">
+            <span class="tag">Integrate</span>
             <h3>How do I call it, from which FHIR version?</h3>
             <p>
-              <code>$lookup</code>, <code>$validate-code</code>,
-              <code>$subsumes</code>, <code>$expand</code>, and
-              <code>$translate</code> under <code>/r4</code>,
-              <code>/r4b</code>, <code>/r5</code>, and <code>/r6</code>, in
-              JSON or XML, each version's parameter set generated from HL7's
-              own packages so the surface is right by construction.
+              Every operation under each version's base, in JSON or XML, with
+              worked examples.
             </p>
             <ul>
               <li><a href="./docs/integrate/fhir-api.html">The FHIR terminology API</a></li>
@@ -241,23 +375,31 @@
             </ul>
           </article>
 
-          <article class="card audience" id="evaluator">
-            <span class="tag">Evaluation</span>
-            <h3>How does it compare, and what does it cost?</h3>
+          <article class="card audience">
+            <span class="tag">Operate</span>
+            <h3>What does running it involve?</h3>
             <p>
-              The software is under the Business Source License 1.1: free
-              outside production and for non-commercial production use, a
-              commercial licence for other production use, Apache 2.0 four
-              years after each version.
-              <a href="/docs/evaluate/licensing.html">A table says which applies to you</a>.
-              Each code system's content is licensed by its owner. The comparison to the reference servers is
-              stated only where it was run on the same machine over the same
-              release, and says so where it was not.
+              Installing it, loading a code system, sizing the hardware, and
+              verifying a release before you run it.
             </p>
             <ul>
-              <li><a href="./benchmarks.html">Benchmarks, with method and conditions</a></li>
-              <li><a href="./docs/evaluate/comparison.html">How it compares</a></li>
-              <li><a href="./docs/evaluate/architecture.html">Architecture at a glance</a></li>
+              <li><a href="./docs/operate/install.html">Install and run</a></li>
+              <li><a href="./docs/operate/loading-snomed.html">Loading code systems</a></li>
+              <li><a href="./docs/operate/hardware-sizing.html">Hardware sizing</a></li>
+            </ul>
+          </article>
+
+          <article class="card audience">
+            <span class="tag">Contribute</span>
+            <h3>How is the work organised?</h3>
+            <p>
+              Building and testing it, the generated FHIR model, and the
+              performance gate every change passes.
+            </p>
+            <ul>
+              <li><a href="./docs/contribute/build-and-test.html">Build and test</a></li>
+              <li><a href="./docs/contribute/performance-gate.html">The performance gate</a></li>
+              <li><a href="./docs/changelog.html">Changelog</a></li>
             </ul>
           </article>
 
@@ -267,28 +409,33 @@
 
   </main>
 
-  <!-- Footer -->
   <footer class="footer">
     <div class="wrap">
       <div class="footer-grid">
         <div class="footer-brand">
           <a class="brand" href="./">
-            <img src="./assets/logo-mark.svg" alt="" aria-hidden="true">
+            <picture>
+          <source srcset="./assets/brand/ferroterm-icon-dark.svg" media="(prefers-color-scheme: dark)">
+          <img src="./assets/brand/ferroterm-icon.svg" alt="" aria-hidden="true" width="28" height="28">
+        </picture>
             <span>FerroTERM</span>
           </a>
           <p>
-            A pure-Rust FHIR terminology server for SNOMED CT, LOINC, ICD, RxNorm, and every FHIR code system.
-            The software is licensed under the
+            A pure-Rust FHIR terminology server, one of the
+            <a href="https://ferrohealth.eu/" rel="noopener">FerroHEALTH</a>
+            family. The software is licensed under the
             <a href="https://github.com/FerroHEALTH/FerroTERM/blob/main/LICENSE" rel="noopener">Business Source License 1.1</a>:
-            free to read, build, modify and redistribute, free outside production, and
-            free in production for personal use, research, teaching and a non-profit or
-            public body outside the course of a business. Treating patients, any other
-            production use by a company, hosting it for third parties, and distributing
-            it for a fee need a commercial licence. Each version becomes Apache License
-            2.0 four years after it is published. The Licensor is Cadasto B.V.
-            <a href="/docs/evaluate/licensing.html">Which one applies to you</a>.
+            free outside production and for non-commercial production use, a
+            commercial licence for other production use, and Apache License
+            2.0 four years after each version.
+            <a href="./docs/evaluate/licensing.html">Which applies to you</a>.
             SNOMED CT is a registered trademark of SNOMED International; each
             code system's content is licensed separately by its owner.
+          </p>
+          <p>
+            Manufactured by Cadasto B.V., Comeniusstraat 2d, 1817 MS Alkmaar,
+            The Netherlands:
+            <a href="mailto:info@cadasto.com">info@cadasto.com</a>.
           </p>
         </div>
         <div class="footer-links">
@@ -296,10 +443,12 @@
             <h4>Read</h4>
             <ul>
               <li><a href="./docs/">Documentation</a></li>
+              <li><a href="./docs/operate/install.html">Quickstart</a></li>
+              <li><a href="./docs/operate/configuration.html">Configuration</a></li>
               <li><a href="./docs/evaluate/code-systems.html">Code systems</a></li>
               <li><a href="./benchmarks.html">Benchmarks</a></li>
               <li><a href="./comparison.html">Comparison</a></li>
-              <li><a href="./docs/integrate/fhir-api.html">FHIR terminology API</a></li>
+              <li><a href="https://ferrohealth.eu/docs/" rel="noopener">The family book</a></li>
             </ul>
           </div>
           <div>
@@ -307,17 +456,17 @@
             <ul>
               <li><a href="https://github.com/FerroHEALTH/FerroTERM" rel="noopener">GitHub</a></li>
               <li><a href="https://github.com/FerroHEALTH/FerroTERM/releases" rel="noopener">Releases</a></li>
+              <li><a href="https://github.com/FerroHEALTH/FerroTERM/milestones" rel="noopener">Roadmap</a></li>
               <li><a href="https://github.com/FerroHEALTH/FerroTERM/issues" rel="noopener">Issues</a></li>
-              <li><a href="https://github.com/FerroHEALTH/FerroTERM/milestones" rel="noopener">Milestones</a></li>
+              <li><a href="https://github.com/FerroHEALTH/FerroTERM/security/policy" rel="noopener">Security policy</a></li>
             </ul>
           </div>
         </div>
       </div>
       <div class="footer-note">
-        <span>FerroTERM, a FerroEHR sibling project. ferroterm.eu</span>
+        <span>ferroterm.eu</span>
       </div>
     </div>
   </footer>
-
 </body>
 </html>
