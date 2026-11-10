@@ -57,12 +57,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/checks/site-released.sh
       - name: Assemble the site (landing at /, the book under /docs/)
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # The roadmap block is rendered from the open milestones; the token
-          # has read access to public metadata and nothing else.
           scripts/site/assemble.sh _site
           # The conformance badges, from the committed pass lists.
           scripts/checks/conformance-badges.sh _site/conformance

@@ -143,6 +143,21 @@ else
   note "no Cargo.toml yet — skipped"
 fi
 
+# --- The landing page's hero badge names the current release ------------------
+# The pill at the top of the landing page is the one place the page names its
+# release, so it names the workspace version and nothing else.
+echo "== landing hero badge (website/landing/index.html <-> Cargo.toml)"
+if [[ -n "${current:-}" ]] && [[ -f website/landing/index.html ]]; then
+  badge="$(sed -nE 's|.*<p class="status"[^>]*>v([0-9]+\.[0-9]+\.[0-9]+) released\..*|\1|p' website/landing/index.html)"
+  if [[ -z "$badge" ]]; then
+    bad "website/landing/index.html has no hero badge 'v$current released.'"
+  elif [[ "$badge" != "$current" ]]; then
+    bad "website/landing/index.html hero badge names v${badge//$'\n'/, v}, the current release is $current"
+  else
+    note "OK: the hero badge names v$current"
+  fi
+fi
+
 # --- Every command that names the release names the current one ---------------
 # The check above matches a bare version anywhere, so it stays on 0.0.x: a
 # sentence may name an older release on purpose (an audit of v0.1.0, "what
