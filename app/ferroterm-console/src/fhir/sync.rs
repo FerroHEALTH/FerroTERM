@@ -10,7 +10,7 @@
 //! `POST /activate` with the summary of the run they performed, once it has
 //! finished. The server's admin listener answers `POST /reload` with what
 //! the reload did. The console's server calls both with the signed-in
-//! reader's access token, at `[ferroterm] sync_url` and `admin_url`; each
+//! reader's access token, at `[ferroterm.sync] url` and `[ferroterm.admin] url`; each
 //! listener admits a token carrying its product scope.
 //!
 //! Only the elements a screen draws are read. Every element of the record is

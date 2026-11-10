@@ -171,38 +171,6 @@ fn a_static_bearer_token_is_no_credential() {
     assert!(reason.contains("token"), "{reason}");
 }
 
-// 0.4.5 moved the reload's address and credential under `[server_admin]`;
-// in 0.4.5 alone the old keys are refused naming their replacements.
-#[test]
-fn the_0_4_4_keys_are_refused_naming_their_replacements() {
-    let reason = refused(
-        "server_admin_url = \"http://server:8081\"\nfhir_base_url = \"http://server:8080/r4b\"\nwebhook_url = \"https://hooks.example.invalid\"\n\n[server_admin_credentials.oauth]\nclient_id = \"x\"\n",
-    );
-    for (old, new) in [
-        ("server_admin_url", "server_admin.url"),
-        ("server_admin_credentials", "server_admin.credentials"),
-        ("fhir_base_url", "fhir.url"),
-        ("webhook_url", "webhook.url"),
-    ] {
-        assert!(
-            reason.contains(&format!("{old} was replaced by {new}")),
-            "{old} names {new}, all at once: {reason}"
-        );
-    }
-}
-
-#[test]
-fn every_retired_key_belongs_to_the_release_being_prepared() {
-    assert!(
-        ferrohealth_config::removed::stale(
-            &ferroterm_sync::config::RETIRED,
-            ferroterm_sync::config::PREPARING
-        )
-        .is_empty(),
-        "a refusal lives for one release"
-    );
-}
-
 #[test]
 fn the_client_credentials_table_reads_from_the_file() {
     let config = Config::from_sources(

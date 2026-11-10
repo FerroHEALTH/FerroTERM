@@ -9,7 +9,6 @@ use std::time::Duration;
 
 use ferrohealth_config::loader::Loaded;
 use ferrohealth_config::provenance::{Provenance, Source};
-use ferrohealth_config::removed::Removals;
 use ferrohealth_session::config::{OidcSection, OidcSettings, SessionSection, SessionSettings};
 use ferrohealth_smart::config::ServerTls;
 use ferrohealth_smart::config::credentials::CredentialsSection;
@@ -18,8 +17,8 @@ use ferrohealth_telemetry::section::TelemetrySection;
 use ferrohealth_ui::i18n::Locale;
 use url::Url;
 
+use crate::config::Config;
 use crate::config::error::Error;
-use crate::config::{Config, RETIRED};
 
 /// The resolved configuration.
 #[derive(Debug, Clone)]
@@ -116,8 +115,7 @@ impl Config {
     /// Checks every value and reads every `_file` secret.
     ///
     /// # Errors
-    /// Returns [`Error::Removed`] for a key the console no longer reads,
-    /// [`Error::Address`] for a listen address that does not parse,
+    /// Returns [`Error::Address`] for a listen address that does not parse,
     /// [`Error::Locale`] for a `server.locale` that is no language tag,
     /// [`Error::Missing`], [`Error::Url`] and [`Error::UrlShape`] for a URL
     /// that is absent, does not parse or is not one its key admits,
@@ -129,17 +127,6 @@ impl Config {
     /// `session.secure_cookie = false` on a console that is not `http` on
     /// loopback.
     pub fn resolve(&self) -> Result<Settings, Error> {
-        let mut removals = Removals::new();
-        let set = [
-            self.ferroterm.base_url,
-            self.ferroterm.timeout,
-            self.ferroterm.sync_url,
-            self.ferroterm.admin_url,
-        ];
-        for (removed, retired) in set.into_iter().zip(&RETIRED) {
-            removals.check(removed, retired);
-        }
-        removals.finish()?;
         let listen = self
             .server
             .listen
@@ -437,36 +424,19 @@ mod tests {
     }
 
     #[test]
-    fn a_key_0_4_5_retired_is_refused_naming_its_replacement() {
-        let config = Config::from_sources(
-            Some("[ferroterm]\nbase_url = \"http://ferroterm:8080/\"\ntimeout = \"30s\"\nsync_url = \"http://s/\"\nadmin_url = \"http://a/\"\n"),
-            &BTreeMap::new(),
-        )
-        .expect("the strict load still reads a retired key");
-        let Err(Error::Removed(refused)) = config.resolve() else {
-            panic!("the retired keys are refused");
-        };
-        let refused = refused.to_string();
-        for (old, new) in [
-            ("ferroterm.base_url", "ferroterm.server.url"),
-            ("ferroterm.timeout", "ferroterm.server.timeout"),
-            ("ferroterm.sync_url", "ferroterm.sync.url"),
-            ("ferroterm.admin_url", "ferroterm.admin.url"),
+    fn a_key_0_4_5_retired_is_an_unknown_key() {
+        for key in [
+            "base_url = \"http://ferroterm:8080/\"",
+            "timeout = \"30s\"",
+            "sync_url = \"http://s/\"",
+            "admin_url = \"http://a/\"",
         ] {
             assert!(
-                refused.contains(&format!("{old} was replaced by {new}")),
-                "{old} names {new}, all at once: {refused}"
+                Config::from_sources(Some(&format!("[ferroterm]\n{key}\n")), &BTreeMap::new())
+                    .is_err(),
+                "the strict load refuses a key it does not read: {key}"
             );
         }
-    }
-
-    #[test]
-    fn every_retired_key_belongs_to_the_release_being_prepared() {
-        assert!(
-            ferrohealth_config::removed::stale(&crate::config::RETIRED, crate::config::PREPARING)
-                .is_empty(),
-            "a refusal lives for one release"
-        );
     }
 
     #[test]

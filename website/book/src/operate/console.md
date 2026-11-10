@@ -101,9 +101,7 @@ and `tls`, the outbound TLS table of
 sets one refuses the start. `[ferroterm.server]` defaults to
 `http://127.0.0.1:8080/` with a timeout of `"30s"`, and a key the table
 leaves out keeps its default; `[ferroterm.sync]` and `[ferroterm.admin]`
-take the family's (`timeout = "10s"`). In 0.4.5 alone, the
-earlier keys `[ferroterm] base_url`, `timeout`, `sync_url` and `admin_url`
-refuse the start, each naming its replacement.
+take the family's (`timeout = "10s"`).
 `[session] store = "memory"` keeps the sessions in the console's process;
 `"sealed"` keeps each in one encrypted cookie, for a console that runs as
 several instances, and needs `key` or `key_file` (base64 of at least 64

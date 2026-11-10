@@ -191,15 +191,8 @@ start_sync() {
   shift 4
   dir="$WORK/$name"
   mkdir -p "$dir/index" "$dir/codesystems" "$dir/staging" "$dir/records" "$dir/state"
-  # The admin listener's key moved under [server_admin] in 0.4.5, so a base
-  # built before it takes the old name; the probe reads which one BIN knows.
-  # TODO(#1202): the probe lives for 0.4.5 alone.
-  local admin_key=FERROTERM_SYNC__SERVER_ADMIN__URL
-  if ! env "$admin_key=$admin" "$bin/ferroterm-sync" config check > /dev/null 2>&1; then
-    admin_key=FERROTERM_SYNC__SERVER_ADMIN_URL
-  fi
   env FERROTERM_SYNC__LISTEN="$listen" \
-    "$admin_key=$admin" \
+    FERROTERM_SYNC__SERVER_ADMIN__URL="$admin" \
     FERROTERM_SYNC__INDEX_ROOT="$dir/index" \
     FERROTERM_SYNC__RESOURCES="$dir/codesystems" \
     FERROTERM_SYNC__STAGING="$dir/staging" \

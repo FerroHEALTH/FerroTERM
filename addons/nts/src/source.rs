@@ -20,7 +20,6 @@ use terminology_syndication::model::{CategoryTerm, ContentLink, Feed};
 use terminology_syndication::select::{Holdings, Selection, Subscription};
 use terminology_syndication::source::{Authorization, BoxFuture, Source, SourceError};
 
-use ferrohealth_config::removed::RemovedKeys;
 use ferrohealth_secret::redacted::Redacted;
 use ferrohealth_smart::client::cache::{Clock, SystemClock, TokenSource};
 use ferrohealth_smart::client::outbound::{self, OutboundClient, OutboundError};
@@ -36,9 +35,6 @@ pub const ENDPOINT_KEY: &str = "nts";
 /// The add-on could not be built, or a content item could not be taken.
 #[derive(Debug, thiserror::Error)]
 pub enum NtsError {
-    /// The source's block sets a key 0.4.5 retired.
-    #[error(transparent)]
-    Retired(#[from] RemovedKeys),
     /// The endpoint table names no client: the service challenges every
     /// request, so the client credentials grant is required.
     #[error(
@@ -131,8 +127,7 @@ impl NtsSource {
     ///
     /// # Errors
     ///
-    /// Returns [`NtsError::Retired`] when the block sets a key 0.4.5 retired,
-    /// [`NtsError::NoUsableClient`] when the table names no client, and
+    /// Returns [`NtsError::NoUsableClient`] when the table names no client, and
     /// [`NtsError::Client`] when the outbound client cannot be built from the
     /// table.
     pub fn with_clock(
@@ -140,7 +135,6 @@ impl NtsSource {
         endpoint: &EndpointSection,
         clock: Arc<dyn Clock>,
     ) -> Result<Self, NtsError> {
-        config.check("source.config")?;
         if endpoint
             .credentials
             .oauth

@@ -20,7 +20,6 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
 
 use ferrohealth_config::loader::{Loaded, Loader};
-use ferrohealth_config::removed::{Removals, Removed, RemovedKeys, Retired};
 use ferrohealth_config::units::Duration;
 use ferrohealth_secret::secret_url::SecretUrl;
 use ferrohealth_smart::config::AuthSection;
@@ -84,65 +83,6 @@ pub struct SourceConfig {
     pub config: toml::Table,
 }
 
-/// `[nts]`: the family outbound endpoint table of the Nationale
-/// Terminologie Server.
-///
-/// It starts from [`addon_nts::config::endpoint`]: the base `url`, the
-/// timeouts, `retry`, `tls`, and the client credentials grant (RFC 6749
-/// §4.4) under `[nts.credentials.oauth]`.
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct NtsSection {
-    /// The endpoint table itself.
-    #[serde(flatten)]
-    pub endpoint: EndpointSection,
-    /// `client_id`, which `[nts.credentials.oauth] client_id` replaced in
-    /// 0.4.5.
-    pub client_id: Removed,
-    /// `client_secret`, which `[nts.credentials.oauth] client_secret`
-    /// replaced in 0.4.5.
-    pub client_secret: Removed,
-    /// `client_secret_file`, which `[nts.credentials.oauth]
-    /// client_secret_file` replaced in 0.4.5.
-    pub client_secret_file: Removed,
-}
-
-// NOTE: serde's `flatten` drops `deny_unknown_fields` (serde.rs/field-attrs.html#flatten),
-// so the retired keys are taken out and the rest read strictly as the table.
-impl<'de> serde::Deserialize<'de> for NtsSection {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        use serde::de::Error as _;
-        let mut table = toml::Table::deserialize(deserializer)?;
-        let mut retired = |key: &str| {
-            table
-                .remove(key)
-                .map_or(Ok(Removed::default()), Removed::deserialize)
-                .map_err(D::Error::custom)
-        };
-        let client_id = retired("client_id")?;
-        let client_secret = retired("client_secret")?;
-        let client_secret_file = retired("client_secret_file")?;
-        let endpoint =
-            EndpointSection::deserialize(toml::Value::Table(table)).map_err(D::Error::custom)?;
-        Ok(Self {
-            endpoint,
-            client_id,
-            client_secret,
-            client_secret_file,
-        })
-    }
-}
-
-impl Default for NtsSection {
-    fn default() -> Self {
-        Self {
-            endpoint: addon_nts::config::endpoint(),
-            client_id: Removed::default(),
-            client_secret: Removed::default(),
-            client_secret_file: Removed::default(),
-        }
-    }
-}
-
 /// The whole configuration of one running service.
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -183,58 +123,16 @@ pub struct Config {
     /// tokens it accepts, the Basic users, and the product scope every route
     /// but `GET /health` requires ([`crate::auth`]).
     pub auth: AuthSection,
-    /// The account the Nationale Terminologie Server add-on authenticates
-    /// with.
-    pub nts: NtsSection,
+    /// `[nts]`: the family outbound endpoint table of the Nationale
+    /// Terminologie Server, starting from [`addon_nts::config::endpoint`]:
+    /// the base `url`, the timeouts, `retry`, `tls`, and the client
+    /// credentials grant (RFC 6749 §4.4) under `[nts.credentials.oauth]`.
+    pub nts: EndpointSection,
     /// The sources a run reads, in the order they are configured.
     pub source: Vec<SourceConfig>,
     /// `[telemetry]`: the console log and the metrics export.
     pub telemetry: TelemetrySection,
-    /// `server_admin_url`, which `[server_admin] url` replaced in 0.4.5.
-    pub server_admin_url: Removed,
-    /// `[server_admin_credentials]`, which `[server_admin.credentials]`
-    /// replaced in 0.4.5.
-    pub server_admin_credentials: Removed,
-    /// `fhir_base_url`, which `[fhir] url` replaced in 0.4.5.
-    pub fhir_base_url: Removed,
-    /// `webhook_url`, which `[webhook] url` replaced in 0.4.5.
-    pub webhook_url: Removed,
 }
-
-/// The release these refusals belong to: each lives for that one release.
-pub const PREPARING: &str = "0.4.5";
-
-/// The keys 0.4.5 retired, each with the key that took its place.
-// TODO(#1202): the refusals ship in 0.4.5 alone; delete them in 0.4.6.
-pub const RETIRED: [Retired; 7] = [
-    Retired::replaced(
-        "server_admin_url",
-        "server_admin.url, the admin listener's base URL",
-        "0.4.5",
-    ),
-    Retired::replaced(
-        "server_admin_credentials",
-        "server_admin.credentials, the same table under [server_admin]",
-        "0.4.5",
-    ),
-    Retired::replaced("fhir_base_url", "fhir.url, the server's FHIR base", "0.4.5"),
-    Retired::replaced(
-        "webhook_url",
-        "webhook.url, the address the summary is posted to",
-        "0.4.5",
-    ),
-    Retired::replaced("nts.client_id", "nts.credentials.oauth.client_id", "0.4.5"),
-    Retired::replaced(
-        "nts.client_secret",
-        "nts.credentials.oauth.client_secret",
-        "0.4.5",
-    ),
-    Retired::replaced(
-        "nts.client_secret_file",
-        "nts.credentials.oauth.client_secret_file",
-        "0.4.5",
-    ),
-];
 
 impl Default for Config {
     fn default() -> Self {
@@ -265,13 +163,9 @@ impl Default for Config {
             build_command: PathBuf::from("ferroterm-build"),
             schedule: ScheduleConfig::default(),
             source: Vec::new(),
-            nts: NtsSection::default(),
+            nts: addon_nts::config::endpoint(),
             auth: AuthSection::default(),
             telemetry: TelemetrySection::default(),
-            server_admin_url: Removed::default(),
-            server_admin_credentials: Removed::default(),
-            fhir_base_url: Removed::default(),
-            webhook_url: Removed::default(),
         }
     }
 }
@@ -283,9 +177,6 @@ pub enum ConfigError {
     /// variable, or a value of the wrong type.
     #[error(transparent)]
     Load(#[from] ferrohealth_config::error::ConfigError),
-    /// Keys the service no longer reads, each named with its replacement.
-    #[error(transparent)]
-    Removed(#[from] RemovedKeys),
     /// HTTP Basic on the reload call: the reload is a machine's call, and a
     /// Basic credential is a person's, so the table takes only `oauth`.
     #[error(
@@ -326,7 +217,6 @@ impl Config {
     /// # Errors
     ///
     /// Returns [`ConfigError::Load`] when the tree does not load,
-    /// [`ConfigError::Removed`] for a key 0.4.5 retired,
     /// [`ConfigError::BasicReload`] for a Basic credential on the reload, and
     /// [`ConfigError::Schedule`] when the schedule it describes does not read.
     pub fn load(
@@ -355,22 +245,8 @@ impl Config {
         Ok(config)
     }
 
-    /// Refuses every retired key the sources set, then checks the schedule.
+    /// Refuses a Basic credential on the reload, then checks the schedule.
     fn check(&self) -> Result<(), ConfigError> {
-        let mut removals = Removals::new();
-        let set = [
-            self.server_admin_url,
-            self.server_admin_credentials,
-            self.fhir_base_url,
-            self.webhook_url,
-            self.nts.client_id,
-            self.nts.client_secret,
-            self.nts.client_secret_file,
-        ];
-        for (removed, retired) in set.into_iter().zip(&RETIRED) {
-            removals.check(removed, retired);
-        }
-        removals.finish()?;
         let credentials = &self.server_admin.credentials;
         if !credentials.user.is_empty()
             || credentials.password.is_some()
@@ -497,7 +373,7 @@ at = "03:00"
 kind = "nts"
 
 [source.config]
-base_url = "https://example.invalid"
+feed_url = "https://example.invalid/feed.xml"
 "#,
             ),
             &BTreeMap::new(),
@@ -519,8 +395,8 @@ base_url = "https://example.invalid"
         };
         assert_eq!(source.kind, "nts", "the add-on kind is read");
         assert_eq!(
-            source.config.get("base_url").and_then(toml::Value::as_str),
-            Some("https://example.invalid"),
+            source.config.get("feed_url").and_then(toml::Value::as_str),
+            Some("https://example.invalid/feed.xml"),
             "the add-on's own block is kept whole"
         );
         config.plan()?;
@@ -557,7 +433,7 @@ base_url = "https://example.invalid"
             ),
             &environment(&[("FERROTERM_SYNC__NTS__TIMEOUT", "2h")]),
         )?;
-        let endpoint = &config.nts.endpoint;
+        let endpoint = &config.nts;
         assert_eq!(endpoint.url.expose(), addon_nts::config::NTS_BASE_URL);
         assert_eq!(
             endpoint.timeout,
@@ -581,23 +457,22 @@ base_url = "https://example.invalid"
     }
 
     #[test]
-    fn an_nts_key_0_4_5_retired_is_refused_naming_its_replacement() {
-        for key in ["client_id", "client_secret", "client_secret_file"] {
-            let refused =
-                Config::from_sources(Some(&format!("[nts]\n{key} = \"x\"\n")), &BTreeMap::new())
-                    .expect_err("a retired key is refused");
-            assert!(matches!(refused, ConfigError::Removed(_)), "{refused:?}");
-            let shown = refused.to_string();
+    fn a_key_0_4_5_retired_is_an_unknown_key() {
+        for text in [
+            "server_admin_url = \"http://127.0.0.1:8081\"\n",
+            "fhir_base_url = \"http://127.0.0.1:8080/r4b\"\n",
+            "webhook_url = \"https://hooks.example.invalid/sync\"\n",
+            "[server_admin_credentials]\nuser = \"x\"\n",
+            "[nts]\nclient_id = \"x\"\n",
+            "[nts]\nclient_secret = \"x\"\n",
+            "[nts]\nclient_secret_file = \"/run/secrets/nts\"\n",
+        ] {
             assert!(
-                shown.contains(&format!("nts.credentials.oauth.{key}")),
-                "{shown}"
+                Config::from_sources(Some(text), &BTreeMap::new())
+                    .is_err_and(|error| matches!(error, ConfigError::Load(_))),
+                "the strict load refuses a key it does not read: {text}"
             );
         }
-        assert!(
-            Config::from_sources(Some("[nts]\nclient_name = \"x\"\n"), &BTreeMap::new())
-                .is_err_and(|error| matches!(error, ConfigError::Load(_))),
-            "a key the table does not read is refused as unknown"
-        );
     }
 
     #[test]
