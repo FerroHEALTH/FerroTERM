@@ -25,6 +25,7 @@ mod console_fixtures;
 mod descriptive;
 mod ecosystem;
 mod elements;
+mod exit;
 mod expand_echo;
 mod fixture;
 mod health;

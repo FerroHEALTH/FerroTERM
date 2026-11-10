@@ -329,7 +329,11 @@ Per request: one
 free-text parameters are never logged. A
 client error logs at `warn`, a server error at `error`. On `SIGTERM` or
 `SIGINT`: the signal, then `ferroterm stopped`. A refused start is one
-`cannot start` line with the reason. On a reload: `the served set was
+`cannot start` line with the reason. A configuration the server refuses ends
+`ferroterm serve` and `ferroterm config check` with exit code 78
+(`EX_CONFIG`, `sysexits(3)`), so an orchestrator tells a bad configuration
+from a failure to serve; `ferroterm healthcheck` writes `not up` with the
+reason and exits 1. On a reload: `the served set was
 reloaded` with the count of code systems, or `the served set was not
 reloaded` at `error` level with the reason.
 

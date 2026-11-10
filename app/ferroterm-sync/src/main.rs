@@ -6,93 +6,60 @@
 #![expect(
     clippy::print_stdout,
     clippy::print_stderr,
-    reason = "a refused configuration is reported before any log subscriber exists, and `run-once` reports its outcome to a person"
+    reason = "a failed health probe and a failed job are reported on standard error, and `run-once` answers a person"
 )]
 
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use clap::Parser;
 use ferrohealth_server::cli::{Common, ConfigCommand};
-use ferrohealth_server::telemetry::build as build_telemetry;
-use ferrohealth_telemetry::telemetry::{Console, Service, Telemetry};
+use ferrohealth_server::run::{Failure, Run, config_check};
+use ferrohealth_server::telemetry::{Installed, install};
+use ferrohealth_telemetry::telemetry::{Service, Telemetry};
 use ferroterm_sync::cli::{Cli, Command};
 use ferroterm_sync::config::Config;
 use ferroterm_sync::record::Outcome;
 
-#[tokio::main]
-async fn main() -> ExitCode {
-    let cli = Cli::parse();
-    let loaded = match ferroterm_sync::cli::load(&cli.config) {
-        Ok(loaded) => loaded,
-        Err(error) => {
-            let error = anyhow::Error::from(error);
-            eprintln!("ferroterm-sync: cannot start: {error:#}");
-            return ExitCode::FAILURE;
-        }
+fn main() -> ExitCode {
+    Run::new("ferroterm-sync").run(std::env::args_os(), dispatch)
+}
+
+/// Runs the job `cli` names; a configuration the service refuses exits
+/// `EX_CONFIG`, except for `healthcheck`, which reports the service not up.
+async fn dispatch(cli: Cli) -> Result<ExitCode, Failure> {
+    let job = match &cli.command {
+        Some(Command::Common(common)) => common.clone(),
+        Some(Command::RunOnce) | None => Common::Serve,
     };
+    let loaded = ferroterm_sync::cli::load(&cli.config).map_err(|error| job.refused(error))?;
     match cli.command {
         Some(Command::Common(Common::Config {
             command: ConfigCommand::Check,
-        })) => match ferrohealth_config::report::check_report(&loaded) {
-            Ok(report) => {
-                println!("{report}");
-                ExitCode::SUCCESS
-            }
-            Err(error) => {
-                eprintln!("ferroterm-sync config check: {error}");
-                ExitCode::FAILURE
-            }
-        },
-        Some(Command::Common(Common::Healthcheck)) => healthcheck(loaded.settings()).await,
+        })) => config_check(&loaded),
+        Some(Command::Common(Common::Healthcheck)) => Ok(healthcheck(loaded.settings()).await),
         Some(Command::RunOnce) => {
             let config = loaded.into_parts().0;
-            match telemetry(&config) {
-                Ok(telemetry) => finished(
-                    Box::pin(run_once(config, Arc::clone(&telemetry))).await,
-                    &telemetry,
-                ),
-                Err(code) => code,
-            }
+            let installed = telemetry(&config)?;
+            let code = Box::pin(run_once(config, Arc::clone(installed.telemetry()))).await;
+            installed.shutdown();
+            Ok(code)
         }
         Some(Command::Common(Common::Serve)) | None => {
             let config = loaded.into_parts().0;
-            match telemetry(&config) {
-                Ok(telemetry) => finished(
-                    Box::pin(serve(config, Arc::clone(&telemetry))).await,
-                    &telemetry,
-                ),
-                Err(code) => code,
-            }
+            let installed = telemetry(&config)?;
+            let code = Box::pin(serve(config, Arc::clone(installed.telemetry()))).await;
+            installed.shutdown();
+            Ok(code)
         }
     }
 }
 
 /// Builds and installs the telemetry `[telemetry]` describes, with the
 /// family's panic line.
-fn telemetry(config: &Config) -> Result<Arc<Telemetry>, ExitCode> {
+fn telemetry(config: &Config) -> Result<Installed, Failure> {
     let service = Service::new("ferroterm-sync", env!("CARGO_PKG_VERSION"));
-    let telemetry = match build_telemetry(&config.telemetry, service) {
-        Ok(telemetry) => Arc::new(telemetry),
-        Err(error) => {
-            eprintln!("ferroterm-sync: cannot start: {error}");
-            return Err(ExitCode::FAILURE);
-        }
-    };
-    if let Err(error) = telemetry.install(&config.telemetry, &Console::detect()) {
-        eprintln!("ferroterm-sync: cannot start: {error}");
-        return Err(ExitCode::FAILURE);
-    }
-    ferrohealth_telemetry::panic::install_hook();
-    Ok(telemetry)
-}
-
-/// Flushes the telemetry before the process exits with `code`.
-fn finished(code: ExitCode, telemetry: &Telemetry) -> ExitCode {
-    if let Err(error) = telemetry.shutdown() {
-        tracing::warn!(%error, "the telemetry did not flush");
-    }
-    code
+    install(&config.telemetry, service)
+        .map_err(|error| Failure::from(error).with_context("cannot start"))
 }
 
 /// `ferroterm-sync healthcheck`: silent when ready, the reason otherwise.

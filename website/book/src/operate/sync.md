@@ -101,6 +101,8 @@ container image sets `/etc/ferroterm/sync.toml`). A variable
 the value below; a key, or a `FERROTERM_SYNC__` variable, that the service
 does not know is refused at start-up rather than ignored. `ferroterm-sync config check`
 prints every key with where it came from, every secret as `***`.
+A refused configuration ends `serve`, `run-once` and `config check` with exit
+code 78 (`EX_CONFIG`, `sysexits(3)`), and `healthcheck` with `not up` and 1.
 
 | Key | Default | What it names |
 |---|---|---|

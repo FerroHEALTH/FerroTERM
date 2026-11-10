@@ -7,19 +7,19 @@
 //! print the banner when a person is reading, install the telemetry, load
 //! the artifacts (their summary is the first thing logged), bind, serve.
 #![expect(
-    clippy::print_stdout,
     clippy::print_stderr,
-    reason = "a refused configuration and a failed health probe are reported before any log subscriber exists, and `config check` prints the running tree for a person"
+    reason = "a failed health probe is reported before any log subscriber exists"
 )]
 
 use std::io::IsTerminal;
 use std::process::ExitCode;
 use std::sync::Arc;
+use std::time::Instant;
 
-use clap::Parser;
 use ferrohealth_server::cli::{Common, ConfigCommand};
-use ferrohealth_server::telemetry::build as build_telemetry;
-use ferrohealth_telemetry::telemetry::{Console, Service, Telemetry};
+use ferrohealth_server::run::{Failure, Run, config_check};
+use ferrohealth_server::telemetry::install;
+use ferrohealth_telemetry::telemetry::{Service, Telemetry};
 use ferroterm_server::cli::{Cli, Command};
 use ferroterm_server::config::Config;
 use ferroterm_server::reload::Serving;
@@ -28,35 +28,27 @@ use ferroterm_server::state::AppState;
 use ferroterm_server::{banner, reload};
 use tokio::net::TcpListener;
 
-#[tokio::main]
-async fn main() -> ExitCode {
-    let started = std::time::Instant::now();
-    let cli = Cli::parse();
-    let loaded = match Config::load(cli.config.config.as_deref(), &cli.config.sets) {
-        Ok(loaded) => loaded,
-        Err(error) => {
-            eprintln!("ferroterm: cannot start: {error}");
-            return ExitCode::FAILURE;
-        }
+fn main() -> ExitCode {
+    let started = Instant::now();
+    Run::new("ferroterm").run(std::env::args_os(), |cli: Cli| dispatch(cli, started))
+}
+
+/// Runs the job `cli` names; a configuration the server refuses exits
+/// `EX_CONFIG`, except for `healthcheck`, which reports the server not up.
+async fn dispatch(cli: Cli, started: Instant) -> Result<ExitCode, Failure> {
+    let job = match &cli.command {
+        Some(Command::Common(common)) => common.clone(),
+        None => Common::Serve,
     };
+    let loaded = Config::load(cli.config.config.as_deref(), &cli.config.sets)
+        .map_err(|error| job.refused(error))?;
     match cli.command {
         Some(Command::Common(Common::Healthcheck)) => {
-            return healthcheck(&loaded.settings().server).await;
+            return Ok(healthcheck(&loaded.settings().server).await);
         }
         Some(Command::Common(Common::Config {
             command: ConfigCommand::Check,
-        })) => {
-            return match ferrohealth_config::report::check_report(&loaded) {
-                Ok(report) => {
-                    println!("{report}");
-                    ExitCode::SUCCESS
-                }
-                Err(error) => {
-                    eprintln!("ferroterm config check: {error}");
-                    ExitCode::FAILURE
-                }
-            };
-        }
+        })) => return config_check(&loaded),
         Some(Command::Common(Common::Serve)) | None => {}
     }
     let (config, _provenance) = loaded.into_parts();
@@ -67,29 +59,17 @@ async fn main() -> ExitCode {
             .resolve(std::io::stdout().is_terminal()),
     );
     let service = Service::new("ferroterm", env!("CARGO_PKG_VERSION"));
-    let telemetry = match build_telemetry(&config.telemetry, service) {
-        Ok(telemetry) => Arc::new(telemetry),
-        Err(error) => {
-            eprintln!("ferroterm: cannot start: {error}");
-            return ExitCode::FAILURE;
-        }
-    };
-    if let Err(error) = telemetry.install(&config.telemetry, &Console::detect()) {
-        eprintln!("ferroterm: cannot start: {error}");
-        return ExitCode::FAILURE;
-    }
-    ferrohealth_telemetry::panic::install_hook();
-    let outcome = match run(config, Arc::clone(&telemetry), started).await {
+    let installed = install(&config.telemetry, service)
+        .map_err(|error| Failure::from(error).with_context("cannot start"))?;
+    let outcome = match run(config, Arc::clone(installed.telemetry()), started).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             tracing::error!(error = format!("{error:#}"), "cannot start");
             ExitCode::FAILURE
         }
     };
-    if let Err(error) = telemetry.shutdown() {
-        tracing::warn!(%error, "the telemetry did not flush");
-    }
-    outcome
+    installed.shutdown();
+    Ok(outcome)
 }
 
 /// `ferroterm healthcheck`: silent when the server is ready, the reason on
@@ -103,11 +83,7 @@ async fn healthcheck(section: &ferrohealth_server::section::ServerSection) -> Ex
     ExitCode::FAILURE
 }
 
-async fn run(
-    config: Config,
-    telemetry: Arc<Telemetry>,
-    started: std::time::Instant,
-) -> anyhow::Result<()> {
+async fn run(config: Config, telemetry: Arc<Telemetry>, started: Instant) -> anyhow::Result<()> {
     use anyhow::Context;
 
     let state = AppState::load(&config).context("loading the artifacts terminology.index names")?;
