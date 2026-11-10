@@ -182,6 +182,13 @@ pub trait Source: fmt::Debug + Send + Sync {
     /// The HTTP client the source's requests go through.
     fn client(&self) -> &reqwest::Client;
 
+    /// The waits before each further try of a request that could not reach
+    /// the service or met a `5xx` ([`crate::retry`]); none, the default,
+    /// sends each request once.
+    fn retry_delays(&self) -> &[std::time::Duration] {
+        &[]
+    }
+
     /// The authorization the listing request carries.
     ///
     /// # Errors
@@ -211,14 +218,15 @@ pub trait Source: fmt::Debug + Send + Sync {
         Box::pin(async move {
             let url = self.feed_url().to_owned();
             let authorization = self.listing_auth().await?;
-            let response = authorization
-                .apply(self.client().get(&url))
-                .send()
-                .await
-                .map_err(|source| SourceError::Request {
-                    url: url.clone(),
-                    source,
-                })?;
+            let response = crate::retry::send(
+                authorization.apply(self.client().get(&url)),
+                self.retry_delays(),
+            )
+            .await
+            .map_err(|source| SourceError::Request {
+                url: url.clone(),
+                source,
+            })?;
             let status = response.status();
             if !status.is_success() {
                 return Err(SourceError::Status { url, status });
@@ -256,7 +264,8 @@ pub trait Source: fmt::Debug + Send + Sync {
                 });
             };
             let authorization = self.listing_auth().await?;
-            crate::fhir_api::list(self.client(), base_url, &authorization).await
+            crate::fhir_api::list(self.client(), base_url, &authorization, self.retry_delays())
+                .await
         })
     }
 
@@ -281,7 +290,7 @@ pub trait Source: fmt::Debug + Send + Sync {
                     .get(&link.href)
                     .header(reqwest::header::ACCEPT, crate::fhir_api::FHIR_JSON),
             );
-            Ok(crate::download::to_file(request, destination, None).await?)
+            Ok(crate::download::to_file(request, self.retry_delays(), destination, None).await?)
         })
     }
 
@@ -306,7 +315,10 @@ pub trait Source: fmt::Debug + Send + Sync {
             };
             let authorization = self.download_auth().await?;
             let request = authorization.apply(self.client().get(&link.href));
-            Ok(crate::download::to_file(request, destination, Some(expected)).await?)
+            Ok(
+                crate::download::to_file(request, self.retry_delays(), destination, Some(expected))
+                    .await?,
+            )
         })
     }
 }

@@ -6,6 +6,7 @@ version = 4
 name = "addon-nts"
 version = "0.4.4"
 dependencies = [
+ "ferrohealth-config",
  "ferrohealth-secret",
  "ferrohealth-smart",
  "reqwest",
@@ -1281,9 +1282,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-smart"
-version = "0.16.1"
+version = "0.16.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34593dc8498df2cb400b56ef06217d8d10963eea3bdd1bd0733237832cb8b84b"
+checksum = "a62af5a286d9d7bb00b4b90889b3d74a2ab1f39ea172271f34e64f1ef54438ca"
 dependencies = [
  "argon2",
  "aws-lc-rs",

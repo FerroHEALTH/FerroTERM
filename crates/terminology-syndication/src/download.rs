@@ -71,6 +71,9 @@ pub struct Fetched {
 /// advertises a digest and computing the SHA-256 of what arrived when it does
 /// not (a FHIR API that serves a resource by its identifier).
 ///
+/// The request is sent again after each of `delays` while it cannot reach
+/// the service or meets a `5xx` ([`crate::retry`]).
+///
 /// The bytes go to `<destination>.part` while they arrive. On a digest match,
 /// or when nothing was expected, that file is renamed onto `destination`; on a
 /// mismatch it is removed, so a refused download leaves nothing behind for a
@@ -85,12 +88,12 @@ pub struct Fetched {
 /// do not carry the expected digest.
 pub async fn to_file(
     request: reqwest::RequestBuilder,
+    delays: &[std::time::Duration],
     destination: &Path,
     expected: Option<&Checksum>,
 ) -> Result<Fetched, DownloadError> {
     let url = request_url(&request);
-    let mut response = request
-        .send()
+    let mut response = crate::retry::send(request, delays)
         .await
         .map_err(|source| DownloadError::Request {
             url: url.clone(),

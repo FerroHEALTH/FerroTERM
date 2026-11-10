@@ -227,3 +227,28 @@ async fn no_rendering_of_the_source_carries_a_secret() {
         "a held token is never rendered"
     );
 }
+
+#[tokio::test]
+async fn a_table_naming_no_client_or_a_block_with_a_retired_key_is_refused() {
+    let server = MockServer::start().await;
+    let mut anonymous = support::endpoint(&server, &support::client_account());
+    if let Some(oauth) = anonymous.credentials.oauth.as_mut() {
+        oauth.client_id.clear();
+    }
+    let refused =
+        addon_nts::source::NtsSource::new(&addon_nts::config::NtsConfig::default(), &anonymous)
+            .expect_err("the service challenges every request, so a client is required");
+    assert!(
+        matches!(refused, addon_nts::source::NtsError::NoUsableClient),
+        "{refused:?}"
+    );
+
+    let retired: addon_nts::config::NtsConfig =
+        serde_json::from_str(r#"{"base_url":"https://example.invalid"}"#).expect("the block reads");
+    let refused = addon_nts::source::NtsSource::new(
+        &retired,
+        &support::endpoint(&server, &support::client_account()),
+    )
+    .expect_err("a retired key of the block is refused");
+    assert!(refused.to_string().contains("nts.url"), "{refused}");
+}

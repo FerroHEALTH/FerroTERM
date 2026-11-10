@@ -22,8 +22,6 @@ use std::path::{Path, PathBuf};
 use ferrohealth_config::loader::{Loaded, Loader};
 use ferrohealth_config::removed::{Removals, Removed, RemovedKeys, Retired};
 use ferrohealth_config::units::Duration;
-use ferrohealth_secret::file::{SecretError, read_secret};
-use ferrohealth_secret::secret::Secret;
 use ferrohealth_secret::secret_url::SecretUrl;
 use ferrohealth_smart::config::AuthSection;
 use ferrohealth_smart::config::endpoint::{EndpointSection, RetrySection};
@@ -86,45 +84,62 @@ pub struct SourceConfig {
     pub config: toml::Table,
 }
 
-/// `[nts]`: the client the Nationale Terminologie Server add-on authenticates
-/// as with the client credentials grant (RFC 6749 §4.4).
+/// `[nts]`: the family outbound endpoint table of the Nationale
+/// Terminologie Server.
 ///
-/// Each secret is set inline or through its `<key>_file` sibling, which names
-/// a mounted file, never both.
-#[expect(
-    clippy::struct_field_names,
-    reason = "the keys are the OAuth 2.0 client parameters, named as RFC 6749 §2.3.1 names them"
-)]
-#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
-#[serde(default, deny_unknown_fields)]
+/// It starts from [`addon_nts::config::endpoint`]: the base `url`, the
+/// timeouts, `retry`, `tls`, and the client credentials grant (RFC 6749
+/// §4.4) under `[nts.credentials.oauth]`.
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct NtsSection {
-    /// The OAuth 2 client identifier.
-    pub client_id: String,
-    /// The client secret.
-    pub client_secret: Option<Secret>,
-    /// A file holding the client secret.
-    pub client_secret_file: Option<PathBuf>,
+    /// The endpoint table itself.
+    #[serde(flatten)]
+    pub endpoint: EndpointSection,
+    /// `client_id`, which `[nts.credentials.oauth] client_id` replaced in
+    /// 0.4.5.
+    pub client_id: Removed,
+    /// `client_secret`, which `[nts.credentials.oauth] client_secret`
+    /// replaced in 0.4.5.
+    pub client_secret: Removed,
+    /// `client_secret_file`, which `[nts.credentials.oauth]
+    /// client_secret_file` replaced in 0.4.5.
+    pub client_secret_file: Removed,
 }
 
-impl NtsSection {
-    /// The client this section names, its secret read inline or from its
-    /// file; an absent secret reads as empty, which the add-on refuses as no
-    /// usable client.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`SecretError`] when a secret is set both inline and through
-    /// its file, or its file cannot be read or is empty.
-    pub fn credentials(&self) -> Result<addon_nts::credentials::Credentials, SecretError> {
-        Ok(addon_nts::credentials::Credentials {
-            client_id: self.client_id.clone(),
-            client_secret: read_secret(
-                "nts.client_secret",
-                self.client_secret.clone(),
-                self.client_secret_file.as_deref(),
-            )?
-            .unwrap_or_default(),
+// NOTE: serde's `flatten` drops `deny_unknown_fields` (serde.rs/field-attrs.html#flatten),
+// so the retired keys are taken out and the rest read strictly as the table.
+impl<'de> serde::Deserialize<'de> for NtsSection {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error as _;
+        let mut table = toml::Table::deserialize(deserializer)?;
+        let mut retired = |key: &str| {
+            table
+                .remove(key)
+                .map_or(Ok(Removed::default()), Removed::deserialize)
+                .map_err(D::Error::custom)
+        };
+        let client_id = retired("client_id")?;
+        let client_secret = retired("client_secret")?;
+        let client_secret_file = retired("client_secret_file")?;
+        let endpoint =
+            EndpointSection::deserialize(toml::Value::Table(table)).map_err(D::Error::custom)?;
+        Ok(Self {
+            endpoint,
+            client_id,
+            client_secret,
+            client_secret_file,
         })
+    }
+}
+
+impl Default for NtsSection {
+    fn default() -> Self {
+        Self {
+            endpoint: addon_nts::config::endpoint(),
+            client_id: Removed::default(),
+            client_secret: Removed::default(),
+            client_secret_file: Removed::default(),
+        }
     }
 }
 
@@ -191,7 +206,7 @@ pub const PREPARING: &str = "0.4.5";
 
 /// The keys 0.4.5 retired, each with the key that took its place.
 // TODO(#1202): the refusals ship in 0.4.5 alone; delete them in 0.4.6.
-pub const RETIRED: [Retired; 4] = [
+pub const RETIRED: [Retired; 7] = [
     Retired::replaced(
         "server_admin_url",
         "server_admin.url, the admin listener's base URL",
@@ -206,6 +221,17 @@ pub const RETIRED: [Retired; 4] = [
     Retired::replaced(
         "webhook_url",
         "webhook.url, the address the summary is posted to",
+        "0.4.5",
+    ),
+    Retired::replaced("nts.client_id", "nts.credentials.oauth.client_id", "0.4.5"),
+    Retired::replaced(
+        "nts.client_secret",
+        "nts.credentials.oauth.client_secret",
+        "0.4.5",
+    ),
+    Retired::replaced(
+        "nts.client_secret_file",
+        "nts.credentials.oauth.client_secret_file",
         "0.4.5",
     ),
 ];
@@ -275,9 +301,11 @@ pub enum ConfigError {
     },
 }
 
-/// The loader of the service's tree, with the product's `[server_admin]`
-/// defaults layered under the file key by key, so a table written in part
-/// keeps the reload's timeout and single try.
+/// The loader of the service's tree.
+///
+/// The product's `[server_admin]` and `[nts]` defaults are layered under the
+/// file key by key, so a table written in part keeps the reload's timeout and
+/// single try, and the service's address and issuer.
 ///
 /// # Errors
 ///
@@ -286,7 +314,8 @@ pub enum ConfigError {
 pub fn loader() -> Result<Loader, ConfigError> {
     Ok(Loader::new(PREFIX)?
         .alias(FILTER_ENV, "telemetry.filter")
-        .defaults("server_admin", &Config::default().server_admin)?)
+        .defaults("server_admin", &Config::default().server_admin)?
+        .defaults("nts", &addon_nts::config::endpoint())?)
 }
 
 impl Config {
@@ -334,6 +363,9 @@ impl Config {
             self.server_admin_credentials,
             self.fhir_base_url,
             self.webhook_url,
+            self.nts.client_id,
+            self.nts.client_secret,
+            self.nts.client_secret_file,
         ];
         for (removed, retired) in set.into_iter().zip(&RETIRED) {
             removals.check(removed, retired);
@@ -518,39 +550,54 @@ base_url = "https://example.invalid"
     }
 
     #[test]
-    fn the_nts_client_secret_reads_inline_or_from_a_file_never_both()
-    -> Result<(), Box<dyn core::error::Error>> {
-        let dir = tempfile::tempdir()?;
-        let path = dir.path().join("client-secret");
-        std::fs::write(&path, "a-client-secret\n")?;
+    fn an_nts_table_written_in_part_keeps_the_service_and_its_issuer() -> Result<(), ConfigError> {
         let config = Config::from_sources(
-            Some("[nts]\nclient_id = \"a-client\"\n"),
-            &environment(&[(
-                "FERROTERM_SYNC__NTS__CLIENT_SECRET_FILE",
-                path.to_str().ok_or("a UTF-8 path")?,
-            )]),
+            Some(
+                "[nts.credentials.oauth]\nclient_id = \"a-client\"\nclient_secret = \"a-client-secret\"\n",
+            ),
+            &environment(&[("FERROTERM_SYNC__NTS__TIMEOUT", "2h")]),
         )?;
-        let credentials = config.nts.credentials()?;
-        assert_eq!(credentials.client_id, "a-client");
+        let endpoint = &config.nts.endpoint;
+        assert_eq!(endpoint.url.expose(), addon_nts::config::NTS_BASE_URL);
         assert_eq!(
-            credentials.client_secret.expose(),
-            "a-client-secret",
-            "the trailing line ending of the file is not part of the secret"
+            endpoint.timeout,
+            Duration::from_hours(2),
+            "the variable sets the timeout"
         );
-        let both = Config::from_sources(
-            Some("[nts]\nclient_secret = \"inline\"\n"),
-            &environment(&[(
-                "FERROTERM_SYNC__NTS__CLIENT_SECRET_FILE",
-                path.to_str().ok_or("a UTF-8 path")?,
-            )]),
-        )?;
-        assert!(
-            both.nts.credentials().is_err(),
-            "a secret set inline and through its file is refused"
+        let oauth = endpoint
+            .credentials
+            .oauth
+            .as_ref()
+            .expect("the product's defaults name the grant");
+        assert_eq!(oauth.client_id, "a-client");
+        assert_eq!(
+            oauth.issuer,
+            addon_nts::config::NTS_ISSUER,
+            "the issuer stays the service's"
         );
         let rendered = format!("{:?}", config.nts);
         assert!(!rendered.contains("a-client-secret"), "{rendered}");
         Ok(())
+    }
+
+    #[test]
+    fn an_nts_key_0_4_5_retired_is_refused_naming_its_replacement() {
+        for key in ["client_id", "client_secret", "client_secret_file"] {
+            let refused =
+                Config::from_sources(Some(&format!("[nts]\n{key} = \"x\"\n")), &BTreeMap::new())
+                    .expect_err("a retired key is refused");
+            assert!(matches!(refused, ConfigError::Removed(_)), "{refused:?}");
+            let shown = refused.to_string();
+            assert!(
+                shown.contains(&format!("nts.credentials.oauth.{key}")),
+                "{shown}"
+            );
+        }
+        assert!(
+            Config::from_sources(Some("[nts]\nclient_name = \"x\"\n"), &BTreeMap::new())
+                .is_err_and(|error| matches!(error, ConfigError::Load(_))),
+            "a key the table does not read is refused as unknown"
+        );
     }
 
     #[test]

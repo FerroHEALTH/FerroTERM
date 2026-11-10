@@ -133,15 +133,6 @@ pub enum RegistryError {
         #[source]
         source: toml::de::Error,
     },
-    /// A secret of the account the add-on authenticates with does not read.
-    #[error("the account of the `{kind}` source does not read")]
-    Credentials {
-        /// The kind whose account did not read.
-        kind: String,
-        /// Why it did not read.
-        #[source]
-        source: ferrohealth_secret::file::SecretError,
-    },
     /// The add-on could not be built from its configuration.
     #[error("the `{kind}` source could not be built")]
     Build {
@@ -162,9 +153,9 @@ pub const KINDS: [&str; 1] = ["nts"];
 ///
 /// Returns [`RegistryError::UnknownKind`] when no add-on reads that kind,
 /// [`RegistryError::Config`] when the add-on's own block does not read, and
-/// [`RegistryError::Credentials`] when a secret of the account `nts` names
-/// does not read, and [`RegistryError::Build`] when the add-on cannot be
-/// built, which is what missing credentials look like.
+/// [`RegistryError::Build`] when the add-on cannot be built: a retired key
+/// of its block, an endpoint table naming no client, or a secret that does
+/// not read.
 pub fn configure(
     sources: &[SourceConfig],
     nts: &NtsSection,
@@ -185,7 +176,7 @@ pub fn configure(
 }
 
 /// The Nationale Terminologie Server add-on, configured from its own block
-/// and authenticating with the account `account` names.
+/// and calling the service through the `[nts]` endpoint table `account`.
 fn nts_source(
     source: &SourceConfig,
     account: &NtsSection,
@@ -199,13 +190,7 @@ fn nts_source(
                 kind: String::from("nts"),
                 source,
             })?;
-    let credentials = account
-        .credentials()
-        .map_err(|source| RegistryError::Credentials {
-            kind: String::from("nts"),
-            source,
-        })?;
-    let built = addon_nts::source::NtsSource::new(&config, credentials).map_err(|error| {
+    let built = addon_nts::source::NtsSource::new(&config, &account.endpoint).map_err(|error| {
         RegistryError::Build {
             kind: String::from("nts"),
             source: Box::new(error),

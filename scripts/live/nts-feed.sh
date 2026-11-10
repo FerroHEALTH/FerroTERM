@@ -10,9 +10,9 @@
 #
 # Local only, by design. It needs a personal licensed account, so it refuses to
 # run under CI and no workflow calls it. Credentials come from the environment
-# the sync service reads (FERROTERM_SYNC__NTS__USERNAME and
-# FERROTERM_SYNC__NTS__PASSWORD, or FERROTERM_SYNC__NTS__CLIENT_ID and
-# FERROTERM_SYNC__NTS__CLIENT_SECRET) and are never
+# (FERROTERM_SYNC__NTS__USERNAME and FERROTERM_SYNC__NTS__PASSWORD, or the
+# sync service's FERROTERM_SYNC__NTS__CREDENTIALS__OAUTH__CLIENT_ID and
+# FERROTERM_SYNC__NTS__CREDENTIALS__OAUTH__CLIENT_SECRET) and are never
 # printed. The listing is written to a temporary file that is removed on exit
 # unless --keep names a path; a kept listing is licensed content, so it stays
 # out of the repository.
@@ -56,10 +56,10 @@ if [[ -n "$saved" ]]; then
 else
 user="${FERROTERM_SYNC__NTS__USERNAME:-}"
 pass="${FERROTERM_SYNC__NTS__PASSWORD:-}"
-client_id="${FERROTERM_SYNC__NTS__CLIENT_ID:-}"
-client_secret="${FERROTERM_SYNC__NTS__CLIENT_SECRET:-}"
+client_id="${FERROTERM_SYNC__NTS__CREDENTIALS__OAUTH__CLIENT_ID:-}"
+client_secret="${FERROTERM_SYNC__NTS__CREDENTIALS__OAUTH__CLIENT_SECRET:-}"
 if [[ -z "$client_secret" ]] && { [[ -z "$user" ]] || [[ -z "$pass" ]]; }; then
-  echo "nts-feed: set FERROTERM_SYNC__NTS__USERNAME and FERROTERM_SYNC__NTS__PASSWORD (or FERROTERM_SYNC__NTS__CLIENT_ID and FERROTERM_SYNC__NTS__CLIENT_SECRET)" >&2
+  echo "nts-feed: set FERROTERM_SYNC__NTS__USERNAME and FERROTERM_SYNC__NTS__PASSWORD (or FERROTERM_SYNC__NTS__CREDENTIALS__OAUTH__CLIENT_ID and FERROTERM_SYNC__NTS__CREDENTIALS__OAUTH__CLIENT_SECRET)" >&2
   exit 2
 fi
 

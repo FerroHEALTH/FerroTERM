@@ -23,8 +23,8 @@ correction its files need.
   (<https://github.com/terminologieserver/ontoserver_authentication_examples>).
   The password grant the manual describes for a personal account is not used:
   RFC 9700 §2.4 says it MUST NOT be.
-- **Reads the token endpoint from the issuer**, the `issuer` key (by default
-  the service's realm), through its OpenID Connect Discovery metadata, so a
+- **Reads the token endpoint from the issuer**, the
+  `nts.credentials.oauth.issuer` key (by default the service's realm), through its OpenID Connect Discovery metadata, so a
   move of the token endpoint needs no code change.
 - **Keeps the token fresh.** The token is cached and a new one is fetched
   inside a 60 second margin before it expires, so a run on any day succeeds
@@ -41,16 +41,20 @@ correction its files need.
 ## Credentials
 
 The client is the deployment's, and it never enters the add-on's
-configuration block. The synchronisation service reads it from its own
-`[nts]` section (`FERROTERM_SYNC__NTS__CLIENT_ID`,
-`FERROTERM_SYNC__NTS__CLIENT_SECRET`, the secret also as a mounted `_file`)
-and hands it to `NtsSource::new`. The
-secrets are held in `ferrohealth-secret`'s `Secret`, so no rendering of the
-configuration, the credentials, or the source prints one.
+configuration block. The synchronisation service reads the service's
+address and the client from its `[nts]` endpoint table, which starts from
+`addon_nts::config::endpoint` (`FERROTERM_SYNC__NTS__URL`,
+`FERROTERM_SYNC__NTS__CREDENTIALS__OAUTH__CLIENT_ID`,
+`FERROTERM_SYNC__NTS__CREDENTIALS__OAUTH__CLIENT_SECRET`, the secret also as
+a mounted `_file`), and hands the table to `NtsSource::new`, which builds the
+family outbound client (`ferrohealth_smart::client::outbound`) from it: the
+HTTP engine with the table's timeouts and TLS, the token source, and the
+retry of a call that could not reach the service or met a `5xx`. No
+rendering of the configuration or the source prints a secret.
 
 ## Another service on the same software
 
-`base_url` is configuration, so an Ontoserver deployment with the same
+`[nts] url` is configuration, so an Ontoserver deployment with the same
 authentication shape is this add-on pointed elsewhere. Anything specific to
 that operator, a different fix-up or another feed layout, belongs in its own
 add-on.

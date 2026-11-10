@@ -93,12 +93,12 @@ services:
       RUST_LOG: ${RUST_LOG:-info}
       # The configuration file the service reads, the mount below.
       FERROTERM_SYNC_CONFIG: /etc/ferroterm/sync.toml
-      # The NTS client, the [nts] keys, passed through from your shell when
-      # set. The secret can be a mounted file instead: set
-      # FERROTERM_SYNC__NTS__CLIENT_SECRET_FILE to its path, never both the
-      # value and the file.
-      FERROTERM_SYNC__NTS__CLIENT_ID:
-      FERROTERM_SYNC__NTS__CLIENT_SECRET:
+      # The NTS client, the [nts.credentials.oauth] keys, passed through from
+      # your shell when set. The secret can be a mounted file instead: set
+      # FERROTERM_SYNC__NTS__CREDENTIALS__OAUTH__CLIENT_SECRET_FILE to its
+      # path, never both the value and the file.
+      FERROTERM_SYNC__NTS__CREDENTIALS__OAUTH__CLIENT_ID:
+      FERROTERM_SYNC__NTS__CREDENTIALS__OAUTH__CLIENT_SECRET:
     volumes:
       - type: bind
         source: ${FERROTERM_SYNC_DATA:-./data}

@@ -20,8 +20,10 @@
 #   --systems ...  the canonicals to subscribe to; default the NL edition of
 #                  SNOMED CT, LOINC, UCUM, and ICD-10
 #   --keep         keep the work directory when it was a temporary one
-# Credentials: FERROTERM_SYNC__NTS__CLIENT_ID and
-# FERROTERM_SYNC__NTS__CLIENT_SECRET, the sync service's [nts] keys. Requires: cargo, curl, jq, python3, and a free port 8080 and 8081.
+# Credentials: FERROTERM_SYNC__NTS__CREDENTIALS__OAUTH__CLIENT_ID and
+# FERROTERM_SYNC__NTS__CREDENTIALS__OAUTH__CLIENT_SECRET, the sync service's
+# [nts.credentials.oauth] keys. Requires: cargo, curl, jq, python3, and a
+# free port 8080 and 8081.
 #
 # The FerroEHR hop comes after this: point its quickstart overlay
 # (docker-compose.terminology.yml, [terminology.external]) at
@@ -51,8 +53,8 @@ done
 for tool in cargo curl jq python3; do
   command -v "$tool" >/dev/null 2>&1 || { echo "sync-e2e: missing required tool: $tool" >&2; exit 2; }
 done
-if [[ -z "${FERROTERM_SYNC__NTS__CLIENT_ID:-}" ]] || [[ -z "${FERROTERM_SYNC__NTS__CLIENT_SECRET:-}" ]]; then
-  echo "sync-e2e: set FERROTERM_SYNC__NTS__CLIENT_ID and FERROTERM_SYNC__NTS__CLIENT_SECRET" >&2
+if [[ -z "${FERROTERM_SYNC__NTS__CREDENTIALS__OAUTH__CLIENT_ID:-}" ]] || [[ -z "${FERROTERM_SYNC__NTS__CREDENTIALS__OAUTH__CLIENT_SECRET:-}" ]]; then
+  echo "sync-e2e: set FERROTERM_SYNC__NTS__CREDENTIALS__OAUTH__CLIENT_ID and FERROTERM_SYNC__NTS__CREDENTIALS__OAUTH__CLIENT_SECRET" >&2
   exit 2
 fi
 
