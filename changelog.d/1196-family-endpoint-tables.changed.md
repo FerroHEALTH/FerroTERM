@@ -19,6 +19,6 @@
 - The server, the synchronisation service and the console take the family
   round of 2026-11-09: ferrohealth-config 0.4.1, ferrohealth-telemetry 0.4,
   ferrohealth-server 0.8.1, ferrohealth-usage-report 0.4,
-  ferrohealth-smart 0.16.1, ferrohealth-session 0.10, ferrobridge-term 0.3
+  ferrohealth-smart 0.16.3, ferrohealth-session 0.10, ferrobridge-term 0.3
   and fhir-types 0.1.130, with the performance gate on ferrohealth-perf
   0.8.

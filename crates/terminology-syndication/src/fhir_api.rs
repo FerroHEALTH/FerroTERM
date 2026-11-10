@@ -69,7 +69,9 @@ const PAGE: &str = "_summary=true&_count=500";
 /// Each type in [`ResourceType::ALL`] is searched and paged to the end. An
 /// entry is identified as `{Type}/{id}`, carries the resource's `url` and
 /// `version` as its content item, `meta.lastUpdated` as its date, and one
-/// `alternate` link to the resource itself, with no digest.
+/// `alternate` link to the resource itself, with no digest. A page is
+/// requested again after each of `delays` while it cannot reach the service
+/// or meets a `5xx` ([`crate::retry`]).
 ///
 /// # Errors
 ///
@@ -81,13 +83,14 @@ pub async fn list(
     client: &reqwest::Client,
     base_url: &str,
     authorization: &Authorization,
+    delays: &[std::time::Duration],
 ) -> Result<Feed, SourceError> {
     let base = base_url.trim_end_matches('/');
     let mut entries = Vec::new();
     for resource_type in ResourceType::ALL {
         let mut next = Some(format!("{base}/{}?{PAGE}", resource_type.as_str()));
         while let Some(url) = next.take() {
-            let page = fetch_page(client, &url, authorization).await?;
+            let page = fetch_page(client, &url, authorization, delays).await?;
             next = next_link(&page);
             for resource in page
                 .get("entry")
@@ -112,15 +115,17 @@ async fn fetch_page(
     client: &reqwest::Client,
     url: &str,
     authorization: &Authorization,
+    delays: &[std::time::Duration],
 ) -> Result<serde_json::Value, SourceError> {
-    let response = authorization
-        .apply(client.get(url).header(reqwest::header::ACCEPT, FHIR_JSON))
-        .send()
-        .await
-        .map_err(|source| SourceError::Request {
-            url: url.to_owned(),
-            source,
-        })?;
+    let response = crate::retry::send(
+        authorization.apply(client.get(url).header(reqwest::header::ACCEPT, FHIR_JSON)),
+        delays,
+    )
+    .await
+    .map_err(|source| SourceError::Request {
+        url: url.to_owned(),
+        source,
+    })?;
     let status = response.status();
     if !status.is_success() {
         return Err(SourceError::Status {

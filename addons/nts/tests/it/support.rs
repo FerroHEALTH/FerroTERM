@@ -14,10 +14,10 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use addon_nts::config::NtsConfig;
-use addon_nts::credentials::Credentials;
 use addon_nts::source::NtsSource;
-use ferrohealth_secret::secret::Secret;
+use ferrohealth_secret::secret_url::SecretUrl;
 use ferrohealth_smart::client::cache::Clock;
+use ferrohealth_smart::config::endpoint::EndpointSection;
 use sha2::Digest as _;
 use wiremock::matchers::{body_string_contains, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -72,30 +72,40 @@ pub(crate) fn sha256_of(body: &str) -> String {
         })
 }
 
-/// The credentials of an account that has only the password grant.
-pub(crate) fn client_account() -> Credentials {
-    Credentials {
-        client_id: String::from("a-client"),
-        client_secret: Secret::new("a-client-secret"),
+/// The confidential client the service issued.
+#[derive(Clone, Copy)]
+pub(crate) struct Account {
+    client_id: &'static str,
+    client_secret: &'static str,
+}
+
+/// The client of an account that has the client credentials grant.
+pub(crate) fn client_account() -> Account {
+    Account {
+        client_id: "a-client",
+        client_secret: "a-client-secret",
     }
 }
 
-/// The configuration pointing at `server`.
-pub(crate) fn config(server: &MockServer) -> NtsConfig {
-    NtsConfig {
-        base_url: server.uri(),
-        issuer: format!("{}/realms/synthetic", server.uri()),
-        ..NtsConfig::default()
-    }
+/// The `[nts]` endpoint table pointing at `server`, with `account` as its
+/// client and every other key the add-on's default.
+pub(crate) fn endpoint(server: &MockServer, account: &Account) -> EndpointSection {
+    let mut endpoint = addon_nts::config::endpoint();
+    endpoint.url = SecretUrl::new(server.uri());
+    let oauth = endpoint
+        .credentials
+        .oauth
+        .as_mut()
+        .expect("the default table names the grant");
+    oauth.issuer = format!("{}/realms/synthetic", server.uri());
+    account.client_id.clone_into(&mut oauth.client_id);
+    oauth.client_secret = Some(account.client_secret.to_owned().into());
+    endpoint
 }
 
 /// A source pointed at `server`, driven by `clock`.
-pub(crate) fn source(
-    server: &MockServer,
-    credentials: Credentials,
-    clock: Arc<TestClock>,
-) -> NtsSource {
-    NtsSource::with_parts(&config(server), credentials, reqwest::Client::new(), clock)
+pub(crate) fn source(server: &MockServer, account: Account, clock: Arc<TestClock>) -> NtsSource {
+    NtsSource::with_clock(&NtsConfig::default(), &endpoint(server, &account), clock)
         .expect("the source builds")
 }
 

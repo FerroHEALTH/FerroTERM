@@ -23,5 +23,6 @@ pub mod download;
 pub mod fhir_api;
 pub mod model;
 pub mod parse;
+pub mod retry;
 pub mod select;
 pub mod source;

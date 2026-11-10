@@ -120,7 +120,7 @@ code 78 (`EX_CONFIG`, `sysexits(3)`), and `healthcheck` with `not up` and 1.
 | `timezone` | `UTC` | the zone a daily schedule is read in |
 | `build_command` | `ferroterm-build` | the offline build, on `PATH` or by path |
 | `[auth]` | on, no issuer | the credentials the admin listener admits (see [The admin listener](#the-admin-listener)) |
-| `[nts]` | no client | the client the NTS add-on authenticates as (see [Credentials](#credentials)) |
+| `[nts]` | `url = "https://terminologieserver.nl"`, `timeout = "1h"`, the realm's issuer, no client | the NTS the add-on calls and the client it authenticates as (see [Credentials](#credentials)) |
 | `[telemetry]` | `auto` format, no export | the console log's `format` and `filter` (`RUST_LOG` sets the filter too), and the OTLP export of the service's metrics, the same section the server reads (see [Telemetry](configuration.md#telemetry)) |
 
 A `[[source]]` entry names the add-on that reads a service and carries that
@@ -163,7 +163,7 @@ names, so the file can stay safe to commit and safe to show.
 
 ### The outbound endpoints
 
-`[server_admin]`, `[fhir]` and `[webhook]` are the family's outbound
+`[server_admin]`, `[fhir]`, `[webhook]` and `[nts]` are the family's outbound
 endpoint table, the keys every FerroHEALTH product writes for a call it
 makes: `url`, `timeout`, `connect_timeout`, `retry` (`max_attempts`,
 `initial_backoff`, `max_backoff`; a call that did not connect, timed out or
@@ -171,7 +171,8 @@ met a `5xx` is tried again), `tls` (the outbound TLS table of
 [Configuration](configuration.md#telemetry)) and `credentials`. A key a
 table leaves out keeps its default: `[server_admin]` keeps the defaults
 above (`timeout = "30min"`, one try, since a reload takes as long as a
-server start), and `[fhir]` and `[webhook]` take the family's
+server start), `[nts]` keeps its own (see [Credentials](#credentials)), and
+`[fhir]` and `[webhook]` take the family's
 (`timeout = "10s"`, three tries). In 0.4.5 alone, the earlier keys `server_admin_url`,
 `[server_admin_credentials]`, `fhir_base_url` and `webhook_url` refuse the
 start, each naming its replacement.
@@ -432,18 +433,23 @@ Nictiz's own authentication examples use it
 The password grant the Nictiz manual describes for a personal account is not
 supported: RFC 9700 §2.4 says it MUST NOT be used.
 
-The service hands the add-on the client its `[nts]` section names. The secret
-is set inline or through its `_file` sibling, which names a mounted file whose
-trailing line ending is dropped; setting both refuses the start. Keep the
-secret out of the file you commit: set it as a variable or mount it.
+`[nts]` is the family's outbound endpoint table (see
+[The outbound endpoints](#the-outbound-endpoints)) for the service every
+`nts` source calls: its base `url`, `timeout` (`"1h"`, since a download of a
+whole edition is one call), `connect_timeout` (`"30s"`), `retry`, `tls`, and
+the client under `[nts.credentials.oauth]`. A key the table leaves out keeps
+that default, so a deployment writes only its client. The secret is set
+inline or through its `_file` sibling, which names a mounted file; setting
+both refuses the start. Keep the secret out of the file you commit: set it
+as a variable or mount it.
 
 | Key (variable) | What it holds |
 |---|---|
-| `nts.client_id` (`FERROTERM_SYNC__NTS__CLIENT_ID`) | The OAuth 2 client identifier Nictiz issued |
-| `nts.client_secret` (`FERROTERM_SYNC__NTS__CLIENT_SECRET`), or `nts.client_secret_file` | Its client secret |
+| `nts.credentials.oauth.client_id` (`FERROTERM_SYNC__NTS__CREDENTIALS__OAUTH__CLIENT_ID`) | The OAuth 2 client identifier Nictiz issued |
+| `nts.credentials.oauth.client_secret` (`FERROTERM_SYNC__NTS__CREDENTIALS__OAUTH__CLIENT_SECRET`), or `client_secret_file` | Its client secret |
 
 ```toml
-[nts]
+[nts.credentials.oauth]
 client_id = "your-client"
 client_secret_file = "/run/secrets/nts-client-secret"
 ```
@@ -451,10 +457,13 @@ client_secret_file = "/run/secrets/nts-client-secret"
 The add-on reads the token endpoint from the realm's OpenID Connect Discovery
 document, at
 `https://terminologieserver.nl/authorisation/auth/realms/nictiz/.well-known/openid-configuration`
-(the `issuer` key of the `[[source]]` block, which defaults to that realm),
-through `ferrohealth-smart`'s token source. The token is cached and a new one
-is fetched a minute before it expires, so an unattended run on any day needs
-no person.
+(`nts.credentials.oauth.issuer`, which defaults to that realm), sends the
+secret in the request body (`client_auth = "client_secret_post"`), and fetches
+a new token a minute before the cached one expires
+(`refresh_margin = "1m"`), so an unattended run on any day needs no person.
+In 0.4.5 alone, the earlier keys `[nts] client_id`, `client_secret` and
+`client_secret_file`, and `base_url` and `issuer` in a `[[source]]` block's
+`config`, refuse the start, each naming its replacement.
 
 ### The first run
 
@@ -473,7 +482,7 @@ run made available.
 1. Get the account, accept the terms, and confirm which systems your licences
    unlock. Run `scripts/live/nts-feed.sh` to see the feed as your account sees
    it.
-2. Put the credentials in the `[nts]` keys as variables or mounted files, and
+2. Put the client in the `[nts.credentials.oauth]` keys as variables or mounted files, and
    keep them out of the configuration file you commit.
 3. Subscribe by canonical identifier. The defaults are the SNOMED CT
    Netherlands edition (`http://snomed.info/sct/11000146104`), LOINC

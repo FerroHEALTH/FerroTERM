@@ -29,7 +29,7 @@ async fn a_matching_sha256_writes_the_destination() {
     let request = reqwest::Client::new().get(format!("{}/content/item.zip", server.uri()));
     let expected = Checksum::Sha256(sha256_of(BODY));
 
-    let fetched = download::to_file(request, &destination, Some(&expected))
+    let fetched = download::to_file(request, &[], &destination, Some(&expected))
         .await
         .expect("the digest matches");
     assert_eq!(fetched.path, destination);
@@ -56,7 +56,7 @@ async fn a_matching_md5_writes_the_destination() {
     let request = reqwest::Client::new().get(format!("{}/content/item.zip", server.uri()));
     let expected = Checksum::Md5(md5_of(BODY));
 
-    let fetched = download::to_file(request, &destination, Some(&expected))
+    let fetched = download::to_file(request, &[], &destination, Some(&expected))
         .await
         .expect("the digest matches");
     assert_eq!(fetched.checksum.algorithm(), "md5");
@@ -74,7 +74,7 @@ async fn an_uppercase_digest_in_the_feed_still_matches() {
     let request = reqwest::Client::new().get(format!("{}/content/item.zip", server.uri()));
     let expected = Checksum::Sha256(sha256_of(BODY).to_ascii_uppercase());
 
-    download::to_file(request, &destination, Some(&expected))
+    download::to_file(request, &[], &destination, Some(&expected))
         .await
         .expect("a digest compares case-insensitively");
 }
@@ -87,7 +87,7 @@ async fn a_digest_that_does_not_match_removes_the_partial_file() {
     let request = reqwest::Client::new().get(format!("{}/content/item.zip", server.uri()));
     let expected = Checksum::Sha256(sha256_of("a different content item"));
 
-    let error = download::to_file(request, &destination, Some(&expected))
+    let error = download::to_file(request, &[], &destination, Some(&expected))
         .await
         .expect_err("the digest does not match");
     match error {
@@ -116,7 +116,7 @@ async fn an_md5_that_does_not_match_removes_the_partial_file() {
     let request = reqwest::Client::new().get(format!("{}/content/item.zip", server.uri()));
     let expected = Checksum::Md5(md5_of("a different content item"));
 
-    let error = download::to_file(request, &destination, Some(&expected))
+    let error = download::to_file(request, &[], &destination, Some(&expected))
         .await
         .expect_err("the digest does not match");
     assert!(
@@ -140,7 +140,7 @@ async fn a_refused_download_writes_nothing() {
     let request = reqwest::Client::new().get(format!("{}/content/item.zip", server.uri()));
     let expected = Checksum::Sha256(sha256_of(BODY));
 
-    let error = download::to_file(request, &destination, Some(&expected))
+    let error = download::to_file(request, &[], &destination, Some(&expected))
         .await
         .expect_err("the server refuses the download");
     match error {
@@ -151,4 +151,58 @@ async fn a_refused_download_writes_nothing() {
     }
     assert!(!destination.exists());
     assert!(!directory.path().join("item.zip.part").exists());
+}
+
+#[tokio::test]
+async fn a_5xx_is_tried_again_after_each_delay_and_a_4xx_is_not() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/content/item.zip"))
+        .respond_with(ResponseTemplate::new(503))
+        .up_to_n_times(1)
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/content/item.zip"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(BODY))
+        .with_priority(2)
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/content/gone.zip"))
+        .respond_with(ResponseTemplate::new(404))
+        .mount(&server)
+        .await;
+    let directory = tempfile::tempdir().expect("a temporary directory");
+    let delays = [std::time::Duration::from_millis(1)];
+    let expected = Checksum::Sha256(sha256_of(BODY));
+
+    let request = reqwest::Client::new().get(format!("{}/content/item.zip", server.uri()));
+    let fetched = download::to_file(
+        request,
+        &delays,
+        &directory.path().join("item.zip"),
+        Some(&expected),
+    )
+    .await
+    .expect("the second try answers");
+    assert_eq!(fetched.checksum, expected);
+
+    let request = reqwest::Client::new().get(format!("{}/content/gone.zip", server.uri()));
+    let error = download::to_file(
+        request,
+        &delays,
+        &directory.path().join("gone.zip"),
+        Some(&expected),
+    )
+    .await
+    .expect_err("a 404 is the answer");
+    assert!(matches!(error, DownloadError::Status { .. }), "{error:?}");
+    let requests = server.received_requests().await.expect("recorded");
+    let gone = requests
+        .iter()
+        .filter(|request| request.url.path() == "/content/gone.zip")
+        .count();
+    assert_eq!(gone, 1, "a 4xx is not tried again");
 }

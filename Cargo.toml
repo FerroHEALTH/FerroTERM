@@ -79,7 +79,7 @@ toml = { version = "1.1.6", default-features = false, features = ["std", "parse"
 # its endpoint table (`client::outbound::OutboundClient`), on ferrohealth-config
 # 0.4. `server-tls` builds an outbound `tls` table through ferrohealth-server's
 # TlsClient. Verified against crates.io on 2026-11-10.
-ferrohealth-smart = { version = "=0.16.1", features = ["axum", "server-tls"] }
+ferrohealth-smart = { version = "=0.16.3", features = ["axum", "server-tls"] }
 # The FerroHEALTH console sign-in and session: the authorization code flow
 # with PKCE over ferrohealth-smart's relying party, the session store with
 # its idle and absolute lifetimes, and the four sign-in routes. Pinned

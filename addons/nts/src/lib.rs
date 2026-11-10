@@ -11,19 +11,19 @@
 //! challenge.
 //!
 //! This crate is the service's identity and nothing else: where the feed is
-//! ([`config`]), how a token is obtained and kept fresh ([`auth`]), where the
-//! credentials come from ([`credentials`]), the one content correction the
-//! service needs ([`fixup`]), and the [`source::NtsSource`] that implements
-//! `terminology_syndication::source::Source`. Reading the feed, deciding what
+//! and the `[nts]` endpoint table a deployment starts from ([`config`]), the
+//! one content correction the service needs ([`fixup`]), and the
+//! [`source::NtsSource`] that implements
+//! `terminology_syndication::source::Source` over the family outbound client,
+//! which obtains the token and keeps it fresh. Reading the feed, deciding what
 //! a run takes, and fetching a verified content item all belong to that crate
 //! and are not repeated here.
 //!
-//! The base URL is configuration, so a second Ontoserver deployment with the
-//! same authentication shape is this add-on pointed elsewhere.
+//! The base URL is the `[nts]` table's `url`, so a second Ontoserver
+//! deployment with the same authentication shape is this add-on pointed
+//! elsewhere.
 #![doc(test(attr(deny(warnings))))]
 
-pub mod auth;
 pub mod config;
-pub mod credentials;
 pub mod fixup;
 pub mod source;

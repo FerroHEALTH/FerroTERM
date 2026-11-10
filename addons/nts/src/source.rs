@@ -13,35 +13,50 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Duration;
 
 use terminology_syndication::download::Fetched;
 use terminology_syndication::model::{CategoryTerm, ContentLink, Feed};
 use terminology_syndication::select::{Holdings, Selection, Subscription};
 use terminology_syndication::source::{Authorization, BoxFuture, Source, SourceError};
 
+use ferrohealth_config::removed::RemovedKeys;
 use ferrohealth_secret::redacted::Redacted;
-use ferrohealth_smart::client::cache::{Clock, SystemClock};
+use ferrohealth_smart::client::cache::{Clock, SystemClock, TokenSource};
+use ferrohealth_smart::client::outbound::{self, OutboundClient, OutboundError};
+use ferrohealth_smart::config::ServerTls;
+use ferrohealth_smart::config::endpoint::EndpointSection;
 
-use crate::auth::{AuthError, Authenticator};
 use crate::config::NtsConfig;
-use crate::credentials::{CredentialError, Credentials};
 use crate::fixup::{Fixup, FixupError};
+
+/// The dotted key of the endpoint table the add-on's client is built from.
+pub const ENDPOINT_KEY: &str = "nts";
 
 /// The add-on could not be built, or a content item could not be taken.
 #[derive(Debug, thiserror::Error)]
 pub enum NtsError {
-    /// The credentials could not be read.
-    #[error("the credentials could not be read")]
-    Credentials(#[from] CredentialError),
-    /// The token source could not be built.
-    #[error("the token source could not be built")]
-    Auth(#[from] AuthError),
-    /// The HTTP client could not be built.
-    #[error("the HTTP client could not be built")]
-    Client {
-        /// Why the client could not be built.
+    /// The source's block sets a key 0.4.5 retired.
+    #[error(transparent)]
+    Retired(#[from] RemovedKeys),
+    /// The endpoint table names no client: the service challenges every
+    /// request, so the client credentials grant is required.
+    #[error(
+        "[nts.credentials.oauth] names no client: write the client_id and the client secret the service issued"
+    )]
+    NoUsableClient,
+    /// The outbound client could not be built from the endpoint table.
+    #[error("the outbound client of the service could not be built")]
+    Client(#[from] OutboundError),
+    /// No access token could be obtained.
+    #[error("{name} obtained no access token")]
+    Token {
+        /// The source's configured name.
+        name: String,
+        /// What `ferrohealth-smart` reported, shared by every caller that
+        /// waited on the same fetch.
         #[source]
-        source: reqwest::Error,
+        source: Arc<ferrohealth_smart::client::TokenError>,
     },
     /// The feed could not be listed, or the item could not be fetched.
     #[error("the syndication request failed")]
@@ -94,50 +109,56 @@ pub struct NtsSource {
     name: String,
     feed_url: String,
     fhir_api_url: Option<String>,
-    client: reqwest::Client,
-    authenticator: Authenticator,
+    outbound: OutboundClient,
+    retry_delays: Vec<Duration>,
     subscription: Subscription,
     yields: Vec<CategoryTerm>,
 }
 
 impl NtsSource {
-    /// The add-on configured from `config`, authenticating with
-    /// `credentials`.
+    /// The add-on configured from the source's block `config`, calling the
+    /// service through the client built from the endpoint table `endpoint`.
     ///
     /// # Errors
     ///
-    /// Returns [`NtsError::Credentials`] when the credentials name no usable
-    /// client, [`NtsError::Client`] when the HTTP client cannot be built, and
-    /// [`NtsError::Auth`] when the token source cannot be.
-    pub fn new(config: &NtsConfig, credentials: Credentials) -> Result<Self, NtsError> {
-        let client = reqwest::Client::builder()
-            .build()
-            .map_err(|source| NtsError::Client { source })?;
-        Self::with_parts(config, credentials, client, Arc::new(SystemClock))
+    /// Returns the errors of [`NtsSource::with_clock`].
+    pub fn new(config: &NtsConfig, endpoint: &EndpointSection) -> Result<Self, NtsError> {
+        Self::with_clock(config, endpoint, Arc::new(SystemClock))
     }
 
-    /// The add-on with its HTTP client, credentials, and the clock its token
+    /// The add-on as [`NtsSource::new`] builds it, with the clock its token
     /// expiry is read against supplied.
     ///
     /// # Errors
     ///
-    /// Returns [`NtsError::Credentials`] when the credentials name no usable
-    /// client, and [`NtsError::Auth`] when the token source cannot be built.
-    pub fn with_parts(
+    /// Returns [`NtsError::Retired`] when the block sets a key 0.4.5 retired,
+    /// [`NtsError::NoUsableClient`] when the table names no client, and
+    /// [`NtsError::Client`] when the outbound client cannot be built from the
+    /// table.
+    pub fn with_clock(
         config: &NtsConfig,
-        credentials: Credentials,
-        client: reqwest::Client,
+        endpoint: &EndpointSection,
         clock: Arc<dyn Clock>,
     ) -> Result<Self, NtsError> {
-        let credentials = credentials.usable()?;
-        let authenticator =
-            Authenticator::new(config.name.clone(), &config.issuer, &credentials, clock)?;
+        config.check("source.config")?;
+        if endpoint
+            .credentials
+            .oauth
+            .as_ref()
+            .is_none_or(|oauth| oauth.client_id.is_empty())
+        {
+            return Err(NtsError::NoUsableClient);
+        }
+        let outbound = OutboundClient::builder(endpoint, ENDPOINT_KEY, &ServerTls)
+            .clock(clock)
+            .build()?;
+        let base = outbound.url().as_str().to_owned();
         Ok(Self {
             name: config.name.clone(),
-            feed_url: config.feed_url(),
-            fhir_api_url: config.fhir_api_url(),
-            client,
-            authenticator,
+            feed_url: config.feed_url(&base),
+            fhir_api_url: config.fhir_api_url(&base),
+            retry_delays: outbound.retry().delays().collect(),
+            outbound,
             subscription: config.subscription(),
             yields: config.yields(),
         })
@@ -226,16 +247,33 @@ impl NtsSource {
         })
     }
 
-    /// The bearer token every request to this service carries.
+    /// The token source of the client credentials grant, which
+    /// [`NtsSource::with_clock`] made sure the table names.
+    fn tokens(&self) -> Option<&TokenSource> {
+        match self.outbound.authorization() {
+            Some(outbound::Authorization::Bearer(tokens)) => Some(tokens),
+            _ => None,
+        }
+    }
+
+    /// The bearer token every request to this service carries (RFC 6750
+    /// §2.1), renewed inside its refresh margin.
     fn bearer(&self) -> BoxFuture<'_, Result<Authorization, SourceError>> {
         Box::pin(async move {
-            let field = self.authenticator.authorization().await.map_err(|source| {
-                SourceError::Authentication {
-                    source_name: self.name.clone(),
-                    source: Box::new(source),
-                }
+            let refused = |source: NtsError| SourceError::Authentication {
+                source_name: self.name.clone(),
+                source: Box::new(source),
+            };
+            let tokens = self
+                .tokens()
+                .ok_or_else(|| refused(NtsError::NoUsableClient))?;
+            let token = tokens.token().await.map_err(|source| {
+                refused(NtsError::Token {
+                    name: self.name.clone(),
+                    source,
+                })
             })?;
-            Ok(Authorization::Field(Redacted::new(field)))
+            Ok(Authorization::Field(Redacted::new(token.header().clone())))
         })
     }
 }
@@ -258,7 +296,11 @@ impl Source for NtsSource {
     }
 
     fn client(&self) -> &reqwest::Client {
-        &self.client
+        self.outbound.http()
+    }
+
+    fn retry_delays(&self) -> &[Duration] {
+        &self.retry_delays
     }
 
     fn listing_auth(&self) -> BoxFuture<'_, Result<Authorization, SourceError>> {
