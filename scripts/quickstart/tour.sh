@@ -15,18 +15,16 @@
 # a README copy that differs from the script by a byte, and an anchor the
 # README lacks.
 #
-# It starts the published server image, which serves UCUM, BCP 47, BCP 13 and
-# ISO 3166-1 with nothing loaded, waits for readiness and looks a unit up.
-# The README's copy of the start step leaves out the switch that keeps a tour
-# from counting as an installation in the usage report; everything else is
-# byte for byte. `docker stop ferroterm` removes what it started.
+# It starts the repository's compose.yaml, the file each release attaches,
+# with an empty index directory, so the server serves UCUM, BCP 47, BCP 13
+# and ISO 3166-1 with nothing loaded, and looks a unit up. Run it beside
+# compose.yaml with docker compose, curl, jq and openssl.
+# `docker compose down --volumes` removes what it started.
 
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 readonly SELF=scripts/quickstart/tour.sh
-# The usage report switch a container is handed on its own command line.
-readonly SWITCH='--env FERROTERM__USAGE_REPORT__ENABLED=false'
 
 # anchor_body NAME: the lines between `# ANCHOR: NAME` and its end.
 anchor_body() {
@@ -63,7 +61,7 @@ self_test() {
     if ! grep -qx "<!-- tour:$name -->" README.md; then
       echo "tour: self-test failed: README.md shows no copy of the anchor '$name'." >&2
       failed=1
-    elif [[ "$(readme_body "$name")" != "$(anchor_body "$name" | sed "s/ $SWITCH//")" ]]; then
+    elif [[ "$(readme_body "$name")" != "$(anchor_body "$name")" ]]; then
       echo "tour: self-test failed: README.md's copy of the anchor '$name' differs from $SELF." >&2
       failed=1
     fi
@@ -89,12 +87,15 @@ fi
 
 cd "$root"
 
-# ANCHOR: start
-docker run --rm -d --name ferroterm -p 8080:8080 --env FERROTERM__USAGE_REPORT__ENABLED=false ghcr.io/ferrohealth/ferroterm:0.4.6
-# ANCHOR_END: start
+# A tour is a throwaway run, never an installation, so it sends no usage
+# report; `docker compose up` by hand leaves it on.
+export FERROTERM__USAGE_REPORT__ENABLED=false
 
-curl --fail -s -o /dev/null --retry 30 --retry-connrefused --retry-all-errors --retry-delay 1 \
-  http://localhost:8080/health/readiness
+# ANCHOR: start
+mkdir -p index secrets && umask 077
+openssl rand -hex 16 > secrets/console_oidc_client_secret
+docker compose up --wait
+# ANCHOR_END: start
 
 # The `$` names a FHIR operation, never a shell expansion.
 # shellcheck disable=SC2016

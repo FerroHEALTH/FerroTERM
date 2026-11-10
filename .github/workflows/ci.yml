@@ -972,8 +972,9 @@ jobs:
 
   # ── The single required check ───────────────────────────────────────────────
 
-  # The README's quick start, run as written against the published image: the
-  # server starts with nothing loaded and answers a UCUM $lookup.
+  # The README's quick start, run as written over the repository's
+  # compose.yaml, the file each release attaches: the published server starts
+  # with an empty index and answers a UCUM $lookup.
   quickstart:
     name: quickstart
     runs-on: ubuntu-latest
@@ -997,9 +998,23 @@ jobs:
             exit 0
           fi
           bash scripts/quickstart/tour.sh
+      # compose.yaml is the whole quickstart a release attaches, so it reads
+      # no host path from the repository: only the secrets, the index and the
+      # releases directory the reader supplies beside it (#1228).
+      - name: compose.yaml mounts nothing from the repository
+        run: |
+          set -euo pipefail
+          mkdir -p index secrets releases
+          : > secrets/console_oidc_client_secret
+          sources="$(docker compose --profile build --profile console --profile proxied config --format json \
+            | jq -r --arg root "$PWD/" '[.services[].volumes[]? | select(.type == "bind") | .source] + [.secrets[]?.file] + [.configs[]?.file // empty] | .[] | ltrimstr($root)')"
+          if grep -vE '^(secrets|index|releases)(/|$)' <<< "$sources"; then
+            echo "::error::compose.yaml reads the host paths above from the repository; inline them as configs" >&2
+            exit 1
+          fi
       - name: Stop the quickstart
         if: always()
-        run: docker stop ferroterm || true
+        run: docker compose down --volumes
 
   conclusion:
     name: conclusion
