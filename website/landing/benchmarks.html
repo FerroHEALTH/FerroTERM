@@ -9,10 +9,11 @@
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>FerroTERM benchmarks: build time, index size, memory, and latency per code system</title>
   <meta name="description" content="What each code system costs FerroTERM to build and serve, and how fast every FHIR terminology operation answers, rendered from committed benchmark records with the machine, the method, and the conditions beside every number.">
-  <link rel="icon" type="image/svg+xml" href="./assets/logo-mark.svg">
+  <link rel="icon" href="./assets/brand/favicon.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="./assets/brand/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="canonical" href="https://ferroterm.eu/benchmarks.html">
   <meta property="og:url" content="https://ferroterm.eu/benchmarks.html">
-  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./style.css?v={{hash:style.css}}">
   <meta property="og:type" content="website">
   <meta property="og:title" content="FerroTERM benchmarks">
   <meta property="og:description" content="Build time, index size, memory, and latency per operation for every code system FerroTERM serves, from committed benchmark records.">
@@ -23,13 +24,17 @@
   <header class="nav">
     <div class="wrap">
       <a class="brand" href="./">
-        <img src="./assets/logo-mark.svg" alt="" aria-hidden="true">
+        <picture>
+          <source srcset="./assets/brand/ferroterm-icon-dark.svg" media="(prefers-color-scheme: dark)">
+          <img src="./assets/brand/ferroterm-icon.svg" alt="" aria-hidden="true" width="28" height="28">
+        </picture>
         <span>FerroTERM</span>
       </a>
       <nav class="nav-links" aria-label="Primary">
         <a href="./docs/">Docs</a>
+        <a href="./docs/operate/install.html" class="hide-sm">Quickstart</a>
         <a href="./docs/evaluate/code-systems.html" class="hide-sm">Code systems</a>
-        <a href="./benchmarks.html" aria-current="page">Benchmarks</a>
+        <a href="./benchmarks.html" class="hide-sm" aria-current="page">Benchmarks</a>
         <a href="./comparison.html" class="hide-sm">Comparison</a>
         <a href="https://github.com/FerroHEALTH/FerroTERM" rel="noopener">GitHub</a>
       </nav>
@@ -220,16 +225,28 @@
       <div class="footer-grid">
         <div class="footer-brand">
           <a class="brand" href="./">
-            <img src="./assets/logo-mark.svg" alt="" aria-hidden="true">
+            <picture>
+          <source srcset="./assets/brand/ferroterm-icon-dark.svg" media="(prefers-color-scheme: dark)">
+          <img src="./assets/brand/ferroterm-icon.svg" alt="" aria-hidden="true" width="28" height="28">
+        </picture>
             <span>FerroTERM</span>
           </a>
           <p>
-            A pure-Rust FHIR terminology server for SNOMED CT, LOINC, ICD, RxNorm, and every FHIR code system.
-            The software is licensed under the
-            <a href="https://github.com/FerroHEALTH/FerroTERM/blob/main/LICENSE" rel="noopener">Business Source License 1.1</a>.
-            The Licensor is Cadasto B.V.
+            A pure-Rust FHIR terminology server, one of the
+            <a href="https://ferrohealth.eu/" rel="noopener">FerroHEALTH</a>
+            family. The software is licensed under the
+            <a href="https://github.com/FerroHEALTH/FerroTERM/blob/main/LICENSE" rel="noopener">Business Source License 1.1</a>:
+            free outside production and for non-commercial production use, a
+            commercial licence for other production use, and Apache License
+            2.0 four years after each version.
+            <a href="./docs/evaluate/licensing.html">Which applies to you</a>.
             SNOMED CT is a registered trademark of SNOMED International; each
             code system's content is licensed separately by its owner.
+          </p>
+          <p>
+            Manufactured by Cadasto B.V., Comeniusstraat 2d, 1817 MS Alkmaar,
+            The Netherlands:
+            <a href="mailto:info@cadasto.com">info@cadasto.com</a>.
           </p>
         </div>
         <div class="footer-links">
@@ -237,10 +254,12 @@
             <h4>Read</h4>
             <ul>
               <li><a href="./docs/">Documentation</a></li>
+              <li><a href="./docs/operate/install.html">Quickstart</a></li>
+              <li><a href="./docs/operate/configuration.html">Configuration</a></li>
               <li><a href="./docs/evaluate/code-systems.html">Code systems</a></li>
               <li><a href="./benchmarks.html">Benchmarks</a></li>
               <li><a href="./comparison.html">Comparison</a></li>
-              <li><a href="./docs/integrate/fhir-api.html">FHIR terminology API</a></li>
+              <li><a href="https://ferrohealth.eu/docs/" rel="noopener">The family book</a></li>
             </ul>
           </div>
           <div>
@@ -248,13 +267,15 @@
             <ul>
               <li><a href="https://github.com/FerroHEALTH/FerroTERM" rel="noopener">GitHub</a></li>
               <li><a href="https://github.com/FerroHEALTH/FerroTERM/releases" rel="noopener">Releases</a></li>
+              <li><a href="https://github.com/FerroHEALTH/FerroTERM/milestones" rel="noopener">Roadmap</a></li>
               <li><a href="https://github.com/FerroHEALTH/FerroTERM/issues" rel="noopener">Issues</a></li>
+              <li><a href="https://github.com/FerroHEALTH/FerroTERM/security/policy" rel="noopener">Security policy</a></li>
             </ul>
           </div>
         </div>
       </div>
       <div class="footer-note">
-        <span>FerroTERM, a FerroEHR sibling project. ferroterm.eu</span>
+        <span>ferroterm.eu</span>
       </div>
     </div>
   </footer>

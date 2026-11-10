@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="FerroTERM">
+  <title>FerroTERM</title>
+  <rect x="0" y="0" width="32" height="32" rx="7" fill="#0d9488"/>
+  <g fill="none" stroke="#f8fafc" stroke-linecap="round" stroke-width="2.4">
+    <line x1="16" y1="16" x2="16" y2="7"/>
+    <line x1="16" y1="16" x2="25" y2="15"/>
+    <line x1="16" y1="16" x2="18" y2="25"/>
+    <line x1="16" y1="16" x2="7" y2="20"/>
+  </g>
+  <g stroke="none" fill="#f8fafc">
+    <circle cx="25" cy="15" r="3.1"/>
+    <circle cx="18" cy="25" r="3.1"/>
+    <circle cx="7" cy="20" r="3.1"/>
+    <circle cx="16" cy="16" r="4.2"/>
+  </g>
+  <circle cx="16" cy="7" r="3.1" fill="#a5f3fc"/>
+</svg>

@@ -143,18 +143,19 @@ else
   note "no Cargo.toml yet — skipped"
 fi
 
-# --- The landing page's hero badge names the current release ------------------
+# --- The landing page's hero badge is rendered from Cargo.toml ---------------
 # The pill at the top of the landing page is the one place the page names its
-# release, so it names the workspace version and nothing else.
-echo "== landing hero badge (website/landing/index.html <-> Cargo.toml)"
-if [[ -n "${current:-}" ]] && [[ -f website/landing/index.html ]]; then
-  badge="$(sed -nE 's|.*<p class="status"[^>]*>v([0-9]+\.[0-9]+\.[0-9]+) released\..*|\1|p' website/landing/index.html)"
-  if [[ -z "$badge" ]]; then
-    bad "website/landing/index.html has no hero badge 'v$current released.'"
-  elif [[ "$badge" != "$current" ]]; then
-    bad "website/landing/index.html hero badge names v${badge//$'\n'/, v}, the current release is $current"
+# release. scripts/site/assemble.sh renders it from the workspace version, so
+# the page carries the {{version:ferroterm}} marker and types no release.
+echo "== landing hero badge (website/landing/index.html, rendered from Cargo.toml)"
+if [[ -f website/landing/index.html ]]; then
+  typed="$(grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+ released' website/landing/index.html || true)"
+  if [[ -n "$typed" ]]; then
+    bad "website/landing/index.html types a release by hand (${typed//$'\n'/, }); write v{{version:ferroterm}}, which the assembly renders"
+  elif ! grep -qF '{{version:ferroterm}}' website/landing/index.html; then
+    bad "website/landing/index.html carries no {{version:ferroterm}} marker for its hero badge"
   else
-    note "OK: the hero badge names v$current"
+    note "OK: the hero badge is rendered from Cargo.toml"
   fi
 fi
 

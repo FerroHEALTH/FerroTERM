@@ -16,8 +16,13 @@ build-dir = "book"
 # sits at the root). site-url makes the book's absolute asset and search links
 # resolve under that path.
 site-url = "/docs/"
-default-theme = "rust"
-preferred-dark-theme = "coal"
+# The two themes theme/ferroterm.css recolours with the teal palette, and
+# theme/fonts/fonts.css keeps mdBook's bundled web fonts out. The tab icon is a
+# theme override: theme/favicon.svg and theme/favicon.png are copies of
+# assets/brand/favicon.svg and favicon-32.png.
+default-theme = "light"
+preferred-dark-theme = "navy"
+additional-css = ["theme/ferroterm.css"]
 git-repository-url = "https://github.com/FerroHEALTH/FerroTERM"
 edit-url-template = "https://github.com/FerroHEALTH/FerroTERM/edit/main/website/book/src/{path}"
 mathjax-support = true

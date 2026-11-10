@@ -27,12 +27,12 @@ licensing and trademark terms are written once, in the
 - **[Evaluate](evaluate/what-ferroterm-is.md)** is for anyone deciding whether
   FerroTERM fits: what it serves, why it exists, the architecture at a glance,
   and how it compares to Snowstorm, Ontoserver, and Hermes.
-- **[Operate](operate/install.md)** is for operators: installing and running
-  the server, configuration, building an index from each code system's
-  release, hardware sizing, and verifying a release before you run it.
 - **[Integrate](integrate/fhir-api.md)** is for API consumers: the FHIR
   terminology operations, the implicit value sets, the served FHIR version,
   and worked request and response examples captured from a running server.
+- **[Operate](operate/install.md)** is for operators: installing and running
+  the server, configuration, building an index from each code system's
+  release, hardware sizing, and verifying a release before you run it.
 - **[Contribute](contribute/build-and-test.md)** is for contributors: building
   and testing, the FHIR code generation model, and where the deeper design
   lives.
