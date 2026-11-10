@@ -79,13 +79,13 @@ toml = { version = "1.1.6", default-features = false, features = ["std", "parse"
 # its endpoint table (`client::outbound::OutboundClient`), on ferrohealth-config
 # 0.4. `server-tls` builds an outbound `tls` table through ferrohealth-server's
 # TlsClient. Verified against crates.io on 2026-11-10.
-ferrohealth-smart = { version = "=0.16.3", features = ["axum", "server-tls"] }
+ferrohealth-smart = { version = "=0.17.0", features = ["axum", "server-tls"] }
 # The FerroHEALTH console sign-in and session: the authorization code flow
 # with PKCE over ferrohealth-smart's relying party, the session store with
 # its idle and absolute lifetimes, and the four sign-in routes. Pinned
 # exactly, at the release beside ferrohealth-smart 0.16, whose `oidc` types
 # it carries. Verified against crates.io on 2026-11-10.
-ferrohealth-session = { version = "=0.10.0", features = ["axum"] }
+ferrohealth-session = { version = "=0.11.0", features = ["axum"] }
 # The FerroHEALTH health family: the readiness document, the indicator
 # registry and the process lifecycle, and the HTTP plumbing whose `health`
 # module serves `/health`, `/health/liveness` and `/health/readiness` over
@@ -93,7 +93,7 @@ ferrohealth-session = { version = "=0.10.0", features = ["axum"] }
 # the run-path calls (`run::config_check`, `telemetry::install`). Verified
 # against crates.io on 2026-11-10.
 ferrohealth-health = { version = "=0.1.1", features = ["registry"] }
-ferrohealth-server = { version = "=0.8.1" }
+ferrohealth-server = { version = "=0.8.2" }
 # The FerroHEALTH configuration loader and its secrets: one TOML tree per
 # binary under `--config` or `<PREFIX>_CONFIG`, `<PREFIX>__SECTION__KEY`
 # overrides, `--set`, strict refusals and provenance, and the `<key>_file`
@@ -101,7 +101,7 @@ ferrohealth-server = { version = "=0.8.1" }
 # every span of time and amount of data is written as, the outbound TLS
 # table, and 0.4 the `removed::Retired` declaration of a key retired for one
 # release. Pinned exactly. Verified against crates.io on 2026-11-10.
-ferrohealth-config = { version = "=0.4.1" }
+ferrohealth-config = { version = "=0.4.3" }
 ferrohealth-secret = { version = "=0.2.0" }
 # The FerroHEALTH telemetry: the `[telemetry]` section, the console, the
 # panic line, the request log with its product fields, and the one

@@ -8,7 +8,7 @@ version = "0.4.4"
 dependencies = [
  "ferrohealth-config",
  "ferrohealth-secret",
- "ferrohealth-smart",
+ "ferrohealth-smart 0.17.0",
  "reqwest",
  "serde",
  "serde_json",
@@ -1176,7 +1176,7 @@ checksum = "a9b997a38116f0594042c19aa6f3508c8e1858d10000e21418cecfa7592f1961"
 dependencies = [
  "async-trait",
  "backon",
- "ferrohealth-smart",
+ "ferrohealth-smart 0.16.3",
  "fhir-types",
  "http",
  "reqwest",
@@ -1189,9 +1189,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-config"
-version = "0.4.1"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d18951fc3a4752fabbe4363a82f965e90893dcdc0ace12bb2f4371c7b3f25f1"
+checksum = "0988b65c0d550f4240abc4decc0ab8eb9e2f3118d194f3fdb8fcea37dafd0c4d"
 dependencies = [
  "ferrohealth-secret",
  "percent-encoding",
@@ -1225,9 +1225,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-server"
-version = "0.8.1"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7702a5ee0e55fcc585f24f7716972c3da577795ed33aea4681137325aba75bfe"
+checksum = "4e47727e318894f5434d77089bf8399e7fbdc679ffea846f08757c2bde2d0c8b"
 dependencies = [
  "axum",
  "clap",
@@ -1257,9 +1257,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-session"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66ec21f48153af605f7b9c584ecd87975f600e8874009ea2f884d28b42cf5d98"
+checksum = "f08b69675cb43a40de942e10af400dc1309c653d0b7e36de2796a22e630cff8b"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -1267,7 +1267,7 @@ dependencies = [
  "cookie",
  "ferrohealth-config",
  "ferrohealth-secret",
- "ferrohealth-smart",
+ "ferrohealth-smart 0.17.0",
  "ferrohealth-ui",
  "http",
  "jiff",
@@ -1285,6 +1285,32 @@ name = "ferrohealth-smart"
 version = "0.16.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a62af5a286d9d7bb00b4b90889b3d74a2ab1f39ea172271f34e64f1ef54438ca"
+dependencies = [
+ "argon2",
+ "aws-lc-rs",
+ "base64 0.23.1",
+ "ferrohealth-config",
+ "ferrohealth-secret",
+ "http",
+ "jiff",
+ "jsonwebtoken",
+ "reqwest",
+ "rustls",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "toml",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "ferrohealth-smart"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c98e84b2d4f212401f565f5ef1101865f36be91022baa69679ea67f065636f9"
 dependencies = [
  "argon2",
  "aws-lc-rs",
@@ -1433,7 +1459,7 @@ dependencies = [
  "ferrohealth-secret",
  "ferrohealth-server",
  "ferrohealth-session",
- "ferrohealth-smart",
+ "ferrohealth-smart 0.17.0",
  "ferrohealth-telemetry",
  "ferrohealth-ui",
  "fhir-types",
@@ -1478,7 +1504,7 @@ dependencies = [
  "ferrohealth-config",
  "ferrohealth-health",
  "ferrohealth-server",
- "ferrohealth-smart",
+ "ferrohealth-smart 0.17.0",
  "ferrohealth-telemetry",
  "ferrohealth-usage-report",
  "ferroterm-problem",
@@ -1521,7 +1547,7 @@ dependencies = [
  "ferrohealth-health",
  "ferrohealth-secret",
  "ferrohealth-server",
- "ferrohealth-smart",
+ "ferrohealth-smart 0.17.0",
  "ferrohealth-telemetry",
  "ferroterm-problem",
  "jiff",
