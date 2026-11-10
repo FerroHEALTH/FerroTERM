@@ -17,6 +17,19 @@ fragments here under the version and its date.
 
 ## [Unreleased]
 
+## [0.4.6] - 2026-11-10
+
+### Removed
+
+- The named refusals of the configuration keys 0.4.5 retired. The console's
+  `[ferroterm] base_url`, `timeout`, `sync_url` and `admin_url`, the sync
+  service's `server_admin_url`, `[server_admin_credentials]`,
+  `fhir_base_url`, `webhook_url` and `[nts] client_id`, `client_secret` and
+  `client_secret_file`, and `base_url` and `issuer` in a `[[source]]` block's
+  `config` are now unknown keys, which the strict load refuses like any other
+  key it does not read. A deployment that moved to the endpoint tables in
+  0.4.5 changes nothing (#1202).
+
 ## [0.4.5] - 2026-11-10
 
 ### Changed
@@ -2825,7 +2838,8 @@ binary answers `GET /health` only.
 - No existing Rust terminology or FHIR crate is a dependency; the README
   records the evaluation and the reasons.
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.5...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.6...HEAD
+[0.4.6]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.5...v0.4.6
 [0.4.5]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.2...v0.4.3
