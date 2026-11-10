@@ -698,7 +698,7 @@ checksum = "1c133bc6a41be0d194c306b5506d15e6feeea7b1d6604bd3f8310dfb2ca96486"
 
 [[package]]
 name = "classification"
-version = "0.1.147"
+version = "0.1.148"
 dependencies = [
  "csv",
  "ferroterm-testkit",
@@ -758,7 +758,7 @@ checksum = "2ebdda89edc534bf8d5dd2857562633b6495557e5846552ade994b99ed13c36a"
 
 [[package]]
 name = "concept-graph"
-version = "0.1.147"
+version = "0.1.148"
 dependencies = [
  "proptest",
  "rf2",
@@ -768,7 +768,7 @@ dependencies = [
 
 [[package]]
 name = "concept-store"
-version = "0.1.147"
+version = "0.1.148"
 dependencies = [
  "concept-graph",
  "redb",
@@ -1048,7 +1048,7 @@ checksum = "9e9de72ce2ad1f90dc62fa25f0f430ef85eb4b0d8fa0be4f30373bc40a21d28e"
 
 [[package]]
 name = "designation-index"
-version = "0.1.147"
+version = "0.1.148"
 dependencies = [
  "concept-graph",
  "fst",
@@ -1061,7 +1061,7 @@ dependencies = [
 
 [[package]]
 name = "dhd-thesaurus"
-version = "0.1.147"
+version = "0.1.148"
 dependencies = [
  "classification",
  "csv",
@@ -1169,12 +1169,13 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-term"
-version = "0.1.148"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "541cce56a6281cac77193ce1d60eaebdf4d156f00a764af257998e317409457a"
+checksum = "a9b997a38116f0594042c19aa6f3508c8e1858d10000e21418cecfa7592f1961"
 dependencies = [
  "async-trait",
  "backon",
+ "ferrohealth-smart",
  "fhir-types",
  "http",
  "reqwest",
@@ -1187,9 +1188,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-config"
-version = "0.3.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52ce40e3df59b02d2c702b4f236f8ff3a345c459b100a9ca245606120e5578da"
+checksum = "3d18951fc3a4752fabbe4363a82f965e90893dcdc0ace12bb2f4371c7b3f25f1"
 dependencies = [
  "ferrohealth-secret",
  "percent-encoding",
@@ -1223,9 +1224,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-server"
-version = "0.7.1"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ea00be22cf2f9b8f9dffa236ec20fdde1c2135135a5487fa17c09cc85a03aa1"
+checksum = "7702a5ee0e55fcc585f24f7716972c3da577795ed33aea4681137325aba75bfe"
 dependencies = [
  "axum",
  "clap",
@@ -1255,9 +1256,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-session"
-version = "0.8.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "921563182490c73f4f15b8718b722e7f590629fa101ad86a0e19d7b2ea807b07"
+checksum = "66ec21f48153af605f7b9c584ecd87975f600e8874009ea2f884d28b42cf5d98"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -1280,9 +1281,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-smart"
-version = "0.14.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65f4cc3a638beeb059a61fcab46772dae02de5db2352010050e273421ef91885"
+checksum = "34593dc8498df2cb400b56ef06217d8d10963eea3bdd1bd0733237832cb8b84b"
 dependencies = [
  "argon2",
  "aws-lc-rs",
@@ -1309,9 +1310,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-telemetry"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ca2f8ecb29315a7a5b73cbc3a732fc24718f7ad8830ab80dddb60d8944bbf0e"
+checksum = "796c92508539000485f0d59584f1555448b8eab6b64ed09bb273dbc29093a8d8"
 dependencies = [
  "axum",
  "ferrohealth-config",
@@ -1355,9 +1356,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-usage-report"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a36a108a2b4ccf63a5274fbecabc82c5e26d83765297286201b710078ceed7d7"
+checksum = "a1a70f3bd128a6114b226689826dba79d038bed7fbdedc78c60a8ece012d1a0a"
 dependencies = [
  "ferrohealth-telemetry",
  "http",
@@ -1455,7 +1456,7 @@ dependencies = [
 
 [[package]]
 name = "ferroterm-problem"
-version = "0.1.147"
+version = "0.1.148"
 dependencies = [
  "axum",
  "ferrohealth-server",
@@ -1562,7 +1563,7 @@ dependencies = [
 
 [[package]]
 name = "fhir-terminology"
-version = "0.1.147"
+version = "0.1.148"
 dependencies = [
  "concept-graph",
  "concept-store",
@@ -1593,9 +1594,9 @@ dependencies = [
 
 [[package]]
 name = "fhir-types"
-version = "0.1.129"
+version = "0.1.130"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a99c9d938318a7973867d3c9ae0941b85fdc8e0699ca766c628da1ed869023aa"
+checksum = "6c6f098ecbdd83958acae1bae0277c9041c3f2e17552436bd40fe9a14a223de0"
 dependencies = [
  "quick-xml",
  "regex",
@@ -1912,7 +1913,7 @@ dependencies = [
 
 [[package]]
 name = "gstandaard"
-version = "0.1.147"
+version = "0.1.148"
 dependencies = [
  "classification",
  "ferroterm-testkit",
@@ -2103,7 +2104,7 @@ dependencies = [
 
 [[package]]
 name = "icd11"
-version = "0.1.147"
+version = "0.1.148"
 dependencies = [
  "ferroterm-testkit",
  "reqwest",
@@ -2488,7 +2489,7 @@ dependencies = [
 
 [[package]]
 name = "labcodeset"
-version = "0.1.147"
+version = "0.1.148"
 dependencies = [
  "ferroterm-testkit",
  "quick-xml",
@@ -2575,7 +2576,7 @@ dependencies = [
 
 [[package]]
 name = "loinc"
-version = "0.1.147"
+version = "0.1.148"
 dependencies = [
  "csv",
  "ferroterm-testkit",
@@ -3531,7 +3532,7 @@ dependencies = [
 
 [[package]]
 name = "rf2"
-version = "0.1.147"
+version = "0.1.148"
 dependencies = [
  "csv",
  "jiff",
@@ -3697,7 +3698,7 @@ dependencies = [
 
 [[package]]
 name = "rxnorm-rrf"
-version = "0.1.147"
+version = "0.1.148"
 dependencies = [
  "csv",
  "ferroterm-testkit",
@@ -3737,7 +3738,7 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "sct-ecl"
-version = "0.1.147"
+version = "0.1.148"
 dependencies = [
  "concept-graph",
  "logos",
@@ -3750,7 +3751,7 @@ dependencies = [
 
 [[package]]
 name = "sct-scg"
-version = "0.1.147"
+version = "0.1.148"
 dependencies = [
  "logos",
  "thiserror",
@@ -4085,7 +4086,7 @@ dependencies = [
 
 [[package]]
 name = "terminology-syndication"
-version = "0.1.147"
+version = "0.1.148"
 dependencies = [
  "ferrohealth-secret",
  "jiff",

@@ -269,11 +269,6 @@ The keys of `[auth]` itself, in the configuration file or as
 | `[[auth.basic.users]]` | HTTP Basic users (RFC 7617), each a person: `user`, `password_hash` or `password_hash_file` (an Argon2id PHC string), and `scopes`, which decide what the user reaches as a token's scopes would. A user granted a `system/` scope refuses the start, naming the user. | none (no Basic) |
 | `[auth.basic] cache_ttl` | How long a Basic credential that verified is kept, so a repeat request skips the Argon2id key derivation. `"0s"` verifies every request. | `"5min"` |
 
-The server refuses to start on the earlier `[auth]` shape: a
-flat `issuer = "…"` key, or `audience`, `algorithms`, `mode`,
-`[auth.introspection]` or another issuer setting on `[auth]` itself, each
-named with the table it moves to.
-
 A machine caller, such as the synchronisation service, authenticates with an
 access token it obtained with the OAuth 2.0 client credentials grant (RFC 6749
 §4.4) from a `machines` issuer; the server accepts no static token, and a Basic

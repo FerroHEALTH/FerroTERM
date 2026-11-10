@@ -10,28 +10,39 @@
 //!
 //! No FHIR specification governs this: our own design.
 
+use ferrohealth_smart::client::outbound::{OutboundClient, OutboundError};
+use ferrohealth_smart::config::ServerTls;
+use ferrohealth_smart::config::endpoint::EndpointSection;
+
 use crate::record::Summary;
 
-/// The address one JSON summary per run is posted to.
+/// Where one JSON summary per run is posted.
 #[derive(Debug, Clone)]
 pub struct Webhook {
-    client: reqwest::Client,
-    url: String,
+    outbound: OutboundClient,
 }
 
 impl Webhook {
-    /// The webhook at `url`.
-    #[must_use]
-    pub fn new(client: reqwest::Client, url: &str) -> Self {
-        Self {
-            client,
-            url: url.to_owned(),
-        }
+    /// The webhook `endpoint` names.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OutboundError`] when the table, its TLS or its credential
+    /// is refused.
+    pub fn new(endpoint: &EndpointSection) -> Result<Self, OutboundError> {
+        Ok(Self {
+            outbound: OutboundClient::build(endpoint, "webhook", &ServerTls)?,
+        })
     }
 
     /// Posts `summary`, reporting a delivery that failed through `tracing`.
     pub async fn deliver(&self, summary: &Summary) {
-        let sent = self.client.post(&self.url).json(summary).send().await;
+        let sent = self
+            .outbound
+            .send(&reqwest::Method::POST, self.outbound.url(), |call| {
+                call.json(summary)
+            })
+            .await;
         match sent {
             Ok(response) if response.status().is_success() => {
                 tracing::debug!(run = %summary.id, "the run webhook was delivered");

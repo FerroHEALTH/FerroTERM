@@ -36,7 +36,7 @@ $ ferroterm-console healthcheck
 The configuration is a TOML file, named by `--config` or
 `FERROTERM_CONSOLE_CONFIG`. Every key can be set from the environment as
 `FERROTERM_CONSOLE__<SECTION>__<KEY>`, for example
-`FERROTERM_CONSOLE__FERROTERM__BASE_URL`, `--set key=value` sets one over
+`FERROTERM_CONSOLE__FERROTERM__SERVER__URL`, `--set key=value` sets one over
 both, and every secret also reads from a file through its `_file` sibling,
 whose trailing line ending is dropped. An unknown key, or a
 `FERROTERM_CONSOLE__` variable that names none, is refused at start.
@@ -49,15 +49,21 @@ console log, and `RUST_LOG` sets the filter too.
 listen = "0.0.0.0:3000"
 
 [ferroterm]
-# Where the console reaches the server, on your private network.
-base_url = "http://ferroterm:8080/"
 # The address readers see the FHIR API at, shown on the screens.
 public_url = "https://terminology.example.org/"
-# The synchronisation service's admin listener, which Synchronisation reads.
-sync_url = "http://ferroterm-sync:8090/"
-# The server's admin listener, which Reload the served set posts to.
-admin_url = "http://ferroterm:8081/"
+
+[ferroterm.server]
+# Where the console reaches the server, on your private network.
+url = "http://ferroterm:8080/"
 timeout = "30s"
+
+[ferroterm.sync]
+# The synchronisation service's admin listener, which Synchronisation reads.
+url = "http://ferroterm-sync:8090/"
+
+[ferroterm.admin]
+# The server's admin listener, which Reload the served set posts to.
+url = "http://ferroterm:8081/"
 
 [session]
 store = "memory"
@@ -84,6 +90,19 @@ when it starts; set `authorization_endpoint`, `token_endpoint`, `jwks_uri`,
 outbound TLS table of [Configuration](configuration.md#telemetry)).
 `config check` reads no provider, so it works offline. Spans of time are
 durations such as `"30s"` or `"8h"`.
+
+`[ferroterm.server]`, `[ferroterm.sync]` and `[ferroterm.admin]` are the
+family's outbound endpoint table: `url`, `timeout` (`"10s"` when the table
+is written without it), `connect_timeout`, `retry` (`max_attempts`,
+`initial_backoff`, `max_backoff`; a read, update or delete is tried again
+after a failed connection, a timeout or a `5xx`, and a create is sent once)
+and `tls`, the outbound TLS table of
+[Configuration](configuration.md#telemetry). A table takes no
+`credentials`: every call carries the signed-in reader's, and a table that
+sets one refuses the start. Without `[ferroterm.server]` the console calls
+`http://127.0.0.1:8080/` with a timeout of `"30s"`. In 0.4.5 alone, the
+earlier keys `[ferroterm] base_url`, `timeout`, `sync_url` and `admin_url`
+refuse the start, each naming its replacement.
 `[session] store = "memory"` keeps the sessions in the console's process;
 `"sealed"` keeps each in one encrypted cookie, for a console that runs as
 several instances, and needs `key` or `key_file` (base64 of at least 64
@@ -227,7 +246,7 @@ configuration file, **More** in the title row offers **Copy the file's path**,
 the path shown under it. **About** names the
 build, the licence and the projects it stands on.
 
-With `admin_url` set and a token that carries `__ferroterm.admin`, **More**
+With `[ferroterm.admin]` set and a token that carries `__ferroterm.admin`, **More**
 on Server offers **Reload the served set**. It asks first, then posts the
 server admin listener's `POST /reload`, and the page says what the server
 answered: the new set is in front of readers, or the old one stays and the
@@ -335,7 +354,7 @@ nothing.
 
 ### Synchronisation
 
-With `sync_url` set and a token that carries the
+With `[ferroterm.sync]` set and a token that carries the
 [synchronisation service](sync.md)'s product scope (`__ferroterm.sync`), the
 Console group of the navigation has **Synchronisation**. It lists the runs the
 service made, newest first, read from its admin listener: when each started,
@@ -351,7 +370,7 @@ the resource.
 answers once the run has finished, which can take as long as a build, and the
 list then names the run with a link to it. **Activate what is staged**, under
 **More**, posts `POST /activate` the same way. Neither needs a script. A
-reader without the scope, or a console without `sync_url`, has no
+reader without the scope, or a console without `[ferroterm.sync]`, has no
 Synchronisation entry and its address is not found.
 
 ### Deleting a value set

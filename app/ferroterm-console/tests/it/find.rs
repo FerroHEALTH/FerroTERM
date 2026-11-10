@@ -69,7 +69,7 @@ async fn terminology() -> MockServer {
 
 /// The console's configuration reaching `server`.
 fn reaching(server: &MockServer) -> String {
-    format!("[ferroterm]\nbase_url = \"{}/\"\n", server.uri())
+    format!("[ferroterm.server]\nurl = \"{}/\"\n", server.uri())
 }
 
 #[tokio::test]

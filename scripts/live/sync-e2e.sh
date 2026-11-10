@@ -104,8 +104,6 @@ curl -sf http://127.0.0.1:8080/health >/dev/null || { tail -20 "$work/server.log
 list="$(printf '%s' "$systems" | python3 -c 'import sys; print(", ".join(f"\"{s.strip()}\"" for s in sys.stdin.read().split(",") if s.strip()))')"
 cat >"$work/sync.toml" <<TOML
 listen = "127.0.0.1:8181"
-server_admin_url = "http://127.0.0.1:8081"
-fhir_base_url = "http://127.0.0.1:8080/r4b"
 index_root = "$work/index"
 resources = "$work/codesystems"
 staging = "$work/staging"
@@ -114,6 +112,13 @@ state = "$work/state"
 retention = 2
 activation = "auto"
 build_command = "$bin/ferroterm-build"
+
+[server_admin]
+url = "http://127.0.0.1:8081"
+timeout = "30min"
+
+[fhir]
+url = "http://127.0.0.1:8080/r4b"
 
 [[source]]
 kind = "nts"

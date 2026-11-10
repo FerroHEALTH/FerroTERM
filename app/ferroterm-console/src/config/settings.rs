@@ -9,14 +9,17 @@ use std::time::Duration;
 
 use ferrohealth_config::loader::Loaded;
 use ferrohealth_config::provenance::{Provenance, Source};
+use ferrohealth_config::removed::Removals;
 use ferrohealth_session::config::{OidcSection, OidcSettings, SessionSection, SessionSettings};
 use ferrohealth_smart::config::ServerTls;
+use ferrohealth_smart::config::credentials::CredentialsSection;
+use ferrohealth_smart::config::endpoint::EndpointSection;
 use ferrohealth_telemetry::section::TelemetrySection;
 use ferrohealth_ui::i18n::Locale;
 use url::Url;
 
-use crate::config::Config;
 use crate::config::error::Error;
+use crate::config::{Config, RETIRED};
 
 /// The resolved configuration.
 #[derive(Debug, Clone)]
@@ -79,6 +82,13 @@ pub struct FerrotermSettings {
     pub admin: Option<Url>,
     /// How long one call to the server may take.
     pub timeout: Duration,
+    /// `[ferroterm.server]`, which the server's outbound client is built
+    /// from.
+    pub server_endpoint: Box<EndpointSection>,
+    /// `[ferroterm.sync]`, when one is configured.
+    pub sync_endpoint: Option<Box<EndpointSection>>,
+    /// `[ferroterm.admin]`, when one is configured.
+    pub admin_endpoint: Option<Box<EndpointSection>>,
 }
 
 impl FerrotermSettings {
@@ -106,16 +116,30 @@ impl Config {
     /// Checks every value and reads every `_file` secret.
     ///
     /// # Errors
-    /// Returns [`Error::Address`] for a listen address that does not parse,
+    /// Returns [`Error::Removed`] for a key the console no longer reads,
+    /// [`Error::Address`] for a listen address that does not parse,
     /// [`Error::Locale`] for a `server.locale` that is no language tag,
     /// [`Error::Missing`], [`Error::Url`] and [`Error::UrlShape`] for a URL
     /// that is absent, does not parse or is not one its key admits,
-    /// [`Error::Zero`] for a zero timeout, [`Error::SignIn`] for an `[oidc]`
+    /// [`Error::Endpoint`] for an endpoint table whose timeout or retry
+    /// breaks a rule, [`Error::Credentials`] for one with a credential of its
+    /// own, [`Error::SignIn`] for an `[oidc]`
     /// or a `[session]` `ferrohealth-session` refuses, the secret errors of
     /// `oidc.client_secret` among them, and [`Error::InsecureCookie`] for
     /// `session.secure_cookie = false` on a console that is not `http` on
     /// loopback.
     pub fn resolve(&self) -> Result<Settings, Error> {
+        let mut removals = Removals::new();
+        let set = [
+            self.ferroterm.base_url,
+            self.ferroterm.timeout,
+            self.ferroterm.sync_url,
+            self.ferroterm.admin_url,
+        ];
+        for (removed, retired) in set.into_iter().zip(&RETIRED) {
+            removals.check(removed, retired);
+        }
+        removals.finish()?;
         let listen = self
             .server
             .listen
@@ -128,7 +152,7 @@ impl Config {
             key: String::from("server.locale"),
             source,
         })?;
-        let base = base_url("ferroterm.base_url", &self.ferroterm.base_url)?;
+        let base = endpoint_url("ferroterm.server", &self.ferroterm.server)?;
         let public = self
             .ferroterm
             .public_url
@@ -138,22 +162,17 @@ impl Config {
             .unwrap_or_else(|| base.clone());
         let sync = self
             .ferroterm
-            .sync_url
-            .as_deref()
-            .map(|text| base_url("ferroterm.sync_url", text))
+            .sync
+            .as_ref()
+            .map(|endpoint| endpoint_url("ferroterm.sync", endpoint))
             .transpose()?;
         let admin = self
             .ferroterm
-            .admin_url
-            .as_deref()
-            .map(|text| base_url("ferroterm.admin_url", text))
+            .admin
+            .as_ref()
+            .map(|endpoint| endpoint_url("ferroterm.admin", endpoint))
             .transpose()?;
-        if self.ferroterm.timeout.is_zero() {
-            return Err(Error::Zero {
-                key: String::from("ferroterm.timeout"),
-            });
-        }
-        let timeout = self.ferroterm.timeout.get();
+        let timeout = self.ferroterm.server.timeout.get();
         let refused = |error| Error::SignIn(Box::new(error));
         let provider = self
             .oidc
@@ -192,6 +211,9 @@ impl Config {
                 sync,
                 admin,
                 timeout,
+                server_endpoint: self.ferroterm.server.clone(),
+                sync_endpoint: self.ferroterm.sync.clone(),
+                admin_endpoint: self.ferroterm.admin.clone(),
             },
             session: self.session.clone(),
             oidc: self.oidc.clone(),
@@ -248,6 +270,24 @@ fn base_url(key: &str, text: &str) -> Result<Url, Error> {
     if !url.path().ends_with('/') {
         let path = format!("{}/", url.path());
         url.set_path(&path);
+    }
+    Ok(url)
+}
+
+/// The checked root of the endpoint table at `key`: its URL as
+/// [`base_url`] admits it, its timeouts and retry as
+/// `EndpointSection::validate` admits them, and no credential of its own,
+/// since every call carries the signed-in reader's.
+fn endpoint_url(key: &str, endpoint: &EndpointSection) -> Result<Url, Error> {
+    let url = base_url(&format!("{key}.url"), endpoint.url.expose())?;
+    endpoint.validate().map_err(|source| Error::Endpoint {
+        key: key.to_owned(),
+        source: Box::new(source),
+    })?;
+    if endpoint.credentials != CredentialsSection::default() {
+        return Err(Error::Credentials {
+            key: format!("{key}.credentials"),
+        });
     }
     Ok(url)
 }
@@ -324,7 +364,7 @@ mod tests {
         ));
         std::fs::write(
             &path,
-            "[ferroterm]\nbase_url = \"http://ferroterm:8080/\"\n",
+            "[ferroterm.server]\nurl = \"http://ferroterm:8080/\"\n",
         )
         .expect("the file is written");
         let settings = Config::load(Some(&path), &[])
@@ -347,7 +387,7 @@ mod tests {
         let loaded = Loader::new(PREFIX)
             .expect("the prefix")
             .load_sources::<Config>(
-                Some("[ferroterm]\nbase_url = \"http://ferroterm:8080/\"\n\n[oidc]\nclient_secret_file = \"/run/secrets/x\"\n"),
+                Some("[ferroterm.server]\nurl = \"http://ferroterm:8080/\"\n\n[oidc]\nclient_secret_file = \"/run/secrets/x\"\n"),
                 None,
                 &environment,
             )
@@ -360,12 +400,15 @@ mod tests {
         .resolve()
         .expect("resolves");
         settings.provenance = provenance;
-        assert_eq!(Source::File, settings.source_of("ferroterm.base_url"));
+        assert_eq!(Source::File, settings.source_of("ferroterm.server.url"));
         assert_eq!(
             Source::Environment,
             settings.source_of("session.secure_cookie")
         );
-        assert_eq!(Source::Default, settings.source_of("ferroterm.timeout"));
+        assert_eq!(
+            Source::Default,
+            settings.source_of("ferroterm.server.timeout")
+        );
         assert_eq!(Source::File, settings.source_of("oidc.client_secret_file"));
         assert_eq!(
             Source::File,
@@ -381,11 +424,60 @@ mod tests {
                 .expect_err("the strict load refuses a key the console does not read");
         assert!(matches!(refused, Error::Load(_)), "{refused:?}");
         assert!(
-            Config::from_sources(Some("[ferroterm]\ntimeout = \"0s\"\n"), &BTreeMap::new())
-                .expect("reads")
-                .resolve()
-                .is_err_and(|error| matches!(error, Error::Zero { .. })),
+            Config::from_sources(
+                Some("[ferroterm.server]\nurl = \"http://ferroterm:8080/\"\ntimeout = \"0s\"\n"),
+                &BTreeMap::new()
+            )
+            .expect("reads")
+            .resolve()
+            .is_err_and(|error| matches!(error, Error::Endpoint { .. })),
             "a zero timeout is refused"
+        );
+    }
+
+    #[test]
+    fn a_key_0_4_5_retired_is_refused_naming_its_replacement() {
+        let config = Config::from_sources(
+            Some("[ferroterm]\nbase_url = \"http://ferroterm:8080/\"\ntimeout = \"30s\"\nsync_url = \"http://s/\"\nadmin_url = \"http://a/\"\n"),
+            &BTreeMap::new(),
+        )
+        .expect("the strict load still reads a retired key");
+        let Err(Error::Removed(refused)) = config.resolve() else {
+            panic!("the retired keys are refused");
+        };
+        let refused = refused.to_string();
+        for (old, new) in [
+            ("ferroterm.base_url", "ferroterm.server.url"),
+            ("ferroterm.timeout", "ferroterm.server.timeout"),
+            ("ferroterm.sync_url", "ferroterm.sync.url"),
+            ("ferroterm.admin_url", "ferroterm.admin.url"),
+        ] {
+            assert!(
+                refused.contains(&format!("{old} was replaced by {new}")),
+                "{old} names {new}, all at once: {refused}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_retired_key_belongs_to_the_release_being_prepared() {
+        assert!(
+            ferrohealth_config::removed::stale(&crate::config::RETIRED, crate::config::PREPARING)
+                .is_empty(),
+            "a refusal lives for one release"
+        );
+    }
+
+    #[test]
+    fn an_endpoint_table_with_its_own_credential_is_refused() {
+        let config = Config::from_sources(
+            Some("[ferroterm.server]\nurl = \"http://ferroterm:8080/\"\n\n[ferroterm.server.credentials]\nuser = \"u\"\npassword = \"p\"\n"),
+            &BTreeMap::new(),
+        )
+        .expect("reads");
+        assert!(
+            matches!(config.resolve(), Err(Error::Credentials { key }) if key == "ferroterm.server.credentials"),
+            "every call carries the reader's credential"
         );
     }
 
@@ -422,7 +514,7 @@ mod tests {
     fn an_environment_value_reads_as_the_key_wants() {
         let environment = BTreeMap::from([
             (
-                String::from("FERROTERM_CONSOLE__FERROTERM__TIMEOUT"),
+                String::from("FERROTERM_CONSOLE__FERROTERM__SERVER__TIMEOUT"),
                 String::from("5s"),
             ),
             (
@@ -435,7 +527,10 @@ mod tests {
             ),
         ]);
         let config = Config::from_sources(None, &environment).expect("reads");
-        assert_eq!(Duration::from_secs(5), config.ferroterm.timeout.get());
+        assert_eq!(
+            Duration::from_secs(5),
+            config.ferroterm.server.timeout.get()
+        );
         assert!(!config.session.secure_cookie);
         assert_eq!("0.0.0.0:3000", config.server.listen);
     }

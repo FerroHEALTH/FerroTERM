@@ -17,7 +17,6 @@ use ferrohealth_smart::basic::StoreError;
 use ferrohealth_smart::config::credentials::OauthSection;
 use ferrohealth_smart::config::{
     AuthMode, AuthSection, BasicSection, BasicUser, ConfigError, IntrospectionSection, IssuerEntry,
-    IssuerKey,
 };
 use ferrohealth_smart::kind::IssuerKind;
 use ferroterm_sync::auth::{AdminAuth, AuthError, SYNC_SCOPE};
@@ -216,7 +215,7 @@ async fn introspecting_issuer() -> MockServer {
 /// An `[auth]` introspecting the tokens of `issuer` under a client secret.
 fn introspecting(issuer: &str) -> AuthSection {
     AuthSection {
-        issuer: IssuerKey::List(vec![IssuerEntry {
+        issuer: vec![IssuerEntry {
             issuer: issuer.to_owned(),
             kind: Some(IssuerKind::Machines),
             audience: vec![String::from(AUDIENCE)],
@@ -230,7 +229,7 @@ fn introspecting(issuer: &str) -> AuthSection {
                 ..IntrospectionSection::default()
             }),
             ..IssuerEntry::default()
-        }]),
+        }],
         ..AuthSection::default()
     }
 }
@@ -466,28 +465,23 @@ async fn refusal(section: &AuthSection) -> String {
     reason
 }
 
-// No specification governs the configuration: our own design over
-// `ferrohealth-smart` 0.9.0, whose `[auth]` names every issuer in its own
-// `[[auth.issuer]]` table with its kind (#1140).
-#[tokio::test]
-async fn the_flat_issuer_of_the_old_shape_refuses_the_start_naming_the_table() {
-    let flat = AuthSection {
-        issuer: IssuerKey::Flat(String::from("https://as.example.org")),
-        ..AuthSection::default()
-    };
-    let reason = refusal(&flat).await;
-    assert!(reason.contains("auth.issuer = "), "{reason}");
-    assert!(reason.contains("[[auth.issuer]]"), "{reason}");
+// ferrohealth-smart 0.15 deleted the named refusal of the flat `issuer`, so
+// the strict load refuses it as a value of the wrong shape.
+#[test]
+fn the_flat_issuer_of_the_old_shape_is_refused_by_the_strict_load() {
+    let refused = ferroterm_sync::config::Config::from_sources(
+        Some("[auth]\nissuer = \"https://as.example.org\"\n"),
+        &std::collections::BTreeMap::new(),
+    );
+    assert!(refused.is_err(), "{refused:?}");
 }
 
 #[tokio::test]
 async fn an_issuer_without_a_kind_refuses_the_start_naming_the_key() {
     let issuer = MockServer::start().await;
     let mut section = introspecting(&issuer.uri());
-    if let IssuerKey::List(entries) = &mut section.issuer {
-        for entry in entries.iter_mut() {
-            entry.kind = None;
-        }
+    for entry in &mut section.issuer {
+        entry.kind = None;
     }
     let reason = refusal(&section).await;
     assert!(reason.contains("auth.issuer.kind"), "{reason}");

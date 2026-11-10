@@ -241,11 +241,11 @@ impl Shown {
 
 /// The first key of every row, whose source the row marks.
 const ROW_KEYS: [&str; 16] = [
-    "ferroterm.base_url",
+    "ferroterm.server.url",
     "ferroterm.public_url",
-    "ferroterm.sync_url",
-    "ferroterm.admin_url",
-    "ferroterm.timeout",
+    "ferroterm.sync.url",
+    "ferroterm.admin.url",
+    "ferroterm.server.timeout",
     "oidc.issuer",
     "oidc.client_id",
     "oidc.client_secret_file",
@@ -366,7 +366,7 @@ fn connection(locale: &Locale, settings: &Shown) -> Vec<Setting> {
             Msg::ConfigServer,
             Msg::ConfigServerLine,
             code(settings.base.as_str()),
-            "ferroterm.base_url",
+            "ferroterm.server.url",
         ),
         row(
             locale,
@@ -380,21 +380,21 @@ fn connection(locale: &Locale, settings: &Shown) -> Vec<Setting> {
             Msg::ConfigSync,
             Msg::ConfigSyncLine,
             sync,
-            "ferroterm.sync_url",
+            "ferroterm.sync.url",
         ),
         row(
             locale,
             Msg::ConfigAdmin,
             Msg::ConfigAdminLine,
             admin,
-            "ferroterm.admin_url",
+            "ferroterm.admin.url",
         ),
         row(
             locale,
             Msg::ConfigTimeout,
             Msg::ConfigTimeoutLine,
             Html::text(duration(locale, settings.timeout)),
-            "ferroterm.timeout",
+            "ferroterm.server.timeout",
         ),
     ]
 }

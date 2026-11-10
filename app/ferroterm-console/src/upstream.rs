@@ -18,6 +18,7 @@
 //! governs this: our own design.
 
 use ferrohealth_session::record::{Credential, Held};
+use ferrohealth_smart::client::outbound::SendError;
 use http::header::{
     ACCEPT, AUTHORIZATION, CONTENT_LOCATION, CONTENT_TYPE, ETAG, IF_MATCH, LOCATION,
 };
@@ -148,60 +149,69 @@ async fn forward(
     exchange: Exchange,
 ) -> Result<Answer, ExchangeError> {
     let target = target(&exchange.path).ok_or(ExchangeError::Forbidden)?;
-    let url = match target {
-        Target::Fhir => joined(&state.settings().ferroterm.base, &exchange.path, target)?,
-        Target::Sync => {
-            let base = state
-                .settings()
-                .ferroterm
-                .sync
-                .as_ref()
-                .ok_or(ExchangeError::NoSync)?;
-            joined(base, &exchange.path, target)?
-        }
-        Target::Admin => {
-            let base = state
-                .settings()
-                .ferroterm
-                .admin
-                .as_ref()
-                .ok_or(ExchangeError::NoAdmin)?;
-            joined(base, &exchange.path, target)?
-        }
+    let ferroterm = &state.settings().ferroterm;
+    let upstream = state.upstream();
+    let (base, client) = match target {
+        Target::Fhir => (&ferroterm.base, &upstream.server),
+        Target::Sync => ferroterm
+            .sync
+            .as_ref()
+            .zip(upstream.sync.as_ref())
+            .ok_or(ExchangeError::NoSync)?,
+        Target::Admin => ferroterm
+            .admin
+            .as_ref()
+            .zip(upstream.admin.as_ref())
+            .ok_or(ExchangeError::NoAdmin)?,
     };
-    let client = state.upstream();
+    let url = joined(base, &exchange.path, target)?;
     let method = match exchange.method {
         Method::Get => reqwest::Method::GET,
         Method::Post => reqwest::Method::POST,
         Method::Put => reqwest::Method::PUT,
         Method::Delete => reqwest::Method::DELETE,
     };
-    let mut request = client
-        .request(method, url)
-        .header(ACCEPT, exchange.accept.as_str());
-    if let Some(content_type) = &exchange.content_type {
-        request = request.header(CONTENT_TYPE, content_type.as_str());
-    }
-    if let Some(if_match) = &exchange.if_match {
-        request = request.header(IF_MATCH, if_match.as_str());
-    }
-    match credential {
-        Some(Credential::Bearer(token)) => {
-            request = request.header(AUTHORIZATION, format!("Bearer {}", token.expose()));
+    let prepare = |mut request: reqwest::RequestBuilder| {
+        request = request.header(ACCEPT, exchange.accept.as_str());
+        if let Some(content_type) = &exchange.content_type {
+            request = request.header(CONTENT_TYPE, content_type.as_str());
         }
-        Some(Credential::Basic { username, password }) => {
-            request = request.basic_auth(username, Some(password.expose()));
+        if let Some(if_match) = &exchange.if_match {
+            request = request.header(IF_MATCH, if_match.as_str());
         }
-        None => {}
-    }
-    if let Some(body) = exchange.body {
-        request = request.body(body);
-    }
-    let response = request.send().await.map_err(|error| {
-        tracing::warn!(method = exchange.method.name(), %error, "the terminology server could not be reached");
-        ExchangeError::Unreachable {
-            message: error.without_url().to_string(),
+        match credential {
+            Some(Credential::Bearer(token)) => {
+                request = request.header(AUTHORIZATION, format!("Bearer {}", token.expose()));
+            }
+            Some(Credential::Basic { username, password }) => {
+                request = request.basic_auth(username, Some(password.expose()));
+            }
+            None => {}
         }
+        if let Some(body) = &exchange.body {
+            request = request.body(body.clone());
+        }
+        request
+    };
+    // NOTE: RFC 9110 §9.2.2: POST is not idempotent, so it is sent once and
+    // only the other methods take the endpoint table's retry.
+    let sent = if method == reqwest::Method::POST {
+        prepare(client.http().request(method, url))
+            .send()
+            .await
+            .map_err(|error| error.without_url().to_string())
+    } else {
+        client
+            .send(&method, &url, prepare)
+            .await
+            .map_err(|error| match error {
+                SendError::Transport(error) => error.without_url().to_string(),
+                other => other.to_string(),
+            })
+    };
+    let response = sent.map_err(|message| {
+        tracing::warn!(method = exchange.method.name(), error = %message, "the terminology server could not be reached");
+        ExchangeError::Unreachable { message }
     })?;
     let status = response.status().as_u16();
     let header = |name: http::HeaderName| {

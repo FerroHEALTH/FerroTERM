@@ -3,15 +3,19 @@
 
 //! The credential of the reload call: none, or an OAuth 2.0 client
 //! credentials token (RFC 6749 §4.4) that `ferrohealth-smart` fetches and
-//! renews once when the server answers `401`. The reload is a machine's call,
-//! so HTTP Basic, a person's credential, is refused at load.
+//! renews once when the server answers `401`, written under
+//! `[server_admin.credentials]`. The reload is a machine's call, so HTTP
+//! Basic, a person's credential, is refused at load.
 //!
 //! No specification governs the reload call: our own design (#750).
 
 use std::collections::BTreeMap;
 
-use ferrohealth_smart::config::credentials::OauthSection;
-use ferroterm_sync::config::{AdminCredentials, Config};
+use ferrohealth_secret::secret_url::SecretUrl;
+use ferrohealth_smart::client::outbound::SendError;
+use ferrohealth_smart::config::credentials::{CredentialsSection, OauthSection};
+use ferrohealth_smart::config::endpoint::EndpointSection;
+use ferroterm_sync::config::{Config, ConfigError};
 use ferroterm_sync::reload::{AdminClient, ReloadError};
 use secrecy::SecretString;
 use wiremock::matchers::{body_string_contains, header, method, path};
@@ -31,20 +35,19 @@ async fn issues(server: &MockServer, token: &str) {
         .await;
 }
 
-/// The admin client of `server` under `section`.
-fn client(server: &MockServer, section: &AdminCredentials) -> AdminClient {
-    let grant = section
-        .resolve()
-        .expect("the table resolves")
-        .expect("the table names a credential");
-    AdminClient::new(reqwest::Client::new(), &server.uri())
-        .with_credentials(grant)
-        .expect("the token client builds")
+/// The admin client of `server` under `credentials`.
+fn client(server: &MockServer, credentials: CredentialsSection) -> AdminClient {
+    AdminClient::new(&EndpointSection {
+        url: SecretUrl::new(server.uri()),
+        credentials,
+        ..EndpointSection::default()
+    })
+    .expect("the client builds")
 }
 
 /// The client credentials table against the token endpoint of `server`.
-fn oauth(server: &MockServer) -> AdminCredentials {
-    AdminCredentials {
+fn oauth(server: &MockServer) -> CredentialsSection {
+    CredentialsSection {
         oauth: Some(OauthSection {
             token_endpoint: format!("{}/token", server.uri()),
             client_id: String::from("ferroterm-sync"),
@@ -52,6 +55,7 @@ fn oauth(server: &MockServer) -> AdminCredentials {
             scope: String::from("__ferroterm.admin"),
             ..OauthSection::default()
         }),
+        ..CredentialsSection::default()
     }
 }
 
@@ -67,7 +71,7 @@ async fn the_reload_carries_a_client_credentials_token() {
         .mount(&server)
         .await;
 
-    let reply = client(&server, &oauth(&server))
+    let reply = client(&server, oauth(&server))
         .reload()
         .await
         .expect("the server reloads");
@@ -95,7 +99,7 @@ async fn a_reload_refused_twice_is_a_refused_reload() {
         .mount(&server)
         .await;
 
-    let error = client(&server, &oauth(&server))
+    let error = client(&server, oauth(&server))
         .reload()
         .await
         .expect_err("the server refuses");
@@ -117,11 +121,14 @@ async fn a_token_endpoint_that_refuses_is_a_failed_reload() {
         .mount(&server)
         .await;
 
-    let error = client(&server, &oauth(&server))
+    let error = client(&server, oauth(&server))
         .reload()
         .await
         .expect_err("no token, no reload");
-    assert!(matches!(error, ReloadError::Token { .. }), "{error:?}");
+    assert!(
+        matches!(&error, ReloadError::Request { source, .. } if matches!(**source, SendError::Token(_))),
+        "{error:?}"
+    );
     let reloads = server
         .received_requests()
         .await
@@ -140,36 +147,74 @@ fn refused(text: &str) -> String {
 }
 
 // The reload is a machine's call, so it carries a client credentials token
-// (RFC 6749 §4.4); the Basic form of earlier releases, a person's credential,
-// is refused at load naming the one key the table takes (#1140).
+// (RFC 6749 §4.4); the Basic form, a person's credential, is refused at load
+// naming the one key the table takes (#1140).
 #[test]
 fn the_basic_form_is_refused_at_load_naming_oauth() {
     for text in [
-        "[server_admin_credentials]\nuser = \"sync\"\npassword = \"synthetic-password\"\n",
-        "[server_admin_credentials]\npassword_file = \"/run/secrets/sync\"\n",
+        "[server_admin.credentials]\nuser = \"sync\"\npassword = \"synthetic-password\"\n",
+        "[server_admin.credentials]\npassword_file = \"/run/secrets/sync\"\n",
     ] {
-        let reason = refused(text);
-        assert!(reason.contains("oauth"), "{text}: {reason}");
+        let refusal = Config::from_sources(Some(text), &BTreeMap::new())
+            .expect_err("the table is refused at load");
+        assert!(
+            matches!(refusal, ConfigError::BasicReload),
+            "{text}: {refusal}"
+        );
+        assert!(refusal.to_string().contains("oauth"), "{text}: {refusal}");
     }
 }
 
 #[test]
 fn a_static_bearer_token_is_no_credential() {
-    let reason = refused("[server_admin_credentials]\ntoken = \"static\"\n");
-    assert!(reason.contains("oauth"), "{reason}");
+    let reason = refused("[server_admin.credentials]\ntoken = \"static\"\n");
+    assert!(reason.contains("token"), "{reason}");
+}
+
+// 0.4.5 moved the reload's address and credential under `[server_admin]`;
+// in 0.4.5 alone the old keys are refused naming their replacements.
+#[test]
+fn the_0_4_4_keys_are_refused_naming_their_replacements() {
+    let reason = refused(
+        "server_admin_url = \"http://server:8081\"\nfhir_base_url = \"http://server:8080/r4b\"\nwebhook_url = \"https://hooks.example.invalid\"\n\n[server_admin_credentials.oauth]\nclient_id = \"x\"\n",
+    );
+    for (old, new) in [
+        ("server_admin_url", "server_admin.url"),
+        ("server_admin_credentials", "server_admin.credentials"),
+        ("fhir_base_url", "fhir.url"),
+        ("webhook_url", "webhook.url"),
+    ] {
+        assert!(
+            reason.contains(&format!("{old} was replaced by {new}")),
+            "{old} names {new}, all at once: {reason}"
+        );
+    }
+}
+
+#[test]
+fn every_retired_key_belongs_to_the_release_being_prepared() {
+    assert!(
+        ferrohealth_config::removed::stale(
+            &ferroterm_sync::config::RETIRED,
+            ferroterm_sync::config::PREPARING
+        )
+        .is_empty(),
+        "a refusal lives for one release"
+    );
 }
 
 #[test]
 fn the_client_credentials_table_reads_from_the_file() {
     let config = Config::from_sources(
         Some(
-            "[server_admin_credentials.oauth]\ntoken_endpoint = \"https://as.example.org/token\"\nclient_id = \"ferroterm-sync\"\nclient_secret_file = \"/run/secrets/sync\"\n",
+            "[server_admin.credentials.oauth]\ntoken_endpoint = \"https://as.example.org/token\"\nclient_id = \"ferroterm-sync\"\nclient_secret_file = \"/run/secrets/sync\"\n",
         ),
         &BTreeMap::new(),
     )
     .expect("the table loads");
     let oauth = config
-        .server_admin_credentials
+        .server_admin
+        .credentials
         .oauth
         .expect("the client credentials table");
     assert_eq!(oauth.client_id, "ferroterm-sync");

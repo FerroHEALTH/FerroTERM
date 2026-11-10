@@ -33,6 +33,7 @@ use crate::record::{
     Trigger,
 };
 use crate::reload::{AdminClient, ReloadError};
+use crate::revalidate::FhirClient;
 use crate::schedule::{Plan, ScheduleError};
 use crate::source::ConfiguredSource;
 use crate::state::{Lane, Staged, State};
@@ -52,34 +53,19 @@ pub enum ServiceError {
     /// The state file does not read.
     #[error("the state does not read")]
     State(#[from] crate::state::StateError),
-    /// The HTTP client could not be built.
-    #[error("the HTTP client could not be built")]
-    Client {
-        /// Why it could not be built.
-        #[source]
-        source: reqwest::Error,
-    },
-    /// `[server_admin_credentials]` breaks a rule.
-    #[error("[server_admin_credentials] is refused")]
-    Credentials {
-        /// The rule.
-        #[source]
-        source: Box<ferrohealth_smart::config::ConfigError>,
-    },
-    /// The token client of the client credentials grant cannot be built.
-    #[error("the token client of [server_admin_credentials.oauth] cannot be built")]
-    Token {
-        /// Why.
-        #[source]
-        source: Box<ferrohealth_smart::client::TokenError>,
-    },
+    /// An endpoint table, its TLS or its credential is refused.
+    #[error("an outbound endpoint is refused")]
+    Endpoint(#[source] Box<ferrohealth_smart::client::outbound::OutboundError>),
+    /// The `[fhir]` endpoint cannot carry the revalidation.
+    #[error("the [fhir] endpoint is refused")]
+    Fhir(#[source] Box<crate::revalidate::RevalidateError>),
 }
 
 /// One running synchronisation service.
 #[derive(Debug)]
 pub struct Service {
     config: Config,
-    client: reqwest::Client,
+    fhir: Option<FhirClient>,
     plan: Plan,
     sources: Vec<ConfiguredSource>,
     clock: Arc<dyn Clock>,
@@ -101,10 +87,9 @@ impl Service {
     /// # Errors
     ///
     /// Returns [`ServiceError::Schedule`] when the schedule does not read,
-    /// [`ServiceError::State`] when the state file does not read, and
-    /// [`ServiceError::Client`] when the HTTP client cannot be built, and
-    /// [`ServiceError::Credentials`] or [`ServiceError::Token`] when the
-    /// credential of the reload call does not resolve.
+    /// [`ServiceError::State`] when the state file does not read,
+    /// [`ServiceError::Endpoint`] when `[server_admin]` or `[webhook]` is
+    /// refused, and [`ServiceError::Fhir`] when `[fhir]` is.
     pub fn new(
         config: Config,
         sources: Vec<ConfiguredSource>,
@@ -113,30 +98,20 @@ impl Service {
     ) -> Result<Self, ServiceError> {
         let plan = config.plan()?;
         let state = State::read(&config.state_file())?;
-        // A reload opens every artifact again, which takes as long as a start,
-        // so the call waits far longer than an ordinary request would.
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_mins(30))
-            .build()
-            .map_err(|source| ServiceError::Client { source })?;
-        let mut admin = AdminClient::new(client.clone(), &config.server_admin_url);
-        let grant = config
-            .server_admin_credentials
-            .resolve()
-            .map_err(|source| ServiceError::Credentials {
-                source: Box::new(source),
-            })?;
-        if let Some(grant) = grant {
-            admin = admin
-                .with_credentials(grant)
-                .map_err(|source| ServiceError::Token {
-                    source: Box::new(source),
-                })?;
-        }
+        let endpoint = |source| ServiceError::Endpoint(Box::new(source));
+        let admin = AdminClient::new(&config.server_admin).map_err(endpoint)?;
         let webhook = config
-            .webhook_url
-            .as_deref()
-            .map(|url| Webhook::new(client.clone(), url));
+            .webhook
+            .as_ref()
+            .map(Webhook::new)
+            .transpose()
+            .map_err(endpoint)?;
+        let fhir = config
+            .fhir
+            .as_ref()
+            .map(FhirClient::new)
+            .transpose()
+            .map_err(|source| ServiceError::Fhir(Box::new(source)))?;
         let records = RecordStore::new(config.records.clone());
         // The configuration and the state file are read, so the service
         // serves from here.
@@ -144,7 +119,7 @@ impl Service {
         lifecycle.booted();
         Ok(Self {
             config,
-            client,
+            fhir,
             plan,
             sources,
             clock,
@@ -659,18 +634,13 @@ impl Service {
     /// finding list is a report for a terminologist, and the service never
     /// edits local content.
     async fn revalidate(&self, record: &mut RunRecord) {
-        let Some(base_url) = self.config.fhir_base_url.as_deref() else {
+        let Some(client) = self.fhir.as_ref() else {
             record.revalidation.skipped = Some(String::from(
-                "no fhir_base_url is configured, so local resources were not revalidated",
+                "no [fhir] url is configured, so local resources were not revalidated",
             ));
             return;
         };
-        let checked = match crate::revalidate::FhirClient::new(self.client.clone(), base_url) {
-            Ok(client) => {
-                crate::revalidate::revalidate(&client, &record.activation.activated).await
-            }
-            Err(error) => Err(error),
-        };
+        let checked = crate::revalidate::revalidate(client, &record.activation.activated).await;
         match checked {
             Ok(report) => {
                 for finding in &report.findings {

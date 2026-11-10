@@ -42,7 +42,7 @@
 #   enabled = false
 #
 # With an issuer, give the sync the client credentials grant it reloads with in
-# its own configuration file, under [server_admin_credentials.oauth]; the
+# its own configuration file, under [server_admin.credentials.oauth]; the
 # reload is a machine's call, and a Basic user is a person. The sync's own admin
 # listener requires a credential carrying `__ferroterm.sync` on every route but
 # GET /health, so its configuration file names the credentials it admits under

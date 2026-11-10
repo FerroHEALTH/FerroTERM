@@ -8,10 +8,10 @@
 //! design (#583).
 
 use ferroterm_sync::record::{FindingKind, Outcome, Trigger};
-use wiremock::matchers::{method, path, query_param};
+use wiremock::matchers::{body_string_contains, method, path};
 use wiremock::{Mock, ResponseTemplate};
 
-use crate::support::{Entry, Harness, TestClock};
+use crate::support::{Entry, Harness, TestClock, endpoint};
 
 /// The `Parameters` a `$validate-code` answers with.
 fn result(value: bool) -> String {
@@ -36,7 +36,7 @@ const LOCAL_VALUE_SET: &str = r#"{"resourceType":"ValueSet","id":"local","url":"
 #[tokio::test]
 async fn a_release_that_changes_nothing_says_so() {
     let mut harness = Harness::new().await;
-    harness.config.fhir_base_url = Some(format!("{}/r4b", harness.server.uri()));
+    harness.config.fhir = Some(endpoint(&format!("{}/r4b", harness.server.uri())));
     harness
         .publish(&[Entry::rf2(
             "11000146104",
@@ -56,7 +56,7 @@ async fn a_release_that_changes_nothing_says_so() {
         .respond_with(ResponseTemplate::new(200).set_body_string(bundle(&[])))
         .mount(&harness.server)
         .await;
-    Mock::given(method("GET"))
+    Mock::given(method("POST"))
         .and(path("/r4b/ValueSet/$validate-code"))
         .respond_with(ResponseTemplate::new(200).set_body_string(result(true)))
         .mount(&harness.server)
@@ -88,7 +88,7 @@ async fn a_release_that_changes_nothing_says_so() {
 #[tokio::test]
 async fn an_inactive_code_is_reported_with_the_release_that_changed_it() {
     let mut harness = Harness::new().await;
-    harness.config.fhir_base_url = Some(format!("{}/r4b", harness.server.uri()));
+    harness.config.fhir = Some(endpoint(&format!("{}/r4b", harness.server.uri())));
     harness
         .publish(&[Entry::rf2(
             "11000146104",
@@ -110,14 +110,15 @@ async fn an_inactive_code_is_reported_with_the_release_that_changed_it() {
         .await;
     // The code is a member, and it is not a member once inactive codes are
     // refused, which is what `activeOnly` asks for.
-    Mock::given(method("GET"))
+    Mock::given(method("POST"))
         .and(path("/r4b/ValueSet/$validate-code"))
-        .and(query_param("code", "11"))
-        .and(query_param("activeOnly", "true"))
+        .and(body_string_contains(r#""valueCode":"11""#))
+        .and(body_string_contains(r#""activeOnly""#))
+        .and(body_string_contains(r#""valueBoolean":true"#))
         .respond_with(ResponseTemplate::new(200).set_body_string(result(false)))
         .mount(&harness.server)
         .await;
-    Mock::given(method("GET"))
+    Mock::given(method("POST"))
         .and(path("/r4b/ValueSet/$validate-code"))
         .respond_with(ResponseTemplate::new(200).set_body_string(result(true)))
         .mount(&harness.server)
@@ -167,7 +168,7 @@ async fn an_inactive_code_is_reported_with_the_release_that_changed_it() {
 #[tokio::test]
 async fn a_removed_code_is_reported_as_absent() {
     let mut harness = Harness::new().await;
-    harness.config.fhir_base_url = Some(format!("{}/r4b", harness.server.uri()));
+    harness.config.fhir = Some(endpoint(&format!("{}/r4b", harness.server.uri())));
     harness
         .publish(&[Entry::rf2(
             "11000146104",
@@ -188,13 +189,13 @@ async fn a_removed_code_is_reported_as_absent() {
         .mount(&harness.server)
         .await;
     // The code is in neither the value set nor the code system at all.
-    Mock::given(method("GET"))
+    Mock::given(method("POST"))
         .and(path("/r4b/ValueSet/$validate-code"))
-        .and(query_param("code", "22"))
+        .and(body_string_contains(r#""valueCode":"22""#))
         .respond_with(ResponseTemplate::new(200).set_body_string(result(false)))
         .mount(&harness.server)
         .await;
-    Mock::given(method("GET"))
+    Mock::given(method("POST"))
         .and(path("/r4b/ValueSet/$validate-code"))
         .respond_with(ResponseTemplate::new(200).set_body_string(result(true)))
         .mount(&harness.server)
@@ -244,7 +245,7 @@ async fn the_check_is_reported_as_not_run_without_a_fhir_base() {
             .revalidation
             .skipped
             .as_deref()
-            .is_some_and(|reason| reason.contains("fhir_base_url")),
+            .is_some_and(|reason| reason.contains("[fhir] url")),
         "the record says why the check did not run: {:?}",
         record.revalidation
     );
@@ -253,7 +254,7 @@ async fn the_check_is_reported_as_not_run_without_a_fhir_base() {
 #[tokio::test]
 async fn a_server_that_does_not_answer_leaves_the_release_served() {
     let mut harness = Harness::new().await;
-    harness.config.fhir_base_url = Some(format!("{}/r4b", harness.server.uri()));
+    harness.config.fhir = Some(endpoint(&format!("{}/r4b", harness.server.uri())));
     harness
         .publish(&[Entry::rf2(
             "11000146104",

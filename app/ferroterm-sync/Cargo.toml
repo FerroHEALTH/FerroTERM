@@ -38,7 +38,7 @@ jiff = { workspace = true, features = ["serde"] }
 opentelemetry.workspace = true
 # The revalidation's `$validate-code` and `$expand`, sent as GET requests
 # through the FerroBRIDGE terminology client.
-ferrobridge-term.workspace = true
+ferrobridge-term = { workspace = true, features = ["smart"] }
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
