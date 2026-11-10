@@ -312,6 +312,7 @@ mod tests {
     use ferrohealth_config::provenance::Source;
     use ferrohealth_secret::file::SecretError;
     use ferrohealth_secret::secret::Secret;
+    use ferrohealth_secret::secret_url::SecretUrl;
     use ferrohealth_session::config::{ConfigError, OidcSection};
 
     use super::Settings;
@@ -332,9 +333,9 @@ mod tests {
         Config {
             oidc: Some(OidcSection {
                 issuer: String::from("https://idp.example"),
-                authorization_endpoint: Some(String::from("https://idp.example/authorize")),
-                token_endpoint: Some(String::from("https://idp.example/token")),
-                jwks_uri: Some(String::from("https://idp.example/jwks")),
+                authorization_endpoint: Some(SecretUrl::new("https://idp.example/authorize")),
+                token_endpoint: Some(SecretUrl::new("https://idp.example/token")),
+                jwks_uri: Some(SecretUrl::new("https://idp.example/jwks")),
                 client_id: String::from("ferroterm-console"),
                 client_secret: inline.map(Secret::new),
                 client_secret_file: file.map(Path::to_path_buf),
@@ -621,7 +622,7 @@ mod tests {
             }
         };
         let plain =
-            refused(|oidc| oidc.token_endpoint = Some(String::from("http://idp.example/t")));
+            refused(|oidc| oidc.token_endpoint = Some(SecretUrl::new("http://idp.example/t")));
         assert!(
             matches!(&plain, ConfigError::UrlShape { key, .. } if *key == "oidc.token_endpoint"),
             "{plain:?}"

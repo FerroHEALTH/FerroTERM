@@ -7,6 +7,7 @@
 
 use axum::body::Body;
 use ferrohealth_secret::secret::Secret;
+use ferrohealth_secret::secret_url::SecretUrl;
 use ferrohealth_session::config::OidcSection;
 use http::header::{AUTHORIZATION, COOKIE};
 use http::{Request, StatusCode};
@@ -34,9 +35,9 @@ fn sign_out(cookies: &[String], site: &str) -> Request<Body> {
 /// The `[oidc]` section with the end-session and revocation endpoints.
 fn full(provider: &Provider) -> OidcSection {
     OidcSection {
-        end_session_endpoint: Some(provider.url(END_SESSION_PATH)),
+        end_session_endpoint: Some(SecretUrl::new(provider.url(END_SESSION_PATH))),
         post_logout_redirect_uri: Some(String::from(POST_LOGOUT)),
-        revocation_endpoint: Some(provider.url(REVOCATION_PATH)),
+        revocation_endpoint: Some(SecretUrl::new(provider.url(REVOCATION_PATH))),
         ..provider.oidc()
     }
 }
@@ -155,7 +156,7 @@ async fn a_refused_revocation_still_signs_the_operator_out() {
 async fn an_unreachable_revocation_endpoint_still_signs_the_operator_out() {
     let provider = Provider::start().await;
     let oidc = OidcSection {
-        revocation_endpoint: Some(String::from("http://127.0.0.1:9/revoke")),
+        revocation_endpoint: Some(SecretUrl::new(String::from("http://127.0.0.1:9/revoke"))),
         ..full(&provider)
     };
     let state = console(Some(oidc), "").await;
@@ -208,7 +209,7 @@ async fn a_sign_out_on_a_console_without_sign_in_asks_no_provider_and_lands_sign
 async fn the_end_session_request_keeps_the_endpoints_own_query() {
     let provider = Provider::start().await;
     let oidc = OidcSection {
-        end_session_endpoint: Some(provider.url("/end-session?realm=north")),
+        end_session_endpoint: Some(SecretUrl::new(provider.url("/end-session?realm=north"))),
         ..provider.oidc()
     };
     let state = console(Some(oidc), "").await;

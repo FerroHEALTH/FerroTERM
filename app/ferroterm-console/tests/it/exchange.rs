@@ -9,6 +9,7 @@
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 use ferrohealth_secret::secret::Secret;
+use ferrohealth_secret::secret_url::SecretUrl;
 use ferrohealth_session::config::OidcSection;
 use ferrohealth_smart::oidc::{Callback, OidcError, PendingSignIn, RelyingParty, SignedIn};
 use http::StatusCode;
@@ -311,7 +312,7 @@ async fn an_answer_without_an_id_token_is_refused() {
 async fn an_unreachable_token_endpoint_is_a_transport_failure() {
     let provider = Provider::start().await;
     let oidc = OidcSection {
-        token_endpoint: Some(String::from("http://127.0.0.1:9/token")),
+        token_endpoint: Some(SecretUrl::new(String::from("http://127.0.0.1:9/token"))),
         ..provider.oidc()
     };
     let error = exchange(oidc, &pending()).await.expect_err("unreachable");
@@ -363,7 +364,7 @@ async fn an_unreachable_key_set_is_a_transport_failure() {
     let provider = Provider::bare().await;
     let pending = pending();
     let oidc = OidcSection {
-        jwks_uri: Some(String::from("http://127.0.0.1:9/jwks.json")),
+        jwks_uri: Some(SecretUrl::new(String::from("http://127.0.0.1:9/jwks.json"))),
         ..provider.oidc()
     };
     let id_token = provider.id_token(&provider.claims(pending.nonce()));

@@ -1,5 +1,5 @@
 - The synchronisation service calls the Nationale Terminologie Server
-  through the family outbound client of ferrohealth-smart 0.16.3, built
+  through the family outbound client of ferrohealth-smart 0.17, built
   from `[nts]`, which is now the family endpoint table: `url`, `timeout`
   (`"1h"`, since a download of a whole edition is one call),
   `connect_timeout` (`"30s"`), `retry`, `tls` and the client credentials
