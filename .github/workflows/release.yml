@@ -62,7 +62,7 @@ jobs:
   plan:
     name: plan
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 60
     permissions:
       contents: read
       issues: read # the milestone titled as the tag
@@ -115,6 +115,20 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
+
+      # The SemVer judge of the published crates (check_crate_semver) builds
+      # each crate and its newest release on crates.io, at the pinned
+      # cargo-semver-checks (docs/VERSIONS.md).
+      # No cache in the release lane (.claude/rules/ci-cd.md).
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
+        with:
+          cache: false
+      - id: semver-pin
+        name: Read the cargo-semver-checks pin
+        run: echo "version=$(bash scripts/checks/semver.sh --pin)" >> "$GITHUB_OUTPUT"
+      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+        with:
+          tool: cargo-semver-checks@${{ steps.semver-pin.outputs.version }}
 
       # Every release fact, verified at the tagged commit before anything is
       # built: the milestone, the version, the changelog structure and its

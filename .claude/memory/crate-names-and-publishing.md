@@ -21,8 +21,10 @@ active crates; `ecl`, `fhir`, `fhir-model`, `fhir-rs`, `rrf` are taken.
 
 The crates have their own lockstep version line (0.1.0 first), separate from
 the product version; `scripts/checks/crate-version-guard.sh` (CI job and push
-hook) forces a bump when packaged content changes, `no-crate-bump` is the
-label escape. Publishing: `scripts/release/publish-crates.sh` per crate in
+hook) forces a bump when packaged content changes, by the step Cargo SemVer
+asks for and `cargo-semver-checks` judges (owner decision 2026-11-10, #1208:
+the patch for a compatible change, the minor at patch 0 for a breaking one),
+and `no-crate-bump` is the label escape. Publishing: `scripts/release/publish-crates.sh` per crate in
 dependency order; the `crates` leg of release.yml and `publish-crates.yml`
 use Trusted Publishing in the `crates-io` environment (owner is the required
 reviewer). The rule is `.claude/rules/crates-publishing.md`.

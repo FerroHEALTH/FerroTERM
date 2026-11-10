@@ -223,10 +223,13 @@ ahead of it, so the strict up-to-date policy is off and no pull request needs
 a rebase just because another one merged first.
 
 `ci.yml` runs on `merge_group`, and the `conclusion` job reports on the queued
-commit. The jobs that read a pull-request payload (`crate-version-guard`,
-`changelog-guard`, `dependency-review`) skip on a merge
-group: each pull request passed them on its own before it joined the queue, and
-`conclusion` counts a skip as a pass.
+commit. The jobs that read a pull-request payload (`changelog-guard`,
+`dependency-review`) skip on a merge group: each pull request passed them on
+its own before it joined the queue, and `conclusion` counts a skip as a pass.
+`crate-version-guard` runs in the merge group too, against the queue base, so
+a crate line the entries ahead already reached fails before it merges, and
+`cargo-semver-checks` judges the merged tree's public APIs against that base
+(#1208).
 
 The merge queue proves the merged tree, never the performance. Every
 pull-request run and every merge-group run of `ci.yml` finishes in under 20
