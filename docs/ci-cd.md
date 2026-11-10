@@ -20,7 +20,7 @@ exist.
 | `ci.yml` (`guards` job) | every committed guard and self-test of the workflow tier, one step each under `!cancelled()`, so one failing guard still lets every other report; hosted runners are shared across the organisation, and one job waits for one runner where fourteen jobs waited for fourteen (#1189) | now |
 | `ci.yml` (Rust lanes) | fmt, clippy `-D warnings`, nextest `--locked` + doctests, rustdoc `-D warnings`, `cargo deny` with no stale advisory exception (`advisory-exceptions.sh`) and every VEX statement's dependency path against the graph (`vex-reachability.sh`), MSRV (`cargo hack check --rust-version`), dependency-review (PR) | on workspace |
 | `ci.yml` (`versions` step of `guards`) | `scripts/checks/versions.sh`, version-drift guard | now |
-| `pr-guards.yml` | on a label change, re-runs the guard it affects (`changelog-guard`, `crate-version-guard`) in the head commit's CI run once that run completes | now |
+| `pr-guards.yml` | on a label change and on the completion of a pull request's CI run, re-runs the guard a label change made stale (`changelog-guard`, `crate-version-guard`) in the head commit's CI run, without waiting for that run | now |
 | `scorecard.yml` | OpenSSF Scorecard, results published, SARIF → code scanning | now |
 | `codeql.yml` | CodeQL: `actions` now, `rust` self-activates when the workspace lands | actions now |
 | `sonar.yml` | SonarQube Cloud (advisory; `.claude/rules/ai-code-review.md`) | now (sweep); coverage of the workspace tests and of the console under the browser journeys (`scripts/ui-e2e-coverage.sh`) |
@@ -249,9 +249,15 @@ The pull-request trigger lists `opened`, `synchronize` and `reopened` only, so
 a commit gets one CI run: a label event would start a second run on the same
 commit, the concurrency group would cancel the first, and its `conclusion`
 would report a failure. The guards read their escape labels from the API when
-they run. `pr-guards.yml` listens for `labeled` and `unlabeled`, waits for the CI run on the head commit to
-complete, and re-runs the guard the change affects, which re-runs `conclusion`
-with it (<https://docs.github.com/en/rest/actions/workflow-runs#re-run-a-job-from-a-workflow-run>).
+they run. `pr-guards.yml` listens for `labeled` and `unlabeled` and for the
+completion of a pull request's CI run (`workflow_run`), and re-runs a guard
+whose label changed after the guard job started when the labels now flip its
+verdict, which re-runs `conclusion` with it
+(<https://docs.github.com/en/rest/actions/workflow-runs#re-run-a-job-from-a-workflow-run>).
+It never waits for CI: on a label event while the CI run is in flight it
+exits, and that run's completion starts it again, so it holds a runner for
+seconds (#1224). The `workflow_run` job runs main's copy with a write token,
+checks nothing out and reads the pull request through the API only.
 
 ## Owner actions (one-time, cannot be scripted)
 

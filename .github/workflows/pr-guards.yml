@@ -2,72 +2,84 @@
 # SPDX-License-Identifier: BUSL-1.1
 
 # Re-runs a pull-request guard of ci.yml when the label it reads changes
-# (#848).
+# (#848), without holding a runner while CI runs (#1224).
 #
 # ci.yml runs on `opened`, `synchronize` and `reopened` only. A label event
-# would start a second run on the same commit, the
-# concurrency group would cancel the first, and that run's `conclusion`, the
-# required check, would report a failure. The guards read their escape labels
-# from the API when they run instead. When one of those changes, this job waits for the CI run on the head commit to complete and
-# re-runs each guard whose verdict may no longer hold. Re-running a job
-# re-runs its dependent jobs ("Re-run a job and its dependent jobs in a
-# workflow run", https://docs.github.com/en/rest/actions/workflow-runs#re-run-a-job-from-a-workflow-run),
+# would start a second run on the same commit, the concurrency group would
+# cancel the first, and that run's `conclusion`, the required check, would
+# report a failure.
+# Its two guards read their escape labels from the API when they run instead
+# (`no-changelog` for changelog-guard, `no-crate-bump` for
+# crate-version-guard), and this workflow re-runs a guard whose verdict a
+# later label change may have flipped. Re-running a job
+# re-runs its dependent jobs (the REST API, re-run a job from a workflow run),
 # so `conclusion` reports again in the same run.
 #
-# Nothing a merge depends on is decided here: each guard reads the pull
-# request itself, and `conclusion` fails until a re-run passes. A pull request
-# from a fork gets a read-only token, so a maintainer re-runs the guard by
-# hand.
+# Two events start the one job, and neither waits for anything: the label
+# event, which acts when the CI run on the head has already completed, and
+# the completion of a CI run (`workflow_run`), which acts on a label changed
+# while that run was in flight and on the next stale guard after a re-run.
+# The job judges from the state of the pull request, never from the event: a
+# guard is stale when its label changed after the guard job started and the
+# labels now can flip its verdict (a failure with the escape set, a pass with
+# it removed). It re-runs the first stale guard and exits; the completion of
+# that re-run brings the next. A re-run guard started after the change, so
+# nothing loops.
+#
+# This job decides nothing a merge depends on: the guard reads the labels
+# itself, and `conclusion` fails until a re-run passes. The `workflow_run`
+# job runs main's copy of this file with a write token, checks nothing out
+# and reads the pull request through the API only. A pull request from a
+# fork gets a read-only token on its label event, so a label changed on a
+# fork after its CI run completed needs a maintainer to re-run the guard by
+# hand. No specification governs this: our own design.
 name: PR guards
 
 on:
   pull_request:
     branches: [main]
     types: [labeled, unlabeled]
+  # The job reads run and pull-request state through the API and re-runs a
+  # job; it checks nothing out and runs no pull-request code.
+  workflow_run: # zizmor: ignore[dangerous-triggers] API reads and a job re-run only, no pull-request code
+    workflows: [CI]
+    types: [completed]
 
 concurrency:
-  # One group per pull request and label, so two labels added together each
-  # get their guard re-run; toggling the same label again supersedes.
-  group: pr-guards-${{ github.event.pull_request.number }}-${{ github.event.label.name }}
-  cancel-in-progress: true
+  # One check at a time per head commit, each reading the state it finds; a
+  # newer pending check replaces an older one, which judged nothing yet.
+  group: pr-guards-${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
 
 permissions: {}
 
 jobs:
   rerun:
     name: pr-guards
-    if: contains(fromJSON('["no-changelog", "no-crate-bump"]'), github.event.label.name)
+    if: >-
+      (github.event_name == 'pull_request'
+        && contains(fromJSON('["no-changelog", "no-crate-bump"]'), github.event.label.name))
+      || (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request')
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 15
     permissions:
-      actions: write # read the CI run and re-run its guard jobs
-      pull-requests: read # the head commit of the pull request now
+      actions: write # read the CI run and re-run one of its jobs
+      pull-requests: read # the head and the labels of the pull request
     steps:
-      - name: Re-run the guards the change affects once the CI run completes
+      - name: Re-run the first guard a later label change made stale
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          PR: ${{ github.event.pull_request.number }}
-          HEAD: ${{ github.event.pull_request.head.sha }}
-          ACTION: ${{ github.event.action }}
-          LABEL: ${{ github.event.label.name }}
+          PR: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha }}
+          RUN: ${{ github.event.workflow_run.id }}
         run: |
           set -euo pipefail
-          case "${ACTION}:${LABEL}" in
-            *:no-changelog) guards=(changelog-guard) ;;
-            *:no-crate-bump) guards=(crate-version-guard) ;;
-            *) echo "::error::no guard reads ${ACTION} ${LABEL}"; exit 1 ;;
-          esac
-
-          # A label added can only turn a failure into a pass and a label
-          # removed only a pass into a failure.
-          stale() {
-            case "${ACTION}:$1" in
-              labeled:failure | unlabeled:success) return 0 ;;
-              *) return 1 ;;
-            esac
-          }
-
+          # Each guard job and the label that escapes it.
+          guards=(
+            "changelog-guard no-changelog"
+            "crate-version-guard no-crate-bump"
+          )
           # Every API read goes through retry: GitHub answers 5xx bursts of a minute
           # or more, so it backs off for about five minutes before failing the job.
           retry() {
@@ -84,64 +96,95 @@ jobs:
             printf '%s\n' "${out}"
           }
 
-          run=""
-          for _ in $(seq 1 30); do
-            run=$(retry gh run list --workflow ci.yml --commit "${HEAD}" --event pull_request \
+          if [ -z "${PR}" ]; then
+            # A CI run from a fork names no pull request; its head commit does.
+            open=$(retry gh pr list --state open --search "${HEAD}" --json number,headRefOid) || exit 1
+            PR=$(jq -r --arg h "${HEAD}" '[.[] | select(.headRefOid == $h)][0].number // empty' <<<"${open}")
+            if [ -z "${PR}" ]; then
+              echo "no open pull request has ${HEAD} as its head"
+              exit 0
+            fi
+          fi
+          if [ -z "${RUN}" ]; then
+            RUN=$(retry gh run list --workflow ci.yml --commit "${HEAD}" --event pull_request \
               --limit 1 --json databaseId --jq '.[0].databaseId // empty') || exit 1
-            [ -n "${run}" ] && break
-            sleep 10
-          done
-          if [ -z "${run}" ]; then
-            echo "::error::no CI run on ${HEAD} to re-run ${guards[*]} in"
-            exit 1
+            if [ -z "${RUN}" ]; then
+              echo "no CI run on ${HEAD} yet; the run that starts on it reads the labels itself"
+              exit 0
+            fi
           fi
 
-          handled=" "
-          for _ in $(seq 1 20); do
-            while :; do
-              status=$(retry gh run view "${run}" --json status --jq .status) || exit 1
-              [ "${status}" = completed ] && break
-              sleep 30
-            done
-            conclusion=$(retry gh run view "${run}" --json conclusion --jq .conclusion) || exit 1
-            if [ "${conclusion}" = "cancelled" ]; then
-              echo "CI run ${run} was cancelled; the run that replaced it reads the pull request itself"
+          state=$(retry gh run view "${RUN}" --json status,conclusion --jq '"\(.status) \(.conclusion)"') || exit 1
+          read -r status conclusion <<<"${state}"
+          if [ "${status}" != completed ]; then
+            echo "CI run ${RUN} is ${status}; its completion checks the guards again"
+            exit 0
+          fi
+          if [ "${conclusion}" = cancelled ]; then
+            echo "CI run ${RUN} was cancelled; a newer run reads the labels itself"
+            exit 0
+          fi
+
+          # The head, the labels now and the label changes, in one read. The
+          # query's variables are GraphQL's.
+          # shellcheck disable=SC2016
+          pull=$(retry gh api graphql -F owner="${GH_REPO%%/*}" -F name="${GH_REPO#*/}" -F number="${PR}" \
+            --jq '.data.repository.pullRequest' -f query='
+            query($owner: String!, $name: String!, $number: Int!) {
+              repository(owner: $owner, name: $name) {
+                pullRequest(number: $number) {
+                  headRefOid
+                  labels(first: 100) { nodes { name } }
+                  timelineItems(last: 100, itemTypes: [LABELED_EVENT, UNLABELED_EVENT]) {
+                    nodes {
+                      ... on LabeledEvent { createdAt label { name } }
+                      ... on UnlabeledEvent { createdAt label { name } }
+                    }
+                  }
+                }
+              }
+            }') || exit 1
+          # Re-running an older commit's run would cancel the newer commit's
+          # run, which shares its concurrency group.
+          if [ "$(jq -r .headRefOid <<<"${pull}")" != "${HEAD}" ]; then
+            echo "the pull request moved past ${HEAD}; the run of its new head reads the labels itself"
+            exit 0
+          fi
+
+          # A failed read is retried, never taken for a missing or settled guard.
+          jobs=$(retry gh run view "${RUN}" --json jobs) || exit 1
+          for entry in "${guards[@]}"; do
+            read -r guard label <<<"${entry}"
+            job=$(jq -c --arg g "${guard}" '[.jobs[] | select(.name == $g)][0] // empty' <<<"${jobs}")
+            if [ -z "${job}" ]; then
+              echo "${guard} is not a job of CI run ${RUN}"
+              continue
+            fi
+            id=$(jq -r .databaseId <<<"${job}")
+            outcome=$(jq -r .conclusion <<<"${job}")
+            started=$(jq -r .startedAt <<<"${job}")
+            # Both sides are UTC instants of one ISO 8601 shape, so they
+            # compare as strings.
+            changed=$(jq -r --arg s "${started}" --arg l "${label}" \
+              'any(.timelineItems.nodes[]; .label.name? == $l and .createdAt > $s)' <<<"${pull}")
+            present=$(jq -r --arg l "${label}" 'any(.labels.nodes[]; .name == $l)' <<<"${pull}")
+            if [ "${changed}" != true ]; then
+              echo "${guard} read the labels as they are now"
+              continue
+            fi
+            # A label added can only turn a failure into a pass and a label
+            # removed only a pass into a failure.
+            case "${present}:${outcome}" in
+              true:failure | false:success) ;;
+              *)
+                echo "${guard} reported ${outcome}, which still holds"
+                continue
+                ;;
+            esac
+            if gh run rerun --job "${id}"; then
+              echo "re-ran ${guard} and its dependents in CI run ${RUN}; that run's completion checks the rest"
               exit 0
             fi
-            # Re-running an older commit's run would cancel the newer commit's
-            # run, which shares its concurrency group.
-            current=$(retry gh api "repos/${GH_REPO}/pulls/${PR}" --jq .head.sha) || exit 1
-            if [ "${current}" != "${HEAD}" ]; then
-              echo "the pull request moved past ${HEAD}; the run of its new head reads the pull request itself"
-              exit 0
-            fi
-            # A failed read is retried, never taken for a missing guard (#850).
-            jobs=$(retry gh run view "${run}" --json jobs \
-              --jq '.jobs[] | "\(.name)\t\(.databaseId) \(.conclusion)"') || exit 1
-            next=""
-            for guard in "${guards[@]}"; do
-              case "${handled}" in *" ${guard} "*) continue ;; esac
-              job="" outcome=""
-              read -r job outcome < <(awk -F '\t' -v g="${guard}" '$1 == g { print $2; exit }' <<<"${jobs}") || true
-              if [ -z "${job}" ]; then
-                echo "${guard} is not a job of CI run ${run}"
-              elif stale "${outcome}"; then
-                next="${job} ${guard}"
-                break
-              else
-                echo "${guard} reported ${outcome}, which still holds after the ${ACTION} event"
-              fi
-              handled+="${guard} "
-            done
-            if [ -z "${next}" ]; then
-              exit 0
-            fi
-            read -r job guard <<<"${next}"
-            if gh run rerun --job "${job}"; then
-              echo "re-ran ${guard} and its dependents in CI run ${run}"
-              handled+="${guard} "
-            fi
-            sleep 15
+            echo "::error::could not re-run ${guard} in CI run ${RUN}; a fork's label event has a read-only token, so re-run it by hand"
+            exit 1
           done
-          echo "::error::could not re-run ${guards[*]} in CI run ${run}; re-run it by hand"
-          exit 1
