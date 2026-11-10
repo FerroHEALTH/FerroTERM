@@ -27,11 +27,13 @@ on:
 
 permissions: {}
 
-# The Pages deployment is serialized on one concurrency group. cancel-in-progress
-# is false so an in-flight deploy finishes rather than being cut off mid-publish.
+# The Pages deployment is serialized on one concurrency group, and
+# cancel-in-progress is false there so an in-flight deploy finishes rather than
+# being cut off mid-publish. A pull request builds in a group of its own, where
+# a newer push cancels the superseded build (#1224).
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'pull_request' && format('docs-pr-{0}', github.ref) || 'pages' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # Render the book and upload it as the Pages artifact. Runs on every event,
