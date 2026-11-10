@@ -11,7 +11,6 @@
 
 use std::collections::BTreeSet;
 
-use ferrohealth_config::removed::{Removals, Removed, RemovedKeys, Retired};
 use ferrohealth_config::units::Duration;
 use ferrohealth_secret::secret_url::SecretUrl;
 use ferrohealth_smart::client::ClientAuth;
@@ -129,18 +128,6 @@ pub fn endpoint() -> EndpointSection {
     }
 }
 
-/// The keys of a source's block 0.4.5 retired, each with the key that took
-/// its place.
-// TODO(#1202): the refusals ship in 0.4.5 alone; delete them in 0.4.6.
-pub const RETIRED: [Retired; 2] = [
-    Retired::replaced("base_url", "nts.url, the service's base URL", "0.4.5"),
-    Retired::replaced(
-        "issuer",
-        "nts.credentials.oauth.issuer, the issuer the tokens come from",
-        "0.4.5",
-    ),
-];
-
 /// The add-on's configuration, one source's block.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -158,10 +145,6 @@ pub struct NtsConfig {
     pub systems: BTreeSet<String>,
     /// The category terms the run takes, as the feed writes them.
     pub categories: BTreeSet<String>,
-    /// `base_url`, which `[nts] url` replaced in 0.4.5.
-    pub base_url: Removed,
-    /// `issuer`, which `[nts.credentials.oauth] issuer` replaced in 0.4.5.
-    pub issuer: Removed,
 }
 
 impl Default for NtsConfig {
@@ -186,27 +169,11 @@ impl Default for NtsConfig {
             .iter()
             .map(|term| String::from(term.as_str()))
             .collect(),
-            base_url: Removed::default(),
-            issuer: Removed::default(),
         }
     }
 }
 
 impl NtsConfig {
-    /// Refuses every key of the block 0.4.5 retired, each named under
-    /// `table` with its replacement.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`RemovedKeys`] naming each retired key the block sets.
-    pub fn check(&self, table: &str) -> Result<(), RemovedKeys> {
-        let mut removals = Removals::new();
-        for (removed, retired) in [self.base_url, self.issuer].into_iter().zip(&RETIRED) {
-            removals.check_under(removed, retired, table);
-        }
-        removals.finish()
-    }
-
     /// The address of the syndication feed under the service's base URL
     /// `base`.
     #[must_use]
@@ -252,8 +219,7 @@ impl NtsConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::{NTS_BASE_URL, NtsConfig, RETIRED, canonical, endpoint};
-    use ferrohealth_config::removed::stale;
+    use super::{NTS_BASE_URL, NtsConfig, canonical, endpoint};
     use ferrohealth_smart::client::ClientAuth;
     use terminology_syndication::model::CategoryTerm;
 
@@ -350,31 +316,16 @@ mod tests {
     }
 
     #[test]
-    fn a_key_0_4_5_retired_is_refused_naming_its_replacement() {
-        let config: NtsConfig = serde_json::from_str(
-            r#"{"base_url":"https://example.invalid","issuer":"https://example.invalid/realm"}"#,
-        )
-        .expect("the strict load accepts a retired key");
-        let refusal = config
-            .check("source.config")
-            .expect_err("a retired key is refused")
-            .to_string();
-        assert!(refusal.contains("source.config.base_url"), "{refusal}");
-        assert!(refusal.contains("nts.url"), "{refusal}");
-        assert!(refusal.contains("source.config.issuer"), "{refusal}");
-        assert!(
-            refusal.contains("nts.credentials.oauth.issuer"),
-            "{refusal}"
-        );
-        assert!(NtsConfig::default().check("source.config").is_ok());
-    }
-
-    #[test]
-    fn every_retired_key_belongs_to_the_release_being_prepared() {
-        assert!(
-            stale(&RETIRED, "0.4.5").is_empty(),
-            "a refusal lives for the one release that retires its key"
-        );
+    fn a_key_0_4_5_retired_is_an_unknown_key() {
+        for retired in [
+            r#"{"base_url":"https://example.invalid"}"#,
+            r#"{"issuer":"https://example.invalid/realm"}"#,
+        ] {
+            let refusal = serde_json::from_str::<NtsConfig>(retired)
+                .expect_err("the strict load refuses a key it does not know")
+                .to_string();
+            assert!(refusal.contains("unknown field"), "{refusal}");
+        }
     }
 
     #[test]

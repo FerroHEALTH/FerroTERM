@@ -15,8 +15,7 @@ authors.workspace = true
 publish = false
 
 [dependencies]
-# The refusal of a retired key of a source's block, and the units of the
-# endpoint table's defaults.
+# The units of the endpoint table's defaults.
 ferrohealth-config.workspace = true
 # The redacting types the endpoint table and a request's token are held in.
 ferrohealth-secret.workspace = true

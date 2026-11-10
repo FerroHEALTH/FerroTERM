@@ -59,9 +59,6 @@ pub enum Error {
         /// The key.
         key: String,
     },
-    /// Keys the console no longer reads, each named with its replacement.
-    #[error(transparent)]
-    Removed(#[from] ferrohealth_config::removed::RemovedKeys),
     /// An endpoint table whose timeouts or retry break a rule.
     #[error("`{key}` is refused")]
     Endpoint {

@@ -13,10 +13,11 @@
 
 use core::fmt;
 
+use ferrohealth_smart::config::endpoint::EndpointSection;
 use terminology_syndication::select::{Holdings, Selection, Subscription};
 use terminology_syndication::source::Source;
 
-use crate::config::{NtsSection, SourceConfig};
+use crate::config::SourceConfig;
 
 /// A FHIR resource file a service publishes with a correction it needs.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -153,12 +154,11 @@ pub const KINDS: [&str; 1] = ["nts"];
 ///
 /// Returns [`RegistryError::UnknownKind`] when no add-on reads that kind,
 /// [`RegistryError::Config`] when the add-on's own block does not read, and
-/// [`RegistryError::Build`] when the add-on cannot be built: a retired key
-/// of its block, an endpoint table naming no client, or a secret that does
-/// not read.
+/// [`RegistryError::Build`] when the add-on cannot be built: an endpoint
+/// table naming no client, or a secret that does not read.
 pub fn configure(
     sources: &[SourceConfig],
-    nts: &NtsSection,
+    nts: &EndpointSection,
 ) -> Result<Vec<ConfiguredSource>, RegistryError> {
     let mut out = Vec::with_capacity(sources.len());
     for source in sources {
@@ -179,7 +179,7 @@ pub fn configure(
 /// and calling the service through the `[nts]` endpoint table `account`.
 fn nts_source(
     source: &SourceConfig,
-    account: &NtsSection,
+    account: &EndpointSection,
 ) -> Result<ConfiguredSource, RegistryError> {
     let config: addon_nts::config::NtsConfig =
         source
@@ -190,7 +190,7 @@ fn nts_source(
                 kind: String::from("nts"),
                 source,
             })?;
-    let built = addon_nts::source::NtsSource::new(&config, &account.endpoint).map_err(|error| {
+    let built = addon_nts::source::NtsSource::new(&config, account).map_err(|error| {
         RegistryError::Build {
             kind: String::from("nts"),
             source: Box::new(error),
@@ -223,7 +223,7 @@ impl Fixups for NtsFixups {
 #[expect(clippy::panic_in_result_fn, reason = "test assertions")]
 mod tests {
     use super::{Fixups, NtsFixups, configure};
-    use crate::config::{NtsSection, SourceConfig};
+    use crate::config::SourceConfig;
 
     #[test]
     fn an_unknown_kind_names_the_kinds_this_build_reads() {
@@ -232,7 +232,7 @@ mod tests {
                 kind: String::from("mlds"),
                 config: toml::Table::new(),
             }],
-            &NtsSection::default(),
+            &addon_nts::config::endpoint(),
         );
         match configured {
             Ok(_) => panic!("a service this build cannot read is refused at start-up"),

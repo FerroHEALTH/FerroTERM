@@ -173,9 +173,7 @@ table leaves out keeps its default: `[server_admin]` keeps the defaults
 above (`timeout = "30min"`, one try, since a reload takes as long as a
 server start), `[nts]` keeps its own (see [Credentials](#credentials)), and
 `[fhir]` and `[webhook]` take the family's
-(`timeout = "10s"`, three tries). In 0.4.5 alone, the earlier keys `server_admin_url`,
-`[server_admin_credentials]`, `fhir_base_url` and `webhook_url` refuse the
-start, each naming its replacement.
+(`timeout = "10s"`, three tries).
 
 ### The credential of the reload call
 
@@ -461,9 +459,6 @@ document, at
 secret in the request body (`client_auth = "client_secret_post"`), and fetches
 a new token a minute before the cached one expires
 (`refresh_margin = "1m"`), so an unattended run on any day needs no person.
-In 0.4.5 alone, the earlier keys `[nts] client_id`, `client_secret` and
-`client_secret_file`, and `base_url` and `issuer` in a `[[source]]` block's
-`config`, refuse the start, each naming its replacement.
 
 ### The first run
 

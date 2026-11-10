@@ -58,7 +58,6 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use ferrohealth_config::loader::{Loaded, Loader};
-use ferrohealth_config::removed::{Removed, Retired};
 use ferrohealth_config::units::Duration;
 use ferrohealth_secret::secret_url::SecretUrl;
 use ferrohealth_session::config::{OidcSection, SessionSection};
@@ -179,14 +178,6 @@ pub struct Ferroterm {
     /// served set; none when unset. The reader's token must carry
     /// `__ferroterm.admin`.
     pub admin: Option<Box<EndpointSection>>,
-    /// `base_url`, which `[ferroterm.server] url` replaced in 0.4.5.
-    pub base_url: Removed,
-    /// `timeout`, which `[ferroterm.server] timeout` replaced in 0.4.5.
-    pub timeout: Removed,
-    /// `sync_url`, which `[ferroterm.sync] url` replaced in 0.4.5.
-    pub sync_url: Removed,
-    /// `admin_url`, which `[ferroterm.admin] url` replaced in 0.4.5.
-    pub admin_url: Removed,
 }
 
 impl Default for Ferroterm {
@@ -200,23 +191,6 @@ impl Default for Ferroterm {
             }),
             sync: None,
             admin: None,
-            base_url: Removed::default(),
-            timeout: Removed::default(),
-            sync_url: Removed::default(),
-            admin_url: Removed::default(),
         }
     }
 }
-
-/// The release these refusals belong to: each lives for that one release.
-pub const PREPARING: &str = "0.4.5";
-
-/// The `[ferroterm]` keys 0.4.5 retired, each with the key that took its
-/// place.
-// TODO(#1202): the refusals ship in 0.4.5 alone; delete them in 0.4.6.
-pub const RETIRED: [Retired; 4] = [
-    Retired::replaced("ferroterm.base_url", "ferroterm.server.url", "0.4.5"),
-    Retired::replaced("ferroterm.timeout", "ferroterm.server.timeout", "0.4.5"),
-    Retired::replaced("ferroterm.sync_url", "ferroterm.sync.url", "0.4.5"),
-    Retired::replaced("ferroterm.admin_url", "ferroterm.admin.url", "0.4.5"),
-];

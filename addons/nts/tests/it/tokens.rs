@@ -242,13 +242,4 @@ async fn a_table_naming_no_client_or_a_block_with_a_retired_key_is_refused() {
         matches!(refused, addon_nts::source::NtsError::NoUsableClient),
         "{refused:?}"
     );
-
-    let retired: addon_nts::config::NtsConfig =
-        serde_json::from_str(r#"{"base_url":"https://example.invalid"}"#).expect("the block reads");
-    let refused = addon_nts::source::NtsSource::new(
-        &retired,
-        &support::endpoint(&server, &support::client_account()),
-    )
-    .expect_err("a retired key of the block is refused");
-    assert!(refused.to_string().contains("nts.url"), "{refused}");
 }

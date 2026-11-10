@@ -98,9 +98,8 @@ ferrohealth-server = { version = "=0.8.1" }
 # binary under `--config` or `<PREFIX>_CONFIG`, `<PREFIX>__SECTION__KEY`
 # overrides, `--set`, strict refusals and provenance, and the `<key>_file`
 # rule with the redacting `Secret`; 0.3 adds the `Duration` and `ByteSize`
-# every span of time and amount of data is written as, the outbound TLS
-# table, and 0.4 the `removed::Retired` declaration of a key retired for one
-# release. Pinned exactly. Verified against crates.io on 2026-11-10.
+# every span of time and amount of data is written as, and the outbound TLS
+# table. Pinned exactly. Verified against crates.io on 2026-11-10.
 ferrohealth-config = { version = "=0.4.1" }
 ferrohealth-secret = { version = "=0.2.0" }
 # The FerroHEALTH telemetry: the `[telemetry]` section, the console, the
