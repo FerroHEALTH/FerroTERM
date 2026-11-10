@@ -13,6 +13,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use ferrohealth_config::units::Duration;
+use ferrohealth_secret::secret_url::SecretUrl;
+use ferrohealth_smart::config::endpoint::EndpointSection;
 use ferroterm_sync::clock::Clock;
 use ferroterm_sync::config::{Activation, Config, ScheduleConfig};
 use ferroterm_sync::run::Service;
@@ -268,7 +270,10 @@ impl Harness {
             std::fs::create_dir_all(root.join(name)).expect("the service directories");
         }
         let config = Config {
-            server_admin_url: server.uri(),
+            server_admin: EndpointSection {
+                url: SecretUrl::new(server.uri()),
+                ..Config::default().server_admin
+            },
             index_root: root.join("index"),
             resources: root.join("codesystems"),
             staging: root.join("staging"),
@@ -276,7 +281,7 @@ impl Harness {
             state: root.join("state"),
             retention: 2,
             activation: Activation::Auto,
-            webhook_url: Some(format!("{}/hook", webhook.uri())),
+            webhook: Some(endpoint(&format!("{}/hook", webhook.uri()))),
             build_command: build_script(root),
             ..Config::default()
         };
@@ -539,4 +544,12 @@ fn telemetry() -> Arc<ferrohealth_telemetry::telemetry::Telemetry> {
         )
         .expect("the default telemetry builds"),
     )
+}
+
+/// The endpoint table of `url`, every other key at its default.
+pub(crate) fn endpoint(url: &str) -> EndpointSection {
+    EndpointSection {
+        url: SecretUrl::new(url),
+        ..EndpointSection::default()
+    }
 }

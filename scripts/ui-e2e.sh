@@ -255,7 +255,7 @@ console() {
   local port="$1" upstream="$2" log="$3"
   shift 3
   env FERROTERM_CONSOLE__SERVER__LISTEN="127.0.0.1:$port" \
-    FERROTERM_CONSOLE__FERROTERM__BASE_URL="$upstream" \
+    FERROTERM_CONSOLE__FERROTERM__SERVER__URL="$upstream" \
     FERROTERM_CONSOLE__SESSION__SECURE_COOKIE=false "$@" \
     target/release/ferroterm-console serve > "$log" 2>&1 &
   pids+=("$!")
@@ -273,7 +273,7 @@ console 13001 http://127.0.0.1:18081/ "$work/console-signed-in.log" \
   FERROTERM_CONSOLE__OIDC__CLIENT_ID=ferroterm-console \
   FERROTERM_CONSOLE__OIDC__REDIRECT_URI=http://127.0.0.1:13001/auth/callback \
   FERROTERM_CONSOLE__OIDC__SCOPES='["openid", "fhirUser", "user/CodeSystem.cud", "user/ValueSet.cud", "user/ConceptMap.cud", "__ferroterm.sync"]' \
-  FERROTERM_CONSOLE__FERROTERM__SYNC_URL=http://127.0.0.1:18090/
+  FERROTERM_CONSOLE__FERROTERM__SYNC__URL=http://127.0.0.1:18090/
 
 "$chromedriver" --port=4444 > "$work/chromedriver.log" 2>&1 &
 pids+=("$!")

@@ -48,9 +48,10 @@ async fn main() -> ExitCode {
         Some(Command::RunOnce) => {
             let config = loaded.into_parts().0;
             match telemetry(&config) {
-                Ok(telemetry) => {
-                    finished(run_once(config, Arc::clone(&telemetry)).await, &telemetry)
-                }
+                Ok(telemetry) => finished(
+                    Box::pin(run_once(config, Arc::clone(&telemetry))).await,
+                    &telemetry,
+                ),
                 Err(code) => code,
             }
         }

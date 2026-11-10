@@ -46,12 +46,6 @@ pub enum Error {
         /// What the key requires.
         reason: &'static str,
     },
-    /// A value that must be positive is zero.
-    #[error("`{key}` must be greater than zero")]
-    Zero {
-        /// The key.
-        key: String,
-    },
     /// A required value is absent.
     #[error("`{key}` is required")]
     Missing {
@@ -62,6 +56,25 @@ pub enum Error {
     /// loopback, where they would travel in the clear.
     #[error("`{key}` may be false only for a console whose redirect_uri is http on loopback")]
     InsecureCookie {
+        /// The key.
+        key: String,
+    },
+    /// Keys the console no longer reads, each named with its replacement.
+    #[error(transparent)]
+    Removed(#[from] ferrohealth_config::removed::RemovedKeys),
+    /// An endpoint table whose timeouts or retry break a rule.
+    #[error("`{key}` is refused")]
+    Endpoint {
+        /// The table's key.
+        key: String,
+        /// The rule it breaks.
+        #[source]
+        source: Box<ferrohealth_smart::config::ConfigError>,
+    },
+    /// An endpoint table with a credential of its own: every call carries
+    /// the signed-in reader's.
+    #[error("`{key}` may not be set: the console calls with the signed-in reader's credential")]
+    Credentials {
         /// The key.
         key: String,
     },

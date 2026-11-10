@@ -74,47 +74,47 @@ toml = { version = "1.1.6", default-features = false, features = ["std", "parse"
 # server and the sync service. Pinned exactly, as every family crate is.
 # 0.13.0 quotes no refused JSON document in its errors (GHSA-mhv7-3975-6xq3)
 # and 0.13.1 keeps no refused key set, introspection or metadata body
-# (GHSA-5qm7-v4fw-p2v9); 0.14 reads its spans of time and its outbound TLS
-# tables as the ferrohealth-config 0.3 types. `server-tls` builds an outbound
-# `tls` table through ferrohealth-server's TlsClient. Verified against
-# crates.io on 2026-11-09.
-ferrohealth-smart = { version = "=0.14.0", features = ["axum", "server-tls"] }
+# (GHSA-5qm7-v4fw-p2v9); 0.15.1 masks an endpoint URL's userinfo
+# (GHSA-vmx8-jr3x-394q); 0.16 builds every outbound integration's client from
+# its endpoint table (`client::outbound::OutboundClient`), on ferrohealth-config
+# 0.4. `server-tls` builds an outbound `tls` table through ferrohealth-server's
+# TlsClient. Verified against crates.io on 2026-11-10.
+ferrohealth-smart = { version = "=0.16.1", features = ["axum", "server-tls"] }
 # The FerroHEALTH console sign-in and session: the authorization code flow
 # with PKCE over ferrohealth-smart's relying party, the session store with
 # its idle and absolute lifetimes, and the four sign-in routes. Pinned
-# exactly, at the release beside ferrohealth-smart 0.14, whose `oidc` types
-# it carries. Verified against crates.io on 2026-11-09.
-ferrohealth-session = { version = "=0.8.0", features = ["axum"] }
+# exactly, at the release beside ferrohealth-smart 0.16, whose `oidc` types
+# it carries. Verified against crates.io on 2026-11-10.
+ferrohealth-session = { version = "=0.10.0", features = ["axum"] }
 # The FerroHEALTH health family: the readiness document, the indicator
 # registry and the process lifecycle, and the HTTP plumbing whose `health`
 # module serves `/health`, `/health/liveness` and `/health/readiness` over
-# them. Pinned exactly; 0.7.1 adds `telemetry::build` (feature `otlp`), which
-# reads the OTLP collector's TLS table for the binaries. Verified against
-# crates.io on 2026-11-09.
+# them. Pinned exactly; 0.8 builds on ferrohealth-config 0.4, and 0.8.1 adds
+# the run-path calls (`run::config_check`, `telemetry::install`). Verified
+# against crates.io on 2026-11-10.
 ferrohealth-health = { version = "=0.1.1", features = ["registry"] }
-ferrohealth-server = { version = "=0.7.1" }
+ferrohealth-server = { version = "=0.8.1" }
 # The FerroHEALTH configuration loader and its secrets: one TOML tree per
 # binary under `--config` or `<PREFIX>_CONFIG`, `<PREFIX>__SECTION__KEY`
 # overrides, `--set`, strict refusals and provenance, and the `<key>_file`
 # rule with the redacting `Secret`; 0.3 adds the `Duration` and `ByteSize`
 # every span of time and amount of data is written as, the outbound TLS
-# table and the refusal of a retired key. Pinned exactly. Verified against
-# crates.io on 2026-11-09.
-ferrohealth-config = { version = "=0.3.0" }
+# table, and 0.4 the `removed::Retired` declaration of a key retired for one
+# release. Pinned exactly. Verified against crates.io on 2026-11-10.
+ferrohealth-config = { version = "=0.4.1" }
 ferrohealth-secret = { version = "=0.2.0" }
 # The FerroHEALTH telemetry: the `[telemetry]` section, the console, the
 # panic line, the request log with its product fields, and the one
 # OpenTelemetry provider read by Prometheus and pushed over OTLP. Each member
-# names the features it uses. Pinned exactly; 0.3 reads no TLS file and
-# dials an `https://` collector over the configuration the product builds.
-# Verified against crates.io on 2026-11-09.
-ferrohealth-telemetry = { version = "=0.3.0" }
+# names the features it uses. Pinned exactly; 0.4 builds on
+# ferrohealth-config 0.4. Verified against crates.io on 2026-11-10.
+ferrohealth-telemetry = { version = "=0.4.0" }
 # The FerroHEALTH usage report to FerroPULSE: envelope v2, the reporter, the
 # instance id and start claim, CI detection and the latency window, which
-# with `telemetry` records what the request log sees. Pinned exactly; 0.3
-# builds that window on ferrohealth-telemetry 0.3. Verified against crates.io
-# on 2026-11-09.
-ferrohealth-usage-report = { version = "=0.3.0" }
+# with `telemetry` records what the request log sees. Pinned exactly; 0.4
+# builds that window on ferrohealth-telemetry 0.4. Verified against crates.io
+# on 2026-11-10.
+ferrohealth-usage-report = { version = "=0.4.0" }
 # The Argon2id hashes of the Basic users the SMART tests configure, the
 # version and features ferrohealth-smart verifies them with. Verified against
 # crates.io on 2026-10-20.
@@ -191,31 +191,33 @@ tempfile = "3.27.0"
 # recorded in docs/VERSIONS.md and `scripts/checks/versions.sh` fails when the
 # manifest, the lock, and that table disagree. It names the four releases the
 # server mounts; nothing here reads the STU3 model its default adds.
-fhir-types = { version = "0.1.129", default-features = false, features = ["r4", "r4b", "r5", "r6", "terminology"] }
+fhir-types = { version = "0.1.130", default-features = false, features = ["r4", "r4b", "r5", "r6", "terminology"] }
 # The FHIR terminology client the console and the sync service send their
 # operations through, published by the FerroBRIDGE repository: the request each
 # release writes and the answer it reads, with or without its own transport.
 # Each FHIR release is its own feature: the same four, which the console offers.
-ferrobridge-term = { version = "0.1.148", default-features = false, features = ["r4", "r4b", "r5", "r6"] }
+# 0.3 builds its client from a ferrohealth-smart 0.16 endpoint table
+# (`Client::from_endpoint`, feature `smart`, which the sync service turns on).
+ferrobridge-term = { version = "0.3.0", default-features = false, features = ["r4", "r4b", "r5", "r6"] }
 # Workspace-internal crates. The `crates/*` members carry the published crate
 # line (lockstep, bumped with their packaged content, never the product
 # version); the tools stay on the workspace version.
-rf2 = { path = "crates/rf2", version = "0.1.147" }
-loinc = { path = "crates/loinc", version = "0.1.147" }
-classification = { path = "crates/classification", version = "0.1.147" }
-dhd-thesaurus = { path = "crates/dhd-thesaurus", version = "0.1.147" }
-gstandaard = { path = "crates/gstandaard", version = "0.1.147" }
-labcodeset = { path = "crates/labcodeset", version = "0.1.147" }
-icd11 = { path = "crates/icd11", version = "0.1.147" }
-rxnorm-rrf = { path = "crates/rxnorm-rrf", version = "0.1.147" }
-concept-graph = { path = "crates/concept-graph", version = "0.1.147" }
-concept-store = { path = "crates/concept-store", version = "0.1.147" }
-designation-index = { path = "crates/designation-index", version = "0.1.147" }
-sct-ecl = { path = "crates/sct-ecl", version = "0.1.147" }
-sct-scg = { path = "crates/sct-scg", version = "0.1.147" }
-fhir-terminology = { path = "crates/fhir-terminology", version = "0.1.147" }
-terminology-syndication = { path = "crates/terminology-syndication", version = "0.1.147" }
-ferroterm-problem = { path = "crates/ferroterm-problem", version = "0.1.147" }
+rf2 = { path = "crates/rf2", version = "0.1.148" }
+loinc = { path = "crates/loinc", version = "0.1.148" }
+classification = { path = "crates/classification", version = "0.1.148" }
+dhd-thesaurus = { path = "crates/dhd-thesaurus", version = "0.1.148" }
+gstandaard = { path = "crates/gstandaard", version = "0.1.148" }
+labcodeset = { path = "crates/labcodeset", version = "0.1.148" }
+icd11 = { path = "crates/icd11", version = "0.1.148" }
+rxnorm-rrf = { path = "crates/rxnorm-rrf", version = "0.1.148" }
+concept-graph = { path = "crates/concept-graph", version = "0.1.148" }
+concept-store = { path = "crates/concept-store", version = "0.1.148" }
+designation-index = { path = "crates/designation-index", version = "0.1.148" }
+sct-ecl = { path = "crates/sct-ecl", version = "0.1.148" }
+sct-scg = { path = "crates/sct-scg", version = "0.1.148" }
+fhir-terminology = { path = "crates/fhir-terminology", version = "0.1.148" }
+terminology-syndication = { path = "crates/terminology-syndication", version = "0.1.148" }
+ferroterm-problem = { path = "crates/ferroterm-problem", version = "0.1.148" }
 # The source add-ons. Path-only and never published; only app/ferroterm-sync
 # may take one (scripts/checks/addon-boundary.sh).
 addon-nts = { path = "addons/nts" }

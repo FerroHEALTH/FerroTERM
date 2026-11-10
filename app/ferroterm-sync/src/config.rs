@@ -20,12 +20,13 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
 
 use ferrohealth_config::loader::{Loaded, Loader};
+use ferrohealth_config::removed::{Removals, Removed, RemovedKeys, Retired};
 use ferrohealth_config::units::Duration;
 use ferrohealth_secret::file::{SecretError, read_secret};
 use ferrohealth_secret::secret::Secret;
-use ferrohealth_smart::client::ClientCredentials;
-use ferrohealth_smart::config::credentials::OauthSection;
-use ferrohealth_smart::config::{AuthSection, ServerTls};
+use ferrohealth_secret::secret_url::SecretUrl;
+use ferrohealth_smart::config::AuthSection;
+use ferrohealth_smart::config::endpoint::{EndpointSection, RetrySection};
 use ferrohealth_telemetry::section::TelemetrySection;
 
 /// The environment prefix: `FERROTERM_SYNC__SCHEDULE__EVERY` sets
@@ -133,14 +134,14 @@ impl NtsSection {
 pub struct Config {
     /// The address the service's own admin listener binds.
     pub listen: SocketAddr,
-    /// The base address of the server's admin listener, which serves
-    /// `POST /reload`.
-    pub server_admin_url: String,
-    /// The FHIR base of the server, such as `http://127.0.0.1:8080/r4b`.
-    ///
-    /// It is what the revalidation reads after a release is activated. With
-    /// no address the check does not run and the run record says so.
-    pub fhir_base_url: Option<String>,
+    /// `[server_admin]`: the server's admin listener, which serves
+    /// `POST /reload`, with the timeout, TLS and credential of the call.
+    pub server_admin: EndpointSection,
+    /// `[fhir]`: the FHIR base of the server, such as
+    /// `http://127.0.0.1:8080/r4b`, which the revalidation reads after a
+    /// release is activated. Unset, the check does not run and the run
+    /// record says so.
+    pub fhir: Option<EndpointSection>,
     /// The index root the server reads, one directory per built release.
     pub index_root: PathBuf,
     /// The managed resource directory the server reads FHIR resources from.
@@ -155,18 +156,14 @@ pub struct Config {
     pub retention: usize,
     /// How a staged release reaches the served set.
     pub activation: Activation,
-    /// The address one JSON summary per run is posted to.
-    pub webhook_url: Option<String>,
+    /// `[webhook]`: where one JSON summary per run is posted.
+    pub webhook: Option<EndpointSection>,
     /// The time zone a daily schedule is read in, an IANA zone name.
     pub timezone: String,
     /// The offline build binary, found on `PATH` when it is a bare name.
     pub build_command: PathBuf,
     /// When a run starts by itself.
     pub schedule: ScheduleConfig,
-    /// The credential the reload call to the server's admin listener carries:
-    /// the client credentials grant under `oauth`, none when the table is
-    /// empty.
-    pub server_admin_credentials: AdminCredentials,
     /// The credentials the admin listener admits: the issuers whose access
     /// tokens it accepts, the Basic users, and the product scope every route
     /// but `GET /health` requires ([`crate::auth`]).
@@ -178,14 +175,58 @@ pub struct Config {
     pub source: Vec<SourceConfig>,
     /// `[telemetry]`: the console log and the metrics export.
     pub telemetry: TelemetrySection,
+    /// `server_admin_url`, which `[server_admin] url` replaced in 0.4.5.
+    pub server_admin_url: Removed,
+    /// `[server_admin_credentials]`, which `[server_admin.credentials]`
+    /// replaced in 0.4.5.
+    pub server_admin_credentials: Removed,
+    /// `fhir_base_url`, which `[fhir] url` replaced in 0.4.5.
+    pub fhir_base_url: Removed,
+    /// `webhook_url`, which `[webhook] url` replaced in 0.4.5.
+    pub webhook_url: Removed,
 }
+
+/// The release these refusals belong to: each lives for that one release.
+pub const PREPARING: &str = "0.4.5";
+
+/// The keys 0.4.5 retired, each with the key that took its place.
+// TODO(#1202): the refusals ship in 0.4.5 alone; delete them in 0.4.6.
+pub const RETIRED: [Retired; 4] = [
+    Retired::replaced(
+        "server_admin_url",
+        "server_admin.url, the admin listener's base URL",
+        "0.4.5",
+    ),
+    Retired::replaced(
+        "server_admin_credentials",
+        "server_admin.credentials, the same table under [server_admin]",
+        "0.4.5",
+    ),
+    Retired::replaced("fhir_base_url", "fhir.url, the server's FHIR base", "0.4.5"),
+    Retired::replaced(
+        "webhook_url",
+        "webhook.url, the address the summary is posted to",
+        "0.4.5",
+    ),
+];
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             listen: SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8181),
-            server_admin_url: String::from("http://127.0.0.1:8081"),
-            fhir_base_url: None,
+            // A reload opens every artifact again, which takes as long as a
+            // start, so the call waits far longer than an ordinary request and
+            // is not repeated.
+            server_admin: EndpointSection {
+                url: SecretUrl::new("http://127.0.0.1:8081"),
+                timeout: Duration::from_mins(30),
+                retry: RetrySection {
+                    max_attempts: 1,
+                    ..RetrySection::default()
+                },
+                ..EndpointSection::default()
+            },
+            fhir: None,
             index_root: PathBuf::from("/data/index"),
             resources: PathBuf::from("/data/codesystems"),
             staging: PathBuf::from("/data/staging"),
@@ -193,49 +234,19 @@ impl Default for Config {
             state: PathBuf::from("/data/state"),
             retention: 2,
             activation: Activation::Auto,
-            webhook_url: None,
+            webhook: None,
             timezone: String::from("UTC"),
             build_command: PathBuf::from("ferroterm-build"),
             schedule: ScheduleConfig::default(),
             source: Vec::new(),
             nts: NtsSection::default(),
-            server_admin_credentials: AdminCredentials::default(),
             auth: AuthSection::default(),
             telemetry: TelemetrySection::default(),
+            server_admin_url: Removed::default(),
+            server_admin_credentials: Removed::default(),
+            fhir_base_url: Removed::default(),
+            webhook_url: Removed::default(),
         }
-    }
-}
-
-/// The `[server_admin_credentials]` table: the OAuth 2.0 client credentials
-/// grant (RFC 6749 §4.4) the reload call is made under, in
-/// `[server_admin_credentials.oauth]`.
-///
-/// The reload is a machine's call, so the table takes no HTTP Basic `user`
-/// and `password`, which a `ferrohealth-smart` 0.9.0 server admits as a
-/// person: a file that still sets them fails to load naming `oauth` (no
-/// specification governs the table: our own design).
-#[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct AdminCredentials {
-    /// The client credentials grant; absent for a call with no credential.
-    pub oauth: Option<OauthSection>,
-}
-
-impl AdminCredentials {
-    /// The grant the table names, its secrets read; `None` when it names
-    /// none.
-    ///
-    /// # Errors
-    ///
-    /// Returns the `ferrohealth-smart` refusal of a table that breaks a rule,
-    /// such as a secret set inline and through its file.
-    pub fn resolve(
-        &self,
-    ) -> Result<Option<ClientCredentials>, ferrohealth_smart::config::ConfigError> {
-        self.oauth
-            .as_ref()
-            .map(|oauth| oauth.resolve_with_tls(&ServerTls))
-            .transpose()
     }
 }
 
@@ -246,6 +257,15 @@ pub enum ConfigError {
     /// variable, or a value of the wrong type.
     #[error(transparent)]
     Load(#[from] ferrohealth_config::error::ConfigError),
+    /// Keys the service no longer reads, each named with its replacement.
+    #[error(transparent)]
+    Removed(#[from] RemovedKeys),
+    /// HTTP Basic on the reload call: the reload is a machine's call, and a
+    /// Basic credential is a person's, so the table takes only `oauth`.
+    #[error(
+        "[server_admin.credentials] takes no Basic user or password: write the client credentials grant under oauth"
+    )]
+    BasicReload,
     /// The schedule the tree describes does not read.
     #[error("the schedule does not read")]
     Schedule {
@@ -272,25 +292,21 @@ impl Config {
     ///
     /// # Errors
     ///
-    /// Returns [`ConfigError::Load`] when the tree does not load, and
-    /// [`ConfigError::Schedule`] when the schedule it describes does not.
+    /// Returns [`ConfigError::Load`] when the tree does not load,
+    /// [`ConfigError::Removed`] for a key 0.4.5 retired,
+    /// [`ConfigError::BasicReload`] for a Basic credential on the reload, and
+    /// [`ConfigError::Schedule`] when the schedule it describes does not read.
     pub fn load(
         path: Option<&Path>,
         sets: &[(String, String)],
     ) -> Result<Loaded<Self>, ConfigError> {
         let loaded = loader()?.load_with::<Self>(path, sets)?;
-        loaded
-            .settings()
-            .plan()
-            .map_err(|source| ConfigError::Schedule { source })?;
-        Ok(loaded)
+        Self::check(loaded.settings()).map(|()| loaded)
     }
 
-    /// Reads `text` as the file and applies `environment` over it, with its
-    /// schedule checked.
-    ///
-    /// Reading the sources and reading the process are separate so a test
-    /// states both: setting a variable is `unsafe` in edition 2024.
+    /// Reads `text` as the file with `environment` over it, checked as
+    /// [`Config::load`] checks the running process's sources, which a test
+    /// cannot set: changing a variable is `unsafe` in edition 2024.
     ///
     /// # Errors
     ///
@@ -302,10 +318,33 @@ impl Config {
         let (config, _provenance) = loader()?
             .load_sources::<Self>(text, None, environment)?
             .into_parts();
-        config
-            .plan()
-            .map_err(|source| ConfigError::Schedule { source })?;
+        config.check()?;
         Ok(config)
+    }
+
+    /// Refuses every retired key the sources set, then checks the schedule.
+    fn check(&self) -> Result<(), ConfigError> {
+        let mut removals = Removals::new();
+        let set = [
+            self.server_admin_url,
+            self.server_admin_credentials,
+            self.fhir_base_url,
+            self.webhook_url,
+        ];
+        for (removed, retired) in set.into_iter().zip(&RETIRED) {
+            removals.check(removed, retired);
+        }
+        removals.finish()?;
+        let credentials = &self.server_admin.credentials;
+        if !credentials.user.is_empty()
+            || credentials.password.is_some()
+            || credentials.password_file.is_some()
+        {
+            return Err(ConfigError::BasicReload);
+        }
+        self.plan()
+            .map_err(|source| ConfigError::Schedule { source })?;
+        Ok(())
     }
 
     /// The schedule the configuration describes.
@@ -378,12 +417,17 @@ mod tests {
             Some(
                 r#"
 listen = "0.0.0.0:9000"
-server_admin_url = "http://server:8081"
 index_root = "/srv/index"
 retention = 4
 activation = "manual"
-webhook_url = "https://hooks.example.invalid/sync"
 timezone = "Europe/Amsterdam"
+
+[server_admin]
+url = "http://server:8081"
+timeout = "30min"
+
+[webhook]
+url = "https://hooks.example.invalid/sync"
 
 [schedule]
 every = "12h"

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The `[auth]` shapes of `ferrohealth-smart` 0.9.1 the server refuses to
+//! The `[auth]` shapes of `ferrohealth-smart` the server refuses to
 //! start with, each naming the key or the user to change.
 //!
 //! No specification governs the configuration: our own design, the family's
@@ -11,7 +11,9 @@ use super::basic::{password, phc};
 use super::{SigningKey, causes, issuer};
 use crate::fixture::{Server, SmartSetup};
 use ferrohealth_smart::basic::StoreError;
-use ferrohealth_smart::config::{BasicSection, BasicUser, ConfigError, IssuerKey};
+use std::collections::BTreeMap;
+
+use ferrohealth_smart::config::{BasicSection, BasicUser, ConfigError};
 use ferroterm_server::smart::{Smart, StartError};
 
 /// The reason the server refuses to start under `setup`.
@@ -24,26 +26,19 @@ async fn refused(setup: SmartSetup) -> String {
     causes(&error)
 }
 
-#[tokio::test]
-async fn the_flat_issuer_of_the_old_shape_refuses_the_start_naming_the_table() {
-    let key = SigningKey::generate("k1");
-    let mock = issuer(&key).await;
-    let mut setup = SmartSetup::for_issuer(&mock.uri());
-    setup.auth.issuer = IssuerKey::Flat(mock.uri());
-    let reason = refused(setup).await;
-    assert!(reason.contains("auth.issuer = "), "{reason}");
-    assert!(reason.contains("[[auth.issuer]]"), "{reason}");
-}
-
-#[tokio::test]
-async fn a_section_level_issuer_setting_of_the_old_shape_refuses_the_start_naming_it() {
-    let key = SigningKey::generate("k1");
-    let mock = issuer(&key).await;
-    let mut setup = SmartSetup::for_issuer(&mock.uri());
-    setup.auth.audience = serde_json::from_value(serde_json::json!(["ferroterm"]))
-        .expect("a retired key reads any value");
-    let reason = refused(setup).await;
-    assert!(reason.contains("auth.audience was replaced"), "{reason}");
+// ferrohealth-smart 0.15 deleted the named refusals of the earlier `[auth]`
+// shape, so the strict load refuses each as a key it does not know.
+#[test]
+fn the_earlier_auth_shape_is_refused_by_the_strict_load() {
+    for text in [
+        "[auth]\nissuer = \"https://idp.example\"\n",
+        "[auth]\naudience = [\"ferroterm\"]\n",
+    ] {
+        assert!(
+            ferroterm_server::config::Config::from_sources(Some(text), &BTreeMap::new()).is_err(),
+            "{text}"
+        );
+    }
 }
 
 #[tokio::test]

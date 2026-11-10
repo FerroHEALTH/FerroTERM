@@ -27,7 +27,7 @@ async fn capabilities_that_do_not_decode_at_their_release_draw_the_error_state()
         .await;
     let state = console(
         None,
-        &format!("[ferroterm]\nbase_url = \"{}/\"\n", server.uri()),
+        &format!("[ferroterm.server]\nurl = \"{}/\"\n", server.uri()),
     )
     .await;
     let page = text(send(&state, get("/systems?fhir=r4b", &[])).await).await;
@@ -45,7 +45,7 @@ async fn capabilities_that_do_not_decode_at_their_release_draw_the_error_state()
 
 /// The About page of a console whose server is reached at `base`.
 async fn about_at(base: &str) -> String {
-    let state = console(None, &format!("[ferroterm]\nbase_url = \"{base}/\"\n")).await;
+    let state = console(None, &format!("[ferroterm.server]\nurl = \"{base}/\"\n")).await;
     text(send(&state, get("/about?fhir=r4", &[])).await).await
 }
 
@@ -94,7 +94,7 @@ async fn a_value_set_that_does_not_decode_at_its_release_draws_the_error_state()
         .await;
     let state = console(
         None,
-        &format!("[ferroterm]\nbase_url = \"{}/\"\n", server.uri()),
+        &format!("[ferroterm.server]\nurl = \"{}/\"\n", server.uri()),
     )
     .await;
     let page = text(send(&state, get("/valuesets/animals?fhir=r4b", &[])).await).await;
@@ -119,7 +119,7 @@ async fn a_concept_map_that_does_not_decode_at_its_release_draws_the_error_state
         .await;
     let state = console(
         None,
-        &format!("[ferroterm]\nbase_url = \"{}/\"\n", server.uri()),
+        &format!("[ferroterm.server]\nurl = \"{}/\"\n", server.uri()),
     )
     .await;
     let page = text(send(&state, get("/conceptmaps/animals?fhir=r5", &[])).await).await;
@@ -142,7 +142,7 @@ async fn a_lookup_answer_that_does_not_decode_at_its_release_draws_the_error_sta
         .await;
     let state = console(
         None,
-        &format!("[ferroterm]\nbase_url = \"{}/\"\n", server.uri()),
+        &format!("[ferroterm.server]\nurl = \"{}/\"\n", server.uri()),
     )
     .await;
     let page = text(
@@ -187,7 +187,7 @@ async fn a_validation_answer_that_does_not_decode_at_its_release_draws_the_error
         .await;
     let state = console(
         None,
-        &format!("[ferroterm]\nbase_url = \"{}/\"\n", server.uri()),
+        &format!("[ferroterm.server]\nurl = \"{}/\"\n", server.uri()),
     )
     .await;
     let page = text(
@@ -236,7 +236,7 @@ async fn a_history_that_does_not_decode_at_its_release_draws_the_error_state() {
         .await;
     let state = console(
         None,
-        &format!("[ferroterm]\nbase_url = \"{}/\"\n", server.uri()),
+        &format!("[ferroterm.server]\nurl = \"{}/\"\n", server.uri()),
     )
     .await;
     let page = text(send(&state, get("/?fhir=r4b", &[])).await).await;
@@ -277,7 +277,7 @@ async fn a_listing_that_does_not_decode_at_its_release_draws_the_error_state() {
         .await;
     let state = console(
         None,
-        &format!("[ferroterm]\nbase_url = \"{}/\"\n", server.uri()),
+        &format!("[ferroterm.server]\nurl = \"{}/\"\n", server.uri()),
     )
     .await;
     let page = text(send(&state, get("/systems?fhir=r4b", &[])).await).await;
@@ -318,7 +318,7 @@ async fn a_code_system_that_does_not_decode_at_its_release_draws_the_error_state
         .await;
     let state = console(
         None,
-        &format!("[ferroterm]\nbase_url = \"{}/\"\n", server.uri()),
+        &format!("[ferroterm.server]\nurl = \"{}/\"\n", server.uri()),
     )
     .await;
     let page = text(
@@ -369,7 +369,7 @@ async fn names_that_do_not_decode_at_their_release_draw_the_operation_page_s_err
         .await;
     let state = console(
         None,
-        &format!("[ferroterm]\nbase_url = \"{}/\"\n", server.uri()),
+        &format!("[ferroterm.server]\nurl = \"{}/\"\n", server.uri()),
     )
     .await;
     let page = text(send(&state, get("/lookup?fhir=r4b", &[])).await).await;

@@ -8,49 +8,40 @@
 //! binds, and answers with the systems it now serves. A reload it refuses
 //! leaves the old set answering, which is what makes a failed run harmless.
 //!
-//! The call carries the credential `[server_admin_credentials.oauth]` names:
-//! an OAuth 2.0 client credentials token (RFC 6749 §4.4) that
-//! `ferrohealth-smart` fetches, caches and renews once on a `401`.
+//! The call is made through the `[server_admin]` endpoint table: its
+//! timeout, TLS and retry, and its credential, an OAuth 2.0 client
+//! credentials token (RFC 6749 §4.4) that `ferrohealth-smart` fetches, caches
+//! and renews once on a `401`.
 //!
 //! No FHIR specification governs the call: our own design.
 
-use std::sync::Arc;
-
-use ferrohealth_smart::client::cache::TokenSource;
-use ferrohealth_smart::client::{CallError, ClientCredentials, RenewalError, TokenError};
-use reqwest::header::HeaderValue;
+use ferrohealth_smart::client::outbound::{OutboundClient, OutboundError, SendError};
+use ferrohealth_smart::config::ServerTls;
+use ferrohealth_smart::config::endpoint::EndpointSection;
 
 use crate::record::ReloadReply;
 
 /// A reload the server did not perform.
 #[derive(Debug, thiserror::Error)]
 pub enum ReloadError {
-    /// The request never reached the server.
+    /// The request never reached the server, or no token could be obtained
+    /// for it.
     #[error("the reload request to {url} failed")]
     Request {
         /// The address the request was sent to.
         url: String,
         /// Why the request failed.
         #[source]
-        source: reqwest::Error,
+        source: Box<SendError>,
     },
-    /// No token could be obtained for the call.
-    #[error("no token could be obtained for the reload request to {url}")]
-    Token {
-        /// The address the request was meant for.
-        url: String,
-        /// Why the token could not be obtained.
-        #[source]
-        source: Arc<TokenError>,
-    },
-    /// The server refused the token and no new one could be obtained.
-    #[error("{url} refused the token of the reload request")]
-    Renewal {
+    /// The answer could not be read.
+    #[error("the answer to the reload request to {url} could not be read")]
+    Body {
         /// The address the request was sent to.
         url: String,
-        /// Why the new token could not be obtained.
+        /// Why the answer did not read.
         #[source]
-        source: RenewalError,
+        source: reqwest::Error,
     },
     /// The server answered, and refused.
     #[error("{url} answered {status}: {body}")]
@@ -64,64 +55,32 @@ pub enum ReloadError {
     },
 }
 
-/// The credential the reload call carries.
-#[derive(Debug, Clone)]
-enum Credential {
-    /// None: the server authenticates no caller.
-    None,
-    /// The client credentials token.
-    Token(TokenSource),
-}
-
 /// The server's admin listener, as this service speaks to it.
 #[derive(Debug, Clone)]
 pub struct AdminClient {
-    client: reqwest::Client,
-    base_url: String,
-    credential: Credential,
+    outbound: OutboundClient,
+    reload: url::Url,
 }
 
 impl AdminClient {
-    /// The client for the admin listener at `base_url`, calling it with no
-    /// credential.
-    #[must_use]
-    pub fn new(client: reqwest::Client, base_url: &str) -> Self {
-        Self {
-            client,
-            base_url: base_url.trim_end_matches('/').to_owned(),
-            credential: Credential::None,
-        }
-    }
-
-    /// This client calling under `grant`, the client credentials grant
-    /// `[server_admin_credentials.oauth]` resolved to.
+    /// The client of the admin listener `endpoint` names.
     ///
     /// # Errors
     ///
-    /// Returns [`TokenError`] when the client credentials grant cannot build
-    /// its token client.
-    pub fn with_credentials(mut self, grant: ClientCredentials) -> Result<Self, TokenError> {
-        self.credential = Credential::Token(TokenSource::new(grant)?);
-        Ok(self)
+    /// Returns [`OutboundError`] when the table, its TLS or its credential
+    /// is refused.
+    pub fn new(endpoint: &EndpointSection) -> Result<Self, OutboundError> {
+        let outbound = OutboundClient::build(endpoint, "server_admin", &ServerTls)?;
+        let mut reload = outbound.url().clone();
+        let base = reload.path().trim_end_matches('/').to_owned();
+        reload.set_path(&format!("{base}/reload"));
+        Ok(Self { outbound, reload })
     }
 
     /// The address `POST /reload` is sent to.
     #[must_use]
     pub fn reload_url(&self) -> String {
-        format!("{}/reload", self.base_url)
-    }
-
-    /// Sends `POST /reload` carrying `authorization`, when given.
-    async fn send(
-        &self,
-        url: &str,
-        authorization: Option<HeaderValue>,
-    ) -> Result<reqwest::Response, reqwest::Error> {
-        let mut request = self.client.post(url);
-        if let Some(value) = authorization {
-            request = request.header(reqwest::header::AUTHORIZATION, value);
-        }
-        request.send().await
+        self.reload.to_string()
     }
 
     /// Asks the server to reload the set it serves.
@@ -129,40 +88,25 @@ impl AdminClient {
     /// # Errors
     ///
     /// Returns [`ReloadError::Request`] when the request does not reach the
-    /// server, [`ReloadError::Token`] when no token could be obtained for it,
-    /// [`ReloadError::Renewal`] when the server refused the token and no new
-    /// one could be obtained, and [`ReloadError::Refused`] when the server
-    /// answers with a status that is not a success, in which case the old set
-    /// still answers.
+    /// server or no token could be obtained for it, [`ReloadError::Body`]
+    /// when the answer does not read, and [`ReloadError::Refused`] when the
+    /// server answers with a status that is not a success, in which case the
+    /// old set still answers.
     pub async fn reload(&self) -> Result<ReloadReply, ReloadError> {
         let url = self.reload_url();
-        let request = |source| ReloadError::Request {
+        let response = self
+            .outbound
+            .send(&reqwest::Method::POST, &self.reload, |call| call)
+            .await
+            .map_err(|source| ReloadError::Request {
+                url: url.clone(),
+                source: Box::new(source),
+            })?;
+        let status = response.status();
+        let body = response.text().await.map_err(|source| ReloadError::Body {
             url: url.clone(),
             source,
-        };
-        let response = match &self.credential {
-            Credential::None => self.send(&url, None).await.map_err(request)?,
-            Credential::Token(source) => source
-                .call(|header| self.send(&url, Some(header)))
-                .await
-                .map_err(|error| match error {
-                    CallError::Token { source } => ReloadError::Token {
-                        url: url.clone(),
-                        source,
-                    },
-                    CallError::Renewal(source) => ReloadError::Renewal {
-                        url: url.clone(),
-                        source,
-                    },
-                    CallError::Call { source } => request(source),
-                    _ => ReloadError::Token {
-                        url: url.clone(),
-                        source: Arc::new(TokenError::Abandoned),
-                    },
-                })?,
-        };
-        let status = response.status();
-        let body = response.text().await.map_err(request)?;
+        })?;
         if !status.is_success() {
             return Err(ReloadError::Refused {
                 url,
@@ -179,11 +123,18 @@ impl AdminClient {
 
 #[cfg(test)]
 mod tests {
+    use ferrohealth_secret::secret_url::SecretUrl;
+    use ferrohealth_smart::config::endpoint::EndpointSection;
+
     use super::AdminClient;
 
     #[test]
     fn the_reload_address_sits_under_the_base() {
-        let client = AdminClient::new(reqwest::Client::new(), "http://server:8081/");
+        let client = AdminClient::new(&EndpointSection {
+            url: SecretUrl::new("http://server:8081/"),
+            ..EndpointSection::default()
+        })
+        .expect("the table builds");
         assert_eq!(
             client.reload_url(),
             "http://server:8081/reload",

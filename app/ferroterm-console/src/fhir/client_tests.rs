@@ -22,7 +22,7 @@ const ROOT: &str = "https://tx.example.org";
 /// `base`.
 async fn console_at(base: &str) -> crate::server::ConsoleState {
     let mut config = crate::config::Config::default();
-    config.ferroterm.base_url = base.to_owned();
+    config.ferroterm.server.url = ferrohealth_secret::secret_url::SecretUrl::new(base);
     crate::server::ConsoleState::new(config.resolve().expect("the settings resolve"))
         .await
         .expect("the clients build")
