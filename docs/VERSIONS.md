@@ -28,9 +28,12 @@ purpose.
   `[workspace.dependencies]` table; `scripts/release/publish-crates.sh version`
   prints the current value. It moves with the crates'
   packaged content (`.claude/rules/crates-publishing.md`), never with the
-  product version. `scripts/checks/crate-version-guard.sh` enforces the bump
-  and the lockstep; `scripts/checks/versions.sh` checks the members' metadata
-  (README, LICENSE, `publish = true`).
+  product version, by the step The Cargo Book's SemVer chapter asks for: the
+  patch for a compatible change, the minor at patch 0 for a breaking one.
+  `scripts/checks/crate-version-guard.sh` enforces the bump, its SemVer class
+  and the lockstep, `scripts/checks/semver.sh` runs `cargo-semver-checks`
+  (pinned under CI tools below), and `scripts/checks/versions.sh` checks the
+  members' metadata (README, LICENSE, `publish = true`).
 
 ## Language and runtime
 
@@ -128,7 +131,8 @@ the browser its journeys drive.
 The CI tools a workflow installs (zizmor, actionlint, shellcheck and the
 cargo tools) are pinned in the workflow step that runs them. The clone
 detector of `scripts/checks/duplication.sh` (#950) also runs on a developer
-machine, so its pins live here and the guard reads them from this table:
+machine, so its pins live here and the guard reads them from this table,
+and so does the SemVer judge of the published crates (`scripts/checks/semver.sh`):
 the release, the official image of that release by digest, and the sha256 of
 each release archive `scripts/checks/duplication.sh --install` fetches into
 `target/tools/` for a machine with neither the binary on `PATH` nor docker
@@ -144,6 +148,7 @@ the new release counts differently.
 | `jscpd darwin-x64` | `ae8d24aba2719df7682b1bb2c5021ab096116b8240c45fdae88654fc1ff36b17` (`jscpd-darwin-x64.tar.gz`) | `scripts/checks/duplication.sh --install` |
 | `jscpd linux-x64` | `5f18a6b70b4210782fc3c401c780ba994a2777249cd44d97d6fa460f6fff4570` (`jscpd-linux-x64-musl.tar.gz`) | `scripts/checks/duplication.sh --install` |
 | `jscpd linux-arm64` | `3635d652ae08ae10bfbc6821bfa8ac14080101f317fb5f45f4b590d5d32b9339` (`jscpd-linux-arm64-musl.tar.gz`) | `scripts/checks/duplication.sh --install` |
+| `cargo-semver-checks` | `0.51.0` | `scripts/checks/semver.sh --pin`, which the `crate-version-guard` job of `ci.yml` and the `plan` job of `release.yml` install through `taiki-e/install-action`; the version FerroBRIDGE, FerroSYS, FerroAUTH and FerroAUDIT pin |
 
 Trivy is the one CI tool pinned outside its workflow step: every workflow
 that scans (`release.yml`, `scan-and-tag.yml`, `image-scan.yml`) sets

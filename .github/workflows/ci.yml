@@ -730,9 +730,9 @@ jobs:
   # that provably does not alter packaged bytes.
   crate-version-guard:
     name: crate-version-guard
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 60
     permissions:
       contents: read
       pull-requests: read # the labels when the step runs
@@ -743,12 +743,17 @@ jobs:
           fetch-depth: 0
       - name: Crate-version guard self-test
         run: bash scripts/checks/crate-version-guard.sh --self-test
-      - name: Packaged crate content moved with its version
+      # The base is the target branch as fetched now, and the guard diffs
+      # from its merge base with the head, so a crate change the target
+      # gained after the fork is not counted.
+      - id: guard-pr
+        name: Packaged crate content moved with its version
+        if: github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
-          BASE: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
@@ -757,7 +762,50 @@ jobs:
             echo "the no-crate-bump label is set: the guard does not apply"
             exit 0
           fi
-          scripts/checks/crate-version-guard.sh "$BASE" "$HEAD"
+          bash scripts/checks/crate-version-guard.sh "origin/$BASE_REF" "$HEAD"
+      # The queue builds each entry onto the one ahead of it and names that as
+      # the base, so the diff is this entry's change alone. The group ref names
+      # the pull request (`gh-readonly-queue/main/pr-<n>-<sha>`), whose label
+      # is the same escape.
+      - id: guard-queue
+        name: The queued change moves the crate line above the queue base
+        if: github.event_name == 'merge_group'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GROUP_REF: ${{ github.event.merge_group.head_ref }}
+          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          pr="$(sed -nE 's|.*/pr-([0-9]+)-[0-9a-f]+$|\1|p' <<<"$GROUP_REF")"
+          if [[ -n "$pr" ]] && gh pr view "$pr" --json labels --jq '.labels[].name' | grep -qx 'no-crate-bump'; then
+            echo "the no-crate-bump label is set on #$pr: the guard does not apply"
+            exit 0
+          fi
+          bash scripts/checks/crate-version-guard.sh "$BASE_SHA" "$HEAD_SHA"
+      - uses: ./.github/actions/setup-rust
+        if: steps.guard-pr.outputs.judged != '' || steps.guard-queue.outputs.judged != ''
+        with:
+          cache-key: semver
+      - id: semver-pin
+        name: Read the cargo-semver-checks pin
+        if: steps.guard-pr.outputs.judged != '' || steps.guard-queue.outputs.judged != ''
+        run: echo "version=$(bash scripts/checks/semver.sh --pin)" >> "$GITHUB_OUTPUT"
+      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+        if: steps.guard-pr.outputs.judged != '' || steps.guard-queue.outputs.judged != ''
+        with:
+          tool: cargo-semver-checks@${{ steps.semver-pin.outputs.version }}
+      # The checkout is the change merged onto its base, so the judge compares
+      # the base's public API with the one the merge would leave (#1208).
+      - name: Each published crate's version answers its change (cargo-semver-checks)
+        if: steps.guard-pr.outputs.judged != '' || steps.guard-queue.outputs.judged != ''
+        env:
+          JUDGED: ${{ steps.guard-pr.outputs.judged }}${{ steps.guard-queue.outputs.judged }}
+          BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || format('origin/{0}', github.event.pull_request.base.ref) }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2086 # one crate name per word by construction
+          bash scripts/checks/semver.sh --baseline-rev "$BASE" $JUDGED
 
   # Every publishable crate packages and verifies as crates.io would build it
   # (no cache: the dry run verifies the bytes a publish would upload).

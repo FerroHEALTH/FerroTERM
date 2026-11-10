@@ -27,6 +27,9 @@
 #   publish-crates.sh verify      # read the registry back, with retries
 #   publish-crates.sh version     # print the lockstep crate version
 #   publish-crates.sh order       # print the derived upload order
+#   publish-crates.sh crates      # print the published list, one per line
+#   publish-crates.sh semver      # judge each crate against its newest
+#                                 # release on crates.io (scripts/checks/semver.sh)
 #   publish-crates.sh self-test   # check the order and the index wait offline
 #
 # Exit status: 0 done; 1 a crate failed to upload, or the read-back found a
@@ -347,9 +350,11 @@ publish) do_publish ;;
 verify) do_verify ;;
 version) manifest_version ;;
 order) derive_order ;;
+crates) printf '%s\n' "${CRATES[@]}" ;;
+semver) bash scripts/checks/semver.sh "${CRATES[@]}" ;;
 self-test) do_self_test ;;
 *)
-  echo "publish-crates: expected 'publish', 'verify', 'version', 'order', or 'self-test', got '${1:-<none>}'" >&2
+  echo "publish-crates: expected 'publish', 'verify', 'version', 'order', 'crates', 'semver', or 'self-test', got '${1:-<none>}'" >&2
   exit "$EXIT_USAGE"
   ;;
 esac

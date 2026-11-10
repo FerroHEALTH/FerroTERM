@@ -97,7 +97,10 @@ cut follows, in order.
    The rendered footer names the FerroTERM version the records came from, so a
    stale set is visible in the published table.
 7. **The crate line is publishable**: the `crate-version-guard` and
-   `publish-dry-run` jobs are green (`.claude/rules/crates-publishing.md`).
+   `publish-dry-run` jobs are green (`.claude/rules/crates-publishing.md`),
+   and `bash scripts/release/publish-crates.sh semver` finds that every
+   crate's step since its newest release on crates.io answers its change
+   (the plan job runs it too).
 8. **The advisories are drafted.** Every `GHSA-` id the section names is a
    draft advisory on this repository, ready to publish with the release, or
    an advisory an upstream crate's repository has already published, which
@@ -131,6 +134,7 @@ The checks, in the order the plan job runs them:
 | The section being cut opens its `### Security` with the reason when it mixes security and functional changes, and every Security entry names a GHSA id or a `security/vex/` path | `scripts/checks/changelog-security.sh --section X.Y.Z` |
 | No fragment other than `changelog.d/README.md` is left for the cut to have assembled, each leftover named | `plan.sh` |
 | The changelog section becomes the notes, with the support period and the CRA user-information link | `plan.sh notes`, `scripts/checks/release-notes.sh` |
+| Each crate the release publishes bumps the minor for a breaking change and the patch otherwise | `scripts/release/publish-crates.sh semver`, `scripts/checks/semver.sh` |
 
 The support period's end month is five years from the date on the section's
 heading (`bash scripts/release/plan.sh support-end YYYY-MM-DD` prints it), and
