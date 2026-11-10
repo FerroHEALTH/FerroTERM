@@ -89,12 +89,24 @@ position.
 
 ## Quick start
 
-The image serves UCUM, BCP 47, BCP 13 and ISO 3166-1 with no configuration,
-so the first call needs nothing beyond Docker and `curl`. Start the server:
+The quickstart runs the published image with nothing loaded: it serves UCUM,
+BCP 47, BCP 13 and ISO 3166-1 from the binary. You need Docker Compose
+2.23.1 or newer, `curl`, `jq` and `openssl`, and no checkout. Every release
+attaches the quickstart as one self-contained `compose.yaml`; download the
+latest release's into an empty directory:
+
+```sh
+curl -fsSLO https://github.com/FerroHEALTH/FerroTERM/releases/latest/download/compose.yaml
+```
+
+Make the index directory and the console's secret beside it, and start the
+server:
 
 <!-- tour:start -->
 ```sh
-docker run --rm -d --name ferroterm -p 8080:8080 ghcr.io/ferrohealth/ferroterm:0.4.6
+mkdir -p index secrets && umask 077
+openssl rand -hex 16 > secrets/console_oidc_client_secret
+docker compose up --wait
 ```
 
 Look up a unit of measure:
@@ -105,12 +117,12 @@ curl --fail-with-body -s 'http://localhost:8080/r4b/CodeSystem/$lookup?system=ht
   | jq -e '.resourceType == "Parameters"'
 ```
 
-Both commands are steps of
+Both steps are part of
 [`scripts/quickstart/tour.sh`](scripts/quickstart/tour.sh), which CI runs
-against the published image; `docker stop ferroterm` stops the server. A
-clinical code system such as SNOMED CT is a release you hold a licence for.
-`ferroterm-build`, in the same image, turns it into an index once, and the
-server reads that index at startup.
+over the repository's `compose.yaml`, the file each release attaches. A
+clinical code system such as SNOMED CT is a release you hold a licence for:
+the `build` service of the same file turns it into an index under `./index`
+once, and the server reads that index at startup.
 [Install and run](https://ferroterm.eu/docs/operate/install.html) and
 [loading code systems](https://ferroterm.eu/docs/operate/loading-snomed.html)
 continue from here.

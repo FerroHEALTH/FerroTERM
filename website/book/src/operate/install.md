@@ -14,13 +14,21 @@ system is an index you build from a release you are licensed for
 
 ## The first call, with nothing to load
 
+Every release attaches the quickstart as one self-contained `compose.yaml`,
+with its `.sha256sum`; it needs Docker Compose 2.23.1 or newer and no
+checkout. Download the latest release's into an empty directory, make the
+index directory and the console's secret beside it, and start it:
+
 ```console
-$ docker run --rm -p 8080:8080 ghcr.io/ferrohealth/ferroterm:0.4.6
+$ curl -fsSLO https://github.com/FerroHEALTH/FerroTERM/releases/latest/download/compose.yaml
+$ mkdir -p index secrets && umask 077
+$ openssl rand -hex 16 > secrets/console_oidc_client_secret
+$ docker compose up --wait
 $ curl 'http://localhost:8080/r4b/CodeSystem/$lookup?system=http://unitsofmeasure.org&code=mg/dL'
 ```
 
-The server starts with no index, serves the four registry systems, and answers
-the lookup with the unit's canonical form. `GET /r4b/metadata?mode=terminology`
+The server starts with an empty index, serves the four registry systems, and
+answers the lookup with the unit's canonical form. `GET /r4b/metadata?mode=terminology`
 lists what a deployment serves.
 
 ## Run with Docker Compose

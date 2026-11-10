@@ -180,6 +180,10 @@ jobs:
       # which runs after this job, and publishing here would freeze the release
       # before those assets exist. A draft is still mutable — the window those
       # uploads need.
+      # The quickstart is one self-contained compose.yaml; its SHA-256 rides
+      # beside it in sha256sum form (#1228).
+      - name: Checksum the quickstart compose file
+        run: sha256sum compose.yaml > compose.yaml.sha256sum
       - name: Create the GitHub release as a draft
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
@@ -189,9 +193,12 @@ jobs:
           # release it is.
           name: ${{ needs.plan.outputs.version }}
           body_path: release-notes.md
-          # The quickstart compose file rides along as a release asset: it pulls
-          # the image this tag publishes, so a downloader never clones the repo.
-          files: compose.yaml
+          # The quickstart compose file rides along as a release asset with its
+          # checksum: one self-contained file that pulls the image this tag
+          # publishes, so a downloader never clones the repo.
+          files: |
+            compose.yaml
+            compose.yaml.sha256sum
           prerelease: ${{ needs.plan.outputs.is-prerelease }}
 
   # ── build-binaries: the SLSA L3 lane, once per target ───────────────────────
@@ -467,7 +474,9 @@ jobs:
                 || missing="$missing ferroterm-console-${TAG}-${target}${suffix}"
             done
           done
-          printf '%s\n' "$assets" | grep -Fxq "compose.yaml" || missing="$missing compose.yaml"
+          for asset in compose.yaml compose.yaml.sha256sum; do
+            printf '%s\n' "$assets" | grep -Fxq "$asset" || missing="$missing $asset"
+          done
           for name in "ferroterm-${TAG}-vulnerability-record.json" "ferroterm-${TAG}-trivy-reports.tar.gz"; do
             printf '%s\n' "$assets" | grep -Fxq "$name" || missing="$missing $name"
           done
