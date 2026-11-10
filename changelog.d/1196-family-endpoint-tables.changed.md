@@ -13,11 +13,9 @@
   `server_admin_url`, `[server_admin.credentials.oauth]` for
   `[server_admin_credentials.oauth]`, `[fhir] url` for `fhir_base_url` and
   `[webhook] url` for `webhook_url` (`FERROTERM_SYNC__SERVER_ADMIN__URL` and
-  so on). A table written without `timeout` takes `"10s"`, so give
-  `[server_admin]` `timeout = "30min"` and `retry.max_attempts = 1`, the
-  values it has when the table is absent. A `[fhir]` URL whose last segment
-  names no served release now refuses the start, and the revalidation sends
-  `$validate-code` and `$expand` as `POST`.
+  so on). A `[fhir]` URL whose last segment names no served release now
+  refuses the start, and the revalidation sends `$validate-code` and
+  `$expand` as `POST`.
 - The server, the synchronisation service and the console take the family
   round of 2026-11-09: ferrohealth-config 0.4.1, ferrohealth-telemetry 0.4,
   ferrohealth-server 0.8.1, ferrohealth-usage-report 0.4,

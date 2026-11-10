@@ -138,7 +138,6 @@ timezone = "Europe/Amsterdam"
 
 [server_admin]
 url = "http://ferroterm:8081"
-timeout = "30min"
 
 [fhir]
 url = "http://ferroterm:8080/r4b"
@@ -169,12 +168,11 @@ endpoint table, the keys every FerroHEALTH product writes for a call it
 makes: `url`, `timeout`, `connect_timeout`, `retry` (`max_attempts`,
 `initial_backoff`, `max_backoff`; a call that did not connect, timed out or
 met a `5xx` is tried again), `tls` (the outbound TLS table of
-[Configuration](configuration.md#telemetry)) and `credentials`. A table
-written without one of these keys takes the table's own default
-(`timeout = "10s"`, three tries), not the defaults of `[server_admin]`
-above, which hold only when the table is absent: a reload takes as long as
-a server start, so write `timeout = "30min"` and `retry.max_attempts = 1`
-with it. In 0.4.5 alone, the earlier keys `server_admin_url`,
+[Configuration](configuration.md#telemetry)) and `credentials`. A key a
+table leaves out keeps its default: `[server_admin]` keeps the defaults
+above (`timeout = "30min"`, one try, since a reload takes as long as a
+server start), and `[fhir]` and `[webhook]` take the family's
+(`timeout = "10s"`, three tries). In 0.4.5 alone, the earlier keys `server_admin_url`,
 `[server_admin_credentials]`, `fhir_base_url` and `webhook_url` refuse the
 start, each naming its replacement.
 

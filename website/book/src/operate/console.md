@@ -92,15 +92,16 @@ outbound TLS table of [Configuration](configuration.md#telemetry)).
 durations such as `"30s"` or `"8h"`.
 
 `[ferroterm.server]`, `[ferroterm.sync]` and `[ferroterm.admin]` are the
-family's outbound endpoint table: `url`, `timeout` (`"10s"` when the table
-is written without it), `connect_timeout`, `retry` (`max_attempts`,
+family's outbound endpoint table: `url`, `timeout`, `connect_timeout`, `retry` (`max_attempts`,
 `initial_backoff`, `max_backoff`; a read, update or delete is tried again
 after a failed connection, a timeout or a `5xx`, and a create is sent once)
 and `tls`, the outbound TLS table of
 [Configuration](configuration.md#telemetry). A table takes no
 `credentials`: every call carries the signed-in reader's, and a table that
-sets one refuses the start. Without `[ferroterm.server]` the console calls
-`http://127.0.0.1:8080/` with a timeout of `"30s"`. In 0.4.5 alone, the
+sets one refuses the start. `[ferroterm.server]` defaults to
+`http://127.0.0.1:8080/` with a timeout of `"30s"`, and a key the table
+leaves out keeps its default; `[ferroterm.sync]` and `[ferroterm.admin]`
+take the family's (`timeout = "10s"`). In 0.4.5 alone, the
 earlier keys `[ferroterm] base_url`, `timeout`, `sync_url` and `admin_url`
 refuse the start, each naming its replacement.
 `[session] store = "memory"` keeps the sessions in the console's process;

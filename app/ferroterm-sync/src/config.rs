@@ -275,14 +275,18 @@ pub enum ConfigError {
     },
 }
 
-/// The loader of the service's tree.
+/// The loader of the service's tree, with the product's `[server_admin]`
+/// defaults layered under the file key by key, so a table written in part
+/// keeps the reload's timeout and single try.
 ///
 /// # Errors
 ///
 /// Returns the loader's error when the prefix is refused, which it never is
-/// for [`PREFIX`].
+/// for [`PREFIX`], or when the defaults do not serialize to a table.
 pub fn loader() -> Result<Loader, ConfigError> {
-    Ok(Loader::new(PREFIX)?.alias(FILTER_ENV, "telemetry.filter"))
+    Ok(Loader::new(PREFIX)?
+        .alias(FILTER_ENV, "telemetry.filter")
+        .defaults("server_admin", &Config::default().server_admin)?)
 }
 
 impl Config {
@@ -406,6 +410,30 @@ mod tests {
             format!("{config:?}"),
             format!("{:?}", Config::default()),
             "every key is optional and falls back to the image layout"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_server_admin_table_written_with_only_its_url_keeps_the_reload_defaults()
+    -> Result<(), ConfigError> {
+        let config = Config::from_sources(
+            Some("[server_admin]\nurl = \"http://server:8081\"\n"),
+            &BTreeMap::new(),
+        )?;
+        assert_eq!(
+            config.server_admin.timeout,
+            Duration::from_mins(30),
+            "the reload's 30 min timeout holds under a table that names only its url"
+        );
+        assert_eq!(
+            config.server_admin.retry.max_attempts, 1,
+            "the reload is tried once under a table that names only its url"
+        );
+        assert_eq!(
+            config.server_admin.url.expose(),
+            "http://server:8081",
+            "the url the file writes wins over the default"
         );
         Ok(())
     }
