@@ -36,6 +36,9 @@ use http::{HeaderValue, Method, StatusCode};
 use ferrohealth_session::cookies::CookieNames;
 use ferrohealth_session::routes::{SignIn, keep_session};
 use ferrohealth_session::sessions::Sessions;
+use ferrohealth_smart::client::outbound::{OutboundClient, OutboundError};
+use ferrohealth_smart::config::ServerTls;
+use ferrohealth_smart::config::endpoint::EndpointSection;
 
 use crate::auth::pages::ConsolePages;
 use crate::config::settings::Settings;
@@ -92,9 +95,9 @@ pub const COOKIES: &str = "ferroterm_console";
 /// Why the console could not start.
 #[derive(Debug, thiserror::Error)]
 pub enum StartError {
-    /// The HTTP client of the terminology server could not be built.
+    /// The outbound client of an endpoint table could not be built.
     #[error("the HTTP client of the console could not be built")]
-    Client(#[source] reqwest::Error),
+    Client(#[source] Box<OutboundError>),
     /// The OpenID Provider's relying party could not be built, its metadata
     /// unread among the reasons.
     #[error("the sign-in at the OpenID Provider could not be set up")]
@@ -106,23 +109,47 @@ pub enum StartError {
 pub struct ConsoleState {
     settings: Arc<Settings>,
     sign_in: SignIn<ConsolePages>,
-    upstream: reqwest::Client,
+    upstream: Upstreams,
     health: Health,
 }
 
-/// The client of the terminology server and the sync service for
-/// `settings`, which `config check` builds with nothing else.
+/// The outbound clients of the terminology server, its sync service and its
+/// admin listener, one per endpoint table.
+#[derive(Debug, Clone)]
+pub struct Upstreams {
+    /// `[ferroterm.server]`.
+    pub server: OutboundClient,
+    /// `[ferroterm.sync]`, when one is configured.
+    pub sync: Option<OutboundClient>,
+    /// `[ferroterm.admin]`, when one is configured.
+    pub admin: Option<OutboundClient>,
+}
+
+/// The outbound clients of `settings`, which `config check` builds with
+/// nothing else.
 ///
 /// # Errors
-/// Returns [`StartError::Client`] when the client cannot be built.
-pub fn upstream_client(settings: &Settings) -> Result<reqwest::Client, StartError> {
-    // NOTE: no specification governs this: our own design; a redirect from
-    // the FHIR server is handed to the page as it came, never followed.
-    reqwest::Client::builder()
-        .timeout(settings.ferroterm.timeout)
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(StartError::Client)
+/// Returns [`StartError::Client`] when an endpoint table, its TLS or its
+/// engine is refused.
+pub fn upstream_client(settings: &Settings) -> Result<Upstreams, StartError> {
+    let build = |endpoint: &EndpointSection, key| {
+        OutboundClient::build(endpoint, key, &ServerTls)
+            .map_err(|error| StartError::Client(Box::new(error)))
+    };
+    let ferroterm = &settings.ferroterm;
+    Ok(Upstreams {
+        server: build(&ferroterm.server_endpoint, "ferroterm.server")?,
+        sync: ferroterm
+            .sync_endpoint
+            .as_ref()
+            .map(|endpoint| build(endpoint, "ferroterm.sync"))
+            .transpose()?,
+        admin: ferroterm
+            .admin_endpoint
+            .as_ref()
+            .map(|endpoint| build(endpoint, "ferroterm.admin"))
+            .transpose()?,
+    })
 }
 
 impl ConsoleState {
@@ -203,9 +230,10 @@ impl ConsoleState {
         }
     }
 
-    /// The HTTP client of the terminology server and the sync service.
+    /// The outbound clients of the terminology server, the sync service and
+    /// the admin listener.
     #[must_use]
-    pub fn upstream(&self) -> &reqwest::Client {
+    pub fn upstream(&self) -> &Upstreams {
         &self.upstream
     }
 }

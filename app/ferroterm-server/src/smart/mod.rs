@@ -29,7 +29,7 @@ use std::sync::Arc;
 use axum::body::Body;
 use axum::response::{IntoResponse, Response};
 use ferrohealth_smart::basic::PasswordStore;
-use ferrohealth_smart::config::{ConfigError, IssuerKey, ServerTls};
+use ferrohealth_smart::config::{ConfigError, ServerTls};
 use ferrohealth_smart::extract::HeaderOnly;
 use ferrohealth_smart::guard::{Gate, Render};
 use ferrohealth_smart::metadata::ServerMetadata;
@@ -161,8 +161,7 @@ impl Smart {
     ///
     /// Returns [`StartError::Unconfigured`] for a guarded surface without an
     /// issuer, [`StartError::Auth`] for a section that breaks a rule (the
-    /// removed flat `issuer` and a Basic user granted a `system/` scope among
-    /// them), [`StartError::Introspector`] for an introspecting issuer that cannot be
+    /// Basic user granted a `system/` scope among them), [`StartError::Introspector`] for an introspecting issuer that cannot be
     /// set up,
     /// [`StartError::Issuer`] for an issuer whose metadata or key set could
     /// not be read, and [`StartError::NoTokenEndpoint`] when the first issuer
@@ -172,8 +171,7 @@ impl Smart {
         if !auth.enabled {
             return Ok(None);
         }
-        let flat = matches!(&auth.issuer, IssuerKey::Flat(issuer) if !issuer.is_empty());
-        if !flat && auth.issuers().iter().all(|entry| entry.issuer.is_empty()) {
+        if auth.issuer.iter().all(|entry| entry.issuer.is_empty()) {
             let surfaces = guarded_surfaces(config);
             if surfaces.is_empty() {
                 return Ok(None);

@@ -54,7 +54,10 @@ fn config_check_accepts_a_valid_configuration() {
 #[test]
 fn a_configuration_that_does_not_resolve_exits_with_ex_config() {
     let dir = tempfile::tempdir().expect("a directory");
-    let path = config_file(dir.path(), "[ferroterm]\ntimeout = \"0s\"\n");
+    let path = config_file(
+        dir.path(),
+        "[ferroterm.server]\nurl = \"http://127.0.0.1:8080/\"\ntimeout = \"0s\"\n",
+    );
     assert_eq!(
         ExitCode::from(EX_CONFIG),
         exit(&["--config", &path, "config", "check"])
@@ -89,7 +92,10 @@ fn a_configuration_file_that_cannot_be_read_exits_with_ex_config() {
 #[test]
 fn a_healthcheck_with_a_refused_configuration_reports_not_up_rather_than_ex_config() {
     let dir = tempfile::tempdir().expect("a directory");
-    let path = config_file(dir.path(), "[ferroterm]\ntimeout = \"0s\"\n");
+    let path = config_file(
+        dir.path(),
+        "[ferroterm.server]\nurl = \"http://127.0.0.1:8080/\"\ntimeout = \"0s\"\n",
+    );
     assert_eq!(ExitCode::FAILURE, exit(&["--config", &path, "healthcheck"]));
 }
 

@@ -213,7 +213,7 @@ services:
       # shows the address the container binds.
       FERROTERM_CONSOLE__SERVER__LISTEN: 0.0.0.0:3000
       # The server, over the compose network.
-      FERROTERM_CONSOLE__FERROTERM__BASE_URL: http://ferroterm:8080/
+      FERROTERM_CONSOLE__FERROTERM__SERVER__URL: http://ferroterm:8080/
       # The address readers reach the server at, which the console shows
       # beside every request it makes; the base URL when unset.
       FERROTERM_CONSOLE__FERROTERM__PUBLIC_URL:

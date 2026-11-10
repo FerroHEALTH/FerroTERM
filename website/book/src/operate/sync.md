@@ -84,7 +84,7 @@ The overlay also sets `FERROTERM__ADMIN__LISTEN` on the server, because
 `POST /reload` on that listener is how the sync asks for the new release to be
 served. That listener is a guarded surface, so the server starts only once
 `[auth]` names an issuer in an `[[auth.issuer]]` table, with
-`[server_admin_credentials.oauth]` in the sync configuration, or turns
+`[server_admin.credentials.oauth]` in the sync configuration, or turns
 authentication off (see
 [Configuration](configuration.md#authentication)).
 
@@ -102,13 +102,13 @@ the value below; a key, or a `FERROTERM_SYNC__` variable, that the service
 does not know is refused at start-up rather than ignored. `ferroterm-sync config check`
 prints every key with where it came from, every secret as `***`.
 A refused configuration ends `serve`, `run-once` and `config check` with exit
-code 78 (`EX_CONFIG`, `sysexits(3)`), and `healthcheck` with 1.
+code 78 (`EX_CONFIG`, `sysexits(3)`), and `healthcheck` with `not up` and 1.
 
 | Key | Default | What it names |
 |---|---|---|
 | `listen` | `127.0.0.1:8181` | the service's own admin listener |
-| `server_admin_url` | `http://127.0.0.1:8081` | the server's admin listener, which serves `POST /reload` |
-| `fhir_base_url` | none | the server's FHIR base, which the revalidation reads |
+| `[server_admin]` | `url = "http://127.0.0.1:8081"`, `timeout = "30min"`, one try | the server's admin listener, which serves `POST /reload` (see [The outbound endpoints](#the-outbound-endpoints)) |
+| `[fhir]` | none | the server's FHIR base, which the revalidation reads |
 | `index_root` | `/data/index` | the index root the server reads |
 | `resources` | `/data/codesystems` | the managed resource directory the server reads |
 | `staging` | `/data/staging` | where a run downloads and builds |
@@ -116,10 +116,9 @@ code 78 (`EX_CONFIG`, `sysexits(3)`), and `healthcheck` with 1.
 | `state` | `/data/state` | what the service remembers between runs |
 | `retention` | `2` | release directories kept per code system |
 | `activation` | `auto` | `auto` or `manual` |
-| `webhook_url` | none | where one JSON summary per run is posted |
+| `[webhook]` | none | where one JSON summary per run is posted |
 | `timezone` | `UTC` | the zone a daily schedule is read in |
 | `build_command` | `ferroterm-build` | the offline build, on `PATH` or by path |
-| `[server_admin_credentials.oauth]` | none | the client credentials grant of the reload call (see [below](#the-credential-of-the-reload-call)) |
 | `[auth]` | on, no issuer | the credentials the admin listener admits (see [The admin listener](#the-admin-listener)) |
 | `[nts]` | no client | the client the NTS add-on authenticates as (see [Credentials](#credentials)) |
 | `[telemetry]` | `auto` format, no export | the console log's `format` and `filter` (`RUST_LOG` sets the filter too), and the OTLP export of the service's metrics, the same section the server reads (see [Telemetry](configuration.md#telemetry)) |
@@ -128,8 +127,6 @@ A `[[source]]` entry names the add-on that reads a service and carries that
 add-on's own block:
 
 ```toml
-server_admin_url = "http://ferroterm:8081"
-fhir_base_url = "http://ferroterm:8080/r4b"
 index_root = "/data/index"
 resources = "/data/codesystems"
 staging = "/data/staging"
@@ -138,6 +135,13 @@ state = "/data/state"
 retention = 2
 activation = "auto"
 timezone = "Europe/Amsterdam"
+
+[server_admin]
+url = "http://ferroterm:8081"
+timeout = "30min"
+
+[fhir]
+url = "http://ferroterm:8080/r4b"
 
 [schedule]
 at = "03:00"
@@ -155,14 +159,30 @@ default; the NTS block takes `fhir_api = false` to keep a run to the feed and
 
 The file needs no secret in clear. The NTS account's secrets can each be a
 mounted file (`password_file`, `client_secret_file`) or a variable, and the
-reload call reads its own from the file `[server_admin_credentials.oauth]`
+reload call reads its own from the file `[server_admin.credentials.oauth]`
 names, so the file can stay safe to commit and safe to show.
+
+### The outbound endpoints
+
+`[server_admin]`, `[fhir]` and `[webhook]` are the family's outbound
+endpoint table, the keys every FerroHEALTH product writes for a call it
+makes: `url`, `timeout`, `connect_timeout`, `retry` (`max_attempts`,
+`initial_backoff`, `max_backoff`; a call that did not connect, timed out or
+met a `5xx` is tried again), `tls` (the outbound TLS table of
+[Configuration](configuration.md#telemetry)) and `credentials`. A table
+written without one of these keys takes the table's own default
+(`timeout = "10s"`, three tries), not the defaults of `[server_admin]`
+above, which hold only when the table is absent: a reload takes as long as
+a server start, so write `timeout = "30min"` and `retry.max_attempts = 1`
+with it. In 0.4.5 alone, the earlier keys `server_admin_url`,
+`[server_admin_credentials]`, `fhir_base_url` and `webhook_url` refuse the
+start, each naming its replacement.
 
 ### The credential of the reload call
 
 The server's admin listener requires a credential carrying its admin scope
 ([Configuration](configuration.md#authentication)), and
-`[server_admin_credentials.oauth]` names the one the sync presents: a token of
+`[server_admin.credentials.oauth]` names the one the sync presents: a token of
 the OAuth 2.0 client credentials grant (RFC 6749 §4.4) from an authorization
 server the server trusts, fetched before the call, kept until shortly before it
 expires, and fetched once more when the server answers `401`. The reload is a
@@ -170,7 +190,7 @@ machine's call and a Basic user is a person, so the sync takes no Basic
 credential:
 
 ```toml
-[server_admin_credentials.oauth]
+[server_admin.credentials.oauth]
 issuer = "https://auth.example.org/realms/tx"   # or token_endpoint = "…"
 client_id = "ferroterm-sync"
 client_secret_file = "/run/secrets/sync-client-secret"
@@ -187,7 +207,7 @@ scope = "__ferroterm.admin"
 | `oauth.scope`, `oauth.resource`, `oauth.audience` | the token request's `scope`, RFC 8707 `resource` and `audience` parameters | none |
 | `oauth.refresh_margin` | how long before the token expires a new one is fetched | `"30s"` |
 | `oauth.timeout` | how long one call to the authorization server may take | `"10s"` |
-| `[server_admin_credentials.oauth.tls]` | the outbound TLS table of the token calls (see [Configuration](configuration.md#telemetry)) | none |
+| `[server_admin.credentials.oauth.tls]` | the outbound TLS table of the token calls (see [Configuration](configuration.md#telemetry)) | none |
 
 With the table empty the call carries no credential, which only a server with
 `[auth]` turned off accepts. There is no static token, and the table takes no
@@ -238,10 +258,10 @@ against the set now being served and writes what it found into the run record.
 It reports and never edits. A finding is a decision for a terminologist, and
 the service changes nothing in your content, ever.
 
-Set `fhir_base_url` to the server's FHIR base, such as
+Set `[fhir] url` to the server's FHIR base, such as
 `http://ferroterm:8080/r4b`, to turn the check on. Its last segment (`r4`,
 `r4b`, `r5` or `r6`) names the FHIR release the check writes its requests in;
-a base whose last segment names none leaves the check not run. Without a base
+a base whose last segment names none refuses the start. Without `[fhir]`
 the run record says the check did not run. The check reads the server's public FHIR API,
 `ValueSet/$validate-code` and `ValueSet/$expand`, both with `activeOnly`, so it
 sees exactly what any client sees:
@@ -325,10 +345,10 @@ leaves both listeners reachable only inside the compose network.
 The console's history screen reads `GET /runs` and `GET /runs/{id}` to show
 what the last run found about the resource a terminologist has open
 ([The console](console.md)). The console's own server makes the call, at
-`[ferroterm] sync_url`, with the signed-in reader's access token, so a reader
+`[ferroterm.sync] url`, with the signed-in reader's access token, so a reader
 sees the findings when the identity provider grants them the product scope
 and lists the sync's audience in the token. A visitor, a reader without the
-scope, or a console with no `sync_url` sees no findings.
+scope, or a console with no `[ferroterm.sync]` sees no findings.
 
 `/metrics` carries `ferroterm_sync_runs_total{outcome="ok"|"failed"}`,
 `ferroterm_sync_last_run_timestamp_seconds`,

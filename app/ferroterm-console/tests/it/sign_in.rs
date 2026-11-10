@@ -615,7 +615,7 @@ async fn a_signed_in_reader_s_requests_carry_their_access_token_and_a_visitor_s_
     let server = wiremock::MockServer::start().await;
     let state = console(
         Some(provider.oidc()),
-        &format!("[ferroterm]\nbase_url = \"{}/\"\n", server.uri()),
+        &format!("[ferroterm.server]\nurl = \"{}/\"\n", server.uri()),
     )
     .await;
     let session = signed_in(&state, &provider).await;

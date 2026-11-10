@@ -401,9 +401,9 @@ mod tests {
         };
         let refused = refused.to_string();
         assert!(
-            refused.contains("server.request_timeout_ms was replaced by server.request_timeout")
-                && refused.contains("server.body_limit_bytes was replaced by server.body_limit"),
-            "each retired key is named with its replacement, all at once: {refused}"
+            refused.contains("unknown field `request_timeout_ms`")
+                && refused.contains("unknown field `body_limit_bytes`"),
+            "ferrohealth-server 0.8 refuses each retired key as unknown, all at once: {refused}"
         );
         assert!(
             matches!(

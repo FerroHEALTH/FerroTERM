@@ -12,8 +12,8 @@
 //! `Default` impl; [`Config::load`] reads it and
 //! [`Config::resolve`](crate::config::Config::resolve) turns it into the
 //! checked [`settings::Settings`] the server runs on. An override names its
-//! key by path, `FERROTERM_CONSOLE__FERROTERM__BASE_URL` for `[ferroterm]
-//! base_url`. `RUST_LOG` is the alias of `telemetry.filter`. No
+//! key by path, `FERROTERM_CONSOLE__FERROTERM__SERVER__URL` for
+//! `[ferroterm.server] url`. `RUST_LOG` is the alias of `telemetry.filter`. No
 //! specification governs the configuration: our own design.
 //!
 //! ```toml
@@ -21,11 +21,17 @@
 //! listen = "0.0.0.0:3000"
 //!
 //! [ferroterm]
-//! base_url = "http://ferroterm:8080/"
 //! public_url = "https://terminology.example.org/"
-//! sync_url = "http://ferroterm-sync:8090/"
-//! admin_url = "http://ferroterm:8081/"
+//!
+//! [ferroterm.server]
+//! url = "http://ferroterm:8080/"
 //! timeout = "30s"
+//!
+//! [ferroterm.sync]
+//! url = "http://ferroterm-sync:8090/"
+//!
+//! [ferroterm.admin]
+//! url = "http://ferroterm:8081/"
 //!
 //! [oidc]
 //! issuer = "https://idp.example.org/realms/ferroterm"
@@ -52,8 +58,11 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use ferrohealth_config::loader::{Loaded, Loader};
+use ferrohealth_config::removed::{Removed, Retired};
 use ferrohealth_config::units::Duration;
+use ferrohealth_secret::secret_url::SecretUrl;
 use ferrohealth_session::config::{OidcSection, SessionSection};
+use ferrohealth_smart::config::endpoint::EndpointSection;
 use ferrohealth_telemetry::section::TelemetrySection;
 use serde::Deserialize;
 
@@ -143,38 +152,83 @@ impl Default for Server {
     }
 }
 
-/// `[ferroterm]`.
+/// `[ferroterm]`: the terminology server, its sync service and its admin
+/// listener, each an outbound endpoint table the console calls with the
+/// signed-in reader's credential.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Ferroterm {
-    /// The root of the terminology server's HTTP surface, under which it
-    /// serves its FHIR roots (`/r4`, `/r4b`, `/r5`, `/r6`) and `/health`.
-    pub base_url: String,
     /// The root the server's readers reach it at, which the console shows
-    /// beside every request it makes; the base URL when unset.
+    /// beside every request it makes; `[ferroterm.server] url` when unset.
     pub public_url: Option<String>,
-    /// The root of the sync service's admin listener, whose runs the
-    /// Synchronisation screens show and whose Run now and Activate they post;
-    /// none when unset. The console calls it with the signed-in reader's
-    /// access token, so the reader's token must carry the listener's product
-    /// scope (`__ferroterm.sync` by default).
-    pub sync_url: Option<String>,
-    /// The root of the terminology server's admin listener, whose
-    /// `POST /reload` the Server screen offers as Reload the served set; none
-    /// when unset. The reader's token must carry `__ferroterm.admin`.
-    pub admin_url: Option<String>,
-    /// How long one call to the server may take, a duration such as `30s`.
-    pub timeout: Duration,
+    /// `[ferroterm.server]`: the root of the terminology server's HTTP
+    /// surface, under which it serves its FHIR roots (`/r4`, `/r4b`, `/r5`,
+    /// `/r6`) and `/health`, with the timeout, retry and TLS of each call.
+    pub server: Box<EndpointSection>,
+    /// `[ferroterm.sync]`: the root of the sync service's admin listener,
+    /// whose runs the Synchronisation screens show and whose Run now and
+    /// Activate they post; none when unset. The reader's token must carry the
+    /// listener's product scope (`__ferroterm.sync` by default).
+    pub sync: Option<Box<EndpointSection>>,
+    /// `[ferroterm.admin]`: the root of the terminology server's admin
+    /// listener, whose `POST /reload` the Server screen offers as Reload the
+    /// served set; none when unset. The reader's token must carry
+    /// `__ferroterm.admin`.
+    pub admin: Option<Box<EndpointSection>>,
+    /// `base_url`, which `[ferroterm.server] url` replaced in 0.4.5.
+    pub base_url: Removed,
+    /// `timeout`, which `[ferroterm.server] timeout` replaced in 0.4.5.
+    pub timeout: Removed,
+    /// `sync_url`, which `[ferroterm.sync] url` replaced in 0.4.5.
+    pub sync_url: Removed,
+    /// `admin_url`, which `[ferroterm.admin] url` replaced in 0.4.5.
+    pub admin_url: Removed,
 }
 
 impl Default for Ferroterm {
     fn default() -> Self {
         Self {
-            base_url: String::from("http://127.0.0.1:8080/"),
             public_url: None,
-            sync_url: None,
-            admin_url: None,
-            timeout: Duration::from_secs(30),
+            server: Box::new(EndpointSection {
+                url: SecretUrl::new("http://127.0.0.1:8080/"),
+                timeout: Duration::from_secs(30),
+                ..EndpointSection::default()
+            }),
+            sync: None,
+            admin: None,
+            base_url: Removed::default(),
+            timeout: Removed::default(),
+            sync_url: Removed::default(),
+            admin_url: Removed::default(),
         }
     }
 }
+
+/// The release these refusals belong to: each lives for that one release.
+pub const PREPARING: &str = "0.4.5";
+
+/// The `[ferroterm]` keys 0.4.5 retired, each with the key that took its
+/// place.
+// TODO(#1202): the refusals ship in 0.4.5 alone; delete them in 0.4.6.
+pub const RETIRED: [Retired; 4] = [
+    Retired::replaced(
+        "ferroterm.base_url",
+        "ferroterm.server.url, the server's root",
+        "0.4.5",
+    ),
+    Retired::replaced(
+        "ferroterm.timeout",
+        "ferroterm.server.timeout, a duration such as `30s`",
+        "0.4.5",
+    ),
+    Retired::replaced(
+        "ferroterm.sync_url",
+        "ferroterm.sync.url, the sync service's admin root",
+        "0.4.5",
+    ),
+    Retired::replaced(
+        "ferroterm.admin_url",
+        "ferroterm.admin.url, the server's admin root",
+        "0.4.5",
+    ),
+];

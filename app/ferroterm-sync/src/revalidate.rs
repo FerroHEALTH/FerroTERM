@@ -15,8 +15,9 @@
 //! `activeOnly` from the terminology ecosystem's requirements
 //! (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>), so it sees
 //! exactly what a client sees and needs no access to the engine. Both
-//! operations go through `ferrobridge-term` as `GET` requests, which writes
-//! them and reads their answers as the base's FHIR release defines them.
+//! operations go through `ferrobridge-term`, which writes them and reads
+//! their answers as the base's FHIR release defines them, over the HTTP
+//! engine, TLS and retry of the `[fhir]` endpoint table.
 //!
 //! The service reads two fields out of a searched resource it never writes
 //! back, so it models no FHIR resource of its own.
@@ -24,9 +25,12 @@
 use std::collections::BTreeSet;
 
 use ferrobridge_term::client::Client;
-use ferrobridge_term::config::{Config, Form, WireVersion};
+use ferrobridge_term::config::WireVersion;
 use ferrobridge_term::outcome::{ExpandOutcome, ExpansionContains};
 use ferrobridge_term::request::{Coded, Expansion, Validation};
+use ferrohealth_smart::client::outbound::{OutboundClient, OutboundError, SendError};
+use ferrohealth_smart::config::ServerTls;
+use ferrohealth_smart::config::endpoint::EndpointSection;
 
 use crate::record::{Activated, Finding, FindingKind, Revalidation};
 
@@ -58,6 +62,9 @@ pub enum RevalidateError {
         #[source]
         source: Box<ferrobridge_term::error::Error>,
     },
+    /// The `[fhir]` endpoint table is refused.
+    #[error("the [fhir] endpoint is refused")]
+    Endpoint(#[source] Box<OutboundError>),
     /// The request never reached the server.
     #[error("the request to {url} failed")]
     Request {
@@ -65,7 +72,7 @@ pub enum RevalidateError {
         url: String,
         /// Why the request failed.
         #[source]
-        source: reqwest::Error,
+        source: Box<SendError>,
     },
     /// The server answered with a status that is not a success.
     #[error("{url} answered {status}")]
@@ -116,40 +123,43 @@ pub enum RevalidateError {
 /// The server's FHIR API, as this service reads it.
 #[derive(Debug, Clone)]
 pub struct FhirClient {
-    http: reqwest::Client,
+    outbound: OutboundClient,
     base_url: String,
     terminology: Client,
 }
 
 impl FhirClient {
-    /// The client for the FHIR base at `base_url`, such as
+    /// The client for the FHIR base `endpoint` names, such as
     /// `http://ferroterm:8080/r4b`, whose last segment names the FHIR
     /// release the operations are written in.
     ///
     /// # Errors
     ///
-    /// Returns [`RevalidateError::Base`] when `base_url` is no URL or its last
-    /// segment names no release the server mounts, and
-    /// [`RevalidateError::Client`] when the terminology client is refused.
-    pub fn new(http: reqwest::Client, base_url: &str) -> Result<Self, RevalidateError> {
-        let base_url = base_url.trim_end_matches('/').to_owned();
-        let refused = || RevalidateError::Base {
-            base_url: base_url.clone(),
-        };
-        let parsed = url::Url::parse(&base_url).map_err(|_unparsed| refused())?;
-        let release = parsed
+    /// Returns [`RevalidateError::Endpoint`] when the table is refused,
+    /// [`RevalidateError::Base`] when its last segment names no release the
+    /// server mounts, and [`RevalidateError::Client`] when the terminology
+    /// client is refused.
+    pub fn new(endpoint: &EndpointSection) -> Result<Self, RevalidateError> {
+        let outbound = OutboundClient::build(endpoint, "fhir", &ServerTls)
+            .map_err(|source| RevalidateError::Endpoint(Box::new(source)))?;
+        let base_url = outbound.url().as_str().trim_end_matches('/').to_owned();
+        let release = outbound
+            .url()
             .path_segments()
-            .and_then(|mut segments| segments.next_back())
+            .and_then(|mut segments| segments.rfind(|segment| !segment.is_empty()))
             .and_then(release)
-            .ok_or_else(refused)?;
-        let config = Config::new(parsed, release).with_form(Form::Get);
-        let terminology =
-            Client::with_http(config, http.clone()).map_err(|source| RevalidateError::Client {
+            .ok_or_else(|| RevalidateError::Base {
                 base_url: base_url.clone(),
-                source: Box::new(source),
+            })?;
+        let terminology =
+            Client::from_endpoint(endpoint, "fhir", &ServerTls, release).map_err(|source| {
+                RevalidateError::Client {
+                    base_url: base_url.clone(),
+                    source: Box::new(source),
+                }
             })?;
         Ok(Self {
-            http,
+            outbound,
             base_url,
             terminology,
         })
@@ -258,16 +268,20 @@ impl FhirClient {
 
     /// One `GET` against the FHIR API, read as JSON.
     async fn get(&self, url: &str) -> Result<serde_json::Value, RevalidateError> {
+        let request = |source| RevalidateError::Request {
+            url: url.to_owned(),
+            source: Box::new(source),
+        };
+        let parsed = url::Url::parse(url).map_err(|_unparsed| RevalidateError::Base {
+            base_url: self.base_url.clone(),
+        })?;
         let response = self
-            .http
-            .get(url)
-            .header("accept", "application/fhir+json")
-            .send()
+            .outbound
+            .send(&reqwest::Method::GET, &parsed, |call| {
+                call.header("accept", "application/fhir+json")
+            })
             .await
-            .map_err(|source| RevalidateError::Request {
-                url: url.to_owned(),
-                source,
-            })?;
+            .map_err(request)?;
         let status = response.status();
         if !status.is_success() {
             return Err(RevalidateError::Status {

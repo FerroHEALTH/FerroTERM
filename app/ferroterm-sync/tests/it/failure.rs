@@ -154,7 +154,8 @@ async fn a_refused_reload_puts_back_the_resource_it_replaced() {
         )])
         .await;
     republished.reloads_with(500).await;
-    harness.config.server_admin_url = republished.server.uri();
+    harness.config.server_admin.url =
+        ferrohealth_secret::secret_url::SecretUrl::new(republished.server.uri());
     let service = harness.service(
         vec![republished.source()],
         TestClock::new("2026-10-01T03:00:00Z", 0),

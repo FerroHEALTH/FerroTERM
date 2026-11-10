@@ -8,7 +8,7 @@ use std::sync::Arc;
 use axum::Router;
 use axum::body::Body;
 use ferrohealth_server::section::ServerSection;
-use ferrohealth_smart::config::{AuthSection, IssuerEntry, IssuerKey};
+use ferrohealth_smart::config::{AuthSection, IssuerEntry};
 use ferrohealth_smart::kind::IssuerKind;
 use ferrohealth_telemetry::section::TelemetrySection;
 use ferrohealth_telemetry::telemetry::{Service, Telemetry};
@@ -42,12 +42,12 @@ impl SmartSetup {
     pub(crate) fn for_issuer(issuer: &str) -> Self {
         Self {
             auth: AuthSection {
-                issuer: IssuerKey::List(vec![IssuerEntry {
+                issuer: vec![IssuerEntry {
                     issuer: issuer.to_owned(),
                     kind: Some(IssuerKind::Machines),
                     audience: vec![String::from(AUDIENCE)],
                     ..IssuerEntry::default()
-                }]),
+                }],
                 ..AuthSection::default()
             },
             base_url: None,
@@ -56,10 +56,7 @@ impl SmartSetup {
 
     /// The one `[[auth.issuer]]` table [`SmartSetup::for_issuer`] wrote.
     pub(crate) fn issuer_mut(&mut self) -> &mut IssuerEntry {
-        match &mut self.auth.issuer {
-            IssuerKey::List(entries) => entries.first_mut().expect("the issuer table"),
-            IssuerKey::Flat(_) => panic!("the setup writes the table form"),
-        }
+        self.auth.issuer.first_mut().expect("the issuer table")
     }
 }
 

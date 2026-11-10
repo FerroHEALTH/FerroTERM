@@ -8,8 +8,8 @@ use std::process::ExitCode;
 
 use ferrohealth_server::cli::{Common, ConfigCommand};
 use ferrohealth_server::run::{EXIT_CONFIG, Failure, Run, chain};
-use ferrohealth_server::telemetry::build as build_telemetry;
-use ferrohealth_telemetry::telemetry::{Console, Service};
+use ferrohealth_server::telemetry::install;
+use ferrohealth_telemetry::telemetry::Service;
 
 use crate::cli::Cli;
 use crate::config::Config;
@@ -38,15 +38,7 @@ where
 async fn dispatch(cli: Cli) -> Result<ExitCode, Failure> {
     let settings = Config::load(cli.config.config.as_deref(), &cli.config.sets)
         .and_then(Settings::from_loaded)
-        .map_err(|error| {
-            if cli.command == Common::Healthcheck {
-                Failure::from(error).with_context("not up")
-            } else {
-                Failure::from(error)
-                    .with_context("cannot start")
-                    .with_code(EXIT_CONFIG)
-            }
-        })?;
+        .map_err(|error| cli.command.refused(error))?;
     match cli.command {
         Common::Healthcheck => Ok(healthcheck(&settings).await),
         Common::Config {
@@ -64,11 +56,7 @@ async fn dispatch(cli: Cli) -> Result<ExitCode, Failure> {
     reason = "the job's one answer goes to standard output"
 )]
 fn config_check(settings: &Settings) -> Result<ExitCode, Failure> {
-    crate::server::upstream_client(settings).map_err(|error| {
-        Failure::from(error)
-            .with_context("cannot start")
-            .with_code(EXIT_CONFIG)
-    })?;
+    crate::server::upstream_client(settings).map_err(Failure::refused_configuration)?;
     println!("ferroterm-console: the configuration is valid");
     Ok(ExitCode::SUCCESS)
 }
@@ -99,12 +87,8 @@ async fn healthcheck(settings: &Settings) -> ExitCode {
 async fn serve(settings: Settings) -> Result<ExitCode, Failure> {
     let service = Service::new("ferroterm-console", env!("CARGO_PKG_VERSION"))
         .export_crate("ferroterm_console");
-    let telemetry = build_telemetry(&settings.telemetry, service)
+    let installed = install(&settings.telemetry, service)
         .map_err(|error| Failure::from(error).with_context("cannot start the log"))?;
-    telemetry
-        .install(&settings.telemetry, &Console::detect())
-        .map_err(|error| Failure::from(error).with_context("cannot start the log"))?;
-    ferrohealth_telemetry::panic::install_hook();
     let listen = settings.listen;
     let state = match ConsoleState::new(settings).await {
         Ok(state) => state,
@@ -135,8 +119,6 @@ async fn serve(settings: Settings) -> Result<ExitCode, Failure> {
             ExitCode::FAILURE
         }
     };
-    if let Err(error) = telemetry.shutdown() {
-        tracing::warn!(%error, "the telemetry did not flush");
-    }
+    installed.shutdown();
     Ok(code)
 }
