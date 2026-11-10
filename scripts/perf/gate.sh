@@ -12,9 +12,12 @@
 #       head, and of its base: the merge base of HEAD with BASE, a commit or
 #       ref, or with no BASE the newest v* tag before HEAD, else HEAD's first
 #       parent. The base is built from `git archive` of that commit under
-#       target/, with its own toolchain pin, into the same target directory,
-#       so the dependencies build once. The base must define both services;
-#       its fixture writer is built when its tree defines one (#1180).
+#       target/, with its own toolchain pin, into a target directory of its
+#       own: Cargo keys a workspace crate by its path within the workspace,
+#       the same in both trees, so a shared directory would link the base's
+#       build of a crate into the head (#1210). The base must define both
+#       services; its fixture writer is built when its tree defines one
+#       (#1180).
 #   scripts/perf/gate.sh run
 #       Writes the scaled synthetic SNOMED CT edition with each side's
 #       ferroterm-fixture, the head's for a base older than the writer,
@@ -41,6 +44,9 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 readonly WORK=target/perf-run
 readonly BASE_TREE=target/perf-base
+# The base's own target directory, beside its tree so a new base keeps the
+# dependencies an earlier one built.
+readonly BASE_TARGET=target/perf-base-target
 readonly BINARIES=(ferroterm ferroterm-sync ferroterm-fixture)
 # The binaries the gate measures, which the base must define too.
 readonly SERVICES=(ferroterm ferroterm-sync)
@@ -160,9 +166,9 @@ build() {
   if [[ " ${binaries[*]} " != *" $FIXTURE "* ]]; then
     echo "perf-gate: the base defines no $FIXTURE, so the head's writes its edition"
   fi
-  (cd "$BASE_TREE/src" && cargo_build "${binaries[@]}" -- --target-dir "$root/target")
+  (cd "$BASE_TREE/src" && cargo_build "${binaries[@]}" -- --target-dir "$root/$BASE_TARGET")
   for binary in "${binaries[@]}"; do
-    cp "target/release/$binary" "$BASE_TREE/$binary"
+    cp "$BASE_TARGET/release/$binary" "$BASE_TREE/$binary"
   done
   cargo_build "${BINARIES[@]}"
 }
@@ -332,6 +338,8 @@ self_test() {
       failed=1
     fi
   }
+  check "the base builds into a target directory the head does not read" \
+    "separate" "$([[ "${BASE_TARGET%/}" != target ]] && echo separate || echo shared)"
   check "the morning turns to the evening" "21:00" "$(twelve_hours_on 09)"
   check "the evening wraps past midnight" "06:00" "$(twelve_hours_on 18)"
   check "midnight turns to noon" "12:00" "$(twelve_hours_on 00)"
