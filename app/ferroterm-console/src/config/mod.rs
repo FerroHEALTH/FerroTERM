@@ -211,24 +211,8 @@ pub const PREPARING: &str = "0.4.5";
 /// place.
 // TODO(#1202): the refusals ship in 0.4.5 alone; delete them in 0.4.6.
 pub const RETIRED: [Retired; 4] = [
-    Retired::replaced(
-        "ferroterm.base_url",
-        "ferroterm.server.url, the server's root",
-        "0.4.5",
-    ),
-    Retired::replaced(
-        "ferroterm.timeout",
-        "ferroterm.server.timeout, a duration such as `30s`",
-        "0.4.5",
-    ),
-    Retired::replaced(
-        "ferroterm.sync_url",
-        "ferroterm.sync.url, the sync service's admin root",
-        "0.4.5",
-    ),
-    Retired::replaced(
-        "ferroterm.admin_url",
-        "ferroterm.admin.url, the server's admin root",
-        "0.4.5",
-    ),
+    Retired::replaced("ferroterm.base_url", "ferroterm.server.url", "0.4.5"),
+    Retired::replaced("ferroterm.timeout", "ferroterm.server.timeout", "0.4.5"),
+    Retired::replaced("ferroterm.sync_url", "ferroterm.sync.url", "0.4.5"),
+    Retired::replaced("ferroterm.admin_url", "ferroterm.admin.url", "0.4.5"),
 ];
