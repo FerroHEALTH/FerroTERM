@@ -13,25 +13,6 @@ to run.
 > The name: Ferro for the Rust family FerroTERM shares with FerroEHR, TERM for
 > terminology. The site is <https://ferroterm.eu>.
 
-## Where the project is
-
-v0.4.5 is the current release. It ships as Linux binaries for `x86_64` and
-`aarch64` (glibc and musl), as a container image for `linux/amd64` and
-`linux/arm64`, and as a Compose file, all built with signed provenance. The
-server answers FHIR R4 under `/r4`, R4B under `/r4b`, R5 under `/r5`, and the
-R6 ballot under `/r6`; the CI lane runs the HL7 terminology ecosystem suite
-against the published versions on every change and holds a committed pass list
-per version.
-
-Hierarchical expansion, persisted client resources, `Bundle` batch, `$closure`,
-and the SNOMED implicit concept maps are served. The persisted resources and the
-closure tables need a deployment that names a database in `FERROTERM__TERMINOLOGY__RESOURCES`,
-and `$closure` answers on `/r4`, `/r4b`, and `/r5`, since the R6 ballot defines
-no such operation. Where a mature terminology server does more, such as
-authoring SNOMED content and MRCM validation of post-coordinated expressions,
-this book says so. Each open item is an issue with acceptance criteria on the
-tracker, and the milestones are the roadmap.
-
 ## What this book leaves to the family book
 
 FerroTERM is one product of the FerroHEALTH family, and Cadasto B.V. is the
