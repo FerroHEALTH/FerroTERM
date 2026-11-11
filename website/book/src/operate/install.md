@@ -201,7 +201,7 @@ a numeric non-root user (`65532`), and the listen address preset to
 $ docker run --rm -p 8080:8080 \
     -v /srv/ferroterm/index:/data/index:ro \
     -e FERROTERM__TERMINOLOGY__INDEX=/data/index \
-    ghcr.io/ferrohealth/ferroterm:0.4.6
+    ghcr.io/ferrohealth/ferroterm:0.4.7
 ```
 
 Mount the index root read-only; each child directory under it is one
@@ -211,7 +211,7 @@ container runs with a read-only root filesystem. Tags are `<version>`,
 provenance first (see [Verifying releases](verifying-releases.md)):
 
 ```console
-$ gh attestation verify oci://ghcr.io/ferrohealth/ferroterm:0.4.6 \
+$ gh attestation verify oci://ghcr.io/ferrohealth/ferroterm:0.4.7 \
     -R FerroHEALTH/FerroTERM \
     --signer-workflow FerroHEALTH/FerroTERM/.github/workflows/release-image.yml
 ```
@@ -233,10 +233,10 @@ musl) holding `ferroterm` and `ferroterm-build`, with a checksum, a CycloneDX
 SBOM, and Sigstore attestations beside it. Download, verify, unpack, run:
 
 ```console
-$ gh release download v0.4.6 -R FerroHEALTH/FerroTERM -p 'ferroterm-v0.4.6-x86_64-unknown-linux-musl.tar.gz*'
-$ gh attestation verify ferroterm-v0.4.6-x86_64-unknown-linux-musl.tar.gz -R FerroHEALTH/FerroTERM \
+$ gh release download v0.4.7 -R FerroHEALTH/FerroTERM -p 'ferroterm-v0.4.7-x86_64-unknown-linux-musl.tar.gz*'
+$ gh attestation verify ferroterm-v0.4.7-x86_64-unknown-linux-musl.tar.gz -R FerroHEALTH/FerroTERM \
     --signer-workflow FerroHEALTH/FerroTERM/.github/workflows/release-build.yml
-$ tar xzf ferroterm-v0.4.6-x86_64-unknown-linux-musl.tar.gz
+$ tar xzf ferroterm-v0.4.7-x86_64-unknown-linux-musl.tar.gz
 $ FERROTERM__TERMINOLOGY__INDEX=/srv/ferroterm/index ./ferroterm
 ```
 

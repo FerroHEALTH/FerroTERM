@@ -18,6 +18,40 @@ fragments here under the version and its date.
 
 ## [Unreleased]
 
+## [0.4.7] - 2026-11-11
+
+### Changed
+
+- ferroterm.eu takes the FerroHEALTH family layout: the hero badge is
+  rendered from the workspace version at assembly, every page's stylesheet
+  link carries a content hash, the console section shows the console as its
+  own image with its screenshot, the book opens in its teal light and navy
+  themes with its parts in the order Evaluate, Integrate, Operate,
+  Contribute and a Changelog page, and the README quick start is the
+  anchored steps of `scripts/quickstart/tour.sh`, which a new CI job runs
+  against the published image
+  ([#1226](https://github.com/FerroHEALTH/FerroTERM/issues/1226)).
+- The quick start downloads the release's self-contained `compose.yaml`,
+  now attached with its `.sha256sum`, and starts it with an empty index
+  directory in place of a `docker run` of the image. CI runs the README's
+  quick start over the repository's `compose.yaml`, the file each release
+  attaches, and refuses a host path it would read from the repository
+  ([#1228](https://github.com/FerroHEALTH/FerroTERM/issues/1228)).
+
+### Fixed
+
+- `ferroterm config check` no longer prints the password of an
+  `[[auth.issuer]]` issuer written with userinfo (`https://user:password@…`):
+  it renders as `https://***@…`. The server moves to `ferrohealth-smart`
+  0.18, which holds every configured issuer identifier as a `SecretUrl`,
+  with `ferrohealth-session` 0.12 and `ferrobridge-term` 0.5, the releases
+  on the same line (#1230).
+- `ferroterm-console config check` and every other rendering of the console's configuration
+  show an `[oidc]` issuer, `redirect_uri` or `post_logout_redirect_uri`
+  written with userinfo as `https://***@…`, never its password. The console
+  moves to `ferrohealth-session` 0.13, which holds the three URLs as
+  `SecretUrl` (#1232).
+
 ## [0.4.6] - 2026-11-10
 
 ### Removed
@@ -2839,7 +2873,8 @@ binary answers `GET /health` only.
 - No existing Rust terminology or FHIR crate is a dependency; the README
   records the evaluation and the reasons.
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.6...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.7...HEAD
+[0.4.7]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.6...v0.4.7
 [0.4.6]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.5...v0.4.6
 [0.4.5]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.3...v0.4.4
