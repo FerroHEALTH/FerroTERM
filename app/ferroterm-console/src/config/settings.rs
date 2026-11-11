@@ -605,7 +605,7 @@ mod tests {
         let no_openid = refused(|oidc| oidc.scopes = vec![String::from("profile")]);
         assert!(matches!(&no_openid, ConfigError::NoOpenId), "{no_openid:?}");
         let fragment = refused(|oidc| {
-            oidc.redirect_uri = SecretUrl::new(format!("{}#x", oidc.redirect_uri.expose()))
+            oidc.redirect_uri = SecretUrl::new(format!("{}#x", oidc.redirect_uri.expose()));
         });
         assert!(
             matches!(&fragment, ConfigError::UrlShape { key, .. } if *key == "oidc.redirect_uri"),
