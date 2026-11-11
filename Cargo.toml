@@ -78,16 +78,16 @@ toml = { version = "1.1.6", default-features = false, features = ["std", "parse"
 # (GHSA-vmx8-jr3x-394q); 0.16 builds every outbound integration's client from
 # its endpoint table (`client::outbound::OutboundClient`), on ferrohealth-config
 # 0.4; 0.18 holds every configured issuer identifier as a SecretUrl, so an
-# issuer's userinfo renders masked. `server-tls` builds an outbound `tls` table
-# through ferrohealth-server's TlsClient. Verified against crates.io on
-# 2026-11-11.
-ferrohealth-smart = { version = "=0.18.0", features = ["axum", "server-tls"] }
+# issuer's userinfo renders masked, and 0.19 the issuer every other `[auth]`
+# table names too. `server-tls` builds an outbound `tls` table through
+# ferrohealth-server's TlsClient. Verified against crates.io on 2026-11-11.
+ferrohealth-smart = { version = "=0.19.0", features = ["axum", "server-tls"] }
 # The FerroHEALTH console sign-in and session: the authorization code flow
 # with PKCE over ferrohealth-smart's relying party, the session store with
 # its idle and absolute lifetimes, and the four sign-in routes. Pinned
-# exactly, at the release beside ferrohealth-smart 0.18, whose `oidc` types
+# exactly, at the release beside ferrohealth-smart 0.19, whose `oidc` types
 # it carries. Verified against crates.io on 2026-11-11.
-ferrohealth-session = { version = "=0.13.0", features = ["axum"] }
+ferrohealth-session = { version = "=0.14.0", features = ["axum"] }
 # The FerroHEALTH health family: the readiness document, the indicator
 # registry and the process lifecycle, and the HTTP plumbing whose `health`
 # module serves `/health`, `/health/liveness` and `/health/readiness` over
@@ -197,9 +197,9 @@ fhir-types = { version = "0.1.131", default-features = false, features = ["r4", 
 # operations through, published by the FerroBRIDGE repository: the request each
 # release writes and the answer it reads, with or without its own transport.
 # Each FHIR release is its own feature: the same four, which the console offers.
-# 0.5 builds its client from a ferrohealth-smart 0.18 endpoint table
+# 0.6 builds its client from a ferrohealth-smart 0.19 endpoint table
 # (`Client::from_endpoint`, feature `smart`, which the sync service turns on).
-ferrobridge-term = { version = "0.5.0", default-features = false, features = ["r4", "r4b", "r5", "r6"] }
+ferrobridge-term = { version = "0.6.0", default-features = false, features = ["r4", "r4b", "r5", "r6"] }
 # Workspace-internal crates. The `crates/*` members carry the published crate
 # line (lockstep, bumped with their packaged content, never the product
 # version); the tools stay on the workspace version.
