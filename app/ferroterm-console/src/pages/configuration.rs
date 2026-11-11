@@ -187,14 +187,14 @@ impl Shown {
     pub(crate) fn of(settings: &crate::config::settings::Settings) -> Self {
         use ferrohealth_config::provenance::Source;
         let oidc = settings.oidc.as_ref().map(|oidc| OidcShown {
-            issuer: oidc.issuer.clone(),
+            issuer: oidc.issuer.to_string(),
             client_id: oidc.client_id.clone(),
             secret: match (&oidc.client_secret_file, &oidc.client_secret) {
                 (Some(file), _) => SecretShown::File(file.display().to_string()),
                 (None, Some(_)) => SecretShown::Inline,
                 (None, None) => SecretShown::Unset,
             },
-            redirect_uri: oidc.redirect_uri.clone(),
+            redirect_uri: oidc.redirect_uri.to_string(),
             scopes: oidc.scopes.clone(),
             end_session: oidc.end_session_endpoint.is_some(),
         });

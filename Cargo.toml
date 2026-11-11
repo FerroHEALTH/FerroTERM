@@ -87,7 +87,7 @@ ferrohealth-smart = { version = "=0.18.0", features = ["axum", "server-tls"] }
 # its idle and absolute lifetimes, and the four sign-in routes. Pinned
 # exactly, at the release beside ferrohealth-smart 0.18, whose `oidc` types
 # it carries. Verified against crates.io on 2026-11-11.
-ferrohealth-session = { version = "=0.12.0", features = ["axum"] }
+ferrohealth-session = { version = "=0.13.0", features = ["axum"] }
 # The FerroHEALTH health family: the readiness document, the indicator
 # registry and the process lifecycle, and the HTTP plumbing whose `health`
 # module serves `/health`, `/health/liveness` and `/health/readiness` over
