@@ -461,7 +461,7 @@ mod tests {
         let [issuer] = auth.issuers() else {
             panic!("one [[auth.issuer]] table, not {:?}", auth.issuers());
         };
-        assert_eq!(issuer.issuer, "https://as.example.org");
+        assert_eq!(issuer.issuer.expose(), "https://as.example.org");
         assert_eq!(issuer.kind, Some(IssuerKind::Machines));
         assert_eq!(issuer.audience, ["ferroterm"]);
         assert_eq!(
@@ -496,7 +496,7 @@ mod tests {
         let [issuer] = config.auth.issuers() else {
             panic!("one [[auth.issuer]] table, not {:?}", config.auth.issuers());
         };
-        assert_eq!(issuer.issuer, "https://as.example.org");
+        assert_eq!(issuer.issuer.expose(), "https://as.example.org");
         assert_eq!(issuer.kind, Some(IssuerKind::Machines));
         assert_eq!(issuer.audience, ["ferroterm"]);
         assert!(

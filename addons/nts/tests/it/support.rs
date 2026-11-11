@@ -97,7 +97,7 @@ pub(crate) fn endpoint(server: &MockServer, account: &Account) -> EndpointSectio
         .oauth
         .as_mut()
         .expect("the default table names the grant");
-    oauth.issuer = format!("{}/realms/synthetic", server.uri());
+    oauth.issuer = SecretUrl::new(format!("{}/realms/synthetic", server.uri()));
     account.client_id.clone_into(&mut oauth.client_id);
     oauth.client_secret = Some(account.client_secret.to_owned().into());
     endpoint

@@ -117,7 +117,7 @@ pub fn endpoint() -> EndpointSection {
         connect_timeout: Some(Duration::from_secs(30)),
         credentials: CredentialsSection {
             oauth: Some(OauthSection {
-                issuer: String::from(NTS_ISSUER),
+                issuer: SecretUrl::new(NTS_ISSUER),
                 client_auth: ClientAuth::ClientSecretPost,
                 refresh_margin: Duration::from_mins(1),
                 ..OauthSection::default()
@@ -237,7 +237,8 @@ mod tests {
             .oauth
             .expect("the default endpoint names the grant");
         assert_eq!(
-            oauth.issuer, "https://terminologieserver.nl/authorisation/auth/realms/nictiz",
+            oauth.issuer.expose(),
+            "https://terminologieserver.nl/authorisation/auth/realms/nictiz",
             "the tokens come from the service's own issuer"
         );
         assert_eq!(

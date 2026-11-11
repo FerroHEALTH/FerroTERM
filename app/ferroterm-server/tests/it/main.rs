@@ -21,6 +21,7 @@ mod closure;
 mod code_system;
 mod concept_map;
 mod config;
+mod config_check;
 mod console_fixtures;
 mod descriptive;
 mod ecosystem;
