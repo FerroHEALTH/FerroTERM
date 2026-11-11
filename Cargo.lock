@@ -1143,6 +1143,8 @@ dependencies = [
 [[package]]
 name = "ferrobridge-term"
 version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c859e1f739a4f4aea718140509a889481bdb51c9308b3fddde7dcc0bcd7dc17b"
 dependencies = [
  "async-trait",
  "backon",
@@ -1567,6 +1569,8 @@ dependencies = [
 [[package]]
 name = "fhir-types"
 version = "0.1.131"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "295ec4729d0e3595a79b426afc54831a5386648c41b376fe0b7c38af19041d4a"
 dependencies = [
  "quick-xml",
  "regex",
