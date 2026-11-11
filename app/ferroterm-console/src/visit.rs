@@ -110,7 +110,7 @@ impl Visit {
                 Held::SignedIn(session) => Some(session.left()),
                 Held::TokenExpired | Held::Ended | Held::Absent => None,
             },
-            issuer: settings.oidc.as_ref().map(|oidc| oidc.issuer.clone()),
+            issuer: settings.oidc.as_ref().map(|oidc| oidc.issuer.to_string()),
             listeners: Listeners {
                 sync: settings.ferroterm.sync.is_some(),
                 admin: settings.ferroterm.admin.is_some(),

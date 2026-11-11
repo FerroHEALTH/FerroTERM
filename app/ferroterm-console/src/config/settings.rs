@@ -176,7 +176,7 @@ impl Config {
         let redirect = self
             .oidc
             .as_ref()
-            .and_then(|oidc| Url::parse(&oidc.redirect_uri).ok());
+            .and_then(|oidc| Url::parse(oidc.redirect_uri.expose()).ok());
         // NOTE: RFC 6265bis §4.1.2.5: a cookie without `Secure` travels over plain
         // HTTP, so it is admitted only where the console itself is HTTP on loopback.
         if !store.secure_cookie()
@@ -319,14 +319,14 @@ mod tests {
     fn oidc(inline: Option<&str>, file: Option<&Path>) -> Config {
         Config {
             oidc: Some(OidcSection {
-                issuer: String::from("https://idp.example"),
+                issuer: SecretUrl::new("https://idp.example"),
                 authorization_endpoint: Some(SecretUrl::new("https://idp.example/authorize")),
                 token_endpoint: Some(SecretUrl::new("https://idp.example/token")),
                 jwks_uri: Some(SecretUrl::new("https://idp.example/jwks")),
                 client_id: String::from("ferroterm-console"),
                 client_secret: inline.map(Secret::new),
                 client_secret_file: file.map(Path::to_path_buf),
-                redirect_uri: String::from("https://console.example/auth/callback"),
+                redirect_uri: SecretUrl::new("https://console.example/auth/callback"),
                 ..OidcSection::default()
             }),
             ..Config::default()
@@ -604,7 +604,9 @@ mod tests {
         );
         let no_openid = refused(|oidc| oidc.scopes = vec![String::from("profile")]);
         assert!(matches!(&no_openid, ConfigError::NoOpenId), "{no_openid:?}");
-        let fragment = refused(|oidc| oidc.redirect_uri.push_str("#x"));
+        let fragment = refused(|oidc| {
+            oidc.redirect_uri = SecretUrl::new(format!("{}#x", oidc.redirect_uri.expose()));
+        });
         assert!(
             matches!(&fragment, ConfigError::UrlShape { key, .. } if *key == "oidc.redirect_uri"),
             "{fragment:?}"
@@ -621,7 +623,7 @@ mod tests {
             "{error:?}"
         );
         if let Some(oidc) = config.oidc.as_mut() {
-            oidc.redirect_uri = String::from("http://127.0.0.1:3000/auth/callback");
+            oidc.redirect_uri = SecretUrl::new("http://127.0.0.1:3000/auth/callback");
         }
         let settings = config.resolve().expect("a console on loopback");
         assert_eq!(

@@ -36,7 +36,7 @@ fn sign_out(cookies: &[String], site: &str) -> Request<Body> {
 fn full(provider: &Provider) -> OidcSection {
     OidcSection {
         end_session_endpoint: Some(SecretUrl::new(provider.url(END_SESSION_PATH))),
-        post_logout_redirect_uri: Some(String::from(POST_LOGOUT)),
+        post_logout_redirect_uri: Some(SecretUrl::new(POST_LOGOUT)),
         revocation_endpoint: Some(SecretUrl::new(provider.url(REVOCATION_PATH))),
         ..provider.oidc()
     }

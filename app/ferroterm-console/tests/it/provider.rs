@@ -135,12 +135,12 @@ impl Provider {
     /// client with the end-session and revocation endpoints left out.
     pub(crate) fn oidc(&self) -> OidcSection {
         OidcSection {
-            issuer: self.issuer(),
+            issuer: SecretUrl::new(self.issuer()),
             authorization_endpoint: Some(SecretUrl::new(self.url("/authorize"))),
             token_endpoint: Some(SecretUrl::new(self.url(TOKEN_PATH))),
             jwks_uri: Some(SecretUrl::new(self.url(JWKS_PATH))),
             client_id: String::from(CLIENT_ID),
-            redirect_uri: String::from(REDIRECT_URI),
+            redirect_uri: SecretUrl::new(REDIRECT_URI),
             scopes: vec![String::from("openid"), String::from("user/*.cruds")],
             ..OidcSection::default()
         }

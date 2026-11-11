@@ -269,12 +269,12 @@ mod tests {
         config.ferroterm.public_url = Some(String::from("https://tx.example.org/"));
         if sign_in {
             config.oidc = Some(OidcSection {
-                issuer: String::from("https://idp.example"),
+                issuer: SecretUrl::new("https://idp.example"),
                 authorization_endpoint: Some(SecretUrl::new("https://idp.example/authorize")),
                 token_endpoint: Some(SecretUrl::new("https://idp.example/token")),
                 jwks_uri: Some(SecretUrl::new("https://idp.example/jwks")),
                 client_id: String::from("ferroterm-console"),
-                redirect_uri: String::from("http://127.0.0.1:3000/auth/callback"),
+                redirect_uri: SecretUrl::new("http://127.0.0.1:3000/auth/callback"),
                 ..OidcSection::default()
             });
         }
