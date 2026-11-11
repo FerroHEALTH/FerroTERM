@@ -216,7 +216,7 @@ async fn introspecting_issuer() -> MockServer {
 fn introspecting(issuer: &str) -> AuthSection {
     AuthSection {
         issuer: vec![IssuerEntry {
-            issuer: issuer.to_owned(),
+            issuer: ferrohealth_secret::secret_url::SecretUrl::new(issuer),
             kind: Some(IssuerKind::Machines),
             audience: vec![String::from(AUDIENCE)],
             mode: AuthMode::Introspection,

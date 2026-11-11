@@ -447,7 +447,7 @@ feed_url = "https://example.invalid/feed.xml"
             .expect("the product's defaults name the grant");
         assert_eq!(oauth.client_id, "a-client");
         assert_eq!(
-            oauth.issuer,
+            oauth.issuer.expose(),
             addon_nts::config::NTS_ISSUER,
             "the issuer stays the service's"
         );

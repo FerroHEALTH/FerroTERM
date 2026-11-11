@@ -43,7 +43,7 @@ impl SmartSetup {
         Self {
             auth: AuthSection {
                 issuer: vec![IssuerEntry {
-                    issuer: issuer.to_owned(),
+                    issuer: ferrohealth_secret::secret_url::SecretUrl::new(issuer),
                     kind: Some(IssuerKind::Machines),
                     audience: vec![String::from(AUDIENCE)],
                     ..IssuerEntry::default()
