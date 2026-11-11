@@ -192,7 +192,7 @@ tempfile = "3.27.0"
 # recorded in docs/VERSIONS.md and `scripts/checks/versions.sh` fails when the
 # manifest, the lock, and that table disagree. It names the four releases the
 # server mounts; nothing here reads the STU3 model its default adds.
-fhir-types = { version = "0.1.130", default-features = false, features = ["r4", "r4b", "r5", "r6", "terminology"] }
+fhir-types = { version = "0.1.131", default-features = false, features = ["r4", "r4b", "r5", "r6", "terminology"] }
 # The FHIR terminology client the console and the sync service send their
 # operations through, published by the FerroBRIDGE repository: the request each
 # release writes and the answer it reads, with or without its own transport.
