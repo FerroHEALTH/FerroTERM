@@ -1,0 +1,1 @@
+- FerroTERM moves to `ferrohealth-smart` 0.20, with `ferrohealth-session` 0.15 and `ferrobridge-term` 0.7, the releases on the same line. A refusal of a role issuer (`ConfigError::RoleIssuer`) renders the issuer with its userinfo masked (#1240).
