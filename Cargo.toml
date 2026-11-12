@@ -96,15 +96,15 @@ ferrohealth-session = { version = "=0.15.0", features = ["axum"] }
 # the run-path calls (`run::config_check`, `telemetry::install`). Verified
 # against crates.io on 2026-11-10.
 ferrohealth-health = { version = "=0.1.1", features = ["registry"] }
-ferrohealth-server = { version = "=0.8.1" }
+ferrohealth-server = { version = "=0.8.2" }
 # The FerroHEALTH configuration loader and its secrets: one TOML tree per
 # binary under `--config` or `<PREFIX>_CONFIG`, `<PREFIX>__SECTION__KEY`
 # overrides, `--set`, strict refusals and provenance, and the `<key>_file`
 # rule with the redacting `Secret`; 0.3 adds the `Duration` and `ByteSize`
 # every span of time and amount of data is written as, and the outbound TLS
 # table. Pinned exactly. Verified against crates.io on 2026-11-10.
-ferrohealth-config = { version = "=0.4.1" }
-ferrohealth-secret = { version = "=0.2.0" }
+ferrohealth-config = { version = "=0.4.3" }
+ferrohealth-secret = { version = "=0.2.1" }
 # The FerroHEALTH telemetry: the `[telemetry]` section, the console, the
 # panic line, the request log with its product fields, and the one
 # OpenTelemetry provider read by Prometheus and pushed over OTLP. Each member
@@ -116,7 +116,7 @@ ferrohealth-telemetry = { version = "=0.4.0" }
 # with `telemetry` records what the request log sees. Pinned exactly; 0.4
 # builds that window on ferrohealth-telemetry 0.4. Verified against crates.io
 # on 2026-11-10.
-ferrohealth-usage-report = { version = "=0.4.0" }
+ferrohealth-usage-report = { version = "=0.4.1" }
 # The Argon2id hashes of the Basic users the SMART tests configure, the
 # version and features ferrohealth-smart verifies them with. Verified against
 # crates.io on 2026-10-20.
