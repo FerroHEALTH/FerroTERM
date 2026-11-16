@@ -7,7 +7,7 @@ use argon2::Argon2;
 use argon2::password_hash::PasswordHasher;
 use axum::body::Body;
 use base64::Engine;
-use ferrohealth_smart::config::{BasicSection, BasicUser};
+use ferrohealth_smart::config::{BasicGrant, BasicSection, BasicUser};
 use http::header::AUTHORIZATION;
 use http::{Request, StatusCode};
 use ring::rand::SystemRandom;
@@ -45,8 +45,9 @@ fn basic(user: &str, password: &str) -> String {
 }
 
 // A person authenticates with HTTP Basic (RFC 7617) as a `[[auth.basic.users]]`
-// entry beside the bearer tokens; the user's `user/` scopes and the product
-// scope decide what the person reaches, as a token's would. A machine takes a
+// entry beside the bearer tokens; the `user/` scopes and the product scope
+// `[basic_grants]` grants the user decide what the person reaches, as a
+// token's would. A machine takes a
 // client credentials token instead (RFC 6749 §4.4).
 #[tokio::test]
 async fn a_basic_user_writes_and_reloads_with_its_configured_scopes() {
@@ -59,18 +60,28 @@ async fn a_basic_user_writes_and_reloads_with_its_configured_scopes() {
             BasicUser {
                 user: String::from("editor"),
                 password_hash: Some(phc(&editor)),
-                scopes: vec![String::from("user/CodeSystem.cud")],
                 ..BasicUser::default()
             },
             BasicUser {
                 user: String::from("operator"),
                 password_hash: Some(phc(&operator)),
-                scopes: vec![String::from("__ferroterm.admin")],
                 ..BasicUser::default()
             },
         ],
         ..BasicSection::default()
     });
+    for (user, scope) in [
+        ("editor", "user/CodeSystem.cud"),
+        ("operator", "__ferroterm.admin"),
+    ] {
+        setup.basic_grants.users.insert(
+            String::from(user),
+            BasicGrant {
+                scopes: vec![String::from(scope)],
+                ..BasicGrant::default()
+            },
+        );
+    }
     let server = Server::start_persisting_with_smart_setup(setup).await;
     let admin = server.admin_router();
 

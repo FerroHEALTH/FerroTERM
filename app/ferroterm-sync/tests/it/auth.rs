@@ -16,7 +16,8 @@ use base64::Engine as _;
 use ferrohealth_smart::basic::StoreError;
 use ferrohealth_smart::config::credentials::OauthSection;
 use ferrohealth_smart::config::{
-    AuthMode, AuthSection, BasicSection, BasicUser, ConfigError, IntrospectionSection, IssuerEntry,
+    AuthMode, AuthSection, BasicGrant, BasicGrants, BasicSection, BasicUser, IntrospectionSection,
+    IssuerEntry,
 };
 use ferrohealth_smart::kind::IssuerKind;
 use ferroterm_sync::auth::{AdminAuth, AuthError, SYNC_SCOPE};
@@ -44,36 +45,61 @@ fn basic(user: &str) -> String {
     format!("Basic {encoded}")
 }
 
-/// An `[auth]` admitting two Basic users: `operator` with the product scope
-/// and `reader` with an unrelated one.
-fn section() -> AuthSection {
+/// An `[auth]` admitting the Basic users `users`.
+fn admitting(users: &[&str]) -> AuthSection {
     AuthSection {
         basic: Some(BasicSection {
-            users: vec![
-                BasicUser {
-                    user: String::from("operator"),
+            users: users
+                .iter()
+                .map(|user| BasicUser {
+                    user: String::from(*user),
                     password_hash: Some(phc()),
-                    scopes: vec![String::from(SYNC_SCOPE)],
                     ..BasicUser::default()
-                },
-                BasicUser {
-                    user: String::from("reader"),
-                    password_hash: Some(phc()),
-                    scopes: vec![String::from("user/CodeSystem.rs")],
-                    ..BasicUser::default()
-                },
-            ],
+                })
+                .collect(),
             ..BasicSection::default()
         }),
         ..AuthSection::default()
     }
 }
 
+/// An `[auth]` admitting two Basic users, `operator` and `reader`.
+fn section() -> AuthSection {
+    admitting(&["operator", "reader"])
+}
+
+/// The `[basic_grants]` of `grants`, one scope per user.
+fn granting(grants: &[(&str, &str)]) -> BasicGrants {
+    BasicGrants {
+        users: grants
+            .iter()
+            .map(|(user, scope)| {
+                let grant = BasicGrant {
+                    scopes: vec![String::from(*scope)],
+                    ..BasicGrant::default()
+                };
+                (String::from(*user), grant)
+            })
+            .collect(),
+    }
+}
+
+/// The grants of [`section`]: `operator` the product scope and `reader` an
+/// unrelated one.
+fn grants() -> BasicGrants {
+    granting(&[("operator", SYNC_SCOPE), ("reader", "user/CodeSystem.rs")])
+}
+
+/// No `[basic_grants]` table.
+fn none() -> BasicGrants {
+    BasicGrants::default()
+}
+
 /// The guarded admin router over a service that has run nothing.
 async fn guarded() -> Router {
     let harness = Harness::new().await;
     let service = harness.service(Vec::new(), TestClock::new("2026-10-01T03:00:00Z", 0));
-    let auth = AdminAuth::start(&section())
+    let auth = AdminAuth::start(&section(), &grants())
         .await
         .expect("the section starts")
         .expect("authentication is on");
@@ -186,7 +212,7 @@ async fn the_product_scope_reaches_the_records_and_the_metrics() {
 
 #[tokio::test]
 async fn a_section_admitting_no_credential_refuses_the_start() {
-    let refused = AdminAuth::start(&AuthSection::default()).await;
+    let refused = AdminAuth::start(&AuthSection::default(), &none()).await;
     assert!(
         matches!(refused, Err(AuthError::Config { .. })),
         "an enabled [auth] with no issuer and no Basic user fails closed: {refused:?}"
@@ -258,7 +284,7 @@ fn active(issuer: &str, scope: &str) -> String {
 async fn introspected(issuer: &MockServer) -> Router {
     let harness = Harness::new().await;
     let service = harness.service(Vec::new(), TestClock::new("2026-10-01T03:00:00Z", 0));
-    let auth = AdminAuth::start(&introspecting(&issuer.uri()))
+    let auth = AdminAuth::start(&introspecting(&issuer.uri()), &none())
         .await
         .expect("the introspecting section starts")
         .expect("authentication is on");
@@ -351,7 +377,7 @@ async fn an_issuer_without_an_introspection_endpoint_refuses_the_start() {
         ))
         .mount(&issuer)
         .await;
-    let refused = AdminAuth::start(&introspecting(&base)).await;
+    let refused = AdminAuth::start(&introspecting(&base), &none()).await;
     assert!(
         matches!(refused, Err(AuthError::Introspector { .. })),
         "the refusal names the introspection endpoint: {refused:?}"
@@ -364,7 +390,12 @@ async fn enabled_false_turns_the_guard_off() {
         enabled: false,
         ..AuthSection::default()
     };
-    assert!(AdminAuth::start(&off).await.expect("starts").is_none());
+    assert!(
+        AdminAuth::start(&off, &none())
+            .await
+            .expect("starts")
+            .is_none()
+    );
 }
 
 #[tokio::test]
@@ -373,7 +404,10 @@ async fn a_deployment_names_its_own_product_scope() {
         product_scope: String::from("__example.sync"),
         ..section()
     };
-    let auth = AdminAuth::start(&named).await.expect("starts").expect("on");
+    let auth = AdminAuth::start(&named, &grants())
+        .await
+        .expect("starts")
+        .expect("on");
     assert_eq!(auth.scope(), "__example.sync");
 }
 
@@ -450,9 +484,10 @@ async fn every_refusal_and_error_is_a_problem_that_quotes_nothing_it_was_sent() 
     }
 }
 
-/// The reason the listener refuses to start under `section`, with its causes.
-async fn refusal(section: &AuthSection) -> String {
-    let error = AdminAuth::start(section)
+/// The reason the listener refuses to start under `section` and `grants`,
+/// with its causes.
+async fn refusal(section: &AuthSection, grants: &BasicGrants) -> String {
+    let error = AdminAuth::start(section, grants)
         .await
         .expect_err("the start is refused");
     let mut reason = error.to_string();
@@ -483,46 +518,75 @@ async fn an_issuer_without_a_kind_refuses_the_start_naming_the_key() {
     for entry in &mut section.issuer {
         entry.kind = None;
     }
-    let reason = refusal(&section).await;
+    let reason = refusal(&section, &none()).await;
     assert!(reason.contains("auth.issuer.kind"), "{reason}");
 }
 
 // A Basic credential is a person's, and a `system/` scope is a backend
 // service's grant (SMART App Launch 2.2.0, Scopes and Launch Context), so
-// `ferrohealth-smart` 0.9.1 refuses a Basic user granted one when the section
-// loads (GHSA-jhg2-jwjp-hq74), and the start carries that refusal.
+// `ferrohealth-smart` refuses a Basic user granted one (GHSA-jhg2-jwjp-hq74),
+// and the start carries that refusal.
 #[tokio::test]
 async fn a_basic_user_with_a_system_scope_refuses_the_start_naming_the_user() {
-    let machine = AuthSection {
-        basic: Some(BasicSection {
-            users: vec![BasicUser {
-                user: String::from("batch-loader"),
-                password_hash: Some(phc()),
-                scopes: vec![
-                    String::from("system/CodeSystem.rs"),
-                    String::from(SYNC_SCOPE),
-                ],
-                ..BasicUser::default()
-            }],
-            ..BasicSection::default()
-        }),
-        ..AuthSection::default()
+    let machine = admitting(&["batch-loader"]);
+    let grant = BasicGrant {
+        scopes: vec![
+            String::from("system/CodeSystem.rs"),
+            String::from(SYNC_SCOPE),
+        ],
+        ..BasicGrant::default()
     };
-    let error = AdminAuth::start(&machine)
+    let grants = BasicGrants {
+        users: std::iter::once((String::from("batch-loader"), grant)).collect(),
+    };
+    let error = AdminAuth::start(&machine, &grants)
         .await
         .expect_err("the start is refused");
-    let AuthError::Config { source } = &error else {
-        panic!("the section's load refuses the start: {error:?}");
-    };
-    let ConfigError::Basic {
+    let AuthError::BasicGrants {
         source: StoreError::SystemScope { username, scope },
-    } = source.as_ref()
+    } = &error
     else {
-        panic!("the crate refuses the Basic user's system scope: {source:?}");
+        panic!("the grants refuse the Basic user's system scope: {error:?}");
     };
     assert_eq!(username, "batch-loader");
     assert_eq!(scope, "system/CodeSystem.rs");
-    let reason = refusal(&machine).await;
+    let reason = refusal(&machine, &grants).await;
     assert!(reason.contains("batch-loader"), "{reason}");
     assert!(reason.contains("system/"), "{reason}");
+}
+
+// A grant whose user-id `[[auth.basic.users]]` does not list would grant no
+// one, so a misspelt user-id refuses the start (our own design).
+#[tokio::test]
+async fn a_grant_naming_no_listed_user_refuses_the_start_naming_the_user() {
+    let grants = granting(&[("opertor", SYNC_SCOPE)]);
+    let issuer = introspecting_issuer().await;
+    for section in [admitting(&["operator"]), introspecting(&issuer.uri())] {
+        let error = AdminAuth::start(&section, &grants)
+            .await
+            .expect_err("the start is refused");
+        let AuthError::BasicGrants {
+            source: StoreError::UnknownUser { username },
+        } = &error
+        else {
+            panic!("the grants refuse the unknown user: {error:?}");
+        };
+        assert_eq!(username, "opertor");
+    }
+}
+
+// A Basic user's scopes and roles are `[basic_grants]`'s since
+// ferrohealth-smart 0.23, so the strict load refuses either under
+// `[[auth.basic.users]]` as a key it does not know.
+#[test]
+fn a_scope_or_a_role_under_the_basic_user_is_refused_by_the_strict_load() {
+    let load = |text: &str| {
+        ferroterm_sync::config::Config::from_sources(Some(text), &std::collections::BTreeMap::new())
+    };
+    let user = "[[auth.basic.users]]\nuser = \"operator\"\npassword_hash_file = \"/run/secrets/operator\"\n";
+    assert!(load(user).is_ok(), "the credential alone loads");
+    for key in ["scopes = [\"__ferroterm.sync\"]", "roles = [\"auditor\"]"] {
+        let text = format!("{user}{key}\n");
+        assert!(load(&text).is_err(), "{text}");
+    }
 }

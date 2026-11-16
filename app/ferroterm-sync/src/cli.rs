@@ -117,7 +117,9 @@ pub fn service(config: Config, telemetry: Arc<Telemetry>) -> Result<Arc<Service>
 /// [`service`] reach the caller unchanged.
 pub async fn serve(config: Config, telemetry: Arc<Telemetry>) -> Result<(), StartError> {
     let service = service(config, telemetry)?;
-    let guard = crate::auth::AdminAuth::start(&service.config().auth).await?;
+    let guard =
+        crate::auth::AdminAuth::start(&service.config().auth, &service.config().basic_grants)
+            .await?;
     let unguarded = crate::admin::routes(Arc::clone(&service));
     let routes = if let Some(guard) = &guard {
         guard.guard(unguarded)

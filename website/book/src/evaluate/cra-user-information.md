@@ -188,8 +188,9 @@ data;"
 - **Configuration.** Naming `FERROTERM__TERMINOLOGY__RESOURCES` turns on writes and
   `FERROTERM__ADMIN__LISTEN` the reload; both demand `[auth]`. Setting
   `[auth] enabled = false` removes the credential check from both. Binding the
-  admin listener to a public address exposes the reload. Adding a user to
-  `[[auth.basic.users]]` or a subject to `scopeless_subjects` grants writes.
+  admin listener to a public address exposes the reload. Granting a user of
+  `[[auth.basic.users]]` a write scope in `[basic_grants]`, or adding a subject
+  to `scopeless_subjects`, grants writes.
 - **Outbound data.** The usage report sends what
   [the usage report](../operate/usage-report.md#what-a-report-contains) lists,
   and `FERROTERM__USAGE_REPORT__ENABLED=false` stops it.

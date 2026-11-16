@@ -73,7 +73,7 @@ audience = ["https://tx.example.org"]
 | `admin.listen` (`FERROTERM__ADMIN__LISTEN`) | The socket address of the admin listener, which serves `POST /reload` and nothing else (see [Reloading the served set](#reloading-the-served-set)). Every route on it requires the admin scope (see [Authentication](#authentication)), and the server refuses to start with it until `[auth]` names an issuer or turns authentication off. Unset or empty, the server binds no second listener and `SIGHUP` is the only reload trigger. | none (no admin listener) |
 | `fhir.base_url` (`FERROTERM__FHIR__BASE_URL`) | The URL clients reach this server at, without a version prefix (`https://tx.example.org`); a trailing slash is dropped. Each version states it as `implementation.url` in its capability statements, so a client behind a reverse proxy learns the address it should use rather than the socket the process bound. Setting it also adds every served version's base under this URL to the audiences the write routes accept, beside each issuer's `audience` (see [Behind a reverse proxy](reverse-proxy.md#the-audience-a-token-carries)). A deployment that names none states no URL. | none |
 | `fhir.security_services` (`FERROTERM__FHIR__SECURITY_SERVICES`) | The authentication in front of the server, as codes of the FHIR `restful-security-service` value set (`OAuth`, `SMART-on-FHIR`, `Basic`, `Certificates`, `Kerberos`, `NTLM`). The codes declare what a proxy enforces, in `CapabilityStatement.rest.security.service`; with an `[auth]` issuer, `SMART-on-FHIR` is added to whatever you declare here. Any other code refuses the start. | none |
-| `[auth]` (`FERROTERM__AUTH__<KEY>`) | Who may write and reach the admin listener (see [Authentication](#authentication)). Every issuer is an `[[auth.issuer]]` table in the file, beside `[[auth.basic.users]]`; a key of `[auth]` itself can be a variable, such as `FERROTERM__AUTH__ENABLED` or `FERROTERM__AUTH__PRODUCT_SCOPE`. | see [Authentication](#authentication) |
+| `[auth]` (`FERROTERM__AUTH__<KEY>`) | Who may write and reach the admin listener (see [Authentication](#authentication)). Every issuer is an `[[auth.issuer]]` table in the file, beside `[[auth.basic.users]]` and the `[basic_grants]` they are granted; a key of `[auth]` itself can be a variable, such as `FERROTERM__AUTH__ENABLED` or `FERROTERM__AUTH__PRODUCT_SCOPE`. | see [Authentication](#authentication) |
 | `usage_report.enabled` (`FERROTERM__USAGE_REPORT__ENABLED`) | Whether the server sends the [usage report](usage-report.md) to FerroPULSE, `true` or `false`. `true` cannot override CI detection: with `GITHUB_ACTIONS` or `CI` set to `true` or `1`, the report is off. | `true` |
 | `usage_report.endpoint` (`FERROTERM__USAGE_REPORT__ENDPOINT`) | The collector the usage report is posted to: an `https` URL without credentials, or plain `http` to a loopback host. The server refuses to start on anything else. | `https://report.ferropulse.eu/v1/report` |
 | `usage_report.state_dir` (`FERROTERM__USAGE_REPORT__STATE_DIR`) | A writable directory where the server keeps its own state: the usage report's instance id and the time of its last start report. Without one, or with one the server cannot write, the usage report is off. | none (the compose file sets `/data/state`, on a named volume; the container image sets none) |
@@ -129,7 +129,7 @@ key_file = "/etc/ferroterm/tls/server.key"
 | `body_limit` | The largest request body read before the request is answered `413`. | `"1MiB"` |
 | `drain_delay` | How long readiness stays withdrawn on `SIGTERM` before the listeners close. | `"0s"` |
 | `shutdown_timeout` | How long the requests in flight may take once the listeners closed. Keep `drain_delay` plus this below the grace period of the container runtime, so the server exits before it is killed. | `"10s"` |
-| `max_concurrent_requests` | How many requests are served at once; past it a request is answered `503`. Unset, there is no bound. | none |
+| `max_concurrent_requests` | How many requests are served at once, at least 1; past it a request is answered `503`. The bound is always on: set the ceiling your deployment holds. | `256` |
 | `retry_after` | How long a `503` past the bound tells the client to wait (`Retry-After`), in whole seconds. | `"1s"` |
 | `trusted_proxies` | The reverse proxies, each an address or a CIDR block, whose forwarded client address the request log believes. Empty, every request is named by the connection's peer. | none |
 | `forwarded_header` | The header a trusted proxy names the client in: `forwarded` (RFC 7239) or `x-forwarded-for`. | `forwarded` |
@@ -266,8 +266,15 @@ The keys of `[auth]` itself, in the configuration file or as
 | `scopes_supported` | The scopes the discovery document lists. List only scopes the server honours: "the server SHALL support all scopes listed here". | none (the member is omitted) |
 | `capabilities` | SMART capabilities the discovery document adds to the ones it derives. | none |
 | `scopeless_subjects` | The machines granted every write without a scope, each a table `{ issuer = "…", sub = "…" }` naming the issuer exactly as its `[[auth.issuer]]` table does, since a `sub` is unique only within its issuer (RFC 7519 §4.1.2). An entry admits a `System` caller of that issuer alone; one naming an issuer the section does not trust refuses the start. | none |
-| `[[auth.basic.users]]` | HTTP Basic users (RFC 7617), each a person: `user`, `password_hash` or `password_hash_file` (an Argon2id PHC string), and `scopes`, which decide what the user reaches as a token's scopes would. A user granted a `system/` scope refuses the start, naming the user. | none (no Basic) |
+| `[[auth.basic.users]]` | HTTP Basic users (RFC 7617), each a person: `user` and `password_hash` or `password_hash_file` (an Argon2id PHC string). The credential alone: what the user reaches is its `[basic_grants]` entry, and a `scopes` or `roles` key here refuses the start as an unknown key. | none (no Basic) |
 | `[auth.basic] cache_ttl` | How long a Basic credential that verified is kept, so a repeat request skips the Argon2id key derivation. `"0s"` verifies every request. | `"5min"` |
+
+A Basic user's scopes are granted in the top-level `[basic_grants]` table,
+one `[basic_grants.<user>]` table per user-id with `scopes` and `roles`. The
+scopes decide what the user reaches as a token's scopes would. A grant naming
+a user `[[auth.basic.users]]` does not list refuses the start, and so does a
+grant of a `system/` scope, naming the user: a Basic credential is a
+person's.
 
 A machine caller, such as the synchronisation service, authenticates with an
 access token it obtained with the OAuth 2.0 client credentials grant (RFC 6749
@@ -284,6 +291,8 @@ audience = ["https://tx.example.org"]
 [[auth.basic.users]]
 user = "terminologist"
 password_hash_file = "/run/secrets/terminologist-password-hash"
+
+[basic_grants.terminologist]
 scopes = ["user/CodeSystem.cud", "__ferroterm.admin"]
 ```
 

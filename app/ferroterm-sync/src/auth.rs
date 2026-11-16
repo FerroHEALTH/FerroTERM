@@ -25,7 +25,8 @@ use axum::body::Body;
 use axum::http::request::Parts;
 use axum::http::{Extensions, Method, Uri};
 use axum::response::Response;
-use ferrohealth_smart::config::{AuthSection, ConfigError, ServerTls};
+use ferrohealth_smart::basic::{PasswordStore, StoreError};
+use ferrohealth_smart::config::{AuthSection, BasicGrants, ConfigError, ServerTls};
 use ferrohealth_smart::extract::HeaderOnly;
 use ferrohealth_smart::guard::{AuthLayer, Gate, Render, Requirement, Target};
 use ferrohealth_smart::refusal::Refusal;
@@ -63,6 +64,14 @@ pub enum AuthError {
         #[source]
         source: Box<ConfigError>,
     },
+    /// `[basic_grants]` names a user `[[auth.basic.users]]` does not list,
+    /// or grants a Basic user a scope or a role it may not hold.
+    #[error("[basic_grants] is refused")]
+    BasicGrants {
+        /// The rule, naming the user.
+        #[source]
+        source: StoreError,
+    },
     /// An introspecting issuer's metadata could not be read, names no
     /// introspection endpoint, or its `[auth.issuer.introspection]` table
     /// breaks a rule.
@@ -97,8 +106,9 @@ pub struct AdminAuth {
 }
 
 impl AdminAuth {
-    /// Reads the metadata and the key set of every issuer `section` names, or
-    /// answers `None` when the section says `enabled = false`.
+    /// Reads the metadata and the key set of every issuer `section` names and
+    /// grants each Basic user its entry of `grants`, or answers `None` when
+    /// the section says `enabled = false`.
     ///
     /// Each issuer is read once here, so an authorization server that cannot
     /// be reached refuses the start rather than the first request.
@@ -107,12 +117,16 @@ impl AdminAuth {
     ///
     /// Returns [`AuthError::Config`] for a section that breaks a rule, an
     /// enabled one admitting no credential and the removed flat `issuer`
-    /// and a Basic user granted a `system/` scope among them,
-    /// [`AuthError::Introspector`] for an introspecting issuer that cannot be
+    /// among them, [`AuthError::BasicGrants`] for a `[basic_grants]` table
+    /// naming a user `[[auth.basic.users]]` does not list or granting a
+    /// Basic user a `system/` scope, [`AuthError::Introspector`] for an introspecting issuer that cannot be
     /// set up, and
     /// [`AuthError::Issuer`] for an issuer whose metadata or key set could
     /// not be read.
-    pub async fn start(section: &AuthSection) -> Result<Option<Self>, AuthError> {
+    pub async fn start(
+        section: &AuthSection,
+        grants: &BasicGrants,
+    ) -> Result<Option<Self>, AuthError> {
         if !section.enabled {
             return Ok(None);
         }
@@ -148,7 +162,17 @@ impl AdminAuth {
             }
             gate = gate.with_bearer(Arc::new(issuers));
         }
-        if let Some(store) = resolved.basic {
+        let basic = match resolved.basic {
+            Some(store) => Some(store),
+            None if grants.users.is_empty() => None,
+            // NOTE: no specification governs this, our own design: a grant
+            // naming no listed user is refused, so a misspelt user-id never grants.
+            None => Some(PasswordStore::new()),
+        };
+        if let Some(store) = basic {
+            let store = store
+                .with_grants(grants)
+                .map_err(|source| AuthError::BasicGrants { source })?;
             gate = gate.with_basic(Arc::new(store));
         }
         Ok(Some(Self {
