@@ -15,21 +15,31 @@
 use std::collections::BTreeSet;
 
 use ferrohealth_smart::resource::configuration::{
-    OpenIdConnect, PermissionCapability, SmartOptions,
+    OpenIdConnect, PermissionCapability, Purpose, SmartOptions,
 };
 
-/// The discovery options of the deployment: the scopes `[auth]
-/// scopes_supported` lists and the capabilities `[auth] capabilities` adds.
+/// The discovery options of the deployment, for the `purpose` its issuer is
+/// described for: the scopes `[auth] scopes_supported` lists and the
+/// capabilities `[auth] capabilities` adds.
+///
+/// An issuer described for SMART Backend Services alone gets the Backend
+/// Services document, with no app-launch member (SMART App Launch 2.2.0,
+/// Backend Services, §Retrieve `.well-known/smart-configuration`).
 ///
 /// The permission capabilities are the v1 scope syntax and `user/` scopes;
 /// `sso-openid-connect` is claimed where the issuer lists the `openid` scope
 /// (<https://openid.net/specs/openid-connect-discovery-1_0.html>, §3).
 #[must_use]
-pub fn options(scopes_supported: &[String], capabilities: &[String]) -> SmartOptions {
+pub fn options(
+    purpose: Purpose,
+    scopes_supported: &[String],
+    capabilities: &[String],
+) -> SmartOptions {
     // NOTE: `permission-v2` is exemplified only by the search-parameter
     // syntax this server refuses, so withholding it is our own reading
     // (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
     SmartOptions {
+        purpose,
         scopes_supported: scopes_supported.to_vec(),
         capabilities: capabilities.to_vec(),
         permissions: BTreeSet::from([PermissionCapability::V1, PermissionCapability::User]),
@@ -40,7 +50,7 @@ pub fn options(scopes_supported: &[String], capabilities: &[String]) -> SmartOpt
 
 #[cfg(test)]
 mod tests {
-    use ferrohealth_smart::resource::configuration::PermissionCapability;
+    use ferrohealth_smart::resource::configuration::{PermissionCapability, Purpose};
 
     use super::options;
 
@@ -48,7 +58,7 @@ mod tests {
     // writes nothing here and the capability that promises them is withheld.
     #[test]
     fn permission_patient_is_never_claimed() {
-        let declared = options(&[], &[]).permissions;
+        let declared = options(Purpose::AppLaunch, &[], &[]).permissions;
         assert!(
             !declared.contains(&PermissionCapability::Patient),
             "{declared:?}"
@@ -66,15 +76,21 @@ mod tests {
     #[test]
     fn a_configured_capability_is_carried() {
         let added = [String::from("launch-ehr")];
-        assert_eq!(options(&[], &added).capabilities, added);
+        assert_eq!(options(Purpose::AppLaunch, &[], &added).capabilities, added);
     }
 
     // The server SHALL support every scope it lists, so the list is the
     // configured one (<https://hl7.org/fhir/smart-app-launch/conformance.html>).
     #[test]
     fn scopes_supported_is_the_configured_list_alone() {
-        assert_eq!(options(&[], &[]).scopes_supported, Vec::<String>::new());
+        assert_eq!(
+            options(Purpose::AppLaunch, &[], &[]).scopes_supported,
+            Vec::<String>::new()
+        );
         let listed = [String::from("system/CodeSystem.cud")];
-        assert_eq!(options(&listed, &[]).scopes_supported, listed);
+        assert_eq!(
+            options(Purpose::AppLaunch, &listed, &[]).scopes_supported,
+            listed
+        );
     }
 }
