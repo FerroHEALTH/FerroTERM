@@ -1,1 +1,1 @@
-- FerroTERM moves to `ferrohealth-smart` 0.27, with `ferrohealth-session` 0.22 and `ferrobridge-term` 0.12, the releases on the same line (#1250).
+- FerroTERM moves to `ferrohealth-smart` 0.28, with `ferrohealth-session` 0.23 and `ferrobridge-term` 0.12, the releases on the same line (#1250).
