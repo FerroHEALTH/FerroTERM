@@ -43,6 +43,7 @@ use std::path::{Path, PathBuf};
 use ferrohealth_config::loader::{Loaded, Loader};
 use ferrohealth_server::section::ServerSection;
 use ferrohealth_smart::config::AuthSection;
+use ferrohealth_smart::config::BasicGrants;
 use ferrohealth_telemetry::section::TelemetrySection;
 use serde::{Deserialize, Serialize};
 
@@ -101,6 +102,9 @@ pub struct Config {
     pub telemetry: TelemetrySection,
     /// `[auth]`: who may write and reach the admin listener.
     pub auth: AuthSection,
+    /// `[basic_grants]`: the scopes and roles each Basic user of
+    /// `[[auth.basic.users]]` is granted, by user-id.
+    pub basic_grants: BasicGrants,
     /// `[usage_report]`: the usage report to `FerroPULSE`.
     pub usage_report: UsageReportSection,
 }
@@ -440,7 +444,7 @@ mod tests {
 
     #[test]
     fn the_file_holds_the_tree_and_the_environment_goes_over_it() {
-        let text = "[terminology]\nindex = [\"/a\", \"/b\"]\n\n[[auth.issuer]]\nissuer = \"https://as.example.org\"\nkind = \"machines\"\naudience = [\"ferroterm\"]\n\n[[auth.basic.users]]\nuser = \"operator\"\npassword_hash_file = \"/run/secrets/operator\"\nscopes = [\"__ferroterm.admin\"]\n";
+        let text = "[terminology]\nindex = [\"/a\", \"/b\"]\n\n[[auth.issuer]]\nissuer = \"https://as.example.org\"\nkind = \"machines\"\naudience = [\"ferroterm\"]\n\n[[auth.basic.users]]\nuser = \"operator\"\npassword_hash_file = \"/run/secrets/operator\"\n\n[basic_grants.operator]\nscopes = [\"__ferroterm.admin\"]\n";
         let config = Config::from_sources(
             Some(text),
             &environment(&[
@@ -470,6 +474,12 @@ mod tests {
         );
         let users = auth.basic.as_ref().expect("the Basic table").users.len();
         assert_eq!(users, 1);
+        let grant = config
+            .basic_grants
+            .users
+            .get("operator")
+            .expect("the grant");
+        assert_eq!(grant.scopes, ["__ferroterm.admin"]);
         assert!(auth.enabled, "authentication is on unless it is turned off");
         assert_eq!(config.telemetry.format, Format::Json);
         assert_eq!(

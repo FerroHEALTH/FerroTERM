@@ -23,6 +23,7 @@ use ferrohealth_config::loader::{Loaded, Loader};
 use ferrohealth_config::units::Duration;
 use ferrohealth_secret::secret_url::SecretUrl;
 use ferrohealth_smart::config::AuthSection;
+use ferrohealth_smart::config::BasicGrants;
 use ferrohealth_smart::config::endpoint::{EndpointSection, RetrySection};
 use ferrohealth_telemetry::section::TelemetrySection;
 
@@ -123,6 +124,9 @@ pub struct Config {
     /// tokens it accepts, the Basic users, and the product scope every route
     /// but `GET /health` requires ([`crate::auth`]).
     pub auth: AuthSection,
+    /// `[basic_grants]`: the scopes and roles each Basic user of
+    /// `[[auth.basic.users]]` is granted, by user-id.
+    pub basic_grants: BasicGrants,
     /// `[nts]`: the family outbound endpoint table of the Nationale
     /// Terminologie Server, starting from [`addon_nts::config::endpoint`]:
     /// the base `url`, the timeouts, `retry`, `tls`, and the client
@@ -165,6 +169,7 @@ impl Default for Config {
             source: Vec::new(),
             nts: addon_nts::config::endpoint(),
             auth: AuthSection::default(),
+            basic_grants: BasicGrants::default(),
             telemetry: TelemetrySection::default(),
         }
     }

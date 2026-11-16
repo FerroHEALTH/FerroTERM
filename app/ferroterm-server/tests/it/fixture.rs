@@ -8,7 +8,7 @@ use std::sync::Arc;
 use axum::Router;
 use axum::body::Body;
 use ferrohealth_server::section::ServerSection;
-use ferrohealth_smart::config::{AuthSection, IssuerEntry};
+use ferrohealth_smart::config::{AuthSection, BasicGrants, IssuerEntry};
 use ferrohealth_smart::kind::IssuerKind;
 use ferrohealth_telemetry::section::TelemetrySection;
 use ferrohealth_telemetry::telemetry::{Service, Telemetry};
@@ -22,8 +22,8 @@ use tower::ServiceExt;
 /// The audience a test token names unless the test says otherwise.
 pub(crate) const AUDIENCE: &str = "ferroterm";
 
-/// What a test's resource server is configured with: the `[auth]` table and
-/// the base URL.
+/// What a test's resource server is configured with: the `[auth]` table, the
+/// `[basic_grants]` table and the base URL.
 ///
 /// There is no `Default`: `[auth]` without an issuer is a configuration the
 /// server refuses to start a guarded surface on, so the issuer is named
@@ -32,6 +32,8 @@ pub(crate) const AUDIENCE: &str = "ferroterm";
 pub(crate) struct SmartSetup {
     /// The `[auth]` table.
     pub(crate) auth: AuthSection,
+    /// The `[basic_grants]` table.
+    pub(crate) basic_grants: BasicGrants,
     /// `FERROTERM__FHIR__BASE_URL`, the address clients reach this server at.
     pub(crate) base_url: Option<String>,
 }
@@ -50,6 +52,7 @@ impl SmartSetup {
                 }],
                 ..AuthSection::default()
             },
+            basic_grants: BasicGrants::default(),
             base_url: None,
         }
     }
@@ -287,7 +290,11 @@ impl Server {
     /// The configuration of that server under `setup`, over the edition
     /// written into `dir`.
     pub(crate) fn smart_config(dir: &std::path::Path, setup: SmartSetup) -> Config {
-        let SmartSetup { auth, base_url } = setup;
+        let SmartSetup {
+            auth,
+            basic_grants,
+            base_url,
+        } = setup;
         ferroterm_testkit::snomed::write(dir).expect("writes the edition");
         let fhir = dir.join("fhir");
         std::fs::create_dir_all(&fhir).expect("creates");
@@ -308,6 +315,7 @@ impl Server {
                 listen: Some(String::from("127.0.0.1:0")),
             },
             auth,
+            basic_grants,
             ..Config::default()
         }
     }

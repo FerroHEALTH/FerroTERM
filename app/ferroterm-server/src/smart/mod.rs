@@ -28,8 +28,8 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::response::{IntoResponse, Response};
-use ferrohealth_smart::basic::PasswordStore;
-use ferrohealth_smart::config::{ConfigError, ServerTls};
+use ferrohealth_smart::basic::{PasswordStore, StoreError};
+use ferrohealth_smart::config::{BasicGrants, ConfigError, ServerTls};
 use ferrohealth_smart::extract::HeaderOnly;
 use ferrohealth_smart::guard::{Gate, Render};
 use ferrohealth_smart::metadata::ServerMetadata;
@@ -91,6 +91,14 @@ pub enum StartError {
         /// The rule.
         #[source]
         source: Box<ConfigError>,
+    },
+    /// `[basic_grants]` names a user `[[auth.basic.users]]` does not list,
+    /// or grants a Basic user a scope or a role it may not hold.
+    #[error("[basic_grants] is refused")]
+    BasicGrants {
+        /// The rule, naming the user.
+        #[source]
+        source: StoreError,
     },
     /// An issuer's metadata or key set could not be read, or breaks a rule.
     #[error("the authorization server {issuer} could not be read")]
@@ -160,9 +168,11 @@ impl Smart {
     /// # Errors
     ///
     /// Returns [`StartError::Unconfigured`] for a guarded surface without an
-    /// issuer, [`StartError::Auth`] for a section that breaks a rule (the
-    /// Basic user granted a `system/` scope among them), [`StartError::Introspector`] for an introspecting issuer that cannot be
-    /// set up,
+    /// issuer, [`StartError::Auth`] for a section that breaks a rule,
+    /// [`StartError::BasicGrants`] for a `[basic_grants]` table naming a user
+    /// `[[auth.basic.users]]` does not list or granting a Basic user a
+    /// `system/` scope, [`StartError::Introspector`] for an introspecting
+    /// issuer that cannot be set up,
     /// [`StartError::Issuer`] for an issuer whose metadata or key set could
     /// not be read, and [`StartError::NoTokenEndpoint`] when the first issuer
     /// names no token endpoint.
@@ -236,7 +246,9 @@ impl Smart {
             .realm
             .or_else(|| config.base_url())
             .unwrap_or_else(|| String::from(REALM));
-        let basic = resolved.basic.map(Arc::new);
+        let basic = granted(resolved.basic, &config.basic_grants)
+            .map_err(|source| StartError::BasicGrants { source })?
+            .map(Arc::new);
         let fhir = gate_of(fhir, basic.as_ref(), &realm);
         let admin = admin_listens.then(|| gate_of(admin, basic.as_ref(), &realm));
         Ok(Some(Self {
@@ -415,6 +427,24 @@ fn gate_of(verifier: Arc<dyn Verifier>, basic: Option<&Arc<PasswordStore>>, real
         Some(store) => gate.with_basic(Arc::clone(store)),
         None => gate,
     }
+}
+
+/// The Basic users of `store` with the scopes and roles of `grants` granted,
+/// `None` when `[auth]` admits no Basic user and nothing is granted.
+///
+/// A grant naming a user the store does not admit is refused, also when
+/// `[auth]` lists no Basic user at all, so a misspelt user-id never grants
+/// silently (no specification governs this: our own design).
+fn granted(
+    store: Option<PasswordStore>,
+    grants: &BasicGrants,
+) -> Result<Option<PasswordStore>, StoreError> {
+    let store = match store {
+        Some(store) => store,
+        None if grants.users.is_empty() => return Ok(None),
+        None => PasswordStore::new(),
+    };
+    store.with_grants(grants).map(Some)
 }
 
 /// The guarded surfaces `config` turns on, each named with its variable.

@@ -309,9 +309,10 @@ scope, `__ferroterm.sync` unless `[auth] product_scope` names another. The
 `[auth]` table is the one the server reads ([Configuration](configuration.md#authentication)):
 an `[[auth.issuer]]` table with its `kind` and `audience` for each issuer whose
 access tokens it accepts (checked as JWTs, or at the issuer's introspection
-endpoint under `mode = "introspection"`), people under `[[auth.basic.users]]`,
-or both. A machine, such as a monitor, calls with a client credentials token,
-and a Basic user granted a `system/` scope refuses the start. A refused
+endpoint under `mode = "introspection"`), people under `[[auth.basic.users]]`
+with their scopes in `[basic_grants]`, or both. A machine, such as a monitor,
+calls with a client credentials token, and a Basic user granted a `system/`
+scope refuses the start. A refused
 request answers `401` with a challenge naming the realm `ferroterm-sync` (or
 `[auth] realm`), or `403` for a credential without the scope, with a JSON
 `error` body.
@@ -333,6 +334,8 @@ first_party_clients = ["ferroterm-console"]
 [[auth.basic.users]]
 user = "operator"
 password_hash_file = "/run/secrets/operator.phc"
+
+[basic_grants.operator]
 scopes = ["__ferroterm.sync"]
 ```
 
