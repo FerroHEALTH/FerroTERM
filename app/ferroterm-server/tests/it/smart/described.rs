@@ -125,13 +125,14 @@ async fn a_machines_only_server_is_described_for_backend_services() {
         }
     }
     let uris = oauth_uris(&server).await;
+    let names: Vec<&str> = uris.iter().map(|(name, _)| name.as_str()).collect();
     assert!(
         uris.contains(&(String::from("token"), format!("{base}/token"))),
-        "{uris:?}"
+        "the token endpoint is named: {names:?}"
     );
     assert!(
-        !uris.iter().any(|(name, _)| name == "authorize"),
-        "no user launch starts at a machines issuer: {uris:?}"
+        !names.contains(&"authorize"),
+        "no user launch starts at a machines issuer: {names:?}"
     );
 }
 
