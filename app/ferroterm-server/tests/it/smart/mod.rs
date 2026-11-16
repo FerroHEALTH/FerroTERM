@@ -29,6 +29,7 @@ use crate::fixture::{self, Server};
 mod admin;
 mod audience;
 mod basic;
+mod described;
 mod discovery;
 mod introspection;
 mod keys;

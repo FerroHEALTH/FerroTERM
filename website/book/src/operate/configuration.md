@@ -266,6 +266,7 @@ The keys of `[auth]` itself, in the configuration file or as
 | `realm` | The realm every challenge names. | `fhir.base_url`, else `FerroTERM` |
 | `scopes_supported` | The scopes the discovery document lists. List only scopes the server honours: "the server SHALL support all scopes listed here". | none (the member is omitted) |
 | `capabilities` | SMART capabilities the discovery document adds to the ones it derives. | none |
+| `described_issuer` | The `[[auth.issuer]]` the discovery document and the capability statement describe, when the server trusts several. Unset, the server describes the one issuer of kind `persons`, `patients` or `federation` whose metadata it holds, and with only `machines` issuers trusted the one `machines` issuer, for SMART Backend Services alone. [The described issuer](#the-described-issuer) gives the rule. | none |
 | `scopeless_subjects` | The machines granted every write without a scope, each a table `{ issuer = "…", sub = "…" }` naming the issuer exactly as its `[[auth.issuer]]` table does, since a `sub` is unique only within its issuer (RFC 7519 §4.1.2). An entry admits a `System` caller of that issuer alone; one naming an issuer the section does not trust refuses the start. | none |
 | `[[auth.basic.users]]` | HTTP Basic users (RFC 7617), each a person: `user` and `password_hash` or `password_hash_file` (an Argon2id PHC string). The credential alone: what the user reaches is its `[basic_grants]` entry, and a `scopes` or `roles` key here refuses the start as an unknown key. | none (no Basic) |
 | `[auth.basic] cache_ttl` | How long a Basic credential that verified is kept, so a repeat request skips the Argon2id key derivation. `"0s"` verifies every request. | `"5min"` |
@@ -276,6 +277,32 @@ scopes decide what the user reaches as a token's scopes would. A grant naming
 a user `[[auth.basic.users]]` does not list refuses the start, and so does a
 grant of a `system/` scope, naming the user: a Basic credential is a
 person's.
+
+#### The described issuer
+
+The SMART discovery document and the capability statement describe one
+authorization server: a user launch starts at its authorization endpoint,
+and a backend client takes its tokens from its token endpoint (SMART App
+Launch 2.2.0, Conformance, Metadata, and Backend Services, Retrieve
+`.well-known/smart-configuration`). SMART does not say which of several
+trusted issuers that is, so `ferrohealth-smart` fixes one rule for the
+FerroHEALTH servers, and the order of the `[[auth.issuer]]` tables never
+decides:
+
+- With `described_issuer`, the server describes that issuer once it is a
+  trusted issuer whose metadata it holds. A `machines` issuer is described
+  for SMART Backend Services alone, and refused while another issuer serves
+  a user launch.
+- Otherwise, when the server trusts an issuer of kind `persons`, `patients`
+  or `federation`, it describes the one such issuer whose metadata it holds,
+  for SMART App Launch. Several refuse the start, naming them and the key,
+  and so does none: an issuer read from a `jwks_file` names no authorization
+  endpoint.
+- Otherwise it describes the one `machines` issuer for SMART Backend
+  Services, the usual terminology deployment: the token endpoint,
+  `private_key_jwt`, the client credentials grant and the `system/` scopes of
+  `scopes_supported`, with no authorization endpoint and no launch
+  capability. Several refuse the start the same way.
 
 A machine caller, such as the synchronisation service, authenticates with an
 access token it obtained with the OAuth 2.0 client credentials grant (RFC 6749

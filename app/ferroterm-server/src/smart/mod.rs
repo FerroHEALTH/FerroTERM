@@ -12,7 +12,8 @@
 //! (RFC 7662), classifies every caller by its issuer's `kind` and profile,
 //! checks the Basic users of `[[auth.basic.users]]`, persons only, answers
 //! the status and challenge of every refusal (RFC 6750 §3.1) and writes the
-//! audit line. This module holds what is the server's own: which surfaces need
+//! audit line, and picks the issuer the discovery documents describe
+//! (`resource::described::describe`). This module holds what is the server's own: which surfaces need
 //! `[auth]`, the audiences each surface accepts, the admin scope, the
 //! `OperationOutcome` and admin bodies of a refusal, and the SMART discovery
 //! document ([`discovery`]). The route table is [`guard`]'s.
@@ -34,7 +35,8 @@ use ferrohealth_smart::extract::HeaderOnly;
 use ferrohealth_smart::guard::{Gate, Render};
 use ferrohealth_smart::metadata::ServerMetadata;
 use ferrohealth_smart::refusal::Refusal;
-use ferrohealth_smart::resource::configuration::SmartOptions;
+use ferrohealth_smart::resource::configuration::{Purpose, SmartOptions};
+use ferrohealth_smart::resource::described::{Candidate, DescribeError, describe};
 use ferrohealth_smart::resource::introspection::{
     IntrospectionError, IntrospectionSettings, Introspector,
 };
@@ -120,7 +122,15 @@ pub enum StartError {
         #[source]
         source: Box<IntrospectionError>,
     },
-    /// The first issuer publishes no token endpoint, which the discovery
+    /// No issuer can be described: `[auth] described_issuer` names an issuer
+    /// the rule refuses, or without it no single issuer is eligible.
+    #[error("the SMART discovery documents can describe no issuer (auth.described_issuer)")]
+    Described {
+        /// Why `describe` refused.
+        #[source]
+        source: DescribeError,
+    },
+    /// The described issuer publishes no token endpoint, which the discovery
     /// document requires (SMART App Launch 2.2.0, Conformance, §Metadata,
     /// `token_endpoint`: REQUIRED).
     #[error("the authorization server metadata of {issuer} names no token_endpoint")]
@@ -141,6 +151,8 @@ pub struct Smart {
     admin: Option<Gate>,
     /// The issuer the discovery document and the capability statement name.
     primary: Primary,
+    /// What the two documents describe that issuer for.
+    purpose: Purpose,
     /// The token endpoint that issuer's metadata names.
     token_endpoint: String,
     /// The protection space the challenges name (RFC 6750 §3, RFC 7617 §2).
@@ -174,8 +186,9 @@ impl Smart {
     /// `system/` scope, [`StartError::Introspector`] for an introspecting
     /// issuer that cannot be set up,
     /// [`StartError::Issuer`] for an issuer whose metadata or key set could
-    /// not be read, and [`StartError::NoTokenEndpoint`] when the first issuer
-    /// names no token endpoint.
+    /// not be read, [`StartError::Described`] when no issuer can be
+    /// described, and [`StartError::NoTokenEndpoint`] when the described
+    /// issuer names no token endpoint.
     pub async fn start(config: &Config) -> Result<Option<Self>, StartError> {
         let auth = &config.auth;
         if !auth.enabled {
@@ -197,12 +210,15 @@ impl Smart {
         let admin_listens = config.admin_listen().is_some();
         let mut fhir = IssuerSet::new();
         let mut admin = IssuerSet::new();
-        let mut primary = None;
+        let mut candidates = Vec::new();
         for settings in resolved.issuers {
             let mut widened = settings.clone();
             widened.audience.extend(bases.iter().cloned());
             let server = discover(widened).await?;
-            primary.get_or_insert_with(|| Primary::Jwt(Arc::clone(&server)));
+            candidates.push(Candidate::of_server(
+                &server,
+                Primary::Jwt(Arc::clone(&server)),
+            ));
             fhir = fhir.with(Arc::clone(&server));
             if admin_listens {
                 // NOTE: no specification governs the admin surface: our own design;
@@ -219,7 +235,10 @@ impl Smart {
             let mut widened = settings.clone();
             widened.audience.extend(bases.iter().cloned());
             let checker = introspect(widened).await?;
-            primary.get_or_insert_with(|| Primary::Introspection(Arc::clone(&checker)));
+            candidates.push(Candidate::of_introspector(
+                &checker,
+                Primary::Introspection(Arc::clone(&checker)),
+            ));
             fhir = fhir.with_introspector(Arc::clone(&checker));
             if admin_listens {
                 let narrow = if bases.is_empty() {
@@ -230,11 +249,15 @@ impl Smart {
                 admin = admin.with_introspector(narrow);
             }
         }
-        let Some(primary) = primary else {
+        if candidates.is_empty() {
             return Err(StartError::Auth {
                 source: Box::new(ConfigError::Missing { key: "auth.issuer" }),
             });
-        };
+        }
+        let described = describe(candidates, resolved.described_issuer.as_ref())
+            .map_err(|source| StartError::Described { source })?;
+        let purpose = described.purpose();
+        let primary = described.into_check();
         let (fhir, admin): (Arc<dyn Verifier>, Arc<dyn Verifier>) =
             (Arc::new(fhir), Arc::new(admin));
         let token_endpoint = primary.metadata().token_endpoint.clone().ok_or_else(|| {
@@ -255,6 +278,7 @@ impl Smart {
             fhir,
             admin,
             primary,
+            purpose,
             token_endpoint,
             realm,
             admin_scope: resolved
@@ -290,7 +314,7 @@ impl Smart {
         &self.realm
     }
 
-    /// The issuer the discovery documents name, the first one configured.
+    /// The issuer the discovery documents name.
     #[must_use]
     pub fn issuer(&self) -> &str {
         self.primary.issuer()
@@ -308,9 +332,14 @@ impl Smart {
         &self.token_endpoint
     }
 
-    /// The issuer's authorization endpoint, when it runs one.
+    /// The issuer's authorization endpoint, when it runs one and is
+    /// described for SMART App Launch; an issuer described for Backend
+    /// Services alone starts no user launch.
     #[must_use]
     pub fn authorize_endpoint(&self) -> Option<&str> {
+        if self.purpose != Purpose::AppLaunch {
+            return None;
+        }
         self.metadata().authorization_endpoint.as_deref()
     }
 
@@ -336,6 +365,7 @@ impl Smart {
     #[must_use]
     pub fn configuration(&self) -> serde_json::Value {
         self.primary.smart_configuration(&discovery::options(
+            self.purpose,
             &self.scopes_supported,
             &self.capabilities,
         ))
@@ -358,11 +388,11 @@ impl Smart {
     }
 }
 
-/// The issuer the discovery documents are built from: the first JWT issuer,
-/// or the first introspected one when every issuer is introspected.
+/// The issuer the discovery documents are built from, the one `describe`
+/// picks.
 #[derive(Debug)]
 enum Primary {
-    /// The first issuer whose tokens are checked as JWTs.
+    /// An issuer whose tokens are checked as JWTs.
     Jwt(Arc<ResourceServer>),
     /// The issuer whose tokens are introspected.
     Introspection(Arc<Introspector>),

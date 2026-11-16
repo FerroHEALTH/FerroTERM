@@ -203,7 +203,8 @@ async fn an_issuer_without_an_audience_refuses_the_start() {
 }
 
 // SMART App Launch: the document lives at `[base]/.well-known/smart-configuration`
-// and `token_endpoint`, `grant_types_supported`, and `capabilities` are required.
+// and `token_endpoint`, `grant_types_supported`, and `capabilities` are required;
+// a machines-only server is described for Backend Services, with no launch member.
 #[tokio::test]
 async fn the_smart_configuration_is_served_from_the_issuer_document() {
     let key = SigningKey::generate("k1");
@@ -219,9 +220,9 @@ async fn the_smart_configuration_is_served_from_the_issuer_document() {
     for version in ["r4", "r4b", "r5", "r6"] {
         let document = configuration(&server, version).await;
         assert_eq!(document["token_endpoint"], format!("{base}/token"));
-        assert_eq!(
-            document["authorization_endpoint"],
-            format!("{base}/authorize")
+        assert!(
+            document["authorization_endpoint"].is_null(),
+            "{version}: no user launch starts at a machines issuer: {document}"
         );
         assert_eq!(document["jwks_uri"], format!("{base}/jwks"));
         assert_eq!(document["scopes_supported"][0], "system/CodeSystem.cud");
@@ -232,7 +233,7 @@ async fn the_smart_configuration_is_served_from_the_issuer_document() {
         // the issuer publishes are dropped, and `plain` is a SHALL NOT.
         assert_eq!(
             document["grant_types_supported"],
-            json!(["authorization_code", "client_credentials"]),
+            json!(["client_credentials"]),
             "{version}"
         );
         assert_eq!(
