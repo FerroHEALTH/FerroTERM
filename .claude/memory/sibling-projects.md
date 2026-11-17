@@ -8,7 +8,7 @@ metadata:
 <!-- SPDX-FileCopyrightText: Cadasto B.V. -->
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 
-The family's repositories ([[family-architecture]]) are checked out side by side under `~/RustroverProjects/`: FerroEHR, FerroBRIDGE, FerroFED, FerroPIX, FerroTERM, the shared-crate repositories FerroAUTH (local folder `FerroSMART`), FerroAUDIT, FerroSYS and FerroUI, FerroPULSE, FerroLICENCE and the FerroHEALTH umbrella.
+The family's repositories ([[family-architecture]]) are checked out side by side under `~/RustroverProjects/`: FerroEHR, FerroBRIDGE, FerroFED, FerroPIX, FerroTERM, FerroSMART (the SMART authorization server, with the `ferrohealth-smart`, `-authz` and `-session` crates), the shared-crate repositories FerroAUDIT, FerroSYS and FerroUI, FerroPULSE, FerroLICENCE and the FerroHEALTH umbrella.
 
 **How to apply:**
 - Read any sibling freely: code, rules, history, closed issues. It is the fastest source of prior art.

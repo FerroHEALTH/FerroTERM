@@ -148,7 +148,7 @@ the new release counts differently.
 | `jscpd darwin-x64` | `ae8d24aba2719df7682b1bb2c5021ab096116b8240c45fdae88654fc1ff36b17` (`jscpd-darwin-x64.tar.gz`) | `scripts/checks/duplication.sh --install` |
 | `jscpd linux-x64` | `5f18a6b70b4210782fc3c401c780ba994a2777249cd44d97d6fa460f6fff4570` (`jscpd-linux-x64-musl.tar.gz`) | `scripts/checks/duplication.sh --install` |
 | `jscpd linux-arm64` | `3635d652ae08ae10bfbc6821bfa8ac14080101f317fb5f45f4b590d5d32b9339` (`jscpd-linux-arm64-musl.tar.gz`) | `scripts/checks/duplication.sh --install` |
-| `cargo-semver-checks` | `0.51.0` | `scripts/checks/semver.sh --pin`, which the `crate-version-guard` job of `ci.yml` and the `plan` job of `release.yml` install through `taiki-e/install-action`; the version FerroBRIDGE, FerroSYS, FerroAUTH and FerroAUDIT pin |
+| `cargo-semver-checks` | `0.51.0` | `scripts/checks/semver.sh --pin`, which the `crate-version-guard` job of `ci.yml` and the `plan` job of `release.yml` install through `taiki-e/install-action`; the version FerroBRIDGE, FerroSYS, FerroSMART and FerroAUDIT pin |
 
 Trivy is the one CI tool pinned outside its workflow step: every workflow
 that scans (`release.yml`, `scan-and-tag.yml`, `image-scan.yml`) sets
