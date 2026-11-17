@@ -1142,9 +1142,9 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-term"
-version = "0.12.0"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c66be4d10749b45746950b04372e84453ef025a89069987b995169e759f2b513"
+checksum = "09680722c98a038c95017ad2d895d468ab6e75af9b47545c98cd459f4887f53c"
 dependencies = [
  "async-trait",
  "backon",
@@ -1229,9 +1229,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-session"
-version = "0.23.0"
+version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5cffb5ccc90280fbd7040665cd728f4afa32271594fd1ee17ccb2739552d5e94"
+checksum = "e6da0649cb92a96487255ce8f55156ed78a8ec2626eb52d023c5624660a8da7a"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -1254,9 +1254,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-smart"
-version = "0.28.0"
+version = "0.29.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a95ca88616c8503a9c4888f18dc79a456c5ed89cef38ded82ee7ad850573bda2"
+checksum = "64721f5376469aed14727623e2892e0ef9709387ce325b10de42edbe4fbe36de"
 dependencies = [
  "argon2",
  "aws-lc-rs",
@@ -1279,6 +1279,7 @@ dependencies = [
  "tower",
  "tracing",
  "url",
+ "x509-parser",
 ]
 
 [[package]]
@@ -1315,9 +1316,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-ui"
-version = "0.6.9"
+version = "0.6.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8ceb285b787e15cf540a37db0202f7f3443b5063d2a609aabd1aad3bba2d387"
+checksum = "fc75ea549c2645895f5dbffcb1105d2da2fef594189d8f8cb2913b925afdf3e0"
 dependencies = [
  "askama",
  "axum",
