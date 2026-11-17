@@ -101,12 +101,12 @@ axum documentation of the pinned release.
 - **A request that is not a safe method is taken only from the console's
   own pages** (`server::same_origin_only`, fetch metadata first).
 - **The reader's sign-in lives on the console's server**, run by
-  `ferrohealth-session` (FerroHEALTH/FerroAUTH): authorization code with
+  `ferrohealth-session` (FerroHEALTH/FerroSMART): authorization code with
   PKCE at the configured OpenID Provider through `ferrohealth-smart`'s
   relying party, the session behind one opaque `HttpOnly` cookie, and the
   routes `/login`, `/auth/callback`, `/logout` and `/session`. Nothing of the
   sign-in, the session store or its cookies is written here: a gap is filed
-  on FerroAUTH. Its middleware hands every page the request's
+  on FerroSMART. Its middleware hands every page the request's
   `record::Held`, which the visit reads; the page is told the reader's name
   and granted scopes (`auth::Operator`), which decide whether an edit
   control is drawn. The terminology server checks the token on every write.
