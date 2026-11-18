@@ -24,6 +24,6 @@ runs:
   steps:
     # taiki-e/install-action fetches each tool's upstream release binary and
     # verifies its checksum, so no `cargo install` compile is needed.
-    - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
+    - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
       with:
         tool: mdbook@${{ inputs.mdbook-version }},mdbook-toc@${{ inputs.mdbook-toc-version }},mdbook-mermaid@${{ inputs.mdbook-mermaid-version }}

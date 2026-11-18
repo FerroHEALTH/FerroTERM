@@ -71,7 +71,7 @@ jobs:
       # (template-injection).
       - name: zizmor
         if: ${{ !cancelled() }}
-        uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
+        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: zizmor@1.30.1
       - name: zizmor / Audit .github/workflows
@@ -132,7 +132,7 @@ jobs:
       # a code off tree-wide.
       - name: shellcheck
         if: ${{ !cancelled() }}
-        uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
+        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: shellcheck@0.11.0
       - name: shellcheck / Every tracked shell program is clean at severity=style
@@ -508,7 +508,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-rust
-      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: cargo-nextest
       - run: cargo nextest run --workspace --locked --no-tests=pass
@@ -547,7 +547,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-rust
-      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: cargo-deny
       # Reads the same RustSec advisory DB as cargo-audit and adds
@@ -662,7 +662,7 @@ jobs:
         with:
           components: clippy, rustfmt
           cache-key: ui-e2e
-      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: cargo-nextest
       - name: Install Chrome and chromedriver
@@ -798,7 +798,7 @@ jobs:
         name: Read the cargo-semver-checks pin
         if: steps.guard-pr.outputs.judged != '' || steps.guard-queue.outputs.judged != ''
         run: echo "version=$(bash scripts/checks/semver.sh --pin)" >> "$GITHUB_OUTPUT"
-      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         if: steps.guard-pr.outputs.judged != '' || steps.guard-queue.outputs.judged != ''
         with:
           tool: cargo-semver-checks@${{ steps.semver-pin.outputs.version }}
@@ -879,7 +879,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-rust
-      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: cargo-hack
       # The Cargo book's named tool for verifying the declared rust-version
