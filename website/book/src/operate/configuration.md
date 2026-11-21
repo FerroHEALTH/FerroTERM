@@ -135,6 +135,7 @@ key_file = "/etc/ferroterm/tls/server.key"
 | `max_concurrent_requests` | How many requests are served at once, at least 1; past it a request waits for a slot and is answered `503` once the queue is full or its wait expires. The bound is always on: set the ceiling your deployment holds. | `256` |
 | `admission_wait` | How long a request past the bound waits for a slot, counted in its latency; `"0s"` refuses it at once. | `"100ms"` |
 | `max_waiting_requests` | How many requests past the bound wait at once, first come first served; `0` keeps no queue. | `256` |
+| `request_decompression` | Whether a request body sent with `Content-Encoding: gzip` or `br` is decoded before a route reads it. On, `body_limit` holds the decoded bytes too, any other coding is answered `415`, and a body that does not decode `400`. | `false` |
 | `retry_after` | How long a `503` past the bound tells the client to wait (`Retry-After`), in whole seconds. | `"1s"` |
 | `trusted_proxies` | The reverse proxies, each an address or a CIDR block, whose forwarded client address the request log believes. Empty, every request is named by the connection's peer. | none |
 | `forwarded_header` | The header a trusted proxy names the client in: `forwarded` (RFC 7239) or `x-forwarded-for`. | `forwarded` |
