@@ -1,0 +1,1 @@
+- FerroTERM moves to `ferrohealth-smart` 0.33, `ferrohealth-session` 0.28, `ferrohealth-server` 0.12 and `ferrobridge-term` 0.17. `[server] request_decompression`, off by default, decodes a request body sent in gzip or Brotli, with `server.body_limit` holding the decoded bytes as well (FerroHEALTH/FerroSYS#408).
