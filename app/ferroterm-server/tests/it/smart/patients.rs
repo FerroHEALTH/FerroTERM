@@ -17,7 +17,7 @@ async fn patients_server(issuer: &str, represents: Option<bool>) -> Server {
     let mut setup = SmartSetup::for_issuer(issuer);
     let entry = setup.issuer_mut();
     entry.kind = Some(IssuerKind::Patients);
-    entry.act_represents_patient = represents;
+    entry.profile.act_represents_patient = represents;
     Server::start_persisting_with_smart_setup(setup).await
 }
 

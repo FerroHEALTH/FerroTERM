@@ -4,32 +4,32 @@
 //! What `ferroterm config check` prints of a configured issuer: an issuer
 //! identifier written with a password in its userinfo renders masked, on
 //! both streams (RFC 3986 §3.2.1: the password is never rendered in clear
-//! text), in `[[auth.issuer]]` and in each of the four `[auth]` tables that
-//! name an issuer.
+//! text), in an `[auth.issuer.<name>]` table and in an issuer carrying each
+//! of the four tables that sit under an issuer.
 
 use std::process::Command;
 
-/// The `[[auth.issuer]]` of an issuer written with a synthetic password.
-const ISSUER: &str = "[auth]\nenabled = true\n\n[[auth.issuer]]\nissuer = \"https://u:SYNTH_ISSUER_PW@as.example.org/realms/ferro\"\nkind = \"persons\"\naudience = [\"https://term.example.org/fhir\"]\n";
+/// The `[auth.issuer.<name>]` of an issuer written with a synthetic password.
+const ISSUER: &str = "[auth]\nenabled = true\n\n[auth.issuer.idp]\nissuer = \"https://u:SYNTH_ISSUER_PW@as.example.org/realms/ferro\"\nkind = \"persons\"\naudience = [\"https://term.example.org/fhir\"]\n";
 
-/// Each `[auth]` table that names an issuer, by the host it names, written
-/// with a synthetic password in the issuer's userinfo.
+/// An issuer carrying each table that sits under an issuer, by the host it
+/// names, written with a synthetic password in the issuer's userinfo.
 const TABLES: [(&str, &str); 4] = [
     (
         "attributes.example.org",
-        "\n[[auth.attributes]]\nissuer = \"https://u:SYNTH_ISSUER_PW@attributes.example.org/realms/ferro\"\nmapping = \"iua\"\n",
+        "\n[auth.issuer.attributes]\nissuer = \"https://u:SYNTH_ISSUER_PW@attributes.example.org/realms/ferro\"\nkind = \"persons\"\naudience = [\"https://term.example.org/fhir\"]\n\n[auth.issuer.attributes.attributes]\nmapping = \"iua\"\n",
     ),
     (
         "federation.example.org",
-        "\n[[auth.federation]]\nissuer = \"https://u:SYNTH_ISSUER_PW@federation.example.org/realms/ferro\"\ncontact_point = false\n",
+        "\n[auth.issuer.federation]\nissuer = \"https://u:SYNTH_ISSUER_PW@federation.example.org/realms/ferro\"\nkind = \"federation\"\naudience = [\"https://term.example.org/fhir\"]\n\n[auth.issuer.federation.federation]\ncontact_point = false\n",
     ),
     (
         "party.example.org",
-        "\n[[auth.party]]\nissuer = \"https://u:SYNTH_ISSUER_PW@party.example.org/realms/ferro\"\nidentifier_issuer = \"urn:example:people\"\nidentifier_type = \"guid\"\n",
+        "\n[auth.issuer.party]\nissuer = \"https://u:SYNTH_ISSUER_PW@party.example.org/realms/ferro\"\nkind = \"persons\"\naudience = [\"https://term.example.org/fhir\"]\n\n[auth.issuer.party.party]\nidentifier_issuer = \"urn:example:people\"\nidentifier_type = \"guid\"\n",
     ),
     (
         "scopeless.example.org",
-        "\n[[auth.scopeless_subjects]]\nissuer = \"https://u:SYNTH_ISSUER_PW@scopeless.example.org/realms/ferro\"\nsub = \"service\"\n",
+        "\n[auth.issuer.scopeless]\nissuer = \"https://u:SYNTH_ISSUER_PW@scopeless.example.org/realms/ferro\"\nkind = \"machines\"\naudience = [\"https://term.example.org/fhir\"]\nscopeless_subjects = [\"service\"]\n",
     ),
 ];
 
@@ -67,7 +67,7 @@ fn config_check_never_renders_an_issuers_userinfo() {
 }
 
 #[test]
-fn config_check_never_renders_the_userinfo_of_a_table_naming_an_issuer() {
+fn config_check_never_renders_the_userinfo_of_an_issuer_carrying_a_table() {
     for (host, table) in TABLES {
         let (stdout, stderr) = config_check(&format!("{ISSUER}{table}"));
         assert!(

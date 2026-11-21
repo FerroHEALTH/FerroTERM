@@ -242,9 +242,8 @@ serve() {
 # The anonymous console writes through a server with [auth] off; the signed-in
 # one through a server that trusts the stub issuer, a `persons` issuer whose
 # access tokens name the reader, the console's client and the audience
-# `ferroterm` when the request names none. An issuer is an [[auth.issuer]]
-# table, which only the configuration file can hold.
-printf '[[auth.issuer]]\nissuer = "%s"\nkind = "persons"\naudience = ["ferroterm"]\nfirst_party_clients = ["ferroterm-console"]\n' \
+# `ferroterm` when the request names none, its profile admitting the console.
+printf '[auth.issuer.stub]\nissuer = "%s"\nkind = "persons"\naudience = ["ferroterm"]\n\n[auth.issuer.stub.profile]\nfirst_party_clients = ["ferroterm-console"]\n' \
   "$issuer" > "$work/server-smart.toml"
 serve 18080 "$work/server.log" FERROTERM__TERMINOLOGY__RESOURCES="$work/resources.redb" \
   FERROTERM__AUTH__ENABLED=false

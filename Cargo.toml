@@ -83,16 +83,19 @@ toml = { version = "1.1.6", default-features = false, features = ["std", "parse"
 # leaves a Basic user's scopes to the product's `[basic_grants]`, 0.26
 # builds on ferrohealth-server 0.10, 0.27 describes a machines-only
 # deployment for SMART Backend Services, and 0.28 takes a client
-# assertion's `aud` and `typ` from the grant's security profile. `server-tls` builds an outbound
-# `tls` table through ferrohealth-server's TlsClient. Verified against
-# crates.io on 2026-11-16.
-ferrohealth-smart = { version = "=0.29.1", features = ["axum", "server-tls"] }
+# assertion's `aud` and `typ` from the grant's security profile; 0.30
+# builds on ferrohealth-server 0.11, and 0.32 names every issuer
+# (`[auth.issuer.<name>]`), moves the profile keys under the issuer's
+# `profile` table and carries a reason code on every refusal. `server-tls`
+# builds an outbound `tls` table through ferrohealth-server's TlsClient.
+# Verified against crates.io on 2026-11-21.
+ferrohealth-smart = { version = "=0.32.0", features = ["axum", "server-tls"] }
 # The FerroHEALTH console sign-in and session: the authorization code flow
 # with PKCE over ferrohealth-smart's relying party, the session store with
 # its idle and absolute lifetimes, and the four sign-in routes. Pinned
-# exactly, at the release beside ferrohealth-smart 0.28, whose `oidc` types
-# it carries. Verified against crates.io on 2026-11-16.
-ferrohealth-session = { version = "=0.24.0", features = ["axum"] }
+# exactly, at the release beside ferrohealth-smart 0.32, whose `oidc` types
+# it carries. Verified against crates.io on 2026-11-21.
+ferrohealth-session = { version = "=0.27.0", features = ["axum"] }
 # The FerroHEALTH health family: the readiness document, the indicator
 # registry and the process lifecycle, and the HTTP plumbing whose `health`
 # module serves `/health`, `/health/liveness` and `/health/readiness` over
@@ -101,7 +104,7 @@ ferrohealth-session = { version = "=0.24.0", features = ["axum"] }
 # on ferrohealth-telemetry 0.5, and 0.10 bounds the requests served at once
 # by default. Verified against crates.io on 2026-11-16.
 ferrohealth-health = { version = "=0.1.1", features = ["registry"] }
-ferrohealth-server = { version = "=0.10.0" }
+ferrohealth-server = { version = "=0.11.0" }
 # The FerroHEALTH configuration loader and its secrets: one TOML tree per
 # binary under `--config` or `<PREFIX>_CONFIG`, `<PREFIX>__SECTION__KEY`
 # overrides, `--set`, strict refusals and provenance, and the `<key>_file`
@@ -152,8 +155,8 @@ uuid = { version = "1.26.0", features = ["v4"] }
 # console moves its pin after looking at its own screens. FerroUI 0.6 renders
 # its components from Askama templates and serves its stylesheet, themes and
 # script modules through its own router. Verified against crates.io on
-# 2026-11-09 (0.6.9).
-ferrohealth-ui = "=0.6.10"
+# 2026-11-21 (0.6.11).
+ferrohealth-ui = "=0.6.11"
 # The console's string catalogs: Project Fluent messages embedded at build
 # time from app/ferroterm-console/locales/, the crate and version
 # ferrohealth-ui catalogs its own words with, so one locale drives both.
@@ -206,8 +209,9 @@ fhir-types = { version = "0.1.131", default-features = false, features = ["r4", 
 # release writes and the answer it reads, with or without its own transport.
 # Each FHIR release is its own feature: the same four, which the console offers.
 # 0.12 builds its client from a ferrohealth-smart 0.28 endpoint table
-# (`Client::from_endpoint`, feature `smart`, which the sync service turns on).
-ferrobridge-term = { version = "0.13.0", default-features = false, features = ["r4", "r4b", "r5", "r6"] }
+# (`Client::from_endpoint`, feature `smart`, which the sync service turns on),
+# and 0.16 builds on ferrohealth-smart 0.32.
+ferrobridge-term = { version = "0.16.0", default-features = false, features = ["r4", "r4b", "r5", "r6"] }
 # Workspace-internal crates. The `crates/*` members carry the published crate
 # line (lockstep, bumped with their packaged content, never the product
 # version); the tools stay on the workspace version.

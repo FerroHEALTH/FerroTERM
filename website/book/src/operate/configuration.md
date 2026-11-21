@@ -52,7 +52,7 @@ format = "json"
 state_dir = "/data/state"
 deployment = "binary"
 
-[[auth.issuer]]
+[auth.issuer.tx]
 issuer = "https://auth.example.org/realms/tx"
 kind = "machines"
 audience = ["https://tx.example.org"]
@@ -73,7 +73,7 @@ audience = ["https://tx.example.org"]
 | `admin.listen` (`FERROTERM__ADMIN__LISTEN`) | The socket address of the admin listener, which serves `POST /reload` and nothing else (see [Reloading the served set](#reloading-the-served-set)). Every route on it requires the admin scope (see [Authentication](#authentication)), and the server refuses to start with it until `[auth]` names an issuer or turns authentication off. Unset or empty, the server binds no second listener and `SIGHUP` is the only reload trigger. | none (no admin listener) |
 | `fhir.base_url` (`FERROTERM__FHIR__BASE_URL`) | The URL clients reach this server at, without a version prefix (`https://tx.example.org`); a trailing slash is dropped. Each version states it as `implementation.url` in its capability statements, so a client behind a reverse proxy learns the address it should use rather than the socket the process bound. Setting it also adds every served version's base under this URL to the audiences the write routes accept, beside each issuer's `audience` (see [Behind a reverse proxy](reverse-proxy.md#the-audience-a-token-carries)). A deployment that names none states no URL. | none |
 | `fhir.security_services` (`FERROTERM__FHIR__SECURITY_SERVICES`) | The authentication in front of the server, as codes of the FHIR `restful-security-service` value set (`OAuth`, `SMART-on-FHIR`, `Basic`, `Certificates`, `Kerberos`, `NTLM`). The codes declare what a proxy enforces, in `CapabilityStatement.rest.security.service`; with an `[auth]` issuer, `SMART-on-FHIR` is added to whatever you declare here. Any other code refuses the start. | none |
-| `[auth]` (`FERROTERM__AUTH__<KEY>`) | Who may write and reach the admin listener (see [Authentication](#authentication)). Every issuer is an `[[auth.issuer]]` table in the file, beside `[[auth.basic.users]]` and the `[basic_grants]` they are granted; a key of `[auth]` itself can be a variable, such as `FERROTERM__AUTH__ENABLED` or `FERROTERM__AUTH__PRODUCT_SCOPE`. | see [Authentication](#authentication) |
+| `[auth]` (`FERROTERM__AUTH__<KEY>`) | Who may write and reach the admin listener (see [Authentication](#authentication)). Every issuer is an `[auth.issuer.<name>]` table, beside `[[auth.basic.users]]` and the `[basic_grants]` they are granted; a key of `[auth]` itself can be a variable, such as `FERROTERM__AUTH__ENABLED` or `FERROTERM__AUTH__PRODUCT_SCOPE`, and so can a key of a named issuer, such as `FERROTERM__AUTH__ISSUER__TX__AUDIENCE`. | see [Authentication](#authentication) |
 | `[basic_grants]` | The scopes and roles each Basic user of `[[auth.basic.users]]` is granted, one `[basic_grants.<user>]` table per user-id (see [Authentication](#authentication)). A grant naming a user `[[auth.basic.users]]` does not list refuses the start. | none (no Basic user reaches anything) |
 | `usage_report.enabled` (`FERROTERM__USAGE_REPORT__ENABLED`) | Whether the server sends the [usage report](usage-report.md) to FerroPULSE, `true` or `false`. `true` cannot override CI detection: with `GITHUB_ACTIONS` or `CI` set to `true` or `1`, the report is off. | `true` |
 | `usage_report.endpoint` (`FERROTERM__USAGE_REPORT__ENDPOINT`) | The collector the usage report is posted to: an `https` URL without credentials, or plain `http` to a loopback host. The server refuses to start on anything else. | `https://report.ferropulse.eu/v1/report` |
@@ -95,8 +95,10 @@ an `OperationOutcome`:
 - a request still running after `request_timeout` is answered `408`
   (`timeout`);
 - a body larger than `body_limit` is answered `413` (`too-long`);
-- past `max_concurrent_requests`, a request is answered `503` (`throttled`)
-  with `Retry-After`, and the health routes are never refused;
+- past `max_concurrent_requests`, a request waits up to `admission_wait`
+  for a slot in a queue of at most `max_waiting_requests` places, and a full
+  queue or an expired wait is answered `503` (`throttled`) with
+  `Retry-After`; the health routes are never refused or queued;
 - a handler that fails unexpectedly is answered `500` (`exception`) with the
   request id, and the log line names the id and nothing of the failure.
 
@@ -130,7 +132,9 @@ key_file = "/etc/ferroterm/tls/server.key"
 | `body_limit` | The largest request body read before the request is answered `413`. | `"1MiB"` |
 | `drain_delay` | How long readiness stays withdrawn on `SIGTERM` before the listeners close. | `"0s"` |
 | `shutdown_timeout` | How long the requests in flight may take once the listeners closed. Keep `drain_delay` plus this below the grace period of the container runtime, so the server exits before it is killed. | `"10s"` |
-| `max_concurrent_requests` | How many requests are served at once, at least 1; past it a request is answered `503`. The bound is always on: set the ceiling your deployment holds. | `256` |
+| `max_concurrent_requests` | How many requests are served at once, at least 1; past it a request waits for a slot and is answered `503` once the queue is full or its wait expires. The bound is always on: set the ceiling your deployment holds. | `256` |
+| `admission_wait` | How long a request past the bound waits for a slot, counted in its latency; `"0s"` refuses it at once. | `"100ms"` |
+| `max_waiting_requests` | How many requests past the bound wait at once, first come first served; `0` keeps no queue. | `256` |
 | `retry_after` | How long a `503` past the bound tells the client to wait (`Retry-After`), in whole seconds. | `"1s"` |
 | `trusted_proxies` | The reverse proxies, each an address or a CIDR block, whose forwarded client address the request log believes. Empty, every request is named by the connection's peer. | none |
 | `forwarded_header` | The header a trusted proxy names the client in: `forwarded` (RFC 7239) or `x-forwarded-for`. | `forwarded` |
@@ -220,29 +224,33 @@ route of the admin listener require a credential.
 
 Authentication is on by default and fails closed: a server that names
 `terminology.resources` or `admin.listen` refuses to start until `[auth]`
-names an issuer in an `[[auth.issuer]]` table, or says `enabled = false`. A
+names an issuer in an `[auth.issuer.<name>]` table, or says `enabled = false`. A
 read-only server with neither starts without `[auth]`.
 
-Each issuer is a table of its own in the configuration file, with its kind and
-its audience. A table cannot be written as a variable, so a deployment that
-authenticates its callers mounts a configuration file; on a network only
+Each issuer is a table of its own, named by the operator, with its kind and
+its audience. The name is a lower-case letter followed by lower-case letters,
+digits and `_`, at most 64 characters, and every other key that names an
+issuer, such as `described_issuer`, uses it. A key of a named issuer can also
+be a variable, `FERROTERM__AUTH__ISSUER__<NAME>__<KEY>`; on a network only
 trusted callers reach, `FERROTERM__AUTH__ENABLED=false` turns authentication
 off instead.
 
 ```toml
-[[auth.issuer]]
+[auth.issuer.tx]
 issuer = "https://auth.example.org/realms/tx"
 kind = "machines"
 audience = ["https://tx.example.org"]
 ```
 
-The keys of each `[[auth.issuer]]` table:
+The keys of each `[auth.issuer.<name>]` table:
 
 | Key | Meaning | Default |
 |---|---|---|
 | `issuer` | The issuer identifier of the authorization server whose access tokens are accepted, an `https` URL (plain `http` on a loopback host only). The server reads its metadata (RFC 8414, with OpenID Connect Discovery as the fallback) and its key set before it binds, and refuses to start when either does not answer. | none (required) |
-| `kind` | Whose tokens the issuer signs: `machines` for backend services under the client credentials grant, `persons` for people signing in to an app, or `patients`. Every token is classified by it, and one that matches no caller of that kind is refused. A `persons` token is admitted only through a client the table lists in `first_party_clients` or `delegates`. | none (required) |
-| `profile` | What the issuer's tokens look like: `rfc9068`, or the preset of a known authorization server (`keycloak`, `entra`, `okta`), each overridable key by key on the table. | `rfc9068` |
+| `kind` | Whose tokens the issuer signs: `machines` for backend services under the client credentials grant, `persons` for people signing in to an app, or `patients`. Every token is classified by it, and one that matches no caller of that kind is refused. A `persons` token is admitted only through a client the `profile` table lists in `first_party_clients` or `delegates`. | the preset's: `persons` under `keycloak`, `entra`, `okta` and `ferrosmart`; none (required) under `rfc9068` |
+| `preset` | What the issuer's tokens look like: `rfc9068`, or the preset of a known authorization server (`keycloak`, `entra`, `okta`, `ferrosmart`). | `rfc9068` |
+| `profile_file` | A profile file in the form of a preset, whose keys win over the preset's. | none |
+| `[auth.issuer.<name>.profile]` | The profile keys of the issuer, which win over the profile file and the preset, such as `first_party_clients`, `delegates` and `act_represents_patient`. | none |
 | `audience` | The `aud` values a token may carry; one of them is required (RFC 9068 §4). The write routes also accept every served version's base under `fhir.base_url`; the admin listener accepts this list alone. | none (required) |
 | `algorithms` | The signature algorithms accepted; an HMAC algorithm refuses the start. | `RS256`, `RS384`, `PS256`, `PS384`, `ES256`, `ES384` |
 | `clock_skew` | The skew allowed on `exp`, `nbf` and `iat`, at most `"5min"`. | `"60s"` |
@@ -251,9 +259,10 @@ The keys of each `[[auth.issuer]]` table:
 | `jwks_file` | A key set file handed over out of band, read in place of the issuer's `jwks_uri`. | none |
 | `timeout` | How long one call to the authorization server may take. | `"10s"` |
 | `mode` | How a bearer token is checked: `jwt`, as an RFC 9068 JWT against the issuer's key set, or `introspection`, by posting it to the issuer's introspection endpoint (RFC 7662), for an authorization server that issues tokens the server cannot read. | `jwt` |
-| `[auth.issuer.introspection]` | The introspection check under `mode = "introspection"`: `endpoint` (the issuer metadata's `introspection_endpoint` when empty), `cache_max_age` (how long an active response is used, at most until its `exp`; `"60s"`), `cache_capacity` (`10000`), and exactly one of `client` (the client authentication of the call, with the keys of a client credentials grant: `client_id`, `client_auth`, `client_secret` or `client_secret_file`, `private_key_file`) and `bearer` (a client credentials grant whose token authorizes the call). | none |
-| `act_represents_patient` | On a `patients` issuer only: whether a patient's token that carries an RFC 8693 §4.1 `act` claim is the patient's representative, the actor in `act` acting for the patient its `sub` names. Without it such a token is refused as no caller of the issuer. A terminology resource sits in no patient's compartment, so the patient and the representative are both refused every write. The key on another kind of issuer refuses the start. | `false` |
+| `[auth.issuer.<name>.introspection]` | The introspection check under `mode = "introspection"`: `endpoint` (the issuer metadata's `introspection_endpoint` when empty), `cache_max_age` (how long an active response is used, at most until its `exp`; `"60s"`), `cache_capacity` (`10000`), and exactly one of `client` (the client authentication of the call, with the keys of a client credentials grant: `client_id`, `client_auth`, `client_secret` or `client_secret_file`, `private_key_file`) and `bearer` (a client credentials grant whose token authorizes the call). | none |
+| `profile.act_represents_patient` | On a `patients` issuer only: whether a patient's token that carries an RFC 8693 §4.1 `act` claim is the patient's representative, the actor in `act` acting for the patient its `sub` names. Without it such a token is refused as no caller of the issuer. A terminology resource sits in no patient's compartment, so the patient and the representative are both refused every write. The key on another kind of issuer refuses the start. | `false` |
 | `role_claims` | The claims the issuer's tokens carry roles in, each a dotted path. The server grants nothing by role, so the roles a token carries change no answer. | `roles`, `groups`, `entitlements` |
+| `scopeless_subjects` | The machines of this issuer granted every write without a scope, by `sub`, since a `sub` is unique only within its issuer (RFC 7519 §4.1.2). An entry admits a `System` caller of this issuer alone. | none |
 
 The keys of `[auth]` itself, in the configuration file or as
 `FERROTERM__AUTH__<KEY>`:
@@ -266,8 +275,7 @@ The keys of `[auth]` itself, in the configuration file or as
 | `realm` | The realm every challenge names. | `fhir.base_url`, else `FerroTERM` |
 | `scopes_supported` | The scopes the discovery document lists. List only scopes the server honours: "the server SHALL support all scopes listed here". | none (the member is omitted) |
 | `capabilities` | SMART capabilities the discovery document adds to the ones it derives. | none |
-| `described_issuer` | The `[[auth.issuer]]` the discovery document and the capability statement describe, when the server trusts several. Unset, the server describes the one issuer of kind `persons`, `patients` or `federation` whose metadata it holds, and with only `machines` issuers trusted the one `machines` issuer, for SMART Backend Services alone. [The described issuer](#the-described-issuer) gives the rule. | none |
-| `scopeless_subjects` | The machines granted every write without a scope, each a table `{ issuer = "…", sub = "…" }` naming the issuer exactly as its `[[auth.issuer]]` table does, since a `sub` is unique only within its issuer (RFC 7519 §4.1.2). An entry admits a `System` caller of that issuer alone; one naming an issuer the section does not trust refuses the start. | none |
+| `described_issuer` | The name of the `[auth.issuer.<name>]` table the discovery document and the capability statement describe, when the server trusts several. Unset, the server describes the one issuer of kind `persons`, `patients` or `federation` whose metadata it holds, and with only `machines` issuers trusted the one `machines` issuer, for SMART Backend Services alone. [The described issuer](#the-described-issuer) gives the rule. | none |
 | `[[auth.basic.users]]` | HTTP Basic users (RFC 7617), each a person: `user` and `password_hash` or `password_hash_file` (an Argon2id PHC string). The credential alone: what the user reaches is its `[basic_grants]` entry, and a `scopes` or `roles` key here refuses the start as an unknown key. | none (no Basic) |
 | `[auth.basic] cache_ttl` | How long a Basic credential that verified is kept, so a repeat request skips the Argon2id key derivation. `"0s"` verifies every request. | `"5min"` |
 
@@ -286,11 +294,11 @@ and a backend client takes its tokens from its token endpoint (SMART App
 Launch 2.2.0, Conformance, Metadata, and Backend Services, Retrieve
 `.well-known/smart-configuration`). SMART does not say which of several
 trusted issuers that is, so `ferrohealth-smart` fixes one rule for the
-FerroHEALTH servers, and the order of the `[[auth.issuer]]` tables never
-decides:
+FerroHEALTH servers, and the order of the `[auth.issuer.<name>]` tables
+never decides:
 
-- With `described_issuer`, the server describes that issuer once it is a
-  trusted issuer whose metadata it holds. A `machines` issuer is described
+- With `described_issuer`, the server describes the issuer of that name once
+  it holds its metadata; a name no table carries refuses the start. A `machines` issuer is described
   for SMART Backend Services alone, and refused while another issuer serves
   a user launch.
 - Otherwise, when the server trusts an issuer of kind `persons`, `patients`
@@ -311,7 +319,7 @@ user is always a person. A configuration file with a machines issuer and a
 person on Basic:
 
 ```toml
-[[auth.issuer]]
+[auth.issuer.tx]
 issuer = "https://auth.example.org/realms/tx"
 kind = "machines"
 audience = ["https://tx.example.org"]
@@ -333,19 +341,20 @@ held until its `exp` and at most `cache_max_age`; an inactive one
 answers `401`, and an endpoint that cannot answer `503`:
 
 ```toml
-[[auth.issuer]]
+[auth.issuer.tx]
 issuer = "https://auth.example.org/realms/tx"
 kind = "machines"
 audience = ["https://tx.example.org"]
 mode = "introspection"
 
-[auth.issuer.introspection.client]
+[auth.issuer.tx.introspection.client]
 client_id = "ferroterm"
 client_secret_file = "/run/secrets/introspection-secret"
 ```
 
 A refused credential answers `401` with an `OperationOutcome` and a
-`WWW-Authenticate` challenge that names no claim and no scope; a credential
+`WWW-Authenticate` challenge that names no claim and no scope, only the
+stable reason code of the refusal as `error_description`; a credential
 that grants no permission for the route answers `403` (RFC 6750 §3.1). The
 scopes each route requires are in
 [Behind a reverse proxy](reverse-proxy.md#validating-tokens-in-the-server).

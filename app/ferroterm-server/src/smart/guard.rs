@@ -15,7 +15,7 @@ use axum::extract::{Request, State};
 use axum::middleware::Next;
 use axum::response::Response;
 use ferrohealth_smart::guard::{AuthLayer, Gate, Render, Requirement, Target};
-use ferrohealth_smart::refusal::Refusal;
+use ferrohealth_smart::refusal::{Denied, Refusal};
 use ferrohealth_smart::resource::Access;
 use ferrohealth_smart::scope::Permission;
 use http::{Extensions, Method, Uri};
@@ -140,7 +140,7 @@ async fn compartment(
     });
     if reached == Some(false) {
         let (parts, _) = request.into_parts();
-        return render.render(&Refusal::Forbidden, &parts);
+        return render.render(&Denied::from(Refusal::Forbidden), &parts);
     }
     next.run(request).await
 }

@@ -190,7 +190,7 @@ data;"
   `[auth] enabled = false` removes the credential check from both. Binding the
   admin listener to a public address exposes the reload. Granting a user of
   `[[auth.basic.users]]` a write scope in `[basic_grants]`, or adding a subject
-  to `scopeless_subjects`, grants writes.
+  to an issuer's `scopeless_subjects`, grants writes.
 - **Outbound data.** The usage report sends what
   [the usage report](../operate/usage-report.md#what-a-report-contains) lists,
   and `FERROTERM__USAGE_REPORT__ENABLED=false` stops it.

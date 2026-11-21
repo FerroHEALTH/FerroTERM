@@ -55,6 +55,7 @@ pub fn app(service: &Service, routes: Router) -> Router {
         refusal_body: ferrohealth_server::problem::refusal_body(),
         request_log: RequestLog::new(&service.config().telemetry.logged_query_parameters)
             .with_metrics(&service.telemetry().meter(crate::metrics::SCOPE)),
+        meter: Some(service.telemetry().meter(crate::metrics::SCOPE)),
     };
     stack::app(routes, service.health().clone(), &section, policy)
 }

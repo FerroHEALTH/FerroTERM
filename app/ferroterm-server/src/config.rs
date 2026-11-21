@@ -444,7 +444,7 @@ mod tests {
 
     #[test]
     fn the_file_holds_the_tree_and_the_environment_goes_over_it() {
-        let text = "[terminology]\nindex = [\"/a\", \"/b\"]\n\n[[auth.issuer]]\nissuer = \"https://as.example.org\"\nkind = \"machines\"\naudience = [\"ferroterm\"]\n\n[[auth.basic.users]]\nuser = \"operator\"\npassword_hash_file = \"/run/secrets/operator\"\n\n[basic_grants.operator]\nscopes = [\"__ferroterm.admin\"]\n";
+        let text = "[terminology]\nindex = [\"/a\", \"/b\"]\n\n[auth.issuer.idp]\nissuer = \"https://as.example.org\"\nkind = \"machines\"\naudience = [\"ferroterm\"]\n\n[[auth.basic.users]]\nuser = \"operator\"\npassword_hash_file = \"/run/secrets/operator\"\n\n[basic_grants.operator]\nscopes = [\"__ferroterm.admin\"]\n";
         let config = Config::from_sources(
             Some(text),
             &environment(&[
@@ -462,8 +462,9 @@ mod tests {
             ]
         );
         let auth = &config.auth;
-        let [issuer] = auth.issuers() else {
-            panic!("one [[auth.issuer]] table, not {:?}", auth.issuers());
+        let issuers: Vec<_> = auth.issuers().collect();
+        let [("idp", issuer)] = issuers.as_slice() else {
+            panic!("one [auth.issuer.idp] table, not {issuers:?}");
         };
         assert_eq!(issuer.issuer.expose(), "https://as.example.org");
         assert_eq!(issuer.kind, Some(IssuerKind::Machines));
@@ -490,21 +491,22 @@ mod tests {
     }
 
     #[test]
-    fn an_issuer_is_declared_through_the_environment_by_element_index() {
+    fn an_issuer_is_declared_through_the_environment_by_name() {
         let config = Config::from_sources(
             None,
             &environment(&[
                 (
-                    "FERROTERM__AUTH__ISSUER__0__ISSUER",
+                    "FERROTERM__AUTH__ISSUER__IDP__ISSUER",
                     "https://as.example.org",
                 ),
-                ("FERROTERM__AUTH__ISSUER__0__KIND", "machines"),
-                ("FERROTERM__AUTH__ISSUER__0__AUDIENCE", "ferroterm"),
+                ("FERROTERM__AUTH__ISSUER__IDP__KIND", "machines"),
+                ("FERROTERM__AUTH__ISSUER__IDP__AUDIENCE", "ferroterm"),
             ]),
         )
         .expect("reads");
-        let [issuer] = config.auth.issuers() else {
-            panic!("one [[auth.issuer]] table, not {:?}", config.auth.issuers());
+        let issuers: Vec<_> = config.auth.issuers().collect();
+        let [("idp", issuer)] = issuers.as_slice() else {
+            panic!("one [auth.issuer.idp] table, not {issuers:?}");
         };
         assert_eq!(issuer.issuer.expose(), "https://as.example.org");
         assert_eq!(issuer.kind, Some(IssuerKind::Machines));
@@ -513,12 +515,12 @@ mod tests {
             Config::from_sources(
                 None,
                 &environment(&[(
-                    "FERROTERM__AUTH__ISSUER__1__ISSUER",
+                    "FERROTERM__AUTH__ISSUER__IDP__ISUER",
                     "https://as.example.org"
                 )]),
             )
             .is_err(),
-            "an index that skips an element is refused"
+            "a key a named issuer does not know is refused"
         );
     }
 
@@ -526,7 +528,7 @@ mod tests {
     fn no_file_and_no_override_is_the_default_tree() {
         let config = Config::from_sources(None, &BTreeMap::new()).expect("reads");
         assert!(config.auth.enabled, "the default fails closed");
-        assert!(config.auth.issuers().is_empty(), "no issuer is named");
+        assert!(config.auth.issuers().next().is_none(), "no issuer is named");
         assert_eq!(config.server.listen.to_string(), "127.0.0.1:8080");
         assert_eq!(config.terminology.default_language, "en");
         let off =
@@ -576,7 +578,7 @@ mod tests {
                 "127.0.0.1:8080",
                 "{foreign}"
             );
-            assert!(config.auth.issuers().is_empty(), "{foreign}");
+            assert!(config.auth.issuers().next().is_none(), "{foreign}");
         }
     }
 

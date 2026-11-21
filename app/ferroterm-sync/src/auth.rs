@@ -5,7 +5,7 @@
 //!
 //! The service validates a presented credential and issues none: the crate
 //! reads each `[auth]` issuer's metadata and key set, checks every access
-//! token under RFC 9068 (or, for an issuer whose `[[auth.issuer]]` table says
+//! token under RFC 9068 (or, for an issuer whose `[auth.issuer.<name>]` table says
 //! `mode = "introspection"`, at its introspection endpoint, RFC 7662),
 //! classifies the caller by its issuer's `kind`, and checks every
 //! `[[auth.basic.users]]` credential, a person's alone, and answers
@@ -29,7 +29,7 @@ use ferrohealth_smart::basic::{PasswordStore, StoreError};
 use ferrohealth_smart::config::{AuthSection, BasicGrants, ConfigError, ServerTls};
 use ferrohealth_smart::extract::HeaderOnly;
 use ferrohealth_smart::guard::{AuthLayer, Gate, Render, Requirement, Target};
-use ferrohealth_smart::refusal::Refusal;
+use ferrohealth_smart::refusal::{Denied, Refusal};
 use ferrohealth_smart::resource::introspection::{IntrospectionError, Introspector};
 use ferrohealth_smart::resource::{IssuerSet, ResourceError, ResourceServer};
 
@@ -57,7 +57,7 @@ pub enum AuthError {
     /// The section breaks a rule, an enabled section naming no issuer and no
     /// Basic user among them.
     #[error(
-        "[auth] is refused; the admin listener needs an [[auth.issuer]] table with its issuer, kind and audience, or Basic users, or `[auth] enabled = false` on a network only trusted callers reach"
+        "[auth] is refused; the admin listener needs an [auth.issuer.<name>] table with its issuer, kind and audience, or Basic users, or `[auth] enabled = false` on a network only trusted callers reach"
     )]
     Config {
         /// The rule.
@@ -130,12 +130,11 @@ impl AdminAuth {
         if !section.enabled {
             return Ok(None);
         }
-        let resolved =
-            section
-                .resolve_with_tls(&ServerTls)
-                .map_err(|source| AuthError::Config {
-                    source: Box::new(source),
-                })?;
+        let resolved = section
+            .resolve_with_tls(&ServerTls, &[])
+            .map_err(|source| AuthError::Config {
+                source: Box::new(source),
+            })?;
         let realm = resolved.realm.unwrap_or_else(|| String::from(REALM));
         let mut gate = Gate::open().with_realm(realm.clone());
         if !resolved.issuers.is_empty() || !resolved.introspection.is_empty() {
@@ -255,9 +254,10 @@ struct Refused {
 }
 
 impl Render for Refused {
-    fn render(&self, refusal: &Refusal, _parts: &Parts) -> Response {
+    fn render(&self, denied: &Denied, _parts: &Parts) -> Response {
+        let refusal = denied.refusal();
         let text = reason(refusal);
-        let challenged = self.header.respond(refusal, Body::empty());
+        let challenged = self.header.respond(denied, Body::empty());
         let challenge = challenged
             .headers()
             .get(axum::http::header::WWW_AUTHENTICATE);

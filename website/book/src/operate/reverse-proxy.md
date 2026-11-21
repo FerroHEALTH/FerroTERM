@@ -157,7 +157,7 @@ The server takes the SMART App Launch resource-server role
 FerroHEALTH crate `ferrohealth-smart`. It issues no tokens of its own: your
 authorization server does that, and FerroTERM only reads its public metadata.
 A server that names `FERROTERM__TERMINOLOGY__RESOURCES` or `FERROTERM__ADMIN__LISTEN` refuses to
-start until `[auth]` names the issuer in an `[[auth.issuer]]` table with its
+start until `[auth]` names the issuer in an `[auth.issuer.<name>]` table with its
 kind and an audience, or turns authentication off
 ([Configuration](configuration.md#authentication)). The table lives in the
 configuration file:
@@ -166,7 +166,7 @@ configuration file:
 [fhir]
 base_url = "https://tx.example.org"
 
-[[auth.issuer]]
+[auth.issuer.tx]
 issuer = "https://auth.example.org/realms/tx"
 kind = "machines"
 audience = ["https://tx.example.org"]
@@ -236,8 +236,8 @@ asymmetric algorithm. The server checks the signature against the key set,
 below, the `typ` header, which must be `at+jwt` (RFC 9068 §4), and the claims
 RFC 9068 §2.2 requires (`sub`, `client_id`, `jti`), as the issuer's profile
 sets them. An issuer that mints plain JWTs is admitted with `token_types =
-["JWT"]` on its `[[auth.issuer]]` table, or the preset of its server (such as
-`profile = "keycloak"`). Every token is then classified by the issuer's `kind`:
+["JWT"]` in its `[auth.issuer.<name>.profile]` table, or the preset of its server (such as
+`preset = "keycloak"`). Every token is then classified by the issuer's `kind`:
 a `machines` issuer admits only the client credentials tokens of its backend
 clients, and a token that matches no caller of that kind answers `401`.
 
@@ -252,7 +252,7 @@ that mints the claim from that request. Both are this server.
 
 The write routes accept every served version's base derived from
 `FERROTERM__FHIR__BASE_URL`, with and without a trailing slash, plus every
-`audience` of the issuer's `[[auth.issuer]]` table. With
+`audience` of the issuer's `[auth.issuer.<name>]` table. With
 `FERROTERM__FHIR__BASE_URL=https://tx.example.org` the server accepts
 `https://tx.example.org/r4`, `/r4b`, `/r5`, and `/r6` under that host. A token
 passes when its `aud` holds any of them, which RFC 7519 §4.1.3 asks of a
@@ -276,7 +276,7 @@ in the issuer's `audience` when your issuer mints it anyway.
 The admin listener is not a FHIR endpoint, so no version base is an audience
 for it: it accepts the issuer's `audience` alone.
 
-An `audience` is required on every `[[auth.issuer]]` table, so every token is
+An `audience` is required on every `[auth.issuer.<name>]` table, so every token is
 checked for an audience of this server (RFC 9068 §4); a server that names an
 issuer and no audience refuses to start. Set `FERROTERM__FHIR__BASE_URL` in any deployment behind a
 proxy as well: it is what the capability statements publish.
@@ -313,9 +313,9 @@ What comes back on a refusal follows RFC 6750 §3:
 | Situation | Answer |
 |---|---|
 | No credential | `401`, `WWW-Authenticate: Bearer realm="…"` (and a `Basic` challenge when Basic users are configured), an `OperationOutcome` with `login` |
-| Expired, malformed, wrong issuer, wrong audience, wrong signature | `401` with `error="invalid_token"` and no `error_description`: every invalid token answers alike |
+| Expired, malformed, wrong issuer, wrong audience, wrong signature | `401` with `error="invalid_token"` and the stable reason code as `error_description` (`expired`, `malformed-token`, `issuer-unknown`, `audience-mismatch`, `signature-invalid` and the rest); the `OperationOutcome` is the same for every invalid token |
 | Two `Authorization` headers, or a scheme with no credential | `400` with `error="invalid_request"` |
-| Valid credential, no scope for the route | `403` with `error="insufficient_scope"`; the outcome names no scope |
+| Valid credential, no scope for the route | `403` with `error="insufficient_scope"` and `error_description="scope-not-granted"`; the outcome names no scope |
 | The key set could not be read to check the token | `503`, an `OperationOutcome` with `transient` |
 
 The outcome is written in the format the request asks for, JSON or XML.
