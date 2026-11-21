@@ -83,7 +83,7 @@ mounts the whole tree and writes to it as uid 65532.
 The overlay also sets `FERROTERM__ADMIN__LISTEN` on the server, because
 `POST /reload` on that listener is how the sync asks for the new release to be
 served. That listener is a guarded surface, so the server starts only once
-`[auth]` names an issuer in an `[[auth.issuer]]` table, with
+`[auth]` names an issuer in an `[auth.issuer.<name>]` table, with
 `[server_admin.credentials.oauth]` in the sync configuration, or turns
 authentication off (see
 [Configuration](configuration.md#authentication)).
@@ -307,7 +307,7 @@ The service binds `listen` and serves six routes:
 Every route but the three health routes requires a credential carrying the product
 scope, `__ferroterm.sync` unless `[auth] product_scope` names another. The
 `[auth]` table is the one the server reads ([Configuration](configuration.md#authentication)):
-an `[[auth.issuer]]` table with its `kind` and `audience` for each issuer whose
+an `[auth.issuer.<name>]` table with its `kind` and `audience` for each issuer whose
 access tokens it accepts (checked as JWTs, or at the issuer's introspection
 endpoint under `mode = "introspection"`), people under `[[auth.basic.users]]`
 with their scopes in `[basic_grants]`, or both. A machine, such as a monitor,
@@ -324,10 +324,12 @@ reach should:
 ```toml
 # The console signs people in at this issuer and calls with their tokens;
 # a monitor calls with its own client credentials token.
-[[auth.issuer]]
+[auth.issuer.tx]
 issuer = "https://auth.example.org/realms/tx"
 kind = "persons"
 audience = ["ferroterm-sync"]
+
+[auth.issuer.tx.profile]
 first_party_clients = ["ferroterm-console"]
 
 # or a person with HTTP Basic, the hash an Argon2id PHC string:

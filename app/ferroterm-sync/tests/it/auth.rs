@@ -241,21 +241,25 @@ async fn introspecting_issuer() -> MockServer {
 /// An `[auth]` introspecting the tokens of `issuer` under a client secret.
 fn introspecting(issuer: &str) -> AuthSection {
     AuthSection {
-        issuer: vec![IssuerEntry {
-            issuer: ferrohealth_secret::secret_url::SecretUrl::new(issuer),
-            kind: Some(IssuerKind::Machines),
-            audience: vec![String::from(AUDIENCE)],
-            mode: AuthMode::Introspection,
-            introspection: Some(IntrospectionSection {
-                client: Some(OauthSection {
-                    client_id: String::from("ferroterm-sync"),
-                    client_secret: Some(SecretString::from("a-synthetic-secret")),
-                    ..OauthSection::default()
+        issuer: [(
+            String::from("idp"),
+            IssuerEntry {
+                issuer: ferrohealth_secret::secret_url::SecretUrl::new(issuer),
+                kind: Some(IssuerKind::Machines),
+                audience: vec![String::from(AUDIENCE)],
+                mode: AuthMode::Introspection,
+                introspection: Some(IntrospectionSection {
+                    client: Some(OauthSection {
+                        client_id: String::from("ferroterm-sync"),
+                        client_secret: Some(SecretString::from("a-synthetic-secret")),
+                        ..OauthSection::default()
+                    }),
+                    ..IntrospectionSection::default()
                 }),
-                ..IntrospectionSection::default()
-            }),
-            ..IssuerEntry::default()
-        }],
+                ..IssuerEntry::default()
+            },
+        )]
+        .into(),
         ..AuthSection::default()
     }
 }
@@ -515,7 +519,7 @@ fn the_flat_issuer_of_the_old_shape_is_refused_by_the_strict_load() {
 async fn an_issuer_without_a_kind_refuses_the_start_naming_the_key() {
     let issuer = MockServer::start().await;
     let mut section = introspecting(&issuer.uri());
-    for entry in &mut section.issuer {
+    for entry in section.issuer.values_mut() {
         entry.kind = None;
     }
     let reason = refusal(&section, &none()).await;

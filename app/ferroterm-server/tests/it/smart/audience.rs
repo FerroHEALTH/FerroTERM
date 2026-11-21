@@ -162,9 +162,9 @@ async fn the_admin_listener_does_not_take_a_version_base_as_its_audience() {
     assert_eq!(response.status(), StatusCode::OK);
 }
 
-// RFC 6750 §3: `error_description` is optional, and every invalid token gets
-// one generic `401` that names no claim, no `kid` and no issuer message, so a
-// refusal teaches the holder of a forged or stolen token nothing.
+// RFC 6750 §3: every invalid token gets one generic `401` body that names no
+// claim, no `kid` and no issuer message, and its challenge carries only the
+// stable reason code of the check that refused it as `error_description`.
 #[tokio::test]
 async fn every_invalid_token_gets_the_same_refusal() {
     let key = SigningKey::generate("k1");
@@ -175,15 +175,23 @@ async fn every_invalid_token_gets_the_same_refusal() {
     let stranger = SigningKey::generate("unknown-kid");
     let unknown = stranger.sign(&claims(&mock.uri(), "system/CodeSystem.cud", 300));
     let mut answers = Vec::new();
-    for token in [expired.as_str(), unknown.as_str(), "not-a-token"] {
+    for (token, code) in [
+        (expired.as_str(), "expired"),
+        (unknown.as_str(), "key-unknown"),
+        ("not-a-token", "malformed-token"),
+    ] {
         let response = put_colours(&server, Some(token)).await;
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
         let sent = challenge(&response);
-        assert!(!sent.contains("error_description"), "{sent}");
-        assert!(!sent.contains("unknown-kid"), "{sent}");
+        assert_eq!(
+            sent,
+            format!(
+                "Bearer realm=\"FerroTERM\", error=\"invalid_token\", error_description=\"{code}\""
+            )
+        );
         let (_, body) = fixture::json(response).await;
         assert!(!body.to_string().contains("unknown-kid"), "{body}");
-        answers.push((sent, body));
+        answers.push(body);
     }
     let (first, rest) = answers.split_first().expect("three answers");
     for other in rest {

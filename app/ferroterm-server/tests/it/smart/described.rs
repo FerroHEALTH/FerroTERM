@@ -5,7 +5,7 @@
 //! name, chosen by `ferrohealth-smart`'s `describe`: `[auth]
 //! described_issuer`, else the one issuer a user launch starts at, else, with
 //! only `machines` issuers trusted, the one `machines` issuer for SMART
-//! Backend Services; never by the order of the `[[auth.issuer]]` tables.
+//! Backend Services; never by the order of the `[auth.issuer.<name>]` tables.
 //! SMART App Launch 2.2.0, Conformance, §Metadata, and Backend Services,
 //! §Retrieve `.well-known/smart-configuration`; which of several issuers is
 //! described is our own design.
@@ -20,7 +20,7 @@ use wiremock::MockServer;
 use super::{SigningKey, capabilities, causes, configuration, issuer};
 use crate::fixture::{AUDIENCE, Server, SmartSetup};
 
-/// The `[[auth.issuer]]` table of `mock` as an issuer of `kind`.
+/// The `[auth.issuer.<name>]` table of `mock` as an issuer of `kind`.
 fn entry(mock: &MockServer, kind: IssuerKind) -> IssuerEntry {
     IssuerEntry {
         issuer: SecretUrl::new(mock.uri()),
@@ -30,7 +30,9 @@ fn entry(mock: &MockServer, kind: IssuerKind) -> IssuerEntry {
     }
 }
 
-/// The setup trusting `entries` in this order, describing `named` when set.
+/// The setup trusting `entries`, named `idp0`, `idp1` and on in this order,
+/// describing `named` when set, by the name `elsewhere` when it is none of
+/// them.
 fn trusting(entries: Vec<IssuerEntry>, named: Option<&MockServer>) -> SmartSetup {
     let first = entries
         .first()
@@ -39,8 +41,18 @@ fn trusting(entries: Vec<IssuerEntry>, named: Option<&MockServer>) -> SmartSetup
         .expose()
         .to_owned();
     let mut setup = SmartSetup::for_issuer(&first);
-    setup.auth.issuer = entries;
-    setup.auth.described_issuer = named.map(|mock| SecretUrl::new(mock.uri()));
+    let tables: Vec<(String, IssuerEntry)> = entries
+        .into_iter()
+        .enumerate()
+        .map(|(index, entry)| (format!("idp{index}"), entry))
+        .collect();
+    setup.auth.described_issuer = named.map(|mock| {
+        tables
+            .iter()
+            .find(|(_, entry)| entry.issuer.expose() == mock.uri())
+            .map_or_else(|| String::from("elsewhere"), |(name, _)| name.clone())
+    });
+    setup.auth.issuer = tables.into_iter().collect();
     setup
 }
 
@@ -232,10 +244,9 @@ async fn a_named_unknown_issuer_refuses_the_start() {
     ))
     .await;
     assert!(
-        reason.contains(&format!(
-            "described_issuer names {}, which is no trusted issuer",
-            elsewhere.uri()
-        )),
+        reason.contains(
+            "auth.described_issuer names the issuer \"elsewhere\", and the issuers are [\"idp0\"]"
+        ),
         "{reason}"
     );
 }

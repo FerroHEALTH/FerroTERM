@@ -7,7 +7,7 @@
 //! one: it validates a presented credential and issues none
 //! (<https://hl7.org/fhir/smart-app-launch/conformance.html>). The crate reads
 //! each configured issuer's metadata and key set, validates every access token
-//! under RFC 9068 or, for an issuer whose `[[auth.issuer]]` table says
+//! under RFC 9068 or, for an issuer whose `[auth.issuer.<name>]` table says
 //! `mode = "introspection"`, posts it to the issuer's introspection endpoint
 //! (RFC 7662), classifies every caller by its issuer's `kind` and profile,
 //! checks the Basic users of `[[auth.basic.users]]`, persons only, answers
@@ -34,7 +34,7 @@ use ferrohealth_smart::config::{BasicGrants, ConfigError, ServerTls};
 use ferrohealth_smart::extract::HeaderOnly;
 use ferrohealth_smart::guard::{Gate, Render};
 use ferrohealth_smart::metadata::ServerMetadata;
-use ferrohealth_smart::refusal::Refusal;
+use ferrohealth_smart::refusal::{Denied, Refusal};
 use ferrohealth_smart::resource::configuration::{Purpose, SmartOptions};
 use ferrohealth_smart::resource::described::{Candidate, DescribeError, describe};
 use ferrohealth_smart::resource::introspection::{
@@ -79,7 +79,7 @@ const REALM: &str = "FerroTERM";
 pub enum StartError {
     /// A guarded surface runs and `[auth]` names no issuer and is not off.
     #[error(
-        "{} need [auth]: write an [[auth.issuer]] table with its issuer, kind and audience, or set auth.enabled = false (FERROTERM__AUTH__ENABLED) on a network only trusted callers reach",
+        "{} need [auth]: write an [auth.issuer.<name>] table with its issuer, kind and audience, or set auth.enabled = false (FERROTERM__AUTH__ENABLED) on a network only trusted callers reach",
         surfaces.join(" and ")
     )]
     Unconfigured {
@@ -194,18 +194,18 @@ impl Smart {
         if !auth.enabled {
             return Ok(None);
         }
-        if auth.issuer.iter().all(|entry| entry.issuer.is_empty()) {
+        if auth.issuers().all(|(_, entry)| entry.issuer.is_empty()) {
             let surfaces = guarded_surfaces(config);
             if surfaces.is_empty() {
                 return Ok(None);
             }
             return Err(StartError::Unconfigured { surfaces });
         }
-        let resolved = auth
-            .resolve_with_tls(&ServerTls)
-            .map_err(|source| StartError::Auth {
-                source: Box::new(source),
-            })?;
+        let resolved =
+            auth.resolve_with_tls(&ServerTls, &[])
+                .map_err(|source| StartError::Auth {
+                    source: Box::new(source),
+                })?;
         let bases = version_bases(config.base_url().as_deref());
         let admin_listens = config.admin_listen().is_some();
         let mut fhir = IssuerSet::new();
@@ -550,13 +550,14 @@ pub struct Challenge {
 }
 
 impl Render for Challenge {
-    fn render(&self, refusal: &Refusal, parts: &Parts) -> Response {
+    fn render(&self, denied: &Denied, parts: &Parts) -> Response {
+        let refusal = denied.refusal();
         // NOTE: an `Accept` this server does not speak is a second fault on a
         // request already refused, so the outcome answers in the default format.
         let wire = crate::wire::Wire::negotiate(&[], &parts.headers).unwrap_or_default();
         let (code, text) = diagnostics(refusal);
         let mut answered = Failure::new(refusal.status(), code, text).respond(wire);
-        let challenged = self.header.respond(refusal, Body::empty());
+        let challenged = self.header.respond(denied, Body::empty());
         if let Some(challenge) = challenged.headers().get(http::header::WWW_AUTHENTICATE) {
             answered
                 .headers_mut()
@@ -575,9 +576,10 @@ pub struct AdminRefusal {
 }
 
 impl Render for AdminRefusal {
-    fn render(&self, refusal: &Refusal, _parts: &Parts) -> Response {
+    fn render(&self, denied: &Denied, _parts: &Parts) -> Response {
+        let refusal = denied.refusal();
         let (_, text) = diagnostics(refusal);
-        let challenged = self.header.respond(refusal, Body::empty());
+        let challenged = self.header.respond(denied, Body::empty());
         let challenge = challenged.headers().get(http::header::WWW_AUTHENTICATE);
         ferroterm_problem::refused(refusal.status(), text, challenge)
     }

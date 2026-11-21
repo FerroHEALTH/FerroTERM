@@ -142,6 +142,7 @@ pub fn stack_policy(serving: &Serving) -> StackPolicy {
             .with_metrics(&telemetry.meter(metrics::SCOPE))
             .with_recorder(serving.usage_window())
             .with_route_namer(std::sync::Arc::new(usage_report::FhirBaseNamer)),
+        meter: Some(telemetry.meter(metrics::SCOPE)),
     }
 }
 
@@ -159,6 +160,7 @@ pub fn admin_router(serving: Serving) -> Router {
         refusal_body: ferrohealth_server::problem::refusal_body(),
         request_log: RequestLog::new(&serving.config().telemetry.logged_query_parameters)
             .with_metrics(&telemetry.meter(metrics::SCOPE)),
+        meter: Some(telemetry.meter(metrics::SCOPE)),
     };
     let health = serving.health().clone();
     let section = serving.config().server.clone();

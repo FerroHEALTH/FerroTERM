@@ -38,18 +38,26 @@ pub(crate) struct SmartSetup {
     pub(crate) base_url: Option<String>,
 }
 
+/// The name of the `[auth.issuer.<name>]` table [`SmartSetup::for_issuer`]
+/// writes.
+pub(crate) const ISSUER_NAME: &str = "idp";
+
 impl SmartSetup {
     /// The `[auth]` table of `issuer`, a `machines` issuer with the audience
     /// [`AUDIENCE`], and everything else at its default.
     pub(crate) fn for_issuer(issuer: &str) -> Self {
         Self {
             auth: AuthSection {
-                issuer: vec![IssuerEntry {
-                    issuer: ferrohealth_secret::secret_url::SecretUrl::new(issuer),
-                    kind: Some(IssuerKind::Machines),
-                    audience: vec![String::from(AUDIENCE)],
-                    ..IssuerEntry::default()
-                }],
+                issuer: [(
+                    String::from(ISSUER_NAME),
+                    IssuerEntry {
+                        issuer: ferrohealth_secret::secret_url::SecretUrl::new(issuer),
+                        kind: Some(IssuerKind::Machines),
+                        audience: vec![String::from(AUDIENCE)],
+                        ..IssuerEntry::default()
+                    },
+                )]
+                .into(),
                 ..AuthSection::default()
             },
             basic_grants: BasicGrants::default(),
@@ -57,9 +65,12 @@ impl SmartSetup {
         }
     }
 
-    /// The one `[[auth.issuer]]` table [`SmartSetup::for_issuer`] wrote.
+    /// The one `[auth.issuer.<name>]` table [`SmartSetup::for_issuer`] wrote.
     pub(crate) fn issuer_mut(&mut self) -> &mut IssuerEntry {
-        self.auth.issuer.first_mut().expect("the issuer table")
+        self.auth
+            .issuer
+            .get_mut(ISSUER_NAME)
+            .expect("the issuer table")
     }
 }
 

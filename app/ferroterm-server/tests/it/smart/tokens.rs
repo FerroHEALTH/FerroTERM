@@ -192,12 +192,19 @@ async fn a_blank_sub_or_a_value_outside_b64token_is_an_invalid_token() {
     let mut blank = claims(&mock.uri(), "system/CodeSystem.cud", 300);
     blank["sub"] = json!("  ");
     let blank = key.sign(&blank);
-    for token in [blank.as_str(), "a,b", "a=b"] {
+    for (token, code) in [
+        (blank.as_str(), "subject-blank"),
+        ("a,b", "not-b64token"),
+        ("a=b", "not-b64token"),
+    ] {
         let response = put_colours(&server, Some(token)).await;
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "{token}");
         let sent = challenge(&response);
         assert!(sent.contains("error=\"invalid_token\""), "{sent}");
-        assert!(!sent.contains("error_description"), "{sent}");
+        assert!(
+            sent.contains(&format!("error_description=\"{code}\"")),
+            "{sent}"
+        );
     }
 }
 

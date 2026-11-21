@@ -164,6 +164,6 @@ async fn a_guarded_surface_without_an_issuer_refuses_the_start() {
             .expect_err("the start is refused");
         let reason = error.to_string();
         assert!(reason.contains(named), "{reason}");
-        assert!(reason.contains("[[auth.issuer]]"), "{reason}");
+        assert!(reason.contains("[auth.issuer.<name>]"), "{reason}");
     }
 }
