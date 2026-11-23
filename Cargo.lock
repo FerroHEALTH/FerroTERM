@@ -862,7 +862,7 @@ dependencies = [
  "ciborium",
  "clap",
  "criterion-plot",
- "itertools 0.13.0",
+ "itertools",
  "num-traits",
  "oorandom",
  "page_size",
@@ -882,7 +882,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d8d80a2f4f5b554395e47b5d8305bc3d27813bacb73493eb1001e8f76dae29ea"
 dependencies = [
  "cast",
- "itertools 0.13.0",
+ "itertools",
 ]
 
 [[package]]
@@ -1142,9 +1142,9 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-term"
-version = "0.17.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e551a417eb463d64867e98d33d87030605630b78ac031dee19e040fbaf41908"
+checksum = "403abc5cf83141b99a569a565280c555859e5aa873ee561ada8b2a650748d317"
 dependencies = [
  "async-trait",
  "backon",
@@ -1197,9 +1197,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-server"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5beacbdd769527817f33963e3341b31109202968c28e817d417bf0b0f8530e50"
+checksum = "6b81adde7764e4b10b55c7bd4579ad0dd60b584320df0ba9a8d09f2c52f2dcb1"
 dependencies = [
  "axum",
  "clap",
@@ -1256,9 +1256,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-smart"
-version = "0.33.0"
+version = "0.33.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38ea5e175481b6babf24a5035ff52a72ff7ced299dcc76017a0923df8d59b240"
+checksum = "aaf5cf747ca823bb70733554c4157382960f585ff15c5a88facd9760aed56310"
 dependencies = [
  "argon2",
  "aws-lc-rs",
@@ -1286,9 +1286,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-telemetry"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1bef07d3744883e3a6bc48a1eb375146a2e731199160eaf452fecaae70d6b0d"
+checksum = "310273c87483166f7ce87517a0df9e2052a40031c0e29bdff99fef280a3284a2"
 dependencies = [
  "axum",
  "ferrohealth-config",
@@ -2256,15 +2256,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "itertools"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
-dependencies = [
- "either",
-]
-
-[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3146,7 +3137,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b570b25f7617e43d59005d0990ccb79e950a423952cea19671b7a876da390adf"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools",
  "proc-macro2",
  "quote",
  "syn 2.0.119",

@@ -90,7 +90,7 @@ toml = { version = "1.1.6", default-features = false, features = ["std", "parse"
 # builds on ferrohealth-server 0.12. `server-tls`
 # builds an outbound `tls` table through ferrohealth-server's TlsClient.
 # Verified against crates.io on 2026-11-21.
-ferrohealth-smart = { version = "=0.33.0", features = ["axum", "server-tls"] }
+ferrohealth-smart = { version = "=0.33.1", features = ["axum", "server-tls"] }
 # The FerroHEALTH console sign-in and session: the authorization code flow
 # with PKCE over ferrohealth-smart's relying party, the session store with
 # its idle and absolute lifetimes, and the four sign-in routes. Pinned
@@ -105,7 +105,7 @@ ferrohealth-session = { version = "=0.28.0", features = ["axum"] }
 # on ferrohealth-telemetry 0.5, and 0.10 bounds the requests served at once
 # by default. Verified against crates.io on 2026-11-16.
 ferrohealth-health = { version = "=0.1.1", features = ["registry"] }
-ferrohealth-server = { version = "=0.12.0" }
+ferrohealth-server = { version = "=0.12.1" }
 # The FerroHEALTH configuration loader and its secrets: one TOML tree per
 # binary under `--config` or `<PREFIX>_CONFIG`, `<PREFIX>__SECTION__KEY`
 # overrides, `--set`, strict refusals and provenance, and the `<key>_file`
@@ -121,7 +121,7 @@ ferrohealth-secret = { version = "=0.2.1" }
 # names the features it uses. Pinned exactly; 0.4 builds on
 # ferrohealth-config 0.4, and 0.5 installs its own bridge from the `log`
 # crate beside the subscriber. Verified against crates.io on 2026-11-15.
-ferrohealth-telemetry = { version = "=0.5.0" }
+ferrohealth-telemetry = { version = "=0.5.1" }
 # The FerroHEALTH usage report to FerroPULSE: envelope v2, the reporter, the
 # instance id and start claim, CI detection and the latency window, which
 # with `telemetry` records what the request log sees. Pinned exactly; 0.5
