@@ -31,6 +31,14 @@ has a durable home and goes there, not into the source:
 "before this refactor…", "the former X is retired" is PR text; git history
 carries it. A comment describes the code as it IS.
 
+**Lean comments, never history** (owner hard rule, 2026-11-23): write a
+comment only when the code cannot say it, because the code should speak for
+itself; most items need one summary line or none. Never describe the old way,
+past figures or how the code got here ("where it sent 41", a measurement
+trail). When code changes, rewrite its comment whole so it describes only the
+new code; never append a "then ... now ..." sentence. A budget or ceiling
+constant gets at most one line naming its issue.
+
 ## The file header
 
 Every first-party file in a format that takes a comment opens with two SPDX
