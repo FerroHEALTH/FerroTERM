@@ -97,6 +97,70 @@ impl Supplemented {
         &self.supplements
     }
 
+    /// Whether `filter` is on a property a supplement gives and the code system
+    /// itself does not define.
+    fn supplements_property(&self, filter: &crate::provider::filter::Filter) -> bool {
+        !self
+            .inner
+            .declaration()
+            .properties
+            .iter()
+            .any(|definition| definition.code == filter.property)
+            && self.supplements.iter().any(|supplement| {
+                supplement.concepts.values().any(|additions| {
+                    additions
+                        .properties
+                        .iter()
+                        .any(|property| property.code == filter.property)
+                })
+            })
+    }
+
+    /// Whether the values `additions` give `filter.property` satisfy `filter`;
+    /// `None` for an operator this layer does not evaluate.
+    fn satisfies(additions: &[&Additions], filter: &crate::provider::filter::Filter) -> Option<bool> {
+        use crate::provider::filter::FilterOperator;
+        let mut values = additions
+            .iter()
+            .flat_map(|additions| additions.properties.iter())
+            .filter(|property| property.code == filter.property)
+            .map(|property| property.value.as_text());
+        match filter.op {
+            FilterOperator::Equal => Some(values.any(|value| value == filter.value)),
+            FilterOperator::In => {
+                let wanted: Vec<&str> = filter.value.split(',').map(str::trim).collect();
+                Some(values.any(|value| wanted.contains(&value.as_str())))
+            }
+            FilterOperator::NotIn => {
+                let refused: Vec<&str> = filter.value.split(',').map(str::trim).collect();
+                Some(!values.any(|value| refused.contains(&value.as_str())))
+            }
+            FilterOperator::Exists => Some(values.next().is_some() == (filter.value == "true")),
+            _ => None,
+        }
+    }
+
+    /// The concepts of the code system that pass `filter`, a filter on a
+    /// supplement's property.
+    fn supplement_filter(
+        &self,
+        filter: &crate::provider::filter::Filter,
+    ) -> Result<ConceptSet, ProviderError> {
+        let mut selected = ConceptSet::new();
+        for index in self.inner.all()? {
+            let concept = Concept::new(index);
+            let additions = self.additions(concept)?;
+            match Self::satisfies(&additions, filter) {
+                Some(true) => {
+                    selected.insert(index);
+                }
+                Some(false) => {}
+                None => return self.inner.filter(filter),
+            }
+        }
+        Ok(selected)
+    }
+
     fn additions(&self, concept: Concept) -> Result<Vec<&Additions>, ProviderError> {
         let code = self.inner.code(concept)?;
         Ok(self
@@ -269,8 +333,34 @@ impl CodeSystemProvider for Supplemented {
         self.inner.all()
     }
 
+    // NOTE: a text filter searches the designations of the supplements in use, in
+    // the language searched (terminology ecosystem IG test cases 1.11.0,
+    // `search-all-supplement-fr-yes`).
     fn search(&self, text: &str, language: Option<&str>) -> Result<ConceptSet, ProviderError> {
-        self.inner.search(text, language)
+        let mut hits = self.inner.search(text, language)?;
+        let words = designation_index::tokenize::prefixes(text);
+        let searched = language.or_else(|| self.inner.language());
+        for supplement in &self.supplements {
+            for (code, additions) in &supplement.concepts {
+                let terms: Vec<&str> = additions
+                    .designations
+                    .iter()
+                    .filter(|d| {
+                        d.language.as_deref().zip(searched).is_some_and(|(l, wanted)| {
+                            crate::text_match::same_language(l, wanted)
+                        })
+                    })
+                    .map(|d| d.value.as_str())
+                    .collect();
+                if !terms.is_empty()
+                    && crate::text_match::matches_all(&words, &terms)
+                    && let Some(located) = self.inner.locate(code)?
+                {
+                    hits.insert(located.concept.index());
+                }
+            }
+        }
+        Ok(hits)
     }
 
     fn implicit_value_set(&self, url: &str) -> Option<Result<Compose, ProviderError>> {
@@ -293,10 +383,16 @@ impl CodeSystemProvider for Supplemented {
         self.inner.implicit_concept_map(url, selection)
     }
 
+    // NOTE: a supplement adds properties to the concepts of the code system it
+    // supplements (<https://hl7.org/fhir/R5/codesystem-definitions.html#CodeSystem.supplements>),
+    // so a filter on one selects by the supplement's values.
     fn filter(
         &self,
         filter: &crate::provider::filter::Filter,
     ) -> Result<ConceptSet, ProviderError> {
+        if self.supplements_property(filter) {
+            return self.supplement_filter(filter);
+        }
         self.inner.filter(filter)
     }
 
@@ -304,18 +400,41 @@ impl CodeSystemProvider for Supplemented {
         &self,
         filters: &[crate::provider::filter::Filter],
     ) -> Result<ConceptSet, ProviderError> {
-        self.inner.filter_all(filters)
+        let (own, base): (Vec<_>, Vec<_>) = filters
+            .iter()
+            .cloned()
+            .partition(|filter| self.supplements_property(filter));
+        if own.is_empty() {
+            return self.inner.filter_all(filters);
+        }
+        let mut selected = if base.is_empty() {
+            self.inner.all()?
+        } else {
+            self.inner.filter_all(&base)?
+        };
+        for filter in &own {
+            selected &= self.supplement_filter(filter)?;
+        }
+        Ok(selected)
     }
 
     fn filter_ordered(
         &self,
         filters: &[crate::provider::filter::Filter],
     ) -> Result<Option<Vec<u32>>, ProviderError> {
+        if filters.iter().any(|filter| self.supplements_property(filter)) {
+            return Ok(None);
+        }
         self.inner.filter_ordered(filters)
     }
 
     fn unclosed(&self, filters: &[crate::provider::filter::Filter]) -> bool {
-        self.inner.unclosed(filters)
+        let base: Vec<_> = filters
+            .iter()
+            .filter(|filter| !self.supplements_property(filter))
+            .cloned()
+            .collect();
+        self.inner.unclosed(&base)
     }
 
     fn unclosed_reason(&self) -> Option<String> {
@@ -327,6 +446,11 @@ impl CodeSystemProvider for Supplemented {
         concept: Concept,
         filter: &crate::provider::filter::Filter,
     ) -> Result<bool, ProviderError> {
+        if self.supplements_property(filter)
+            && let Some(passes) = Self::satisfies(&self.additions(concept)?, filter)
+        {
+            return Ok(passes);
+        }
         self.inner.filter_matches(concept, filter)
     }
 

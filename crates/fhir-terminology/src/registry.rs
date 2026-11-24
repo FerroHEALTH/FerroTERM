@@ -211,6 +211,44 @@ impl Registry {
             })
     }
 
+    /// The registered supplements `wanted` names, one per supplement `url`.
+    ///
+    /// Only one version of a supplement applies: the one a canonical names by
+    /// version, else the latest (terminology ecosystem IG test cases 1.11.0,
+    /// `expand-supplement-version`).
+    fn chosen_supplements(
+        &self,
+        wanted: &[String],
+    ) -> Result<Vec<&(String, crate::supplement::Supplement)>, UnknownSupplement> {
+        let mut chosen: Vec<(&str, bool, &(String, crate::supplement::Supplement))> = Vec::new();
+        for canonical in wanted {
+            let (url, version) = match canonical.split_once('|') {
+                Some((url, version)) => (url, Some(version)),
+                None => (canonical.as_str(), None),
+            };
+            let found = self
+                .supplements
+                .values()
+                .filter(|(_, s)| {
+                    s.url == url && version.is_none_or(|v| s.version.as_deref() == Some(v))
+                })
+                .max_by(|(_, a), (_, b)| {
+                    crate::versioned::version_order(
+                        a.version.as_deref().unwrap_or_default(),
+                        b.version.as_deref().unwrap_or_default(),
+                    )
+                })
+                .ok_or_else(|| UnknownSupplement(canonical.clone()))?;
+            let pinned = version.is_some();
+            match chosen.iter_mut().find(|(seen, _, _)| *seen == url) {
+                Some(entry) if pinned && !entry.1 => *entry = (url, pinned, found),
+                Some(_) => {}
+                None => chosen.push((url, pinned, found)),
+            }
+        }
+        Ok(chosen.into_iter().map(|(_, _, found)| found).collect())
+    }
+
     /// The canonicals, versioned, of the supplements `wanted` names.
     ///
     /// A request names a supplement with or without a version, and the answer
@@ -223,26 +261,14 @@ impl Registry {
     /// Returns [`UnknownSupplement`] naming the first one no registered
     /// supplement answers.
     pub fn applied_supplements(&self, wanted: &[String]) -> Result<Vec<String>, UnknownSupplement> {
-        wanted
-            .iter()
-            .map(|canonical| {
-                let (url, version) = match canonical.split_once('|') {
-                    Some((url, version)) => (url, Some(version)),
-                    None => (canonical.as_str(), None),
-                };
-                let (_, supplement) = self
-                    .supplements
-                    .values()
-                    .find(|(_, s)| {
-                        s.url == url && version.is_none_or(|v| s.version.as_deref() == Some(v))
-                    })
-                    .ok_or_else(|| UnknownSupplement(canonical.clone()))?;
-                Ok(match &supplement.version {
-                    Some(version) => format!("{}|{version}", supplement.url),
-                    None => supplement.url.clone(),
-                })
+        Ok(self
+            .chosen_supplements(wanted)?
+            .into_iter()
+            .map(|(_, supplement)| match &supplement.version {
+                Some(version) => format!("{}|{version}", supplement.url),
+                None => supplement.url.clone(),
             })
-            .collect()
+            .collect())
     }
 
     /// This registry with the dormant supplements `wanted` names (each a `url`
@@ -254,18 +280,7 @@ impl Registry {
     /// answers to.
     pub fn with_supplements(&self, wanted: &[String]) -> Result<Self, UnknownSupplement> {
         let mut layered = self.clone();
-        for canonical in wanted {
-            let (url, version) = match canonical.split_once('|') {
-                Some((url, version)) => (url, Some(version)),
-                None => (canonical.as_str(), None),
-            };
-            let found = self
-                .supplements
-                .values()
-                .find(|(_, s)| {
-                    s.url == url && version.is_none_or(|v| s.version.as_deref() == Some(v))
-                })
-                .ok_or_else(|| UnknownSupplement(canonical.clone()))?;
+        for found in self.chosen_supplements(wanted)? {
             let (target, supplement) = found.clone();
             let (target_url, target_version) = match target.split_once('|') {
                 Some((u, v)) => (u.to_owned(), Some(v.to_owned())),
