@@ -118,7 +118,10 @@ impl Supplemented {
 
     /// Whether the values `additions` give `filter.property` satisfy `filter`;
     /// `None` for an operator this layer does not evaluate.
-    fn satisfies(additions: &[&Additions], filter: &crate::provider::filter::Filter) -> Option<bool> {
+    fn satisfies(
+        additions: &[&Additions],
+        filter: &crate::provider::filter::Filter,
+    ) -> Option<bool> {
         use crate::provider::filter::FilterOperator;
         let mut values = additions
             .iter()
@@ -346,9 +349,10 @@ impl CodeSystemProvider for Supplemented {
                     .designations
                     .iter()
                     .filter(|d| {
-                        d.language.as_deref().zip(searched).is_some_and(|(l, wanted)| {
-                            crate::text_match::same_language(l, wanted)
-                        })
+                        d.language
+                            .as_deref()
+                            .zip(searched)
+                            .is_some_and(|(l, wanted)| crate::text_match::same_language(l, wanted))
                     })
                     .map(|d| d.value.as_str())
                     .collect();
@@ -422,7 +426,10 @@ impl CodeSystemProvider for Supplemented {
         &self,
         filters: &[crate::provider::filter::Filter],
     ) -> Result<Option<Vec<u32>>, ProviderError> {
-        if filters.iter().any(|filter| self.supplements_property(filter)) {
+        if filters
+            .iter()
+            .any(|filter| self.supplements_property(filter))
+        {
             return Ok(None);
         }
         self.inner.filter_ordered(filters)

@@ -227,6 +227,9 @@ async fn infer_system_past_an_unheld_code_system_is_refused_naming_it() {
             .as_str()
             .is_some_and(|text| text.contains(unheld)),
         "{issue}"
+    );
+}
+
 /// A supplement for a version of `INLINE_CS` the request does not hold.
 fn supplement_of_another_version() -> Value {
     json!({"resourceType": "CodeSystem", "url": "http://example.org/fhir/CodeSystem/inline-fr",
