@@ -157,8 +157,8 @@ The server takes the SMART App Launch resource-server role
 FerroHEALTH crate `ferrohealth-smart`. It issues no tokens of its own: your
 authorization server does that, and FerroTERM only reads its public metadata.
 A server that names `FERROTERM__TERMINOLOGY__RESOURCES` or `FERROTERM__ADMIN__LISTEN` refuses to
-start until `[auth]` names the issuer in an `[auth.issuer.<name>]` table with its
-kind and an audience, or turns authentication off
+start until `[auth]` names the issuer in an `[auth.issuer.<name>]` table with
+an audience, or turns authentication off
 ([Configuration](configuration.md#authentication)). The table lives in the
 configuration file:
 
@@ -168,7 +168,6 @@ base_url = "https://tx.example.org"
 
 [auth.issuer.tx]
 issuer = "https://auth.example.org/realms/tx"
-kind = "machines"
 audience = ["https://tx.example.org"]
 ```
 
@@ -233,13 +232,11 @@ the granular syntax. Grant an unnarrowed scope.
 The token is an RFC 9068 JWT access token signed by the issuer with an
 asymmetric algorithm. The server checks the signature against the key set,
 `iss`, `exp`, `nbf` and `iat` within the clock skew, the audience as described
-below, the `typ` header, which must be `at+jwt` (RFC 9068 §4), and the claims
-RFC 9068 §2.2 requires (`sub`, `client_id`, `jti`), as the issuer's profile
-sets them. An issuer that mints plain JWTs is admitted with `token_types =
-["JWT"]` in its `[auth.issuer.<name>.profile]` table, or the preset of its server (such as
-`preset = "keycloak"`). Every token is then classified by the issuer's `kind`:
-a `machines` issuer admits only the client credentials tokens of its backend
-clients, and a token that matches no caller of that kind answers `401`.
+below, the `typ` header, which must be `at+jwt` or `application/at+jwt` (RFC
+9068 §4), and the claims RFC 9068 §2.2 requires (`sub`, `client_id`, `jti`)
+with `scope`. The caller is read from the token's standard claims: a token
+whose `sub` is its `client_id` is a backend service, and any other names a
+user by its `fhirUser`.
 
 ### The audience a token carries
 

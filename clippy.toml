@@ -34,4 +34,4 @@ disallowed-types = [
 # (https://openid.net/specs/openid-connect-discovery-1_0.html). FerroUI is the
 # shared component library of the FerroHEALTH consoles the console is drawn
 # with.
-doc-valid-idents = ["FerroTERM", "FerroEHR", "FerroUI", "FerroHEALTH", "OpenID", "RESTful", "WebDriver", ".."]
+doc-valid-idents = ["FerroTERM", "FerroEHR", "FerroUI", "FerroHEALTH", "FerroSMART", "OpenID", "RESTful", "WebDriver", ".."]

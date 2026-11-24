@@ -3,30 +3,52 @@
 
 //! The issuer the SMART discovery document and the capability statement
 //! name, chosen by `ferrohealth-smart`'s `describe`: `[auth]
-//! described_issuer`, else the one issuer a user launch starts at, else, with
-//! only `machines` issuers trusted, the one `machines` issuer for SMART
-//! Backend Services; never by the order of the `[auth.issuer.<name>]` tables.
-//! SMART App Launch 2.2.0, Conformance, §Metadata, and Backend Services,
-//! §Retrieve `.well-known/smart-configuration`; which of several issuers is
-//! described is our own design.
+//! described_issuer`, else the one SMART issuer; never a `federation` issuer
+//! unnamed, and never by the order of the `[auth.issuer.<name>]` tables.
+//! SMART App Launch 2.2.0, Conformance, §Metadata; which of several issuers
+//! is described is our own design.
 
 use ferrohealth_secret::secret_url::SecretUrl;
 use ferrohealth_smart::config::IssuerEntry;
+use ferrohealth_smart::federation::FederationSection;
 use ferrohealth_smart::kind::IssuerKind;
 use ferroterm_server::smart::Smart;
 use serde_json::{Value, json};
 use wiremock::MockServer;
 
-use super::{SigningKey, capabilities, causes, configuration, issuer};
+use super::{SigningKey, causes, configuration, issuer};
 use crate::fixture::{AUDIENCE, Server, SmartSetup};
 
-/// The `[auth.issuer.<name>]` table of `mock` as an issuer of `kind`.
-fn entry(mock: &MockServer, kind: IssuerKind) -> IssuerEntry {
+/// The `[auth.issuer.<name>]` table of `mock` as a SMART issuer.
+fn entry(mock: &MockServer) -> IssuerEntry {
     IssuerEntry {
         issuer: SecretUrl::new(mock.uri()),
-        kind: Some(kind),
         audience: vec![String::from(AUDIENCE)],
         ..IssuerEntry::default()
+    }
+}
+
+/// The `[auth.issuer.<name>]` table of `mock` as another party's
+/// `federation` issuer, mapping the persons of `https://as.example.org`.
+fn federation(mock: &MockServer) -> IssuerEntry {
+    let section: FederationSection = serde_json::from_value(json!({
+        "contact_point": false,
+        "mapping": "iua",
+        "countries": ["NL"],
+        "issuing_authorities": ["CIBG"],
+        "provider_identifier_prefixes": ["urn:oid:2.16.528.1.1007.3.3."],
+        "exchanges_from": ["https://as.example.org"],
+        "person_mapping": "hp_identifier",
+        "fields": {
+            "professional.country_code": [{"constant": "NL"}],
+            "professional.issuing_authority_name": [{"constant": "CIBG"}],
+        },
+    }))
+    .expect("the federation table reads");
+    IssuerEntry {
+        kind: Some(IssuerKind::Federation),
+        federation: Some(section),
+        ..entry(mock)
     }
 }
 
@@ -89,80 +111,18 @@ async fn refused(setup: SmartSetup) -> String {
     causes(&error)
 }
 
-// SMART App Launch 2.2.0, Backend Services, Retrieve
-// `.well-known/smart-configuration`: a backend client reads the token endpoint here.
 #[tokio::test]
-async fn a_machines_only_server_is_described_for_backend_services() {
+async fn a_federation_issuer_written_first_is_never_described() {
     let key = SigningKey::generate("k1");
-    let mock = issuer(&key).await;
-    let base = mock.uri();
-    let mut setup = SmartSetup::for_issuer(&base);
-    setup.auth.scopes_supported = vec![
-        String::from("system/CodeSystem.cud"),
-        String::from("user/CodeSystem.cud"),
-    ];
-    let server = Server::start_persisting_with_smart_setup(setup).await;
-    for version in ["r4", "r4b", "r5", "r6"] {
-        let document = configuration(&server, version).await;
-        assert_eq!(document["token_endpoint"], json!(format!("{base}/token")));
-        assert_eq!(
-            document["grant_types_supported"],
-            json!(["client_credentials"]),
-            "{version}"
-        );
-        assert_eq!(
-            document["token_endpoint_auth_methods_supported"],
-            json!(["private_key_jwt"]),
-            "{version}"
-        );
-        assert_eq!(
-            capabilities(&document),
-            ["client-confidential-asymmetric", "permission-v1"],
-            "{version}"
-        );
-        assert_eq!(
-            document["scopes_supported"],
-            json!(["system/CodeSystem.cud"]),
-            "{version}"
-        );
-        for absent in [
-            "authorization_endpoint",
-            "issuer",
-            "response_types_supported",
-        ] {
-            assert!(
-                document[absent].is_null(),
-                "{version}: {absent}: {document}"
-            );
-        }
-    }
-    let uris = oauth_uris(&server).await;
-    let names: Vec<&str> = uris.iter().map(|(name, _)| name.as_str()).collect();
-    assert!(
-        uris.contains(&(String::from("token"), format!("{base}/token"))),
-        "the token endpoint is named: {names:?}"
-    );
-    assert!(
-        !names.contains(&"authorize"),
-        "no user launch starts at a machines issuer: {names:?}"
-    );
-}
-
-#[tokio::test]
-async fn a_machines_issuer_written_first_is_never_described() {
-    let key = SigningKey::generate("k1");
-    let machines = issuer(&key).await;
-    let persons = issuer(&key).await;
-    let written = vec![
-        entry(&machines, IssuerKind::Machines),
-        entry(&persons, IssuerKind::Persons),
-    ];
+    let other = issuer(&key).await;
+    let smart = issuer(&key).await;
+    let written = vec![federation(&other), entry(&smart)];
     let mut reversed = written.clone();
     reversed.reverse();
     for entries in [written, reversed] {
         let server = Server::start_persisting_with_smart_setup(trusting(entries, None)).await;
         let document: Value = configuration(&server, "r4b").await;
-        let base = persons.uri();
+        let base = smart.uri();
         assert_eq!(
             document["authorization_endpoint"],
             json!(format!("{base}/authorize"))
@@ -177,17 +137,14 @@ async fn a_machines_issuer_written_first_is_never_described() {
 }
 
 #[tokio::test]
-async fn several_user_issuers_without_the_key_refuse_the_start() {
+async fn several_smart_issuers_without_the_key_refuse_the_start() {
     let key = SigningKey::generate("k1");
-    let persons = issuer(&key).await;
-    let patients = issuer(&key).await;
-    let written = vec![
-        entry(&persons, IssuerKind::Persons),
-        entry(&patients, IssuerKind::Patients),
-    ];
+    let first = issuer(&key).await;
+    let second = issuer(&key).await;
+    let written = vec![entry(&first), entry(&second)];
     let mut reversed = written.clone();
     reversed.reverse();
-    let mut sorted = [persons.uri(), patients.uri()];
+    let mut sorted = [first.uri(), second.uri()];
     sorted.sort();
     for entries in [written, reversed] {
         let reason = refused(trusting(entries, None)).await;
@@ -202,13 +159,10 @@ async fn several_user_issuers_without_the_key_refuse_the_start() {
 #[tokio::test]
 async fn the_named_issuer_is_described_among_several() {
     let key = SigningKey::generate("k1");
-    let persons = issuer(&key).await;
-    let patients = issuer(&key).await;
-    let entries = vec![
-        entry(&persons, IssuerKind::Persons),
-        entry(&patients, IssuerKind::Patients),
-    ];
-    for named in [&persons, &patients] {
+    let first = issuer(&key).await;
+    let second = issuer(&key).await;
+    let entries = vec![entry(&first), entry(&second)];
+    for named in [&first, &second] {
         let server =
             Server::start_persisting_with_smart_setup(trusting(entries.clone(), Some(named))).await;
         let document = configuration(&server, "r4b").await;
@@ -220,29 +174,11 @@ async fn the_named_issuer_is_described_among_several() {
 }
 
 #[tokio::test]
-async fn a_named_machines_issuer_beside_a_user_issuer_refuses_the_start() {
-    let key = SigningKey::generate("k1");
-    let machines = issuer(&key).await;
-    let persons = issuer(&key).await;
-    let entries = vec![
-        entry(&persons, IssuerKind::Persons),
-        entry(&machines, IssuerKind::Machines),
-    ];
-    let reason = refused(trusting(entries, Some(&machines))).await;
-    assert!(reason.contains("machines issuer"), "{reason}");
-    assert!(reason.contains(&machines.uri()), "{reason}");
-}
-
-#[tokio::test]
 async fn a_named_unknown_issuer_refuses_the_start() {
     let key = SigningKey::generate("k1");
-    let persons = issuer(&key).await;
+    let smart = issuer(&key).await;
     let elsewhere = issuer(&key).await;
-    let reason = refused(trusting(
-        vec![entry(&persons, IssuerKind::Persons)],
-        Some(&elsewhere),
-    ))
-    .await;
+    let reason = refused(trusting(vec![entry(&smart)], Some(&elsewhere))).await;
     assert!(
         reason.contains(
             "auth.described_issuer names the issuer \"elsewhere\", and the issuers are [\"idp0\"]"

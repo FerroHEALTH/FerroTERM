@@ -11,14 +11,11 @@ use super::{
     sparse_discovery,
 };
 use crate::fixture::{Server, SmartSetup};
-use ferrohealth_smart::kind::IssuerKind;
 
-/// A server whose one issuer, at `issuer`, signs `persons` tokens, so its
-/// document is the SMART App Launch one a user launch starts from.
-async fn persons_server(issuer: &str) -> Server {
-    let mut setup = SmartSetup::for_issuer(issuer);
-    setup.issuer_mut().kind = Some(IssuerKind::Persons);
-    Server::start_persisting_with_smart_setup(setup).await
+/// A server whose one SMART issuer is at `issuer`, so its document is the
+/// SMART App Launch one a user launch starts from.
+async fn smart_server(issuer: &str) -> Server {
+    Server::start_persisting_with_smart_setup(SmartSetup::for_issuer(issuer)).await
 }
 
 // The public client profile needs the authorization endpoint, `S256`, and the
@@ -29,7 +26,7 @@ async fn the_configuration_publishes_what_a_public_client_needs() {
     let key = SigningKey::generate("k1");
     let mock = issuer_publishing(&key, public_discovery).await;
     let base = mock.uri();
-    let server = persons_server(&base).await;
+    let server = smart_server(&base).await;
 
     for version in ["r4", "r4b", "r5", "r6"] {
         let document = configuration(&server, version).await;
@@ -93,7 +90,7 @@ async fn the_configuration_names_no_client_of_its_own() {
 async fn an_issuer_that_omits_the_optional_members_gets_their_documented_defaults() {
     let key = SigningKey::generate("k1");
     let mock = issuer_publishing(&key, sparse_discovery).await;
-    let server = persons_server(&mock.uri()).await;
+    let server = smart_server(&mock.uri()).await;
 
     let document = configuration(&server, "r4b").await;
     // The default is `["authorization_code", "implicit"]`, of which SMART
@@ -180,7 +177,7 @@ async fn the_capability_statement_declares_the_service_and_the_oauth_uris() {
     let key = SigningKey::generate("k1");
     let mock = issuer(&key).await;
     let base = mock.uri();
-    let server = persons_server(&base).await;
+    let server = smart_server(&base).await;
 
     for version in ["r4", "r4b", "r5", "r6"] {
         let (status, body) = server.get(&format!("/{version}/metadata")).await;

@@ -326,11 +326,7 @@ reach should:
 # a monitor calls with its own client credentials token.
 [auth.issuer.tx]
 issuer = "https://auth.example.org/realms/tx"
-kind = "persons"
 audience = ["ferroterm-sync"]
-
-[auth.issuer.tx.profile]
-first_party_clients = ["ferroterm-console"]
 
 # or a person with HTTP Basic, the hash an Argon2id PHC string:
 [[auth.basic.users]]

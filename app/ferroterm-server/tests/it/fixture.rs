@@ -9,7 +9,6 @@ use axum::Router;
 use axum::body::Body;
 use ferrohealth_server::section::ServerSection;
 use ferrohealth_smart::config::{AuthSection, BasicGrants, IssuerEntry};
-use ferrohealth_smart::kind::IssuerKind;
 use ferrohealth_telemetry::section::TelemetrySection;
 use ferrohealth_telemetry::telemetry::{Service, Telemetry};
 use ferroterm_server::config::{AdminSection, Config, FhirSection, TerminologySection};
@@ -43,7 +42,7 @@ pub(crate) struct SmartSetup {
 pub(crate) const ISSUER_NAME: &str = "idp";
 
 impl SmartSetup {
-    /// The `[auth]` table of `issuer`, a `machines` issuer with the audience
+    /// The `[auth]` table of `issuer`, a SMART issuer with the audience
     /// [`AUDIENCE`], and everything else at its default.
     pub(crate) fn for_issuer(issuer: &str) -> Self {
         Self {
@@ -52,7 +51,6 @@ impl SmartSetup {
                     String::from(ISSUER_NAME),
                     IssuerEntry {
                         issuer: ferrohealth_secret::secret_url::SecretUrl::new(issuer),
-                        kind: Some(IssuerKind::Machines),
                         audience: vec![String::from(AUDIENCE)],
                         ..IssuerEntry::default()
                     },

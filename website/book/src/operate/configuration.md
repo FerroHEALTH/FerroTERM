@@ -54,7 +54,6 @@ deployment = "binary"
 
 [auth.issuer.tx]
 issuer = "https://auth.example.org/realms/tx"
-kind = "machines"
 audience = ["https://tx.example.org"]
 ```
 
@@ -228,8 +227,11 @@ Authentication is on by default and fails closed: a server that names
 names an issuer in an `[auth.issuer.<name>]` table, or says `enabled = false`. A
 read-only server with neither starts without `[auth]`.
 
-Each issuer is a table of its own, named by the operator, with its kind and
-its audience. The name is a lower-case letter followed by lower-case letters,
+Each issuer is a table of its own, named by the operator, with its issuer
+identifier and its audience. An issuer is a SMART App Launch 2.2
+authorization server, FerroSMART among them, whose access tokens the server
+reads from their standard claims; `kind = "federation"` marks another
+party's issuer instead (see [Running behind FerroSMART](behind-ferrosmart.md)). The name is a lower-case letter followed by lower-case letters,
 digits and `_`, at most 64 characters, and every other key that names an
 issuer, such as `described_issuer`, uses it. A key of a named issuer can also
 be a variable, `FERROTERM__AUTH__ISSUER__<NAME>__<KEY>`; on a network only
@@ -239,7 +241,6 @@ off instead.
 ```toml
 [auth.issuer.tx]
 issuer = "https://auth.example.org/realms/tx"
-kind = "machines"
 audience = ["https://tx.example.org"]
 ```
 
@@ -248,11 +249,9 @@ The keys of each `[auth.issuer.<name>]` table:
 | Key | Meaning | Default |
 |---|---|---|
 | `issuer` | The issuer identifier of the authorization server whose access tokens are accepted, an `https` URL (plain `http` on a loopback host only). The server reads its metadata (RFC 8414, with OpenID Connect Discovery as the fallback) and its key set before it binds, and refuses to start when either does not answer. | none (required) |
-| `kind` | Whose tokens the issuer signs: `machines` for backend services under the client credentials grant, `persons` for people signing in to an app, or `patients`. Every token is classified by it, and one that matches no caller of that kind is refused. A `persons` token is admitted only through a client the `profile` table lists in `first_party_clients` or `delegates`. | the preset's: `persons` under `keycloak`, `entra`, `okta` and `ferrosmart`; none (required) under `rfc9068` |
-| `preset` | What the issuer's tokens look like: `rfc9068`, or the preset of a known authorization server (`keycloak`, `entra`, `okta`, `ferrosmart`). | `rfc9068` |
-| `profile_file` | A profile file in the form of a preset, whose keys win over the preset's. | none |
-| `[auth.issuer.<name>.profile]` | The profile keys of the issuer, which win over the profile file and the preset, such as `first_party_clients`, `delegates` and `act_represents_patient`. | none |
-| `audience` | The `aud` values a token may carry; one of them is required (RFC 9068 §4). The write routes also accept every served version's base under `fhir.base_url`; the admin listener accepts this list alone. | none (required) |
+| `kind` | `federation` for another party's issuer, whose tokens name its professionals or its organisation and need an `[auth.issuer.<name>.federation]` table. Unset for a SMART authorization server, whose tokens are read from their standard claims: a token whose `sub` is its `client_id` is a backend service, and any other names a user by its `fhirUser`. Any other value refuses the start as an unknown variant. | none (a SMART authorization server) |
+| `[auth.issuer.<name>.profile]` | Keys over the token checks: `token_types` (the `typ` values admitted, `at+jwt` and `application/at+jwt` by default, RFC 9068 §2.1), `required_claims` (the claims every token carries, the RFC 9068 §2.2 set and `scope` by default) and `max_actor_chain` (the RFC 8693 §4.1 `act` nesting admitted, `1`). The authorization server's registry decides which clients reach the server, through the audience it writes, so the table lists no client. | none |
+| `audience` | The `aud` values a token may carry; one of them is required (RFC 9068 §4). The write routes also accept every served version's base under `fhir.base_url`; the admin listener accepts this list alone, so an issuer that names none opens only the write routes. | the served version bases under `fhir.base_url`; required without it |
 | `algorithms` | The signature algorithms accepted; an HMAC algorithm refuses the start. | `RS256`, `RS384`, `PS256`, `PS384`, `ES256`, `ES384` |
 | `clock_skew` | The skew allowed on `exp`, `nbf` and `iat`, at most `"5min"`. | `"60s"` |
 | `jwks_max_age` | How long a key set is used before it is read again. | `"10min"` |
@@ -261,9 +260,7 @@ The keys of each `[auth.issuer.<name>]` table:
 | `timeout` | How long one call to the authorization server may take. | `"10s"` |
 | `mode` | How a bearer token is checked: `jwt`, as an RFC 9068 JWT against the issuer's key set, or `introspection`, by posting it to the issuer's introspection endpoint (RFC 7662), for an authorization server that issues tokens the server cannot read. | `jwt` |
 | `[auth.issuer.<name>.introspection]` | The introspection check under `mode = "introspection"`: `endpoint` (the issuer metadata's `introspection_endpoint` when empty), `cache_max_age` (how long an active response is used, at most until its `exp`; `"60s"`), `cache_capacity` (`10000`), and exactly one of `client` (the client authentication of the call, with the keys of a client credentials grant: `client_id`, `client_auth`, `client_secret` or `client_secret_file`, `private_key_file`) and `bearer` (a client credentials grant whose token authorizes the call). | none |
-| `profile.act_represents_patient` | On a `patients` issuer only: whether a patient's token that carries an RFC 8693 §4.1 `act` claim is the patient's representative, the actor in `act` acting for the patient its `sub` names. Without it such a token is refused as no caller of the issuer. A terminology resource sits in no patient's compartment, so the patient and the representative are both refused every write. The key on another kind of issuer refuses the start. | `false` |
 | `role_claims` | The claims the issuer's tokens carry roles in, each a dotted path. The server grants nothing by role, so the roles a token carries change no answer. | `roles`, `groups`, `entitlements` |
-| `scopeless_subjects` | The machines of this issuer granted every write without a scope, by `sub`, since a `sub` is unique only within its issuer (RFC 7519 §4.1.2). An entry admits a `System` caller of this issuer alone. | none |
 
 The keys of `[auth]` itself, in the configuration file or as
 `FERROTERM__AUTH__<KEY>`:
@@ -276,7 +273,7 @@ The keys of `[auth]` itself, in the configuration file or as
 | `realm` | The realm every challenge names. | `fhir.base_url`, else `FerroTERM` |
 | `scopes_supported` | The scopes the discovery document lists. List only scopes the server honours: "the server SHALL support all scopes listed here". | none (the member is omitted) |
 | `capabilities` | SMART capabilities the discovery document adds to the ones it derives. | none |
-| `described_issuer` | The name of the `[auth.issuer.<name>]` table the discovery document and the capability statement describe, when the server trusts several. Unset, the server describes the one issuer of kind `persons`, `patients` or `federation` whose metadata it holds, and with only `machines` issuers trusted the one `machines` issuer, for SMART Backend Services alone. [The described issuer](#the-described-issuer) gives the rule. | none |
+| `described_issuer` | The name of the `[auth.issuer.<name>]` table the discovery document and the capability statement describe, when the server trusts several. Unset, the server describes the one SMART issuer whose metadata it holds, and never a `federation` issuer. [The described issuer](#the-described-issuer) gives the rule. | none |
 | `[[auth.basic.users]]` | HTTP Basic users (RFC 7617), each a person: `user` and `password_hash` or `password_hash_file` (an Argon2id PHC string). The credential alone: what the user reaches is its `[basic_grants]` entry, and a `scopes` or `roles` key here refuses the start as an unknown key. | none (no Basic) |
 | `[auth.basic] cache_ttl` | How long a Basic credential that verified is kept, so a repeat request skips the Argon2id key derivation. `"0s"` verifies every request. | `"5min"` |
 
@@ -299,30 +296,26 @@ FerroHEALTH servers, and the order of the `[auth.issuer.<name>]` tables
 never decides:
 
 - With `described_issuer`, the server describes the issuer of that name once
-  it holds its metadata; a name no table carries refuses the start. A `machines` issuer is described
-  for SMART Backend Services alone, and refused while another issuer serves
-  a user launch.
-- Otherwise, when the server trusts an issuer of kind `persons`, `patients`
-  or `federation`, it describes the one such issuer whose metadata it holds,
-  for SMART App Launch. Several refuse the start, naming them and the key,
-  and so does none: an issuer read from a `jwks_file` names no authorization
-  endpoint.
-- Otherwise it describes the one `machines` issuer for SMART Backend
-  Services, the usual terminology deployment: the token endpoint,
-  `private_key_jwt`, the client credentials grant and the `system/` scopes of
-  `scopes_supported`, with no authorization endpoint and no launch
-  capability. Several refuse the start the same way.
+  it holds its metadata; a name no table carries refuses the start.
+- Otherwise it describes the one SMART issuer whose metadata it holds. A
+  `federation` issuer is another party's and is never chosen unnamed.
+  Several SMART issuers refuse the start, naming them and the key, and so
+  does none: an issuer read from a `jwks_file` names no endpoints.
+
+The document carries what the issuer's metadata supports: the authorization
+endpoint and the launch capabilities when it runs one, and the token
+endpoint, `private_key_jwt` and the client credentials grant a backend
+client needs.
 
 A machine caller, such as the synchronisation service, authenticates with an
 access token it obtained with the OAuth 2.0 client credentials grant (RFC 6749
-§4.4) from a `machines` issuer; the server accepts no static token, and a Basic
-user is always a person. A configuration file with a machines issuer and a
-person on Basic:
+§4.4), whose `sub` is its `client_id` (RFC 9068 §2.2); the server accepts no
+static token, and a Basic user is always a person. A configuration file with
+an issuer and a person on Basic:
 
 ```toml
 [auth.issuer.tx]
 issuer = "https://auth.example.org/realms/tx"
-kind = "machines"
 audience = ["https://tx.example.org"]
 
 [[auth.basic.users]]
@@ -344,7 +337,6 @@ answers `401`, and an endpoint that cannot answer `503`:
 ```toml
 [auth.issuer.tx]
 issuer = "https://auth.example.org/realms/tx"
-kind = "machines"
 audience = ["https://tx.example.org"]
 mode = "introspection"
 

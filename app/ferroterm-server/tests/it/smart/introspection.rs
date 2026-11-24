@@ -14,7 +14,7 @@ use wiremock::matchers::{body_string_contains, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use super::{
-    PROXIED, SigningKey, capabilities, causes, challenge, claims, configuration, discovery, issuer,
+    SigningKey, capabilities, causes, challenge, claims, configuration, discovery, issuer,
     issuer_publishing, put_colours, sparse_discovery,
 };
 use crate::fixture::{self, Server, SmartSetup};
@@ -184,16 +184,16 @@ async fn a_read_only_server_or_auth_off_starts_without_an_issuer() {
 }
 
 // RFC 9068 §4: the resource server validates that `aud` names it, so an issuer
-// without an audience refuses the start rather than accepting a token minted
-// for any resource server of that issuer (RFC 8725 §3.9).
+// with no audience on a server with no base URL refuses the start rather than
+// accepting a token minted for any resource server of that issuer (RFC 8725
+// §3.9).
 #[tokio::test]
-async fn an_issuer_without_an_audience_refuses_the_start() {
+async fn an_issuer_without_an_audience_or_a_base_url_refuses_the_start() {
     let key = SigningKey::generate("k1");
     let mock = issuer(&key).await;
     let dir = tempfile::tempdir().expect("tempdir");
     let mut setup = SmartSetup::for_issuer(&mock.uri());
     setup.issuer_mut().audience = Vec::new();
-    setup.base_url = Some(String::from(PROXIED));
     let config = Server::smart_config(dir.path(), setup);
     let error = Smart::start(&config)
         .await
@@ -203,8 +203,7 @@ async fn an_issuer_without_an_audience_refuses_the_start() {
 }
 
 // SMART App Launch: the document lives at `[base]/.well-known/smart-configuration`
-// and `token_endpoint`, `grant_types_supported`, and `capabilities` are required;
-// a machines-only server is described for Backend Services, with no launch member.
+// and `token_endpoint`, `grant_types_supported`, and `capabilities` are required.
 #[tokio::test]
 async fn the_smart_configuration_is_served_from_the_issuer_document() {
     let key = SigningKey::generate("k1");
@@ -220,9 +219,10 @@ async fn the_smart_configuration_is_served_from_the_issuer_document() {
     for version in ["r4", "r4b", "r5", "r6"] {
         let document = configuration(&server, version).await;
         assert_eq!(document["token_endpoint"], format!("{base}/token"));
-        assert!(
-            document["authorization_endpoint"].is_null(),
-            "{version}: no user launch starts at a machines issuer: {document}"
+        assert_eq!(
+            document["authorization_endpoint"],
+            format!("{base}/authorize"),
+            "{version}"
         );
         assert_eq!(document["jwks_uri"], format!("{base}/jwks"));
         assert_eq!(document["scopes_supported"][0], "system/CodeSystem.cud");
@@ -233,7 +233,7 @@ async fn the_smart_configuration_is_served_from_the_issuer_document() {
         // the issuer publishes are dropped, and `plain` is a SHALL NOT.
         assert_eq!(
             document["grant_types_supported"],
-            json!(["client_credentials"]),
+            json!(["authorization_code", "client_credentials"]),
             "{version}"
         );
         assert_eq!(
