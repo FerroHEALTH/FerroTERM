@@ -1,10 +1,10 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The XML reading shared by the two readers.
+//! The XML reading shared by the readers.
 
-use quick_xml::XmlVersion;
-use quick_xml::events::{BytesRef, BytesStart};
+use quick_xml::events::{BytesRef, BytesStart, Event};
+use quick_xml::{Reader, XmlVersion};
 
 /// The normalized value of the attribute `name` on `event`.
 pub(crate) fn attribute(event: &BytesStart<'_>, name: &str) -> Option<String> {
@@ -35,12 +35,153 @@ pub(crate) fn reference(event: &BytesRef<'_>) -> String {
     }
 }
 
+/// One element read whole: its name, attributes, text, and child elements.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct Element {
+    /// The qualified name (`skos:notation`).
+    pub(crate) name: String,
+    /// The attributes by qualified name, normalized.
+    pub(crate) attributes: Vec<(String, String)>,
+    /// The element's own character data, references resolved.
+    pub(crate) text: String,
+    /// The child elements in document order.
+    pub(crate) children: Vec<Element>,
+}
+
+/// `name` without its namespace prefix.
+fn local(name: &str) -> &str {
+    name.rsplit_once(':').map_or(name, |(_, l)| l)
+}
+
+impl Element {
+    /// The local name.
+    pub(crate) fn local(&self) -> &str {
+        local(&self.name)
+    }
+
+    /// The attribute whose local name is `name`.
+    pub(crate) fn attr(&self, name: &str) -> Option<&str> {
+        self.attributes
+            .iter()
+            .find(|(k, _)| local(k) == name)
+            .map(|(_, v)| v.as_str())
+    }
+
+    /// The first child whose local name is `name`.
+    pub(crate) fn child(&self, name: &str) -> Option<&Element> {
+        self.children.iter().find(|c| c.local() == name)
+    }
+
+    /// Every child whose local name is `name`.
+    pub(crate) fn all<'a>(&'a self, name: &'a str) -> impl Iterator<Item = &'a Element> + 'a {
+        self.children.iter().filter(move |c| c.local() == name)
+    }
+
+    /// The text of the child at the `/`-separated local-name `path`, trimmed.
+    pub(crate) fn text_at(&self, path: &str) -> Option<&str> {
+        let mut at = self;
+        for step in path.split('/') {
+            at = at.child(step)?;
+        }
+        Some(at.text.trim()).filter(|t| !t.is_empty())
+    }
+}
+
+fn open(event: &BytesStart<'_>) -> Element {
+    Element {
+        name: event.name().as_ref().to_owned(),
+        attributes: event
+            .attributes()
+            .flatten()
+            .filter_map(|a| {
+                let value = a.normalized_value(XmlVersion::Explicit1_0).ok()?;
+                Some((a.key.as_ref().to_owned(), value.into_owned()))
+            })
+            .collect(),
+        ..Element::default()
+    }
+}
+
+/// Calls `each` with every element whose local name is `record`, read whole,
+/// in document order; a record nested in another stays inside its parent.
+///
+/// Only one record is held at a time, so a large document streams.
+pub(crate) fn records<E: From<quick_xml::Error>>(
+    text: &str,
+    record: &str,
+    mut each: impl FnMut(Element) -> Result<(), E>,
+) -> Result<(), E> {
+    let mut reader = Reader::from_str(text);
+    let mut stack: Vec<Element> = Vec::new();
+    loop {
+        match reader.read_event()? {
+            Event::Start(start) => {
+                if !stack.is_empty() || local(start.name().as_ref()) == record {
+                    stack.push(open(&start));
+                }
+            }
+            Event::Empty(start) => {
+                let element = open(&start);
+                if let Some(parent) = stack.last_mut() {
+                    parent.children.push(element);
+                } else if element.local() == record {
+                    each(element)?;
+                }
+            }
+            Event::Text(text) => {
+                if let Some(top) = stack.last_mut() {
+                    top.text
+                        .push_str(&text.xml_content(XmlVersion::Explicit1_0));
+                }
+            }
+            Event::CData(data) => {
+                if let Some(top) = stack.last_mut() {
+                    top.text
+                        .push_str(&data.xml_content(XmlVersion::Explicit1_0));
+                }
+            }
+            Event::GeneralRef(r) => {
+                if let Some(top) = stack.last_mut() {
+                    top.text.push_str(&reference(&r));
+                }
+            }
+            Event::End(_) => {
+                if let Some(done) = stack.pop() {
+                    match stack.last_mut() {
+                        Some(parent) => parent.children.push(done),
+                        None => each(done)?,
+                    }
+                }
+            }
+            Event::Eof => return Ok(()),
+            _ => {}
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use quick_xml::Reader;
     use quick_xml::events::Event;
 
-    use super::{attribute, reference};
+    use super::{Element, attribute, records, reference};
+
+    #[test]
+    fn records_read_whole_with_nested_records_kept_inside() {
+        let xml = "<root><r id='1'><n>a&amp;b</n><r id='2'/></r><x/><r id='3'><n/></r></root>";
+        let mut seen: Vec<Element> = Vec::new();
+        records::<quick_xml::Error>(xml, "r", |e| {
+            seen.push(e);
+            Ok(())
+        })
+        .expect("parses");
+        assert_eq!(seen.len(), 2);
+        assert_eq!(seen[0].attr("id"), Some("1"));
+        assert_eq!(seen[0].text_at("n"), Some("a&b"));
+        assert_eq!(seen[0].all("r").count(), 1);
+        assert_eq!(seen[1].attr("id"), Some("3"));
+        assert_eq!(seen[1].text_at("n"), None);
+    }
 
     /// The references in `xml`, in document order, as `reference` resolves them.
     fn references(xml: &str) -> Vec<String> {
