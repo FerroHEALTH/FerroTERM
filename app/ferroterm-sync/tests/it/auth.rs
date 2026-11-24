@@ -19,7 +19,6 @@ use ferrohealth_smart::config::{
     AuthMode, AuthSection, BasicGrant, BasicGrants, BasicSection, BasicUser, IntrospectionSection,
     IssuerEntry,
 };
-use ferrohealth_smart::kind::IssuerKind;
 use ferroterm_sync::auth::{AdminAuth, AuthError, SYNC_SCOPE};
 use secrecy::SecretString;
 use tower::ServiceExt as _;
@@ -245,7 +244,6 @@ fn introspecting(issuer: &str) -> AuthSection {
             String::from("idp"),
             IssuerEntry {
                 issuer: ferrohealth_secret::secret_url::SecretUrl::new(issuer),
-                kind: Some(IssuerKind::Machines),
                 audience: vec![String::from(AUDIENCE)],
                 mode: AuthMode::Introspection,
                 introspection: Some(IntrospectionSection {
@@ -513,17 +511,6 @@ fn the_flat_issuer_of_the_old_shape_is_refused_by_the_strict_load() {
         &std::collections::BTreeMap::new(),
     );
     assert!(refused.is_err(), "{refused:?}");
-}
-
-#[tokio::test]
-async fn an_issuer_without_a_kind_refuses_the_start_naming_the_key() {
-    let issuer = MockServer::start().await;
-    let mut section = introspecting(&issuer.uri());
-    for entry in section.issuer.values_mut() {
-        entry.kind = None;
-    }
-    let reason = refusal(&section, &none()).await;
-    assert!(reason.contains("auth.issuer.kind"), "{reason}");
 }
 
 // A Basic credential is a person's, and a `system/` scope is a backend

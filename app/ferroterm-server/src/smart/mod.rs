@@ -9,7 +9,7 @@
 //! each configured issuer's metadata and key set, validates every access token
 //! under RFC 9068 or, for an issuer whose `[auth.issuer.<name>]` table says
 //! `mode = "introspection"`, posts it to the issuer's introspection endpoint
-//! (RFC 7662), classifies every caller by its issuer's `kind` and profile,
+//! (RFC 7662), reads every caller from the token's standard claims,
 //! checks the Basic users of `[[auth.basic.users]]`, persons only, answers
 //! the status and challenge of every refusal (RFC 6750 §3.1) and writes the
 //! audit line, and picks the issuer the discovery documents describe
@@ -25,12 +25,13 @@
 pub mod discovery;
 pub mod guard;
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use axum::body::Body;
 use axum::response::{IntoResponse, Response};
 use ferrohealth_smart::basic::{PasswordStore, StoreError};
-use ferrohealth_smart::config::{BasicGrants, ConfigError, ServerTls};
+use ferrohealth_smart::config::{AuthSection, BasicGrants, ConfigError, Resolved, ServerTls};
 use ferrohealth_smart::extract::HeaderOnly;
 use ferrohealth_smart::guard::{Gate, Render};
 use ferrohealth_smart::metadata::ServerMetadata;
@@ -79,7 +80,7 @@ const REALM: &str = "FerroTERM";
 pub enum StartError {
     /// A guarded surface runs and `[auth]` names no issuer and is not off.
     #[error(
-        "{} need [auth]: write an [auth.issuer.<name>] table with its issuer, kind and audience, or set auth.enabled = false (FERROTERM__AUTH__ENABLED) on a network only trusted callers reach",
+        "{} need [auth]: write an [auth.issuer.<name>] table with its issuer, or set auth.enabled = false (FERROTERM__AUTH__ENABLED) on a network only trusted callers reach",
         surfaces.join(" and ")
     )]
     Unconfigured {
@@ -201,28 +202,23 @@ impl Smart {
             }
             return Err(StartError::Unconfigured { surfaces });
         }
-        let resolved =
-            auth.resolve_with_tls(&ServerTls, &[])
-                .map_err(|source| StartError::Auth {
-                    source: Box::new(source),
-                })?;
         let bases = version_bases(config.base_url().as_deref());
+        let resolved = resolve(auth, &bases)?;
+        let admin_issuers = admin_issuers(auth);
         let admin_listens = config.admin_listen().is_some();
         let mut fhir = IssuerSet::new();
         let mut admin = IssuerSet::new();
         let mut candidates = Vec::new();
         for settings in resolved.issuers {
             let mut widened = settings.clone();
-            widened.audience.extend(bases.iter().cloned());
+            widen(&mut widened.audience, &bases);
             let server = discover(widened).await?;
             candidates.push(Candidate::of_server(
                 &server,
                 Primary::Jwt(Arc::clone(&server)),
             ));
             fhir = fhir.with(Arc::clone(&server));
-            if admin_listens {
-                // NOTE: no specification governs the admin surface: our own design;
-                // it serves no FHIR base, so only the configured audiences open it.
+            if admin_listens && admin_issuers.contains(settings.issuer.as_str()) {
                 let narrow = if bases.is_empty() {
                     server
                 } else {
@@ -233,14 +229,14 @@ impl Smart {
         }
         for settings in resolved.introspection {
             let mut widened = settings.clone();
-            widened.audience.extend(bases.iter().cloned());
+            widen(&mut widened.audience, &bases);
             let checker = introspect(widened).await?;
             candidates.push(Candidate::of_introspector(
                 &checker,
                 Primary::Introspection(Arc::clone(&checker)),
             ));
             fhir = fhir.with_introspector(Arc::clone(&checker));
-            if admin_listens {
+            if admin_listens && admin_issuers.contains(settings.issuer.as_str()) {
                 let narrow = if bases.is_empty() {
                     checker
                 } else {
@@ -489,8 +485,42 @@ fn guarded_surfaces(config: &Config) -> Vec<&'static str> {
     surfaces
 }
 
-/// The audiences the write routes accept beside `[auth] audience`: every
-/// served version's base under `base_url`, with and without a trailing slash.
+/// `auth` resolved for a server serving `bases`, the audience of every issuer
+/// whose table names none.
+fn resolve(auth: &AuthSection, bases: &[String]) -> Result<Resolved, StartError> {
+    auth.resolve_with_tls(
+        &ServerTls,
+        &bases.iter().map(String::as_str).collect::<Vec<_>>(),
+    )
+    .map_err(|source| StartError::Auth {
+        source: Box::new(source),
+    })
+}
+
+/// The issuers whose tables name an audience outright, the ones the admin
+/// listener admits.
+///
+/// No specification governs the admin surface: our own design; it serves no
+/// FHIR base, so a served version base never opens it.
+fn admin_issuers(auth: &AuthSection) -> BTreeSet<&str> {
+    auth.issuers()
+        .filter(|(_, entry)| !entry.audience.is_empty())
+        .map(|(_, entry)| entry.issuer.expose())
+        .collect()
+}
+
+/// Adds each of `bases` that `audience` does not already hold.
+fn widen(audience: &mut Vec<String>, bases: &[String]) {
+    for base in bases {
+        if !audience.contains(base) {
+            audience.push(base.clone());
+        }
+    }
+}
+
+/// The audiences the write routes accept beside an issuer's `audience`, and
+/// its whole audience when it names none: every served version's base under
+/// `base_url`, with and without a trailing slash.
 ///
 /// The `aud` of a SMART authorization request names the resource server the
 /// app wants FHIR data from (<https://hl7.org/fhir/smart-app-launch/app-launch.html>),

@@ -96,7 +96,7 @@ const GRANTABLE: [&str; 6] = [
 /// The scopes a sign-in that identifies the person and changes nothing gets.
 const IDENTITY_ONLY: [&str; 2] = ["openid", "fhirUser"];
 
-/// The `fhirUser` claim the identity token carries.
+/// The `fhirUser` claim the identity token and the access token carry.
 ///
 /// It is the URL of the resource describing the person
 /// (<https://hl7.org/fhir/smart-app-launch/scopes-and-launch-context.html>),
@@ -403,7 +403,8 @@ impl Stub {
         let now = jiff::Timestamp::now().as_second();
         let expires = now + LIFETIME_SECONDS;
         // RFC 9068 §2: an access token is typed `at+jwt` and carries `client_id`
-        // and `jti` beside the claims every JWT carries.
+        // and `jti` beside the claims every JWT carries; `fhirUser` names the
+        // user as a SMART authorization server's token does.
         let audience = if pending.audience.is_empty() {
             AUDIENCE
         } else {
@@ -420,6 +421,7 @@ impl Stub {
                 "nbf": now,
                 "exp": expires,
                 "scope": pending.profile.in_token(&pending.asked).join(" "),
+                "fhirUser": FHIR_USER,
             }),
             "at+jwt",
         )?;

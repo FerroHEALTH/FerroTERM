@@ -240,10 +240,10 @@ serve() {
   await "http://127.0.0.1:$port/health" "$log"
 }
 # The anonymous console writes through a server with [auth] off; the signed-in
-# one through a server that trusts the stub issuer, a `persons` issuer whose
-# access tokens name the reader, the console's client and the audience
-# `ferroterm` when the request names none, its profile admitting the console.
-printf '[auth.issuer.stub]\nissuer = "%s"\nkind = "persons"\naudience = ["ferroterm"]\n\n[auth.issuer.stub.profile]\nfirst_party_clients = ["ferroterm-console"]\n' \
+# one through a server that trusts the stub issuer, whose access tokens name
+# the reader, the console's client and the audience `ferroterm` when the
+# request names none.
+printf '[auth.issuer.stub]\nissuer = "%s"\naudience = ["ferroterm"]\n' \
   "$issuer" > "$work/server-smart.toml"
 serve 18080 "$work/server.log" FERROTERM__TERMINOLOGY__RESOURCES="$work/resources.redb" \
   FERROTERM__AUTH__ENABLED=false

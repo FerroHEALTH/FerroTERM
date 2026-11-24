@@ -162,6 +162,35 @@ async fn the_admin_listener_does_not_take_a_version_base_as_its_audience() {
     assert_eq!(response.status(), StatusCode::OK);
 }
 
+// An issuer table that names no audience takes the served version bases as
+// its audience (RFC 9068 §4: `aud` names this server), and opens no admin
+// listener, which serves no FHIR base.
+#[tokio::test]
+async fn an_issuer_naming_no_audience_takes_the_version_bases_and_opens_no_admin() {
+    let key = SigningKey::generate("k1");
+    let mock = issuer(&key).await;
+    let mut setup = SmartSetup::for_issuer(&mock.uri());
+    setup.issuer_mut().audience = Vec::new();
+    setup.base_url = Some(String::from(PROXIED));
+    let server = Server::start_persisting_with_smart_setup(setup).await;
+
+    let for_a_base = key.sign(&claims_for(&mock.uri(), json!(format!("{PROXIED}/r4b"))));
+    let response = put_colours_on(&server, "r4b", &for_a_base).await;
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let foreign = key.sign(&claims_for(&mock.uri(), json!(fixture::AUDIENCE)));
+    let response = put_colours(&server, Some(&foreign)).await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+
+    let mut admin_token = claims_for(&mock.uri(), json!(format!("{PROXIED}/r4b")));
+    admin_token["scope"] = json!("__ferroterm.admin");
+    let response = server
+        .admin_router()
+        .oneshot(reload(Some(format!("Bearer {}", key.sign(&admin_token)))))
+        .await
+        .expect("the admin answers");
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
 // RFC 6750 §3: every invalid token gets one generic `401` body that names no
 // claim, no `kid` and no issuer message, and its challenge carries only the
 // stable reason code of the check that refused it as `error_description`.
