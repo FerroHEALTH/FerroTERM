@@ -52,7 +52,7 @@
 # no detector.
 #
 # No specification governs this: our own design. The flags are jscpd's own
-# (https://github.com/kucherenko/jscpd/blob/v5.4.2/docs/rust.md).
+# (https://github.com/kucherenko/jscpd/blob/v5.4.3/docs/rust.md).
 set -Eeuo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
