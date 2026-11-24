@@ -227,6 +227,45 @@ async fn infer_system_past_an_unheld_code_system_is_refused_naming_it() {
             .as_str()
             .is_some_and(|text| text.contains(unheld)),
         "{issue}"
+/// A supplement for a version of `INLINE_CS` the request does not hold.
+fn supplement_of_another_version() -> Value {
+    json!({"resourceType": "CodeSystem", "url": "http://example.org/fhir/CodeSystem/inline-fr",
+        "version": "1", "status": "active", "content": "supplement", "language": "fr",
+        "supplements": format!("{INLINE_CS}|0.9"), "concept": [{"code": "x", "display": "Ixe"}]})
+}
+
+// The terminology ecosystem IG: a supplement applies only to the code system
+// version it names (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>),
+// so one for a version the request does not hold leaves the request served,
+// and a request that requires it is refused as naming a missing supplement.
+#[tokio::test]
+async fn a_supplied_supplement_of_an_unheld_version_applies_to_nothing() {
+    let server = Server::start();
+    let request = |extra: Vec<Value>| {
+        let mut parameter = vec![
+            json!({"name": "url", "valueUri": INLINE_VS}),
+            json!({"name": "tx-resource", "resource": inline_code_system()}),
+            json!({"name": "tx-resource", "resource": inline_value_set()}),
+            json!({"name": "tx-resource", "resource": supplement_of_another_version()}),
+        ];
+        parameter.extend(extra);
+        json!({"resourceType": "Parameters", "parameter": parameter})
+    };
+    let (status, body) = server
+        .post("/r4b/ValueSet/$expand", &request(Vec::new()))
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["expansion"]["contains"][0]["display"], "Ex");
+
+    let required = vec![json!({"name": "useSupplement",
+        "valueCanonical": "http://example.org/fhir/CodeSystem/inline-fr"})];
+    let (status, body) = server
+        .post("/r4b/ValueSet/$expand", &request(required))
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "{body}");
+    assert_eq!(
+        body["issue"][0]["details"]["text"],
+        "Required supplement not found: http://example.org/fhir/CodeSystem/inline-fr"
     );
 }
 
