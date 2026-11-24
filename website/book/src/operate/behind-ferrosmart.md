@@ -13,17 +13,31 @@ describes the whole deployment in
 [§13.21 A product behind FerroSMART](https://github.com/FerroHEALTH/FerroSMART/blob/main/docs/architecture.md#1321-a-product-behind-ferrosmart);
 this page is FerroTERM's side of it.
 
-```text
- browser         app or console         FerroSMART            IdP (login only)
-    | 1. sign in     |                      |                        |
-    |--------------->| 2. /authorize        |                        |
-    |                |  aud = /r4b base     |                        |
-    |<--------------------------------------| 3. OpenID Connect login |
-    |---------------------------------------------------------------->|
-    |                |<- 4. code, /token -->|                        |
-    |                |  RFC 9068 token, typ at+jwt                    |
-    |                | 5. PUT /r4b/CodeSystem/…, Bearer token         |
-    |                |--------------------------> FerroTERM           |
+```mermaid
+flowchart LR
+    person["Person in a browser"] --> app["App or the FerroTERM console"]
+    app -- "sign in" --> smart["FerroSMART"]
+    smart -- "login only" --> idp["OpenID Connect provider"]
+    app -- "write, Bearer token" --> term["FerroTERM write routes"]
+    term -. "metadata and key set" .-> smart
+```
+
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant A as App or console
+    participant S as FerroSMART
+    participant I as IdP (login only)
+    participant T as FerroTERM
+    B->>A: Sign in
+    A->>S: /authorize, aud = the /r4b base
+    S->>I: OpenID Connect login
+    I-->>S: The person is authenticated
+    S-->>A: Authorization code
+    A->>S: /token
+    S-->>A: RFC 9068 access token, typ at+jwt
+    A->>T: PUT /r4b/CodeSystem/…, Bearer token
+    T-->>A: 201 Created, or 401 or 403
 ```
 
 Reading needs no token: the read surface stays open whatever `[auth]` says,
