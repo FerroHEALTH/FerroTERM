@@ -34,7 +34,6 @@
 #
 #   [auth.issuer.tx]
 #   issuer = "https://auth.example.org/realms/tx"
-#   kind = "machines"
 #   audience = ["https://tx.example.org"]
 #
 #   # or, on a network only trusted callers reach:

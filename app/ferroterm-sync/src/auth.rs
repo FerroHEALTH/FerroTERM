@@ -7,7 +7,7 @@
 //! reads each `[auth]` issuer's metadata and key set, checks every access
 //! token under RFC 9068 (or, for an issuer whose `[auth.issuer.<name>]` table says
 //! `mode = "introspection"`, at its introspection endpoint, RFC 7662),
-//! classifies the caller by its issuer's `kind`, and checks every
+//! reads the caller from the token's standard claims, and checks every
 //! `[[auth.basic.users]]` credential, a person's alone, and answers
 //! the status and challenge of a refusal (RFC 6750 §3.1) and writes the audit
 //! line. Every route but `GET /health` requires the product scope, which
@@ -57,7 +57,7 @@ pub enum AuthError {
     /// The section breaks a rule, an enabled section naming no issuer and no
     /// Basic user among them.
     #[error(
-        "[auth] is refused; the admin listener needs an [auth.issuer.<name>] table with its issuer, kind and audience, or Basic users, or `[auth] enabled = false` on a network only trusted callers reach"
+        "[auth] is refused; the admin listener needs an [auth.issuer.<name>] table with its issuer, or Basic users, or `[auth] enabled = false` on a network only trusted callers reach"
     )]
     Config {
         /// The rule.

@@ -317,7 +317,6 @@ mod tests {
     use std::collections::BTreeMap;
     use std::time::Duration;
 
-    use ferrohealth_smart::kind::IssuerKind;
     use ferrohealth_telemetry::section::Format;
 
     use super::{Config, ConfigError, base_url_of};
@@ -444,7 +443,7 @@ mod tests {
 
     #[test]
     fn the_file_holds_the_tree_and_the_environment_goes_over_it() {
-        let text = "[terminology]\nindex = [\"/a\", \"/b\"]\n\n[auth.issuer.idp]\nissuer = \"https://as.example.org\"\nkind = \"machines\"\naudience = [\"ferroterm\"]\n\n[[auth.basic.users]]\nuser = \"operator\"\npassword_hash_file = \"/run/secrets/operator\"\n\n[basic_grants.operator]\nscopes = [\"__ferroterm.admin\"]\n";
+        let text = "[terminology]\nindex = [\"/a\", \"/b\"]\n\n[auth.issuer.idp]\nissuer = \"https://as.example.org\"\naudience = [\"ferroterm\"]\n\n[[auth.basic.users]]\nuser = \"operator\"\npassword_hash_file = \"/run/secrets/operator\"\n\n[basic_grants.operator]\nscopes = [\"__ferroterm.admin\"]\n";
         let config = Config::from_sources(
             Some(text),
             &environment(&[
@@ -467,7 +466,7 @@ mod tests {
             panic!("one [auth.issuer.idp] table, not {issuers:?}");
         };
         assert_eq!(issuer.issuer.expose(), "https://as.example.org");
-        assert_eq!(issuer.kind, Some(IssuerKind::Machines));
+        assert_eq!(issuer.kind, None, "a SMART issuer names no kind");
         assert_eq!(issuer.audience, ["ferroterm"]);
         assert_eq!(
             auth.product_scope, "__ferroterm.reload",
@@ -499,7 +498,6 @@ mod tests {
                     "FERROTERM__AUTH__ISSUER__IDP__ISSUER",
                     "https://as.example.org",
                 ),
-                ("FERROTERM__AUTH__ISSUER__IDP__KIND", "machines"),
                 ("FERROTERM__AUTH__ISSUER__IDP__AUDIENCE", "ferroterm"),
             ]),
         )
@@ -509,7 +507,7 @@ mod tests {
             panic!("one [auth.issuer.idp] table, not {issuers:?}");
         };
         assert_eq!(issuer.issuer.expose(), "https://as.example.org");
-        assert_eq!(issuer.kind, Some(IssuerKind::Machines));
+        assert_eq!(issuer.kind, None, "a SMART issuer names no kind");
         assert_eq!(issuer.audience, ["ferroterm"]);
         assert!(
             Config::from_sources(

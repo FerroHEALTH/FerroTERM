@@ -34,6 +34,7 @@
 - [Syncing from a national terminology service](operate/sync.md)
 - [Hardware sizing](operate/hardware-sizing.md)
 - [Behind a reverse proxy](operate/reverse-proxy.md)
+- [Running behind FerroSMART](operate/behind-ferrosmart.md)
 - [Health, metrics, and request identifiers](operate/observability.md)
 - [Problem types](operate/problems.md)
 - [Usage report](operate/usage-report.md)
