@@ -200,6 +200,34 @@ artifact in `FERROTERM__TERMINOLOGY__INDEX`; the SNOMED CT materials and outcome
 resolve when a SNOMED CT edition is loaded too. Retired concepts stay in the
 supplement, marked `labcodeset-status = retired`, and leave the value set.
 
+## Loading the MyHealth@EU Master Value Sets Catalogue
+
+The MyHealth@EU Master Value Sets Catalogue (MVC) is the value set source of
+every MyHealth@EU guide, distributed as a FHIR NPM package. Its value sets
+enumerate codes from SNOMED CT and other licensed systems, so FerroTERM ships
+none of it: you obtain the package and the code system releases it draws on
+under your own licences, and load them. Pin the package's sha256 as the
+publisher states it; a file whose digest differs is refused:
+
+```console
+$ ferroterm-build --fhir-package mvc-package.tgz \
+    --fhir-package-sha256 8f42b6d0e3a5bad3517a7fe01025b1112d80b12503a66fa8495f9806a81de0e4 \
+    --out /path/to/packages
+```
+
+The import writes the package manifest and its `CodeSystem`, `ValueSet` and
+`ConceptMap` resources, unchanged, to
+`/path/to/packages/myhealth.eu.fhir.mvc-package-<version>/`, so every value
+set keeps its canonical and its version. It leaves out the package's
+examples and index, and refuses to import a release twice. Point
+`FERROTERM__TERMINOLOGY__CODE_SYSTEMS` at that directory beside the code
+system artifacts in `FERROTERM__TERMINOLOGY__INDEX`. Import the next release
+the same way and list both directories: `ValueSet/$expand` and
+`ValueSet/$validate-code` answer the release `valueSetVersion` names, and the
+greatest without one. A value set over a code system version you have not
+loaded answers an `OperationOutcome` naming that system and version, never an
+empty expansion.
+
 ## Loading the NHG ICPC-1 to SNOMED CT map
 
 Nictiz and the NHG distribute the ICPC-1 (NHG table 24) to SNOMED CT mapping

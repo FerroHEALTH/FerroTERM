@@ -86,7 +86,11 @@ pub fn resolve(cli: &Cli, cwd: &Path) -> Result<PathBuf, OutputError> {
 /// The child of the index root a source builds into, or `None` for a source
 /// that writes its own children under the directory it is given.
 fn default_child(cli: &Cli) -> Option<String> {
-    if cli.icd11.is_some() || cli.gstandaard.is_some() || cli.labcodeset.is_some() {
+    if cli.icd11.is_some()
+        || cli.gstandaard.is_some()
+        || cli.labcodeset.is_some()
+        || cli.fhir_package.is_some()
+    {
         return None;
     }
     let name = if cli.loinc.is_some() {

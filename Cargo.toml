@@ -60,6 +60,11 @@ quick-xml = "0.42.0"
 # and the MLDS feed advertises an MD5; both versions were checked against
 # crates.io on 2026-09-22.
 sha2 = "0.11.0"
+# A FHIR NPM package is a gzipped tarball (FHIR Package specification,
+# <https://hl7.org/fhir/packages.html>); `ferroterm-build --fhir-package`
+# reads one. Verified against crates.io on 2026-11-24.
+flate2 = { version = "1.1.10", default-features = false, features = ["zlib-rs"] }
+tar = { version = "0.4.46", default-features = false }
 md-5 = "0.11.0"
 # Serde and formats.
 serde = { version = "1.0.229", features = ["derive"] }

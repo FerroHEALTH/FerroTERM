@@ -482,9 +482,22 @@ impl<'a> Expander<'a> {
         well_formed(include)?;
         let mut parts: Option<BTreeMap<SelectionKey, Selection>> = None;
         if let Some(system) = &include.system {
+            // NOTE: an include that pins a version of a system the server does not
+            // hold names that version, so the operator sees which release to load
+            // (draft EEHRxF act Art 6(5): a value set names the version of each system).
             let resolved = self
                 .registry
-                .resolve(&system.url, system.version.as_deref())?;
+                .resolve(&system.url, system.version.as_deref())
+                .map_err(|error| match (error, &system.version) {
+                    (ResolveError::UnknownSystem(url), Some(version)) => {
+                        ResolveError::UnknownVersion {
+                            url,
+                            version: version.clone(),
+                            available: Vec::new(),
+                        }
+                    }
+                    (error, _) => error,
+                })?;
             let provider = &resolved.provider;
             let identity = provider.identity();
             versions.push(UsedVersion {
