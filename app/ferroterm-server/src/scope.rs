@@ -65,8 +65,10 @@ impl Scope {
     ///
     /// # Errors
     ///
-    /// A `CodeSystem` the engine cannot serve is a 400; a supplement whose
-    /// target is not loaded is a 404.
+    /// A `CodeSystem` the engine cannot serve is a 400, and so is a supplement
+    /// that names no code system. A supplement whose target this request cannot
+    /// resolve is left out, so a request that names it is refused as naming an
+    /// unknown supplement.
     pub fn layered(
         state: &AppState,
         fhir_version: &str,
@@ -117,13 +119,12 @@ impl Scope {
                 Some((url, version)) => (url, Some(version)),
                 None => (target.as_str(), None),
             };
-            registry.resolve(url, version).map_err(|e| {
-                Failure::new(
-                    StatusCode::NOT_FOUND,
-                    "not-found",
-                    format!("cannot supplement: {e}"),
-                )
-            })?;
+            // NOTE: a supplement applies only to the code system version it names
+            // (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>), so one for a
+            // version this request cannot resolve applies to nothing, and naming it fails.
+            if registry.resolve(url, version).is_err() {
+                continue;
+            }
             // NOTE: a supplied supplement is dormant like a loaded one: a request
             // applies it by naming it in `useSupplement`, or through the value set's
             // `valueset-supplement` (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).

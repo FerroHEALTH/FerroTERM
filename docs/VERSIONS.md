@@ -124,7 +124,7 @@ the browser its journeys drive.
 
 | Item | Pin |
 |---|---|
-| Chrome for Testing | 157.0.8103.38 with its chromedriver, installed by `browser-actions/setup-chrome` in the `ui-e2e` job of `ci.yml`, and on a developer machine by `scripts/release/journey-tools.sh`, which checks each zip against its SHA-256 |
+| Chrome for Testing | 158.0.8127.88 with its chromedriver, installed by `browser-actions/setup-chrome` in the `ui-e2e` job of `ci.yml`, and on a developer machine by `scripts/release/journey-tools.sh`, which checks each zip against its SHA-256 |
 
 ## CI tools
 
@@ -142,8 +142,8 @@ the new release counts differently.
 
 | Tool | Pin | Read by |
 |---|---|---|
-| `jscpd` | `5.4.2` (release v5.4.2 of github.com/kucherenko/jscpd, 2026-10-20) | `scripts/checks/duplication.sh` |
-| `jscpd image` | `ghcr.io/kucherenko/jscpd:5.4.2@sha256:112bc771493f25ec412ebf61bef738dc1fbe80d3793090e6a5eeac827ef0ee79` | `scripts/checks/duplication.sh` (docker, podman) |
+| `jscpd` | `5.4.3` (release v5.4.3 of github.com/kucherenko/jscpd, 2026-11-08) | `scripts/checks/duplication.sh` |
+| `jscpd image` | `ghcr.io/kucherenko/jscpd:5.4.3@sha256:6f3d337cd70dce3561e5569b9c59d29adec815fc7d17ad7590012b6936e7eb7a` | `scripts/checks/duplication.sh` (docker, podman) |
 | `jscpd darwin-arm64` | `b51d22d7c7610d27d8fd022577021ff3266a10f13295a2e545a8b8e126133a88` (`jscpd-darwin-arm64.tar.gz`) | `scripts/checks/duplication.sh --install` |
 | `jscpd darwin-x64` | `ae8d24aba2719df7682b1bb2c5021ab096116b8240c45fdae88654fc1ff36b17` (`jscpd-darwin-x64.tar.gz`) | `scripts/checks/duplication.sh --install` |
 | `jscpd linux-x64` | `5f18a6b70b4210782fc3c401c780ba994a2777249cd44d97d6fa460f6fff4570` (`jscpd-linux-x64-musl.tar.gz`) | `scripts/checks/duplication.sh --install` |
@@ -168,8 +168,8 @@ trailing `# vX.Y.Z` comment (`.claude/rules/ci-cd.md`); Dependabot bumps them.
 
 | Item | Pin |
 |---|---|
-| HL7 terminology ecosystem test cases | `HL7/fhir-tx-ecosystem-ig` at `f158adedf67b280e2a596f805194489205bfe9bd` (test cases 1.10.0), `tests/` only. The requirements are cited by their unversioned page (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>): the versioned path does not resolve, and this table is where the version is pinned. |
-| FHIR Validator (`txTests` runner) | 7.0.4, `validator_cli.jar` sha256 `43e29fa8822d670740a909c395ca5b70a3d07fbaa8936f8dedc6a98b007f555b` |
+| HL7 terminology ecosystem test cases | `HL7/fhir-tx-ecosystem-ig` at `9c2bbce57366319d6a5265cbfbf6697f094822e3` (test cases 1.11.0), `tests/` only. The requirements are cited by their unversioned page (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>): the versioned path does not resolve, and this table is where the version is pinned. |
+| FHIR Validator (`txTests` runner) | 7.0.6, `validator_cli.jar` sha256 `2686590539f0b3ba7683149b25d78249f6886c04e2c326e884c5049d8947df89` |
 
 Both pins live in `scripts/checks/tx-ecosystem.sh`; the pass list is
 `conformance/tx-ecosystem/passing.txt`.

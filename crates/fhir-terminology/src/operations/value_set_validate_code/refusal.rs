@@ -33,6 +33,11 @@ pub(super) fn infer_system(model: &ValueSetModel) -> Option<String> {
 /// The systems of the value set whose `subject.code` the value set contains
 /// (`inferSystem`), in system order; one is the inferred system and several
 /// leave it undetermined.
+///
+/// # Errors
+///
+/// Returns [`OperationError::UnknownSystem`] when an include of a code system
+/// the server does not hold may contain the code.
 pub(super) fn infer_by_membership(
     context: &Context<'_>,
     subject: &Subject<'_>,
@@ -44,6 +49,21 @@ pub(super) fn infer_by_membership(
         resolver,
         ..
     } = *context;
+    // NOTE: an include of an unheld code system that may hold the code leaves the
+    // system undetermined, so inference refuses naming it (terminology ecosystem
+    // IG test cases 1.11.0, `infer-unknown-system`).
+    if let Some(unheld) = model.compose.include.iter().find_map(|include| {
+        let system = include.system.as_ref()?;
+        let may_hold = include.concepts.is_empty()
+            || include
+                .concepts
+                .iter()
+                .any(|concept| concept.code == subject.code);
+        (may_hold && sources.registry.resolve(&system.url, None).is_err())
+            .then(|| system.url.clone())
+    }) {
+        return Err(OperationError::UnknownSystem(unheld));
+    }
     let mut systems: Vec<&str> = model
         .compose
         .include

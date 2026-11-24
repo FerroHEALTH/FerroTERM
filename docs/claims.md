@@ -210,7 +210,7 @@ claim, not a test that merely touches the area.
 | Claim | Evidence |
 |---|---|
 | The badges are derived from the committed pass lists and the suite total | `scripts/checks/conformance-badges.sh` |
-| The suite is the HL7 terminology ecosystem IG's test cases, run with the FHIR Validator's `txTests` | `scripts/checks/tx-ecosystem.sh`, its `java -jar "$jar" txTests` call; suite commit `f158adedf67b280e2a596f805194489205bfe9bd`, validator 7.0.4, pinned in `docs/VERSIONS.md` |
+| The suite is the HL7 terminology ecosystem IG's test cases, run with the FHIR Validator's `txTests` | `scripts/checks/tx-ecosystem.sh`, its `java -jar "$jar" txTests` call; suite commit `9c2bbce57366319d6a5265cbfbf6697f094822e3`, validator 7.0.6, pinned in `docs/VERSIONS.md` |
 | The `general` mode runs once per served version on every pull request and push to `main` | `.github/workflows/ci.yml` job `tx-ecosystem` |
 | CI fails when a listed case stops passing | `scripts/checks/tx-ecosystem.sh` compares against the list |
 | Passing a case is not an HL7 certification | Correct as stated: HL7 issues no such certification |

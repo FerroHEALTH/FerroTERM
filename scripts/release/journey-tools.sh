@@ -22,11 +22,11 @@
 #                                          line, for this platform
 set -Eeuo pipefail
 
-chrome_version="157.0.8103.38"
-chrome_linux64_sha256="8cdeb344e9b2cefe59f4aea8d1d93d5d93054c03cde217665c16fc1f62e72a66"
-chrome_mac_arm64_sha256="3406b38b52b7d341d74450eb7b369be038c9fec9894c8b8a9e9e9f97333caf2f"
-chromedriver_linux64_sha256="329525fa0bf02be19794de1e9475772ef64695e0456f142888bd70df3147dc1e"
-chromedriver_mac_arm64_sha256="e59394fda6a05067362c225678e185e46e473cebea1593025deb2b2641b75688"
+chrome_version="158.0.8127.88"
+chrome_linux64_sha256="59e3b43f8b3aaa292238fbdcfb36a93127debd53e212510dcdc2cc8812b4b57e"
+chrome_mac_arm64_sha256="6caf16b007aafaf6d4a4db252262be8ebbf0d91a2af005257e388996dbe463d6"
+chromedriver_linux64_sha256="afabc2d0f866af4d9e209389f930ce34b5f2d365fb1b6c83874845cc123b0e2e"
+chromedriver_mac_arm64_sha256="7f9653f99ff26c4649dd7dc771c0c5a28248d836dd8bae6e71227b3d35cfd642"
 
 api="https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json"
 

@@ -1,0 +1,1 @@
+- A `tx-resource` supplement for a code system version the request does not hold no longer refuses the request with `404`: it applies to nothing, as the terminology ecosystem IG says a supplement applies only to the version it names, and a request that requires it with `useSupplement` is refused as naming a missing supplement.

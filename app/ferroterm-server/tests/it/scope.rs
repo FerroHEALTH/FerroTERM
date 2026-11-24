@@ -145,6 +145,133 @@ async fn a_tx_resource_the_request_never_resolves_does_not_refuse_it() {
     assert_eq!(body["expansion"]["contains"][0]["code"], "x");
 }
 
+/// A value set whose one filter carries a modifier extension.
+fn value_set_with_a_filter_modifier() -> Value {
+    json!({"resourceType": "ValueSet", "url": INLINE_VS, "status": "active",
+        "compose": {"include": [{"system": INLINE_CS, "filter": [{
+            "modifierExtension": [{"url": "http://example.org/unknown-modifier", "valueString": "child-of"}],
+            "property": "concept", "op": "is-a", "value": "x"}]}]}})
+}
+
+// An implementation SHALL NOT process an element carrying a modifier extension
+// it does not understand (<https://hl7.org/fhir/R4B/extensibility.html#modifierExtension>).
+#[tokio::test]
+async fn a_value_set_with_an_unknown_modifier_extension_is_refused() {
+    let server = Server::start();
+    for (operation, coded) in [("$expand", false), ("$validate-code", true)] {
+        let mut parameter = vec![json!({"name": "url", "valueUri": INLINE_VS})];
+        if coded {
+            parameter.push(json!({"name": "system", "valueUri": INLINE_CS}));
+            parameter.push(json!({"name": "code", "valueCode": "x"}));
+        }
+        parameter.push(json!({"name": "tx-resource", "resource": inline_code_system()}));
+        parameter
+            .push(json!({"name": "tx-resource", "resource": value_set_with_a_filter_modifier()}));
+        let (status, body) = server
+            .post(
+                &format!("/r4b/ValueSet/{operation}"),
+                &json!({"resourceType": "Parameters", "parameter": parameter}),
+            )
+            .await;
+        assert_eq!(
+            status,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "{operation}: {body}"
+        );
+        let issue = &body["issue"][0];
+        assert_eq!(issue["code"], "business-rule", "{operation}");
+        assert_eq!(
+            issue["details"]["coding"][0]["code"], "vs-invalid",
+            "{operation}"
+        );
+        assert_eq!(
+            issue["expression"][0], "ValueSet.compose.include[0].filter[0]",
+            "{operation}"
+        );
+        assert!(
+            issue["details"]["text"]
+                .as_str()
+                .is_some_and(|text| text.contains("http://example.org/unknown-modifier")),
+            "{operation}: {issue}"
+        );
+    }
+}
+
+// `inferSystem` needs the one system of the value set that holds the code, and
+// a whole code system the server does not hold may hold it (terminology
+// ecosystem IG test cases 1.11.0, `infer-unknown-system`).
+#[tokio::test]
+async fn infer_system_past_an_unheld_code_system_is_refused_naming_it() {
+    let server = Server::start();
+    let unheld = "http://example.org/fhir/CodeSystem/unheld";
+    let value_set = json!({"resourceType": "ValueSet", "url": INLINE_VS, "status": "active",
+        "compose": {"include": [{"system": INLINE_CS}, {"system": unheld}]}});
+    let (status, body) = server
+        .post(
+            "/r4b/ValueSet/$validate-code",
+            &json!({"resourceType": "Parameters", "parameter": [
+                {"name": "url", "valueUri": INLINE_VS},
+                {"name": "code", "valueCode": "x"},
+                {"name": "inferSystem", "valueBoolean": true},
+                {"name": "tx-resource", "resource": inline_code_system()},
+                {"name": "tx-resource", "resource": value_set}
+            ]}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "{body}");
+    let issue = &body["issue"][0];
+    assert_eq!(issue["code"], "not-found");
+    assert_eq!(issue["details"]["coding"][0]["code"], "not-found");
+    assert!(
+        issue["details"]["text"]
+            .as_str()
+            .is_some_and(|text| text.contains(unheld)),
+        "{issue}"
+    );
+}
+
+/// A supplement for a version of `INLINE_CS` the request does not hold.
+fn supplement_of_another_version() -> Value {
+    json!({"resourceType": "CodeSystem", "url": "http://example.org/fhir/CodeSystem/inline-fr",
+        "version": "1", "status": "active", "content": "supplement", "language": "fr",
+        "supplements": format!("{INLINE_CS}|0.9"), "concept": [{"code": "x", "display": "Ixe"}]})
+}
+
+// The terminology ecosystem IG: a supplement applies only to the code system
+// version it names (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>),
+// so one for a version the request does not hold leaves the request served,
+// and a request that requires it is refused as naming a missing supplement.
+#[tokio::test]
+async fn a_supplied_supplement_of_an_unheld_version_applies_to_nothing() {
+    let server = Server::start();
+    let request = |extra: Vec<Value>| {
+        let mut parameter = vec![
+            json!({"name": "url", "valueUri": INLINE_VS}),
+            json!({"name": "tx-resource", "resource": inline_code_system()}),
+            json!({"name": "tx-resource", "resource": inline_value_set()}),
+            json!({"name": "tx-resource", "resource": supplement_of_another_version()}),
+        ];
+        parameter.extend(extra);
+        json!({"resourceType": "Parameters", "parameter": parameter})
+    };
+    let (status, body) = server
+        .post("/r4b/ValueSet/$expand", &request(Vec::new()))
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["expansion"]["contains"][0]["display"], "Ex");
+
+    let required = vec![json!({"name": "useSupplement",
+        "valueCanonical": "http://example.org/fhir/CodeSystem/inline-fr"})];
+    let (status, body) = server
+        .post("/r4b/ValueSet/$expand", &request(required))
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "{body}");
+    assert_eq!(
+        body["issue"][0]["details"]["text"],
+        "Required supplement not found: http://example.org/fhir/CodeSystem/inline-fr"
+    );
+}
+
 /// `invalid` is "content invalid against the specification or a profile" in
 /// the `IssueType` code system, where `structure` is for content the server
 /// cannot parse (<https://hl7.org/fhir/R4B/codesystem-issue-type.html>).
