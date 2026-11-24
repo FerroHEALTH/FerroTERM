@@ -31,6 +31,7 @@
 - [The console](operate/console.md)
 - [Configuration](operate/configuration.md)
 - [Loading code systems](operate/loading-snomed.md)
+- [Loading the EEHRxF code systems](operate/loading-eehrxf.md)
 - [Syncing from a national terminology service](operate/sync.md)
 - [Hardware sizing](operate/hardware-sizing.md)
 - [Behind a reverse proxy](operate/reverse-proxy.md)

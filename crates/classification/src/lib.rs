@@ -6,15 +6,21 @@
 //! `claml` reads Classification Markup Language (ISO 13120: WHO ICD-10, the
 //! national ICD-10 translations, ICPC-2); `icd10cm` reads the NCHS ICD-10-CM
 //! tabular release (the tabular XML and the order file); `atc` reads the WHO
-//! ATC/DDD index as a table or the G-Standaard ATC file. Both produce a
-//! [`Classification`]: classes of a declared kind, each with one parent,
+//! ATC/DDD index as a table or the G-Standaard ATC file; `npu`, `icdo`,
+//! `emdn`, and `isco` read the publisher tables of NPU, ICD-O-3, EMDN, and
+//! ISCO-08 through `sheet`. Each produces a [`Classification`]: classes of a declared kind, each with one parent,
 //! labelled and annotated by rubric kind. `ferroterm-build` turns the model
 //! into the served artifacts.
 #![doc(test(attr(deny(warnings))))]
 
 pub mod atc;
 pub mod claml;
+pub mod emdn;
 pub mod icd10cm;
+pub mod icdo;
+pub mod isco;
+pub mod npu;
+pub mod sheet;
 mod xml;
 
 /// The rubric kind of a class's title.
@@ -116,6 +122,18 @@ pub struct Rubric {
     pub text: String,
 }
 
+impl Rubric {
+    /// An English rubric of `kind`, its whitespace collapsed.
+    #[must_use]
+    pub fn english(kind: &str, text: &str) -> Self {
+        Self {
+            kind: kind.to_owned(),
+            language: String::from("en"),
+            text: collapse(text),
+        }
+    }
+}
+
 impl Class {
     /// The title in `language`, when the class has one.
     #[must_use]
@@ -144,6 +162,23 @@ pub fn with_period(code: &str) -> String {
     match (shaped, code.split_at_checked(3)) {
         (true, Some((head, tail))) => format!("{head}.{tail}"),
         _ => code.to_owned(),
+    }
+}
+
+/// Sets each class's parent to the longest proper prefix of its code that is
+/// itself a class, for the classifications whose codes nest by prefix.
+pub(crate) fn prefix_parents(classes: &mut [Class]) {
+    let codes: std::collections::BTreeSet<String> =
+        classes.iter().map(|c| c.code.clone()).collect();
+    for class in classes {
+        class.parent = class
+            .code
+            .char_indices()
+            .skip(1)
+            .map(|(at, _)| class.code.get(..at).unwrap_or_default())
+            .filter(|prefix| codes.contains(*prefix))
+            .last()
+            .map(str::to_owned);
     }
 }
 

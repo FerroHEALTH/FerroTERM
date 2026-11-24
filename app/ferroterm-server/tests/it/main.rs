@@ -43,6 +43,7 @@ mod primitives;
 mod r4;
 mod r5;
 mod r6;
+mod releases;
 mod reload;
 mod scope;
 mod shutdown;

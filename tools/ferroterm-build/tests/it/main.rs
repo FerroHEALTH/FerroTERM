@@ -22,4 +22,5 @@ mod local_edition;
 mod loinc;
 mod output;
 mod pipeline;
+mod releases;
 mod rxnorm;
