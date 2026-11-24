@@ -42,3 +42,21 @@ means the server answers as the suite expects; it does not make the server an
 HL7-certified product, and HL7 issues no such certification for terminology
 servers. Registration in the HL7 terminology ecosystem is a separate step and
 will be linked from this page when it exists.
+
+## The EHDS badges
+
+Two badges under **EHDS (self-tested)** in the README report the European
+Health Data Space terminology work. Each counts a committed corpus that a
+test proves over synthetic or freely licensed data, because FerroTERM ships
+no licensed content; neither is a certification or a conformity assessment.
+
+- **MyHealth@EU MVC 10.1.0 (CI) import** counts the value sets of a synthetic
+  package shaped like the Master Value Sets Catalogue that the server answers
+  after `ferroterm-build --fhir-package` imports it
+  (`conformance/ehds/mvc-synthetic.tsv`, held to the fixture by a server
+  test). The real catalogue is the operator's to load.
+- **EEHRxF draft 2026-11-23 Art 6 code systems** counts the coding systems of
+  the draft EEHRxF implementing act whose loader a test proves over a
+  synthetic fixture, of the 16 the draft names
+  (`conformance/ehds/art6-code-systems.tsv`, each row naming its test,
+  checked by `scripts/checks/ehds-matrix.sh`).
