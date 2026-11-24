@@ -57,9 +57,9 @@ pub fn output(cli: &Cli) -> Result<PathBuf, OutputError> {
 /// `--out` wins when given. Without it, the build writes into a child of the
 /// index root named for the source (`snomed`, `loinc`, `rxnorm`, `atc`, `dhd`,
 /// `icd-10-cm`, `npu`, `icd-o-3`, `emdn`, `isco-08`, `orphanet`, `dicom`,
-/// `edqm`, the last segment of a `ClaML` system), or into the root itself
+/// `edqm`, `spor`, the last segment of a `ClaML` system), or into the root itself
 /// for the sources that already lay out their own children (ICD-11, the
-/// G-Standaard, the Labcodeset).
+/// G-Standaard, the Labcodeset, the GPS).
 ///
 /// # Errors
 ///
@@ -87,7 +87,11 @@ pub fn resolve(cli: &Cli, cwd: &Path) -> Result<PathBuf, OutputError> {
 /// The child of the index root a source builds into, or `None` for a source
 /// that writes its own children under the directory it is given.
 fn default_child(cli: &Cli) -> Option<String> {
-    if cli.icd11.is_some() || cli.gstandaard.is_some() || cli.labcodeset.is_some() {
+    if cli.icd11.is_some()
+        || cli.gstandaard.is_some()
+        || cli.labcodeset.is_some()
+        || cli.releases.gps.is_some()
+    {
         return None;
     }
     if let Some(child) = cli.releases.child() {

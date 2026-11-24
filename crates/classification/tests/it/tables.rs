@@ -5,7 +5,7 @@
 //! each publisher's distribution format.
 
 use ::classification::{
-    Class, Classification, PREFERRED, dicom, edqm, emdn, icdo, isco, npu, orpha, sheet,
+    Class, Classification, PREFERRED, dicom, edqm, emdn, icdo, isco, npu, orpha, sheet, spor,
 };
 use ferroterm_testkit::tables::{self, VERSION};
 
@@ -219,4 +219,47 @@ fn the_edqm_response_reads_translations_links_and_status() {
         !class(&edqm, tables::edqm::ROUTE).active,
         "a deprecated term"
     );
+}
+
+#[test]
+fn the_spor_responses_read_each_kind_under_its_system() {
+    let dir = releases();
+    let path = |name: &str| dir.path().join(name);
+    let rms = spor::read(&[&path("spor-rms.xml")], None).expect("reads");
+    assert_eq!(rms.system, format!("{}{}", spor::LISTS, tables::spor::LIST));
+    assert_eq!(rms.classification.title, "Synthetic list");
+    assert_eq!(rms.classification.version.as_deref(), Some("2099-03-01"));
+    let term = class(&rms.classification, tables::spor::TERM);
+    assert!(term.active);
+    assert_eq!(term.title("en"), Some("Synthetic use"));
+    assert_eq!(term.title("de"), Some("Synthetische Anwendung"));
+    assert_eq!(rubric(term, spor::SYNONYM), ["999999000011S"]);
+    assert!(!class(&rms.classification, tables::spor::OLD_TERM).active);
+    let oms = spor::read(&[&path("spor-oms.json")], None).expect("reads");
+    assert_eq!(oms.system, spor::ORGANISATIONS);
+    assert_eq!(
+        class(&oms.classification, tables::spor::ORGANISATION).title("en"),
+        Some("Synthetic Medicines Agency")
+    );
+    let sms = spor::read(&[&path("spor-sms.json")], None).expect("reads");
+    assert_eq!(sms.system, spor::SUBSTANCES);
+    let substance = class(&sms.classification, tables::spor::SUBSTANCE);
+    assert!(substance.active);
+    assert_eq!(substance.title("en"), Some("SYNTHETIC ACID"));
+    assert_eq!(rubric(substance, spor::SYNONYM), ["Acidum syntheticum"]);
+    let pms = spor::read(&[&path("spor-pms.json")], Some("2099-12")).expect("reads");
+    assert_eq!(pms.system, spor::PRODUCTS);
+    assert_eq!(pms.classification.version.as_deref(), Some("2099-12"));
+    assert_eq!(
+        class(&pms.classification, tables::spor::PRODUCT).title("en"),
+        Some("Synthomab 10 mg tablets")
+    );
+    assert!(matches!(
+        spor::read(&[&path("spor-oms.json"), &path("spor-sms.json")], None),
+        Err(spor::SporError::Mixed { .. })
+    ));
+    assert!(matches!(
+        spor::read(&[&path("edqm.json")], None),
+        Err(spor::SporError::Unknown(_))
+    ));
 }

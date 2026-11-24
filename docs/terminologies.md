@@ -45,7 +45,7 @@ engine. Each row is a tracker issue under the program issue.
 | 7 | RxNorm | Typed drug relationships as filters; US context, open subset. | RRF loader (prescribable subset) |
 | 8 | ATC, ICPC, ICD-11 | Classification systems with one parent per code; ICD-11 needs the WHO API or local deployment. | Table and ClaML loaders; API export for ICD-11 |
 | 9 | The Dutch national code systems (DHD thesauri, G-Standaard, Labcodeset) | Licence-gated deployment demand; each rides on the SNOMED, LOINC, and UCUM providers or a table loader. | Per section |
-| 10 | The EEHRxF bindings (NPU, ICD-O-3, EMDN, ISCO-08, ORPHAcodes, DICOM, EDQM) | The European exchange format binds them (Regulation (EU) 2025/327, the EEHRxF implementing act, Annexes IV to X); each is a publisher table the operator supplies. | Table readers in `classification` |
+| 10 | The EEHRxF bindings (NPU, ICD-O-3, EMDN, ISCO-08, ORPHAcodes, DICOM, EDQM, EMA SPOR, SNOMED GPS, the EHDS identifier types) | The European exchange format binds them (Regulation (EU) 2025/327, the EEHRxF implementing act, Annexes IV to X); each is a publisher table the operator supplies. | Table readers in `classification` |
 | later | CPT, CVX, NDC, MDC, UNII, NCI Metathesaurus | US registries with thin FHIR definitions; each is a table provider when a deployment needs it. | Table providers |
 
 ## SNOMED CT
@@ -580,6 +580,26 @@ fixtures are synthetic files in each publisher's format
   responses of the Standard Terms API (`content[]` with `class`, `code`,
   `english`, `status`, `translations`, `links`); versioned by the newest
   `modification_date`; flat across classes.
+- **EMA SPOR.** No THO entry. RMS lists under
+  `https://spor.ema.europa.eu/v1/lists/<id>` (the HL7 Europe UNICOM aliases),
+  OMS organisations under `https://spor.ema.europa.eu/v1/organisations`,
+  SMS substances under `https://spor.ema.europa.eu/v2/SubstanceDefinition`
+  (the MyHealth@EU substance value set), PMS products under the MPID system
+  `http://ema.europa.eu/fhir/MPID` (SPOR API v2 specification,
+  EMA/567640/2018). Saved SPOR API responses: v1 XML for RMS terms, v1 JSON
+  for OMS (the EMA's SPOR API access guide shows both shapes), v2 FHIR
+  bundles for SMS and PMS. One list or kind per build.
+- **SNOMED CT GPS.** The freeset (concept id, active, FSN, US preferred
+  term) becomes the value set `https://ferroterm.eu/fhir/ValueSet/snomed-gps`
+  over `http://snomed.info/sct`, unversioned, so it expands over the loaded
+  edition; the RF2 refset package layers with `--rf2-refset` instead.
+- **EHDS identifier types.** Annex X binds `EHDSPatient.identifier.type` to
+  the HL7 identifier type extended with NI, HI, HIN, SS, REGPID, and REGION.
+  NI and SS are in HL7 v2 table 0203; the other four are not, so FerroTERM
+  authors `https://ferroterm.eu/fhir/CodeSystem/ehds-identifier-type` for
+  them and `https://ferroterm.eu/fhir/ValueSet/ehds-identifier-type` over
+  all of it, embedded in `crates/fhir-terminology/data/ferroterm/` and
+  served beneath the FHIR core terminology of every version.
 
 ## US registries: CPT, CVX, NDC, MDC, UNII, NCI Metathesaurus
 

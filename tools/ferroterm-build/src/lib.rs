@@ -16,6 +16,7 @@ pub mod archive;
 pub mod artifact;
 pub mod classification;
 pub mod dhd;
+pub mod gps;
 pub mod icd11;
 pub mod labcodeset;
 pub mod loinc;
@@ -142,6 +143,13 @@ pub fn run(cli: &Cli) -> Result<Report, RunError> {
 /// read, the edition cannot be identified, a layered package's module
 /// dependency is unmet, or an artifact cannot be written.
 pub fn run_into(cli: &Cli, out: &Path) -> Result<Report, RunError> {
+    if let Some(freeset) = &cli.releases.gps {
+        return Ok(Report::Gps(gps::build(
+            freeset,
+            cli.releases.gps_version.as_deref(),
+            out,
+        )?));
+    }
     if let Some(report) = cli.releases.build(out)? {
         return Ok(Report::Classification(report));
     }
@@ -421,6 +429,8 @@ pub enum Report {
     Icd11(Vec<icd11::Report>),
     /// The Nederlandse Labcodeset as FHIR resources.
     Labcodeset(labcodeset::Report),
+    /// The SNOMED CT Global Patient Set as a value set.
+    Gps(gps::Report),
 }
 
 /// A failure of the command as a whole.
@@ -428,7 +438,7 @@ pub enum Report {
 pub enum RunError {
     /// No input was given.
     #[error(
-        "give `--rf2`, `--loinc`, `--claml`, `--icd10cm`, `--rxnorm`, `--icd11`, `--atc`, `--dhd`, `--gstandaard`, `--labcodeset`, `--npu`, `--icdo`, `--emdn`, `--isco`, `--orpha`, `--dicom`, or `--edqm`"
+        "give `--rf2`, `--loinc`, `--claml`, `--icd10cm`, `--rxnorm`, `--icd11`, `--atc`, `--dhd`, `--gstandaard`, `--labcodeset`, `--npu`, `--icdo`, `--emdn`, `--isco`, `--orpha`, `--dicom`, `--edqm`, `--spor`, or `--gps`"
     )]
     NoInput,
     /// `--atc` without `--atc-version`.
@@ -464,6 +474,9 @@ pub enum RunError {
     /// The ATC table does not read.
     #[error(transparent)]
     Atc(#[from] ::classification::atc::AtcError),
+    /// The GPS freeset does not read or the value set cannot be written.
+    #[error(transparent)]
+    Gps(#[from] gps::GpsError),
     /// A publisher release does not read or build.
     #[error(transparent)]
     Release(#[from] releases::ReleaseError),

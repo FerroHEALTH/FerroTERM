@@ -371,9 +371,145 @@ pub mod edqm {
     }
 }
 
-/// Writes every release into `dir`: `npu-codes.csv`, `Topoenglish.txt`,
-/// `icdo-morphology.xlsx`, `emdn.xlsx`, `isco08.xlsx`, `en_product1.xml`,
-/// `fr_product1.xml`, `dcm.owl`, and `edqm.json`.
+/// EMA SPOR: one RMS list with a current and a non-current term, an OMS
+/// organisation, an SMS substance, and a PMS product, each a saved API response.
+pub mod spor {
+    /// The RMS list id.
+    pub const LIST: &str = "999999000001";
+    /// The current RMS term.
+    pub const TERM: &str = "999999000011";
+    /// The non-current RMS term.
+    pub const OLD_TERM: &str = "999999000012";
+    /// The OMS organisation.
+    pub const ORGANISATION: &str = "ORG-999999001";
+    /// The SMS substance.
+    pub const SUBSTANCE: &str = "999999000101";
+    /// The PMS product's MPID.
+    pub const PRODUCT: &str = "EU-999-MPID-1";
+
+    fn term(id: &str, en: &str, de: &str, status: &str, modified: &str) -> String {
+        format!(
+            "<controlled-term spor:rowid=\"1\"><term-id id=\"{id}\"><link href=\"http://spor.ema.europa.eu/v1/lists/{LIST}/terms/{id}\"/></term-id>\
+             <term-names><term-name><name translation-status-code=\"CURRENT\" lang=\"en\">{en}</name></term-name>\
+             <term-name><name translation-status-code=\"CURRENT\" lang=\"de\">{de}</name></term-name></term-names>\
+             <short-names><short-name><name lang=\"en\">{id}S</name></short-name></short-names>\
+             <status code=\"{status}\" modified-by=\"ema\" modified-on=\"{modified}\"/>\
+             <operational-attributes version-number=\"1\" modified-on=\"{modified}\" created-on=\"2090-01-01T00:00:00Z\"/>\
+             <list-reference id=\"{LIST}\" name=\"Synthetic list\" status=\"CURRENT\"/></controlled-term>"
+        )
+    }
+
+    /// The RMS terms of the list (SPOR API v1 XML).
+    #[must_use]
+    pub fn rms() -> String {
+        format!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?><terms xmlns=\"http://ema.europa.eu/schema/spor\" xmlns:spor=\"http://ema.europa.eu/schema/spor\">{}{}</terms>",
+            term(
+                TERM,
+                "Synthetic use",
+                "Synthetische Anwendung",
+                "CURRENT",
+                "2099-03-01T10:00:00Z"
+            ),
+            term(
+                OLD_TERM,
+                "Former synthetic use",
+                "Alte Anwendung",
+                "NON_CURRENT",
+                "2098-01-01T10:00:00Z"
+            )
+        )
+    }
+
+    /// An OMS organisation (SPOR API v1 JSON).
+    #[must_use]
+    pub fn oms() -> String {
+        serde_json::json!({"organisations": {"organisation": [{
+            "operational-attributes": {"created-on": "2090-01-01T00:00:00Z", "modified-on": "2099-02-01T00:00:00Z"},
+            "organisation-id": {"id": ORGANISATION, "link": {"href": "http://spor.ema.europa.eu/v1/organisations/ORG-999999001"}},
+            "status": "ACTIVE", "name": "Synthetic Medicines Agency"
+        }]}})
+        .to_string()
+    }
+
+    /// An SMS substance (SPOR API v2 FHIR `Bundle`).
+    #[must_use]
+    pub fn sms() -> String {
+        serde_json::json!({"resourceType": "Bundle", "type": "searchset", "entry": [{"resource": {
+            "resourceType": "SubstanceDefinition", "id": "s1",
+            "meta": {"lastUpdated": "2099-04-01T00:00:00Z"},
+            "identifier": [{"system": "http://example.org/sms", "value": SUBSTANCE}],
+            "status": {"coding": [{"code": "200000005004", "display": "Current"}]},
+            "name": [{"name": "SYNTHETIC ACID", "preferred": true}, {"name": "Acidum syntheticum"}]
+        }}]})
+        .to_string()
+    }
+
+    /// A PMS product (SPOR API v2 FHIR `Bundle`).
+    #[must_use]
+    pub fn pms() -> String {
+        serde_json::json!({"resourceType": "Bundle", "type": "searchset", "entry": [{"resource": {
+            "resourceType": "MedicinalProductDefinition", "id": "p1",
+            "meta": {"lastUpdated": "2099-05-01T00:00:00Z"},
+            "identifier": [{"system": "http://ema.europa.eu/fhir/MPID", "value": PRODUCT}],
+            "name": [{"productName": "Synthomab 10 mg tablets"}]
+        }}]})
+        .to_string()
+    }
+}
+
+/// SNOMED CT GPS: a freeset over the testkit edition, two active concepts
+/// and one inactive row.
+pub mod gps {
+    use crate::snomed::{CAT, DOG, FISH, item, sctid};
+
+    /// The file name, with the release date SNOMED International writes into it.
+    pub const FILE: &str = "SnomedINTL_GPSRelease_PRODUCTION_20990101T120000Z.txt";
+    /// The release the file name carries.
+    pub const RELEASE: &str = "20990101";
+
+    /// The active concepts of the freeset.
+    #[must_use]
+    pub fn active() -> [String; 2] {
+        [sctid(item(CAT)), sctid(item(DOG))]
+    }
+
+    /// The freeset: concept id, active flag, FSN, and US English preferred term.
+    #[must_use]
+    pub fn freeset() -> String {
+        let [cat, dog] = active();
+        let fish = sctid(item(FISH));
+        [
+            String::from("id\tactive\tfsn\tpt"),
+            format!("{cat}\t1\tCat (organism)\tCat"),
+            format!("{dog}\t1\tDog (organism)\tDog"),
+            format!("{fish}\t0\tFish (organism)\tFish"),
+        ]
+        .join("\n")
+    }
+
+    /// Builds the freeset at `freeset` into the value set under `<out>/gps`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an I/O error wrapping the build failure.
+    pub fn write_value_set(
+        freeset: &std::path::Path,
+        out: &std::path::Path,
+    ) -> std::io::Result<()> {
+        ferroterm_build::gps::build(freeset, None, out)
+            .map(|_| ())
+            .map_err(std::io::Error::other)
+    }
+}
+
+/// Writes every release into `dir`.
+///
+/// The files are `npu-codes.csv`, `Topoenglish.txt`, `icdo-morphology.xlsx`,
+/// `emdn.xlsx`, `isco08.xlsx`, `en_product1.xml`, `fr_product1.xml`,
+/// `dcm.owl`, `edqm.json`, the GPS freeset ([`gps::FILE`]), and the SPOR
+/// responses `spor-rms.xml`, `spor-oms.json`, `spor-sms.json`, and
+/// `spor-pms.json`.
 ///
 /// # Errors
 ///
@@ -394,11 +530,19 @@ pub fn write_releases(dir: &Path) -> std::io::Result<()> {
     std::fs::write(dir.join("fr_product1.xml"), orpha::product("fr"))?;
     std::fs::write(dir.join("dcm.owl"), dicom::owl())?;
     std::fs::write(dir.join("edqm.json"), edqm::response())?;
+    std::fs::write(dir.join(gps::FILE), gps::freeset())?;
+    std::fs::write(dir.join("spor-rms.xml"), spor::rms())?;
+    std::fs::write(dir.join("spor-oms.json"), spor::oms())?;
+    std::fs::write(dir.join("spor-sms.json"), spor::sms())?;
+    std::fs::write(dir.join("spor-pms.json"), spor::pms())?;
     Ok(())
 }
 
 /// The artifact directory names [`write_artifacts`] writes, one per release.
-pub const ARTIFACTS: [&str; 7] = ["npu", "icdo", "emdn", "isco", "orpha", "dicom", "edqm"];
+pub const ARTIFACTS: [&str; 11] = [
+    "npu", "icdo", "emdn", "isco", "orpha", "dicom", "edqm", "spor-rms", "spor-oms", "spor-sms",
+    "spor-pms",
+];
 
 /// Builds every release into its directory under `dir` (see [`ARTIFACTS`])
 /// through the `ferroterm-build` release flags.
@@ -441,6 +585,22 @@ pub fn write_artifacts(dir: &Path) -> std::io::Result<()> {
         },
         Releases {
             edqm: vec![r.join("edqm.json")],
+            ..Releases::default()
+        },
+        Releases {
+            spor: vec![r.join("spor-rms.xml")],
+            ..Releases::default()
+        },
+        Releases {
+            spor: vec![r.join("spor-oms.json")],
+            ..Releases::default()
+        },
+        Releases {
+            spor: vec![r.join("spor-sms.json")],
+            ..Releases::default()
+        },
+        Releases {
+            spor: vec![r.join("spor-pms.json")],
             ..Releases::default()
         },
     ];

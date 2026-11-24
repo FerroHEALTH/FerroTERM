@@ -27,7 +27,7 @@ struct Case {
     under_root: &'static [&'static str],
 }
 
-const CASES: [Case; 7] = [
+const CASES: [Case; 11] = [
     Case {
         system: "http://npu-terminology.org",
         version: VERSION,
@@ -90,6 +90,42 @@ const CASES: [Case; 7] = [
         property: ("link-bdf", "99992000"),
         root: None,
         under_root: &[tables::edqm::DOSE_FORM, tables::edqm::ROUTE],
+    },
+    Case {
+        system: "https://spor.ema.europa.eu/v1/lists/999999000001",
+        version: "2099-03-01",
+        code: tables::spor::TERM,
+        display: "Synthetic use",
+        property: ("status", "CURRENT"),
+        root: None,
+        under_root: &[tables::spor::TERM, tables::spor::OLD_TERM],
+    },
+    Case {
+        system: "https://spor.ema.europa.eu/v1/organisations",
+        version: "2099-02-01",
+        code: tables::spor::ORGANISATION,
+        display: "Synthetic Medicines Agency",
+        property: ("status", "ACTIVE"),
+        root: None,
+        under_root: &[tables::spor::ORGANISATION],
+    },
+    Case {
+        system: "https://spor.ema.europa.eu/v2/SubstanceDefinition",
+        version: "2099-04-01",
+        code: tables::spor::SUBSTANCE,
+        display: "SYNTHETIC ACID",
+        property: ("kind", "substance"),
+        root: None,
+        under_root: &[tables::spor::SUBSTANCE],
+    },
+    Case {
+        system: "http://ema.europa.eu/fhir/MPID",
+        version: "2099-05-01",
+        code: tables::spor::PRODUCT,
+        display: "Synthomab 10 mg tablets",
+        property: ("kind", "medicinal-product"),
+        root: None,
+        under_root: &[tables::spor::PRODUCT],
     },
 ];
 
@@ -306,6 +342,120 @@ async fn a_dicom_context_group_expands_and_validates_over_the_loaded_dcm() {
             "/r4/ValueSet/$validate-code?url={url}&system={}&code={}",
             encode("http://dicom.nema.org/resources/ontology/DCM"),
             tables::dicom::CURRENT
+        ))
+        .await;
+    assert_eq!(
+        parameter(&body, "result").expect("result")["valueBoolean"],
+        true,
+        "{body}"
+    );
+}
+
+/// The EHDS identifier types of the exchange format act (Regulation (EU) 2025/327,
+/// Annex X, `EHDSPatient.identifier.type`): the HL7 identifier type extended
+/// with NI, HI, HIN, SS, REGPID, and REGION, expanding as one value set over
+/// the HL7 Terminology the deployment loads (two of its codes here, CC0).
+#[tokio::test]
+async fn the_ehds_identifier_types_expand_as_one_value_set() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let tho = dir.path().join("tho");
+    std::fs::create_dir_all(&tho).expect("creates");
+    let v2_0203 = json!({"resourceType": "CodeSystem", "url": "http://terminology.hl7.org/CodeSystem/v2-0203",
+    "version": "5.0.0", "status": "active", "content": "complete", "caseSensitive": true,
+    "concept": [
+        {"code": "MR", "display": "Medical record number"},
+        {"code": "NI", "display": "National unique individual identifier"},
+        {"code": "PPN", "display": "Passport number"},
+        {"code": "SS", "display": "Social Security number"}
+    ]});
+    let identifier_type = json!({"resourceType": "ValueSet", "url": "http://hl7.org/fhir/ValueSet/identifier-type",
+    "version": "4.0.1", "status": "active", "compose": {"include": [
+        {"system": "http://terminology.hl7.org/CodeSystem/v2-0203", "concept": [{"code": "MR"}, {"code": "PPN"}]}
+    ]}});
+    std::fs::write(tho.join("CodeSystem-v2-0203.json"), v2_0203.to_string()).expect("writes");
+    std::fs::write(
+        tho.join("ValueSet-identifier-type.json"),
+        identifier_type.to_string(),
+    )
+    .expect("writes");
+    let config = Config {
+        terminology: TerminologySection {
+            code_systems: vec![tho],
+            ..TerminologySection::default()
+        },
+        ..Config::default()
+    };
+    let server = Server::start_with_config(dir, config);
+    let url = encode("https://ferroterm.eu/fhir/ValueSet/ehds-identifier-type");
+    for version in ["r4", "r4b", "r5", "r6"] {
+        let (status, body) = server
+            .get(&format!("/{version}/ValueSet/$expand?url={url}"))
+            .await;
+        assert_eq!(status, StatusCode::OK, "{version}: {body}");
+        let mut codes = Vec::new();
+        flatten(&body["expansion"]["contains"], &mut codes);
+        codes.sort_unstable();
+        assert_eq!(
+            codes,
+            ["HI", "HIN", "MR", "NI", "PPN", "REGION", "REGPID", "SS"],
+            "{version}"
+        );
+    }
+    let (_, body) = server
+        .get(&format!(
+            "/r4/ValueSet/$validate-code?url={url}&system={}&code=REGPID",
+            encode("https://ferroterm.eu/fhir/CodeSystem/ehds-identifier-type")
+        ))
+        .await;
+    assert_eq!(
+        parameter(&body, "result").expect("result")["valueBoolean"],
+        true,
+        "{body}"
+    );
+    assert_eq!(
+        parameter(&body, "display").expect("display")["valueString"],
+        "Regional person identifier"
+    );
+}
+
+/// The SNOMED CT Global Patient Set freeset becomes a value set over the
+/// loaded edition: its active concepts expand and validate there.
+#[tokio::test]
+async fn the_gps_freeset_expands_over_the_loaded_edition() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let release = dir.path().join("release");
+    let snomed = dir.path().join("snomed");
+    let out = dir.path().join("out");
+    for path in [&release, &snomed, &out] {
+        std::fs::create_dir_all(path).expect("creates");
+    }
+    tables::write_releases(&release).expect("writes");
+    ferroterm_testkit::snomed::write(&snomed).expect("writes the edition");
+    tables::gps::write_value_set(&release.join(tables::gps::FILE), &out).expect("builds");
+    let config = Config {
+        terminology: TerminologySection {
+            index: vec![snomed],
+            code_systems: vec![out.join("gps")],
+            ..TerminologySection::default()
+        },
+        ..Config::default()
+    };
+    let server = Server::start_with_config(dir, config);
+    let url = encode("https://ferroterm.eu/fhir/ValueSet/snomed-gps");
+    let (status, body) = server.get(&format!("/r4/ValueSet/$expand?url={url}")).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["version"], tables::gps::RELEASE, "{body}");
+    let mut codes = Vec::new();
+    flatten(&body["expansion"]["contains"], &mut codes);
+    codes.sort_unstable();
+    let mut expected = tables::gps::active().to_vec();
+    expected.sort_unstable();
+    assert_eq!(codes, expected);
+    let [cat, _] = tables::gps::active();
+    let (_, body) = server
+        .get(&format!(
+            "/r4/ValueSet/$validate-code?url={url}&system={}&code={cat}",
+            encode("http://snomed.info/sct")
         ))
         .await;
     assert_eq!(

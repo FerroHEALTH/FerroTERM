@@ -166,3 +166,78 @@ definition, and the links to terms of other classes (`link-bdf`, `link-roa`,
 and so on) are properties. A term whose status is not `Current` is served
 inactive. The EDQM's terms of use apply to the data you load. The default
 child is `edqm`.
+
+## EMA SPOR
+
+The EMA distributes its SPOR master data through the SPOR API, behind an
+account you register with the EMA
+(<https://www.ema.europa.eu/en/human-regulatory-overview/research-development/data-medicines-iso-idmp-standards-overview/substance-product-organisation-referential-spor-master-data>).
+Save the responses and build each kind on its own; each RMS list is a code
+system of its own, so build each list separately:
+
+```console
+$ ferroterm-build --spor rms-200000000004-terms.xml --out /path/to/spor-dose-forms
+$ ferroterm-build --spor oms-organisations.json --out /path/to/spor-organisations
+$ ferroterm-build --spor sms-substances.json --out /path/to/spor-substances
+$ ferroterm-build --spor pms-products.json --out /path/to/spor-products
+```
+
+| Kind | Response | System |
+|---|---|---|
+| RMS terms of one list | SPOR API v1 XML (`controlled-term`) | `https://spor.ema.europa.eu/v1/lists/<list id>` |
+| OMS organisations | SPOR API v1 JSON (`organisation-id`, `name`, `status`) | `https://spor.ema.europa.eu/v1/organisations` |
+| SMS substances | SPOR API v2 FHIR `Bundle` of `SubstanceDefinition` | `https://spor.ema.europa.eu/v2/SubstanceDefinition` |
+| PMS medicinal products | SPOR API v2 FHIR `Bundle` of `MedicinalProductDefinition` | `http://ema.europa.eu/fhir/MPID` |
+
+HL7 Terminology registers none of these. The list URIs are those of the HL7
+Europe guides, the substance URI that of the MyHealth@EU substance value set,
+and the product URI the MPID identifier system of the SPOR API v2
+specification. A term or organisation that is not current or active is
+served inactive; a term's names in each language are designations. The
+version is the newest modification date among the records unless you pass
+`--spor-version`. Give several files of one kind to build them as one. The
+default child is `spor`.
+
+## SNOMED CT Global Patient Set
+
+SNOMED International publishes the Global Patient Set (GPS) freeset as a
+tab-separated file with the concept id, the active flag, the fully specified
+name, and the US English preferred term
+(<https://docs.snomed.org/implementation-guides/gps-implementation-guide/global-patient-set-content>).
+The build writes it as a value set over SNOMED CT:
+
+```console
+$ ferroterm-build --gps SnomedINTL_GPSRelease_PRODUCTION_20260101T120000Z.txt --out /path/to/gps-root
+```
+
+The value set lands in `gps/` under the output, with the canonical
+`https://ferroterm.eu/fhir/ValueSet/snomed-gps` (FerroTERM's own; the
+freeset has none on the FHIR wire) and the release date in the file name as
+its version (`--gps-version` overrides it). Point
+`FERROTERM__TERMINOLOGY__CODE_SYSTEMS` at that directory beside a SNOMED CT
+edition in `FERROTERM__TERMINOLOGY__INDEX`: the value set holds the active
+concepts and expands and validates over whichever edition you load. If you
+hold the GPS RF2 refset package instead, layer it onto the edition with
+`ferroterm-build --rf2 <edition> --rf2-refset <package>`; it is then served
+as `http://snomed.info/sct?fhir_vs=refset/<refset id>`.
+
+## EHDS identifier types
+
+The EEHRxF act (Annex X, `EHDSPatient.identifier.type`) binds the identifier
+type to the HL7 identifier type extended with NI (national unique
+identifier), HI (health identifier), HIN (health insurance number), SS
+(social security identifier), REGPID (regional person identifier), and
+REGION (region identifier). FerroTERM serves this binding on every FHIR
+version with nothing to load:
+
+- the value set `https://ferroterm.eu/fhir/ValueSet/ehds-identifier-type`,
+  which includes the FHIR `identifier-type` value set, NI and SS from
+  `http://terminology.hl7.org/CodeSystem/v2-0203`, and the four codes below;
+- the code system `https://ferroterm.eu/fhir/CodeSystem/ehds-identifier-type`
+  with HI, HIN, REGPID, and REGION, which the HL7 v2 table 0203 does not
+  define.
+
+Both are FerroTERM's own resources. The value set expands fully when HL7
+Terminology (`hl7.terminology`, CC0) is loaded through
+`FERROTERM__TERMINOLOGY__CODE_SYSTEMS`, since the HL7 identifier type and
+table 0203 come from there.

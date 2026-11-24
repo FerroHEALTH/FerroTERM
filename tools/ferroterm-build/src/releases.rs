@@ -62,6 +62,18 @@ pub struct Releases {
     /// The EDQM release to record; the newest modification date when absent.
     #[arg(long, value_name = "VERSION", requires = "edqm")]
     pub edqm_version: Option<String>,
+    /// A saved EMA SPOR API response: RMS terms of one list (v1 XML), OMS organisations (v1 JSON), or SMS substances or PMS products (v2 FHIR `Bundle`) (repeatable, one kind per build).
+    #[arg(long, value_name = "FILE", action = clap::ArgAction::Append, group = GROUP)]
+    pub spor: Vec<PathBuf>,
+    /// The SPOR release to record; the newest modification date when absent.
+    #[arg(long, value_name = "VERSION", requires = "spor")]
+    pub spor_version: Option<String>,
+    /// The SNOMED CT Global Patient Set freeset (the tab-separated `.txt`); writes a value set over the loaded edition under `<out>/gps`.
+    #[arg(long, value_name = "TXT", group = GROUP)]
+    pub gps: Option<PathBuf>,
+    /// The GPS release to record (`20260101`); the date in the file name when absent.
+    #[arg(long, value_name = "RELEASE", requires = "gps")]
+    pub gps_version: Option<String>,
 }
 
 /// A failure to read a release.
@@ -79,6 +91,9 @@ pub enum ReleaseError {
     /// The EDQM responses do not read.
     #[error(transparent)]
     Edqm(#[from] ::classification::edqm::EdqmError),
+    /// The SPOR responses do not read.
+    #[error(transparent)]
+    Spor(#[from] ::classification::spor::SporError),
     /// A source was given without the version it needs.
     #[error("`--{0}` needs `--{0}-version`")]
     NoVersion(&'static str),
@@ -105,18 +120,31 @@ impl Releases {
             Some("dicom")
         } else if !self.edqm.is_empty() {
             Some("edqm")
+        } else if !self.spor.is_empty() {
+            Some("spor")
         } else {
             None
         }
     }
 
-    /// Builds the given source into `out`, `None` when no release source is given.
+    /// Builds the given classification source into `out`, `None` when no such
+    /// source is given (the GPS writes a value set through [`crate::gps`]).
     ///
     /// # Errors
     ///
     /// Returns [`ReleaseError`] when the release does not read, lacks its
     /// version, or cannot be built.
     pub fn build(&self, out: &Path) -> Result<Option<classification::Report>, ReleaseError> {
+        if !self.spor.is_empty() {
+            let paths: Vec<&Path> = self.spor.iter().map(PathBuf::as_path).collect();
+            let read = ::classification::spor::read(&paths, self.spor_version.as_deref())?;
+            return Ok(Some(classification::build(
+                &read.classification,
+                &read.system,
+                None,
+                out,
+            )?));
+        }
         let (read, system) = if let Some(npu) = &self.npu {
             let version = self
                 .npu_version
