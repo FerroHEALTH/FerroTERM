@@ -8,18 +8,23 @@
 //! tabular release (the tabular XML and the order file); `atc` reads the WHO
 //! ATC/DDD index as a table or the G-Standaard ATC file; `npu`, `icdo`,
 //! `emdn`, and `isco` read the publisher tables of NPU, ICD-O-3, EMDN, and
-//! ISCO-08 through `sheet`. Each produces a [`Classification`]: classes of a declared kind, each with one parent,
-//! labelled and annotated by rubric kind. `ferroterm-build` turns the model
+//! ISCO-08 through `sheet`; `orpha` reads the Orphadata nomenclature, `dicom`
+//! the DICOM `dcm.owl`, and `edqm` saved EDQM Standard Terms API responses.
+//! Each produces a [`Classification`]: classes of a declared kind, each with
+//! one parent, labelled and annotated by rubric kind. `ferroterm-build` turns the model
 //! into the served artifacts.
 #![doc(test(attr(deny(warnings))))]
 
 pub mod atc;
 pub mod claml;
+pub mod dicom;
+pub mod edqm;
 pub mod emdn;
 pub mod icd10cm;
 pub mod icdo;
 pub mod isco;
 pub mod npu;
+pub mod orpha;
 pub mod sheet;
 mod xml;
 

@@ -102,6 +102,21 @@ fn open(event: &BytesStart<'_>) -> Element {
     }
 }
 
+/// The first element whose local name is `name`, with its attributes and no
+/// content; the document is read only up to its start tag.
+pub(crate) fn first(text: &str, name: &str) -> Result<Option<Element>, quick_xml::Error> {
+    let mut reader = Reader::from_str(text);
+    loop {
+        match reader.read_event()? {
+            Event::Start(start) | Event::Empty(start) if local(start.name().as_ref()) == name => {
+                return Ok(Some(open(&start)));
+            }
+            Event::Eof => return Ok(None),
+            _ => {}
+        }
+    }
+}
+
 /// Calls `each` with every element whose local name is `record`, read whole,
 /// in document order; a record nested in another stays inside its parent.
 ///

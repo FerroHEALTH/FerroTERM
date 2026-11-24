@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The publisher release builds (`--npu`, `--icdo`, `--emdn`, `--isco`) from
-//! the command line over the testkit's synthetic tables.
+//! The publisher release builds from the command line over the testkit's
+//! synthetic releases.
 
 use clap::Parser;
 use ferroterm_build::{Cli, Report};
@@ -17,7 +17,7 @@ fn each_release_builds_under_its_canonical_uri_and_version() {
     let releases = tempfile::tempdir().expect("tempdir");
     tables::write_releases(releases.path()).expect("writes");
     let path = |name: &str| releases.path().join(name).display().to_string();
-    let cases: [(Vec<String>, &str, &str, u64); 4] = [
+    let cases: [(Vec<String>, &str, &str, u64); 7] = [
         (
             vec![
                 "--npu".into(),
@@ -54,6 +54,34 @@ fn each_release_builds_under_its_canonical_uri_and_version() {
             "2008",
             4,
         ),
+        (
+            vec![
+                "--orpha".into(),
+                path("en_product1.xml"),
+                "--orpha".into(),
+                path("fr_product1.xml"),
+            ],
+            "https://www.orpha.net",
+            "2099-01-31",
+            2,
+        ),
+        (
+            vec!["--dicom".into(), path("dcm.owl")],
+            "http://dicom.nema.org/resources/ontology/DCM",
+            tables::dicom::EDITION,
+            2,
+        ),
+        (
+            vec![
+                "--edqm".into(),
+                path("edqm.json"),
+                "--edqm-version".into(),
+                "2099".into(),
+            ],
+            "http://standardterms.edqm.eu",
+            "2099",
+            2,
+        ),
     ];
     for (args, system, version, concepts) in cases {
         let out = tempfile::tempdir().expect("tempdir");
@@ -89,4 +117,6 @@ fn a_release_without_its_required_version_or_beside_another_source_is_refused() 
         "the sheet names its release"
     );
     assert!(parse(&["--labcodeset", "l.zip"]).is_ok());
+    assert!(parse(&["--dicom", "dcm.owl", "--orpha", "en_product1.xml"]).is_err());
+    assert!(parse(&["--edqm", "a.json", "--edqm", "b.json"]).is_ok());
 }

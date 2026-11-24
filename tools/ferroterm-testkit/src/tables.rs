@@ -1,12 +1,14 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! Synthetic publisher tables, with invented codes and terms.
+//! Synthetic publisher releases, with invented codes and terms.
 //!
 //! Each is in its publisher's distribution format: NPU (the IFCC code file),
 //! ICD-O-3 (the WHO topography and morphology tables), EMDN (the Commission's
-//! workbook), and ISCO-08 (the ILO structure workbook). `write_xlsx` is a
-//! minimal Office Open XML workbook writer.
+//! workbook), ISCO-08 (the ILO structure workbook), Orphanet (the Orphadata
+//! `product1` file), DICOM (NEMA's `dcm.owl`), and EDQM (a saved Standard
+//! Terms API response). `write_xlsx` is a minimal Office Open XML workbook
+//! writer.
 
 use std::io::Write;
 use std::path::Path;
@@ -245,8 +247,133 @@ pub mod isco {
     }
 }
 
-/// Writes every table into `dir`: `npu-codes.csv`, `Topoenglish.txt`,
-/// `icdo-morphology.xlsx`, `emdn.xlsx`, and `isco08.xlsx`.
+/// Orphanet: an active disease with a synonym in two languages, and an
+/// obsolete entity.
+pub mod orpha {
+    /// The active disease.
+    pub const DISEASE: &str = "999901";
+    /// The obsolete entity.
+    pub const OBSOLETE: &str = "999902";
+
+    fn disorder(code: &str, lang: &str, name: &str, synonym: &str, flags: &str) -> String {
+        format!(
+            "<Disorder id=\"1\"><OrphaCode>{code}</OrphaCode><Name lang=\"{lang}\">{name}</Name>\
+             <DisorderFlagList count=\"1\">{flags}</DisorderFlagList>\
+             <SynonymList count=\"1\"><Synonym lang=\"{lang}\">{synonym}</Synonym></SynonymList>\
+             <DisorderType id=\"21394\"><Name lang=\"{lang}\">Disease</Name></DisorderType>\
+             <DisorderGroup id=\"36547\"><Name lang=\"{lang}\">Disorder</Name></DisorderGroup>\
+             <DisorderDisorderAssociationList count=\"0\"/></Disorder>"
+        )
+    }
+
+    /// The `<lang>_product1.xml` document in `lang`, dated 2099-01-31.
+    #[must_use]
+    pub fn product(lang: &str) -> String {
+        let active = "<DisorderFlag id=\"475\"><Value>1</Value><Label></Label></DisorderFlag>";
+        let obsolete = "<DisorderFlag id=\"495\"><Value>8192</Value><Label>Inactive</Label></DisorderFlag>\
+                        <DisorderFlag id=\"455\"><Value>16</Value><Label>Obsolete entity</Label></DisorderFlag>";
+        let (name, synonym, old) = if lang == "fr" {
+            ("Syndrome synthétique", "Synthose", "Ancien syndrome")
+        } else {
+            ("Synthetic syndrome", "Synthosis", "Former syndrome")
+        };
+        format!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
+             <JDBOR date=\"2099-01-31 07:53:50\" version=\"1.3.42\" copyright=\"Synthetic\">\
+             <DisorderList count=\"2\">{}{}</DisorderList></JDBOR>",
+            disorder(DISEASE, lang, name, synonym, active),
+            disorder(OBSOLETE, lang, old, "Old synthosis", obsolete)
+        )
+    }
+}
+
+/// DICOM: a current code with a definition and a retired one replaced by it.
+pub mod dicom {
+    /// The edition the ontology names.
+    pub const EDITION: &str = "2099a_20990101";
+    /// The current code.
+    pub const CURRENT: &str = "999001";
+    /// The retired code.
+    pub const RETIRED: &str = "ZZ";
+
+    /// The canonical of the synthetic context group, in the shape of NEMA's
+    /// PS3.16 context group value sets.
+    pub const CONTEXT_GROUP: &str =
+        "http://dicom.nema.org/medical/dicom/current/output/chtml/part16/sect_CID_99999.html";
+
+    /// Writes a context group `ValueSet` over [`CURRENT`] into `dir`, shaped
+    /// like the FHIR value sets NEMA publishes for PS3.16
+    /// (<https://dicom.nema.org/medical/dicom/resources/valuesets/fhir/json/>).
+    ///
+    /// # Errors
+    ///
+    /// Returns the I/O error when the file cannot be written.
+    pub fn write_context_group(dir: &std::path::Path) -> std::io::Result<()> {
+        let group = serde_json::json!({
+            "resourceType": "ValueSet", "id": "dicom-cid-99999-SyntheticAcquisition",
+            "url": CONTEXT_GROUP, "version": "20990101", "name": "SyntheticAcquisition",
+            "status": "active", "experimental": false, "publisher": "Synthetic",
+            "compose": {"include": [{"system": "http://dicom.nema.org/resources/ontology/DCM",
+                "concept": [{"code": CURRENT, "display": "Synthetic acquisition"}]}]}
+        });
+        std::fs::write(
+            dir.join("ValueSet-dicom-cid-99999-SyntheticAcquisition.json"),
+            group.to_string(),
+        )
+    }
+
+    /// The `dcm.owl` document.
+    #[must_use]
+    pub fn owl() -> String {
+        let base = "http://dicom.nema.org/resources/ontology/DCM";
+        format!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
+             <rdf:RDF xmlns:skos=\"http://www.w3.org/2004/02/skos/core#\" xmlns:owl=\"http://www.w3.org/2002/07/owl#\" \
+             xmlns:rdfs=\"http://www.w3.org/2000/01/rdf-schema#\" xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\
+             <rdf:Description rdf:about=\"{base}/\"><rdf:type rdf:resource=\"http://www.w3.org/2002/07/owl#Ontology\"/>\
+             <rdfs:label>DCM</rdfs:label><owl:versionInfo>{EDITION}</owl:versionInfo></rdf:Description>\
+             <rdf:Description rdf:about=\"{base}/{CURRENT}\"><rdf:type rdf:resource=\"http://www.w3.org/2002/07/owl#Class\"/>\
+             <skos:notation>{CURRENT}</skos:notation><skos:prefLabel xml:lang=\"en\">Synthetic acquisition</skos:prefLabel>\
+             <skos:definition xml:lang=\"en\">An invented acquisition.</skos:definition></rdf:Description>\
+             <rdf:Description rdf:about=\"{base}/{RETIRED}\"><rdf:type rdf:resource=\"http://www.w3.org/2002/07/owl#Class\"/>\
+             <skos:notation>{RETIRED}</skos:notation><skos:prefLabel xml:lang=\"en\">Old synthetic modality</skos:prefLabel>\
+             <owl:deprecated>true</owl:deprecated><skos:changeNote xml:lang=\"en\">Retired</skos:changeNote>\
+             <owl:sameAs rdf:resource=\"{base}/{CURRENT}\"/></rdf:Description></rdf:RDF>"
+        )
+    }
+}
+
+/// EDQM: a current dose form linked to a basic dose form, and a deprecated
+/// route, with French translations.
+pub mod edqm {
+    /// The current pharmaceutical dose form.
+    pub const DOSE_FORM: &str = "99990000";
+    /// The deprecated route.
+    pub const ROUTE: &str = "99991000";
+    /// The newest modification date, the version when none is given.
+    pub const MODIFIED: &str = "2099-02-01";
+
+    /// A saved `full_data_by_class` response with both terms.
+    #[must_use]
+    pub fn response() -> String {
+        serde_json::json!({"content": [
+            {"class": "PDF", "code": DOSE_FORM, "english": "Synthetic tablet", "comment": null,
+             "status": "Current", "domain": "Human and Veterinary", "version": 1,
+             "creation_date": "2098-01-01 00:00:00", "modification_date": "2099-02-01 10:00:00",
+             "definition": "An invented solid dose form.",
+             "translations": [{"language": "fr", "region": "", "term": "Comprimé synthétique"}],
+             "links": {"BDF": [{"code": "99992000", "term": "Synthetic solid"}]}},
+            {"class": "ROA", "code": ROUTE, "english": "Synthetic use", "status": "Deprecated",
+             "domain": "Human", "version": 2, "creation_date": "2097-01-01 00:00:00",
+             "modification_date": "2098-06-01 00:00:00", "translations": []}
+        ]})
+        .to_string()
+    }
+}
+
+/// Writes every release into `dir`: `npu-codes.csv`, `Topoenglish.txt`,
+/// `icdo-morphology.xlsx`, `emdn.xlsx`, `isco08.xlsx`, `en_product1.xml`,
+/// `fr_product1.xml`, `dcm.owl`, and `edqm.json`.
 ///
 /// # Errors
 ///
@@ -263,48 +390,63 @@ pub fn write_releases(dir: &Path) -> std::io::Result<()> {
     let isco = isco::rows();
     let rows: Vec<&[&str]> = isco.iter().map(<[&str; 8]>::as_slice).collect();
     write_xlsx(&dir.join("isco08.xlsx"), "ISCO-08", &rows)?;
+    std::fs::write(dir.join("en_product1.xml"), orpha::product("en"))?;
+    std::fs::write(dir.join("fr_product1.xml"), orpha::product("fr"))?;
+    std::fs::write(dir.join("dcm.owl"), dicom::owl())?;
+    std::fs::write(dir.join("edqm.json"), edqm::response())?;
     Ok(())
 }
 
-/// Builds the four tables into `<dir>/npu`, `<dir>/icdo`, `<dir>/emdn`, and
-/// `<dir>/isco`, each an artifact directory.
+/// The artifact directory names [`write_artifacts`] writes, one per release.
+pub const ARTIFACTS: [&str; 7] = ["npu", "icdo", "emdn", "isco", "orpha", "dicom", "edqm"];
+
+/// Builds every release into its directory under `dir` (see [`ARTIFACTS`])
+/// through the `ferroterm-build` release flags.
 ///
 /// # Errors
 ///
 /// Returns an I/O error wrapping a read or build failure.
 pub fn write_artifacts(dir: &Path) -> std::io::Result<()> {
+    use ferroterm_build::releases::Releases;
     let release = tempfile::tempdir()?;
     let r = release.path();
     write_releases(r)?;
-    let other = |e: ::classification::sheet::SheetError| std::io::Error::other(e);
     let builds = [
-        (
-            ::classification::npu::read(&r.join("npu-codes.csv"), VERSION).map_err(other)?,
-            ::classification::npu::SYSTEM,
-            "npu",
-        ),
-        (
-            ::classification::icdo::read(
-                &[&r.join("Topoenglish.txt"), &r.join("icdo-morphology.xlsx")],
-                VERSION,
-            )
-            .map_err(other)?,
-            ::classification::icdo::SYSTEM,
-            "icdo",
-        ),
-        (
-            ::classification::emdn::read(&r.join("emdn.xlsx"), None).map_err(other)?,
-            ::classification::emdn::SYSTEM,
-            "emdn",
-        ),
-        (
-            ::classification::isco::read(&r.join("isco08.xlsx"), Some(VERSION)).map_err(other)?,
-            ::classification::isco::SYSTEM,
-            "isco",
-        ),
+        Releases {
+            npu: Some(r.join("npu-codes.csv")),
+            npu_version: Some(VERSION.to_owned()),
+            ..Releases::default()
+        },
+        Releases {
+            icdo: vec![r.join("Topoenglish.txt"), r.join("icdo-morphology.xlsx")],
+            icdo_version: Some(VERSION.to_owned()),
+            ..Releases::default()
+        },
+        Releases {
+            emdn: Some(r.join("emdn.xlsx")),
+            ..Releases::default()
+        },
+        Releases {
+            isco: Some(r.join("isco08.xlsx")),
+            isco_version: Some(VERSION.to_owned()),
+            ..Releases::default()
+        },
+        Releases {
+            orpha: vec![r.join("en_product1.xml"), r.join("fr_product1.xml")],
+            ..Releases::default()
+        },
+        Releases {
+            dicom: Some(r.join("dcm.owl")),
+            ..Releases::default()
+        },
+        Releases {
+            edqm: vec![r.join("edqm.json")],
+            ..Releases::default()
+        },
     ];
-    for (classification, system, name) in builds {
-        ferroterm_build::classification::build(&classification, system, None, &dir.join(name))
+    for (releases, name) in builds.iter().zip(ARTIFACTS) {
+        releases
+            .build(&dir.join(name))
             .map_err(std::io::Error::other)?;
     }
     Ok(())

@@ -37,6 +37,9 @@ properties, implicit value sets, with their citations) are in
 | ICD-O-3 | `http://terminology.hl7.org/CodeSystem/icd-o-3` | Any WHO revision (`3.2` style), topography and morphology | `ferroterm-build --icdo <topography> --icdo <morphology> --icdo-version <revision>` | Licensed by WHO; you supply the tables |
 | EMDN | `https://smt.esante.gouv.fr/terminologie-emdn` | Any yearly Commission release (`2026` style) | `ferroterm-build --emdn <EMDN workbook>` | Free from the European Commission; you download the release |
 | ISCO-08 | `urn:oid:2.16.840.1.113883.2.9.6.2.7` | The ILO structure workbook | `ferroterm-build --isco <ISCO-08 workbook>` | Published by the ILO; you download the release |
+| ORPHAcodes | `https://www.orpha.net` | Any Orphadata nomenclature release, in the languages you load | `ferroterm-build --orpha <lang>_product1.xml` | Published by Orphanet (Orphadata); you download the release |
+| DICOM Controlled Terminology (DCM) | `http://dicom.nema.org/resources/ontology/DCM` | Any edition (`2026e` style); the PS3.16 context groups as NEMA's FHIR value sets | `ferroterm-build --dicom <dcm.owl.zip>`, the context groups in `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` | Copyright NEMA; you download the release |
+| EDQM Standard Terms | `http://standardterms.edqm.eu` | Any download from the Standard Terms API | `ferroterm-build --edqm <API response JSON>` | Under the EDQM terms of use; you download the data |
 | FHIR `CodeSystem`, `ValueSet`, and `ConceptMap` resources | Each resource's own `url` | HL7 Terminology and any FHIR package or directory of JSON, supplements included | `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` | Per resource; HL7 Terminology is CC0 |
 <!-- code-systems:end -->
 

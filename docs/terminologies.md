@@ -45,7 +45,7 @@ engine. Each row is a tracker issue under the program issue.
 | 7 | RxNorm | Typed drug relationships as filters; US context, open subset. | RRF loader (prescribable subset) |
 | 8 | ATC, ICPC, ICD-11 | Classification systems with one parent per code; ICD-11 needs the WHO API or local deployment. | Table and ClaML loaders; API export for ICD-11 |
 | 9 | The Dutch national code systems (DHD thesauri, G-Standaard, Labcodeset) | Licence-gated deployment demand; each rides on the SNOMED, LOINC, and UCUM providers or a table loader. | Per section |
-| 10 | The EEHRxF bindings (NPU, ICD-O-3, EMDN, ISCO-08) | The European exchange format binds them (Regulation (EU) 2025/327, the EEHRxF implementing act, Annexes IV to X); each is a publisher table the operator supplies. | Table readers in `classification` |
+| 10 | The EEHRxF bindings (NPU, ICD-O-3, EMDN, ISCO-08, ORPHAcodes, DICOM, EDQM) | The European exchange format binds them (Regulation (EU) 2025/327, the EEHRxF implementing act, Annexes IV to X); each is a publisher table the operator supplies. | Table readers in `classification` |
 | later | CPT, CVX, NDC, MDC, UNII, NCI Metathesaurus | US registries with thin FHIR definitions; each is a table provider when a deployment needs it. | Table providers |
 
 ## SNOMED CT
@@ -563,6 +563,23 @@ fixtures are synthetic files in each publisher's format
 - **ISCO-08.** `urn:oid:2.16.840.1.113883.2.9.6.2.7` (THO
   `NamingSystem-ISCO08`). The ILO structure workbook; four levels nested by
   code prefix.
+- **ORPHAcodes.** `https://www.orpha.net` (THO `NamingSystem-orphanet`).
+  The Orphadata `<lang>_product1.xml` files, one per language, versioned by
+  their `JDBOR` date; flat, an `Inactive` flag served inactive. Orphadata
+  licenses them CC BY 4.0; they are still operator-supplied.
+- **DICOM.** `http://dicom.nema.org/resources/ontology/DCM` (THO
+  `NamingSystem-v3-DCM`). NEMA's `dcm.owl` (SKOS notation, label,
+  definition, `owl:deprecated`, `owl:sameAs`), versioned by its
+  `owl:versionInfo`. The PS3.16 context groups are NEMA's own FHIR
+  `ValueSet` resources and load as supplied resources. NEMA holds the
+  copyright of the Standard's text and reproduction needs its permission
+  (<https://www.dicomstandard.org/about-home/trademark>), so neither is
+  committed.
+- **EDQM Standard Terms.** No THO entry; `http://standardterms.edqm.eu`, the
+  URI the HL7 Europe guides and the IPS use. Saved `full_data_by_class`
+  responses of the Standard Terms API (`content[]` with `class`, `code`,
+  `english`, `status`, `translations`, `links`); versioned by the newest
+  `modification_date`; flat across classes.
 
 ## US registries: CPT, CVX, NDC, MDC, UNII, NCI Metathesaurus
 

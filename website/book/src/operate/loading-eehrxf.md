@@ -97,3 +97,72 @@ The version is `2008` unless you pass `--isco-version`. The system is
 `NamingSystem-ISCO08`). The four levels nest by code prefix; the definition,
 the tasks, and the included and excluded occupations are properties. The
 default child is `isco-08`.
+
+## ORPHAcodes
+
+Orphanet publishes its nomenclature through Orphadata as one XML file per
+language, `<lang>_product1.xml`
+(<https://www.orphadata.com/orphanet-nomenclature/>). Give the file of the
+display language first and any other languages after it:
+
+```console
+$ ferroterm-build --orpha en_product1.xml --orpha fr_product1.xml --out /path/to/orphanet
+```
+
+The version is the date in the file's `JDBOR` element (`2026-06-23`) unless
+you pass `--orpha-version`. The system is `https://www.orpha.net` (HL7
+Terminology, `NamingSystem-orphanet`). The nomenclature is a flat list: the
+preferred name is the display in each language, synonyms are designations,
+and the disorder type, group, and flags are properties. An entity flagged
+`Inactive` (obsolete, deprecated, or moved) is served inactive. The default
+child is `orphanet`.
+
+## DICOM
+
+NEMA publishes the DICOM Controlled Terminology (PS3.16 Annex D, the `DCM`
+coding scheme) as OWL with each edition, `dcm.owl.zip`
+(<https://dicom.nema.org/medical/dicom/resources/ontology/>):
+
+```console
+$ ferroterm-build --dicom dcm.owl.zip --out /path/to/dicom
+```
+
+The version is the edition the ontology names (`2026e_20261121`) unless you
+pass `--dicom-version`. The system is
+`http://dicom.nema.org/resources/ontology/DCM` (HL7 Terminology,
+`NamingSystem-v3-DCM`). The code meaning is the display; the definition and
+notes are properties; a retired code is inactive, with its replacement as
+`replaced-by`.
+
+The PS3.16 context groups are published by NEMA as FHIR `ValueSet` resources,
+one per CID, at
+<https://dicom.nema.org/medical/dicom/resources/valuesets/fhir/json/>. Download
+the ones you need into a directory and point
+`FERROTERM__TERMINOLOGY__CODE_SYSTEMS` at it. Each group expands and
+validates over the codes it includes: the `DCM` codes from this build, and
+SNOMED CT, LOINC, or UCUM codes from those systems when you load them. The
+DICOM Standard is free to implement, but NEMA holds the copyright of its text
+and reproduction needs NEMA's permission, so FerroTERM ships neither the
+terminology nor the context groups. The default child is `dicom`.
+
+## EDQM Standard Terms
+
+The EDQM distributes the Standard Terms database through its API, behind a
+free account (<https://standardterms.edqm.eu>, "Help API"). Save the
+response of `full_data_by_class` for all classes, or one response per class,
+as JSON, and build them:
+
+```console
+$ ferroterm-build --edqm edqm-all.json --out /path/to/edqm
+```
+
+The database names no release number, so the version is the newest
+modification date among the terms (`2026-10-14`) unless you pass
+`--edqm-version`. HL7 Terminology registers no URI for EDQM; the system is
+`http://standardterms.edqm.eu`, the one the HL7 Europe guides and the
+International Patient Summary use. The English term is the display and each
+translation a designation in its language; the class, domain, status,
+definition, and the links to terms of other classes (`link-bdf`, `link-roa`,
+and so on) are properties. A term whose status is not `Current` is served
+inactive. The EDQM's terms of use apply to the data you load. The default
+child is `edqm`.

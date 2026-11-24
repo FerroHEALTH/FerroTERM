@@ -27,7 +27,7 @@ struct Case {
     under_root: &'static [&'static str],
 }
 
-const CASES: [Case; 4] = [
+const CASES: [Case; 7] = [
     Case {
         system: "http://npu-terminology.org",
         version: VERSION,
@@ -64,12 +64,39 @@ const CASES: [Case; 4] = [
         root: Some("999"),
         under_root: &["999", tables::isco::UNIT],
     },
+    Case {
+        system: "https://www.orpha.net",
+        version: "2099-01-31",
+        code: tables::orpha::DISEASE,
+        display: "Synthetic syndrome",
+        property: ("type", "Disease"),
+        root: None,
+        under_root: &[tables::orpha::DISEASE, tables::orpha::OBSOLETE],
+    },
+    Case {
+        system: "http://dicom.nema.org/resources/ontology/DCM",
+        version: tables::dicom::EDITION,
+        code: tables::dicom::CURRENT,
+        display: "Synthetic acquisition",
+        property: ("definition", "An invented acquisition."),
+        root: None,
+        under_root: &[tables::dicom::CURRENT, tables::dicom::RETIRED],
+    },
+    Case {
+        system: "http://standardterms.edqm.eu",
+        version: tables::edqm::MODIFIED,
+        code: tables::edqm::DOSE_FORM,
+        display: "Synthetic tablet",
+        property: ("link-bdf", "99992000"),
+        root: None,
+        under_root: &[tables::edqm::DOSE_FORM, tables::edqm::ROUTE],
+    },
 ];
 
 fn server() -> Server {
     let dir = tempfile::tempdir().expect("tempdir");
     tables::write_artifacts(dir.path()).expect("builds");
-    let index = ["npu", "icdo", "emdn", "isco"]
+    let index = tables::ARTIFACTS
         .iter()
         .map(|name| dir.path().join(name))
         .collect();
@@ -250,4 +277,40 @@ async fn expand_enumerates_a_release_and_filters_its_tree() {
         expected.sort_unstable();
         assert_eq!(codes, expected, "{}", case.system);
     }
+}
+
+#[tokio::test]
+async fn a_dicom_context_group_expands_and_validates_over_the_loaded_dcm() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    tables::write_artifacts(dir.path()).expect("builds");
+    let groups = dir.path().join("context-groups");
+    std::fs::create_dir_all(&groups).expect("creates");
+    tables::dicom::write_context_group(&groups).expect("writes");
+    let config = Config {
+        terminology: TerminologySection {
+            index: vec![dir.path().join("dicom")],
+            code_systems: vec![groups],
+            ..TerminologySection::default()
+        },
+        ..Config::default()
+    };
+    let server = Server::start_with_config(dir, config);
+    let url = encode(tables::dicom::CONTEXT_GROUP);
+    let (status, body) = server.get(&format!("/r4/ValueSet/$expand?url={url}")).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let mut codes = Vec::new();
+    flatten(&body["expansion"]["contains"], &mut codes);
+    assert_eq!(codes, [tables::dicom::CURRENT]);
+    let (_, body) = server
+        .get(&format!(
+            "/r4/ValueSet/$validate-code?url={url}&system={}&code={}",
+            encode("http://dicom.nema.org/resources/ontology/DCM"),
+            tables::dicom::CURRENT
+        ))
+        .await;
+    assert_eq!(
+        parameter(&body, "result").expect("result")["valueBoolean"],
+        true,
+        "{body}"
+    );
 }

@@ -103,7 +103,7 @@ pub struct Cli {
     /// The `RxNorm` sources (`SAB`) whose names are kept beside the unrestricted `RXNORM` and `MTHSPL` (a full release under a UMLS licence).
     #[arg(long, value_name = "SAB", value_delimiter = ',', action = clap::ArgAction::Append, requires = "rxnorm")]
     pub rxnorm_sources: Vec<String>,
-    /// The publisher releases the European exchange format binds (NPU, ICD-O-3, EMDN, ISCO-08).
+    /// The publisher releases the European exchange format binds.
     #[command(flatten)]
     pub releases: releases::Releases,
     /// The directory to write the artifacts into; a child of `--index-root` named for the source when absent.
@@ -428,7 +428,7 @@ pub enum Report {
 pub enum RunError {
     /// No input was given.
     #[error(
-        "give `--rf2`, `--loinc`, `--claml`, `--icd10cm`, `--rxnorm`, `--icd11`, `--atc`, `--dhd`, `--gstandaard`, `--labcodeset`, `--npu`, `--icdo`, `--emdn`, or `--isco`"
+        "give `--rf2`, `--loinc`, `--claml`, `--icd10cm`, `--rxnorm`, `--icd11`, `--atc`, `--dhd`, `--gstandaard`, `--labcodeset`, `--npu`, `--icdo`, `--emdn`, `--isco`, `--orpha`, `--dicom`, or `--edqm`"
     )]
     NoInput,
     /// `--atc` without `--atc-version`.

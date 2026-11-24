@@ -44,6 +44,24 @@ pub struct Releases {
     /// The ISCO version to record; `2008` when absent.
     #[arg(long, value_name = "VERSION", requires = "isco")]
     pub isco_version: Option<String>,
+    /// An Orphadata nomenclature file (`en_product1.xml`); the first gives the display language, each further language file adds designations (repeatable).
+    #[arg(long, value_name = "XML", action = clap::ArgAction::Append, group = GROUP)]
+    pub orpha: Vec<PathBuf>,
+    /// The Orphanet release to record; the date the first file carries when absent.
+    #[arg(long, value_name = "VERSION", requires = "orpha")]
+    pub orpha_version: Option<String>,
+    /// NEMA's DICOM Controlled Terminology as OWL (`dcm.owl` or `dcm.owl.zip`).
+    #[arg(long, value_name = "OWL_OR_ZIP", group = GROUP)]
+    pub dicom: Option<PathBuf>,
+    /// The DICOM edition to record; the ontology's `owl:versionInfo` when absent.
+    #[arg(long, value_name = "EDITION", requires = "dicom")]
+    pub dicom_version: Option<String>,
+    /// A saved EDQM Standard Terms API response (`full_data_by_class`, JSON) (repeatable).
+    #[arg(long, value_name = "JSON", action = clap::ArgAction::Append, group = GROUP)]
+    pub edqm: Vec<PathBuf>,
+    /// The EDQM release to record; the newest modification date when absent.
+    #[arg(long, value_name = "VERSION", requires = "edqm")]
+    pub edqm_version: Option<String>,
 }
 
 /// A failure to read a release.
@@ -52,6 +70,15 @@ pub enum ReleaseError {
     /// A table does not read.
     #[error(transparent)]
     Sheet(#[from] ::classification::sheet::SheetError),
+    /// The Orphadata nomenclature does not read.
+    #[error(transparent)]
+    Orpha(#[from] ::classification::orpha::OrphaError),
+    /// The DICOM terminology does not read.
+    #[error(transparent)]
+    Dicom(#[from] ::classification::dicom::DicomError),
+    /// The EDQM responses do not read.
+    #[error(transparent)]
+    Edqm(#[from] ::classification::edqm::EdqmError),
     /// A source was given without the version it needs.
     #[error("`--{0}` needs `--{0}-version`")]
     NoVersion(&'static str),
@@ -72,6 +99,12 @@ impl Releases {
             Some("emdn")
         } else if self.isco.is_some() {
             Some("isco-08")
+        } else if !self.orpha.is_empty() {
+            Some("orphanet")
+        } else if self.dicom.is_some() {
+            Some("dicom")
+        } else if !self.edqm.is_empty() {
+            Some("edqm")
         } else {
             None
         }
@@ -112,6 +145,23 @@ impl Releases {
             (
                 ::classification::isco::read(isco, self.isco_version.as_deref())?,
                 ::classification::isco::SYSTEM,
+            )
+        } else if !self.orpha.is_empty() {
+            let paths: Vec<&Path> = self.orpha.iter().map(PathBuf::as_path).collect();
+            (
+                ::classification::orpha::read(&paths, self.orpha_version.as_deref())?,
+                ::classification::orpha::SYSTEM,
+            )
+        } else if let Some(dicom) = &self.dicom {
+            (
+                ::classification::dicom::read(dicom, self.dicom_version.as_deref())?,
+                ::classification::dicom::SYSTEM,
+            )
+        } else if !self.edqm.is_empty() {
+            let paths: Vec<&Path> = self.edqm.iter().map(PathBuf::as_path).collect();
+            (
+                ::classification::edqm::read(&paths, self.edqm_version.as_deref())?,
+                ::classification::edqm::SYSTEM,
             )
         } else {
             return Ok(None);

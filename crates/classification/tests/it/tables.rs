@@ -1,10 +1,12 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The NPU, ICD-O-3, EMDN, and ISCO-08 readers over the testkit's tables in
+//! The publisher release readers over the testkit's synthetic releases in
 //! each publisher's distribution format.
 
-use ::classification::{Class, Classification, PREFERRED, emdn, icdo, isco, npu, sheet};
+use ::classification::{
+    Class, Classification, PREFERRED, dicom, edqm, emdn, icdo, isco, npu, orpha, sheet,
+};
 use ferroterm_testkit::tables::{self, VERSION};
 
 fn class<'a>(classification: &'a Classification, code: &str) -> &'a Class {
@@ -142,4 +144,79 @@ fn a_table_without_its_code_column_is_refused_by_name() {
         isco::read(&book, None),
         Err(sheet::SheetError::Zip { .. })
     ));
+}
+
+#[test]
+fn the_orphadata_files_read_every_language_and_the_inactive_flag() {
+    let dir = releases();
+    let en = dir.path().join("en_product1.xml");
+    let fr = dir.path().join("fr_product1.xml");
+    let orpha = orpha::read(&[&en, &fr], None).expect("reads");
+    assert_eq!(
+        orpha.version.as_deref(),
+        Some("2099-01-31"),
+        "the JDBOR date"
+    );
+    assert_eq!(orpha.language, "en");
+    let disease = class(&orpha, tables::orpha::DISEASE);
+    assert!(disease.active);
+    assert_eq!(disease.title("en"), Some("Synthetic syndrome"));
+    assert_eq!(disease.title("fr"), Some("Syndrome synthétique"));
+    assert_eq!(rubric(disease, orpha::SYNONYM), ["Synthosis", "Synthose"]);
+    assert_eq!(rubric(disease, orpha::TYPE), ["Disease"]);
+    let obsolete = class(&orpha, tables::orpha::OBSOLETE);
+    assert!(!obsolete.active);
+    assert_eq!(
+        rubric(obsolete, orpha::FLAG),
+        ["Inactive", "Obsolete entity"]
+    );
+    let pinned = orpha::read(&[&en], Some("2099")).expect("reads");
+    assert_eq!(pinned.version.as_deref(), Some("2099"));
+}
+
+#[test]
+fn the_dcm_ontology_reads_its_edition_and_retired_codes_from_owl_or_zip() {
+    let dir = releases();
+    let owl = dir.path().join("dcm.owl");
+    let zip_path = dir.path().join("dcm.owl.zip");
+    let mut writer = zip::ZipWriter::new(std::fs::File::create(&zip_path).expect("creates"));
+    writer
+        .start_file("dcm.owl", zip::write::SimpleFileOptions::default())
+        .expect("starts");
+    std::io::Write::write_all(&mut writer, tables::dicom::owl().as_bytes()).expect("writes");
+    writer.finish().expect("finishes");
+    for path in [&owl, &zip_path] {
+        let dcm = dicom::read(path, None).expect("reads");
+        assert_eq!(dcm.version.as_deref(), Some(tables::dicom::EDITION));
+        assert_eq!(dcm.classes.len(), 2, "the ontology itself is no code");
+        let current = class(&dcm, tables::dicom::CURRENT);
+        assert!(current.active);
+        assert_eq!(current.title("en"), Some("Synthetic acquisition"));
+        assert_eq!(rubric(current, "definition"), ["An invented acquisition."]);
+        let retired = class(&dcm, tables::dicom::RETIRED);
+        assert!(!retired.active);
+        assert_eq!(
+            rubric(retired, dicom::REPLACED_BY),
+            [tables::dicom::CURRENT]
+        );
+        assert_eq!(rubric(retired, "change-note"), ["Retired"]);
+    }
+}
+
+#[test]
+fn the_edqm_response_reads_translations_links_and_status() {
+    let dir = releases();
+    let edqm = edqm::read(&[&dir.path().join("edqm.json")], None).expect("reads");
+    assert_eq!(edqm.version.as_deref(), Some(tables::edqm::MODIFIED));
+    assert_eq!(edqm.kinds, ["PDF", "ROA"]);
+    let form = class(&edqm, tables::edqm::DOSE_FORM);
+    assert!(form.active);
+    assert_eq!(form.kind, "PDF");
+    assert_eq!(form.title("fr"), Some("Comprimé synthétique"));
+    assert_eq!(rubric(form, "link-bdf"), ["99992000"]);
+    assert_eq!(rubric(form, edqm::DOMAIN), ["Human and Veterinary"]);
+    assert!(
+        !class(&edqm, tables::edqm::ROUTE).active,
+        "a deprecated term"
+    );
 }
