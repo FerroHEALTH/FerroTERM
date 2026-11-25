@@ -74,15 +74,15 @@ pub fn subsumes(
                 .or(coding_a.version.as_deref())
                 .or(coding_b.version.as_deref());
             let a = coding_a.code.as_deref().ok_or_else(|| {
-                OperationError::Required(String::from("`codingA.code` is required"))
+                OperationError::Invalid(String::from("`codingA.code` is required"))
             })?;
             let b = coding_b.code.as_deref().ok_or_else(|| {
-                OperationError::Required(String::from("`codingB.code` is required"))
+                OperationError::Invalid(String::from("`codingB.code` is required"))
             })?;
             (a, b)
         }
         ((None, None), (None, None)) => {
-            return Err(OperationError::Required(String::from(
+            return Err(OperationError::Invalid(String::from(
                 "provide `codeA` and `codeB`, or `codingA` and `codingB`",
             )));
         }

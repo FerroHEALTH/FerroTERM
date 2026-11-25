@@ -187,7 +187,7 @@ pub fn lookup(
         }
         (Some(coding), None) => {
             let code = coding.code.as_deref().ok_or_else(|| {
-                OperationError::Required(String::from("`coding.code` is required"))
+                OperationError::Invalid(String::from("`coding.code` is required"))
             })?;
             (
                 coding.system.as_deref(),
@@ -197,7 +197,7 @@ pub fn lookup(
         }
         (None, Some(code)) => (input.system.as_deref(), input.version.as_deref(), code),
         (None, None) => {
-            return Err(OperationError::Required(String::from(
+            return Err(OperationError::Invalid(String::from(
                 "a code is required: `code` with `system`, or `coding`",
             )));
         }

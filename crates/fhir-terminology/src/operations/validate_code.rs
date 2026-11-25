@@ -270,7 +270,7 @@ pub fn validate_code(
         );
     }
     let Some(concept) = &input.codeable_concept else {
-        return Err(OperationError::Required(String::from(
+        return Err(OperationError::Invalid(String::from(
             "provide one of `code`, `coding`, or `codeableConcept`",
         )));
     };

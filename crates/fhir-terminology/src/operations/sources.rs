@@ -45,7 +45,7 @@ impl<'a> Sources<'a> {
     /// # Errors
     ///
     /// Returns [`OperationError::Invalid`] for both an inline and a `url`,
-    /// [`OperationError::Required`] for neither, and
+    /// [`OperationError::Invalid`] for neither, and
     /// [`OperationError::UnknownValueSet`] when nothing answers the `url`.
     pub fn value_set(
         &self,
@@ -109,7 +109,7 @@ impl<'a> Sources<'a> {
                     })),
                 }
             }
-            (None, None) => Err(OperationError::Required(String::from(
+            (None, None) => Err(OperationError::Invalid(String::from(
                 "a value set is required: the `url` parameter or an inline `valueSet`",
             ))),
         }

@@ -321,7 +321,7 @@ async fn a_tx_resource_of_another_type_is_refused() {
     assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
     assert_eq!(body["issue"][0]["code"], "not-supported");
     assert!(
-        body["issue"][0]["diagnostics"]
+        body["issue"][0]["details"]["text"]
             .as_str()
             .is_some_and(|d| d.contains("Parameters"))
     );
@@ -384,7 +384,7 @@ async fn a_cache_front_loads_resources_and_ends() {
     .await;
     assert_eq!(status, StatusCode::NOT_FOUND, "{body}");
     assert!(
-        body["issue"][0]["diagnostics"]
+        body["issue"][0]["details"]["text"]
             .as_str()
             .is_some_and(|d| d.contains("cache"))
     );

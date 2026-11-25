@@ -134,7 +134,7 @@ macro_rules! reading {
                 object: &fhir_types::codec::Object,
             ) -> Result<Loaded, ReadError> {
                 let resource = resource_of(object).map_err(ReadError::Decode)?;
-                loaded(resource).map_err(|failure| ReadError::Convert(failure.diagnostics))
+                loaded(resource).map_err(|failure| ReadError::Convert(failure.text))
             }
 
             /// `object` read as a resource of this version and written back.

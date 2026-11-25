@@ -144,7 +144,7 @@ fn expand_refuses_what_it_cannot_answer() {
     let none = ExpandInput::default();
     assert!(matches!(
         expand::expand(&world.sources(), &none),
-        Err(OperationError::Required(_))
+        Err(OperationError::Invalid(_))
     ));
     let context = ExpandInput {
         url: Some(VS_ALL.to_owned()),

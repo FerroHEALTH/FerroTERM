@@ -162,10 +162,10 @@ fn lookup_refusals_carry_their_issue_code_and_status() {
     let run = |input: LookupInput| lookup(&registry, &Invocation::Type, &input).err();
     // Nothing named.
     let error = run(LookupInput::default()).expect("refused");
-    assert!(matches!(error, OperationError::Required(_)));
+    assert!(matches!(error, OperationError::Invalid(_)));
     assert_eq!(
         (error.issue_code(), error.status()),
-        ("required", StatusCode::BAD_REQUEST)
+        ("invalid", StatusCode::BAD_REQUEST)
     );
     // A code without a system.
     let error = run(LookupInput {
@@ -173,7 +173,7 @@ fn lookup_refusals_carry_their_issue_code_and_status() {
         ..LookupInput::default()
     })
     .expect("refused");
-    assert!(matches!(error, OperationError::Required(_)));
+    assert!(matches!(error, OperationError::Invalid(_)));
     // Both forms at once.
     let error = run(LookupInput {
         code: Some(String::from("cat")),
@@ -420,7 +420,7 @@ fn validate_code_refusals() {
             code: Some(String::from("cat")),
             ..ValidateCodeInput::default()
         }),
-        OperationError::Required(_)
+        OperationError::Invalid(_)
     ));
     // A coding whose system contradicts the URL.
     assert!(matches!(
@@ -518,7 +518,7 @@ fn subsumes_refusals_are_errors_never_not_subsumed() {
         |input: SubsumesInput| subsumes(&registry, &Invocation::Type, &input).expect_err("refused");
     assert!(matches!(
         run(SubsumesInput::default()),
-        OperationError::Required(_)
+        OperationError::Invalid(_)
     ));
     // A code and a coding mixed.
     assert!(matches!(
@@ -537,7 +537,7 @@ fn subsumes_refusals_are_errors_never_not_subsumed() {
             code_b: Some(String::from("dog")),
             ..SubsumesInput::default()
         }),
-        OperationError::Required(_)
+        OperationError::Invalid(_)
     ));
     let unknown = run(SubsumesInput {
         code_a: Some(String::from("cat")),

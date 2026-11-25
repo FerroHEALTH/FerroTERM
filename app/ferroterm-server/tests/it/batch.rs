@@ -144,7 +144,7 @@ async fn a_failing_entry_carries_its_own_outcome_and_leaves_the_others_standing(
         "the entry beside a failure still answers"
     );
     assert!(
-        entries.get(3).expect("the entry without a request")["resource"]["issue"][0]["diagnostics"]
+        entries.get(3).expect("the entry without a request")["resource"]["issue"][0]["details"]["text"]
             .as_str()
             .is_some_and(|text| text.contains("request")),
         "an entry without a request says so: {body}"

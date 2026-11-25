@@ -143,7 +143,7 @@ async fn translate_refuses_what_it_cannot_answer() {
         ))
         .await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
-    assert_eq!(body["issue"][0]["code"], "required");
+    assert_eq!(body["issue"][0]["code"], "invalid");
     let (status, body) = server
         .get(&format!("/r4b/ConceptMap/$translate?url=http://example.org/fhir/ConceptMap/nowhere&system={ANIMALS}&code=cat"))
         .await;
