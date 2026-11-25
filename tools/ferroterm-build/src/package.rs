@@ -32,7 +32,7 @@ pub struct Report {
     pub version: String,
     /// The sha256 of the package file, in lower-case hex.
     pub sha256: String,
-    /// The resources written, by type, in [`SERVED`] order.
+    /// The resources written, by type: `CodeSystem`, `ValueSet`, then `ConceptMap`.
     pub counts: [(&'static str, usize); 3],
     /// The directory written, which `terminology.code_systems` names.
     pub dir: PathBuf,
