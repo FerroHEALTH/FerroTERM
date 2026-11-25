@@ -12,3 +12,4 @@
 mod atc;
 mod claml;
 mod icd10cm;
+mod tables;

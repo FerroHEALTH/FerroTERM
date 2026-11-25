@@ -45,6 +45,7 @@ engine. Each row is a tracker issue under the program issue.
 | 7 | RxNorm | Typed drug relationships as filters; US context, open subset. | RRF loader (prescribable subset) |
 | 8 | ATC, ICPC, ICD-11 | Classification systems with one parent per code; ICD-11 needs the WHO API or local deployment. | Table and ClaML loaders; API export for ICD-11 |
 | 9 | The Dutch national code systems (DHD thesauri, G-Standaard, Labcodeset) | Licence-gated deployment demand; each rides on the SNOMED, LOINC, and UCUM providers or a table loader. | Per section |
+| 10 | The EEHRxF bindings (NPU, ICD-O-3, EMDN, ISCO-08) | The European exchange format binds them (Regulation (EU) 2025/327, the EEHRxF implementing act, Annexes IV to X); each is a publisher table the operator supplies. | Table readers in `classification` |
 | later | CPT, CVX, NDC, MDC, UNII, NCI Metathesaurus | US registries with thin FHIR definitions; each is a table provider when a deployment needs it. | Table providers |
 
 ## SNOMED CT
@@ -532,6 +533,36 @@ Labcodeset, ICF, and the NHG tables to licence holders
 the behavioural oracle for the Dutch variants (ICD-10-NL, the NL edition, the
 Labcodeset) in the sense of `.claude/rules/spec-adherence.md`: a reference for
 spec-silent edge cases, never the specification.
+
+## The EEHRxF bindings
+
+The draft EEHRxF implementing act (Art 6, Annexes IV to X) binds the
+exchange format to systems the other sections do not cover. None has FHIR
+filters, properties, or implicit value sets of its own, so each is read into
+the classification model and served by the classification provider: the
+generic tree filters where the codes nest, the publisher's columns as
+properties. Every release is operator-supplied and never committed; the
+fixtures are synthetic files in each publisher's format
+(`tools/ferroterm-testkit/src/tables.rs`). The commands are in the book
+(`website/book/src/operate/loading-eehrxf.md`).
+
+- **NPU.** `http://npu-terminology.org` (THO `NamingSystem-NPU`). The IFCC
+  code file `npu-codes-latest.csv` (<https://npu-terminology.org/npu-database/>),
+  comma-separated with a header; monthly, with no release name in the file,
+  so the build is given one. Flat.
+- **ICD-O-3.** `http://terminology.hl7.org/CodeSystem/icd-o-3` (THO
+  `NamingSystem-icd-o-3`). The WHO topography and morphology tables, the
+  ICD-O-3.2 morphology workbook distributed by the IACR; code, level, and
+  term columns. Topography codes nest in their three-character category;
+  morphology codes stand alone. Licensed by WHO.
+- **EMDN.** No THO entry. `https://smt.esante.gouv.fr/terminologie-emdn`,
+  the canonical of the one published FHIR `CodeSystem` for EMDN
+  (`ans.fr.terminologies`). The Commission's workbook
+  (<https://webgate.ec.europa.eu/dyna2/emdn/>), free of charge, the year in
+  the sheet name. Codes nest by prefix (a letter, then two digits per level).
+- **ISCO-08.** `urn:oid:2.16.840.1.113883.2.9.6.2.7` (THO
+  `NamingSystem-ISCO08`). The ILO structure workbook; four levels nested by
+  code prefix.
 
 ## US registries: CPT, CVX, NDC, MDC, UNII, NCI Metathesaurus
 

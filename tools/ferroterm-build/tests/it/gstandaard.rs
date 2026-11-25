@@ -35,6 +35,7 @@ fn the_release_builds_the_four_rungs_under_the_output_directory() {
         fhir_package: None,
         fhir_package_sha256: None,
         rxnorm_sources: Vec::new(),
+        releases: ferroterm_build::releases::Releases::default(),
         out: Some(out.path().to_path_buf()),
         index_root: None,
     })

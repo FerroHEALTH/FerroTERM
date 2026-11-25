@@ -56,7 +56,7 @@ pub fn output(cli: &Cli) -> Result<PathBuf, OutputError> {
 ///
 /// `--out` wins when given. Without it, the build writes into a child of the
 /// index root named for the source (`snomed`, `loinc`, `rxnorm`, `atc`, `dhd`,
-/// `icd-10-cm`, the last segment of a `ClaML` system), or into the root itself
+/// `icd-10-cm`, `npu`, `icd-o-3`, `emdn`, `isco-08`, the last segment of a `ClaML` system), or into the root itself
 /// for the sources that already lay out their own children (ICD-11, the
 /// G-Standaard, the Labcodeset).
 ///
@@ -92,6 +92,9 @@ fn default_child(cli: &Cli) -> Option<String> {
         || cli.fhir_package.is_some()
     {
         return None;
+    }
+    if let Some(child) = cli.releases.child() {
+        return Some(child.to_owned());
     }
     let name = if cli.loinc.is_some() {
         "loinc"

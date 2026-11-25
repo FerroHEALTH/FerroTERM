@@ -4,7 +4,9 @@
 # classification
 
 The readers for statistical classifications: ClaML (ISO 13120; WHO ICD-10 and
-its national translations, ICPC-2) and the NCHS ICD-10-CM tabular release.
+its national translations, ICPC-2), the NCHS ICD-10-CM tabular release, the
+ATC index, and the publisher tables the EEHRxF binds (NPU, ICD-O-3, EMDN,
+ISCO-08), which `sheet` reads from a workbook or a delimited export.
 Hand-written; the FHIR ICD page (<https://hl7.org/fhir/R4B/icd.html>) and the
 ClaML DTD are the authority.
 
