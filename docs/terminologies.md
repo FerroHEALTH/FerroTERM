@@ -45,7 +45,7 @@ engine. Each row is a tracker issue under the program issue.
 | 7 | RxNorm | Typed drug relationships as filters; US context, open subset. | RRF loader (prescribable subset) |
 | 8 | ATC, ICPC, ICD-11 | Classification systems with one parent per code; ICD-11 needs the WHO API or local deployment. | Table and ClaML loaders; API export for ICD-11 |
 | 9 | The Dutch national code systems (DHD thesauri, G-Standaard, Labcodeset) | Licence-gated deployment demand; each rides on the SNOMED, LOINC, and UCUM providers or a table loader. | Per section |
-| 10 | The EEHRxF bindings (NPU, ICD-O-3, EMDN, ISCO-08, ORPHAcodes, DICOM, EDQM, EMA SPOR, SNOMED GPS, the EHDS identifier types) | The European exchange format binds them (Regulation (EU) 2025/327, the EEHRxF implementing act, Annexes IV to X); each is a publisher table the operator supplies. | Table readers in `classification` |
+| 10 | The EEHRxF bindings (NPU, ICD-O-3, EMDN, ISCO-08, ORPHAcodes, DICOM, EDQM, EMA SPOR, SNOMED GPS, UDI-DI, the EHDS identifier types) | The European exchange format binds them (Regulation (EU) 2025/327, the EEHRxF implementing act, Annexes IV to X); each is a publisher table the operator supplies. | Table readers in `classification` |
 | later | CPT, CVX, NDC, MDC, UNII, NCI Metathesaurus | US registries with thin FHIR definitions; each is a table provider when a deployment needs it. | Table providers |
 
 ## SNOMED CT
@@ -600,6 +600,13 @@ fixtures are synthetic files in each publisher's format
   them and `https://ferroterm.eu/fhir/ValueSet/ehds-identifier-type` over
   all of it, embedded in `crates/fhir-terminology/data/ferroterm/` and
   served beneath the FHIR core terminology of every version.
+- **UDI-DI.** No THO entry; one system per issuing entity, the
+  `Device.udiCarrier.issuer` URIs of FHIR R5 (`http://hl7.org/fhir/NamingSystem/gs1-di`,
+  `hibcc-diI`, `iccbba-blood-di`, `iccbba-other-di`, `ifa-gmbh-di`; R4 spells
+  the HIBCC one `hibcc-dI`). A device table the operator exports (the
+  AccessGUDID pipe-delimited `device.txt`, or an EUDAMED or issuing-entity
+  export); flat, the brand name as display; one issuing entity per build, and
+  a row whose issuing-agency column names another refuses the build.
 
 ## US registries: CPT, CVX, NDC, MDC, UNII, NCI Metathesaurus
 

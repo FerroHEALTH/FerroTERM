@@ -10,7 +10,8 @@
 //! `emdn`, and `isco` read the publisher tables of NPU, ICD-O-3, EMDN, and
 //! ISCO-08 through `sheet`; `orpha` reads the Orphadata nomenclature, `dicom`
 //! the DICOM `dcm.owl`, `edqm` saved EDQM Standard Terms API responses, and
-//! `spor` saved EMA SPOR API responses.
+//! `spor` saved EMA SPOR API responses; `udi` reads the UDI-DI table of one
+//! issuing entity.
 //! Each produces a [`Classification`]: classes of a declared kind, each with
 //! one parent, labelled and annotated by rubric kind. `ferroterm-build` turns the model
 //! into the served artifacts.
@@ -28,6 +29,7 @@ pub mod npu;
 pub mod orpha;
 pub mod sheet;
 pub mod spor;
+pub mod udi;
 mod xml;
 
 /// The rubric kind of a class's title.
