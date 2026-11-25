@@ -1,0 +1,7 @@
+# The value sets of the synthetic MyHealth@EU-shaped package's 10.1.0 release
+# (ferroterm-testkit mvc), each with the answer the server gives over it:
+# `expands`, or `names-missing` (an OperationOutcome naming the code system
+# version that is not loaded). app/ferroterm-server/tests/it/mvc.rs holds the
+# list to the fixture and to the server; the badge counts it.
+http://example.org/fhir/ValueSet/eHDSIAllergyNoAllergy	expands
+http://example.org/fhir/ValueSet/eHDSIUnserved	names-missing

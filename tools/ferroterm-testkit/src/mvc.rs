@@ -20,6 +20,8 @@ pub const VS_UNSERVED: &str = "http://example.org/fhir/ValueSet/eHDSIUnserved";
 pub const UNSERVED_SYSTEM: &str = "http://example.org/fhir/CodeSystem/unserved";
 /// The version [`VS_UNSERVED`] pins.
 pub const UNSERVED_VERSION: &str = "2026-01";
+/// Every value set a release of the package defines.
+pub const VALUE_SETS: [&str; 2] = [VS_ALLERGY, VS_UNSERVED];
 
 /// The files of the package for `version`, by path inside the tarball.
 fn files(version: &str) -> Vec<(String, serde_json::Value)> {

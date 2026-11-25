@@ -292,6 +292,13 @@ jobs:
       - name: tree-guards / extension-definitions
         if: ${{ !cancelled() }}
         run: bash scripts/checks/extension-definitions.sh
+      # The EHDS badge corpora name existing tests, and no badge label claims
+      # a certification (#1284).
+      - name: tree-guards / ehds-badges
+        if: ${{ !cancelled() }}
+        run: |
+          bash scripts/checks/ehds-matrix.sh
+          bash scripts/checks/conformance-badges.sh --self-test
       # Every first-party file carries both SPDX lines, and every header
       # names the Licensor. Each self-test runs first on a synthetic tree.
       - name: tree-guards / spdx-headers
