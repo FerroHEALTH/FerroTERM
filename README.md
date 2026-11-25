@@ -79,8 +79,10 @@ SNOMED CT, LOINC, UCUM, BCP 47, BCP 13, ISO 3166-1, ICD-10 (WHO), ICD-10-NL,
 ICD-10-CM, ICD-11 MMS, ICD-11 ICF, ICD-11 Foundation, ATC/DDD, ICPC-2, RxNorm,
 the DHD Diagnosethesaurus and Verrichtingenthesaurus, the G-Standaard, the
 Nederlandse Labcodeset, the NHG ICPC-1 to SNOMED CT map, NPU, ICD-O-3, EMDN,
-ISCO-08, and any FHIR `CodeSystem`, `ValueSet`, and `ConceptMap` resources
-(HL7 Terminology's 900+ systems load this way).
+ISCO-08, ORPHAcodes, the DICOM Controlled Terminology (DCM), EDQM Standard
+Terms, EMA SPOR, the SNOMED CT Global Patient Set, the EHDS identifier types,
+and any FHIR `CodeSystem`, `ValueSet`, and `ConceptMap` resources (HL7
+Terminology's 900+ systems load this way).
 <!-- code-systems:end -->
 
 The [code systems page](https://ferroterm.eu/docs/evaluate/code-systems.html)

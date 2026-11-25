@@ -37,6 +37,12 @@ const R6_CODE_SYSTEMS: &str = include_str!("../data/fhir/r6/code-systems.json");
 /// The R6 value sets, generated from `hl7.fhir.r6.core` 6.0.0-ballot5.
 const R6_VALUE_SETS: &str = include_str!("../data/fhir/r6/value-sets.json");
 
+/// The code systems this server authors, served on every version: the EHDS
+/// identifier types (Regulation (EU) 2025/327, the exchange format act, Annex X).
+const AUTHORED_CODE_SYSTEMS: &str = include_str!("../data/ferroterm/code-systems.json");
+/// The value sets this server authors: the EHDS identifier type binding.
+const AUTHORED_VALUE_SETS: &str = include_str!("../data/ferroterm/value-sets.json");
+
 /// A failure to read an embedded bundle.
 ///
 /// Every variant means the generated bundle disagrees with the engine, which
@@ -128,6 +134,25 @@ impl CoreTerminology {
         Ok(Self {
             code_systems: Arc::new(registry_of(code_systems, version)?),
             value_sets: Arc::new(store_of(value_sets, version)?),
+        })
+    }
+
+    /// This version's terminology with the terminology this server authors
+    /// beneath it, so a deployment reaches both under its own; the
+    /// specification's bundle answers first.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError`] when the embedded authored bundle does not parse,
+    /// decode, model, or build.
+    pub fn with_authored(self, version: FhirVersion) -> Result<Self, CoreError> {
+        let code_systems = Arc::new(registry_of(AUTHORED_CODE_SYSTEMS, version)?);
+        let value_sets = Arc::new(store_of(AUTHORED_VALUE_SETS, version)?);
+        Ok(Self {
+            code_systems: Arc::new(
+                Arc::unwrap_or_clone(self.code_systems).with_beneath(code_systems),
+            ),
+            value_sets: Arc::new(Arc::unwrap_or_clone(self.value_sets).with_beneath(value_sets)),
         })
     }
 
