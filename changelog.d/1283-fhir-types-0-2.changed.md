@@ -1,1 +1,0 @@
-- FerroTERM moves to `fhir-types` 0.2.0, whose `terminology` feature carries the `Provenance` model, and `ferrobridge-term` 0.19.0, built on it.

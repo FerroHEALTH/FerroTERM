@@ -1,1 +1,0 @@
-- The `$expand` text filter searches one language: the first language the request asks for that the code system has, else the code system's own, over the designations of supplements in use as well. A request that names no language no longer matches designations in other languages.

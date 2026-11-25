@@ -18,6 +18,196 @@ fragments here under the version and its date.
 
 ## [Unreleased]
 
+## [0.4.8] - 2026-11-25
+
+FerroTERM runs behind FerroSMART, the FerroHEALTH SMART App Launch
+authorization server, with an issuer table that names the issuer alone, and
+reads every caller from the token's standard claims. The configuration of
+`[auth]` changes shape: read **Changed** and **Removed** before you upgrade.
+For the European Health Data Space, `ferroterm-build` loads the code systems
+the draft EEHRxF implementing act binds and an operator-supplied MyHealth@EU
+Master Value Sets Catalogue, a `ConceptMap`'s `Provenance` reads by the map's
+canonical, and `/r6` serves FHIR R6 6.0.0-snapshot1. FerroTERM ships none of
+the licensed releases it loads.
+
+### Added
+
+- `ferroterm-build --fhir-package <TGZ>` imports an operator-supplied FHIR
+  NPM package, such as the MyHealth@EU Master Value Sets Catalogue, into
+  `<out>/<name>-<version>/` for `terminology.code_systems`, keeping each
+  `CodeSystem`, `ValueSet`, `ConceptMap` and `Provenance` with its canonical
+  and version. `--fhir-package-sha256` refuses a file whose digest differs
+  from the pin, and two releases load side by side and answer by
+  `valueSetVersion` (#1281).
+- `ferroterm-build` loads the code systems the draft EEHRxF act binds from
+  the release file you download from each publisher, each served under the
+  canonical URI HL7 Terminology or the published FHIR `CodeSystem` names,
+  versioned from the release, through `$lookup`, `$validate-code` and
+  `$expand`:
+  - ORPHAcodes (`--orpha`, the Orphadata nomenclature files, one per
+    language), the DICOM Controlled Terminology (`--dicom`, NEMA's `dcm.owl`,
+    with the PS3.16 context group value sets expanding over the loaded DCM
+    codes) and EDQM Standard Terms (`--edqm`, saved Standard Terms API
+    responses) (#1282);
+  - EMA SPOR master data from saved SPOR API responses (`--spor`: RMS terms
+    of one list, OMS organisations, SMS substances and PMS products), and the
+    SNOMED CT Global Patient Set freeset as a value set over the loaded
+    edition (`--gps`) (#1282);
+  - NPU (`--npu`, the IFCC code file), ICD-O-3 (`--icdo`, the WHO topography
+    and morphology tables), EMDN (`--emdn`, the Commission's workbook) and
+    ISCO-08 (`--isco`, the ILO structure workbook) (#1282);
+  - the UDI device identifiers (UDI-DI) of one issuing entity from a device
+    table you export (`--udi` with `--udi-issuer` and `--udi-version`): the
+    AccessGUDID `device.txt`, or an EUDAMED or issuing entity export as a
+    delimited file or workbook, served under the URI FHIR names for the
+    issuer (`Device.udiCarrier.issuer`) (#1295).
+- The EHDS identifier types of the EEHRxF act (Annex X: the HL7 identifier
+  type with NI, HI, HIN, SS, REGPID and REGION) expand as one value set,
+  `https://ferroterm.eu/fhir/ValueSet/ehds-identifier-type`, on every FHIR
+  version, with FerroTERM's own code system for the four codes HL7 v2 table
+  0203 lacks (#1282).
+- A `ConceptMap`'s `Provenance` (who validated the map, and when) reads by
+  the map's canonical: `GET {base}/Provenance?target=<url|version>` answers
+  a `searchset` of every `Provenance` whose `target.reference` is that
+  canonical, and `Provenance/{id}` reads one. The server keeps the
+  `Provenance` resources of every package directory it loads, and a
+  deployment with a resource database accepts them over the REST API like
+  the terminology resources, behind the same SMART write scopes. Every
+  `$translate` match names its map as `url|version`, so a receiver records
+  which mapping version produced a code (draft EEHRxF implementing act
+  Art 6(3)) (#1283).
+- The README shows two EHDS badges, labelled self-tested: the MyHealth@EU
+  MVC 10.1.0 (CI) import over a synthetic fixture, and the loaders of the
+  draft EEHRxF act's Art 6 code systems that a synthetic fixture proves (16
+  of 16). `scripts/checks/ehds-matrix.sh` holds each counted loader to an
+  existing test, and the badge script refuses a label that claims a
+  certification (#1284).
+
+### Changed
+
+- Breaking: FerroTERM moves to `ferrohealth-smart` 0.34, with
+  `ferrohealth-session` 0.29, `ferrohealth-server` 0.12,
+  `ferrohealth-telemetry` 0.5.1 and FerroUI 0.6.11, and reads every caller
+  from the token's standard claims. `[auth.issuer.<name>]` trusts a SMART
+  authorization server such as FerroSMART with its `issuer` alone: with no
+  `audience` key the audience is the served version bases under
+  `fhir.base_url`, and such an issuer opens the write routes and not the
+  admin listener. A token's `typ` is `at+jwt` or `application/at+jwt`,
+  `scope` is required, a token whose `sub` is its `client_id` is a backend
+  service, and any other names a user by its `fhirUser`. The authorization
+  server's registry decides which clients reach FerroTERM, through the `aud`
+  it writes. The book gains
+  [Running behind FerroSMART](https://ferroterm.eu/docs/operate/behind-ferrosmart.html)
+  (#1255).
+- Breaking: in the server and the sync service every issuer is a named
+  table, `[auth.issuer.<name>]`, in place of the `[[auth.issuer]]` array. A
+  key of a named issuer can be set as
+  `FERROTERM__AUTH__ISSUER__<NAME>__<KEY>`, and the `party`, `federation`,
+  `attributes` and `profile` tables sit under their issuer (#1265).
+- The SMART discovery document and the capability statement name the issuer
+  `ferrohealth-smart`'s shared rule describes, never the first issuer table:
+  the one `[auth] described_issuer` names, which the server accepted without
+  reading before, else the one SMART issuer whose metadata the server holds,
+  never a `federation` issuer unnamed. Breaking: several SMART issuers and no
+  `described_issuer` refuse the start, naming them and the key, and so does
+  a `described_issuer` naming an unknown issuer or one without metadata
+  (#1250).
+- Breaking: a Basic user's scopes and roles move from `[[auth.basic.users]]`
+  to the new top-level `[basic_grants]` table of the server and the sync
+  service, one `[basic_grants.<user>]` table per user-id. A `scopes` or
+  `roles` key under `[[auth.basic.users]]` is refused as an unknown key. A
+  grant naming a user `[[auth.basic.users]]` does not list refuses the
+  start, and so does a grant of a `system/` scope (#1249).
+- Every `401` and `403` challenge carries the refusal's stable reason code
+  as `error_description` (RFC 6750 §3), such as `expired` or
+  `scope-not-granted`; the `OperationOutcome` stays the same for every
+  invalid token (#1265).
+- `[server] max_concurrent_requests` is always on, 256 by default, where it
+  was unbounded when unset (#1249). A request past it waits up to
+  `server.admission_wait` (100 ms by default) in a queue of at most
+  `server.max_waiting_requests` places (256 by default) before it is
+  answered `503`, and the server's metrics count the waits and the refusals
+  (#1265).
+- `[server] request_decompression`, off by default, decodes a request body
+  sent in gzip or Brotli, with `server.body_limit` holding the decoded bytes
+  as well (FerroHEALTH/FerroSYS#408) (#1268).
+- `/r6` serves FHIR R6 6.0.0-snapshot1 in place of 6.0.0-ballot5: its
+  `CapabilityStatement` and `TerminologyCapabilities` state that
+  `fhirVersion`, and the R6 core terminology is regenerated from
+  `hl7.fhir.r6.core` 6.0.0-snapshot1. The surface stays ballot-tracking and
+  says so (#1301).
+- A value set whose include pins a version of a code system the server does
+  not hold answers with that system and version named ("A definition for
+  CodeSystem … version … could not be found"), so the operator sees which
+  release to load (#1281).
+- FerroTERM moves to `fhir-types` 0.2.0, whose `terminology` feature carries
+  the `Provenance` model and whose `r6` model is 6.0.0-snapshot1, and to
+  `ferrobridge-term` 0.19.0, built on it (#1283, #1301).
+
+### Removed
+
+- The issuer keys `kind` (other than `federation`), `profile = "…"` (the
+  preset name), `profile_file` and `scopeless_subjects`, the `[auth.idp]`
+  table, the `persons`, `patients` and `machines` kinds and the profile keys
+  that listed clients or described a vendor's tokens (`first_party_clients`,
+  `delegates`, `audience_delegates`, `issuer_client_is_person`,
+  `act_represents_patient`, `app_only`, `client_claims` and the rest). A
+  configuration that sets one is refused as an unknown key: drop `kind` and
+  `preset` from a SMART issuer's table and register its clients at the
+  authorization server (#1255).
+
+### Fixed
+
+- `ferroterm config check` and every error that names an issuer render an
+  issuer identifier written with userinfo (`https://user:password@…`) as
+  `https://***@…`, in every table that names an issuer and in the refusal of
+  a role issuer (`ConfigError::RoleIssuer`) (#1235, #1240).
+- The server, the sync worker and the operator console move to
+  `ferrohealth-telemetry` 0.5, whose subscriber installs its own bridge from
+  the `log` crate in place of `tracing-log`'s `LogTracer`. Under a console
+  filter that lets a target through above its default level, such as
+  `info,ferrohealth_smart=debug`, a dependency's `log::log_enabled!` check no
+  longer drops the next event on its thread, which lost the request line of
+  a request that ran such a check (FerroHEALTH/FerroSYS#388) (#1246).
+- A `tx-resource` supplement for a code system version the request does not
+  hold no longer refuses the request with `404`: it applies to nothing, as
+  the terminology ecosystem IG says a supplement applies only to the version
+  it names, and a request that requires it with `useSupplement` is refused
+  as naming a missing supplement (#1287).
+- A value set whose compose, include, exclude, concept or filter carries a
+  modifier extension refuses expansion and validation with `422`,
+  `business-rule` and the `vs-invalid` classification, naming the extension
+  and the element, where the server ignored the extension and processed the
+  element (FHIR Extensibility, modifierExtension) (#1288).
+- `ValueSet/$validate-code` with `inferSystem` refuses with `404` naming the
+  code system when the value set includes a code system the server does not
+  hold that may contain the code, where it inferred the system from the
+  other includes (#1289).
+- A value set filter on a property that a supplement in use gives selects
+  the codes the supplement gives that value, alone or beside filters on the
+  code system's own properties, in `$expand` and `$validate-code`, where it
+  answered `422`. Of two versions of one supplement in scope, only the one a
+  request names by version applies, else the latest, and `used-supplement`
+  reports that one (#1290).
+- The `$expand` text filter searches one language: the first language the
+  request asks for that the code system has, else the code system's own,
+  over the designations of supplements in use as well. A request that names
+  no language no longer matches designations in other languages (#1291).
+
+### Security
+
+Shipped with functional changes because: only the newest release is supported (`SECURITY.md`), so a security-only patch published beside this release would be out of support the moment this release lands; the fix is a lockfile move with no behaviour change of its own.
+
+- The server takes `url` 2.5.9 in place of 2.5.8 (RUSTSEC-2026-0592,
+  GHSA-hrj5-67jp-wqp9): every earlier `url` lets `Url::origin()` recurse
+  without a bound on a nested `blob:` URL, so a crafted URL overflows the
+  stack (#1270).
+- The operator console takes `cookie` 0.18.3 in place of 0.18.2
+  (RUSTSEC-2026-0594, GHSA-8wcq-xq25-7fhm): in 0.14.0 up to 0.18.2 a private
+  cookie added in more than one process after a `fork()` could reuse an
+  AES-GCM nonce. The console does not fork, so no shipped build met the
+  conditions; the upgrade closes the advisory (#1275).
+
 ## [0.4.7] - 2026-11-11
 
 ### Changed
@@ -2873,7 +3063,8 @@ binary answers `GET /health` only.
 - No existing Rust terminology or FHIR crate is a dependency; the README
   records the evaluation and the reasons.
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.7...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.8...HEAD
+[0.4.8]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.7...v0.4.8
 [0.4.7]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.6...v0.4.7
 [0.4.6]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.5...v0.4.6
 [0.4.5]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.4...v0.4.5
