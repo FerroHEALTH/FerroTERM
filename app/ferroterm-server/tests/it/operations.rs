@@ -136,7 +136,7 @@ async fn lookup_refusals_on_the_wire() {
         .get(&format!("/r4b/CodeSystem/$lookup?code={cat}"))
         .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
-    assert_eq!(body["issue"][0]["code"], "required");
+    assert_eq!(body["issue"][0]["code"], "invalid");
     // Unknown code: 400 code-invalid. The code "was not valid in the context",
     // where `not-found` is for a reference that could not be resolved
     // (<https://hl7.org/fhir/R4B/valueset-issue-type.html>); the system below
@@ -252,7 +252,7 @@ async fn validate_code_at_type_and_instance_level() {
         .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert!(
-        body["issue"][0]["diagnostics"]
+        body["issue"][0]["details"]["text"]
             .as_str()
             .unwrap()
             .contains("system")
@@ -342,7 +342,15 @@ async fn subsumes_at_type_and_instance_level() {
         ))
         .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
-    assert_eq!(body["issue"][0]["code"], "required");
+    assert_eq!(body["issue"][0]["code"], "invalid");
+    assert_eq!(
+        body["issue"][0]["details"]["coding"][0]["code"],
+        "invalid-data"
+    );
+    assert!(
+        body["issue"][0].get("diagnostics").is_none(),
+        "the sentence is in details.text alone: {body}"
+    );
 }
 
 /// `Accept-Language` picks the display language when `displayLanguage` is

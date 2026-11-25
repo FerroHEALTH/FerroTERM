@@ -322,7 +322,6 @@ macro_rules! store {
                         text: Some(text.into()),
                         ..Default::default()
                     }),
-                    diagnostics: Some(text.into()),
                     ..Default::default()
                 }
             }

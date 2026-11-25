@@ -395,7 +395,7 @@ fn subjects(input: &TranslateInput) -> Result<Vec<Subject>, OperationError> {
     }
     if let Some(code) = input.code.as_deref() {
         let system = input.system.as_deref().ok_or_else(|| {
-            OperationError::Required(String::from("`system` is required with `code`"))
+            OperationError::Invalid(String::from("`system` is required with `code`"))
         })?;
         return Ok(vec![Subject {
             system: system.to_owned(),
@@ -411,7 +411,7 @@ fn subjects(input: &TranslateInput) -> Result<Vec<Subject>, OperationError> {
     let mut subjects = Vec::new();
     for coding in codings {
         let (Some(system), Some(code)) = (coding.system.as_deref(), coding.code.as_deref()) else {
-            return Err(OperationError::Required(String::from(
+            return Err(OperationError::Invalid(String::from(
                 "a coding to translate needs `system` and `code`",
             )));
         };
@@ -422,7 +422,7 @@ fn subjects(input: &TranslateInput) -> Result<Vec<Subject>, OperationError> {
         });
     }
     if subjects.is_empty() {
-        return Err(OperationError::Required(String::from(
+        return Err(OperationError::Invalid(String::from(
             "`codeableConcept` carries no coding with `system` and `code`",
         )));
     }

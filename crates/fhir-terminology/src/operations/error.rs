@@ -80,7 +80,6 @@ impl OperationError {
     #[must_use]
     pub const fn issue_code(&self) -> &'static str {
         match self {
-            Self::Required(_) => "required",
             // NOTE: a code the system does not have "was not valid in the
             // context", where `not-found` is for a reference
             // (<https://hl7.org/fhir/R4B/valueset-issue-type.html>).
@@ -108,7 +107,7 @@ impl OperationError {
     #[must_use]
     pub const fn tx_issue_type(&self) -> &'static str {
         match self {
-            Self::Required(_) | Self::Invalid(_) => "invalid-data",
+            Self::Invalid(_) => "invalid-data",
             Self::InvalidLanguage(_) => "invalid-display",
             Self::NotSupported(_) | Self::Provider(_) | Self::UnsupportedGrammar { .. } => {
                 "not-supported"
@@ -145,8 +144,7 @@ impl OperationError {
             Self::UnknownCode { .. } | Self::InvalidCode { .. } => "Unknown_Code_in_Version",
             Self::ValueSetCyclic(_) => "VALUESET_CIRCULAR_REFERENCE",
             Self::InvalidLanguage(_) => "INVALID_DISPLAY_NAME",
-            Self::Required(_)
-            | Self::Invalid(_)
+            Self::Invalid(_)
             | Self::ValueSetInvalid { .. }
             | Self::CannotDetermine(_)
             | Self::UnknownConceptMap(_)
@@ -163,8 +161,7 @@ impl OperationError {
     #[must_use]
     pub const fn status(&self) -> StatusCode {
         match self {
-            Self::Required(_)
-            | Self::Invalid(_)
+            Self::Invalid(_)
             | Self::InvalidLanguage(_)
             | Self::VersionCheck(_)
             | Self::UnknownCode { .. }

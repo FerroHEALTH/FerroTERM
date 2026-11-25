@@ -236,7 +236,7 @@ async fn handle_unclosed_expansion_is_taken_under_r6_and_refused_under_the_earli
             .await;
         assert_eq!(status, StatusCode::BAD_REQUEST, "/{version}: {body}");
         assert_eq!(body["issue"][0]["code"], "invalid", "/{version}: {body}");
-        let diagnostics = body["issue"][0]["diagnostics"]
+        let diagnostics = body["issue"][0]["details"]["text"]
             .as_str()
             .expect("diagnostics");
         assert!(

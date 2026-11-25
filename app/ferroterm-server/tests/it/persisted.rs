@@ -290,7 +290,7 @@ async fn a_write_is_refused_where_the_deployment_persists_nothing() {
     let (_, body) = fixture::json(response).await;
     assert_eq!(body["resourceType"], "OperationOutcome");
     assert!(
-        body["issue"][0]["diagnostics"]
+        body["issue"][0]["details"]["text"]
             .as_str()
             .is_some_and(|text| text.contains("terminology.resources")),
         "the refusal names the key that turns persistence on: {body}"

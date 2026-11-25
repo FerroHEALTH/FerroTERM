@@ -68,10 +68,10 @@ pub enum Invocation {
 /// and HTTP status (<https://hl7.org/fhir/R4B/operations.html#3.2.0.6.2>).
 #[derive(Debug, thiserror::Error)]
 pub enum OperationError {
-    /// A required parameter (or one of a required group) is absent.
-    #[error("{0}")]
-    Required(String),
-    /// Parameters contradict each other or the invocation.
+    /// An input the operation needs is absent, or the inputs contradict each
+    /// other or the invocation.
+    // NOTE: the tx-ecosystem cases `simple-subsumes-no-system` and `validation-missing-cs-*`
+    // answer a missing input `invalid`: "a problem with the request", not a missing element.
     #[error("{0}")]
     Invalid(String),
     /// A `displayLanguage` that is not a valid BCP 47 language range list.
@@ -202,7 +202,7 @@ pub enum RefusedInput {
 ///
 /// # Errors
 ///
-/// Returns [`OperationError::Required`] when a type-level invocation names no
+/// Returns [`OperationError::Invalid`] when a type-level invocation names no
 /// system, [`OperationError::Invalid`] when an instance-level invocation names
 /// another system, and the unknown-system or unknown-version errors.
 pub fn resolve(
@@ -234,7 +234,7 @@ pub fn resolve(
         }
         Invocation::Type => {
             let system = system.ok_or_else(|| {
-                OperationError::Required(String::from(
+                OperationError::Invalid(String::from(
                     "a code system is required: the `system` parameter, a `coding.system`, or an instance-level invocation",
                 ))
             })?;
@@ -375,6 +375,8 @@ pub enum MessageId {
     TerminologyTxSystemRelative,
     /// The coding has no system.
     CodingHasNoSystemCannotValidate,
+    /// The coding has neither a system nor a code.
+    CodingHasNoSystemOrCodeCannotValidate,
     /// The code system cannot be enumerated.
     CodeSystemNotEnumerable,
     /// The expansion is too costly.
@@ -433,6 +435,9 @@ impl MessageId {
             Self::TerminologyTxSystemValueSet2 => "Terminology_TX_System_ValueSet2",
             Self::TerminologyTxSystemRelative => "Terminology_TX_System_Relative",
             Self::CodingHasNoSystemCannotValidate => "Coding_has_no_system__cannot_validate",
+            Self::CodingHasNoSystemOrCodeCannotValidate => {
+                "Coding_has_no_system_or_code__cannot_validate"
+            }
             Self::CodeSystemNotEnumerable => "CODESYSTEM_NOT_ENUMERABLE",
             Self::ValueSetTooCostly => "VALUESET_TOO_COSTLY",
             Self::TxGeneralError => "TX_GENERAL_ERROR",
@@ -508,7 +513,7 @@ pub fn codeless(coding: &CodingRef, base: &str) -> Issue {
         )
     } else {
         incomplete(
-            MessageId::CodingHasNoSystemCannotValidate,
+            MessageId::CodingHasNoSystemOrCodeCannotValidate,
             "Coding has no system and no code, so it cannot be validated",
             base,
         )

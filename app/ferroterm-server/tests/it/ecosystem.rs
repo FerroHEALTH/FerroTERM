@@ -468,6 +468,77 @@ async fn lookup_answers_code_system_and_abstract_on_every_version() {
     }
 }
 
+/// The issues of the `issues` parameter of `body` as (severity, code,
+/// message id, first expression).
+fn issue_rows(body: &Value) -> Vec<(String, String, String, String)> {
+    let text = |issue: &Value, pointer: &str| {
+        issue
+            .pointer(pointer)
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned()
+    };
+    parameter(body, "issues")
+        .and_then(|issues| issues.pointer("/resource/issue"))
+        .and_then(Value::as_array)
+        .expect("an issue list")
+        .iter()
+        .map(|issue| {
+            (
+                text(issue, "/severity"),
+                text(issue, "/code"),
+                text(issue, "/extension/0/valueString"),
+                text(issue, "/expression/0"),
+            )
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn a_coding_without_a_system_is_a_warning_in_a_codeable_concept_and_alone() {
+    let server = Server::start_with_resources();
+    for version in VERSIONS {
+        let concept = json!({"resourceType": "Parameters", "parameter": [
+            {"name": "url", "valueUri": VS_PETS},
+            {"name": "codeableConcept", "valueCodeableConcept": {"coding": [{"code": "cat"}]}}
+        ]});
+        let (status, body) = server
+            .post(&format!("/{version}/ValueSet/$validate-code"), &concept)
+            .await;
+        assert_eq!(status, StatusCode::OK, "{version}: {body}");
+        assert!(
+            issue_rows(&body).contains(&(
+                String::from("warning"),
+                String::from("invalid"),
+                String::from("Coding_has_no_system__cannot_validate"),
+                String::from("CodeableConcept.coding[0]"),
+            )),
+            "{version}: {body}"
+        );
+        let display_only = json!({"resourceType": "Parameters", "parameter": [
+            {"name": "url", "valueUri": VS_PETS},
+            {"name": "coding", "valueCoding": {"display": "Cat"}}
+        ]});
+        let (status, body) = server
+            .post(
+                &format!("/{version}/ValueSet/$validate-code"),
+                &display_only,
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK, "{version}: {body}");
+        assert_eq!(
+            issue_rows(&body),
+            [(
+                String::from("warning"),
+                String::from("invalid"),
+                String::from("Coding_has_no_system_or_code__cannot_validate"),
+                String::from("Coding"),
+            )],
+            "{version}: {body}"
+        );
+    }
+}
+
 /// The `property` part of `body` whose `code` is `code`.
 fn lookup_property<'a>(body: &'a Value, code: &str) -> Option<&'a Value> {
     body["parameter"].as_array()?.iter().find(|parameter| {
@@ -854,7 +925,7 @@ async fn the_undeclared_suite_parameters_are_refused_on_every_version() {
                 body["issue"][0]["code"], "invalid",
                 "{version} {name}: {body}"
             );
-            let diagnostics = body["issue"][0]["diagnostics"].as_str().unwrap();
+            let diagnostics = body["issue"][0]["details"]["text"].as_str().unwrap();
             assert!(
                 diagnostics.contains(&format!("does not declare a parameter `{name}`")),
                 "{version} {name}: {diagnostics}"
