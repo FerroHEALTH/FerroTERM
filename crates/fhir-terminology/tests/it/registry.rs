@@ -80,3 +80,43 @@ fn a_wildcard_version_resolves_to_the_greatest_match() {
         Err(ResolveError::UnknownVersion { .. })
     ));
 }
+
+/// A supplement of `URL` at `url|version`.
+fn supplement(url: &str, version: &str) -> fhir_terminology::supplement::Supplement {
+    fhir_terminology::supplement::Supplement {
+        url: url.to_owned(),
+        version: Some(version.to_owned()),
+        concepts: std::collections::BTreeMap::new(),
+    }
+}
+
+// The terminology ecosystem IG test cases 1.11.0 (`expand-supplement-version`):
+// only one version of a supplement applies, the one named by version, else
+// the latest.
+#[test]
+fn one_version_of_a_supplement_applies() {
+    let mut registry = registry();
+    let url = "http://example.org/fixture-supplement";
+    for version in ["0.9.0", "1.0.0"] {
+        registry.register_supplement(URL.to_owned(), supplement(url, version));
+    }
+    assert_eq!(
+        registry
+            .applied_supplements(&[url.to_owned()])
+            .expect("applies"),
+        [format!("{url}|1.0.0")],
+        "the latest without a version"
+    );
+    assert_eq!(
+        registry
+            .applied_supplements(&[url.to_owned(), format!("{url}|0.9.0")])
+            .expect("applies"),
+        [format!("{url}|0.9.0")],
+        "the version asked for, once"
+    );
+    assert!(
+        registry
+            .applied_supplements(&[format!("{url}|2.0.0")])
+            .is_err()
+    );
+}

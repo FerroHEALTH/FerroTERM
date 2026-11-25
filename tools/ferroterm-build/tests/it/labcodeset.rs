@@ -38,6 +38,7 @@ fn cli(labcodeset: std::path::PathBuf, out: &std::path::Path) -> ferroterm_build
         fhir_package: None,
         fhir_package_sha256: None,
         rxnorm_sources: Vec::new(),
+        releases: ferroterm_build::releases::Releases::default(),
         out: Some(out.to_path_buf()),
         index_root: None,
     }

@@ -27,19 +27,7 @@ fn main() -> anyhow::Result<()> {
                 );
             }
         }
-        ferroterm_build::Report::FhirPackage(report) => println!(
-            "FHIR package {}#{} (sha256 {}): {} written to {}",
-            report.name,
-            report.version,
-            report.sha256,
-            report
-                .counts
-                .iter()
-                .map(|(kind, count)| format!("{count} {kind}"))
-                .collect::<Vec<_>>()
-                .join(", "),
-            report.dir.display()
-        ),
+        ferroterm_build::Report::FhirPackage(report) => print_package(&report),
         ferroterm_build::Report::Labcodeset(report) => println!(
             "Labcodeset {}: {} active concepts, {} retired, {} ordinal value sets, written to {}",
             report.release,
@@ -47,6 +35,13 @@ fn main() -> anyhow::Result<()> {
             report.retired,
             report.ordinals,
             report.dir.display()
+        ),
+        ferroterm_build::Report::Gps(report) => println!(
+            "SNOMED CT GPS {}: {} active concepts, {} inactive left out, written to {}",
+            report.version,
+            report.active,
+            report.inactive,
+            report.path.display()
         ),
         ferroterm_build::Report::Loinc(report) => println!(
             "LOINC {}: {} terms, {} parts, {} answer lists, {} designations, {} words, written to {}",
@@ -105,4 +100,21 @@ fn main() -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+/// Reports an imported FHIR package: its release, digest and resources.
+fn print_package(report: &ferroterm_build::package::Report) {
+    let counts: Vec<String> = report
+        .counts
+        .iter()
+        .map(|(kind, count)| format!("{count} {kind}"))
+        .collect();
+    println!(
+        "FHIR package {}#{} (sha256 {}): {} written to {}",
+        report.name,
+        report.version,
+        report.sha256,
+        counts.join(", "),
+        report.dir.display()
+    );
 }

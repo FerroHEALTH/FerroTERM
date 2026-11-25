@@ -66,6 +66,9 @@ cat > "$data/PROVENANCE.md" <<PROV
 
 Vendored verbatim as the input of the registry code systems (BCP 47, BCP 13,
 ISO 3166); never edit a file here, re-run \`scripts/vendor/registries.sh\`.
+\`fhir/\` has its own provenance. \`ferroterm/\` is not vendored: it holds
+FerroTERM's own resources (the EHDS identifier types of the EEHRxF act,
+Annex X) and is edited in place.
 
 ## IANA Language Subtag Registry (BCP 47)
 

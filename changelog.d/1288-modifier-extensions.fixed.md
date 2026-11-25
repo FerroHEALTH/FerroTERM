@@ -1,0 +1,1 @@
+- A value set whose compose, include, exclude, concept or filter carries a modifier extension refuses expansion and validation with `422`, `business-rule` and the `vs-invalid` classification, naming the extension and the element, where the server ignored the extension and processed the element (FHIR Extensibility, modifierExtension).

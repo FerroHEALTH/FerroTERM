@@ -1,9 +1,11 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! An operator-supplied FHIR NPM package (`--fhir-package`), such as the
-//! MyHealth@EU Master Value Sets Catalogue: its terminology resources written
-//! to a directory the server serves under `terminology.code_systems`.
+//! An operator-supplied FHIR NPM package (`--fhir-package`), imported.
+//!
+//! The MyHealth@EU Master Value Sets Catalogue is one: its terminology
+//! resources are written to a directory the server serves under
+//! `terminology.code_systems`.
 //!
 //! A package is a gzipped tarball whose resources sit in `package/`, with the
 //! manifest `package/package.json` naming the package and its version (FHIR
@@ -243,5 +245,14 @@ fn resource_type(body: &[u8]) -> Option<String> {
 
 /// `bytes` as lower-case hex.
 fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let digit = |nibble: u8| {
+        DIGITS
+            .get(usize::from(nibble))
+            .map_or('0', |digit| char::from(*digit))
+    };
+    bytes
+        .iter()
+        .flat_map(|byte| [digit(byte >> 4), digit(byte & 0x0f)])
+        .collect()
 }

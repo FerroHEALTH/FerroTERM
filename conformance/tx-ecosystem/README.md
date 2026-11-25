@@ -16,8 +16,8 @@ turns the lists and the total into the README's badges at site build time.
 
 ## What is committed, per mode
 
-The `general` rows were recorded on 2026-11-04 with validator 7.0.4 and suite
-`f158adedf67b280e2a596f805194489205bfe9bd` (test cases 1.10.0), on CI. Every
+The `general` rows were recorded on 2026-11-24 with validator 7.0.6 and suite
+`9c2bbce57366319d6a5265cbfbf6697f094822e3` (test cases 1.11.0). Every
 mode run also carries the two mode-independent `metadata` cases, so a mode's
 count is two above the suite's own. The `snomed`, `icd-11`, `tx.fhir.org`,
 `mimetypes`, and `omop` rows were last measured on 2026-09-06, with validator
@@ -25,9 +25,9 @@ count is two above the suite's own. The `snomed`, `icd-11`, `tx.fhir.org`,
 
 | mode | surface | pass list | passed of ran | needs | open failures |
 |---|---|---|---|---|---|
-| `general` | `/r4b` | `passing.txt` | 660 of 764 | nothing | #995, #507, #1061 to #1070, #1106, #1107 |
-| `general` | `/r4` | `passing-r4.txt` | 672 of 764 | nothing | #995, #507, #1061 to #1070, #1106, #1107 |
-| `general` | `/r5` | `passing-r5.txt` | 673 of 764 | nothing | #995, #507, #1061 to #1070, #1106, #1107 |
+| `general` | `/r4b` | `passing.txt` | 689 of 805 | nothing | #995, #507, #1067 to #1069, #1107 |
+| `general` | `/r4` | `passing-r4.txt` | 701 of 805 | nothing | #995, #507, #1067 to #1069, #1107 |
+| `general` | `/r5` | `passing-r5.txt` | 702 of 805 | nothing | #995, #507, #1067 to #1069, #1107 |
 | `snomed` | `/r4b` | `passing-snomed.txt` | 2 of 170 | a SNOMED CT edition | #344, #352, #349 |
 | `icd-11` | `/r4b` | `passing-icd-11.txt` | 44 of 52 | the three ICD-11 artifacts | #350, #349, #117 |
 | `tx.fhir.org` | `/r4b` | `passing-tx.fhir.org.txt` | 57 of 227 | a LOINC release | #420, #421, #305, #349 |
@@ -245,11 +245,11 @@ collection of languages", so `zh` does not subsume `zh-min-nan`.
 
 ## What the `general` mode still holds open
 
-- **Some entries are skips, not failures: nine of the 764 on `/r4b`, five on
+- **Some entries are skips, not failures: nine of the 805 on `/r4b`, five on
   `/r4`.** `simple-expand-isa-o2`, `-c2`, and `-o2c2` declare `"mode":
   "tx.fhir.org"`, so the general run lists them and runs none; eight
   `translate`/`translate2` cases declare `"version"`, so the six `-r4` ones run
-  only on `/r4` and the two `r5+` ones only on `/r4b` and `/r5`. Each surface
+  only on `/r4` and the two `r5plus` ones only on `/r4b` and `/r5`. Each surface
   therefore reports its own skip set and no case is silently lost.
 - **`$lookup` answers `definition` in the `property` group on `/r4b` and
   `/r4`, and the suite asks for a named parameter there.**
@@ -265,8 +265,8 @@ collection of languages", so `zh` does not subsume `zh-min-nan`.
   either. All three pass on `/r5`, and the three stay unpassed on `/r4b` and
   `/r4` because the case reads an R5 shape onto an R4-family surface.
 - **`reverse` on `$translate` is an R4-family input, and the suite refuses it
-  on `/r4b`.** `translate2/translate-reverse-r5+` and
-  `translate-reverse-r5+-a` run wherever the server is not R4, and the second
+  on `/r4b`.** `translate2/translate-reverse-r5plus` and
+  `translate-reverse-r5plus-a` run wherever the server is not R4, and the second
   wants a 4xx "reverse is not allowed in R5". `hl7.fhir.r4b.core` 4.3.0
   declares `reverse` among the inputs of `ConceptMap/$translate`, and
   `hl7.fhir.r5.core` 5.0.0 does not, so `/r4b` honours it and `/r5` refuses
@@ -315,6 +315,29 @@ collection of languages", so `zh` does not subsume `zh-min-nan`.
   it and answer `invalid` with the `vs-invalid` classification, the
   `IssueType` reading of "content invalid against the specification"
   (`structure` stays for a body the server cannot parse at all).
+
+## The cases test cases 1.11.0 added, triaged
+
+The 1.11.0 suite runs 805 `general` cases. Of the 43 it adds or renames, 14
+fail on `/r4b` and `/r4` and 12 on `/r5`:
+
+- **`extension-codes/ec-vs-*` (9)** rest on reserved code spaces and
+  `extension-codes` supplements, whose extensions the FHIR Extensions Pack
+  5.4.0 still does not define (#1067).
+- **`extensions/expand-supplement-prop`, `-prop-base` and
+  `expand-supplement-version`** select the right codes and supplement now
+  (#1290), and differ only on the `order` and `label` concept properties
+  #1107 holds.
+- **`translate2/translate-reverse-r5plus` and `-a`** are the renamed
+  `r5+` pair above, unpassed on `/r4b` for the reason given there.
+
+The server now refuses a value set whose compose carries a modifier
+extension it does not know (#1288), refuses `inferSystem` past an include of
+an unheld code system (#1289), filters on a supplement's properties and
+applies one version of a supplement (#1290), and searches one language with
+the designations of supplements in use (#1291). The `global-lang-pack` setup
+supplies a supplement for a code system version the server does not hold,
+which it leaves dormant (#1287).
 
 ## The cases test cases 1.10.0 added, triaged
 

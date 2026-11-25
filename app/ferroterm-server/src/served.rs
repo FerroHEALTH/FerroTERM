@@ -203,6 +203,18 @@ macro_rules! reading {
                         .kind("vs-invalid")
                         .at(expression)
                     }
+                    // NOTE: a modifier the server does not know leaves the value set's
+                    // meaning undefined, a rule of the content (<https://hl7.org/fhir/R4B/valueset-issue-type.html>).
+                    valueset::model::ModelError::ModifierExtension { ref expression, .. } => {
+                        let expression = expression.clone();
+                        Failure::new(
+                            StatusCode::UNPROCESSABLE_ENTITY,
+                            "business-rule",
+                            error.to_string(),
+                        )
+                        .kind("vs-invalid")
+                        .at(expression)
+                    }
                     other => invalid(other),
                 }
             }

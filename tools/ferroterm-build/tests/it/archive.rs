@@ -87,6 +87,7 @@ fn a_release_zip_builds_the_same_bytes_as_the_directory() {
         fhir_package: None,
         fhir_package_sha256: None,
         rxnorm_sources: Vec::new(),
+        releases: ferroterm_build::releases::Releases::default(),
         out: Some(from_dir.path().to_path_buf()),
         index_root: None,
     })
@@ -116,6 +117,7 @@ fn a_release_zip_builds_the_same_bytes_as_the_directory() {
         fhir_package: None,
         fhir_package_sha256: None,
         rxnorm_sources: Vec::new(),
+        releases: ferroterm_build::releases::Releases::default(),
         out: Some(from_zip.path().to_path_buf()),
         index_root: None,
     })
@@ -183,6 +185,7 @@ fn only_the_snapshot_is_unpacked_and_a_zip_without_one_is_refused() {
             fhir_package: None,
             fhir_package_sha256: None,
             rxnorm_sources: Vec::new(),
+            releases: ferroterm_build::releases::Releases::default(),
             out: Some(out.path().to_path_buf()),
             index_root: None,
         }),

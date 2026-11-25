@@ -293,3 +293,113 @@ fn a_supplemented_system_declares_and_resolves_the_forms_of_the_system_it_supple
         ],
     );
 }
+
+/// A supplement giving `cat` the property `size = small` and the French
+/// designation `Chat`, at `version`.
+fn sized(version: &str) -> Supplement {
+    Supplement {
+        url: String::from("http://example.org/fixture-sizes"),
+        version: Some(String::from(version)),
+        concepts: BTreeMap::from([(
+            String::from("cat"),
+            Additions {
+                designations: vec![Designation {
+                    standards_status: None,
+                    language: Some(String::from("fr")),
+                    use_: None,
+                    value: String::from("Chat"),
+                }],
+                properties: vec![Property {
+                    code: String::from("size"),
+                    value: PropertyValue::String(String::from("small")),
+                    ..Property::default()
+                }],
+            },
+        )]),
+    }
+}
+
+// A supplement adds properties to the concepts of the code system it
+// supplements (<https://hl7.org/fhir/R5/codesystem-definitions.html#CodeSystem.supplements>),
+// so a filter on one selects by the supplement's values.
+#[test]
+fn a_filter_on_a_supplement_property_selects_by_its_values() {
+    let inner: Arc<dyn CodeSystemProvider> = Arc::new(Fixture::hierarchical("2025"));
+    let supplemented = Supplemented::new(Arc::clone(&inner), vec![sized("1")]);
+    let cat = supplemented
+        .locate("cat")
+        .expect("reads")
+        .expect("cat")
+        .concept;
+    let dog = supplemented
+        .locate("dog")
+        .expect("reads")
+        .expect("dog")
+        .concept;
+
+    for op_filter in [
+        filter("size", FilterOperator::Equal, "small"),
+        filter("size", FilterOperator::In, "large, small"),
+        filter("size", FilterOperator::Exists, "true"),
+    ] {
+        let selected = supplemented.filter(&op_filter).expect("filters");
+        assert!(selected.contains(cat.index()), "{op_filter:?}");
+        assert!(!selected.contains(dog.index()), "{op_filter:?}");
+        assert!(
+            supplemented
+                .filter_matches(cat, &op_filter)
+                .expect("matches")
+        );
+        assert!(
+            !supplemented
+                .filter_matches(dog, &op_filter)
+                .expect("matches")
+        );
+    }
+    let not_small = supplemented
+        .filter(&filter("size", FilterOperator::NotIn, "small"))
+        .expect("filters");
+    assert!(!not_small.contains(cat.index()));
+    assert!(not_small.contains(dog.index()));
+
+    let both = supplemented
+        .filter_all(&[
+            filter("concept", FilterOperator::IsA, "animal"),
+            filter("size", FilterOperator::Equal, "small"),
+        ])
+        .expect("filters");
+    assert_eq!(both.iter().collect::<Vec<_>>(), [cat.index()]);
+    assert_eq!(
+        supplemented
+            .filter_ordered(&[filter("size", FilterOperator::Equal, "small")])
+            .expect("orders"),
+        None,
+        "a supplement filter states no order"
+    );
+}
+
+// The terminology ecosystem IG test cases 1.11.0 (`search-all-supplement-fr-yes`):
+// a text filter searches the designations of the supplements in use, in the
+// language searched, and not in another.
+#[test]
+fn search_finds_a_supplement_designation_in_the_language_searched() {
+    let inner: Arc<dyn CodeSystemProvider> = Arc::new(Fixture::hierarchical("2025"));
+    let supplemented = Supplemented::new(inner, vec![sized("1")]);
+    let cat = supplemented
+        .locate("cat")
+        .expect("reads")
+        .expect("cat")
+        .concept;
+    assert!(
+        supplemented
+            .search("chat", Some("fr"))
+            .expect("searches")
+            .contains(cat.index())
+    );
+    assert!(
+        !supplemented
+            .search("chat", Some("de"))
+            .expect("searches")
+            .contains(cat.index())
+    );
+}

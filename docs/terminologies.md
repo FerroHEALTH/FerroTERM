@@ -45,6 +45,7 @@ engine. Each row is a tracker issue under the program issue.
 | 7 | RxNorm | Typed drug relationships as filters; US context, open subset. | RRF loader (prescribable subset) |
 | 8 | ATC, ICPC, ICD-11 | Classification systems with one parent per code; ICD-11 needs the WHO API or local deployment. | Table and ClaML loaders; API export for ICD-11 |
 | 9 | The Dutch national code systems (DHD thesauri, G-Standaard, Labcodeset) | Licence-gated deployment demand; each rides on the SNOMED, LOINC, and UCUM providers or a table loader. | Per section |
+| 10 | The EEHRxF bindings (NPU, ICD-O-3, EMDN, ISCO-08, ORPHAcodes, DICOM, EDQM, EMA SPOR, SNOMED GPS, the EHDS identifier types) | The European exchange format binds them (Regulation (EU) 2025/327, the EEHRxF implementing act, Annexes IV to X); each is a publisher table the operator supplies. | Table readers in `classification` |
 | later | CPT, CVX, NDC, MDC, UNII, NCI Metathesaurus | US registries with thin FHIR definitions; each is a table provider when a deployment needs it. | Table providers |
 
 ## SNOMED CT
@@ -532,6 +533,73 @@ Labcodeset, ICF, and the NHG tables to licence holders
 the behavioural oracle for the Dutch variants (ICD-10-NL, the NL edition, the
 Labcodeset) in the sense of `.claude/rules/spec-adherence.md`: a reference for
 spec-silent edge cases, never the specification.
+
+## The EEHRxF bindings
+
+The draft EEHRxF implementing act (Art 6, Annexes IV to X) binds the
+exchange format to systems the other sections do not cover. None has FHIR
+filters, properties, or implicit value sets of its own, so each is read into
+the classification model and served by the classification provider: the
+generic tree filters where the codes nest, the publisher's columns as
+properties. Every release is operator-supplied and never committed; the
+fixtures are synthetic files in each publisher's format
+(`tools/ferroterm-testkit/src/tables.rs`). The commands are in the book
+(`website/book/src/operate/loading-eehrxf.md`).
+
+- **NPU.** `http://npu-terminology.org` (THO `NamingSystem-NPU`). The IFCC
+  code file `npu-codes-latest.csv` (<https://npu-terminology.org/npu-database/>),
+  comma-separated with a header; monthly, with no release name in the file,
+  so the build is given one. Flat.
+- **ICD-O-3.** `http://terminology.hl7.org/CodeSystem/icd-o-3` (THO
+  `NamingSystem-icd-o-3`). The WHO topography and morphology tables, the
+  ICD-O-3.2 morphology workbook distributed by the IACR; code, level, and
+  term columns. Topography codes nest in their three-character category;
+  morphology codes stand alone. Licensed by WHO.
+- **EMDN.** No THO entry. `https://smt.esante.gouv.fr/terminologie-emdn`,
+  the canonical of the one published FHIR `CodeSystem` for EMDN
+  (`ans.fr.terminologies`). The Commission's workbook
+  (<https://webgate.ec.europa.eu/dyna2/emdn/>), free of charge, the year in
+  the sheet name. Codes nest by prefix (a letter, then two digits per level).
+- **ISCO-08.** `urn:oid:2.16.840.1.113883.2.9.6.2.7` (THO
+  `NamingSystem-ISCO08`). The ILO structure workbook; four levels nested by
+  code prefix.
+- **ORPHAcodes.** `https://www.orpha.net` (THO `NamingSystem-orphanet`).
+  The Orphadata `<lang>_product1.xml` files, one per language, versioned by
+  their `JDBOR` date; flat, an `Inactive` flag served inactive. Orphadata
+  licenses them CC BY 4.0; they are still operator-supplied.
+- **DICOM.** `http://dicom.nema.org/resources/ontology/DCM` (THO
+  `NamingSystem-v3-DCM`). NEMA's `dcm.owl` (SKOS notation, label,
+  definition, `owl:deprecated`, `owl:sameAs`), versioned by its
+  `owl:versionInfo`. The PS3.16 context groups are NEMA's own FHIR
+  `ValueSet` resources and load as supplied resources. NEMA holds the
+  copyright of the Standard's text and reproduction needs its permission
+  (<https://www.dicomstandard.org/about-home/trademark>), so neither is
+  committed.
+- **EDQM Standard Terms.** No THO entry; `http://standardterms.edqm.eu`, the
+  URI the HL7 Europe guides and the IPS use. Saved `full_data_by_class`
+  responses of the Standard Terms API (`content[]` with `class`, `code`,
+  `english`, `status`, `translations`, `links`); versioned by the newest
+  `modification_date`; flat across classes.
+- **EMA SPOR.** No THO entry. RMS lists under
+  `https://spor.ema.europa.eu/v1/lists/<id>` (the HL7 Europe UNICOM aliases),
+  OMS organisations under `https://spor.ema.europa.eu/v1/organisations`,
+  SMS substances under `https://spor.ema.europa.eu/v2/SubstanceDefinition`
+  (the MyHealth@EU substance value set), PMS products under the MPID system
+  `http://ema.europa.eu/fhir/MPID` (SPOR API v2 specification,
+  EMA/567640/2018). Saved SPOR API responses: v1 XML for RMS terms, v1 JSON
+  for OMS (the EMA's SPOR API access guide shows both shapes), v2 FHIR
+  bundles for SMS and PMS. One list or kind per build.
+- **SNOMED CT GPS.** The freeset (concept id, active, FSN, US preferred
+  term) becomes the value set `https://ferroterm.eu/fhir/ValueSet/snomed-gps`
+  over `http://snomed.info/sct`, unversioned, so it expands over the loaded
+  edition; the RF2 refset package layers with `--rf2-refset` instead.
+- **EHDS identifier types.** Annex X binds `EHDSPatient.identifier.type` to
+  the HL7 identifier type extended with NI, HI, HIN, SS, REGPID, and REGION.
+  NI and SS are in HL7 v2 table 0203; the other four are not, so FerroTERM
+  authors `https://ferroterm.eu/fhir/CodeSystem/ehds-identifier-type` for
+  them and `https://ferroterm.eu/fhir/ValueSet/ehds-identifier-type` over
+  all of it, embedded in `crates/fhir-terminology/data/ferroterm/` and
+  served beneath the FHIR core terminology of every version.
 
 ## US registries: CPT, CVX, NDC, MDC, UNII, NCI Metathesaurus
 

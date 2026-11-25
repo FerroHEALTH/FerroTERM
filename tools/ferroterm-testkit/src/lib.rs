@@ -23,3 +23,4 @@ pub mod openehr;
 pub mod rxnorm;
 pub mod scaled;
 pub mod snomed;
+pub mod tables;

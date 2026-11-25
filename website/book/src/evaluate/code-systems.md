@@ -33,6 +33,16 @@ properties, implicit value sets, with their citations) are in
 | G-Standaard | `urn:oid:2.16.840.1.213883.2.4.4.1` (GPK), `.10` (PRK), `.7` (HPK), `.8` (article) | Any monthly release | `ferroterm-build --gstandaard <dir> --gstandaard-version <release>` | Z-Index subscription |
 | Nederlandse Labcodeset | `https://ferroterm.eu/fhir/ValueSet/nl-labcodeset` and the LOINC supplement `https://ferroterm.eu/fhir/CodeSystem/nl-labcodeset-loinc` | Any Nictiz publication, as a value set and supplement over LOINC, SNOMED CT, and UCUM | `ferroterm-build --labcodeset <zip, document, or dir>` into `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` | Licensed by Nictiz |
 | NHG ICPC-1 to SNOMED CT map | `http://terminologie.nictiz.nl/ns/ConceptMap/icpc1nl-snomed` (source `http://hl7.org/fhir/sid/icpc-1-nl`) | Any Nictiz release of the FHIR `ConceptMap` | A directory with the `ConceptMap` and a `package.json`, in `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` | Licensed by the NHG |
+| NPU | `http://npu-terminology.org` | Any IFCC code file; you name the release | `ferroterm-build --npu <npu-codes-latest.csv> --npu-version <release>` | Published by the IFCC and the Danish Health Data Authority; you download the release |
+| ICD-O-3 | `http://terminology.hl7.org/CodeSystem/icd-o-3` | Any WHO revision (`3.2` style), topography and morphology | `ferroterm-build --icdo <topography> --icdo <morphology> --icdo-version <revision>` | Licensed by WHO; you supply the tables |
+| EMDN | `https://smt.esante.gouv.fr/terminologie-emdn` | Any yearly Commission release (`2026` style) | `ferroterm-build --emdn <EMDN workbook>` | Free from the European Commission; you download the release |
+| ISCO-08 | `urn:oid:2.16.840.1.113883.2.9.6.2.7` | The ILO structure workbook | `ferroterm-build --isco <ISCO-08 workbook>` | Published by the ILO; you download the release |
+| ORPHAcodes | `https://www.orpha.net` | Any Orphadata nomenclature release, in the languages you load | `ferroterm-build --orpha <lang>_product1.xml` | Published by Orphanet (Orphadata); you download the release |
+| DICOM Controlled Terminology (DCM) | `http://dicom.nema.org/resources/ontology/DCM` | Any edition (`2026e` style); the PS3.16 context groups as NEMA's FHIR value sets | `ferroterm-build --dicom <dcm.owl.zip>`, the context groups in `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` | Copyright NEMA; you download the release |
+| EDQM Standard Terms | `http://standardterms.edqm.eu` | Any download from the Standard Terms API | `ferroterm-build --edqm <API response JSON>` | Under the EDQM terms of use; you download the data |
+| EMA SPOR | `https://spor.ema.europa.eu/v1/lists/<list id>` (RMS), `https://spor.ema.europa.eu/v1/organisations` (OMS), `https://spor.ema.europa.eu/v2/SubstanceDefinition` (SMS), `http://ema.europa.eu/fhir/MPID` (PMS) | Any download from the SPOR API, one list or kind per build | `ferroterm-build --spor <API response>` | Under the EMA's SPOR terms; you download the data |
+| SNOMED CT Global Patient Set | `https://ferroterm.eu/fhir/ValueSet/snomed-gps` over `http://snomed.info/sct` | Any GPS freeset release, over the edition you load | `ferroterm-build --gps <freeset .txt>` into `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` | CC BY-ND 4.0 from SNOMED International; you download the release |
+| EHDS identifier types | `https://ferroterm.eu/fhir/ValueSet/ehds-identifier-type` and `https://ferroterm.eu/fhir/CodeSystem/ehds-identifier-type` | The Annex X binding of the EEHRxF act, built in | Nothing to load; HL7 Terminology completes the expansion | FerroTERM's own |
 | FHIR `CodeSystem`, `ValueSet`, and `ConceptMap` resources | Each resource's own `url` | HL7 Terminology and any FHIR package or directory of JSON, supplements included | `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` | Per resource; HL7 Terminology is CC0 |
 <!-- code-systems:end -->
 
@@ -40,4 +50,6 @@ Every system reaches the operations through one provider seam, so nothing in
 an operation is a special case for one system. The repository ships no code
 system content, licensed or open: you bring the release you are licensed for,
 and the build tool turns it into an index. The
-[loading page](../operate/loading-snomed.md) shows each build.
+[loading page](../operate/loading-snomed.md) shows each build, and the
+[EEHRxF page](../operate/loading-eehrxf.md) the systems the European exchange
+format binds.

@@ -10,7 +10,7 @@ use ferroterm_testkit::mvc::{NAME, write_package};
 fn a_package_keeps_its_manifest_and_terminology_resources() {
     let dir = tempfile::tempdir().expect("tempdir");
     let tgz = dir.path().join("package.tgz");
-    write_package(&tgz, "10.1.0");
+    write_package(&tgz, "10.1.0").expect("the package is written");
     let out = dir.path().join("out");
     let report = import(&tgz, None, &out).expect("imports");
     assert_eq!(
@@ -50,7 +50,7 @@ fn a_package_keeps_its_manifest_and_terminology_resources() {
 fn a_pinned_digest_the_file_does_not_have_is_refused() {
     let dir = tempfile::tempdir().expect("tempdir");
     let tgz = dir.path().join("package.tgz");
-    write_package(&tgz, "10.1.0");
+    write_package(&tgz, "10.1.0").expect("the package is written");
     let pin = "0".repeat(64);
     let refused = import(&tgz, Some(&pin), &dir.path().join("out")).expect_err("refused");
     assert!(matches!(refused, Error::Digest { .. }), "{refused}");
@@ -73,7 +73,7 @@ fn two_releases_land_side_by_side_and_a_release_is_imported_once() {
     let out = dir.path().join("out");
     for version in ["10.0.0", "10.1.0"] {
         let tgz = dir.path().join(format!("{version}.tgz"));
-        write_package(&tgz, version);
+        write_package(&tgz, version).expect("the package is written");
         import(&tgz, None, &out).expect("imports");
     }
     assert!(out.join(format!("{NAME}-10.0.0/package.json")).is_file());

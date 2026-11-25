@@ -47,7 +47,7 @@ fn the_index_root_flag_names_the_root() {
 fn without_out_each_source_builds_into_its_own_child_of_the_root() {
     let root = Some("/data/index");
     let cwd = Path::new("/");
-    let cases: [(&[&str], &str); 9] = [
+    let cases: [(&[&str], &str); 18] = [
         (&["--rf2", "/releases/SnomedCT.zip"], "/data/index/snomed"),
         (
             &["--loinc", "/releases/Loinc_2.83.zip"],
@@ -79,6 +79,24 @@ fn without_out_each_source_builds_into_its_own_child_of_the_root() {
             "/data/index/claml",
         ),
         (&["--icd11", "/releases/icd11"], "/data/index"),
+        (
+            &["--npu", "/releases/npu.csv", "--npu-version", "2026-11"],
+            "/data/index/npu",
+        ),
+        (
+            &["--icdo", "/releases/topo.txt", "--icdo-version", "3.2"],
+            "/data/index/icd-o-3",
+        ),
+        (&["--emdn", "/releases/emdn.xlsx"], "/data/index/emdn"),
+        (&["--isco", "/releases/isco.xlsx"], "/data/index/isco-08"),
+        (
+            &["--orpha", "/releases/en_product1.xml"],
+            "/data/index/orphanet",
+        ),
+        (&["--dicom", "/releases/dcm.owl.zip"], "/data/index/dicom"),
+        (&["--edqm", "/releases/edqm.json"], "/data/index/edqm"),
+        (&["--spor", "/releases/rms.xml"], "/data/index/spor"),
+        (&["--gps", "/releases/gps.txt"], "/data/index"),
     ];
     for (args, expected) in cases {
         assert_eq!(
