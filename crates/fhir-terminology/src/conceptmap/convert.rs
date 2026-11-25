@@ -268,7 +268,7 @@ macro_rules! convert_concept_map {
                     // A version that declares the field carries it there; one
                     // that does not carries the extension, so a document
                     // written either way reads the same
-                    // (<https://hl7.org/fhir/6.0.0-ballot5/conceptmap-definitions.html>).
+                    // (<https://hl7.org/fhir/6.0.0-snapshot1/conceptmap-definitions.html>).
                     comment: ($native_comment)(e).or_else(|| {
                         e.extension
                             .iter()

@@ -159,7 +159,7 @@ fn named(text: Option<&str>) -> Option<String> {
 /// Reads the `TerminologyCapabilities` of the `fhir-types` module `$module`:
 /// `$id` is the element a version names itself in, `code` up to R5 and
 /// `value` from the R6 ballot
-/// (<https://hl7.org/fhir/6.0.0-ballot5/terminologycapabilities.html>), and
+/// (<https://hl7.org/fhir/6.0.0-snapshot1/terminologycapabilities.html>), and
 /// `$content` reads `codeSystem.content`, which R5 and R6 declare and R4 and
 /// R4B do not.
 macro_rules! reads_terminology {

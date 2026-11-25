@@ -280,4 +280,4 @@ macro_rules! reading {
 reading!(r4, "4.0.1");
 reading!(r4b, "4.3.0");
 reading!(r5, "5.0.0");
-reading!(r6, "6.0.0-ballot5");
+reading!(r6, "6.0.0-snapshot1");

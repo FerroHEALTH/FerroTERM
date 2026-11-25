@@ -32,7 +32,7 @@ reads.
 ## Licence
 
 - Source packages: `hl7.fhir.r4.core` 4.0.1, `hl7.fhir.r4b.core` 4.3.0,
-  `hl7.fhir.r5.core` 5.0.0, `hl7.fhir.r6.core` 6.0.0-ballot5, the versions
+  `hl7.fhir.r5.core` 5.0.0, `hl7.fhir.r6.core` 6.0.0-snapshot1, the versions
   these bundles were generated from.
 - Upstream license: CC0-1.0 (the `license` field of each package's
   `package/package.json`), so the specification's own terminology is

@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The FHIR R6 ballot (6.0.0-ballot5) under `/r6`: the generated
+//! The FHIR R6 ballot (6.0.0-snapshot1) under `/r6`: the generated
 //! `fhir_types::r6` contracts over the engine
-//! (<https://hl7.org/fhir/6.0.0-ballot5/terminology-service.html>).
+//! (<https://hl7.org/fhir/6.0.0-snapshot1/terminology-service.html>).
 //!
 //! The ballot shares R5's result shapes and renames or adds a few inputs
 //! (`sourceSystem` and `sourceVersion` alone on `$translate`, a repeating

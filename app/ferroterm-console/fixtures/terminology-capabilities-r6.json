@@ -1065,8 +1065,8 @@
       ]
     }
   ],
-  "date": "2026-11-25T07:24:29.196124Z",
-  "description": "Serves the FHIR R6 ballot (version 6.0.0-ballot5). Every behaviour grounded only in the ballot is re-verified against the published specification when it appears, and may change with it.",
+  "date": "2026-11-25T07:40:59.704434Z",
+  "description": "Serves the FHIR R6 ballot (version 6.0.0-snapshot1). Every behaviour grounded only in the ballot is re-verified against the published specification when it appears, and may change with it.",
   "expansion": {
     "hierarchical": false,
     "incomplete": false,

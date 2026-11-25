@@ -331,7 +331,7 @@ fn an_inline_map_translates_and_malformed_requests_are_refused() {
 fn an_r6_element_comment_reads_from_the_field_and_from_the_extension() {
     // R6 declares `ConceptMap.group.element.comment`; R5 and earlier carry the
     // same fact in an extension, so a document written either way has to read
-    // the same (<https://hl7.org/fhir/6.0.0-ballot5/conceptmap-definitions.html>).
+    // the same (<https://hl7.org/fhir/6.0.0-snapshot1/conceptmap-definitions.html>).
     let native = serde_json::json!({
         "resourceType": "ConceptMap",
         "url": "http://example.org/fhir/ConceptMap/native-comment",

@@ -417,7 +417,7 @@ fn a_language_tag_expansion_states_why_it_is_unclosed() {
 /// SHALL include the valueset-unclosed extension if the value set is unclosed.
 /// If handle-unclosed-expansion is set to false the server SHALL return an
 /// error if the value set is unclosed"
-/// (<https://hl7.org/fhir/6.0.0-ballot5/valueset-operation-expand.html>).
+/// (<https://hl7.org/fhir/6.0.0-snapshot1/valueset-operation-expand.html>).
 // NOTE: the ballot fixes no behaviour for the absent parameter, so an expansion that
 // names none keeps the mark the R4B and R5 Notes describe: our own design.
 #[test]

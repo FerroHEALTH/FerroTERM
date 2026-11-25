@@ -1,0 +1,1 @@
+- `/r6` serves FHIR R6 6.0.0-snapshot1 in place of 6.0.0-ballot5: its `CapabilityStatement` and `TerminologyCapabilities` state that `fhirVersion`, and the R6 core terminology is regenerated from `hl7.fhir.r6.core` 6.0.0-snapshot1, the package the `r6` model of `fhir-types` 0.2.0 is generated from. The surface stays ballot-tracking and says so.

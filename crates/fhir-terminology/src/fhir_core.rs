@@ -32,9 +32,9 @@ const R4B_VALUE_SETS: &str = include_str!("../data/fhir/r4b/value-sets.json");
 const R5_CODE_SYSTEMS: &str = include_str!("../data/fhir/r5/code-systems.json");
 /// The R5 value sets, generated from `hl7.fhir.r5.core` 5.0.0.
 const R5_VALUE_SETS: &str = include_str!("../data/fhir/r5/value-sets.json");
-/// The R6 code systems, generated from `hl7.fhir.r6.core` 6.0.0-ballot5.
+/// The R6 code systems, generated from `hl7.fhir.r6.core` 6.0.0-snapshot1.
 const R6_CODE_SYSTEMS: &str = include_str!("../data/fhir/r6/code-systems.json");
-/// The R6 value sets, generated from `hl7.fhir.r6.core` 6.0.0-ballot5.
+/// The R6 value sets, generated from `hl7.fhir.r6.core` 6.0.0-snapshot1.
 const R6_VALUE_SETS: &str = include_str!("../data/fhir/r6/value-sets.json");
 
 /// The code systems this server authors, served on every version: the EHDS

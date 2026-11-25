@@ -95,7 +95,7 @@ pub struct ExpandInput {
     pub use_supplement: Vec<String>,
     /// `handle-unclosed-expansion` (R6): whether the client handles an
     /// unclosed expansion. `false` refuses one
-    /// (<https://hl7.org/fhir/6.0.0-ballot5/valueset-operation-expand.html>).
+    /// (<https://hl7.org/fhir/6.0.0-snapshot1/valueset-operation-expand.html>).
     pub handle_unclosed_expansion: Option<bool>,
 }
 
@@ -215,7 +215,7 @@ pub fn expand(
 /// The R6 Notes name both among the reasons a server returns an unclosed
 /// expansion ("e.g. fragment, post-coordinated concepts, code systems with a
 /// grammar, size",
-/// <https://hl7.org/fhir/6.0.0-ballot5/valueset-operation-expand.html>).
+/// <https://hl7.org/fhir/6.0.0-snapshot1/valueset-operation-expand.html>).
 // NOTE: no published `StructureDefinition` defines `valueset-unclosed-reason`, so the
 // wording is the ecosystem suite's, its `fragment` case for a fragment and its
 // `langcodes` case for a grammar (<https://github.com/HL7/fhir-tx-ecosystem-ig>).
@@ -677,7 +677,7 @@ fn properties_of(
     };
     let mut out = Vec::new();
     // NOTE: `definition` is a concept property the specification itself defines
-    // (<https://hl7.org/fhir/6.0.0-ballot5/codesystem.html#defined-props>), which
+    // (<https://hl7.org/fhir/6.0.0-snapshot1/codesystem.html#defined-props>), which
     // a system states as its own element rather than through `properties`.
     if asked("definition")
         && let Some(definition) = resolved.provider.definition(located.concept)?

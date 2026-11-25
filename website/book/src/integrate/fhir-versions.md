@@ -4,7 +4,7 @@
 # FHIR versions
 
 FerroTERM answers FHIR R4 under `/r4`, R4B under `/r4b`, R5 under `/r5`, and
-the R6 ballot (6.0.0-ballot5) under `/r6`, marked ballot-tracking.
+the R6 ballot (6.0.0-snapshot1) under `/r6`, marked ballot-tracking.
 
 <!-- toc -->
 
@@ -28,7 +28,7 @@ drift apart.
 | R4 | `hl7.fhir.r4.core` 4.0.1 | served under `/r4` |
 | R4B | `hl7.fhir.r4b.core` 4.3.0 | served under `/r4b` |
 | R5 | `hl7.fhir.r5.core` 5.0.0 | served under `/r5` |
-| R6 | `hl7.fhir.r6.core` 6.0.0-ballot5 | served under `/r6`, marked ballot-tracking |
+| R6 | `hl7.fhir.r6.core` 6.0.0-snapshot1 | served under `/r6`, marked ballot-tracking |
 
 R4B is the current stable release of the R4 line and a near-superset of R4;
 both endpoints serve the same engine, and a `$cache-control` cache started on

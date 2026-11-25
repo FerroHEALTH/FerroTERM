@@ -51,7 +51,7 @@ pub(crate) struct Dialect {
     /// (<https://hl7.org/fhir/R5/conceptmap.html>). The R6 ballot demoted it
     /// to a warning, so this is empty there: the editor refuses what the
     /// version refuses and nothing more
-    /// (<https://hl7.org/fhir/6.0.0-ballot5/conceptmap.html>).
+    /// (<https://hl7.org/fhir/6.0.0-snapshot1/conceptmap.html>).
     pub(crate) comment_required: &'static [&'static str],
     /// Whether a draft map is excused from that requirement.
     ///
@@ -85,7 +85,7 @@ pub(crate) fn dialect(version: FhirVersion) -> Dialect {
         // `equivalence` with `relationship`, made a group's system a canonical,
         // and added `element.noMap` (<https://hl7.org/fhir/R5/conceptmap.html>).
         // The R6 ballot carries the same four
-        // (<https://hl7.org/fhir/6.0.0-ballot5/conceptmap.html>).
+        // (<https://hl7.org/fhir/6.0.0-snapshot1/conceptmap.html>).
         FhirVersion::R5 => Dialect {
             relationship_value_set: RELATIONSHIP_VALUE_SET,
             no_map: true,

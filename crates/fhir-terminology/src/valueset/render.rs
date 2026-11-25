@@ -53,7 +53,7 @@ fn status(model: &crate::valueset::model::ValueSetModel) -> &str {
 
 macro_rules! render_value_set {
     // R6 makes `compose.include.filter.value` optional
-    // (<https://hl7.org/fhir/6.0.0-ballot5/valueset-definitions.html#ValueSet.compose.include.filter.value>).
+    // (<https://hl7.org/fhir/6.0.0-snapshot1/valueset-definitions.html#ValueSet.compose.include.filter.value>).
     (@filter_value required, $f:ident) => {
         $f.value.as_str().into()
     };

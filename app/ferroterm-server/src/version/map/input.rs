@@ -238,7 +238,7 @@ macro_rules! family_input {
             $crate::version::map::input::family_input!(@translate_inputs $fhir, $flavour);
     };
     // Only R6 declares `handle-unclosed-expansion`; R4 and R5 refuse the name
-    // as undeclared (<https://hl7.org/fhir/6.0.0-ballot5/valueset-operation-expand.html>).
+    // as undeclared (<https://hl7.org/fhir/6.0.0-snapshot1/valueset-operation-expand.html>).
     (@handle_unclosed r6, $request:expr, $flag:ident) => {
         $flag(&$request.handle_unclosed_expansion)
     };
@@ -246,7 +246,7 @@ macro_rules! family_input {
         None
     };
     // R4 and R5 declare one `displayLanguage`; R6 declares a list, joined as a BCP 47
-    // range list (<https://hl7.org/fhir/6.0.0-ballot5/valueset-operation-validate-code.html>).
+    // range list (<https://hl7.org/fhir/6.0.0-snapshot1/valueset-operation-validate-code.html>).
     (@vs_language r6, $request:expr) => {{
         let languages: Vec<String> = $request
             .display_language

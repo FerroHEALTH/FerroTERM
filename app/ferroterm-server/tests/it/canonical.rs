@@ -318,7 +318,7 @@ const CORE: [(&str, &str); 4] = [
     ("r4", "4.0.1"),
     ("r4b", "4.3.0"),
     ("r5", "5.0.0"),
-    ("r6", "6.0.0-ballot5"),
+    ("r6", "6.0.0-snapshot1"),
 ];
 
 /// A code system the core terminology of every served version defines

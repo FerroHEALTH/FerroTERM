@@ -285,7 +285,7 @@ pub(super) fn unlisted_in_fragment(
     let (message, text) = super::super::display::unknown_code(provider.as_ref(), subject.code);
     // NOTE: under `valueset-membership-only` the server performs no "validation
     // tasks beyond validating membership", so the fragment note stays unsaid
-    // (<https://hl7.org/fhir/6.0.0-ballot5/valueset-operation-validate-code.html>).
+    // (<https://hl7.org/fhir/6.0.0-snapshot1/valueset-operation-validate-code.html>).
     let issues = if policy.membership_only {
         Vec::new()
     } else {
@@ -354,7 +354,7 @@ pub(super) fn unknown_code(
     );
     // NOTE: under `valueset-membership-only` the server performs no "validation
     // tasks beyond validating membership", so the code's standing in its system
-    // stays unreported (<https://hl7.org/fhir/6.0.0-ballot5/valueset-operation-validate-code.html>).
+    // stays unreported (<https://hl7.org/fhir/6.0.0-snapshot1/valueset-operation-validate-code.html>).
     if !policy.membership_only {
         validation.issues.push(unknown);
     }

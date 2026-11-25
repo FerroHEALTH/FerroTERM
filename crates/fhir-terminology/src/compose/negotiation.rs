@@ -10,8 +10,8 @@
 //! `force-valueset-version` (R6, pre-adopted) name a version per canonical: a
 //! default when the reference names none, a check that refuses a differing
 //! reference, and a force that overrides it
-//! (<https://hl7.org/fhir/6.0.0-ballot5/valueset-operation-validate-code.html>,
-//! <https://hl7.org/fhir/6.0.0-ballot5/valueset-operation-expand.html>). One
+//! (<https://hl7.org/fhir/6.0.0-snapshot1/valueset-operation-validate-code.html>,
+//! <https://hl7.org/fhir/6.0.0-snapshot1/valueset-operation-expand.html>). One
 //! negotiation applies to the value set named by the request, to every value
 //! set it imports, and to every system any of them selects from.
 

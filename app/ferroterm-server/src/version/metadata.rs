@@ -211,10 +211,12 @@ macro_rules! metadata {
                 }
             }
 
-            /// The note a ballot-tracking version carries: which ballot it serves, and
-            /// that ballot-grounded behaviour is re-verified when the version publishes.
+            /// The note a ballot-tracking version carries: which pre-release it serves,
+            /// and that ballot-grounded behaviour is re-verified when the version
+            /// publishes. A pre-release version carries a label after its number
+            /// (`6.0.0-snapshot1`, <https://hl7.org/fhir/versions.html#versions>).
             fn ballot_note() -> Option<String> {
-                FHIR_VERSION.contains("ballot").then(|| {
+                FHIR_VERSION.contains('-').then(|| {
                     format!(
                         "Serves the FHIR {} (version {FHIR_VERSION}). Every behaviour grounded only in the ballot is re-verified against the published specification when it appears, and may change with it.",
                         $label
