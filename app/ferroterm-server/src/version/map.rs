@@ -75,6 +75,7 @@ macro_rules! family_map {
             /// `abstract`.
             #[must_use]
             pub fn lookup_response(outcome: LookupOutcome) -> CodeSystemLookupResponse {
+                let r#abstract = abstract_of(&outcome);
                 CodeSystemLookupResponse {
                     name: outcome.name.into(),
                     version: outcome.version.map(Into::into),
@@ -88,7 +89,7 @@ macro_rules! family_map {
                         .collect(),
                     code: Some(outcome.code.into()),
                     system: Some(outcome.system.into()),
-                    r#abstract: abstract_of(outcome.abstract_concept),
+                    r#abstract,
                     ..$crate::version::map::family_map!(@definition $flavour, outcome.definition)
                 }
             }
@@ -133,10 +134,22 @@ macro_rules! family_map {
                 }
             }
 
-            /// `abstract`, answered for an abstract concept only.
-            // NOTE: the ecosystem's cases expect no `abstract = false`.
-            fn abstract_of(abstract_concept: bool) -> Option<fhir_types::$fhir::primitives::Boolean> {
-                abstract_concept.then_some(true.into())
+            /// `abstract`: true for an abstract concept, and false where the
+            /// outcome answers `notSelectable` false.
+            // NOTE: tx-ecosystem requirements, $lookup: "SHOULD return `abstract`"; the cases
+            // expect `abstract = false` only beside `notSelectable`, which `property=*` asks for.
+            fn abstract_of(outcome: &LookupOutcome) -> Option<fhir_types::$fhir::primitives::Boolean> {
+                if outcome.abstract_concept {
+                    return Some(true.into());
+                }
+                outcome
+                    .properties
+                    .iter()
+                    .any(|property| {
+                        property.code == "notSelectable"
+                            && property.value == PropertyValue::Boolean(false)
+                    })
+                    .then_some(false.into())
             }
 
             /// A property value as a `Parameters` value.
