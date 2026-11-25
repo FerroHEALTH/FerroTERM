@@ -18,6 +18,7 @@ pub mod gstandaard;
 pub mod icd11;
 pub mod labcodeset;
 pub mod loinc;
+pub mod mvc;
 pub mod openehr;
 pub mod rxnorm;
 pub mod scaled;

@@ -24,7 +24,9 @@ rf2.workspace = true
 rxnorm-rrf.workspace = true
 concept-store.workspace = true
 designation-index.workspace = true
+flate2.workspace = true
 serde_json.workspace = true
+tar.workspace = true
 tempfile.workspace = true
 zip.workspace = true
 

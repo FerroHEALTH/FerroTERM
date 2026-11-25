@@ -278,6 +278,8 @@ fn no_input() -> ferroterm_build::Cli {
         gstandaard: None,
         gstandaard_version: None,
         labcodeset: None,
+        fhir_package: None,
+        fhir_package_sha256: None,
         rxnorm_sources: Vec::new(),
         releases: ferroterm_build::releases::Releases::default(),
         out: None,

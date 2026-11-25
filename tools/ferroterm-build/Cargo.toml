@@ -26,6 +26,7 @@ dhd-thesaurus.workspace = true
 gstandaard.workspace = true
 labcodeset.workspace = true
 fhir-types.workspace = true
+flate2.workspace = true
 concept-graph.workspace = true
 icd11 = { workspace = true, features = ["api"] }
 rxnorm-rrf.workspace = true
@@ -36,6 +37,8 @@ concept-store.workspace = true
 designation-index.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
+tar.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true
 zip.workspace = true

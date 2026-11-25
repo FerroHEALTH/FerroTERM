@@ -21,6 +21,7 @@ pub mod icd11;
 pub mod labcodeset;
 pub mod loinc;
 pub mod output;
+pub mod package;
 pub mod pipeline;
 pub mod releases;
 pub mod rxnorm;
@@ -37,8 +38,8 @@ pub struct Cli {
     #[arg(
         long,
         value_name = "DIR_OR_ZIP",
-        conflicts_with_all = ["loinc", "claml", "icd10cm", "rxnorm", "icd11", "atc", "dhd", "gstandaard", "release"],
-        required_unless_present_any = ["loinc", "claml", "icd10cm", "rxnorm", "icd11", "atc", "dhd", "gstandaard", "labcodeset", "release"]
+        conflicts_with_all = ["loinc", "claml", "icd10cm", "rxnorm", "icd11", "atc", "dhd", "gstandaard", "release", "fhir_package"],
+        required_unless_present_any = ["loinc", "claml", "icd10cm", "rxnorm", "icd11", "atc", "dhd", "gstandaard", "labcodeset", "release", "fhir_package"]
     )]
     pub rf2: Option<PathBuf>,
     /// A refset-only RF2 package layered onto the edition `--rf2` names (repeatable).
@@ -101,6 +102,12 @@ pub struct Cli {
     /// A Nederlandse Labcodeset publication: the release zip, or the `labconcepts-*.xml` document or its directory; writes FHIR resources under `<out>/labcodeset`.
     #[arg(long, value_name = "FILE_DIR_OR_ZIP", conflicts_with_all = ["loinc", "claml", "icd10cm", "rxnorm", "icd11", "atc", "dhd", "gstandaard", "release"])]
     pub labcodeset: Option<PathBuf>,
+    /// An operator-supplied FHIR NPM package (`.tgz`), such as the MyHealth@EU Master Value Sets Catalogue; writes its manifest and its `CodeSystem`, `ValueSet` and `ConceptMap` resources under `<out>/<name>-<version>`.
+    #[arg(long, value_name = "TGZ", conflicts_with_all = ["loinc", "claml", "icd10cm", "rxnorm", "icd11", "atc", "dhd", "gstandaard", "labcodeset", "release"])]
+    pub fhir_package: Option<PathBuf>,
+    /// The sha256 the operator pinned for `--fhir-package`; a package whose digest differs is refused.
+    #[arg(long, value_name = "HEX", requires = "fhir_package")]
+    pub fhir_package_sha256: Option<String>,
     /// The `RxNorm` sources (`SAB`) whose names are kept beside the unrestricted `RXNORM` and `MTHSPL` (a full release under a UMLS licence).
     #[arg(long, value_name = "SAB", value_delimiter = ',', action = clap::ArgAction::Append, requires = "rxnorm")]
     pub rxnorm_sources: Vec<String>,
@@ -143,6 +150,13 @@ pub fn run(cli: &Cli) -> Result<Report, RunError> {
 /// read, the edition cannot be identified, a layered package's module
 /// dependency is unmet, or an artifact cannot be written.
 pub fn run_into(cli: &Cli, out: &Path) -> Result<Report, RunError> {
+    if let Some(package) = &cli.fhir_package {
+        return Ok(Report::FhirPackage(package::import(
+            package,
+            cli.fhir_package_sha256.as_deref(),
+            out,
+        )?));
+    }
     if let Some(freeset) = &cli.releases.gps {
         return Ok(Report::Gps(gps::build(
             freeset,
@@ -429,6 +443,8 @@ pub enum Report {
     Icd11(Vec<icd11::Report>),
     /// The Nederlandse Labcodeset as FHIR resources.
     Labcodeset(labcodeset::Report),
+    /// An operator-supplied FHIR package's terminology resources.
+    FhirPackage(package::Report),
     /// The SNOMED CT Global Patient Set as a value set.
     Gps(gps::Report),
 }
@@ -441,6 +457,9 @@ pub enum RunError {
         "give `--rf2`, `--loinc`, `--claml`, `--icd10cm`, `--rxnorm`, `--icd11`, `--atc`, `--dhd`, `--gstandaard`, `--labcodeset`, `--npu`, `--icdo`, `--emdn`, `--isco`, `--orpha`, `--dicom`, `--edqm`, `--spor`, or `--gps`"
     )]
     NoInput,
+    /// A `--fhir-package` that cannot be imported.
+    #[error(transparent)]
+    FhirPackage(#[from] package::Error),
     /// `--atc` without `--atc-version`.
     #[error("`--atc` needs `--atc-version` (the index year)")]
     NoAtcVersion,

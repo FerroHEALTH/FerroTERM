@@ -90,6 +90,7 @@ fn default_child(cli: &Cli) -> Option<String> {
     if cli.icd11.is_some()
         || cli.gstandaard.is_some()
         || cli.labcodeset.is_some()
+        || cli.fhir_package.is_some()
         || cli.releases.gps.is_some()
     {
         return None;
