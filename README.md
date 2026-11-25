@@ -14,13 +14,13 @@
 **Project**<br>
 [![Release](https://img.shields.io/github/v/release/FerroHEALTH/FerroTERM?sort=semver&logo=github&label=release)](https://github.com/FerroHEALTH/FerroTERM/releases/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/FerroHEALTH/FerroTERM/ci.yml?branch=main&logo=githubactions&logoColor=white&label=CI)](https://github.com/FerroHEALTH/FerroTERM/actions/workflows/ci.yml)
-[![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue)](LICENSE)
+[![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue?logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZD0iTTEyIDN2MThNNyAyMWgxME00IDdoMTZNNCA3TDEgMTRhMyAzIDAgMCAwIDYgMFpNMjAgN2wtMyA3YTMgMyAwIDAgMCA2IDBaIi8%2BPC9zdmc%2B)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-ferroterm.eu-blue?logo=mdbook)](https://ferroterm.eu/docs/)
 [![GHCR](https://img.shields.io/badge/ghcr.io-ferroterm-2496ED?logo=docker&logoColor=white)](https://github.com/FerroHEALTH/FerroTERM/pkgs/container/ferroterm)
 [![Image pulls](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fghcr-badge.elias.eu.org%2Fapi%2FFerroHEALTH%2FFerroTERM%2Fferroterm&query=downloadCount&label=image%20pulls&logo=github)](https://github.com/FerroHEALTH/FerroTERM/pkgs/container/ferroterm)
 
 **Quality and security**<br>
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/FerroHEALTH/FerroTERM/badge)](https://scorecard.dev/viewer/?uri=github.com/FerroHEALTH/FerroTERM)
+[![OpenSSF Scorecard](https://img.shields.io/ossf-scorecard/github.com/FerroHEALTH/FerroTERM?label=openssf%20scorecard&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZD0iTTEyIDJsOCAzdjZjMCA1LTMuNSA5LjUtOCAxMS00LjUtMS41LTgtNi04LTExVjVaTTguNSAxMmwyLjUgMi41IDQuNS01Ii8%2BPC9zdmc%2B)](https://scorecard.dev/viewer/?uri=github.com/FerroHEALTH/FerroTERM)
 [![Quality gate](https://img.shields.io/sonar/quality_gate/FerroHEALTH_FerroTERM?server=https%3A%2F%2Fsonarcloud.io&logo=sonarqubecloud&label=quality%20gate)](https://sonarcloud.io/summary/overall?id=FerroHEALTH_FerroTERM)
 [![Coverage](https://img.shields.io/sonar/coverage/FerroHEALTH_FerroTERM?server=https%3A%2F%2Fsonarcloud.io&logo=sonarqubecloud&label=coverage)](https://sonarcloud.io/summary/new_code?id=FerroHEALTH_FerroTERM)
 [![CodeQL](https://img.shields.io/github/actions/workflow/status/FerroHEALTH/FerroTERM/codeql.yml?branch=main&logo=github&label=CodeQL)](https://github.com/FerroHEALTH/FerroTERM/actions/workflows/codeql.yml)
@@ -36,7 +36,7 @@
 [![MyHealth@EU MVC 10.1.0 (CI) import](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fehds-mvc.json)](https://ferroterm.eu/docs/evaluate/conformance.html)
 [![EEHRxF draft 2026-11-23 Art 6 code systems](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fehds-art6.json)](https://ferroterm.eu/docs/evaluate/conformance.html)
 <br>
-[![CRA](https://img.shields.io/badge/CRA-risk%20assessment-blue?logo=europeanunion)](https://ferroterm.eu/docs/evaluate/cra-risk-assessment.html)
+[![CRA](https://img.shields.io/badge/CRA-risk%20assessment-blue?logo=europeanunion&labelColor=003399&logoColor=FFCC00)](https://ferroterm.eu/docs/evaluate/cra-risk-assessment.html)
 
 </div>
 
