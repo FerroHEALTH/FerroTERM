@@ -506,7 +506,7 @@ dependencies = [
 
 [[package]]
 name = "ferroterm-build"
-version = "0.4.7"
+version = "0.4.8"
 dependencies = [
  "anyhow",
  "clap",
@@ -549,7 +549,7 @@ dependencies = [
 
 [[package]]
 name = "ferroterm-testkit"
-version = "0.4.7"
+version = "0.4.8"
 dependencies = [
  "classification",
  "concept-graph",
