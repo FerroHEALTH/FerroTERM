@@ -124,6 +124,40 @@ async fn translate_on_r4b_accepts_the_pre_adopted_r6_names() {
         part(m, "sourceConcept").expect("sourceConcept")["valueCoding"]["code"],
         "cat"
     );
+    // An R4 `reverse` reports the match as the map states it, as `targetCode`
+    // does, and a reverse read that finds nothing names both systems.
+    for version in ["r4", "r4b"] {
+        let (status, body) = server
+            .get(&format!(
+                "/{version}/ConceptMap/$translate?system={COLOURS}&code=RED&reverse=true&targetsystem={ANIMALS}"
+            ))
+            .await;
+        assert_eq!(status, StatusCode::OK, "{version}: {body}");
+        let m = param(&body, "match").expect("match");
+        assert_eq!(
+            part(m, "concept").expect("concept")["valueCoding"]["code"],
+            "RED",
+            "{version}: {body}"
+        );
+        assert_eq!(
+            part(m, "sourceConcept").expect("sourceConcept")["valueCoding"]["code"],
+            "cat",
+            "{version}: {body}"
+        );
+        let (status, body) = server
+            .get(&format!(
+                "/{version}/ConceptMap/$translate?url={CM_ANIMALS_COLOURS}&system={ANIMALS}&code=cat&reverse=true&targetsystem={COLOURS}"
+            ))
+            .await;
+        assert_eq!(status, StatusCode::OK, "{version}: {body}");
+        let message = param(&body, "message").expect("message")["valueString"]
+            .as_str()
+            .expect("a message");
+        assert!(
+            message.contains(ANIMALS) && message.contains(COLOURS),
+            "{version}: {message}"
+        );
+    }
     // R5 declares no `reverse`; the refusal names the target inputs.
     let (status, body) = server
         .get(&format!(

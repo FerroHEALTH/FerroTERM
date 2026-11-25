@@ -37,9 +37,8 @@ hand; their lists live beside the general ones.
 
 ## Where the remaining cases stand
 
-The `general` mode counts 805 cases on every surface. On 2026-11-25 (`main`
-at `9660d14`, suite `9c2bbce`, validator 7.0.6) `/r4` passed 701, `/r4b` 689
-and `/r5` 702. Every case that does not pass falls into one of the rows
+The `general` mode counts 805 cases on every surface. With suite `9c2bbce`
+and validator 7.0.6, `/r4` passes 703, `/r4b` 689 and `/r5` 702. Every case that does not pass falls into one of the rows
 below. None of them needs licensed content: the cases that do (SNOMED CT,
 LOINC, ICD-11, OMOP) sit in the suite's other modes, which run by hand and
 are not in these counts.
@@ -60,8 +59,7 @@ are not in these counts.
 | A request with no code system answers `required` where the suite expects `invalid`, and a refusal repeats its text in `diagnostics`. | [#1326](https://github.com/FerroHEALTH/FerroTERM/issues/1326) | 5 | 5 | 5 |
 | `$validate-code` leaves out the warning for a coding with no system inside a CodeableConcept, and names a display-only Coding differently. | [#1327](https://github.com/FerroHEALTH/FerroTERM/issues/1327) | 3 | 3 | 3 |
 | R4 and R4B do not read `compose.property` or write expansion properties as R5 cross-version extensions. | [#1328](https://github.com/FerroHEALTH/FerroTERM/issues/1328) | 2 | 2 | 0 |
-| An R4 reverse `$translate` reports the match from the request's side, and its no-match message names neither system. | [#1329](https://github.com/FerroHEALTH/FerroTERM/issues/1329) | 2 | 0 | 0 |
-| **Total not passing** | | 104 | 116 | 103 |
+| **Total not passing** | | 102 | 116 | 103 |
 
 The rows marked as having no published definition are upstream reports:
 FerroTERM answers what the published OperationDefinitions and extensions
