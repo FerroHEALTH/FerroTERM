@@ -38,8 +38,8 @@ hand; their lists live beside the general ones.
 ## Where the remaining cases stand
 
 The `general` mode counts 805 cases on every surface. With suite `9c2bbce`
-and validator 7.0.6, `/r4` passes 703, `/r4b` 689 and `/r5` 702. Every case that does not pass falls into one of the rows
-below. None of them needs licensed content: the cases that do (SNOMED CT,
+and validator 7.0.6, `/r4` passes 703, `/r4b` 689 and `/r5` 702. Every case
+that does not pass falls into one of the rows below. None of them needs licensed content: the cases that do (SNOMED CT,
 LOINC, ICD-11, OMOP) sit in the suite's other modes, which run by hand and
 are not in these counts.
 
