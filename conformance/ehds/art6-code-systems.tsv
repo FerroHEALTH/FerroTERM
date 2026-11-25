@@ -11,11 +11,11 @@ LOINC	http://loinc.org	tools/ferroterm-build/tests/it/loinc.rs::the_loinc_releas
 EDQM Standard Terms	http://standardterms.edqm.eu	-
 ICD-10	http://hl7.org/fhir/sid/icd-10	tools/ferroterm-build/tests/it/classification.rs::the_claml_classification_builds_an_artifact_the_store_graph_and_text_open
 ISO 3166	urn:iso:std:iso:3166	crates/fhir-terminology/tests/it/registries/grammar_systems.rs::iso3166_is_a_case_insensitive_table_with_user_assigned_codes
-NPU	http://npu-terminology.org	-
+NPU	http://npu-terminology.org	app/ferroterm-server/tests/it/releases.rs::lookup_answers_the_display_and_properties_of_each_release
 EMA SPOR	-	-
 UDI	-	-
 ATC	http://www.whocc.no/atc	crates/classification/tests/it/atc.rs::the_index_csv_reads_into_the_five_level_tree_with_ddds
-ICD-O-3	http://terminology.hl7.org/CodeSystem/icd-o-3	-
-EMDN	-	-
-ISCO-08	-	-
+ICD-O-3	http://terminology.hl7.org/CodeSystem/icd-o-3	app/ferroterm-server/tests/it/releases.rs::lookup_answers_the_display_and_properties_of_each_release
+EMDN	https://smt.esante.gouv.fr/terminologie-emdn	app/ferroterm-server/tests/it/releases.rs::lookup_answers_the_display_and_properties_of_each_release
+ISCO-08	urn:oid:2.16.840.1.113883.2.9.6.2.7	app/ferroterm-server/tests/it/releases.rs::lookup_answers_the_display_and_properties_of_each_release
 ORPHAcodes	http://www.orpha.net	-
