@@ -20,6 +20,7 @@ mod exchange;
 mod find;
 mod forms;
 mod logout;
+mod post_quantum;
 mod provider;
 mod refresh;
 mod service;

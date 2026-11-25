@@ -23,5 +23,6 @@ mod local_edition;
 mod loinc;
 mod output;
 mod pipeline;
+mod post_quantum;
 mod releases;
 mod rxnorm;

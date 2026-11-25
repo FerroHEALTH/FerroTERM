@@ -55,6 +55,7 @@ jsonwebtoken.workspace = true
 # signing key and publish it as a JWK instead of committing one.
 ring.workspace = true
 rcgen.workspace = true
+rustls.workspace = true
 secrecy.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["io-util", "sync", "time"] }

@@ -29,6 +29,8 @@ fhir-types.workspace = true
 flate2.workspace = true
 concept-graph.workspace = true
 icd11 = { workspace = true, features = ["api"] }
+# The ICD-API client offers X25519MLKEM768 first (RFC 10024).
+rustls.workspace = true
 rxnorm-rrf.workspace = true
 loinc.workspace = true
 rayon.workspace = true

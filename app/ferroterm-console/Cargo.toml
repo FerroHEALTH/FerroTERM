@@ -80,6 +80,10 @@ toml.workspace = true
 # The test provider's signing key.
 aws-lc-rs.workspace = true
 jsonwebtoken.workspace = true
+# The TLS 1.3 peer of the key exchange test; the console links no workspace
+# crate, the testkit included.
+rcgen.workspace = true
+rustls.workspace = true
 tempfile.workspace = true
 # The router driven in-process with `ServiceExt::oneshot`.
 tower = { workspace = true, features = ["util"] }
