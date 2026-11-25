@@ -66,9 +66,9 @@ requested on that repository's tracker.
 
 | Package | Pin | Notes |
 |---|---|---|
-| `fhir-types` | 0.1.131 | from crates.io; the requirement lives in the root `Cargo.toml` `[workspace.dependencies]` |
+| `fhir-types` | 0.2.0 | from crates.io; the requirement lives in the root `Cargo.toml` `[workspace.dependencies]` |
 
-The requirement is a caret, so a later 0.1.x release resolves into `Cargo.lock`
+The requirement is a caret, so a later 0.2.x release resolves into `Cargo.lock`
 by itself. `scripts/checks/versions.sh` fails when the row above, the root
 requirement, and the lock disagree, so a new FHIR model reaches the build only
 in a change that moves the pin with it.

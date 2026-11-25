@@ -136,6 +136,29 @@ pub(super) fn load_code_systems(
     Ok(())
 }
 
+/// The `Provenance` resources in the package directories `paths`, by id, each
+/// read in the FHIR version its directory's `package.json` declares.
+///
+/// # Errors
+///
+/// A manifest or file that cannot be read, and a `Provenance` the loader
+/// refuses.
+fn load_provenance(
+    paths: &[PathBuf],
+) -> Result<BTreeMap<String, super::provenance::Held>, LoadError> {
+    let mut held = BTreeMap::new();
+    for path in paths {
+        let version = package_version(path)
+            .map_err(|source| LoadError::CodeSystems {
+                path: path.clone(),
+                source: Box::new(source),
+            })?
+            .unwrap_or(FhirVersion::R4B);
+        super::provenance::load(path, crate::served::version_label(version), &mut held)?;
+    }
+    Ok(held)
+}
+
 /// Every supplement names a loaded system (`CodeSystem.supplements`, a `url`
 /// or `url|version` canonical,
 /// <https://hl7.org/fhir/R4B/codesystem-definitions.html#CodeSystem.supplements>).
@@ -357,6 +380,7 @@ impl AppState {
                 &mut concept_maps,
             )?;
         }
+        let provenance = load_provenance(&config.terminology.code_systems)?;
         check_supplement_targets(&loaded, &supplements)?;
         check_distinct_ids(
             ResourceType::CodeSystem,
@@ -395,6 +419,7 @@ impl AppState {
             .security_services
             .clone_from(&config.fhir.security_services);
         state.base_url = config.base_url();
+        state.provenance = provenance;
         state.register_supplements(supplements)?;
         state.register_instances(&value_sets, &concept_maps)?;
         state.base.value_sets = value_sets;
@@ -571,6 +596,7 @@ impl AppState {
             software_version: env!("CARGO_PKG_VERSION"),
             security_services: Vec::new(),
             base_url: None,
+            provenance: BTreeMap::new(),
         }
     }
 

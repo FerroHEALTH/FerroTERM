@@ -34,7 +34,7 @@ async fn the_capability_statement_is_an_r4_resource() {
         .as_array()
         .unwrap()
         .iter()
-        .flat_map(|r| r["operation"].as_array().unwrap())
+        .flat_map(|r| r["operation"].as_array().into_iter().flatten())
         .map(|o| o["name"].as_str().unwrap())
         .collect();
     assert_eq!(

@@ -1,5 +1,5 @@
 {
-  "date": "2026-11-11T02:29:41.809084Z",
+  "date": "2026-11-25T07:24:29.183358Z",
   "extension": [
     {
       "extension": [
@@ -257,6 +257,36 @@
             }
           ],
           "type": "ConceptMap"
+        },
+        {
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "search-type"
+            }
+          ],
+          "searchParam": [
+            {
+              "definition": "http://hl7.org/fhir/SearchParameter/Provenance-target",
+              "documentation": "matches `target.reference` as written, such as a ConceptMap canonical `url|version`",
+              "name": "target",
+              "type": "reference"
+            },
+            {
+              "definition": "http://hl7.org/fhir/SearchParameter/Resource-elements",
+              "name": "_elements",
+              "type": "string"
+            },
+            {
+              "definition": "http://hl7.org/fhir/SearchParameter/Resource-summary",
+              "documentation": "`text`, `data`, `count` and `false`; `true` is refused as not supported",
+              "name": "_summary",
+              "type": "token"
+            }
+          ],
+          "type": "Provenance"
         }
       ],
       "security": {

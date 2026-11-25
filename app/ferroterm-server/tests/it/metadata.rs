@@ -293,10 +293,9 @@ async fn every_declared_operation_states_the_levels_its_definition_declares() {
             .as_array()
             .expect("resource is a list")
         {
-            for operation in resource["operation"]
-                .as_array()
-                .expect("operation is a list")
-            {
+            // NOTE: a resource type with no operation, `Provenance`, carries no
+            // `operation` element.
+            for operation in resource["operation"].as_array().into_iter().flatten() {
                 assert!(
                     levels_of(operation).contains(&"type".to_owned()),
                     "{version} answers {} {} at the type level: {body}",
