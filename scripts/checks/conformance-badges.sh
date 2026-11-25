@@ -54,8 +54,8 @@ done
 # The EHDS badges, self-tested: each counts a committed corpus that a test or
 # scripts/checks/ehds-matrix.sh holds true, and names the exact version it
 # measures. A corpus that does not exist yet writes no badge. The badges stay
-# short, and the README heading over them says once that they are self-tested
-# (owner decision, 2026-11-25); a heading without it fails.
+# short, and the small caption under the README's conformance heading says
+# once what they count (owner decision, 2026-11-25); a README without it fails.
 badge() {
   local file="$1" label="$2" message="$3" colour="$4" logo="$5"
   # A badge reports what a synthetic or free corpus proves, so it never claims
@@ -68,17 +68,6 @@ badge() {
     --argjson logo "$(badge_logo_fields "$logo")" \
     '{schemaVersion: 1, label: $label, message: $message, color: $color} + $logo' > "$out/$file"
   echo "conformance-badges: $file $message"
-}
-
-# Fails unless the bold heading over the README's first EHDS badge says the
-# counts are self-tested.
-ehds_heading() {
-  local heading
-  heading="$(awk '/^\*\*/ { last = $0 } /conformance%2Fehds-/ { print last; exit }' "$1")"
-  if ! grep -qi 'self-tested' <<<"$heading"; then
-    echo "conformance-badges: $1: the heading over the EHDS badges says they are self-tested" >&2
-    return 1
-  fi
 }
 
 if [[ -n "$self_test" ]]; then
@@ -105,14 +94,14 @@ if [[ -n "$self_test" ]]; then
     exit 1
   fi
   badge_logo_readme README.md || exit 1
-  printf '**EHDS (self-tested)**<br>\n[![x](https://img.shields.io/endpoint?url=https%%3A%%2F%%2Fferroterm.eu%%2Fconformance%%2Fehds-mvc.json)](x)\n' > "$out/README.md"
-  ehds_heading "$out/README.md" || exit 1
-  printf '**EHDS**<br>\n[![x](https://img.shields.io/endpoint?url=https%%3A%%2F%%2Fferroterm.eu%%2Fconformance%%2Fehds-mvc.json)](x)\n' > "$out/README.md"
-  if ehds_heading "$out/README.md" 2>/dev/null; then
-    echo "conformance-badges: self-test: an EHDS heading without self-tested passes" >&2
+  printf '**Conformance and compliance**<br>\n%s<br>\n' "$badge_caption" > "$out/README.md"
+  badge_caption_check "$out/README.md" || exit 1
+  printf '**Conformance and compliance**<br>\n' > "$out/README.md"
+  if badge_caption_check "$out/README.md" 2>/dev/null; then
+    echo "conformance-badges: self-test: a README without the conformance caption passes" >&2
     exit 1
   fi
-  ehds_heading README.md || exit 1
+  badge_caption_check README.md || exit 1
   echo "conformance-badges: self-test OK"
   exit 0
 fi
