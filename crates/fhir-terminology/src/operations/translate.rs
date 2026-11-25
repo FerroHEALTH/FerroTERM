@@ -112,8 +112,8 @@ pub struct TranslateInput {
     pub reverse: Option<bool>,
     /// Whether `dependency` was given; not supported.
     pub dependency: bool,
-    /// Whether the subject is a target code (the R5 `target*` inputs): the map
-    /// is read in reverse and each match is reported source to target.
+    /// Whether each match is reported as the map states it, source to target:
+    /// the R5 `target*` inputs, and an R4 `reverse`.
     pub target_input: bool,
 }
 
@@ -172,7 +172,11 @@ pub fn translate(
     {
         Some(out_of_scope_message(subject, &consulted.out_of_scope))
     } else if consulted.mapped {
-        Some(String::from("No translations found"))
+        Some(no_translation_message(
+            subjects.first(),
+            target_system,
+            reverse,
+        ))
     } else {
         Some(no_map_message(subjects.first(), target_system, reverse))
     };
@@ -362,6 +366,22 @@ fn successors(
         }
     }
     Ok(matches)
+}
+
+/// The message when a map applied and gave no translation; a reverse read
+/// names both systems, as the ecosystem's `translate-reverse-r4-a` asks.
+fn no_translation_message(
+    subject: Option<&Subject>,
+    target_system: Option<&str>,
+    reverse: bool,
+) -> String {
+    match (reverse, subject, target_system) {
+        (true, Some(subject), Some(target)) => format!(
+            "No translations found for '{}' from '{}' in reverse to '{target}'",
+            subject.code, subject.system
+        ),
+        _ => String::from("No translations found"),
+    }
 }
 
 /// The ecosystem's message when no concept map fits the request.
