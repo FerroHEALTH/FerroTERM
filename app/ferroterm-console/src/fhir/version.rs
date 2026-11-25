@@ -46,7 +46,7 @@ impl FhirVersion {
             Self::R4 => "FHIR 4.0.1",
             Self::R4B => "FHIR 4.3.0",
             Self::R5 => "FHIR 5.0.0",
-            Self::R6 => "FHIR 6.0.0-ballot5",
+            Self::R6 => "FHIR 6.0.0-snapshot1",
         }
     }
 

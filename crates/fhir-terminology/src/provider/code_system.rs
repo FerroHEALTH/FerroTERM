@@ -349,7 +349,7 @@ mod tests {
             Some("http://hl7.org/fhir/concept-properties#status"),
             "status is defined in the FHIR concept properties"
         );
-        // <https://hl7.org/fhir/6.0.0-ballot5/codesystem.html#defined-props>
+        // <https://hl7.org/fhir/6.0.0-snapshot1/codesystem.html#defined-props>
         assert_eq!(
             defined_property_uri("definition").as_deref(),
             Some("http://hl7.org/fhir/concept-properties#definition"),

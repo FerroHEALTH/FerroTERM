@@ -102,7 +102,7 @@ fn validate_code_checks_display_case_and_inactive_codes() {
 
 // NOTE: `inferSystem` finds a bare code's system by its membership in the value
 // set, and `lenient-display-validation` keeps a wrong display from failing the
-// result (<https://hl7.org/fhir/6.0.0-ballot5/valueset-operation-validate-code.html>).
+// result (<https://hl7.org/fhir/6.0.0-snapshot1/valueset-operation-validate-code.html>).
 #[test]
 fn validate_code_infers_the_system_by_membership_and_can_be_lenient_on_displays() {
     let world = World::load();

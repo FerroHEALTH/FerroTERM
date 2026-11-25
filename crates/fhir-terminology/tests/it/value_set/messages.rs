@@ -773,7 +773,7 @@ fn validate_code_checks_membership_only_when_asked() {
 }
 // NOTE: under `valueset-membership-only` the server performs no "validation tasks
 // beyond validating membership", so an unknown code carries the membership issue
-// alone (<https://hl7.org/fhir/6.0.0-ballot5/valueset-operation-validate-code.html>).
+// alone (<https://hl7.org/fhir/6.0.0-snapshot1/valueset-operation-validate-code.html>).
 #[test]
 fn membership_only_reports_membership_without_the_codes_standing_in_its_system() {
     let world = two_version_world();

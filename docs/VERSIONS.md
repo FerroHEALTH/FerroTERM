@@ -75,7 +75,7 @@ in a change that moves the pin with it.
 
 | Item | Pin |
 |---|---|
-| FHIR R6 terminology bundles | 6.0.0-ballot5 (the `hl7.fhir.r6.core` package `crates/fhir-terminology/data/fhir/r6/` is generated from, the R6 package FerroBRIDGE pins), held: snapshot builds are not releases |
+| FHIR R6 terminology bundles | 6.0.0-snapshot1 (the `hl7.fhir.r6.core` package `crates/fhir-terminology/data/fhir/r6/` is generated from, the R6 package FerroBRIDGE pins; it follows the `r6` model of `fhir-types` 0.2.0, so the surface, the model and the bundles name one package) |
 
 ## SNOMED CT / ECL
 

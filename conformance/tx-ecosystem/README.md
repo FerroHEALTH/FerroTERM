@@ -284,7 +284,7 @@ collection of languages", so `zh` does not subsume `zh-min-nan`.
   `valueset-expansion-parameter` extension naming `versionsMatch`, which
   appears nowhere in `hl7.fhir.r4.core` 4.0.1,
   `hl7.fhir.r4b.core` 4.3.0, `hl7.fhir.r5.core` 5.0.0, or `hl7.fhir.r6.core`
-  6.0.0-ballot5, and nowhere in the ecosystem IG outside these fixtures. No
+  6.0.0-snapshot1, and nowhere in the ecosystem IG outside these fixtures. No
   FHIR version prescribes the order of two `expansion.contains` entries
   either. The server keeps one entry per include, in include order, and the
   eight stay unpassed. #507 holds the upstream report: define `versionsMatch`,

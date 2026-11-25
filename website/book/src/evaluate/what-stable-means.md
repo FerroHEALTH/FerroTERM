@@ -40,7 +40,7 @@ release states. A released version's terms never change after the fact.
 ## What does not carry the promise
 
 **R6, which is ballot-tracking.** `/r6` answers in the shapes of
-`hl7.fhir.r6.core` 6.0.0-ballot5. R6 is not published, so its shapes can
+`hl7.fhir.r6.core` 6.0.0-snapshot1. R6 is not published, so its shapes can
 change under us, and when the ballot moves this endpoint moves with it inside
 the 0.1 line. Build against `/r5` if you need the promise;
 [FHIR versions](../integrate/fhir-versions.md) has the detail.

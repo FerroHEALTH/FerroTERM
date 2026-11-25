@@ -199,8 +199,8 @@ fn r4_family_operators(operators: &[FilterOperator]) -> Vec<&'static str> {
 /// The operators one filter entry states on an R5-family surface: every
 /// operator the engine evaluates.
 ///
-/// `filter-operator` 6.0.0-ballot5 adds a twelfth, `property-value-of`
-/// (<https://hl7.org/fhir/6.0.0-ballot5/codesystem-filter-operator.html>),
+/// `filter-operator` 6.0.0-snapshot1 adds a twelfth, `property-value-of`
+/// (<https://hl7.org/fhir/6.0.0-snapshot1/codesystem-filter-operator.html>),
 /// which the engine does not evaluate, so the R6 statement stays at eleven.
 fn r5_family_operators(operators: &[FilterOperator]) -> Vec<&'static str> {
     operators.iter().map(|operator| operator.code()).collect()
@@ -349,7 +349,7 @@ macro_rules! version_extensions {
     }};
 }
 
-// NOTE: <https://hl7.org/fhir/6.0.0-ballot5/terminologycapabilities.html>: R6 differs from
+// NOTE: <https://hl7.org/fhir/6.0.0-snapshot1/terminologycapabilities.html>: R6 differs from
 // R5 only in an optional `codeSystem.content` and `version.value` for `version.code`, so
 // one macro with a flavour arm renders both.
 macro_rules! r5_family_capabilities {

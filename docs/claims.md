@@ -274,7 +274,7 @@ Per system, the loader flag, the provider, and the test that exercises it:
 
 | Claim | Evidence |
 |---|---|
-| The four version prefixes and their packages (4.0.1, 4.3.0, 5.0.0, 6.0.0-ballot5) | `app/ferroterm-server/src/served.rs`; `app/ferroterm-server/src/version/r4.rs`, `r4b.rs`, `r5.rs`, `r6.rs`; each `PROVENANCE.md` |
+| The four version prefixes and their packages (4.0.1, 4.3.0, 5.0.0, 6.0.0-snapshot1) | `app/ferroterm-server/src/served.rs`; `app/ferroterm-server/src/version/r4.rs`, `r4b.rs`, `r5.rs`, `r6.rs`; each `PROVENANCE.md` |
 | R4 and R4B declare the same terminology parameters, so one set of macros instantiates both | `app/ferroterm-server/src/version/mod.rs` `surface!` |
 | `$versions` names `4.0`, `4.3`, `5.0`, or `6.0` | `app/ferroterm-server/src/version/system.rs`; `app/ferroterm-server/tests/it/r4.rs::versions_names_r4` |
 | A parameter the version does not declare is refused with an `OperationOutcome` | `app/ferroterm-server/tests/it/r6.rs`, `tests/it/operations.rs` |

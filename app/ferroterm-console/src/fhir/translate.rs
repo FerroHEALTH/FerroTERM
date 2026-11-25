@@ -6,7 +6,7 @@
 //! The operation is spelled differently in every release this server mounts
 //! (<https://hl7.org/fhir/R4B/conceptmap-operation-translate.html>,
 //! <https://hl7.org/fhir/R5/conceptmap-operation-translate.html>,
-//! <https://hl7.org/fhir/6.0.0-ballot5/conceptmap-operation-translate.html>),
+//! <https://hl7.org/fhir/6.0.0-snapshot1/conceptmap-operation-translate.html>),
 //! and `ferrobridge-term` writes each release's names and reads each
 //! release's answer.
 //!

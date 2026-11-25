@@ -24,7 +24,7 @@ const FHIR_VERSIONS: [(FhirVersion, &str); 4] = [
     (FhirVersion::R4, "4.0.1"),
     (FhirVersion::R4B, "4.3.0"),
     (FhirVersion::R5, "5.0.0"),
-    (FhirVersion::R6, "6.0.0-ballot5"),
+    (FhirVersion::R6, "6.0.0-snapshot1"),
 ];
 
 const GENDER: &str = "http://hl7.org/fhir/administrative-gender";

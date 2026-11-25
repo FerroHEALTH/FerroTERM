@@ -344,7 +344,7 @@ mod tests {
                 ("R4", Some("4.0.1")),
                 ("R4B", Some("4.3.0")),
                 ("R5", Some("5.0.0")),
-                ("R6", Some("6.0.0-ballot5")),
+                ("R6", Some("6.0.0-snapshot1")),
             ],
             "the release comes from the document, never from the viewer"
         );

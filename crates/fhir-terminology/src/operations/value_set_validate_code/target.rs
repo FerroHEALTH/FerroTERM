@@ -548,7 +548,7 @@ pub(super) fn assess(
         issues.push(note);
     }
     // NOTE: under `lenient-display-validation` a wrong display does not fail the
-    // result (<https://hl7.org/fhir/6.0.0-ballot5/valueset-operation-validate-code.html>).
+    // result (<https://hl7.org/fhir/6.0.0-snapshot1/valueset-operation-validate-code.html>).
     if let Some(given) = subject.display
         && policy.display != DisplayCheck::Skipped
         && let Some(issue) = super::super::display::judge(

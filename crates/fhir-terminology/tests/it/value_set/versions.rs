@@ -304,7 +304,7 @@ fn validate_code_itemises_version_disagreements_against_the_value_set_version() 
 
 // NOTE: the value set version trio and the system trio negotiate the versions an
 // operation touches, top-level and imported alike
-// (<https://hl7.org/fhir/6.0.0-ballot5/valueset-operation-expand.html>).
+// (<https://hl7.org/fhir/6.0.0-snapshot1/valueset-operation-expand.html>).
 #[test]
 fn expand_negotiates_value_set_versions_and_names_the_value_sets_it_used() {
     let world = World::load();

@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The FHIR R6 ballot under `/r6`: the 6.0.0-ballot5 resources, the shapes
+//! The FHIR R6 ballot under `/r6`: the 6.0.0-snapshot1 resources, the shapes
 //! the ballot shares with R5, and the inputs it renames or adds
-//! (<https://hl7.org/fhir/6.0.0-ballot5/terminology-service.html>).
+//! (<https://hl7.org/fhir/6.0.0-snapshot1/terminology-service.html>).
 
 use ferroterm_testkit::fhir::{ANIMALS, CM_ANIMALS_COLOURS, COLOURS, VS_ALL, VS_PETS};
 use fhir_types::codec::{Json, Path, expect_object};
@@ -21,13 +21,13 @@ async fn the_metadata_resources_are_the_r6_ballot_and_say_so() {
     let server = Server::start();
     let (status, body) = server.get("/r6/metadata").await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body["fhirVersion"], "6.0.0-ballot5");
+    assert_eq!(body["fhirVersion"], "6.0.0-snapshot1");
     assert_eq!(
         body["url"],
         "https://ferroterm.eu/fhir/CapabilityStatement/ferroterm-r6"
     );
     let description = body["description"].as_str().expect("the ballot note");
-    assert!(description.contains("6.0.0-ballot5"), "{description}");
+    assert!(description.contains("6.0.0-snapshot1"), "{description}");
     assert!(description.contains("re-verified"), "{description}");
     let mut path = Path::root("CapabilityStatement");
     let carried = crate::fixture::document(&body);
@@ -198,7 +198,7 @@ async fn r6_takes_a_repeated_display_language_and_refuses_what_it_does_not_imple
 /// `handle-unclosed-expansion` is declared by the R6 `OperationDefinition`
 /// alone (`in 0..1 boolean`); R4, R4B, and R5 declare no such input, so they
 /// refuse the name as undeclared
-/// (<https://hl7.org/fhir/6.0.0-ballot5/valueset-operation-expand.html>,
+/// (<https://hl7.org/fhir/6.0.0-snapshot1/valueset-operation-expand.html>,
 /// <https://hl7.org/fhir/R5/valueset-operation-expand.html>).
 #[tokio::test]
 async fn handle_unclosed_expansion_is_taken_under_r6_and_refused_under_the_earlier_versions() {
