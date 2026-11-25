@@ -28,11 +28,12 @@
 [![SLSA Build Level 3](https://slsa.dev/images/gh-badge-level3.svg)](https://ferroterm.eu/docs/operate/verifying-releases.html)
 
 **Conformance and compliance**<br>
+<sub>(self-tested and self-assessed counts; none is a certification)</sub><br>
 [![tx-ecosystem R4](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fr4.json)](https://ferroterm.eu/docs/evaluate/conformance.html)
 [![tx-ecosystem R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fr4b.json)](https://ferroterm.eu/docs/evaluate/conformance.html)
 [![tx-ecosystem R5](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fr5.json)](https://ferroterm.eu/docs/evaluate/conformance.html)
 <br>
-**EHDS (self-tested)**<br>
+**EHDS**<br>
 [![MyHealth@EU MVC 10.1.0 (CI) import](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fehds-mvc.json)](https://ferroterm.eu/docs/evaluate/conformance.html)
 [![EEHRxF draft 2026-11-23 Art 6 code systems](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fehds-art6.json)](https://ferroterm.eu/docs/evaluate/conformance.html)
 <br>
