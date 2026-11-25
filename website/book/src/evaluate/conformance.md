@@ -35,6 +35,38 @@ their clusters are tracked on the issue tracker, and the lists grow with the
 work. The suite's other modes (ICD-11, LOINC) need licensed content and run by
 hand; their lists live beside the general ones.
 
+## Where the remaining cases stand
+
+The `general` mode counts 805 cases on every surface. With suite `9c2bbce`
+and validator 7.0.6, `/r4` passes 701, `/r4b` 689 and `/r5` 705. Every case that does not pass falls into one of the rows
+below. None of them needs licensed content: the cases that do (SNOMED CT,
+LOINC, ICD-11, OMOP) sit in the suite's other modes, which run by hand and
+are not in these counts.
+
+| Why the case does not pass | Tracked in | R4 | R4B | R5 |
+|---|---|---|---|---|
+| **Not run on this surface.** The case is gated to another FHIR version or to the `tx.fhir.org` mode, and the runner still counts it in the 805. | | 5 | 9 | 9 |
+| **The R4B surface.** The suite targets R4 and R5: on `/r4b` its `$version$` stands for R4's `4.0.1` (the `metadata`, `exclude` and two `contained-nested` cases), and its `!4.0` gate lets two R5-only reverse `$translate` cases run against R4B, which keeps `reverse`. | | 0 | 11 | 0 |
+| **No published definition.** The cases rest on extensions no released package defines (`extension-codes`, `global-lang-pack`). | [#1067](https://github.com/FerroHEALTH/FerroTERM/issues/1067) | 42 | 42 | 42 |
+| The cases send `reset` or `dispose` to `$closure`, or `useSupplement` to `CodeSystem/$validate-code`, which no OperationDefinition declares; nine more `closure` cases fail because the closure the first one sets up is never made. | [#1068](https://github.com/FerroHEALTH/FerroTERM/issues/1068) | 15 | 15 | 15 |
+| The cases expect `$lookup` outputs `warning` and `used-supplement`, which no OperationDefinition declares. | [#1069](https://github.com/FerroHEALTH/FerroTERM/issues/1069) | 4 | 4 | 4 |
+| The cases expect concept properties (`label`, `order`) and extension placements no published definition allows. | [#1107](https://github.com/FerroHEALTH/FerroTERM/issues/1107) | 9 | 9 | 9 |
+| The cases turn on `versionsMatch`, an expansion parameter no publication defines. | [#507](https://github.com/FerroHEALTH/FerroTERM/issues/507) | 8 | 8 | 8 |
+| The cases expect R5's `$lookup` `definition` output, or send R5's `$translate` `targetcode`, on R4 and R4B, whose OperationDefinitions declare neither. | [#1330](https://github.com/FerroHEALTH/FerroTERM/issues/1330) | 3 | 3 | 0 |
+| The cases send an input the operation does not declare (`codingX` in a batch, `targetcode` on R4), and FerroTERM refuses an undeclared input. | [#349](https://github.com/FerroHEALTH/FerroTERM/issues/349) | 3 | 2 | 2 |
+| **Waiting on the FHIR model.** `$translate` checks each target code and answers `error`; the output enters through the `fhir-types` ecosystem overlay, which no release carries yet. | [#1308](https://github.com/FerroHEALTH/FerroTERM/issues/1308) | 3 | 3 | 3 |
+| **FerroTERM gaps.** A request with no code system answers `required` where the suite expects `invalid`, and a refusal repeats its text in `diagnostics`. | [#1326](https://github.com/FerroHEALTH/FerroTERM/issues/1326) | 5 | 5 | 5 |
+| `$validate-code` leaves out the warning for a coding with no system inside a CodeableConcept, and names a display-only Coding differently. | [#1327](https://github.com/FerroHEALTH/FerroTERM/issues/1327) | 3 | 3 | 3 |
+| R4 and R4B do not read `compose.property` or write expansion properties as R5 cross-version extensions. | [#1328](https://github.com/FerroHEALTH/FerroTERM/issues/1328) | 2 | 2 | 0 |
+| An R4 reverse `$translate` reports the match from the request's side, and its no-match message names neither system. | [#1329](https://github.com/FerroHEALTH/FerroTERM/issues/1329) | 2 | 0 | 0 |
+| **Total not passing** | | 104 | 116 | 100 |
+
+The rows marked as having no published definition are upstream reports:
+FerroTERM answers what the published OperationDefinitions and extensions
+define, and each report names the change upstream that would settle it.
+The gaps are this server's to close, and each one's issue lists the cases
+it earns.
+
 ## What the numbers are not
 
 The suite is the ecosystem's test suite, not a certification. Passing a case
