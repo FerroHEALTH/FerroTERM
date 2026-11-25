@@ -211,6 +211,23 @@ fn loaded(request: &Request<'_>, id: &str) -> Result<Option<Object>, Failure> {
                 .map(Some)
                 .map_err(|reason| rendering(&reason))
         }
+        ResourceType::Provenance => {
+            let Some(held) = request.state.provenance_instance(id) else {
+                return Ok(None);
+            };
+            (request.surface.round_trip)(&held.object)
+                .map(Some)
+                .map_err(|reason| {
+                    Failure::new(
+                        StatusCode::NOT_FOUND,
+                        "not-supported",
+                        format!(
+                            "Provenance/{id} was loaded as FHIR {} and does not read as FHIR {}: {reason}",
+                            held.fhir_version, request.surface.fhir_version
+                        ),
+                    )
+                })
+        }
     }
 }
 
@@ -404,7 +421,8 @@ fn history_since(query: &[(String, String)]) -> Result<Option<jiff::Timestamp>, 
     Ok(since)
 }
 
-/// The records a search over `url` and `version` matches, sorted by id.
+/// The records a search over `url` and `version` matches, sorted by id, or
+/// over `target` for a `Provenance`.
 ///
 /// # Errors
 ///
@@ -414,6 +432,18 @@ pub(crate) fn matches(
     resource_type: ResourceType,
     query: &[(String, String)],
 ) -> Result<Vec<Record>, Failure> {
+    if resource_type == ResourceType::Provenance {
+        let target = loaded::provenance_target(query)?;
+        return Ok(state
+            .persisted_records(resource_type)
+            .into_iter()
+            .filter(|record| {
+                target.is_none_or(|wanted| {
+                    crate::state::provenance::targets(&record.resource).any(|named| named == wanted)
+                })
+            })
+            .collect());
+    }
     let (url, version) = loaded::criteria(query)?;
     Ok(state
         .persisted_records(resource_type)

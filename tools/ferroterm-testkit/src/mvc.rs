@@ -20,6 +20,12 @@ pub const VS_UNSERVED: &str = "http://example.org/fhir/ValueSet/eHDSIUnserved";
 pub const UNSERVED_SYSTEM: &str = "http://example.org/fhir/CodeSystem/unserved";
 /// The version [`VS_UNSERVED`] pins.
 pub const UNSERVED_VERSION: &str = "2026-01";
+/// A national code system the package maps from.
+pub const NATIONAL: &str = "http://example.org/fhir/CodeSystem/national-allergy";
+/// The map from [`NATIONAL`] to [`SYSTEM`], one version per release.
+pub const MAP: &str = "http://example.org/fhir/ConceptMap/national-to-mvc";
+/// Who validated the map of each release, as its `Provenance` names them.
+pub const VALIDATOR: &str = "Synthetic Terminology Board";
 
 /// The files of the package for `version`, by path inside the tarball.
 fn files(version: &str) -> Vec<(String, serde_json::Value)> {
@@ -57,6 +63,31 @@ fn files(version: &str) -> Vec<(String, serde_json::Value)> {
             serde_json::json!({"resourceType": "ValueSet", "url": VS_UNSERVED, "version": version,
                 "status": "active", "compose": {"include": [{"system": UNSERVED_SYSTEM,
                     "version": UNSERVED_VERSION, "concept": [{"code": "u1"}]}]}}),
+        ),
+        (
+            String::from("package/CodeSystem-national-allergy.json"),
+            serde_json::json!({"resourceType": "CodeSystem", "url": NATIONAL, "version": version,
+                "status": "active", "content": "complete",
+                "concept": [{"code": "n1", "display": "National allergy one"}]}),
+        ),
+        (
+            String::from("package/ConceptMap-national-to-mvc.json"),
+            serde_json::json!({"resourceType": "ConceptMap",
+                "id": format!("national-to-mvc-{}", version.replace('.', "-")),
+                "url": MAP, "version": version, "status": "active",
+                "group": [{"source": NATIONAL, "target": SYSTEM, "element": [{"code": "n1",
+                    "target": [{"code": "a1", "equivalence": "equivalent"}]}]}]}),
+        ),
+        (
+            String::from("package/Provenance-national-to-mvc.json"),
+            serde_json::json!({"resourceType": "Provenance",
+                "id": format!("national-to-mvc-{}", version.replace('.', "-")),
+                "target": [{"reference": format!("{MAP}|{version}")}],
+                "recorded": "2026-11-01T10:00:00Z",
+                "activity": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/v3-DataOperation",
+                    "code": "UPDATE"}]},
+                "agent": [{"type": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/provenance-participant-type",
+                    "code": "verifier"}]}, "who": {"display": VALIDATOR}}]}),
         ),
         (
             String::from("package/.index.json"),

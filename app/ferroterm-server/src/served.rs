@@ -41,6 +41,37 @@ pub const CORE: [(&str, FhirVersion); 4] = [
     (r6::FHIR_VERSION, FhirVersion::R6),
 ];
 
+/// The FHIR version label of the served surface that reads `version`.
+#[must_use]
+pub fn version_label(version: FhirVersion) -> &'static str {
+    CORE.iter()
+        .find(|(_, served)| *served == version)
+        .map_or(r4b::FHIR_VERSION, |(label, _)| label)
+}
+
+/// Decodes `object` as a resource of `fhir_version`, refused with the
+/// element path the codec names.
+///
+/// # Errors
+///
+/// What the codec refused, and a version this server does not serve.
+pub fn decode(fhir_version: &str, object: &fhir_types::codec::Object) -> Result<(), String> {
+    let refused = |error: fhir_types::codec::DecodeError| error.to_string();
+    if fhir_version == r4::FHIR_VERSION {
+        r4::resource_of(object).map(drop).map_err(refused)
+    } else if fhir_version == r4b::FHIR_VERSION {
+        r4b::resource_of(object).map(drop).map_err(refused)
+    } else if fhir_version == r5::FHIR_VERSION {
+        r5::resource_of(object).map(drop).map_err(refused)
+    } else if fhir_version == r6::FHIR_VERSION {
+        r6::resource_of(object).map(drop).map_err(refused)
+    } else {
+        Err(format!(
+            "`{fhir_version}` is not a FHIR version this server serves"
+        ))
+    }
+}
+
 /// The FHIR base a client reaches the version served under `segment` at.
 ///
 /// This is the one derivation of a version's base: a capability statement
@@ -158,6 +189,7 @@ macro_rules! reading {
                             .map(Loaded::ConceptMap)
                             .map_err(invalid)
                     }
+                    Resource::Provenance(_) => Ok(Loaded::Provenance),
                     ref other => Err(unsupported(other)),
                 }
             }
@@ -235,6 +267,7 @@ macro_rules! reading {
                     Resource::ConceptMap(_) => "ConceptMap",
                     Resource::OperationOutcome(_) => "OperationOutcome",
                     Resource::Parameters(_) => "Parameters",
+                    Resource::Provenance(_) => "Provenance",
                     Resource::TerminologyCapabilities(_) => "TerminologyCapabilities",
                     Resource::ValueSet(_) => "ValueSet",
                     Resource::Unknown(_) => "resource of another type",

@@ -294,7 +294,7 @@ it used. Designations carry their BCP 47 language and their use.
 ## Persisted resources
 
 A deployment that names a database in `FERROTERM__TERMINOLOGY__RESOURCES` accepts
-`CodeSystem`, `ValueSet`, and `ConceptMap` resources over the REST API and
+`CodeSystem`, `ValueSet`, `ConceptMap` and `Provenance` resources over the REST API and
 keeps them across restarts. The interactions are the ones the FHIR RESTful API
 defines (<https://hl7.org/fhir/R4B/http.html>), under every version prefix:
 
@@ -386,6 +386,30 @@ Every operation sees a persisted resource exactly as it sees one loaded from
 
 A deployment that names no database refuses every write with a `422` and
 declares no write interaction in its capability statement.
+
+## The version and provenance of a mapping
+
+The draft EEHRxF implementing act (Art 6) admits a national code only with a
+validated mapping whose versions and provenance are recorded. Every `match` of
+`ConceptMap/$translate` names the map it came from as a versioned canonical,
+`url|version`, in `source` (R4 and R4B) or `originMap` (R5 and R6)
+(<https://hl7.org/fhir/R4/conceptmap-operation-translate.html>).
+
+Who validated that map, and when, is a `Provenance` whose `target.reference`
+is the same canonical (<https://hl7.org/fhir/R4B/provenance.html>). The server
+keeps the `Provenance` resources of every package directory under
+`FERROTERM__TERMINOLOGY__CODE_SYSTEMS`, and `ferroterm-build --fhir-package`
+keeps them on import; with a resource database, a client writes more. Read
+them by the canonical:
+
+```console
+$ curl 'https://tx.example.org/r4b/Provenance?target=http://example.org/fhir/ConceptMap/national-to-mvc%7C10.1.0'
+```
+
+The answer is a `searchset` of every `Provenance` whose `target.reference` is
+that string as written; `Provenance/{id}` reads one. A `Provenance` decodes in
+the FHIR version it was loaded or written in, and a base whose version cannot
+read it leaves it out, as it does for any persisted resource.
 
 ## Primitive lexical forms on local content
 

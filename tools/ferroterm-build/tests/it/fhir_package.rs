@@ -19,7 +19,12 @@ fn a_package_keeps_its_manifest_and_terminology_resources() {
     );
     assert_eq!(
         report.counts,
-        [("CodeSystem", 1), ("ValueSet", 2), ("ConceptMap", 0)]
+        [
+            ("CodeSystem", 2),
+            ("ValueSet", 2),
+            ("ConceptMap", 1),
+            ("Provenance", 1)
+        ]
     );
     assert_eq!(report.dir, out.join(format!("{NAME}-10.1.0")));
     let mut written: Vec<String> = std::fs::read_dir(&report.dir)
@@ -37,6 +42,9 @@ fn a_package_keeps_its_manifest_and_terminology_resources() {
         written,
         [
             "CodeSystem-mvc-synthetic.json",
+            "CodeSystem-national-allergy.json",
+            "ConceptMap-national-to-mvc.json",
+            "Provenance-national-to-mvc.json",
             "ValueSet-eHDSIAllergyNoAllergy.json",
             "ValueSet-eHDSIUnserved.json",
             "package.json"

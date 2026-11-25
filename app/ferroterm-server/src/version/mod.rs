@@ -84,8 +84,8 @@ macro_rules! surface {
             lookup_instance_route(operation_routes(resource_routes(router)))
         }
 
-        /// The RESTful interactions of the three resource types this server
-        /// serves (<https://hl7.org/fhir/R4B/http.html>).
+        /// The RESTful interactions of the resource types this server serves
+        /// (<https://hl7.org/fhir/R4B/http.html>).
         fn resource_routes(
             router: axum::Router<crate::reload::Serving>,
         ) -> axum::Router<crate::reload::Serving> {
@@ -138,6 +138,22 @@ macro_rules! surface {
                 .route(
                     "/ConceptMap/{id}/_history/{version}",
                     get(store::concept_map_version_read),
+                )
+                .route(
+                    "/Provenance",
+                    get(store::provenance_search).post(store::provenance_create),
+                )
+                .route(
+                    "/Provenance/{id}",
+                    get(store::provenance_read)
+                        .put(store::provenance_update)
+                        .delete(store::provenance_delete),
+                )
+                .route("/Provenance/_history", get(store::provenance_type_history))
+                .route("/Provenance/{id}/_history", get(store::provenance_history))
+                .route(
+                    "/Provenance/{id}/_history/{version}",
+                    get(store::provenance_version_read),
                 )
         }
 

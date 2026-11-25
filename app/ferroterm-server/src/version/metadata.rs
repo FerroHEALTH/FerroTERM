@@ -374,8 +374,33 @@ macro_rules! metadata {
                 ]
             }
 
-            /// The three resource types this server serves, with their
-            /// interactions, search parameters, and operations.
+            /// The search parameters of `Provenance`: `target`, the resource
+            /// the record is about (<https://hl7.org/fhir/R4B/provenance.html#search>),
+            /// beside `_elements` and `_summary`.
+            fn provenance_search_params() -> Vec<CapabilityStatementRestResourceSearchParam> {
+                let mut params: Vec<_> = search_params()
+                    .into_iter()
+                    .filter(|param| param.name.value.as_deref() != Some("url")
+                        && param.name.value.as_deref() != Some("version"))
+                    .collect();
+                params.insert(
+                    0,
+                    CapabilityStatementRestResourceSearchParam {
+                        name: "target".into(),
+                        definition: Some("http://hl7.org/fhir/SearchParameter/Provenance-target".into()),
+                        r#type: "reference".into(),
+                        documentation: Some(
+                            "matches `target.reference` as written, such as a ConceptMap canonical `url|version`"
+                                .into(),
+                        ),
+                        ..Default::default()
+                    },
+                );
+                params
+            }
+
+            /// The resource types this server serves, with their interactions,
+            /// search parameters, and operations.
             fn rest_resources(state: &AppState) -> Vec<CapabilityStatementRestResource> {
                 vec![
                     CapabilityStatementRestResource {
@@ -404,6 +429,14 @@ macro_rules! metadata {
                         interaction: interactions(state),
                         search_param: search_params(),
                         operation: vec![declared(&CONCEPT_MAP_TRANSLATE)],
+                        ..Default::default()
+                    },
+                    // NOTE: the provenance of a ConceptMap, read by the canonical its
+                    // `target` names (draft EEHRxF implementing act Art 6).
+                    CapabilityStatementRestResource {
+                        r#type: "Provenance".into(),
+                        interaction: interactions(state),
+                        search_param: provenance_search_params(),
                         ..Default::default()
                     },
                 ]

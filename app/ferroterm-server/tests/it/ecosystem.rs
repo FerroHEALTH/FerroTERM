@@ -223,7 +223,7 @@ async fn the_capability_statement_documents_the_overlay_per_operation() {
             .as_array()
             .unwrap()
             .iter()
-            .flat_map(|r| r["operation"].as_array().unwrap())
+            .flat_map(|r| r["operation"].as_array().into_iter().flatten())
             .collect();
         let documentation = |name: &str| -> String {
             operations

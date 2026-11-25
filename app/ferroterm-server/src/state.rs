@@ -39,6 +39,7 @@ mod ids;
 pub mod layer;
 pub mod load;
 pub mod persisted;
+pub mod provenance;
 
 /// A failure to load the state.
 #[derive(Debug, thiserror::Error)]
@@ -178,6 +179,24 @@ pub enum LoadError {
     /// A persisted resource does not layer over the loaded state.
     #[error("cannot serve the persisted resources")]
     Persisted(#[source] PersistError),
+    /// A package directory or one of its files cannot be read for its
+    /// `Provenance` resources.
+    #[error("cannot read {path} for its Provenance resources")]
+    ProvenanceDir {
+        /// The directory or file.
+        path: PathBuf,
+        /// The cause.
+        #[source]
+        source: std::io::Error,
+    },
+    /// A loaded `Provenance` is refused.
+    #[error("the Provenance in {path} is refused: {reason}")]
+    Provenance {
+        /// The file.
+        path: PathBuf,
+        /// Why, with the element path the codec names.
+        reason: String,
+    },
     /// Two loaded resources of one type answer on the same logical id.
     #[error("the {resource_type} `{second}` carries the id `{id}`, which `{first}` answers on")]
     DuplicateId {
@@ -289,6 +308,8 @@ pub struct AppState {
     /// The base URL clients reach this server at, when the deployment named
     /// one; the capability statements state it per version.
     base_url: Option<String>,
+    /// The `Provenance` resources the deployment loaded, by id.
+    provenance: BTreeMap<String, provenance::Held>,
 }
 
 impl AppState {
@@ -436,6 +457,30 @@ impl AppState {
         }
         out.sort_by(|(left, ..), (right, ..)| left.cmp(right));
         out
+    }
+
+    /// The `Provenance` the deployment loaded under `id`.
+    #[must_use]
+    pub fn provenance_instance(&self, id: &str) -> Option<&provenance::Held> {
+        self.provenance.get(id)
+    }
+
+    /// The `Provenance` resources the deployment loaded whose `target` names
+    /// `target`, by id, the persisted ones left out because a search lists
+    /// those from their records.
+    #[must_use]
+    pub fn provenance_targeting(&self, target: Option<&str>) -> Vec<(&str, &provenance::Held)> {
+        self.provenance
+            .iter()
+            .filter(|(id, held)| {
+                self.persisted_record(ResourceType::Provenance, id)
+                    .is_none()
+                    && target.is_none_or(|wanted| {
+                        provenance::targets(&held.object).any(|named| named == wanted)
+                    })
+            })
+            .map(|(id, held)| (id.as_str(), held))
+            .collect()
     }
 
     /// Resolves a `ConceptMap` instance id, a persisted one first.

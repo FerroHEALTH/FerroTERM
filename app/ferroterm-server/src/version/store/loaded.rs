@@ -169,3 +169,33 @@ pub(crate) fn criteria(
     }
     Ok((url, version))
 }
+
+/// The `target` a `Provenance` search names.
+///
+/// `Provenance` search defines `target`, "the resource(s) the provenance
+/// record is about" (<https://hl7.org/fhir/R4B/provenance.html#search>); this
+/// server matches it against `target.reference` as written, a `ConceptMap`'s
+/// canonical (`url|version`) among them.
+///
+/// # Errors
+///
+/// A search parameter this server does not answer is a 400.
+pub(crate) fn provenance_target(query: &[(String, String)]) -> Result<Option<&str>, Failure> {
+    let mut target = None;
+    for (name, value) in query {
+        match name.as_str() {
+            "target" => target = Some(value.as_str()),
+            "_format" | crate::elements::PARAMETER | crate::elements::SUMMARY => {}
+            other => {
+                return Err(Failure::new(
+                    StatusCode::BAD_REQUEST,
+                    "not-supported",
+                    format!(
+                        "search parameter `{other}` is not supported; use `target`, `_elements` or `_summary`"
+                    ),
+                ));
+            }
+        }
+    }
+    Ok(target)
+}

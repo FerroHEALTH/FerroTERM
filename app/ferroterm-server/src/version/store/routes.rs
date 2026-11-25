@@ -386,6 +386,9 @@ macro_rules! store {
                         ));
                     }
                 }
+                if resource_type == ResourceType::Provenance {
+                    entry.extend(loaded_provenance(state, query, &at)?);
+                }
                 if resource_type == ResourceType::ConceptMap {
                     for id in loaded(state.concept_map_instances())? {
                         let Some(model) = state.concept_map_instance(&id) else {
@@ -446,6 +449,31 @@ macro_rules! store {
                     .map_err(|reason| crate::version::store::rendering(&reason.to_string()))?;
                 projection.apply_bundle(&mut object, surface.schemas);
                 wire.object(StatusCode::OK, &object, surface.schemas)
+            }
+
+            /// The loaded `Provenance` resources whose `target` the search names,
+            /// as this version reads them; one it cannot read is left out, as a
+            /// loaded resource is never converted between releases.
+            ///
+            /// # Errors
+            ///
+            /// A search parameter `Provenance` does not answer is a 400.
+            fn loaded_provenance(
+                state: &AppState,
+                query: &[(String, String)],
+                at: &dyn Fn(&str) -> Option<String>,
+            ) -> Result<Vec<BundleEntry>, Failure> {
+                let target = crate::version::store::loaded::provenance_target(query)?;
+                let mut out = Vec::new();
+                for (id, held) in state.provenance_targeting(target) {
+                    let Ok(object) = (surface().round_trip)(&held.object) else {
+                        continue;
+                    };
+                    let resource = crate::served::$fhir::resource_of(&object)
+                        .map_err(|reason| crate::version::store::rendering(&reason.to_string()))?;
+                    out.push(found(at(id), resource));
+                }
+                Ok(out)
             }
 
             /// What a history request asked, beside the resource it names.
@@ -620,6 +648,17 @@ macro_rules! store {
                 concept_map_history,
                 concept_map_type_history,
                 ResourceType::ConceptMap
+            );
+            crate::version::store::routes::store_routes!(
+                provenance_create,
+                provenance_read,
+                provenance_update,
+                provenance_version_read,
+                provenance_delete,
+                provenance_search,
+                provenance_history,
+                provenance_type_history,
+                ResourceType::Provenance
             );
         }
     };

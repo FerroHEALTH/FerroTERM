@@ -50,6 +50,9 @@ pub enum ResourceType {
     ValueSet,
     /// `ConceptMap`.
     ConceptMap,
+    /// `Provenance`: who produced or validated a resource the server holds
+    /// (<https://hl7.org/fhir/R4B/provenance.html>).
+    Provenance,
 }
 
 impl ResourceType {
@@ -60,6 +63,7 @@ impl ResourceType {
             Self::CodeSystem => "CodeSystem",
             Self::ValueSet => "ValueSet",
             Self::ConceptMap => "ConceptMap",
+            Self::Provenance => "Provenance",
         }
     }
 
@@ -70,6 +74,7 @@ impl ResourceType {
             "CodeSystem" => Some(Self::CodeSystem),
             "ValueSet" => Some(Self::ValueSet),
             "ConceptMap" => Some(Self::ConceptMap),
+            "Provenance" => Some(Self::Provenance),
             _ => None,
         }
     }
