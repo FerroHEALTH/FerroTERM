@@ -221,6 +221,42 @@ hold the GPS RF2 refset package instead, layer it onto the edition with
 `ferroterm-build --rf2 <edition> --rf2-refset <package>`; it is then served
 as `http://snomed.info/sct?fhir_vs=refset/<refset id>`.
 
+## UDI device identifiers
+
+A Unique Device Identifier (UDI) is assigned under the rules of an issuing
+entity: GS1, HIBCC, ICCBBA, or IFA. Its device identifier (UDI-DI) is what
+FerroTERM serves. Export the device records you need, for example the
+AccessGUDID delimited release
+(<https://accessgudid.nlm.nih.gov/download/delimited>, its pipe-delimited
+`device.txt`) or the UDI-DI records of EUDAMED (Regulation (EU) 2017/745,
+Article 28) saved as a delimited file or workbook, and build one issuing
+entity at a time:
+
+```console
+$ ferroterm-build --udi device.txt --udi-issuer gs1 --udi-version 20261102 --out /path/to/udi-gs1
+```
+
+The table carries no release, so give the export's date as the version. The
+build reads the UDI-DI column (`PrimaryDI` or `UDI-DI`); the brand or trade
+name is the display, the device description a designation and the display
+when a row has no name, and the model, the manufacturer, and the Basic
+UDI-DI are properties.
+
+| `--udi-issuer` | System |
+|---|---|
+| `gs1` | `http://hl7.org/fhir/NamingSystem/gs1-di` |
+| `hibcc` | `http://hl7.org/fhir/NamingSystem/hibcc-diI` |
+| `iccbba-blood` | `http://hl7.org/fhir/NamingSystem/iccbba-blood-di` |
+| `iccbba-other` | `http://hl7.org/fhir/NamingSystem/iccbba-other-di` |
+| `ifa` | `http://hl7.org/fhir/NamingSystem/ifa-gmbh-di` |
+
+HL7 Terminology registers no UDI issuer, so the systems are the issuer URIs
+FHIR R5 gives for `Device.udiCarrier.issuer`
+(<https://hl7.org/fhir/R5/device-definitions.html#Device.udiCarrier.issuer>).
+When the table has an issuing agency column (`deviceIdIssuingAgency`,
+`Issuing agency`), a row that names another entity stops the build: filter
+the export to one issuing entity first. The default child is `udi`.
+
 ## EHDS identifier types
 
 The EEHRxF act (Annex X, `EHDSPatient.identifier.type`) binds the identifier

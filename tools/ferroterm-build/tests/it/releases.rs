@@ -106,6 +106,31 @@ fn each_release_builds_under_its_canonical_uri_and_version() {
 }
 
 #[test]
+fn a_udi_table_builds_under_its_issuers_uri_and_the_given_release() {
+    let releases = tempfile::tempdir().expect("tempdir");
+    tables::write_releases(releases.path()).expect("writes");
+    let device = releases.path().join("device.txt").display().to_string();
+    let out = tempfile::tempdir().expect("tempdir");
+    let cli = parse(&[
+        "--udi",
+        &device,
+        "--udi-issuer",
+        "gs1",
+        "--udi-version",
+        "20991102",
+    ])
+    .expect("parses");
+    let Report::Classification(report) =
+        ferroterm_build::run_into(&cli, out.path()).expect("builds")
+    else {
+        panic!("a UDI table builds as a classification");
+    };
+    assert_eq!(report.system, "http://hl7.org/fhir/NamingSystem/gs1-di");
+    assert_eq!(report.version, "20991102");
+    assert_eq!(report.concepts, 2);
+}
+
+#[test]
 fn a_release_without_its_required_version_or_beside_another_source_is_refused() {
     assert!(
         parse(&["--npu", "npu.csv"]).is_err(),
@@ -125,6 +150,38 @@ fn a_release_without_its_required_version_or_beside_another_source_is_refused() 
     assert!(parse(&["--labcodeset", "l.zip"]).is_ok());
     assert!(parse(&["--dicom", "dcm.owl", "--orpha", "en_product1.xml"]).is_err());
     assert!(parse(&["--edqm", "a.json", "--edqm", "b.json"]).is_ok());
+    assert!(
+        parse(&["--udi", "device.txt", "--udi-version", "20991102"]).is_err(),
+        "a UDI table names no issuing entity"
+    );
+    assert!(
+        parse(&["--udi", "device.txt", "--udi-issuer", "gs1"]).is_err(),
+        "a UDI table names no release"
+    );
+    assert!(
+        parse(&[
+            "--udi",
+            "device.txt",
+            "--udi-issuer",
+            "acme",
+            "--udi-version",
+            "1"
+        ])
+        .is_err()
+    );
+    assert!(
+        parse(&[
+            "--udi",
+            "d.txt",
+            "--udi-issuer",
+            "hibcc",
+            "--udi-version",
+            "1",
+            "--emdn",
+            "e.xlsx"
+        ])
+        .is_err()
+    );
 }
 
 #[test]
