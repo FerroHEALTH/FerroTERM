@@ -523,6 +523,7 @@ dependencies = [
  "loinc",
  "rayon",
  "rf2",
+ "rustls",
  "rxnorm-rrf",
  "serde",
  "serde_json",

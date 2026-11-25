@@ -37,6 +37,7 @@
 [![MyHealth@EU MVC 10.1.0 (CI) import](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fehds-mvc.json)](https://ferroterm.eu/docs/evaluate/conformance.html)
 [![EEHRxF draft 2026-11-23 Art 6 code systems](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fehds-art6.json)](https://ferroterm.eu/docs/evaluate/conformance.html)
 <br>
+[![Post-quantum safe uses, self-assessed](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fpost-quantum.json)](docs/post-quantum.md)
 [![CRA](https://img.shields.io/badge/CRA-risk%20assessment-blue?logo=europeanunion&labelColor=003399&logoColor=FFCC00)](https://ferroterm.eu/docs/evaluate/cra-risk-assessment.html)
 
 </div>

@@ -115,7 +115,7 @@ fn lookup_property_star_asks_for_every_property_and_the_designations() {
     };
     let outcome = lookup(&registry, &Invocation::Type, &input).expect("looks up");
     let codes: Vec<&str> = outcome.properties.iter().map(|p| p.code.as_str()).collect();
-    assert_eq!(codes, ["legs", "kingdom"]);
+    assert_eq!(codes, ["legs", "kingdom", "notSelectable"]);
     let values: Vec<&str> = outcome
         .designations
         .iter()

@@ -299,6 +299,14 @@ jobs:
         run: |
           bash scripts/checks/ehds-matrix.sh
           bash scripts/checks/conformance-badges.sh --self-test
+      # The post-quantum inventory is well formed, names files that exist and
+      # matches the table of docs/post-quantum.md; the README carries its
+      # badge (#1321).
+      - name: tree-guards / post-quantum
+        if: ${{ !cancelled() }}
+        run: |
+          bash scripts/checks/post-quantum.sh --self-test
+          bash scripts/checks/post-quantum.sh --check
       # Every first-party file carries both SPDX lines, and every header
       # names the Licensor. Each self-test runs first on a synthetic tree.
       - name: tree-guards / spdx-headers

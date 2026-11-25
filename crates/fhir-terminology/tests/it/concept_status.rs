@@ -327,7 +327,8 @@ fn lookup_returns_the_declared_lifecycle_properties_as_they_were_written() {
             (
                 String::from("retirementDate"),
                 PropertyValue::DateTime(String::from(PAST))
-            )
+            ),
+            (String::from("notSelectable"), PropertyValue::Boolean(false))
         ]
     );
     assert_eq!(
@@ -337,7 +338,8 @@ fn lookup_returns_the_declared_lifecycle_properties_as_they_were_written() {
             (
                 String::from("status"),
                 PropertyValue::Code(String::from("deprecated"))
-            )
+            ),
+            (String::from("notSelectable"), PropertyValue::Boolean(false))
         ]
     );
     assert_eq!(
@@ -347,7 +349,8 @@ fn lookup_returns_the_declared_lifecycle_properties_as_they_were_written() {
             (
                 String::from("status"),
                 PropertyValue::Code(String::from("retired"))
-            )
+            ),
+            (String::from("notSelectable"), PropertyValue::Boolean(false))
         ],
         "the derived flag replaces the one the resource stated"
     );

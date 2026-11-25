@@ -10,7 +10,8 @@
 # https://img.shields.io/endpoint (https://shields.io/badges/endpoint-badge).
 # Every badge, and every static badge in the README, carries a logo from
 # scripts/checks/badge-logos/: the EU emblem on EU blue for an EU act, else a
-# pictogram. A badge without one fails.
+# pictogram. A badge without one fails. The post-quantum badge counts the
+# safe uses of conformance/post-quantum.tsv.
 #
 #   conformance-badges.sh <out-dir>
 #   conformance-badges.sh --self-test   # a claimed certification or a missing logo is refused
@@ -139,6 +140,11 @@ if [[ -f "$matrix" ]]; then
   badge ehds-art6.json "EEHRxF draft 2026-11-23 Art 6 code systems" \
     "$proven" "$systems" " loaders" eu
 fi
+
+# The post-quantum safe uses of conformance/post-quantum.tsv, drawn by the
+# shared helper; scripts/checks/post-quantum.sh holds the file to the tree.
+badge_post_quantum conformance/post-quantum.tsv > "$out/post-quantum.json"
+echo "conformance-badges: post-quantum.json $(jq -r .message "$out/post-quantum.json")"
 
 badge_logo_check "$out"/*.json
 badge_color_check "$out"/*.json

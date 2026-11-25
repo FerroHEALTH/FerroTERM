@@ -1145,9 +1145,9 @@ dependencies = [
 
 [[package]]
 name = "ferrobridge-term"
-version = "0.19.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e6dc4494be13d088ca66ae23c09a94acb7cd9b60f9e8b7ca2b4cf987701de06"
+checksum = "1c4f28366d020a44e46c733c5555920d0f4143a76adfcb9e48850df773c51d14"
 dependencies = [
  "async-trait",
  "backon",
@@ -1200,9 +1200,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-server"
-version = "0.12.2"
+version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26080981973ace77a850adbbba06131f6408d9e4ddc4e3e87903b6a7e6238d34"
+checksum = "b70fdd6d5e2c17d72b91fe98d92a66f6c37f9292867b3a3bf3a691084ea5dd4e"
 dependencies = [
  "axum",
  "clap",
@@ -1234,9 +1234,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-session"
-version = "0.29.0"
+version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f202e4902815a7d02b45e4faea1cd68eed1c4ead02db89dca8f2929c1142cfd"
+checksum = "47fd4ed091afd320036146bea3048691a24bafef58af70f4a2d9d8211772c5cd"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -1259,9 +1259,9 @@ dependencies = [
 
 [[package]]
 name = "ferrohealth-smart"
-version = "0.34.0"
+version = "0.35.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b07089669e8f38d9ff0b2ad0fbc192fc1cf62facc4a59687de63cec8e6f7e05"
+checksum = "ef02d962a9ff0f8f9b21d9ba8e6a4dadd252e81eb49248e9ac6c96e68b19f215"
 dependencies = [
  "argon2",
  "aws-lc-rs",
@@ -1272,7 +1272,6 @@ dependencies = [
  "ferrohealth-server",
  "http",
  "jiff",
- "jsonwebtoken",
  "reqwest",
  "rustls",
  "secrecy",
@@ -1392,6 +1391,7 @@ dependencies = [
  "loinc",
  "rayon",
  "rf2",
+ "rustls",
  "rxnorm-rrf",
  "serde",
  "serde_json",
@@ -1425,7 +1425,9 @@ dependencies = [
  "jiff",
  "jsonwebtoken",
  "percent-encoding",
+ "rcgen",
  "reqwest",
+ "rustls",
  "serde",
  "serde_json",
  "tempfile",
@@ -1477,6 +1479,7 @@ dependencies = [
  "rcgen",
  "redb",
  "ring",
+ "rustls",
  "secrecy",
  "serde",
  "serde_json",
@@ -1508,9 +1511,11 @@ dependencies = [
  "ferrohealth-smart",
  "ferrohealth-telemetry",
  "ferroterm-problem",
+ "ferroterm-testkit",
  "jiff",
  "opentelemetry",
  "reqwest",
+ "rustls",
  "secrecy",
  "serde",
  "serde_json",
@@ -1541,11 +1546,14 @@ dependencies = [
  "icd11",
  "labcodeset",
  "loinc",
+ "rcgen",
  "rf2",
+ "rustls",
  "rxnorm-rrf",
  "serde_json",
  "tar",
  "tempfile",
+ "thiserror",
  "zip",
 ]
 
@@ -2466,11 +2474,9 @@ dependencies = [
  "base64 0.22.1",
  "getrandom 0.2.17",
  "js-sys",
- "pem 3.0.6",
  "serde",
  "serde_json",
  "signature",
- "simple_asn1",
  "zeroize",
 ]
 
@@ -2936,16 +2942,6 @@ dependencies = [
 
 [[package]]
 name = "pem"
-version = "3.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d30c53c26bc5b31a98cd02d20f25a7c8567146caf63ed593a9d87b2775291be"
-dependencies = [
- "base64 0.22.1",
- "serde_core",
-]
-
-[[package]]
-name = "pem"
 version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d354a98a3d1251555de99e8fdd8afda05573c31b82f59063a7b0a29b5527f120"
@@ -3385,7 +3381,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8774e05a7d0de114588e6a28fe7e71694b82614ed569d86d8b389dfbc98b8ad8"
 dependencies = [
  "aws-lc-rs",
- "pem 4.0.0",
+ "pem",
  "rustls-pki-types",
  "time",
  "x509-parser",
@@ -3931,18 +3927,6 @@ name = "simdutf8"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
-
-[[package]]
-name = "simple_asn1"
-version = "0.6.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d585997b0ac10be3c5ee635f1bab02d512760d14b7c468801ac8a01d9ae5f1d"
-dependencies = [
- "num-bigint",
- "num-traits",
- "thiserror",
- "time",
-]
 
 [[package]]
 name = "slab"

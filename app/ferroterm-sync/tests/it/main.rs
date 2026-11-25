@@ -25,6 +25,7 @@ mod exit;
 mod failure;
 mod lanes;
 mod manual;
+mod post_quantum;
 mod retention;
 mod revalidation;
 mod schedule;

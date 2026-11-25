@@ -539,6 +539,64 @@ async fn a_coding_without_a_system_is_a_warning_in_a_codeable_concept_and_alone(
     }
 }
 
+/// The `property` part of `body` whose `code` is `code`.
+fn lookup_property<'a>(body: &'a Value, code: &str) -> Option<&'a Value> {
+    body["parameter"].as_array()?.iter().find(|parameter| {
+        parameter["name"] == "property"
+            && parameter["part"]
+                .as_array()
+                .is_some_and(|parts| parts.iter().any(|part| part["valueCode"] == code))
+    })
+}
+
+#[tokio::test]
+async fn every_property_answers_abstract_false_and_not_selectable_on_every_version() {
+    let server = Server::start_with_resources();
+    for version in VERSIONS {
+        let (status, body) = server
+            .get(&format!(
+                "/{version}/CodeSystem/$lookup?system={ANIMALS}&code=cat&property=*"
+            ))
+            .await;
+        assert_eq!(status, StatusCode::OK, "{version}: {body}");
+        assert_eq!(
+            parameter(&body, "abstract").unwrap()["valueBoolean"],
+            false,
+            "{version}: {body}"
+        );
+        let not_selectable = lookup_property(&body, "notSelectable").expect("notSelectable");
+        assert_eq!(
+            not_selectable["part"][1]["valueBoolean"], false,
+            "{version}: {body}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn the_definition_answers_only_when_the_request_asks_for_it() {
+    let server = Server::start_with_resources();
+    for version in ["r5", "r6"] {
+        let lookup = |property: &str| {
+            format!("/{version}/CodeSystem/$lookup?system={ANIMALS}&code=animal{property}")
+        };
+        for asked in ["", "&property=*", "&property=definition"] {
+            let (status, body) = server.get(&lookup(asked)).await;
+            assert_eq!(status, StatusCode::OK, "{version}{asked}: {body}");
+            assert_eq!(
+                parameter(&body, "definition").unwrap()["valueString"],
+                "A living thing that is not a plant.",
+                "{version}{asked}: {body}"
+            );
+        }
+        let (status, body) = server.get(&lookup("&property=legs")).await;
+        assert_eq!(status, StatusCode::OK, "{version}: {body}");
+        assert!(
+            parameter(&body, "definition").is_none(),
+            "{version}: a request naming other properties leaves `definition` out: {body}"
+        );
+    }
+}
+
 #[tokio::test]
 async fn a_wildcard_system_version_names_the_greatest_matching_version() {
     let server = Server::start_with_resources();

@@ -356,7 +356,10 @@ simple-cases/simple-expand-regexp-prop
 simple-cases/simple-expand-repeating-prop
 simple-cases/simple-expand-repeating-prop-values
 simple-cases/simple-expand-unknown-property
+simple-cases/simple-lookup-1
 simple-cases/simple-lookup-2
+simple-cases/simple-lookup-only-unknown-property
+simple-cases/simple-lookup-unknown-property
 simple-cases/simple-subsumes-child
 simple-cases/simple-subsumes-child-coding
 simple-cases/simple-subsumes-equivalent

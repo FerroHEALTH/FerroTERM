@@ -501,7 +501,8 @@ async fn validate_code_calls_a_retired_concept_valid_and_inactive_on_every_versi
 
 // `$lookup` answers the properties the system states for the concept
 // (<https://hl7.org/fhir/R4/codesystem-operation-lookup.html>), so the
-// lifecycle properties come back as written.
+// lifecycle properties come back as written, and `property=*` adds the
+// standard `notSelectable` the ecosystem requirements ask for.
 #[tokio::test]
 async fn lookup_answers_the_declared_status_properties_as_written() {
     let server = Server::start_persisting();
@@ -530,7 +531,7 @@ async fn lookup_answers_the_declared_status_properties_as_written() {
                 .iter()
                 .map(|(code, _)| *code)
                 .collect::<Vec<&str>>(),
-            ["inactive", "retirementDate"],
+            ["inactive", "retirementDate", "notSelectable"],
             "{version}: {body}"
         );
         assert_eq!(

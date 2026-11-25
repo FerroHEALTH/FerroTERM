@@ -3,7 +3,8 @@
 
 //! `[server.tls]` through FerroTERM's own wiring: both listeners speak TLS
 //! with the configured certificate, and `ferroterm healthcheck` probes over
-//! TLS pinned to that certificate.
+//! TLS pinned to that certificate. Both listeners agree on X25519MLKEM768
+//! (RFC 10024) with a client that offers it, and on X25519 with one that does not.
 
 use std::net::SocketAddr;
 use std::path::Path;
@@ -217,6 +218,45 @@ async fn the_subcommand_probes_over_the_tls_its_configuration_names()
         stderr.starts_with("ferroterm healthcheck: unhealthy: ") && stderr.contains("TLS"),
         "the reason names the TLS failure: {stderr}"
     );
+
+    running.stop().await
+}
+
+#[tokio::test]
+async fn both_listeners_agree_on_x25519mlkem768_and_still_on_x25519()
+-> Result<(), Box<dyn std::error::Error>> {
+    use rustls::NamedGroup;
+    use rustls::crypto::aws_lc_rs::kx_group;
+    let dir = tempfile::tempdir()?;
+    let server = Server::start_with_server(ServerSection {
+        tls: Some(certificate(dir.path(), "server")),
+        ..ServerSection::default()
+    });
+    let running = Served::start(&server).await?;
+
+    for (name, address) in [("FHIR", running.fhir), ("admin", running.admin)] {
+        let hybrid = tokio::task::spawn_blocking(move || {
+            ferroterm_testkit::kx::agreed_as_client(
+                address,
+                vec![kx_group::X25519MLKEM768, kx_group::X25519],
+            )
+        })
+        .await??;
+        assert_eq!(
+            Some(NamedGroup::X25519MLKEM768),
+            hybrid,
+            "the {name} listener agrees on the hybrid group (RFC 10024)"
+        );
+        let classical = tokio::task::spawn_blocking(move || {
+            ferroterm_testkit::kx::agreed_as_client(address, vec![kx_group::X25519])
+        })
+        .await??;
+        assert_eq!(
+            Some(NamedGroup::X25519),
+            classical,
+            "the {name} listener still serves a classical-only client"
+        );
+    }
 
     running.stop().await
 }

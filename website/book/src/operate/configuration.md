@@ -167,6 +167,13 @@ The `[server.tls]` table:
 `ferroterm healthcheck` asks `GET /health/readiness` over the same TLS and
 accepts only the certificate `certificate_file` holds.
 
+Both listeners, and every outbound client FerroTERM builds, offer the hybrid
+key exchange X25519MLKEM768 (RFC 10024) first in TLS 1.3, then X25519, P-256
+and P-384 for a peer that lacks it, so a session recorded today stays closed
+to a quantum computer later. Nothing is configured for it. The
+[post-quantum inventory](https://github.com/FerroHEALTH/FerroTERM/blob/main/docs/post-quantum.md)
+lists every cryptographic use and which ones are post-quantum safe.
+
 ## Telemetry
 
 The console log, the request log and the `/metrics` scrape need no
