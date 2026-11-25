@@ -47,7 +47,7 @@ fn assert_duplicate(status: StatusCode, body: &Value, holder: &str) {
         "{body}"
     );
     let diagnostics = body
-        .pointer("/issue/0/diagnostics")
+        .pointer("/issue/0/details/text")
         .and_then(Value::as_str)
         .unwrap_or_default();
     assert!(

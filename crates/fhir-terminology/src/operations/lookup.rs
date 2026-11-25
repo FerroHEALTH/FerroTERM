@@ -11,6 +11,7 @@
 
 use super::{CodingRef, Invocation, OperationError, locate, resolve};
 use crate::language;
+use crate::provider::code_system::NOT_SELECTABLE;
 use crate::provider::{
     CodeSystemProvider, Concept, Designation, DesignationUse, Property, PropertyValue,
 };
@@ -22,6 +23,9 @@ const NAMED_ELSEWHERE: [&str; 6] = ["url", "system", "name", "version", "display
 
 /// The `property` value that asks for every property.
 const EVERY_PROPERTY: &str = "*";
+
+/// The property that carries a concept's definition.
+const DEFINITION: &str = "definition";
 
 /// The property codes the `$lookup` `property` parameter names for every code
 /// system (<https://hl7.org/fhir/R4B/codesystem-operation-lookup.html>,
@@ -100,7 +104,8 @@ pub struct LookupOutcome {
     pub version: Option<String>,
     /// The display in the chosen language.
     pub display: String,
-    /// `definition`: the meaning of the concept, when the system states one.
+    /// `definition`: the meaning of the concept, when the system states one
+    /// and the request asks for it.
     pub definition: Option<String>,
     /// The designations, when asked for, filtered by the `lang.x` properties
     /// asked for; the display is among them with its language.
@@ -136,13 +141,15 @@ impl<'a> Asked<'a> {
         self.all || self.names.contains(&code)
     }
 
-    /// Whether a property the provider generates was asked for.
+    /// Whether the request named the property, by its own name or through
+    /// `*`, which asks for everything there is.
     ///
-    /// A generated property costs more than a read, so it is answered only
-    /// where the request named it: by its own name, or through `*`, which asks
-    /// for everything there is. A request naming no property leaves them out,
-    /// which is what "the server chooses what to return" admits.
-    fn generated(&self, code: &str) -> bool {
+    /// A property the provider generates costs more than a read, and a
+    /// default the code system leaves unstated adds nothing, so both are
+    /// answered only where the request named them. A request naming no
+    /// property leaves them out, which is what "the server chooses what to
+    /// return" admits.
+    fn named(&self, code: &str) -> bool {
         self.names.contains(&code) || self.names.contains(&EVERY_PROPERTY)
     }
 
@@ -187,7 +194,7 @@ pub fn lookup(
         }
         (Some(coding), None) => {
             let code = coding.code.as_deref().ok_or_else(|| {
-                OperationError::Required(String::from("`coding.code` is required"))
+                OperationError::Invalid(String::from("`coding.code` is required"))
             })?;
             (
                 coding.system.as_deref(),
@@ -197,7 +204,7 @@ pub fn lookup(
         }
         (None, Some(code)) => (input.system.as_deref(), input.version.as_deref(), code),
         (None, None) => {
-            return Err(OperationError::Required(String::from(
+            return Err(OperationError::Invalid(String::from(
                 "a code is required: `code` with `system`, or `coding`",
             )));
         }
@@ -235,11 +242,25 @@ pub fn lookup(
     } else {
         Vec::new()
     };
-    let properties = properties(provider.as_ref(), concept, &asked)?;
+    let mut properties = properties(provider.as_ref(), concept, &asked)?;
     // NOTE: the ecosystem's icd-11 `lookup-mms-no-code` answers a codeless grouper
     // `notSelectable` as a property and no `abstract`; `simple-lookup-2` wants `abstract`.
     let status = provider.status(concept)?;
     let abstract_concept = status.abstract_concept && !status.codeless;
+    // NOTE: tx-ecosystem requirements, $lookup: under `property=*` the server SHALL
+    // return the standard properties it knows, `notSelectable` among them.
+    if asked.named(NOT_SELECTABLE)
+        && !status.codeless
+        && !properties
+            .iter()
+            .any(|property| property.code == NOT_SELECTABLE)
+    {
+        properties.push(Property {
+            code: String::from(NOT_SELECTABLE),
+            value: PropertyValue::Boolean(abstract_concept),
+            ..Property::default()
+        });
+    }
     Ok(LookupOutcome {
         // NOTE: no FHIR/SNOMED spec governs this: our own design. The code as
         // the system spells it, which for an expression is its canonical form
@@ -254,7 +275,11 @@ pub fn lookup(
             .unwrap_or_else(|| identity.url.clone()),
         version: Some(identity.version.clone()).filter(|v| !v.is_empty()),
         display,
-        definition: provider.definition(concept)?,
+        definition: if asked.property(DEFINITION) {
+            provider.definition(concept)?
+        } else {
+            None
+        },
         designations,
         properties,
     })
@@ -332,11 +357,11 @@ fn properties(
     asked: &Asked<'_>,
 ) -> Result<Vec<Property>, OperationError> {
     let mut properties = Vec::new();
-    if asked.property("definition")
+    if asked.property(DEFINITION)
         && let Some(definition) = provider.definition(concept)?
     {
         properties.push(Property {
-            code: String::from("definition"),
+            code: String::from(DEFINITION),
             value: PropertyValue::String(definition),
             ..Property::default()
         });
@@ -348,7 +373,7 @@ fn properties(
         properties.push(property);
     }
     for name in provider.generated_properties() {
-        if !asked.generated(name) {
+        if !asked.named(name) {
             continue;
         }
         if let Some(property) = provider.generated_property(concept, name)? {

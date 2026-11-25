@@ -453,6 +453,7 @@ fn lookup_property_star_answers_parent_child_inactive_and_the_declared_propertie
             ("legs", String::from("4")),
             ("parent", String::from("animal")),
             ("child", String::from("kitten")),
+            ("notSelectable", String::from("false")),
         ]
     );
     let named = lookup_cat(&registry, &["parent", "inactive"]);

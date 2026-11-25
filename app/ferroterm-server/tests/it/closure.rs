@@ -245,7 +245,7 @@ async fn a_table_that_was_never_initialised_is_not_found_and_is_not_created() {
     assert_eq!(status, StatusCode::NOT_FOUND, "{body}");
     assert_eq!(body["issue"][0]["code"], "not-found");
     assert!(
-        body["issue"][0]["diagnostics"]
+        body["issue"][0]["details"]["text"]
             .as_str()
             .is_some_and(|text| text.contains("nothing")),
         "the refusal names the table: {body}"

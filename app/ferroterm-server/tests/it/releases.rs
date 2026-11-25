@@ -281,7 +281,6 @@ async fn an_unloaded_version_is_an_operation_outcome_naming_it() {
         assert_eq!(body["resourceType"], "OperationOutcome", "{}", case.system);
         let text = body["issue"][0]["details"]["text"]
             .as_str()
-            .or_else(|| body["issue"][0]["diagnostics"].as_str())
             .unwrap_or_default();
         assert!(text.contains("1900"), "{}: {body}", case.system);
     }

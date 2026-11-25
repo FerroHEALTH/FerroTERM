@@ -125,7 +125,7 @@ fn validate_code_refuses_malformed_requests() {
     };
     assert!(matches!(
         value_set_validate_code::validate_code(&world.sources(), &no_value_set),
-        Err(OperationError::Required(_))
+        Err(OperationError::Invalid(_))
     ));
     let unknown = ValueSetValidateInput {
         url: Some(String::from("http://example.org/fhir/ValueSet/nowhere")),

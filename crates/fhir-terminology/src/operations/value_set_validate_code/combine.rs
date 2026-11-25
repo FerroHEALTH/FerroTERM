@@ -202,7 +202,8 @@ pub(super) fn first_in_value_set(
 }
 
 /// The answer when no coding is in the value set: one `not-in-vs` error, each
-/// coding's own errors, and an `information` per coding, with no code outputs.
+/// coding's own errors, an `information` per coding, and the warning of each
+/// coding that names no system, with no code outputs.
 pub(super) fn none_in_value_set(
     model: &ValueSetModel,
     judged: &[(&CodingRef, Validation)],
@@ -221,6 +222,17 @@ pub(super) fn none_in_value_set(
         answer
             .issues
             .push(this_code_not_in_vs(model, coding, &base(index)));
+    }
+    // NOTE: the tx-ecosystem `validation-missing-vs-cc-no-system` cases keep the warning
+    // that a coding names no system, after the per-coding information.
+    for (_, other) in judged {
+        answer.issues.extend(
+            other
+                .issues
+                .iter()
+                .filter(|issue| issue.message == MessageId::CodingHasNoSystemCannotValidate)
+                .cloned(),
+        );
     }
     answer.message = message_of(&answer.issues);
     answer

@@ -402,7 +402,7 @@ async fn a_version_another_release_cannot_read_keeps_its_response_and_says_why()
         "{entry}"
     );
     assert!(
-        text(entry, "/response/outcome/issue/0/diagnostics").contains("5.0.0"),
+        text(entry, "/response/outcome/issue/0/details/text").contains("5.0.0"),
         "the outcome names the release the version reads as: {entry}"
     );
 }
