@@ -294,7 +294,7 @@ fn an_inline_map_translates_and_malformed_requests_are_refused() {
     };
     assert!(matches!(
         translate(&world.sources(), &no_system),
-        Err(OperationError::Required(_))
+        Err(OperationError::Invalid(_))
     ));
     let two = TranslateInput {
         url: Some(CM_ANIMALS_COLOURS.to_owned()),

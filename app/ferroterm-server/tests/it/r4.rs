@@ -207,7 +207,7 @@ async fn a_later_version_parameter_is_refused_under_r4() {
     assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
     assert_eq!(body["resourceType"], "OperationOutcome");
     assert_eq!(body["issue"][0]["code"], "invalid");
-    let diagnostics = body["issue"][0]["diagnostics"].as_str().unwrap();
+    let diagnostics = body["issue"][0]["details"]["text"].as_str().unwrap();
     assert!(
         diagnostics.contains(&format!("does not declare a parameter `{parameter_name}`")),
         "{diagnostics}"
@@ -383,7 +383,9 @@ async fn the_capability_statement_lists_only_the_expand_parameters_the_version_d
                     "/{version}/ValueSet/$expand?url={VS_PETS}&{name}=x"
                 ))
                 .await;
-            let diagnostics = body["issue"][0]["diagnostics"].as_str().unwrap_or_default();
+            let diagnostics = body["issue"][0]["details"]["text"]
+                .as_str()
+                .unwrap_or_default();
             assert!(
                 !diagnostics.contains("does not declare a parameter"),
                 "{version}: `{name}` is advertised and refused: {diagnostics}"

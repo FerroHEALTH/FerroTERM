@@ -10,7 +10,7 @@
 //!
 //! Every failure a client can cause answers with an `OperationOutcome` whose
 //! issue carries `severity`, `code` from the issue-type value set, and
-//! `diagnostics`; the status is the one the operation layer chose.
+//! `details.text`; the status is the one the operation layer chose.
 
 use std::sync::Arc;
 
@@ -35,8 +35,8 @@ pub struct Failure {
     pub status: StatusCode,
     /// The `issue.code`.
     pub code: &'static str,
-    /// The `issue.diagnostics` and `issue.details.text`.
-    pub diagnostics: String,
+    /// The `issue.details.text`.
+    pub text: String,
     /// The `tx-issue-type` code in `issue.details.coding`, when one applies.
     pub kind: Option<&'static str>,
     /// The path of the element at fault, for `issue.expression`.
@@ -181,13 +181,13 @@ fn form_decoded(text: &str) -> Option<String> {
 }
 
 impl Failure {
-    /// A failure with `status`, `code`, and `diagnostics`.
+    /// A failure with `status`, `code`, and `text`.
     #[must_use]
-    pub fn new(status: StatusCode, code: &'static str, diagnostics: impl Into<String>) -> Self {
+    pub fn new(status: StatusCode, code: &'static str, text: impl Into<String>) -> Self {
         Self {
             status,
             code,
-            diagnostics: diagnostics.into(),
+            text: text.into(),
             kind: None,
             expression: None,
             column: None,
@@ -237,10 +237,9 @@ impl Failure {
                 code: self.code.into(),
                 details: Some(CodeableConcept {
                     coding: self.kind.map(tx_issue_coding).into_iter().collect(),
-                    text: Some(self.diagnostics.as_str().into()),
+                    text: Some(self.text.as_str().into()),
                     ..Default::default()
                 }),
-                diagnostics: Some(self.diagnostics.as_str().into()),
                 expression: self
                     .expression
                     .iter()

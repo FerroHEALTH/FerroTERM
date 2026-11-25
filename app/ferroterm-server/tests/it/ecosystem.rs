@@ -468,6 +468,135 @@ async fn lookup_answers_code_system_and_abstract_on_every_version() {
     }
 }
 
+/// The issues of the `issues` parameter of `body` as (severity, code,
+/// message id, first expression).
+fn issue_rows(body: &Value) -> Vec<(String, String, String, String)> {
+    let text = |issue: &Value, pointer: &str| {
+        issue
+            .pointer(pointer)
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned()
+    };
+    parameter(body, "issues")
+        .and_then(|issues| issues.pointer("/resource/issue"))
+        .and_then(Value::as_array)
+        .expect("an issue list")
+        .iter()
+        .map(|issue| {
+            (
+                text(issue, "/severity"),
+                text(issue, "/code"),
+                text(issue, "/extension/0/valueString"),
+                text(issue, "/expression/0"),
+            )
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn a_coding_without_a_system_is_a_warning_in_a_codeable_concept_and_alone() {
+    let server = Server::start_with_resources();
+    for version in VERSIONS {
+        let concept = json!({"resourceType": "Parameters", "parameter": [
+            {"name": "url", "valueUri": VS_PETS},
+            {"name": "codeableConcept", "valueCodeableConcept": {"coding": [{"code": "cat"}]}}
+        ]});
+        let (status, body) = server
+            .post(&format!("/{version}/ValueSet/$validate-code"), &concept)
+            .await;
+        assert_eq!(status, StatusCode::OK, "{version}: {body}");
+        assert!(
+            issue_rows(&body).contains(&(
+                String::from("warning"),
+                String::from("invalid"),
+                String::from("Coding_has_no_system__cannot_validate"),
+                String::from("CodeableConcept.coding[0]"),
+            )),
+            "{version}: {body}"
+        );
+        let display_only = json!({"resourceType": "Parameters", "parameter": [
+            {"name": "url", "valueUri": VS_PETS},
+            {"name": "coding", "valueCoding": {"display": "Cat"}}
+        ]});
+        let (status, body) = server
+            .post(
+                &format!("/{version}/ValueSet/$validate-code"),
+                &display_only,
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK, "{version}: {body}");
+        assert_eq!(
+            issue_rows(&body),
+            [(
+                String::from("warning"),
+                String::from("invalid"),
+                String::from("Coding_has_no_system_or_code__cannot_validate"),
+                String::from("Coding"),
+            )],
+            "{version}: {body}"
+        );
+    }
+}
+
+/// The `property` part of `body` whose `code` is `code`.
+fn lookup_property<'a>(body: &'a Value, code: &str) -> Option<&'a Value> {
+    body["parameter"].as_array()?.iter().find(|parameter| {
+        parameter["name"] == "property"
+            && parameter["part"]
+                .as_array()
+                .is_some_and(|parts| parts.iter().any(|part| part["valueCode"] == code))
+    })
+}
+
+#[tokio::test]
+async fn every_property_answers_abstract_false_and_not_selectable_on_every_version() {
+    let server = Server::start_with_resources();
+    for version in VERSIONS {
+        let (status, body) = server
+            .get(&format!(
+                "/{version}/CodeSystem/$lookup?system={ANIMALS}&code=cat&property=*"
+            ))
+            .await;
+        assert_eq!(status, StatusCode::OK, "{version}: {body}");
+        assert_eq!(
+            parameter(&body, "abstract").unwrap()["valueBoolean"],
+            false,
+            "{version}: {body}"
+        );
+        let not_selectable = lookup_property(&body, "notSelectable").expect("notSelectable");
+        assert_eq!(
+            not_selectable["part"][1]["valueBoolean"], false,
+            "{version}: {body}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn the_definition_answers_only_when_the_request_asks_for_it() {
+    let server = Server::start_with_resources();
+    for version in ["r5", "r6"] {
+        let lookup = |property: &str| {
+            format!("/{version}/CodeSystem/$lookup?system={ANIMALS}&code=animal{property}")
+        };
+        for asked in ["", "&property=*", "&property=definition"] {
+            let (status, body) = server.get(&lookup(asked)).await;
+            assert_eq!(status, StatusCode::OK, "{version}{asked}: {body}");
+            assert_eq!(
+                parameter(&body, "definition").unwrap()["valueString"],
+                "A living thing that is not a plant.",
+                "{version}{asked}: {body}"
+            );
+        }
+        let (status, body) = server.get(&lookup("&property=legs")).await;
+        assert_eq!(status, StatusCode::OK, "{version}: {body}");
+        assert!(
+            parameter(&body, "definition").is_none(),
+            "{version}: a request naming other properties leaves `definition` out: {body}"
+        );
+    }
+}
+
 #[tokio::test]
 async fn a_wildcard_system_version_names_the_greatest_matching_version() {
     let server = Server::start_with_resources();
@@ -796,7 +925,7 @@ async fn the_undeclared_suite_parameters_are_refused_on_every_version() {
                 body["issue"][0]["code"], "invalid",
                 "{version} {name}: {body}"
             );
-            let diagnostics = body["issue"][0]["diagnostics"].as_str().unwrap();
+            let diagnostics = body["issue"][0]["details"]["text"].as_str().unwrap();
             assert!(
                 diagnostics.contains(&format!("does not declare a parameter `{name}`")),
                 "{version} {name}: {diagnostics}"

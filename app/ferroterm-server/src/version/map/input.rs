@@ -160,7 +160,6 @@ macro_rules! family_input {
                         .concept_map
                         .as_ref()
                         .map(conceptmap::convert::$fhir::convert),
-                    target_input: targeted,
                     dependency: !request.dependency.is_empty(),
                     ..translate_inputs(request, targeted)
                 }
@@ -313,6 +312,11 @@ macro_rules! family_input {
             /// the scope, and the direction. R4 keeps its names beside the pre-adopted
             /// R6 `sourceSystem` and `sourceVersion`.
             fn translate_inputs(request: &ConceptMapTranslateRequest, targeted: bool) -> TranslateInput {
+                let reverse = request
+                    .reverse
+                    .as_ref()
+                    .and_then(|b| b.value)
+                    .or(targeted.then_some(true));
                 // NOTE: the R6 names are pre-adopted beside the version's own; a
                 // `target*` input reads the map in reverse, as R5 and R6 define it
                 // (<https://hl7.org/fhir/R5/conceptmap-operation-translate.html>).
@@ -352,11 +356,10 @@ macro_rules! family_input {
                     } else {
                         uri(request.targetsystem.as_ref()).or_else(|| uri(request.target_system.as_ref()))
                     },
-                    reverse: request
-                        .reverse
-                        .as_ref()
-                        .and_then(|b| b.value)
-                        .or(targeted.then_some(true)),
+                    reverse,
+                    // NOTE: tx-ecosystem `translate-reverse-r4`: an R4 `reverse` reports each
+                    // match as the map states it, as R5's `target*` inputs do.
+                    target_input: targeted || reverse == Some(true),
                     ..TranslateInput::default()
                 }
             }
@@ -401,6 +404,7 @@ macro_rules! family_input {
                         uri(request.target_system.as_ref())
                     },
                     reverse: targeted.then_some(true),
+                    target_input: targeted,
                     ..TranslateInput::default()
                 }
             }

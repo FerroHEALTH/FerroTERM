@@ -90,7 +90,9 @@ async fn a_token_with_the_scope_writes_and_one_without_it_is_refused() {
     assert!(!sent.contains("scope="), "{sent}");
     let (_, body) = fixture::json(response).await;
     assert_eq!(body["issue"][0]["code"], "forbidden");
-    let diagnostics = body["issue"][0]["diagnostics"].as_str().unwrap_or_default();
+    let diagnostics = body["issue"][0]["details"]["text"]
+        .as_str()
+        .unwrap_or_default();
     assert!(!diagnostics.contains("CodeSystem."), "{diagnostics}");
 
     let writer = key.sign(&claims(&mock.uri(), "system/CodeSystem.cud", 300));
@@ -187,7 +189,9 @@ async fn a_user_update_scope_writes_a_put_and_a_user_create_scope_does_not() {
     assert!(sent.contains("error=\"insufficient_scope\""), "{sent}");
     let (_, body) = fixture::json(response).await;
     assert_eq!(body["issue"][0]["code"], "forbidden");
-    let diagnostics = body["issue"][0]["diagnostics"].as_str().unwrap_or_default();
+    let diagnostics = body["issue"][0]["details"]["text"]
+        .as_str()
+        .unwrap_or_default();
     assert!(!diagnostics.contains("ValueSet."), "{diagnostics}");
 
     let updater = key.sign(&claims(&mock.uri(), "user/ValueSet.u", 300));
