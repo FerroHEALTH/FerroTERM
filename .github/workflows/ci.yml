@@ -12,6 +12,12 @@
 #      lands, then activates by itself — no workflow edit needed. (hashFiles()
 #      cannot gate a job at `if:` time because the workspace is empty before
 #      checkout, so a real detection job is the correct primitive.)
+#
+# A merge group runs the light set: tier 1, rustfmt, cargo-deny, the boundary
+# and token guards, the crate-version guard, and every test target compiled
+# with the unit tests run.
+# The pull request ran the full suite on the same change, so every other lane
+# is skipped there, and `conclusion` reads a skipped lane as a pass.
 name: CI
 
 on:
@@ -286,6 +292,13 @@ jobs:
       - name: tree-guards / extension-definitions
         if: ${{ !cancelled() }}
         run: bash scripts/checks/extension-definitions.sh
+      # The EHDS badge corpora name existing tests, and no badge label claims
+      # a certification (#1284).
+      - name: tree-guards / ehds-badges
+        if: ${{ !cancelled() }}
+        run: |
+          bash scripts/checks/ehds-matrix.sh
+          bash scripts/checks/conformance-badges.sh --self-test
       # Every first-party file carries both SPDX lines, and every header
       # names the Licensor. Each self-test runs first on a synthetic tree.
       - name: tree-guards / spdx-headers
@@ -428,8 +441,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # The first parent of a pull request's merge commit and of a merge
-          # group's commit is its base, which the perf probe diffs against.
+          # The first parent of a pull request's merge commit is its base,
+          # which the perf probe diffs against.
           fetch-depth: 2
       - id: check
         run: |
@@ -442,15 +455,15 @@ jobs:
             echo "No Cargo.toml — the Rust lanes are skipped (repository in discovery)."
           fi
       # The performance gate runs on a push to main, on a dispatch, and on a
-      # pull request or merge group that changes what the two services are
-      # built from or what the gate reads (#1151).
+      # pull request that changes what the two services are built from or
+      # what the gate reads (#1151).
       - id: perf
         env:
           EVENT: ${{ github.event_name }}
         run: |
           set -euo pipefail
           perf=true
-          if [ "$EVENT" = "pull_request" ] || [ "$EVENT" = "merge_group" ]; then
+          if [ "$EVENT" = "pull_request" ]; then
             changed="$(git diff --name-only HEAD^1 HEAD)"
             if ! grep -qE '^(app/ferroterm-server/|app/ferroterm-sync/|addons/|crates/|tools/ferroterm-testkit/|e2e/fixtures/codesystems/|perf/|scripts/perf/|Cargo\.toml$|Cargo\.lock$|rust-toolchain\.toml$|docs/VERSIONS\.md$|\.github/workflows/(ci|perf)\.yml$|\.github/actions/setup-rust/)' <<< "$changed"; then
               perf=false
@@ -478,7 +491,7 @@ jobs:
   clippy:
     name: clippy
     needs: detect
-    if: needs.detect.outputs.cargo == 'true'
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -511,14 +524,24 @@ jobs:
       - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: cargo-nextest
-      - run: cargo nextest run --workspace --locked --no-tests=pass
+      - if: github.event_name != 'merge_group'
+        run: cargo nextest run --workspace --locked --no-tests=pass
       # nextest does not run doctests; run them as their own compile.
-      - run: cargo test --doc --workspace --locked
+      - if: github.event_name != 'merge_group'
+        run: cargo test --doc --workspace --locked
+      # The merge group's smoke set: the pull request ran every suite, so the
+      # queue compiles every test target with every feature and runs only the
+      # unit tests.
+      - if: github.event_name == 'merge_group'
+        run: |
+          set -euo pipefail
+          cargo nextest run --workspace --all-features --no-run --locked
+          cargo nextest run --workspace --lib --bins --all-features --locked --no-tests=pass
 
   doc:
     name: rustdoc
     needs: detect
-    if: needs.detect.outputs.cargo == 'true'
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -649,7 +672,7 @@ jobs:
   ui-e2e:
     name: ui-e2e
     needs: detect
-    if: needs.detect.outputs.cargo == 'true'
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -791,24 +814,25 @@ jobs:
           fi
           bash scripts/checks/crate-version-guard.sh "$BASE_SHA" "$HEAD_SHA"
       - uses: ./.github/actions/setup-rust
-        if: steps.guard-pr.outputs.judged != '' || steps.guard-queue.outputs.judged != ''
+        if: steps.guard-pr.outputs.judged != ''
         with:
           cache-key: semver
       - id: semver-pin
         name: Read the cargo-semver-checks pin
-        if: steps.guard-pr.outputs.judged != '' || steps.guard-queue.outputs.judged != ''
+        if: steps.guard-pr.outputs.judged != ''
         run: echo "version=$(bash scripts/checks/semver.sh --pin)" >> "$GITHUB_OUTPUT"
       - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
-        if: steps.guard-pr.outputs.judged != '' || steps.guard-queue.outputs.judged != ''
+        if: steps.guard-pr.outputs.judged != ''
         with:
           tool: cargo-semver-checks@${{ steps.semver-pin.outputs.version }}
       # The checkout is the change merged onto its base, so the judge compares
-      # the base's public API with the one the merge would leave (#1208).
+      # the base's public API with the one the merge would leave (#1208). The
+      # merge group runs the guard alone: the pull request ran the judge.
       - name: Each published crate's version answers its change (cargo-semver-checks)
-        if: steps.guard-pr.outputs.judged != '' || steps.guard-queue.outputs.judged != ''
+        if: steps.guard-pr.outputs.judged != ''
         env:
-          JUDGED: ${{ steps.guard-pr.outputs.judged }}${{ steps.guard-queue.outputs.judged }}
-          BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || format('origin/{0}', github.event.pull_request.base.ref) }}
+          JUDGED: ${{ steps.guard-pr.outputs.judged }}
+          BASE: origin/${{ github.event.pull_request.base.ref }}
         run: |
           set -euo pipefail
           # shellcheck disable=SC2086 # one crate name per word by construction
@@ -819,7 +843,7 @@ jobs:
   publish-dry-run:
     name: publish-dry-run
     needs: detect
-    if: needs.detect.outputs.cargo == 'true'
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -842,7 +866,7 @@ jobs:
   bench-bars:
     name: bench-bars
     needs: detect
-    if: needs.detect.outputs.cargo == 'true'
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -869,7 +893,7 @@ jobs:
   msrv:
     name: msrv (cargo-hack)
     needs: detect
-    if: needs.detect.outputs.cargo == 'true'
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -894,23 +918,20 @@ jobs:
   # builds of their base on the same runner, in perf.yml, which the release
   # lane calls on the release commit too. The base is the pull request's
   # base or the commit before a push; a dispatch takes the previous release.
-  # A merge group builds nothing for it and its verdict passes with a
-  # summary saying why (#1186).
   perf:
     name: perf
     needs: detect
-    if: needs.detect.outputs.cargo == 'true' && needs.detect.outputs.perf == 'true'
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true' && needs.detect.outputs.perf == 'true'
     permissions:
       contents: read
     uses: ./.github/workflows/perf.yml
     with:
-      base: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
-      skip: ${{ github.event_name == 'merge_group' }}
+      base: ${{ github.event.pull_request.base.sha || github.event.before }}
 
   tx-ecosystem:
     name: tx-ecosystem
     needs: detect
-    if: needs.detect.outputs.cargo == 'true'
+    if: github.event_name != 'merge_group' && needs.detect.outputs.cargo == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -977,6 +998,7 @@ jobs:
   # with an empty index and answers a UCUM $lookup.
   quickstart:
     name: quickstart
+    if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

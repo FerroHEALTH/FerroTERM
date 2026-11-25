@@ -26,6 +26,8 @@ pub const NATIONAL: &str = "http://example.org/fhir/CodeSystem/national-allergy"
 pub const MAP: &str = "http://example.org/fhir/ConceptMap/national-to-mvc";
 /// Who validated the map of each release, as its `Provenance` names them.
 pub const VALIDATOR: &str = "Synthetic Terminology Board";
+/// Every value set a release of the package defines.
+pub const VALUE_SETS: [&str; 2] = [VS_ALLERGY, VS_UNSERVED];
 
 /// The files of the package for `version`, by path inside the tarball.
 fn files(version: &str) -> Vec<(String, serde_json::Value)> {

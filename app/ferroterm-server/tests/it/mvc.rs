@@ -101,3 +101,40 @@ async fn a_value_set_over_an_unloaded_code_system_names_it_and_its_version() {
     assert!(text.contains(UNSERVED_SYSTEM), "{text}");
     assert!(text.contains(UNSERVED_VERSION), "{text}");
 }
+
+// The MVC badge counts conformance/ehds/mvc-synthetic.tsv, so the list names
+// every value set of the fixture with the answer the server gives over it.
+#[tokio::test]
+async fn the_badge_list_names_every_value_set_and_its_answer() {
+    let server = two_releases();
+    let list = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../conformance/ehds/mvc-synthetic.tsv"
+    ))
+    .expect("the list reads");
+    let rows: Vec<(&str, &str)> = list
+        .lines()
+        .filter(|line| !line.starts_with('#') && !line.trim().is_empty())
+        .map(|line| line.split_once('\t').expect("two columns"))
+        .collect();
+    let mut listed: Vec<&str> = rows.iter().map(|(url, _)| *url).collect();
+    listed.sort_unstable();
+    let mut fixture = ferroterm_testkit::mvc::VALUE_SETS.to_vec();
+    fixture.sort_unstable();
+    assert_eq!(listed, fixture, "every value set of the fixture, once");
+    for (url, answer) in rows {
+        let (status, body) = server
+            .get(&format!(
+                "/r4b/ValueSet/$expand?url={url}&valueSetVersion=10.1.0"
+            ))
+            .await;
+        match answer {
+            "expands" => assert_eq!(status, StatusCode::OK, "{url}: {body}"),
+            "names-missing" => {
+                assert!(status.is_client_error(), "{url}: {body}");
+                assert_eq!(body["resourceType"], "OperationOutcome", "{url}");
+            }
+            other => panic!("{url}: unknown answer {other}"),
+        }
+    }
+}

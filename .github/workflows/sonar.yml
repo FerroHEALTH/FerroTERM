@@ -12,84 +12,33 @@
 # projectVersion derivation) are guarded on Cargo.toml, so the sweep still
 # analyzes config and shell in discovery. Scan SCOPE lives in
 # sonar-project.properties (do not overwrite it here).
+#
+# It runs on a push to main and weekly, never on a pull request or a merge
+# group: it gates no merge, and the org shares 20 concurrent jobs that the
+# gates need (owner decision, 2026-11-25).
 name: SonarQube Cloud
 
 on:
   push:
     branches: [main]
-  pull_request:
-    types: [opened, synchronize, reopened]
+  schedule:
+    - cron: "41 4 * * 1" # Mondays 04:41 UTC
 
-# A newer push to a pull request cancels its running analysis (#1224). On main
-# a running analysis finishes, and a queued one gives way to the newer merge,
-# so main is analyzed at its latest commit.
+# A newer push to main replaces a running analysis, so main is analyzed at
+# its latest commit.
 concurrency:
   group: sonar-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 permissions: {}
 
 jobs:
-  # Change detection (pull requests only). A main push is NEVER gated —
-  # coverage and the New Code baseline are wanted on every merge.
-  changes:
-    name: change detection
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    outputs:
-      code: ${{ steps.filter.outputs.code }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - id: filter
-        shell: bash
-        # Context reaches the shell through env, never `${{ }}`-inline.
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          PR_BASE: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          if [ "$EVENT_NAME" != "pull_request" ]; then
-            echo "$EVENT_NAME is not a pull request — scanning unconditionally."
-            echo "code=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if ! git rev-parse --verify --quiet "$PR_BASE" >/dev/null; then
-            echo "Base $PR_BASE unavailable — treating as a scannable change."
-            echo "code=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          changed=$(git diff --name-only "$PR_BASE" "$PR_HEAD")
-          echo "Changed files:"; echo "$changed"
-          # Anything the sweep or the Rust analyzer reads: the source trees, the
-          # manifests, the analyzer's own config, the scan scope, this workflow,
-          # and the multi-language surfaces (shell / yaml / Dockerfiles).
-          if echo "$changed" | grep -qE '^(app/|crates/|tools/|scripts/|Cargo\.(toml|lock)$|rust-toolchain\.toml$|clippy\.toml$|sonar-project\.properties$|\.github/|.*\.sh$|.*\.ya?ml$|.*Dockerfile.*)'; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "Nothing scannable touched — the analysis will be skipped."
-            echo "code=false" >> "$GITHUB_OUTPUT"
-          fi
-
   scan:
     name: analyze
-    needs: changes
-    # PR analysis authenticates with SONAR_TOKEN, which fork PRs and DEPENDABOT
-    # PRs cannot read (a dependabot-actor run gets Dependabot secrets, not
-    # Actions secrets). A main push always scans; a pull request scans only from
-    # the same repository, not dependabot, and only when it touched scannable
-    # files.
-    if: github.event_name == 'push' || (github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository && needs.changes.outputs.code == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
       contents: read
-      pull-requests: read # PR decoration reads the PR metadata
       security-events: write # the main-branch SARIF upload to code scanning
       actions: read # upload-sarif reads the run it belongs to
     steps:
@@ -155,17 +104,13 @@ jobs:
       # SonarQube Cloud reports to GitHub code scanning itself only on Sonar's
       # Enterprise plan, so the main branch's open issues are converted to
       # SARIF here and uploaded the way scorecard.yml uploads its own; the
-      # alerts stay advisory. Pull requests are not uploaded: their analysis
-      # holds only the issues the change adds, and code scanning would read
-      # every other alert as fixed.
+      # alerts stay advisory.
       - name: Convert the main branch's open issues to SARIF
-        if: github.event_name == 'push'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: scripts/sonar/sarif.sh sonar.sarif
 
       - name: Upload the SARIF log to code scanning
-        if: github.event_name == 'push'
         uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: sonar.sarif

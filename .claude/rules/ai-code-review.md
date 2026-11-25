@@ -3,7 +3,7 @@
 
 # Machine review (SonarQube Cloud): advisory, never authority
 
-Every pull request and every push to `main` is analyzed by SonarQube Cloud
+Every push to `main`, and a weekly schedule, is analyzed by SonarQube Cloud
 (`.github/workflows/sonar.yml`; scope in `sonar-project.properties`; project
 `FerroHEALTH_FerroTERM`, organization `ferrohealth`). Rust is analyzed
 first-party (the analyzer runs Clippy over the workspace); shell, YAML, and
@@ -14,12 +14,15 @@ After each analysis of `main`, the workflow converts the open issues to SARIF
 (`scripts/sonar/sarif.sh`) and uploads them to GitHub code scanning under the
 category `sonarqube-cloud`, so SonarQube Cloud is listed as a code-scanning
 tool beside CodeQL and Scorecard. Sonar's own code-scanning integration needs
-its Enterprise plan. Pull requests are not uploaded: a pull-request analysis
-lists only the issues the change adds, and code scanning would read every
-other alert as fixed. SonarQube Cloud decorates the pull request itself.
-Those alerts are as advisory as the dashboard.
+its Enterprise plan. Those alerts are as advisory as the dashboard.
 
 It is a **second opinion**. It is not authority, and it gates no merge.
+Because it gates no merge, it runs on no pull request and no merge group
+(owner decision, 2026-11-25): the organisation shares 20 concurrent jobs,
+and an advisory analysis must not hold a runner a gate needs. A newer push
+to `main` cancels a running analysis. CodeQL, the security scanner, keeps
+its pull-request run, limited to changes under Rust sources, Cargo files or
+`.github/`, and runs on no merge group.
 
 ## Precedence: a finding never outranks the sources
 

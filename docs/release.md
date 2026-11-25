@@ -66,6 +66,7 @@ cut follows, in order.
    bash scripts/checks/repo-map.sh
    bash scripts/checks/claims.sh
    bash scripts/checks/extension-definitions.sh
+   bash scripts/checks/ehds-matrix.sh
    bash scripts/checks/usage-report-off.sh
    bash scripts/checks/brand-contrast.sh
    bash scripts/checks/code-systems.sh
