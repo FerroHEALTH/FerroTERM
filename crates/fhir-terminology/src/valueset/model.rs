@@ -104,4 +104,17 @@ pub enum ModelError {
         /// The path of the filter, for `OperationOutcome.issue.expression`.
         expression: String,
     },
+    // NOTE: an implementation SHALL NOT process an element that carries a modifier
+    // extension it does not understand (<https://hl7.org/fhir/R4B/extensibility.html#modifierExtension>).
+    /// An element of the compose carries a modifier extension, and this server
+    /// knows none.
+    #[error(
+        "The modifier extension {url} on {expression} is not known, so the value set cannot be used"
+    )]
+    ModifierExtension {
+        /// The extension's `url`.
+        url: String,
+        /// The path of the element that carries it.
+        expression: String,
+    },
 }

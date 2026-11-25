@@ -612,22 +612,25 @@ impl CodeSystemProvider for FhirCodeSystem {
     fn search(&self, text: &str, language: Option<&str>) -> Result<ConceptSet, ProviderError> {
         self.complete_enough()?;
         let words = designation_index::tokenize::prefixes(text);
+        let own = self.model.language.as_deref();
         let mut hits = ConceptSet::new();
         for (i, entry) in self.model.concepts.iter().enumerate() {
             let mut terms: Vec<&str> = Vec::new();
             if language.is_none() {
                 terms.extend(entry.display.as_deref());
             }
+            // NOTE: a text filter searches one language, the code system's own when
+            // the request asks for none (terminology ecosystem IG test cases 1.11.0,
+            // `search-all-de-no-language`).
             terms.extend(
                 entry
                     .designations
                     .iter()
-                    .filter(|d| {
-                        language.is_none_or(|wanted| {
-                            d.language
-                                .as_deref()
-                                .is_some_and(|l| text_match::same_language(l, wanted))
-                        })
+                    .filter(|d| match (language, d.language.as_deref()) {
+                        (Some(wanted), Some(l)) => text_match::same_language(l, wanted),
+                        (Some(_), None) => false,
+                        (None, Some(l)) => own.is_some_and(|own| text_match::same_language(l, own)),
+                        (None, None) => true,
                     })
                     .map(|d| d.value.as_str()),
             );

@@ -25,9 +25,9 @@ count is two above the suite's own. The `snomed`, `icd-11`, `tx.fhir.org`,
 
 | mode | surface | pass list | passed of ran | needs | open failures |
 |---|---|---|---|---|---|
-| `general` | `/r4b` | `passing.txt` | 682 of 805 | nothing | #995, #507, #1067 to #1069, #1107, #1288 to #1291 |
-| `general` | `/r4` | `passing-r4.txt` | 694 of 805 | nothing | #995, #507, #1067 to #1069, #1107, #1288 to #1291 |
-| `general` | `/r5` | `passing-r5.txt` | 695 of 805 | nothing | #995, #507, #1067 to #1069, #1107, #1288 to #1291 |
+| `general` | `/r4b` | `passing.txt` | 689 of 805 | nothing | #995, #507, #1067 to #1069, #1107 |
+| `general` | `/r4` | `passing-r4.txt` | 701 of 805 | nothing | #995, #507, #1067 to #1069, #1107 |
+| `general` | `/r5` | `passing-r5.txt` | 702 of 805 | nothing | #995, #507, #1067 to #1069, #1107 |
 | `snomed` | `/r4b` | `passing-snomed.txt` | 2 of 170 | a SNOMED CT edition | #344, #352, #349 |
 | `icd-11` | `/r4b` | `passing-icd-11.txt` | 44 of 52 | the three ICD-11 artifacts | #350, #349, #117 |
 | `tx.fhir.org` | `/r4b` | `passing-tx.fhir.org.txt` | 57 of 227 | a LOINC release | #420, #421, #305, #349 |
@@ -318,28 +318,26 @@ collection of languages", so `zh` does not subsume `zh-min-nan`.
 
 ## The cases test cases 1.11.0 added, triaged
 
-The 1.11.0 suite runs 805 `general` cases. Of the 43 it adds or renames, 21
-fail on `/r4b` and `/r4` and 19 on `/r5`, each in a cluster with its issue:
+The 1.11.0 suite runs 805 `general` cases. Of the 43 it adds or renames, 14
+fail on `/r4b` and `/r4` and 12 on `/r5`:
 
 - **`extension-codes/ec-vs-*` (9)** rest on reserved code spaces and
   `extension-codes` supplements, whose extensions the FHIR Extensions Pack
   5.4.0 still does not define (#1067).
-- **`errors/filter-modifier-expand`**: a filter's modifier extension the
-  server does not know is ignored (#1288).
-- **`errors/infer-unknown-system` and `-import`**: `inferSystem` infers past
-  an include of an unheld code system (#1289).
-- **`extensions/expand-supplement-prop`, `-prop-base`,
-  `validate-supplement-prop-base-code4`, `-code5` and
-  `expand-supplement-version`**: filters on a supplement's properties and
-  two versions of one supplement (#1290).
-- **`search/search-all-de-no-language` and `search-all-supplement-fr-yes`**:
-  the language the text filter searches (#1291).
+- **`extensions/expand-supplement-prop`, `-prop-base` and
+  `expand-supplement-version`** select the right codes and supplement now
+  (#1290), and differ only on the `order` and `label` concept properties
+  #1107 holds.
 - **`translate2/translate-reverse-r5plus` and `-a`** are the renamed
   `r5+` pair above, unpassed on `/r4b` for the reason given there.
 
-The `global-lang-pack` setup also supplies a supplement for a code system
-version the server does not hold, which refused every case of the suite until
-the server left such a supplement dormant (#1287).
+The server now refuses a value set whose compose carries a modifier
+extension it does not know (#1288), refuses `inferSystem` past an include of
+an unheld code system (#1289), filters on a supplement's properties and
+applies one version of a supplement (#1290), and searches one language with
+the designations of supplements in use (#1291). The `global-lang-pack` setup
+supplies a supplement for a code system version the server does not hold,
+which it leaves dormant (#1287).
 
 ## The cases test cases 1.10.0 added, triaged
 

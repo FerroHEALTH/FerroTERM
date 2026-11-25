@@ -14,6 +14,16 @@ fn text<T: AsRef<str>>(value: Option<T>) -> Option<String> {
     value.map(|v| v.as_ref().to_owned())
 }
 
+/// Refuses an element at `expression` whose first modifier extension is `url`.
+fn unmodified(url: Option<&str>, expression: &str) -> Result<(), ModelError> {
+    url.map_or(Ok(()), |url| {
+        Err(ModelError::ModifierExtension {
+            url: url.to_owned(),
+            expression: expression.to_owned(),
+        })
+    })
+}
+
 /// One `compose.include.filter`, located at `expression` in `system`.
 fn filter(
     system: Option<&str>,
@@ -73,9 +83,20 @@ macro_rules! convert_value_set {
             use crate::provider::compose::{Compose, ConceptRef, Include, SystemRef};
 
             fn include(source: &ValueSetComposeInclude, at: &str) -> Result<Include, ModelError> {
+                super::unmodified(source.modifier_extension.first().map(|x| x.url.as_str()), at)?;
+                for (index, c) in source.concept.iter().enumerate() {
+                    super::unmodified(
+                        c.modifier_extension.first().map(|x| x.url.as_str()),
+                        &format!("{at}.concept[{index}]"),
+                    )?;
+                }
                 let system = source.system.as_ref().and_then(|s| s.value.as_deref());
                 let mut filters = Vec::with_capacity(source.filter.len());
                 for (index, f) in source.filter.iter().enumerate() {
+                    super::unmodified(
+                        f.modifier_extension.first().map(|x| x.url.as_str()),
+                        &format!("{at}.filter[{index}]"),
+                    )?;
                     // NOTE: an R4 resource converted from R5 carries `child-of` and
                     // `descendent-leaf` in the cross-version extension on `op`
                     // (<https://hl7.org/fhir/versions.html#extensions>).
@@ -145,6 +166,10 @@ macro_rules! convert_value_set {
             fn compose_of(
                 source: &fhir_types::$module::value_set::ValueSetCompose,
             ) -> Result<Compose, ModelError> {
+                super::unmodified(
+                    source.modifier_extension.first().map(|x| x.url.as_str()),
+                    "ValueSet.compose",
+                )?;
                 let mut compose = Compose {
                     inactive: source.inactive.as_ref().and_then(|b| b.value),
                     property: convert_value_set!(@property $property, source),
@@ -168,12 +193,17 @@ macro_rules! convert_value_set {
             /// # Errors
             ///
             /// Returns [`ModelError`] for a filter with an unknown operator or
-            /// with no value.
+            /// with no value, and for a modifier extension on the resource or
+            /// its compose.
             pub fn convert(resource: &ValueSet) -> Result<ValueSetModel, ModelError> {
                 // NOTE: `ValueSet.url` is 0..1 (<https://hl7.org/fhir/R4B/valueset.html>);
                 // an inline value set may have none, a stored one must (the loader checks).
                 let url = text(resource.url.as_ref().and_then(|u| u.value.as_deref()))
                     .unwrap_or_default();
+                super::unmodified(
+                    resource.modifier_extension.first().map(|x| x.url.as_str()),
+                    "ValueSet",
+                )?;
                 let compose = match &resource.compose {
                     Some(source) => compose_of(source)?,
                     None => Compose::default(),
