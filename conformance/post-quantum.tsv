@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The post-quantum inventory: docs/post-quantum.md and scripts/checks/post-quantum.sh.
+use	algorithm	safe	pq_standard	location
+TLS 1.3 key exchange of the listeners: the server's FHIR and admin listeners, the sync service's admin listener and the console	X25519MLKEM768 first; X25519, P-256, P-384 for a peer without it	yes	RFC 10024	ferrohealth-server tls, app/ferroterm-server/src/lib.rs, app/ferroterm-sync/src/cli.rs, app/ferroterm-console/src/server.rs
+TLS 1.3 key exchange of the outbound clients FerroTERM builds: the console's clients of the server, the sync service and the admin listener, the sync service's reload, revalidation and webhook clients, and the NTS add-on	X25519MLKEM768 first; X25519, P-256, P-384 for a peer without it	yes	RFC 10024	ferrohealth-smart client outbound, app/ferroterm-console/src/server.rs, app/ferroterm-sync/src/reload.rs, app/ferroterm-sync/src/revalidate.rs, app/ferroterm-sync/src/webhook.rs, addons/nts/src/source.rs
+TLS 1.3 key exchange of the WHO ICD-API client of the offline build	X25519MLKEM768 first (rustls prefer-post-quantum); X25519, P-256, P-384 for a peer without it	yes	RFC 10024	crates/icd11/src/api.rs, tools/ferroterm-build/Cargo.toml
+TLS 1.3 key exchange of the family clients: the issuer key sets, the console's OpenID Provider, the token endpoints, the OTLP export and the FerroPULSE usage report	X25519MLKEM768 first (rustls prefer-post-quantum); X25519, P-256, P-384 for a peer without it	yes	RFC 10024	ferrohealth-smart, ferrohealth-session, ferrohealth-telemetry, ferrohealth-usage-report
+TLS 1.2 key exchange where min_version lowers the floor	ECDHE over X25519, P-256 or P-384	no	no standard yet	ferrohealth-server tls (min_version)
+TLS server and client certificate authentication	ECDSA, RSA or Ed25519, as the operator's certificates hold	no	no standard yet	ferrohealth-server tls, ferrohealth-server tls_client
+TLS record protection	AES-128-GCM, AES-256-GCM, ChaCha20-Poly1305	yes	NIST IR 8547 4.1.3	ferrohealth-server tls
+Access token and DPoP proof verification	ML-DSA-44, ML-DSA-65 or ML-DSA-87 (AKP) beside RS256, RS384, PS256, PS384, ES256 and ES384, as the issuer signs	no	RFC 9964	ferrohealth-smart resource, app/ferroterm-server/src/smart/mod.rs, app/ferroterm-sync/src/auth.rs
+Client assertions of the outbound client credentials grant (private_key_jwt)	the configured key's algorithm: RS384 by default, RS256 to PS512, ES256, ES384, EdDSA, or ML-DSA-44, ML-DSA-65 or ML-DSA-87 with an ML-DSA key	no	RFC 9964	ferrohealth-smart client assertion, app/ferroterm-sync/src/revalidate.rs, addons/nts/src/source.rs
+DPoP proofs of the outbound client credentials grant	ES256 or ES384	no	RFC 9964	ferrohealth-smart client dpop, addons/nts/src/source.rs
+Console sign-in ID token verification	RS256, RS384, RS512, PS256, PS384, PS512, ES256, ES384, EdDSA	no	RFC 9964	ferrohealth-smart oidc, app/ferroterm-console/src/config/settings.rs
+Console sign-in PKCE challenge	SHA-256 (S256)	yes	NIST IR 8547 4.1.3	ferrohealth-smart oidc, app/ferroterm-console/src/server.rs
+Console session cookie in sealed mode	AES-256-GCM	yes	NIST IR 8547 4.1.3	ferrohealth-session sessions, app/ferroterm-console/src/config/settings.rs
+Basic password hashing	Argon2id	yes	NIST IR 8547 4.1.3	ferrohealth-smart basic, app/ferroterm-server/src/smart/mod.rs, app/ferroterm-sync/src/auth.rs
+Syndication download checksums where the feed publishes a SHA-256	SHA-256	yes	NIST IR 8547 4.1.3	crates/terminology-syndication/src/download.rs, crates/terminology-syndication/src/model.rs
+Syndication download checksums where the feed publishes only sct:md5Hash	MD5	no	NIST IR 8547 4.1.3	crates/terminology-syndication/src/download.rs, crates/terminology-syndication/src/model.rs
+FHIR package pin of the offline build	SHA-256	yes	NIST IR 8547 4.1.3	tools/ferroterm-build/src/package.rs
+crates.io publishing	Trusted Publishing (OIDC token from GitHub, RS256)	no	no standard yet	.github/workflows/release.yml, .github/workflows/publish-crates.yml
+Documentation site deployment	GitHub Pages deployment (OIDC token from GitHub, RS256)	no	no standard yet	.github/workflows/docs.yml
+Release provenance and SBOM attestations	Sigstore attestation (ECDSA P-256)	no	no standard yet	.github/workflows/release-build.yml, .github/workflows/release-image.yml, .github/workflows/release-console.yml
