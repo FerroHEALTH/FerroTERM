@@ -3,7 +3,7 @@
 
 //! Operator-supplied MyHealth@EU-shaped packages, imported with
 //! `ferroterm-build --fhir-package` and served side by side: each value set
-//! keeps its canonical and version (draft EEHRxF act Art 6(5)).
+//! keeps its canonical and version (the draft `EEHRxF` act, Art 6(5)).
 
 use http::StatusCode;
 use serde_json::Value;
@@ -17,8 +17,8 @@ use ferroterm_testkit::mvc::{
 /// A server over the 10.0.0 and 10.1.0 releases of the synthetic package.
 fn two_releases() -> Server {
     let dir = tempfile::tempdir().expect("tempdir");
-    let older = imported(dir.path(), "10.0.0");
-    let newer = imported(dir.path(), "10.1.0");
+    let older = imported(dir.path(), "10.0.0").expect("imports");
+    let newer = imported(dir.path(), "10.1.0").expect("imports");
     let config = Config {
         terminology: TerminologySection {
             code_systems: vec![older, newer],
@@ -30,9 +30,14 @@ fn two_releases() -> Server {
 }
 
 fn codes(body: &Value) -> Vec<&str> {
-    body["expansion"]["contains"]
-        .as_array()
-        .map(|contains| contains.iter().filter_map(|c| c["code"].as_str()).collect())
+    body.pointer("/expansion/contains")
+        .and_then(Value::as_array)
+        .map(|contains| {
+            contains
+                .iter()
+                .filter_map(|c| c.get("code").and_then(Value::as_str))
+                .collect()
+        })
         .unwrap_or_default()
 }
 

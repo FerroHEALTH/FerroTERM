@@ -100,7 +100,7 @@ pub struct Cli {
     /// A Nederlandse Labcodeset publication: the release zip, or the `labconcepts-*.xml` document or its directory; writes FHIR resources under `<out>/labcodeset`.
     #[arg(long, value_name = "FILE_DIR_OR_ZIP", conflicts_with_all = ["loinc", "claml", "icd10cm", "rxnorm", "icd11", "atc", "dhd", "gstandaard"])]
     pub labcodeset: Option<PathBuf>,
-    /// An operator-supplied FHIR NPM package (`.tgz`), such as the MyHealth@EU Master Value Sets Catalogue; writes its manifest and its CodeSystem, ValueSet and ConceptMap resources under `<out>/<name>-<version>`.
+    /// An operator-supplied FHIR NPM package (`.tgz`), such as the MyHealth@EU Master Value Sets Catalogue; writes its manifest and its `CodeSystem`, `ValueSet` and `ConceptMap` resources under `<out>/<name>-<version>`.
     #[arg(long, value_name = "TGZ", conflicts_with_all = ["loinc", "claml", "icd10cm", "rxnorm", "icd11", "atc", "dhd", "gstandaard", "labcodeset"])]
     pub fhir_package: Option<PathBuf>,
     /// The sha256 the operator pinned for `--fhir-package`; a package whose digest differs is refused.

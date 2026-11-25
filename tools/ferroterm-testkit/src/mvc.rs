@@ -72,43 +72,35 @@ fn files(version: &str) -> Vec<(String, serde_json::Value)> {
 
 /// Writes the synthetic package for `version` to `path` as a `.tgz`.
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics when the file cannot be written; a test fixture fails loud.
-pub fn write_package(path: &Path, version: &str) {
-    let file = std::fs::File::create(path).expect("the package file is created");
+/// Returns the I/O error when the file cannot be written.
+pub fn write_package(path: &Path, version: &str) -> std::io::Result<()> {
+    let file = std::fs::File::create(path)?;
     let encoder = flate2::write::GzEncoder::new(file, flate2::Compression::fast());
     let mut archive = tar::Builder::new(encoder);
     for (name, value) in files(version) {
-        let body = serde_json::to_vec_pretty(&value).expect("the resource serializes");
+        let body = serde_json::to_vec_pretty(&value).map_err(std::io::Error::other)?;
         let mut header = tar::Header::new_gnu();
-        header.set_size(u64::try_from(body.len()).expect("the size fits"));
+        header.set_size(u64::try_from(body.len()).map_err(std::io::Error::other)?);
         header.set_mode(0o644);
         header.set_cksum();
-        archive
-            .append_data(&mut header, name, body.as_slice())
-            .expect("the entry is appended");
+        archive.append_data(&mut header, name, body.as_slice())?;
     }
-    archive
-        .into_inner()
-        .expect("the tarball closes")
-        .finish()
-        .expect("the gzip stream closes")
-        .flush()
-        .expect("the file flushes");
+    archive.into_inner()?.finish()?.flush()
 }
 
 /// Writes the package for `version` under `dir` and imports it with
 /// `ferroterm-build`'s package import, returning the directory to serve.
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics when the package cannot be written or imported.
-#[must_use]
-pub fn imported(dir: &Path, version: &str) -> std::path::PathBuf {
+/// Returns the error of the write or of the import.
+pub fn imported(
+    dir: &Path,
+    version: &str,
+) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
     let tgz = dir.join(format!("{version}.tgz"));
-    write_package(&tgz, version);
-    ferroterm_build::package::import(&tgz, None, &dir.join("packages"))
-        .expect("the package imports")
-        .dir
+    write_package(&tgz, version)?;
+    Ok(ferroterm_build::package::import(&tgz, None, &dir.join("packages"))?.dir)
 }
