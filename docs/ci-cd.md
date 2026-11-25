@@ -227,23 +227,28 @@ commit. The jobs that read a pull-request payload (`changelog-guard`,
 `dependency-review`) skip on a merge group: each pull request passed them on
 its own before it joined the queue, and `conclusion` counts a skip as a pass.
 `crate-version-guard` runs in the merge group too, against the queue base, so
-a crate line the entries ahead already reached fails before it merges, and
-`cargo-semver-checks` judges the merged tree's public APIs against that base
-(#1208).
+a crate line the entries ahead already reached fails before it merges.
+`cargo-semver-checks` judges the public APIs on the pull request (#1208).
 
-The merge queue proves the merged tree, never the performance. Every
-pull-request run and every merge-group run of `ci.yml` finishes in under 20
-minutes of wall time, runner queue included (owner, 2026-11-09). The
-functional gates (build, clippy, the tests, the guards, the tx-ecosystem pass
-list, the console journeys) run in the merge group. The performance gate
-runs on the pull request that reaches the server or the sync service and on
-every push to `main`; in a merge group `perf.yml` builds nothing and its
-`perf verdict` job passes with a step summary that says why (#1186). The
-fuzz and differential lanes never ran in a merge group. No gate is weakened:
-the thresholds, the phases and the retry rule are the same, and only the
-event the gate runs on changes. A regression two pull requests cause only
-together surfaces on the push to `main`, and its fix is a follow-up pull
-request. No specification governs this: our own design.
+The merge-group run is light (owner, 2026-11-25): the pull request already
+ran the full suite on the same change, and queues of about ten entries fell
+out at the 60-minute check timeout when every group ran it again. In a merge
+group `ci.yml` runs `lint`, `guards`, `rustfmt`, `cargo-deny`, the boundary
+and token guards, the crate-version guard, and `test` in smoke mode: it
+compiles every test target of the workspace with every feature in the dev
+profile and runs only the unit tests (`--lib --bins`), with no integration
+suite or doctest run. The compile stays in the queue: two pull requests
+that each passed alone can break a test binary together. Clippy, rustdoc, msrv, the
+publish dry run, the bench bars, the tx-ecosystem pass list, the console
+journeys, the quickstart and the performance gate are skipped at job level,
+so they start no runner, and run on the pull request and on every push to
+`main`. `conclusion` keeps its name and reads a skipped lane as a pass, so
+it judges the merge group on the light set and the pull request on the full
+one. The fuzz and differential lanes never ran in a merge group. No gate is
+weakened: the thresholds, the phases and the retry rule are the same, and
+only the event a lane runs on changes. A regression two pull requests cause
+only together surfaces on the push to `main`, and its fix is a follow-up
+pull request. No specification governs this: our own design.
 
 The pull-request trigger lists `opened`, `synchronize` and `reopened` only, so
 a commit gets one CI run: a label event would start a second run on the same

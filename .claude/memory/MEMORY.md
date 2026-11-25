@@ -81,3 +81,4 @@
 - [Lean comments, no history](lean-comments-no-history.md): comments rare and short, describing only the current code; a changed comment is rewritten whole, never extended with the old way; owner hard rule 2026-11-23
 - [Family memories in every repo](family-memories-every-repo.md): a family-wide owner rule goes into every FerroHEALTH repo's `.claude/memory` through a merged PR; owner 2026-11-23
 - [Mermaid diagrams](mermaid-diagrams.md): every diagram is a mermaid block, never ASCII art; render each fence before a PR; owner 2026-11-24
+- [Merge queue is light](merge-queue-light.md): the merge-group run is the guards, rustfmt, cargo-deny and a unit-test smoke set; the full suite runs on the pull request and on main; owner 2026-11-25
