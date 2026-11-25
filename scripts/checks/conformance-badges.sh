@@ -38,12 +38,7 @@ for version in r4 r4b r5 r6; do
   [[ "$version" = r4b ]] || list="conformance/tx-ecosystem/passing-$version.txt"
   [[ -f "$list" ]] || continue
   passed="$(grep -c . "$list" || true)"
-  # Colour by share: grey below a quarter, orange to three quarters, green above.
-  share=$((passed * 100 / total))
-  if [[ "$share" -lt 25 ]]; then colour=lightgrey
-  elif [[ "$share" -lt 75 ]]; then colour=orange
-  else colour=brightgreen
-  fi
+  colour="$(badge_count_color "$passed" "$total")"
   label="tx-ecosystem $suite $(printf '%s' "$version" | tr '[:lower:]' '[:upper:]')"
   jq -cn --arg label "$label" --arg message "$passed / $total" --arg color "$colour" \
     --argjson logo "$(badge_logo_fields shield-check)" \
@@ -56,8 +51,13 @@ done
 # measures. A corpus that does not exist yet writes no badge. The badges stay
 # short, and the small caption under the README's conformance heading says
 # once what they count (owner decision, 2026-11-25); a README without it fails.
+# Every badge's colour follows its count N/M by the shared rule: green when
+# all pass, yellow when some do, red when none do.
+#
+#   badge FILE LABEL N M SUFFIX LOGO
 badge() {
-  local file="$1" label="$2" message="$3" colour="$4" logo="$5"
+  local file="$1" label="$2" message="$3/$4$5" colour logo="$6"
+  colour="$(badge_count_color "$3" "$4")"
   # A badge reports what a synthetic or free corpus proves, so it never claims
   # a certification or a conformity assessment (owner ruling, 2026-11-24).
   if printf '%s %s' "$label" "$message" | grep -qiE 'certified|compliant|conformant'; then
@@ -72,13 +72,28 @@ badge() {
 
 if [[ -n "$self_test" ]]; then
   for claim in "FHIR R4 certified" "EHDS compliant" "Conformant terminology"; do
-    if (badge probe.json "$claim" "1/1" blue eu) 2>/dev/null; then
+    if (badge probe.json "$claim" 1 1 "" eu) 2>/dev/null; then
       echo "conformance-badges: self-test: '$claim' was written" >&2
       exit 1
     fi
   done
-  badge probe.json "EEHRxF draft 2026-11-23 Art 6 code systems" "1/16 loaders" blue eu > /dev/null
+  badge probe.json "EEHRxF draft 2026-11-23 Art 6 code systems" 1 16 " loaders" eu > /dev/null
   badge_logo_check "$out"/*.json || exit 1
+  badge_color_check "$out"/*.json || exit 1
+  for want in "0 16 red" "1 16 yellow" "16 16 brightgreen"; do
+    read -r passed whole colour <<<"$want"
+    badge colour.json "EEHRxF draft 2026-11-23 Art 6 code systems" "$passed" "$whole" " loaders" eu > /dev/null
+    [[ "$(jq -r .color "$out/colour.json")" == "$colour" ]] || {
+      echo "conformance-badges: self-test: $passed of $whole is not $colour" >&2
+      exit 1
+    }
+  done
+  jq -c '.color = "blue"' "$out/colour.json" > "$out/blue.json"
+  if badge_color_check "$out/blue.json" 2>/dev/null; then
+    echo "conformance-badges: self-test: a counted badge in blue passes" >&2
+    exit 1
+  fi
+  rm "$out/blue.json" "$out/colour.json"
   [[ "$(jq -r '.namedLogo + .labelColor' "$out/probe.json")" == "europeanunion#003399" ]] || {
     echo "conformance-badges: self-test: the EEHRxF badge carries no EU emblem on EU blue" >&2
     exit 1
@@ -114,7 +129,7 @@ mvc=conformance/ehds/mvc-synthetic.tsv
 if [[ -f "$mvc" ]]; then
   listed="$(count_rows "$mvc")"
   badge ehds-mvc.json "MyHealth@EU MVC 10.1.0 (CI) import" \
-    "$listed/$listed value sets, synthetic fixture" blue eu
+    "$listed" "$listed" " value sets, synthetic fixture" eu
 fi
 
 matrix=conformance/ehds/art6-code-systems.tsv
@@ -122,7 +137,8 @@ if [[ -f "$matrix" ]]; then
   systems="$(count_rows "$matrix")"
   proven="$(grep -vE '^(#|[[:space:]]*$)' "$matrix" | awk -F'\t' '$3 != "-"' | wc -l | tr -d ' ')"
   badge ehds-art6.json "EEHRxF draft 2026-11-23 Art 6 code systems" \
-    "$proven/$systems loaders" blue eu
+    "$proven" "$systems" " loaders" eu
 fi
 
 badge_logo_check "$out"/*.json
+badge_color_check "$out"/*.json
