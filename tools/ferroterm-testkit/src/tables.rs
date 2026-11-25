@@ -6,9 +6,10 @@
 //! Each is in its publisher's distribution format: NPU (the IFCC code file),
 //! ICD-O-3 (the WHO topography and morphology tables), EMDN (the Commission's
 //! workbook), ISCO-08 (the ILO structure workbook), Orphanet (the Orphadata
-//! `product1` file), DICOM (NEMA's `dcm.owl`), and EDQM (a saved Standard
-//! Terms API response). `write_xlsx` is a minimal Office Open XML workbook
-//! writer.
+//! `product1` file), DICOM (NEMA's `dcm.owl`), EDQM (a saved Standard Terms
+//! API response), EMA SPOR (saved SPOR API responses), and UDI (the
+//! `AccessGUDID` `device.txt`). `write_xlsx` is a minimal Office Open XML
+//! workbook writer.
 
 use std::io::Write;
 use std::path::Path;
@@ -458,6 +459,43 @@ pub mod spor {
     }
 }
 
+/// UDI: two GS1 UDI-DIs in the pipe-delimited `AccessGUDID` `device.txt`, and
+/// a comma-separated export naming a GS1 and a HIBCC issuing agency.
+pub mod udi {
+    /// The UDI-DI with a brand name.
+    pub const BRANDED: &str = "09999990000015";
+    /// The UDI-DI with only a description.
+    pub const DESCRIBED: &str = "09999990000022";
+    /// The HIBCC UDI-DI of the mixed export.
+    pub const HIBCC: &str = "+H999SYNTH0011";
+
+    /// The `AccessGUDID` `device.txt` columns, two synthetic rows.
+    #[must_use]
+    pub fn device_txt() -> String {
+        [
+            "PrimaryDI|PublicDeviceRecordKey|publicVersionStatus|deviceRecordStatus|publicVersionNumber|publicVersionDate|devicePublishDate|brandName|versionModelNumber|catalogNumber|dunsNumber|companyName|deviceCount|deviceDescription",
+            &format!(
+                "{BRANDED}|00000000-0000-0000-0000-000000000001|New|Published|1|2099-01-01|2099-01-01|Synthoprobe|SP-10|SP10|999999999|Synthetic Devices Inc.|1|A synthetic sterile probe"
+            ),
+            &format!(
+                "{DESCRIBED}|00000000-0000-0000-0000-000000000002|New|Published|1|2099-01-01|2099-01-01||SP-20||999999999|Synthetic Devices Inc.|10|A synthetic probe tray"
+            ),
+        ]
+        .join("\n")
+    }
+
+    /// An export with a Basic UDI-DI and an issuing-agency column, one GS1 row and one HIBCC row.
+    #[must_use]
+    pub fn mixed_csv() -> String {
+        [
+            "UDI-DI,Basic UDI-DI,Trade name,Issuing agency",
+            &format!("{BRANDED},999999SYNTHBASIC01,Synthoprobe,GS1"),
+            &format!("{HIBCC},+H999SYNTHBASIC02,Synthoclip,HIBCC"),
+        ]
+        .join("\n")
+    }
+}
+
 /// SNOMED CT GPS: a freeset over the testkit edition, two active concepts
 /// and one inactive row.
 pub mod gps {
@@ -535,13 +573,15 @@ pub fn write_releases(dir: &Path) -> std::io::Result<()> {
     std::fs::write(dir.join("spor-oms.json"), spor::oms())?;
     std::fs::write(dir.join("spor-sms.json"), spor::sms())?;
     std::fs::write(dir.join("spor-pms.json"), spor::pms())?;
+    std::fs::write(dir.join("device.txt"), udi::device_txt())?;
+    std::fs::write(dir.join("udi-mixed.csv"), udi::mixed_csv())?;
     Ok(())
 }
 
 /// The artifact directory names [`write_artifacts`] writes, one per release.
-pub const ARTIFACTS: [&str; 11] = [
+pub const ARTIFACTS: [&str; 12] = [
     "npu", "icdo", "emdn", "isco", "orpha", "dicom", "edqm", "spor-rms", "spor-oms", "spor-sms",
-    "spor-pms",
+    "spor-pms", "udi-gs1",
 ];
 
 /// Builds every release into its directory under `dir` (see [`ARTIFACTS`])
@@ -601,6 +641,12 @@ pub fn write_artifacts(dir: &Path) -> std::io::Result<()> {
         },
         Releases {
             spor: vec![r.join("spor-pms.json")],
+            ..Releases::default()
+        },
+        Releases {
+            udi: Some(r.join("device.txt")),
+            udi_issuer: Some(::classification::udi::Issuer::Gs1),
+            udi_version: Some(VERSION.to_owned()),
             ..Releases::default()
         },
     ];

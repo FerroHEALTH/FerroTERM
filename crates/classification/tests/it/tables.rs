@@ -5,7 +5,7 @@
 //! each publisher's distribution format.
 
 use ::classification::{
-    Class, Classification, PREFERRED, dicom, edqm, emdn, icdo, isco, npu, orpha, sheet, spor,
+    Class, Classification, PREFERRED, dicom, edqm, emdn, icdo, isco, npu, orpha, sheet, spor, udi,
 };
 use ferroterm_testkit::tables::{self, VERSION};
 
@@ -261,5 +261,56 @@ fn the_spor_responses_read_each_kind_under_its_system() {
     assert!(matches!(
         spor::read(&[&path("edqm.json")], None),
         Err(spor::SporError::Unknown(_))
+    ));
+}
+
+#[test]
+fn the_gudid_device_table_reads_one_issuers_udi_dis_flat() {
+    let dir = releases();
+    let path = |name: &str| dir.path().join(name);
+    let gs1 = udi::read(&path("device.txt"), udi::Issuer::Gs1, VERSION).expect("reads");
+    assert_eq!(gs1.version.as_deref(), Some(VERSION));
+    assert_eq!(gs1.hierarchy, None, "UDI-DIs are a flat list");
+    assert_eq!(gs1.classes.len(), 2);
+    let branded = class(&gs1, tables::udi::BRANDED);
+    assert_eq!(branded.title("en"), Some("Synthoprobe"));
+    assert_eq!(rubric(branded, udi::MODEL), ["SP-10"]);
+    assert_eq!(
+        rubric(branded, udi::MANUFACTURER),
+        ["Synthetic Devices Inc."]
+    );
+    assert_eq!(
+        rubric(branded, udi::DESCRIPTION),
+        ["A synthetic sterile probe"]
+    );
+    assert_eq!(
+        class(&gs1, tables::udi::DESCRIBED).title("en"),
+        Some("A synthetic probe tray"),
+        "a row without a brand name is shown by its description"
+    );
+    assert_eq!(
+        udi::Issuer::Gs1.system(),
+        "http://hl7.org/fhir/NamingSystem/gs1-di"
+    );
+    assert_eq!("IFA".parse(), Ok(udi::Issuer::Ifa));
+    assert!("acme".parse::<udi::Issuer>().is_err());
+}
+
+#[test]
+fn a_udi_table_naming_another_issuing_agency_is_refused() {
+    let dir = releases();
+    let mixed = dir.path().join("udi-mixed.csv");
+    let error = udi::read(&mixed, udi::Issuer::Gs1, VERSION).expect_err("mixed issuers");
+    assert!(
+        matches!(&error, udi::UdiError::OtherIssuer { agency, rows: 1, .. } if agency == "HIBCC"),
+        "{error}"
+    );
+    assert!(matches!(
+        udi::read(&mixed, udi::Issuer::Hibcc, VERSION),
+        Err(udi::UdiError::OtherIssuer { rows: 1, .. })
+    ));
+    assert!(matches!(
+        udi::read(&dir.path().join("npu-codes.csv"), udi::Issuer::Gs1, VERSION),
+        Err(udi::UdiError::Sheet(sheet::SheetError::Column { .. }))
     ));
 }

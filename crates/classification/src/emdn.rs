@@ -94,11 +94,7 @@ pub fn read(path: &Path, version: Option<&str>) -> Result<Classification, SheetE
         if let Some(term) = term_at.and_then(|i| row.get(i)).filter(|t| !t.is_empty()) {
             rubrics.push(Rubric::english(PREFERRED, term));
         }
-        for (index, kind) in [(2, LEVEL), (3, TERMINAL)] {
-            if let Some(value) = header.cell(row, index) {
-                rubrics.push(Rubric::english(kind, value));
-            }
-        }
+        rubrics.extend(header.rubrics(row, &[(2, LEVEL), (3, TERMINAL)]));
         classes.push(Class {
             code: code.to_owned(),
             kind: if code.len() == 1 { CATEGORY } else { TYPE }.to_owned(),
