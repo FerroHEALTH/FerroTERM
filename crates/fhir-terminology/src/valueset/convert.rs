@@ -51,6 +51,11 @@ fn filter(
     })
 }
 
+/// The cross-version extension an R4 resource carries R5's
+/// `ValueSet.compose.property` in (<https://hl7.org/fhir/versions.html#extensions>).
+const COMPOSE_PROPERTY_EXTENSION: &str =
+    "http://hl7.org/fhir/5.0/StructureDefinition/extension-ValueSet.compose.property";
+
 /// The cross-version extension an R4 resource carries an R5 filter operator in
 /// (<https://hl7.org/fhir/versions.html#extensions>).
 const FILTER_OP_EXTENSION: &str =
@@ -63,15 +68,23 @@ macro_rules! convert_value_set {
     (@value optional, $f:ident) => {
         $f.value.as_ref().and_then(|v| v.value.as_deref())
     };
-    (@property with, $source:ident) => {
+    (@property with, $module:ident, $source:ident) => {
         $source
             .property
             .iter()
             .filter_map(|p| p.value.clone())
             .collect()
     };
-    (@property without, $source:ident) => {
-        Vec::new()
+    (@property extended, $module:ident, $source:ident) => {
+        $source
+            .extension
+            .iter()
+            .filter(|x| x.url == super::COMPOSE_PROPERTY_EXTENSION)
+            .filter_map(|x| match &x.value {
+                Some(fhir_types::$module::extension::ExtensionValue::String(s)) => s.value.clone(),
+                _ => None,
+            })
+            .collect()
     };
     ($module:ident, $value:tt, $property:tt) => {
         /// The conversion for this FHIR version's `ValueSet`.
@@ -172,7 +185,7 @@ macro_rules! convert_value_set {
                 )?;
                 let mut compose = Compose {
                     inactive: source.inactive.as_ref().and_then(|b| b.value),
-                    property: convert_value_set!(@property $property, source),
+                    property: convert_value_set!(@property $property, $module, source),
                     ..Compose::default()
                 };
                 for (index, i) in source.include.iter().enumerate() {
@@ -305,9 +318,9 @@ macro_rules! convert_value_set {
     };
 }
 
-// NOTE: `ValueSet.compose.property` is an R5 element; R4 and R4B carry none
-// (<https://hl7.org/fhir/R5/valueset-definitions.html#ValueSet.compose.property>).
-convert_value_set!(r4, required, without);
-convert_value_set!(r4b, required, without);
+// NOTE: `ValueSet.compose.property` is an R5 element; R4 and R4B carry it in its
+// cross-version extension (<https://hl7.org/fhir/versions.html#extensions>).
+convert_value_set!(r4, required, extended);
+convert_value_set!(r4b, required, extended);
 convert_value_set!(r5, required, with);
 convert_value_set!(r6, optional, with);

@@ -315,6 +315,8 @@ permutations/good-scd-exclude-import-request
 permutations/good-scd-exclude-list-request
 permutations/good-scd-import-request
 permutations/good-scd-isa-request
+properties/expand-with-valueset.compose.property-all-properties-enums
+properties/expand-with-valueset.compose.property-all-properties-wildcard
 regex-bad/expand-regex-bad
 regex-bad/expand-regex-bad-2
 regex-bad/validate-regex-bad
