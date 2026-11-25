@@ -39,6 +39,9 @@ errors/broken-filter-validate
 errors/broken-filter2-validate
 errors/combination-bad
 errors/combination-ok
+errors/filter-modifier-expand
+errors/infer-unknown-system
+errors/infer-unknown-system-import
 errors/unknown-system1
 errors/unknown-system2
 exclude/exclude-1
@@ -65,6 +68,8 @@ extensions/validate-coding-bad-supplement
 extensions/validate-coding-bad-supplement-url
 extensions/validate-coding-good-supplement
 extensions/validate-coding-good2-supplement
+extensions/validate-supplement-prop-base-code4
+extensions/validate-supplement-prop-base-code5
 fragment/fragment-expansion
 fragment/validation-fragment-code-bad-code
 fragment/validation-fragment-code-good
@@ -314,9 +319,11 @@ regex-bad/expand-regex-bad
 regex-bad/expand-regex-bad-2
 regex-bad/validate-regex-bad
 regex-bad/validate-regex-bad-2
+search/search-all-de-no-language
 search/search-all-de-yes
 search/search-all-no
 search/search-all-supplement-fr-no-language
+search/search-all-supplement-fr-yes
 search/search-all-yes
 search/search-enum-de-yes
 search/search-enum-no
