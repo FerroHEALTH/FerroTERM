@@ -15,13 +15,17 @@ the 60-minute check timeout when every group re-ran the full tests, e2e,
 perf and coverage.
 
 In merge_group, `ci.yml` runs the tier-1 guards, rustfmt, cargo-deny, the
-crate-version guard and a smoke set: the build in one profile and the unit
-tests (`--lib`, or `--bins` for a binary-only package). Every other lane
-(clippy, the full test matrix, doctests, rustdoc, msrv, coverage, e2e
-containers, browser journeys, perf and CPU gates, conformance corpora,
-fuzz, publish dry runs) carries `github.event_name != 'merge_group'` in its
-job condition, so it starts no runner. The required check keeps its name and
-reads a skipped lane as a pass, so the rulesets need no edit.
+crate-version guard and a smoke set: every test target compiled in one
+profile (`cargo nextest run --no-run` with every feature), and only the
+unit tests run (`--lib`, or `--bins` for a binary-only package). The
+compile stays in the queue: on 2026-11-25 two FerroBRIDGE pull requests
+that each passed alone merged on top of a third and broke a test binary on
+`main`. Every other lane (clippy, the full test matrix, doctests, rustdoc,
+msrv, coverage, e2e containers, browser journeys, perf and CPU gates,
+conformance corpora, fuzz, publish dry runs) carries
+`github.event_name != 'merge_group'` in its job condition, so it starts no
+runner. The required check keeps its name and reads a skipped lane as a
+pass, so the rulesets need no edit.
 
 **How to apply:** a new lane that compiles beyond the smoke build, measures,
 or starts a container or a browser runs on the pull request and on main and

@@ -14,7 +14,8 @@
 #      checkout, so a real detection job is the correct primitive.)
 #
 # A merge group runs the light set: tier 1, rustfmt, cargo-deny, the boundary
-# and token guards, the crate-version guard and the workspace's unit tests.
+# and token guards, the crate-version guard, and every test target compiled
+# with the unit tests run.
 # The pull request ran the full suite on the same change, so every other lane
 # is skipped there, and `conclusion` reads a skipped lane as a pass.
 name: CI
@@ -522,9 +523,13 @@ jobs:
       - if: github.event_name != 'merge_group'
         run: cargo test --doc --workspace --locked
       # The merge group's smoke set: the pull request ran every suite, so the
-      # queue builds the workspace and runs its unit tests only.
+      # queue compiles every test target with every feature and runs only the
+      # unit tests.
       - if: github.event_name == 'merge_group'
-        run: cargo nextest run --workspace --lib --bins --locked --no-tests=pass
+        run: |
+          set -euo pipefail
+          cargo nextest run --workspace --all-features --no-run --locked
+          cargo nextest run --workspace --lib --bins --all-features --locked --no-tests=pass
 
   doc:
     name: rustdoc

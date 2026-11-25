@@ -235,8 +235,10 @@ ran the full suite on the same change, and queues of about ten entries fell
 out at the 60-minute check timeout when every group ran it again. In a merge
 group `ci.yml` runs `lint`, `guards`, `rustfmt`, `cargo-deny`, the boundary
 and token guards, the crate-version guard, and `test` in smoke mode: it
-builds the workspace in the dev profile and runs the unit tests (`--lib
---bins`), with no integration suite or doctest. Clippy, rustdoc, msrv, the
+compiles every test target of the workspace with every feature in the dev
+profile and runs only the unit tests (`--lib --bins`), with no integration
+suite or doctest run. The compile stays in the queue: two pull requests
+that each passed alone can break a test binary together. Clippy, rustdoc, msrv, the
 publish dry run, the bench bars, the tx-ecosystem pass list, the console
 journeys, the quickstart and the performance gate are skipped at job level,
 so they start no runner, and run on the pull request and on every push to
