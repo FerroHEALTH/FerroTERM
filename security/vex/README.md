@@ -61,6 +61,7 @@ and nobody can re-evaluate it later.
 | File | Subject | Authored |
 |---|---|---|
 | `rust-advisories.openvex.json` | The Rust dependency advisories the advisory gate accepts. Each statement additionally carries a `ferroterm:reachability` block (our own extension, since OpenVEX defines none) naming the crates the affected package is reached through. | **generated** |
+| `console-cookie.openvex.json` | GHSA-8wcq-xq25-7fhm (RUSTSEC-2026-0594) in `cookie` before 0.18.3, for the operator console images released before 0.4.8: not affected, since the console never forks (#1317). | by hand |
 
 There is no document for the operating-system layer. Every image is static
 distroless (`gcr.io/distroless/static-debian13`, musl binaries), and a scan
