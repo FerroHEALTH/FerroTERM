@@ -11,6 +11,11 @@ repository.workspace = true
 authors.workspace = true
 publish = false
 
+[features]
+# The TLS 1.3 key exchange peer and client of `kx`, for the suites that test
+# a listener or an outbound client.
+tls = ["dep:rcgen", "dep:rustls", "dep:thiserror"]
+
 [dependencies]
 ferroterm-build.workspace = true
 classification.workspace = true
@@ -28,9 +33,9 @@ flate2.workspace = true
 serde_json.workspace = true
 tar.workspace = true
 tempfile.workspace = true
-rcgen.workspace = true
-rustls.workspace = true
-thiserror.workspace = true
+rcgen = { workspace = true, optional = true }
+rustls = { workspace = true, optional = true }
+thiserror = { workspace = true, optional = true }
 zip.workspace = true
 
 [lints]

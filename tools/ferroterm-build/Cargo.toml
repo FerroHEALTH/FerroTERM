@@ -46,7 +46,7 @@ thiserror.workspace = true
 zip.workspace = true
 
 [dev-dependencies]
-ferroterm-testkit.workspace = true
+ferroterm-testkit = { workspace = true, features = ["tls"] }
 tempfile.workspace = true
 
 [lints]

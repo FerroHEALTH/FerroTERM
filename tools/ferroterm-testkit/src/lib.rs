@@ -16,6 +16,7 @@ mod edition;
 pub mod fhir;
 pub mod gstandaard;
 pub mod icd11;
+#[cfg(feature = "tls")]
 pub mod kx;
 pub mod labcodeset;
 pub mod loinc;
