@@ -38,7 +38,8 @@ use crate::state::layer::Layer;
 use crate::state::persisted::Persisted;
 use crate::state::{AppState, LoadError, Origin, instance_id};
 
-/// The FHIR core terminology of every served version, read once per process.
+/// The FHIR core terminology of every served version, with the terminology
+/// this server authors beneath it, read once per process.
 ///
 /// The bundles are embedded and generated, so the result is the same on every
 /// call; the cache keeps a second server in one process from reading them
@@ -52,10 +53,12 @@ pub(super) fn core_terminology() -> Result<BTreeMap<&'static str, CoreTerminolog
     for (fhir_version, bundle) in crate::served::CORE {
         built.insert(
             fhir_version,
-            CoreTerminology::load(bundle).map_err(|source| LoadError::Core {
-                fhir_version,
-                source: Box::new(source),
-            })?,
+            CoreTerminology::load(bundle)
+                .and_then(|core| core.with_authored(bundle))
+                .map_err(|source| LoadError::Core {
+                    fhir_version,
+                    source: Box::new(source),
+                })?,
         );
     }
     Ok(CACHE.get_or_init(|| built).clone())

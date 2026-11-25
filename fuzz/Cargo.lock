@@ -221,10 +221,12 @@ checksum = "1c133bc6a41be0d194c306b5506d15e6feeea7b1d6604bd3f8310dfb2ca96486"
 
 [[package]]
 name = "classification"
-version = "0.1.150"
+version = "0.1.151"
 dependencies = [
  "csv",
  "quick-xml",
+ "serde",
+ "serde_json",
  "thiserror",
  "zip",
 ]
@@ -256,7 +258,7 @@ dependencies = [
 
 [[package]]
 name = "concept-graph"
-version = "0.1.150"
+version = "0.1.151"
 dependencies = [
  "roaring",
  "thiserror",
@@ -264,7 +266,7 @@ dependencies = [
 
 [[package]]
 name = "concept-store"
-version = "0.1.150"
+version = "0.1.151"
 dependencies = [
  "concept-graph",
  "redb",
@@ -384,7 +386,7 @@ dependencies = [
 
 [[package]]
 name = "designation-index"
-version = "0.1.150"
+version = "0.1.151"
 dependencies = [
  "concept-graph",
  "fst",
@@ -395,7 +397,7 @@ dependencies = [
 
 [[package]]
 name = "dhd-thesaurus"
-version = "0.1.150"
+version = "0.1.151"
 dependencies = [
  "classification",
  "csv",
@@ -530,7 +532,7 @@ dependencies = [
 
 [[package]]
 name = "fhir-terminology"
-version = "0.1.150"
+version = "0.1.151"
 dependencies = [
  "concept-graph",
  "concept-store",
@@ -685,7 +687,7 @@ dependencies = [
 
 [[package]]
 name = "gstandaard"
-version = "0.1.150"
+version = "0.1.151"
 dependencies = [
  "classification",
  "thiserror",
@@ -802,7 +804,7 @@ dependencies = [
 
 [[package]]
 name = "icd11"
-version = "0.1.150"
+version = "0.1.151"
 dependencies = [
  "reqwest",
  "serde_json",
@@ -1067,7 +1069,7 @@ dependencies = [
 
 [[package]]
 name = "labcodeset"
-version = "0.1.150"
+version = "0.1.151"
 dependencies = [
  "quick-xml",
  "thiserror",
@@ -1147,7 +1149,7 @@ dependencies = [
 
 [[package]]
 name = "loinc"
-version = "0.1.150"
+version = "0.1.151"
 dependencies = [
  "csv",
  "thiserror",
@@ -1463,7 +1465,7 @@ dependencies = [
 
 [[package]]
 name = "rf2"
-version = "0.1.150"
+version = "0.1.151"
 dependencies = [
  "csv",
  "jiff",
@@ -1607,7 +1609,7 @@ checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 
 [[package]]
 name = "rxnorm-rrf"
-version = "0.1.150"
+version = "0.1.151"
 dependencies = [
  "csv",
  "thiserror",
@@ -1639,7 +1641,7 @@ dependencies = [
 
 [[package]]
 name = "sct-ecl"
-version = "0.1.150"
+version = "0.1.151"
 dependencies = [
  "concept-graph",
  "logos",
@@ -1651,7 +1653,7 @@ dependencies = [
 
 [[package]]
 name = "sct-scg"
-version = "0.1.150"
+version = "0.1.151"
 dependencies = [
  "logos",
  "thiserror",
