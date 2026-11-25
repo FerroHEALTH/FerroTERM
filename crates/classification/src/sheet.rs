@@ -6,12 +6,13 @@
 //!
 //! A workbook cell is a shared string (`t="s"`, §18.4.8), an inline string
 //! (`t="inlineStr"`), or a value written as it stands; formulas and styles
-//! are not read. A delimited file is split on the first of tab, `;`, or `,`
-//! its header line holds.
+//! are not read. A delimited file is split on the first of tab, `|`, `;`, or
+//! `,` its header line holds.
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+use crate::Rubric;
 use crate::xml::{Element, records};
 
 /// A failure to read a table.
@@ -102,6 +103,18 @@ impl Header {
             .map(String::as_str)
             .filter(|v| !v.is_empty())
     }
+
+    /// An English rubric of each `(index, kind)` whose cell in `row` is not empty.
+    #[must_use]
+    pub fn rubrics(&self, row: &[String], kinds: &[(usize, &str)]) -> Vec<Rubric> {
+        kinds
+            .iter()
+            .filter_map(|(index, kind)| {
+                self.cell(row, *index)
+                    .map(|value| Rubric::english(kind, value))
+            })
+            .collect()
+    }
 }
 
 /// One column a reader looks for: the header names it accepts (compared
@@ -187,10 +200,10 @@ pub fn read(path: &Path) -> Result<Sheet, SheetError> {
     }
 }
 
-/// The delimiter of a text export: the first of tab, `;`, and `,` on the header line.
+/// The delimiter of a text export: the first of tab, `|`, `;`, and `,` on the header line.
 fn delimiter(text: &str) -> u8 {
     let header = text.lines().next().unwrap_or_default();
-    b"\t;,"
+    b"\t|;,"
         .iter()
         .copied()
         .find(|d| header.contains(char::from(*d)))

@@ -68,6 +68,15 @@ pub struct Releases {
     /// The SPOR release to record; the newest modification date when absent.
     #[arg(long, value_name = "VERSION", requires = "spor")]
     pub spor_version: Option<String>,
+    /// A UDI-DI table of one issuing entity: the `AccessGUDID` `device.txt`, or an EUDAMED or issuing-entity export as a delimited file or workbook.
+    #[arg(long, value_name = "FILE", group = GROUP, requires_all = ["udi_issuer", "udi_version"])]
+    pub udi: Option<PathBuf>,
+    /// The issuing entity of the UDI-DIs (`gs1`, `hibcc`, `iccbba-blood`, `iccbba-other`, `ifa`).
+    #[arg(long, value_name = "ISSUER", requires = "udi")]
+    pub udi_issuer: Option<::classification::udi::Issuer>,
+    /// The UDI release to record (`20261102`); required, the table carries none.
+    #[arg(long, value_name = "RELEASE", requires = "udi")]
+    pub udi_version: Option<String>,
     /// The SNOMED CT Global Patient Set freeset (the tab-separated `.txt`); writes a value set over the loaded edition under `<out>/gps`.
     #[arg(long, value_name = "TXT", group = GROUP)]
     pub gps: Option<PathBuf>,
@@ -94,9 +103,15 @@ pub enum ReleaseError {
     /// The SPOR responses do not read.
     #[error(transparent)]
     Spor(#[from] ::classification::spor::SporError),
+    /// The UDI-DI table does not read.
+    #[error(transparent)]
+    Udi(#[from] ::classification::udi::UdiError),
     /// A source was given without the version it needs.
     #[error("`--{0}` needs `--{0}-version`")]
     NoVersion(&'static str),
+    /// A UDI-DI table was given without its issuing entity.
+    #[error("`--udi` needs `--udi-issuer`")]
+    NoIssuer,
     /// The classification build failed.
     #[error(transparent)]
     Build(#[from] classification::Error),
@@ -122,6 +137,8 @@ impl Releases {
             Some("edqm")
         } else if !self.spor.is_empty() {
             Some("spor")
+        } else if self.udi.is_some() {
+            Some("udi")
         } else {
             None
         }
@@ -141,6 +158,20 @@ impl Releases {
             return Ok(Some(classification::build(
                 &read.classification,
                 &read.system,
+                None,
+                out,
+            )?));
+        }
+        if let Some(udi) = &self.udi {
+            let issuer = self.udi_issuer.ok_or(ReleaseError::NoIssuer)?;
+            let version = self
+                .udi_version
+                .as_deref()
+                .ok_or(ReleaseError::NoVersion("udi"))?;
+            let read = ::classification::udi::read(udi, issuer, version)?;
+            return Ok(Some(classification::build(
+                &read,
+                issuer.system(),
                 None,
                 out,
             )?));

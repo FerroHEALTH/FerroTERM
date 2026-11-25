@@ -27,7 +27,7 @@ struct Case {
     under_root: &'static [&'static str],
 }
 
-const CASES: [Case; 11] = [
+const CASES: [Case; 12] = [
     Case {
         system: "http://npu-terminology.org",
         version: VERSION,
@@ -126,6 +126,15 @@ const CASES: [Case; 11] = [
         property: ("kind", "medicinal-product"),
         root: None,
         under_root: &[tables::spor::PRODUCT],
+    },
+    Case {
+        system: "http://hl7.org/fhir/NamingSystem/gs1-di",
+        version: VERSION,
+        code: tables::udi::BRANDED,
+        display: "Synthoprobe",
+        property: ("manufacturer", "Synthetic Devices Inc."),
+        root: None,
+        under_root: &[tables::udi::BRANDED, tables::udi::DESCRIBED],
     },
 ];
 
