@@ -1,0 +1,31 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://github.com/FerroHEALTH/FerroTERM/blob/main/security/vex/console-cookie.openvex.json",
+  "author": "Cadasto B.V.",
+  "role": "vendor",
+  "timestamp": "2026-11-25T00:00:00Z",
+  "version": 1,
+  "statements": [
+    {
+      "vulnerability": {
+        "name": "GHSA-8wcq-xq25-7fhm",
+        "aliases": [
+          "RUSTSEC-2026-0594"
+        ]
+      },
+      "products": [
+        {
+          "@id": "pkg:oci/ferroterm-console",
+          "subcomponents": [
+            {
+              "@id": "pkg:cargo/cookie"
+            }
+          ]
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "In `cookie` 0.14.0 up to 0.18.2 a private cookie encrypted in more than one process after a `fork()` could reuse an AES-GCM nonce. The operator console encrypts its session cookie with `cookie`'s private jar, through `ferrohealth-session`, in its one server process and never forks, so no released console image met the condition; the console takes `cookie` 0.18.3 from FerroTERM 0.4.8 on (#1275), where the advisory is fixed."
+    }
+  ]
+}
