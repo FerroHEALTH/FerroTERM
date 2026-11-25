@@ -39,6 +39,7 @@ fn cli(
         gstandaard_version: None,
         labcodeset: None,
         rxnorm_sources: Vec::new(),
+        releases: ferroterm_build::releases::Releases::default(),
         out: Some(out.to_path_buf()),
         index_root: None,
     }

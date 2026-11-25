@@ -33,6 +33,10 @@ properties, implicit value sets, with their citations) are in
 | G-Standaard | `urn:oid:2.16.840.1.213883.2.4.4.1` (GPK), `.10` (PRK), `.7` (HPK), `.8` (article) | Any monthly release | `ferroterm-build --gstandaard <dir> --gstandaard-version <release>` | Z-Index subscription |
 | Nederlandse Labcodeset | `https://ferroterm.eu/fhir/ValueSet/nl-labcodeset` and the LOINC supplement `https://ferroterm.eu/fhir/CodeSystem/nl-labcodeset-loinc` | Any Nictiz publication, as a value set and supplement over LOINC, SNOMED CT, and UCUM | `ferroterm-build --labcodeset <zip, document, or dir>` into `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` | Licensed by Nictiz |
 | NHG ICPC-1 to SNOMED CT map | `http://terminologie.nictiz.nl/ns/ConceptMap/icpc1nl-snomed` (source `http://hl7.org/fhir/sid/icpc-1-nl`) | Any Nictiz release of the FHIR `ConceptMap` | A directory with the `ConceptMap` and a `package.json`, in `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` | Licensed by the NHG |
+| NPU | `http://npu-terminology.org` | Any IFCC code file; you name the release | `ferroterm-build --npu <npu-codes-latest.csv> --npu-version <release>` | Published by the IFCC and the Danish Health Data Authority; you download the release |
+| ICD-O-3 | `http://terminology.hl7.org/CodeSystem/icd-o-3` | Any WHO revision (`3.2` style), topography and morphology | `ferroterm-build --icdo <topography> --icdo <morphology> --icdo-version <revision>` | Licensed by WHO; you supply the tables |
+| EMDN | `https://smt.esante.gouv.fr/terminologie-emdn` | Any yearly Commission release (`2026` style) | `ferroterm-build --emdn <EMDN workbook>` | Free from the European Commission; you download the release |
+| ISCO-08 | `urn:oid:2.16.840.1.113883.2.9.6.2.7` | The ILO structure workbook | `ferroterm-build --isco <ISCO-08 workbook>` | Published by the ILO; you download the release |
 | FHIR `CodeSystem`, `ValueSet`, and `ConceptMap` resources | Each resource's own `url` | HL7 Terminology and any FHIR package or directory of JSON, supplements included | `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` | Per resource; HL7 Terminology is CC0 |
 <!-- code-systems:end -->
 
@@ -40,4 +44,6 @@ Every system reaches the operations through one provider seam, so nothing in
 an operation is a special case for one system. The repository ships no code
 system content, licensed or open: you bring the release you are licensed for,
 and the build tool turns it into an index. The
-[loading page](../operate/loading-snomed.md) shows each build.
+[loading page](../operate/loading-snomed.md) shows each build, and the
+[EEHRxF page](../operate/loading-eehrxf.md) the systems the European exchange
+format binds.

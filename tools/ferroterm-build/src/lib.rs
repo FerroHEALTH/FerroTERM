@@ -21,6 +21,7 @@ pub mod labcodeset;
 pub mod loinc;
 pub mod output;
 pub mod pipeline;
+pub mod releases;
 pub mod rxnorm;
 
 use std::path::{Path, PathBuf};
@@ -35,21 +36,21 @@ pub struct Cli {
     #[arg(
         long,
         value_name = "DIR_OR_ZIP",
-        conflicts_with_all = ["loinc", "claml", "icd10cm", "rxnorm", "icd11", "atc", "dhd", "gstandaard"],
-        required_unless_present_any = ["loinc", "claml", "icd10cm", "rxnorm", "icd11", "atc", "dhd", "gstandaard"]
+        conflicts_with_all = ["loinc", "claml", "icd10cm", "rxnorm", "icd11", "atc", "dhd", "gstandaard", "release"],
+        required_unless_present_any = ["loinc", "claml", "icd10cm", "rxnorm", "icd11", "atc", "dhd", "gstandaard", "labcodeset", "release"]
     )]
     pub rf2: Option<PathBuf>,
     /// A refset-only RF2 package layered onto the edition `--rf2` names (repeatable).
     #[arg(long, value_name = "DIR_OR_ZIP", action = clap::ArgAction::Append, requires = "rf2")]
     pub rf2_refset: Vec<PathBuf>,
     /// The LOINC release: the unpacked `Loinc_<version>` directory, or the release zip.
-    #[arg(long, value_name = "DIR_OR_ZIP", conflicts_with_all = ["claml", "icd10cm", "rxnorm"])]
+    #[arg(long, value_name = "DIR_OR_ZIP", conflicts_with_all = ["claml", "icd10cm", "rxnorm", "release"])]
     pub loinc: Option<PathBuf>,
     /// The LOINC version to record when the release does not say (`2.82`).
     #[arg(long, value_name = "VERSION", requires = "loinc")]
     pub loinc_version: Option<String>,
     /// A `ClaML` classification (WHO ICD-10, a national ICD-10, ICPC-2): the XML file, or a zip holding it.
-    #[arg(long, value_name = "XML_OR_ZIP", conflicts_with_all = ["icd10cm", "rxnorm"], requires = "system")]
+    #[arg(long, value_name = "XML_OR_ZIP", conflicts_with_all = ["icd10cm", "rxnorm", "release"], requires = "system")]
     pub claml: Option<PathBuf>,
     /// The code system URI the `ClaML` classification is served as (`http://hl7.org/fhir/sid/icd-10`).
     #[arg(long, value_name = "URI", requires = "claml")]
@@ -58,16 +59,16 @@ pub struct Cli {
     #[arg(long, value_name = "VERSION", requires = "claml")]
     pub claml_version: Option<String>,
     /// The ICD-10-CM release: the directories or zips holding the tabular XML and the order file (repeatable).
-    #[arg(long, value_name = "DIR_OR_ZIP", action = clap::ArgAction::Append, conflicts_with = "rxnorm")]
+    #[arg(long, value_name = "DIR_OR_ZIP", action = clap::ArgAction::Append, conflicts_with_all = ["rxnorm", "release"])]
     pub icd10cm: Vec<PathBuf>,
     /// The `RxNorm` release: the unpacked directory holding `rrf/`, or the release zip (the full release or the Current Prescribable Content).
-    #[arg(long, value_name = "DIR_OR_ZIP")]
+    #[arg(long, value_name = "DIR_OR_ZIP", conflicts_with = "release")]
     pub rxnorm: Option<PathBuf>,
     /// The release date to record when the release does not say (`09082026`).
     #[arg(long, value_name = "MMDDYYYY", requires = "rxnorm")]
     pub rxnorm_version: Option<String>,
     /// The ICD-11 cache directory: the entity JSON a local ICD-API deployment served, per code system and language; built into `<out>/mms`, `<out>/icf`, `<out>/entity`.
-    #[arg(long, value_name = "DIR", conflicts_with_all = ["loinc", "claml", "icd10cm", "rxnorm"])]
+    #[arg(long, value_name = "DIR", conflicts_with_all = ["loinc", "claml", "icd10cm", "rxnorm", "release"])]
     pub icd11: Option<PathBuf>,
     /// A local ICD-API deployment (`http://127.0.0.1:80`) to fill the cache from before building.
     #[arg(long, value_name = "URL", requires = "icd11")]
@@ -79,29 +80,32 @@ pub struct Cli {
     #[arg(long, value_name = "LANG", value_delimiter = ',', action = clap::ArgAction::Append, requires = "icd11_api")]
     pub icd11_languages: Vec<String>,
     /// The WHO ATC/DDD index as a CSV export (`ATC code`, `ATC level name`, `DDD`, `U`, `Adm.R`, `Note`), or the G-Standaard file `BST801T`.
-    #[arg(long, value_name = "FILE", conflicts_with_all = ["loinc", "claml", "icd10cm", "rxnorm", "icd11"])]
+    #[arg(long, value_name = "FILE", conflicts_with_all = ["loinc", "claml", "icd10cm", "rxnorm", "icd11", "release"])]
     pub atc: Option<PathBuf>,
     /// The ATC index year to record (`2026`); required, the files carry none.
     #[arg(long, value_name = "YEAR", requires = "atc")]
     pub atc_version: Option<String>,
     /// A DHD Diagnosethesaurus or Verrichtingenthesaurus delivery: the zip, or the unpacked directory of CSV tables.
-    #[arg(long, value_name = "DIR_OR_ZIP", conflicts_with_all = ["loinc", "claml", "icd10cm", "rxnorm", "icd11", "atc"])]
+    #[arg(long, value_name = "DIR_OR_ZIP", conflicts_with_all = ["loinc", "claml", "icd10cm", "rxnorm", "icd11", "atc", "release"])]
     pub dhd: Option<PathBuf>,
     /// The thesaurus version to record when the delivery name does not carry it (`2.27`).
     #[arg(long, value_name = "VERSION", requires = "dhd")]
     pub dhd_version: Option<String>,
     /// A G-Standaard release directory (the `BSTnnnT` files); builds the GPK, PRK, HPK, and article systems under `<out>/{gpk,prk,hpk,artikel}`.
-    #[arg(long, value_name = "DIR", requires = "gstandaard_version", conflicts_with_all = ["loinc", "claml", "icd10cm", "rxnorm", "icd11", "atc", "dhd"])]
+    #[arg(long, value_name = "DIR", requires = "gstandaard_version", conflicts_with_all = ["loinc", "claml", "icd10cm", "rxnorm", "icd11", "atc", "dhd", "release"])]
     pub gstandaard: Option<PathBuf>,
     /// The G-Standaard release to record (`202609`); required, the files carry none.
     #[arg(long, value_name = "RELEASE", requires = "gstandaard")]
     pub gstandaard_version: Option<String>,
     /// A Nederlandse Labcodeset publication: the release zip, or the `labconcepts-*.xml` document or its directory; writes FHIR resources under `<out>/labcodeset`.
-    #[arg(long, value_name = "FILE_DIR_OR_ZIP", conflicts_with_all = ["loinc", "claml", "icd10cm", "rxnorm", "icd11", "atc", "dhd", "gstandaard"])]
+    #[arg(long, value_name = "FILE_DIR_OR_ZIP", conflicts_with_all = ["loinc", "claml", "icd10cm", "rxnorm", "icd11", "atc", "dhd", "gstandaard", "release"])]
     pub labcodeset: Option<PathBuf>,
     /// The `RxNorm` sources (`SAB`) whose names are kept beside the unrestricted `RXNORM` and `MTHSPL` (a full release under a UMLS licence).
     #[arg(long, value_name = "SAB", value_delimiter = ',', action = clap::ArgAction::Append, requires = "rxnorm")]
     pub rxnorm_sources: Vec<String>,
+    /// The publisher releases the European exchange format binds (NPU, ICD-O-3, EMDN, ISCO-08).
+    #[command(flatten)]
+    pub releases: releases::Releases,
     /// The directory to write the artifacts into; a child of `--index-root` named for the source when absent.
     #[arg(long, value_name = "DIR")]
     pub out: Option<PathBuf>,
@@ -138,6 +142,9 @@ pub fn run(cli: &Cli) -> Result<Report, RunError> {
 /// read, the edition cannot be identified, a layered package's module
 /// dependency is unmet, or an artifact cannot be written.
 pub fn run_into(cli: &Cli, out: &Path) -> Result<Report, RunError> {
+    if let Some(report) = cli.releases.build(out)? {
+        return Ok(Report::Classification(report));
+    }
     if let Some(report) = run_labcodeset(cli, out)? {
         return Ok(Report::Labcodeset(report));
     }
@@ -421,7 +428,7 @@ pub enum Report {
 pub enum RunError {
     /// No input was given.
     #[error(
-        "give `--rf2`, `--loinc`, `--claml`, `--icd10cm`, `--rxnorm`, `--icd11`, `--atc`, `--dhd`, or `--gstandaard`"
+        "give `--rf2`, `--loinc`, `--claml`, `--icd10cm`, `--rxnorm`, `--icd11`, `--atc`, `--dhd`, `--gstandaard`, `--labcodeset`, `--npu`, `--icdo`, `--emdn`, or `--isco`"
     )]
     NoInput,
     /// `--atc` without `--atc-version`.
@@ -457,6 +464,9 @@ pub enum RunError {
     /// The ATC table does not read.
     #[error(transparent)]
     Atc(#[from] ::classification::atc::AtcError),
+    /// A publisher release does not read or build.
+    #[error(transparent)]
+    Release(#[from] releases::ReleaseError),
     /// The DHD delivery does not read.
     #[error(transparent)]
     Dhd(#[from] ::dhd_thesaurus::DhdError),

@@ -33,6 +33,7 @@ fn the_release_builds_the_four_rungs_under_the_output_directory() {
         gstandaard_version: Some(String::from(VERSION)),
         labcodeset: None,
         rxnorm_sources: Vec::new(),
+        releases: ferroterm_build::releases::Releases::default(),
         out: Some(out.path().to_path_buf()),
         index_root: None,
     })
