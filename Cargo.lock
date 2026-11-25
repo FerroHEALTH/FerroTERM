@@ -698,6 +698,8 @@ dependencies = [
  "csv",
  "ferroterm-testkit",
  "quick-xml",
+ "serde",
+ "serde_json",
  "tempfile",
  "thiserror",
  "zip",

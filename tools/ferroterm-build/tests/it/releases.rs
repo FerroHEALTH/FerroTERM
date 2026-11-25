@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The publisher release builds (`--npu`, `--icdo`, `--emdn`, `--isco`) from
-//! the command line over the testkit's synthetic tables.
+//! The publisher release builds from the command line over the testkit's
+//! synthetic releases.
 
 use clap::Parser;
 use ferroterm_build::{Cli, Report};
@@ -17,7 +17,7 @@ fn each_release_builds_under_its_canonical_uri_and_version() {
     let releases = tempfile::tempdir().expect("tempdir");
     tables::write_releases(releases.path()).expect("writes");
     let path = |name: &str| releases.path().join(name).display().to_string();
-    let cases: [(Vec<String>, &str, &str, u64); 4] = [
+    let cases: [(Vec<String>, &str, &str, u64); 8] = [
         (
             vec![
                 "--npu".into(),
@@ -54,6 +54,40 @@ fn each_release_builds_under_its_canonical_uri_and_version() {
             "2008",
             4,
         ),
+        (
+            vec![
+                "--orpha".into(),
+                path("en_product1.xml"),
+                "--orpha".into(),
+                path("fr_product1.xml"),
+            ],
+            "https://www.orpha.net",
+            "2099-01-31",
+            2,
+        ),
+        (
+            vec!["--dicom".into(), path("dcm.owl")],
+            "http://dicom.nema.org/resources/ontology/DCM",
+            tables::dicom::EDITION,
+            2,
+        ),
+        (
+            vec![
+                "--edqm".into(),
+                path("edqm.json"),
+                "--edqm-version".into(),
+                "2099".into(),
+            ],
+            "http://standardterms.edqm.eu",
+            "2099",
+            2,
+        ),
+        (
+            vec!["--spor".into(), path("spor-rms.xml")],
+            "https://spor.ema.europa.eu/v1/lists/999999000001",
+            "2099-03-01",
+            2,
+        ),
     ];
     for (args, system, version, concepts) in cases {
         let out = tempfile::tempdir().expect("tempdir");
@@ -89,4 +123,50 @@ fn a_release_without_its_required_version_or_beside_another_source_is_refused() 
         "the sheet names its release"
     );
     assert!(parse(&["--labcodeset", "l.zip"]).is_ok());
+    assert!(parse(&["--dicom", "dcm.owl", "--orpha", "en_product1.xml"]).is_err());
+    assert!(parse(&["--edqm", "a.json", "--edqm", "b.json"]).is_ok());
+}
+
+#[test]
+fn the_gps_freeset_writes_a_value_set_of_its_active_concepts() {
+    let releases = tempfile::tempdir().expect("tempdir");
+    tables::write_releases(releases.path()).expect("writes");
+    let freeset = releases
+        .path()
+        .join(tables::gps::FILE)
+        .display()
+        .to_string();
+    let out = tempfile::tempdir().expect("tempdir");
+    let cli = parse(&["--gps", &freeset]).expect("parses");
+    let Report::Gps(report) = ferroterm_build::run_into(&cli, out.path()).expect("builds") else {
+        panic!("the GPS builds as a value set");
+    };
+    assert_eq!(report.version, tables::gps::RELEASE, "from the file name");
+    assert_eq!((report.active, report.inactive), (2, 1));
+    let text = std::fs::read_to_string(&report.path).expect("reads");
+    let value_set: serde_json::Value = serde_json::from_str(&text).expect("parses");
+    assert_eq!(
+        value_set["url"],
+        "https://ferroterm.eu/fhir/ValueSet/snomed-gps"
+    );
+    assert_eq!(
+        value_set["compose"]["include"][0]["system"],
+        "http://snomed.info/sct"
+    );
+    let codes: Vec<&str> = value_set["compose"]["include"][0]["concept"]
+        .as_array()
+        .expect("concepts")
+        .iter()
+        .map(|c| c["code"].as_str().expect("code"))
+        .collect();
+    assert_eq!(codes, tables::gps::active());
+    let bad = releases.path().join("gps.txt");
+    std::fs::write(&bad, "123\tmaybe\tX\tY\n").expect("writes");
+    let cli = parse(&["--gps", &bad.display().to_string(), "--gps-version", "1"]).expect("parses");
+    assert!(matches!(
+        ferroterm_build::run_into(&cli, out.path()),
+        Err(ferroterm_build::RunError::Gps(
+            ferroterm_build::gps::GpsError::Row { line: 1, .. }
+        ))
+    ));
 }

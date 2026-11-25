@@ -234,6 +234,8 @@ version = "0.2.1"
 dependencies = [
  "csv",
  "quick-xml",
+ "serde",
+ "serde_json",
  "thiserror",
  "zip",
 ]

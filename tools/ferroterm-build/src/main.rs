@@ -48,6 +48,13 @@ fn main() -> anyhow::Result<()> {
             report.ordinals,
             report.dir.display()
         ),
+        ferroterm_build::Report::Gps(report) => println!(
+            "SNOMED CT GPS {}: {} active concepts, {} inactive left out, written to {}",
+            report.version,
+            report.active,
+            report.inactive,
+            report.path.display()
+        ),
         ferroterm_build::Report::Loinc(report) => println!(
             "LOINC {}: {} terms, {} parts, {} answer lists, {} designations, {} words, written to {}",
             report.version,
