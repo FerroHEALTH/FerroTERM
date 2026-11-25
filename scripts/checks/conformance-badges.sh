@@ -53,7 +53,9 @@ done
 
 # The EHDS badges, self-tested: each counts a committed corpus that a test or
 # scripts/checks/ehds-matrix.sh holds true, and names the exact version it
-# measures. A corpus that does not exist yet writes no badge.
+# measures. A corpus that does not exist yet writes no badge. The badges stay
+# short, and the README heading over them says once that they are self-tested
+# (owner decision, 2026-11-25); a heading without it fails.
 badge() {
   local file="$1" label="$2" message="$3" colour="$4" logo="$5"
   # A badge reports what a synthetic or free corpus proves, so it never claims
@@ -68,6 +70,17 @@ badge() {
   echo "conformance-badges: $file $message"
 }
 
+# Fails unless the bold heading over the README's first EHDS badge says the
+# counts are self-tested.
+ehds_heading() {
+  local heading
+  heading="$(awk '/^\*\*/ { last = $0 } /conformance%2Fehds-/ { print last; exit }' "$1")"
+  if ! grep -qi 'self-tested' <<<"$heading"; then
+    echo "conformance-badges: $1: the heading over the EHDS badges says they are self-tested" >&2
+    return 1
+  fi
+}
+
 if [[ -n "$self_test" ]]; then
   for claim in "FHIR R4 certified" "EHDS compliant" "Conformant terminology"; do
     if (badge probe.json "$claim" "1/1" blue eu) 2>/dev/null; then
@@ -75,7 +88,7 @@ if [[ -n "$self_test" ]]; then
       exit 1
     fi
   done
-  badge probe.json "EEHRxF draft 2026-11-23 Art 6 code systems" "1/16 loaders, self-tested" blue eu > /dev/null
+  badge probe.json "EEHRxF draft 2026-11-23 Art 6 code systems" "1/16 loaders" blue eu > /dev/null
   badge_logo_check "$out"/*.json || exit 1
   [[ "$(jq -r '.namedLogo + .labelColor' "$out/probe.json")" == "europeanunion#003399" ]] || {
     echo "conformance-badges: self-test: the EEHRxF badge carries no EU emblem on EU blue" >&2
@@ -92,6 +105,14 @@ if [[ -n "$self_test" ]]; then
     exit 1
   fi
   badge_logo_readme README.md || exit 1
+  printf '**EHDS (self-tested)**<br>\n[![x](https://img.shields.io/endpoint?url=https%%3A%%2F%%2Fferroterm.eu%%2Fconformance%%2Fehds-mvc.json)](x)\n' > "$out/README.md"
+  ehds_heading "$out/README.md" || exit 1
+  printf '**EHDS**<br>\n[![x](https://img.shields.io/endpoint?url=https%%3A%%2F%%2Fferroterm.eu%%2Fconformance%%2Fehds-mvc.json)](x)\n' > "$out/README.md"
+  if ehds_heading "$out/README.md" 2>/dev/null; then
+    echo "conformance-badges: self-test: an EHDS heading without self-tested passes" >&2
+    exit 1
+  fi
+  ehds_heading README.md || exit 1
   echo "conformance-badges: self-test OK"
   exit 0
 fi
@@ -104,7 +125,7 @@ mvc=conformance/ehds/mvc-synthetic.tsv
 if [[ -f "$mvc" ]]; then
   listed="$(count_rows "$mvc")"
   badge ehds-mvc.json "MyHealth@EU MVC 10.1.0 (CI) import" \
-    "$listed/$listed value sets, synthetic fixture, self-tested" blue eu
+    "$listed/$listed value sets, synthetic fixture" blue eu
 fi
 
 matrix=conformance/ehds/art6-code-systems.tsv
@@ -112,7 +133,7 @@ if [[ -f "$matrix" ]]; then
   systems="$(count_rows "$matrix")"
   proven="$(grep -vE '^(#|[[:space:]]*$)' "$matrix" | awk -F'\t' '$3 != "-"' | wc -l | tr -d ' ')"
   badge ehds-art6.json "EEHRxF draft 2026-11-23 Art 6 code systems" \
-    "$proven/$systems loaders, self-tested" blue eu
+    "$proven/$systems loaders" blue eu
 fi
 
 badge_logo_check "$out"/*.json
