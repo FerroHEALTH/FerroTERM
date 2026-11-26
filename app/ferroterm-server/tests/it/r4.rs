@@ -310,6 +310,46 @@ async fn expand_returns_properties_as_cross_version_extensions_under_r4() {
     assert!(kitten.get("property").is_none(), "{kitten}");
 }
 
+// NOTE: R4 and R4B carry R5's `ValueSet.compose.property` in its cross-version
+// extension (<https://hl7.org/fhir/R5/versions.html#extensions>).
+#[tokio::test]
+async fn a_compose_property_extension_selects_the_expansion_properties_under_r4() {
+    let server = Server::start_with_resources();
+    for version in ["r4", "r4b"] {
+        let request = json!({"resourceType": "Parameters", "parameter": [
+            {"name": "valueSet", "resource": {
+                "resourceType": "ValueSet",
+                "url": "http://ferroterm.test/ValueSet/compose-property",
+                "status": "active",
+                "compose": {
+                    "extension": [{
+                        "url": "http://hl7.org/fhir/5.0/StructureDefinition/extension-ValueSet.compose.property",
+                        "valueString": "legs"
+                    }],
+                    "include": [{"system": ANIMALS, "concept": [{"code": "cat"}]}]
+                }
+            }}
+        ]});
+        let (status, body) = server
+            .post(&format!("/{version}/ValueSet/$expand"), &request)
+            .await;
+        assert_eq!(status, StatusCode::OK, "{version}: {body}");
+        let property = &body["expansion"]["extension"][0];
+        assert_eq!(
+            property["url"],
+            "http://hl7.org/fhir/5.0/StructureDefinition/extension-ValueSet.expansion.property",
+            "{version}: {body}"
+        );
+        assert_eq!(property["extension"][0]["valueCode"], "legs", "{version}");
+        let cat = &body["expansion"]["contains"][0];
+        assert_eq!(cat["code"], "cat", "{version}: {body}");
+        assert_eq!(
+            cat["extension"][0]["extension"][1]["valueInteger"], 4,
+            "{version}: {body}"
+        );
+    }
+}
+
 #[tokio::test]
 async fn the_capability_statement_lists_only_the_expand_parameters_the_version_declares() {
     let server = Server::start_with_resources();

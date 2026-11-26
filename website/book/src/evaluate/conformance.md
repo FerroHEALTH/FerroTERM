@@ -38,7 +38,7 @@ hand; their lists live beside the general ones.
 ## Where the remaining cases stand
 
 The `general` mode counts 805 cases on every surface. With suite `9c2bbce`
-and validator 7.0.6, `/r4` passes 711, `/r4b` 697 and `/r5` 713. Every case
+and validator 7.0.6, `/r4` passes 713, `/r4b` 699 and `/r5` 713. Every case
 that does not pass falls into one of the rows below. None of them needs
 licensed content: the cases that do (SNOMED CT, LOINC, ICD-11, OMOP) sit in
 the suite's other modes, which run by hand and are not in these counts.
@@ -55,14 +55,14 @@ the suite's other modes, which run by hand and are not in these counts.
 | The cases expect R5's `$lookup` `definition` output, or send R5's `$translate` `targetcode`, on R4 and R4B, whose OperationDefinitions declare neither. | [#1330](https://github.com/FerroHEALTH/FerroTERM/issues/1330) | 3 | 3 | 0 |
 | The cases send an input the operation does not declare (`codingX` in a batch, `targetcode` on R4), and FerroTERM refuses an undeclared input. | [#349](https://github.com/FerroHEALTH/FerroTERM/issues/349) | 3 | 2 | 2 |
 | **Waiting on the FHIR model.** `$translate` checks each target code and answers `error`; the output enters through the `fhir-types` ecosystem overlay, which no release carries yet. | [#1308](https://github.com/FerroHEALTH/FerroTERM/issues/1308) | 3 | 3 | 3 |
-| **FerroTERM gaps.** R4 and R4B do not read `compose.property` or write expansion properties as R5 cross-version extensions. | [#1328](https://github.com/FerroHEALTH/FerroTERM/issues/1328) | 2 | 2 | 0 |
-| **Total not passing** | | 94 | 108 | 92 |
+| **Total not passing** | | 92 | 106 | 92 |
 
 The rows marked as having no published definition are upstream reports:
 FerroTERM answers what the published OperationDefinitions and extensions
 define, and each report names the change upstream that would settle it.
-The gaps are this server's to close, and each one's issue lists the cases
-it earns.
+No case of the general mode is left as a gap in FerroTERM itself: the
+`$translate` cases wait on the FHIR model's next release, and every other
+row is a gate or an upstream report.
 
 ## What the numbers are not
 
