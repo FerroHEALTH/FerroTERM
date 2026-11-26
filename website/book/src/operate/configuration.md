@@ -538,6 +538,9 @@ deployment serves.
 ## What you do not configure
 
 You do not configure a database connection, a search cluster, or a JVM heap.
-FerroTERM has none of these. The inputs the server needs are the built indexes and any
+FerroTERM has none of these: it needs no PostgreSQL or other database server.
+What it keeps on disk is the built indexes, read at start, and, when you name
+`terminology.resources`, one embedded `redb` file for the resources clients
+write and the `$closure` tables. The inputs the server needs are the built indexes and any
 FHIR resource directories, and you build the indexes offline with
 `ferroterm-build` as described in [Loading code systems](loading-snomed.md).
