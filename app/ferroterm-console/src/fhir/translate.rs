@@ -81,6 +81,8 @@ pub(crate) struct TranslateAnswer {
     used_maps: Vec<String>,
     /// Each `match`, in the server's order.
     matches: Vec<TranslationMatch>,
+    /// Each `error`, a returned target its code system does not hold.
+    errors: Vec<String>,
 }
 
 /// One `match` of a translation, with the elements the answer carried.
@@ -108,6 +110,8 @@ pub(crate) struct TranslationMatch {
     pub(crate) depends_on: Vec<NamedValue>,
     /// `match.property`, which R5 and the R6 ballot answer.
     pub(crate) properties: Vec<NamedValue>,
+    /// `match.note`, set where the target's code system is not known.
+    pub(crate) note: Option<String>,
 }
 
 /// One named value of a `match`: what it is about, and what it says.
@@ -136,20 +140,19 @@ impl TranslateAnswer {
         let BatchOutcome::Translate(outcome) = outcome else {
             return Err(mismatched(url, version));
         };
-        let (result, matches, message, used_maps) = match outcome {
-            // TODO(#1308): draw the `error` parameters beside the matches.
+        let (result, matches, message, used_maps, errors) = match outcome {
             TranslateOutcome::Translated {
                 matches,
                 message,
                 used_maps,
-                errors: _,
-            } => (true, matches, message, used_maps),
+                errors,
+            } => (true, matches, message, used_maps, errors),
             TranslateOutcome::NoMatch {
                 message,
                 matches,
                 used_maps,
-                errors: _,
-            } => (false, matches, message, used_maps),
+                errors,
+            } => (false, matches, message, used_maps, errors),
             _ => return Err(mismatched(url, version)),
         };
         Ok(Self {
@@ -157,6 +160,7 @@ impl TranslateAnswer {
             message,
             used_maps,
             matches: matches.into_iter().map(translation_match).collect(),
+            errors,
         })
     }
 
@@ -179,6 +183,11 @@ impl TranslateAnswer {
     pub(crate) fn matches(&self) -> Vec<TranslationMatch> {
         self.matches.clone()
     }
+
+    /// Every `error`, in the server's order.
+    pub(crate) fn errors(&self) -> Vec<String> {
+        self.errors.clone()
+    }
 }
 
 /// One match, as the screen draws it.
@@ -197,6 +206,7 @@ fn translation_match(found: Match) -> TranslationMatch {
         products: found.products.into_iter().map(named_value).collect(),
         depends_on: found.depends_on.into_iter().map(named_value).collect(),
         properties: found.properties.into_iter().map(named_value).collect(),
+        note: found.note,
     }
 }
 
