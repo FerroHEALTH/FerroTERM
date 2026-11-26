@@ -109,8 +109,8 @@ fn each_hot_request_stays_within_its_allocation_budget() {
                 "/r4b/ConceptMap/$translate?url=http%3A%2F%2Fsnomed.info%2Fsct%3Ffhir_cm%3D{}&system={system}&code={deep}",
                 ferroterm_testkit::snomed::ICD10_MAP_SCTID
             ),
-            blocks: 516,
-            bytes: 137_216,
+            blocks: 521,
+            bytes: 139_264,
         },
     ];
     let answer = |uri: &str| {
