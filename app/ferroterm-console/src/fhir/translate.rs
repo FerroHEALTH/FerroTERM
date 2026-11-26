@@ -137,15 +137,18 @@ impl TranslateAnswer {
             return Err(mismatched(url, version));
         };
         let (result, matches, message, used_maps) = match outcome {
+            // TODO(#1308): draw the `error` parameters beside the matches.
             TranslateOutcome::Translated {
                 matches,
                 message,
                 used_maps,
+                errors: _,
             } => (true, matches, message, used_maps),
             TranslateOutcome::NoMatch {
                 message,
                 matches,
                 used_maps,
+                errors: _,
             } => (false, matches, message, used_maps),
             _ => return Err(mismatched(url, version)),
         };

@@ -140,6 +140,22 @@ macro_rules! surface {
                     get(store::concept_map_version_read),
                 )
                 .route(
+                    "/NamingSystem",
+                    get(store::naming_system_search).post(store::naming_system_create),
+                )
+                .route(
+                    "/NamingSystem/{id}",
+                    get(store::naming_system_read)
+                        .put(store::naming_system_update)
+                        .delete(store::naming_system_delete),
+                )
+                .route("/NamingSystem/_history", get(store::naming_system_type_history))
+                .route("/NamingSystem/{id}/_history", get(store::naming_system_history))
+                .route(
+                    "/NamingSystem/{id}/_history/{version}",
+                    get(store::naming_system_version_read),
+                )
+                .route(
                     "/Provenance",
                     get(store::provenance_search).post(store::provenance_create),
                 )
