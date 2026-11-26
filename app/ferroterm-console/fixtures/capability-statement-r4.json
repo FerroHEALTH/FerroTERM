@@ -1,5 +1,5 @@
 {
-  "date": "2026-11-25T11:06:03.703439Z",
+  "date": "2026-11-26T04:48:20.257172Z",
   "extension": [
     {
       "extension": [
@@ -217,7 +217,7 @@
           "operation": [
             {
               "definition": "http://hl7.org/fhir/OperationDefinition/ConceptMap-translate",
-              "documentation": "Beyond the R4 definition, the server accepts `sourceCode`, `sourceSystem`, `sourceVersion`, `sourceScope`, `sourceCoding`, `sourceCodeableConcept`, `targetCode`, `targetCoding`, `targetCodeableConcept`, `targetScope`, `targetSystem` (pre-adopted from the FHIR R6 ballot for the terminology ecosystem). Beyond the R4 definition, the server answers `used-conceptmap`, `used-system` (defined by the terminology ecosystem). See <https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>.",
+              "documentation": "Beyond the R4 definition, the server accepts `sourceCode`, `sourceSystem`, `sourceVersion`, `sourceScope`, `sourceCoding`, `sourceCodeableConcept`, `targetCode`, `targetCoding`, `targetCodeableConcept`, `targetScope`, `targetSystem` (pre-adopted from the FHIR R6 ballot for the terminology ecosystem). Beyond the R4 definition, the server answers `used-conceptmap`, `used-system`, `error` (defined by the terminology ecosystem). See <https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>.",
               "extension": [
                 {
                   "url": "https://ferroterm.eu/fhir/StructureDefinition/operation-level",
@@ -253,6 +253,55 @@
             }
           ],
           "type": "ConceptMap"
+        },
+        {
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "search-type"
+            }
+          ],
+          "searchParam": [
+            {
+              "definition": "http://hl7.org/fhir/SearchParameter/NamingSystem-kind",
+              "name": "kind",
+              "type": "token"
+            },
+            {
+              "definition": "http://hl7.org/fhir/SearchParameter/NamingSystem-value",
+              "name": "value",
+              "type": "string"
+            },
+            {
+              "definition": "http://hl7.org/fhir/SearchParameter/NamingSystem-type",
+              "name": "type",
+              "type": "token"
+            },
+            {
+              "definition": "http://hl7.org/fhir/SearchParameter/NamingSystem-id-type",
+              "name": "id-type",
+              "type": "token"
+            },
+            {
+              "definition": "http://hl7.org/fhir/SearchParameter/conformance-status",
+              "name": "status",
+              "type": "token"
+            },
+            {
+              "definition": "http://hl7.org/fhir/SearchParameter/Resource-elements",
+              "name": "_elements",
+              "type": "string"
+            },
+            {
+              "definition": "http://hl7.org/fhir/SearchParameter/Resource-summary",
+              "documentation": "`text`, `data`, `count` and `false`; `true` is refused as not supported",
+              "name": "_summary",
+              "type": "token"
+            }
+          ],
+          "type": "NamingSystem"
         },
         {
           "interaction": [
