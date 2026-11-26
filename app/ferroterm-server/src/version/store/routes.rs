@@ -385,8 +385,10 @@ macro_rules! store {
                         ));
                     }
                 }
-                if resource_type == ResourceType::Provenance {
-                    entry.extend(loaded_provenance(state, query, &at)?);
+                if let Some(held) =
+                    crate::version::store::loaded::HeldSearch::parse(resource_type, query)?
+                {
+                    entry.extend(loaded_held(state, resource_type, &held, &at)?);
                 }
                 if resource_type == ResourceType::ConceptMap {
                     for id in loaded(state.concept_map_instances())? {
@@ -450,21 +452,23 @@ macro_rules! store {
                 wire.object(StatusCode::OK, &object, surface.schemas)
             }
 
-            /// The loaded `Provenance` resources whose `target` the search names,
-            /// as this version reads them; one it cannot read is left out, as a
-            /// loaded resource is never converted between releases.
+            /// The loaded `Provenance` or `NamingSystem` resources the search
+            /// matches, as this version reads them; one it cannot read is left
+            /// out, as a loaded resource is never converted between releases.
             ///
             /// # Errors
             ///
-            /// A search parameter `Provenance` does not answer is a 400.
-            fn loaded_provenance(
+            /// A loaded resource this version reads and cannot write is a 500.
+            fn loaded_held(
                 state: &AppState,
-                query: &[(String, String)],
+                resource_type: ResourceType,
+                search: &crate::version::store::loaded::HeldSearch,
                 at: &dyn Fn(&str) -> Option<String>,
             ) -> Result<Vec<BundleEntry>, Failure> {
-                let target = crate::version::store::loaded::provenance_target(query)?;
                 let mut out = Vec::new();
-                for (id, held) in state.provenance_targeting(target) {
+                for (id, held) in
+                    state.held_matching(resource_type, |object| search.matches(object))
+                {
                     let Ok(object) = (surface().round_trip)(&held.object) else {
                         continue;
                     };
@@ -647,6 +651,17 @@ macro_rules! store {
                 concept_map_history,
                 concept_map_type_history,
                 ResourceType::ConceptMap
+            );
+            crate::version::store::routes::store_routes!(
+                naming_system_create,
+                naming_system_read,
+                naming_system_update,
+                naming_system_version_read,
+                naming_system_delete,
+                naming_system_search,
+                naming_system_history,
+                naming_system_type_history,
+                ResourceType::NamingSystem
             );
             crate::version::store::routes::store_routes!(
                 provenance_create,

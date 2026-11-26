@@ -9,11 +9,13 @@ use std::sync::Arc;
 use fhir_terminology::provider::CodeSystemProvider;
 use fhir_terminology::provider::code_system::CodeSystemModel;
 
+use fhir_types::codec::Object;
 use http::{HeaderMap, StatusCode};
 
 use crate::outcome::Failure;
 use crate::persistence::ResourceType;
 use crate::state::AppState;
+use crate::version::store::naming_system::Criteria;
 
 /// The ids of the loaded resources of `resource_type` among `instances` that
 /// `query` matches, the persisted ones left out because a search lists those
@@ -170,21 +172,58 @@ pub(crate) fn criteria(
     Ok((url, version))
 }
 
+/// What a search of a held type, `Provenance` or `NamingSystem`, asks of
+/// each resource.
+#[derive(Debug)]
+pub(crate) enum HeldSearch {
+    /// `Provenance` search defines `target`, "the resource(s) the provenance
+    /// record is about" (<https://hl7.org/fhir/R4B/provenance.html#search>);
+    /// this server matches it against `target.reference` as written, a
+    /// `ConceptMap`'s canonical (`url|version`) among them.
+    Provenance(Option<String>),
+    /// The `NamingSystem` search parameters.
+    NamingSystem(Criteria),
+}
+
+impl HeldSearch {
+    /// What `query` asks of a resource of `resource_type`, or `None` for a
+    /// type that is not held.
+    ///
+    /// # Errors
+    ///
+    /// A search parameter this server does not answer is a 400.
+    pub(crate) fn parse(
+        resource_type: ResourceType,
+        query: &[(String, String)],
+    ) -> Result<Option<Self>, Failure> {
+        Ok(match resource_type {
+            ResourceType::Provenance => Some(Self::Provenance(provenance_target(query)?)),
+            ResourceType::NamingSystem => Some(Self::NamingSystem(Criteria::parse(query)?)),
+            ResourceType::CodeSystem | ResourceType::ValueSet | ResourceType::ConceptMap => None,
+        })
+    }
+
+    /// Whether the resource `object` matches the search.
+    pub(crate) fn matches(&self, object: &Object) -> bool {
+        match self {
+            Self::Provenance(target) => target.as_deref().is_none_or(|wanted| {
+                crate::state::provenance::targets(object).any(|named| named == wanted)
+            }),
+            Self::NamingSystem(criteria) => criteria.matches(object),
+        }
+    }
+}
+
 /// The `target` a `Provenance` search names.
-///
-/// `Provenance` search defines `target`, "the resource(s) the provenance
-/// record is about" (<https://hl7.org/fhir/R4B/provenance.html#search>); this
-/// server matches it against `target.reference` as written, a `ConceptMap`'s
-/// canonical (`url|version`) among them.
 ///
 /// # Errors
 ///
 /// A search parameter this server does not answer is a 400.
-pub(crate) fn provenance_target(query: &[(String, String)]) -> Result<Option<&str>, Failure> {
+fn provenance_target(query: &[(String, String)]) -> Result<Option<String>, Failure> {
     let mut target = None;
     for (name, value) in query {
         match name.as_str() {
-            "target" => target = Some(value.as_str()),
+            "target" => target = Some(value.clone()),
             "_format" | crate::elements::PARAMETER | crate::elements::SUMMARY => {}
             other => {
                 return Err(Failure::new(

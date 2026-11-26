@@ -112,9 +112,9 @@ impl Layer {
             artefact::Loaded::ValueSet(model) => self.value_sets.replace(model.clone()),
             artefact::Loaded::ConceptMap(model) => self.concept_maps.replace(model.clone()),
             // NOTE: a resource the server cannot use answers the request that resolves
-            // it (`crate::artefact::Unusable`), and a `Provenance` is read from its
-            // record, so a layer holds nothing for either.
-            artefact::Loaded::Unusable(_) | artefact::Loaded::Provenance => {}
+            // it (`crate::artefact::Unusable`), and a `Provenance` or `NamingSystem`
+            // is read from its record, so a layer holds nothing for either.
+            artefact::Loaded::Unusable(_) | artefact::Loaded::Record => {}
         }
         Ok(())
     }

@@ -88,6 +88,10 @@ exceptions = [
   # operations through, published by the FerroBRIDGE repository under the same
   # Licensor and licence.
   { allow = ["BUSL-1.1"], crate = "ferrobridge-term" },
+  # The FHIR search value grammar the server reads the NamingSystem search
+  # with, published by the FerroBRIDGE repository under the same Licensor and
+  # licence.
+  { allow = ["BUSL-1.1"], crate = "fhir-search" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-build" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-bench" },
   { allow = ["BUSL-1.1"], crate = "ferroterm-testkit" },

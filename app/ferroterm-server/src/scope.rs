@@ -86,9 +86,9 @@ impl Scope {
         for resource in resources {
             match resource {
                 Loaded::Unusable(held) => unusable.push(held.clone()),
-                // NOTE: a `Provenance` changes no answer of a terminology
-                // operation, so a request's scope holds nothing of it.
-                Loaded::Provenance => {}
+                // NOTE: a `Provenance` or `NamingSystem` changes no answer of a
+                // terminology operation, so a request's scope holds nothing of it.
+                Loaded::Record => {}
                 Loaded::CodeSystem(model) => {
                     if model.content == ContentMode::Supplement {
                         supplements.push(model);

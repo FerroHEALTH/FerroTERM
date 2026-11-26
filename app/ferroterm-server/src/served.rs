@@ -189,7 +189,7 @@ macro_rules! reading {
                             .map(Loaded::ConceptMap)
                             .map_err(invalid)
                     }
-                    Resource::Provenance(_) => Ok(Loaded::Provenance),
+                    Resource::Provenance(_) | Resource::NamingSystem(_) => Ok(Loaded::Record),
                     ref other => Err(unsupported(other)),
                 }
             }
@@ -265,6 +265,7 @@ macro_rules! reading {
                     Resource::CapabilityStatement(_) => "CapabilityStatement",
                     Resource::CodeSystem(_) => "CodeSystem",
                     Resource::ConceptMap(_) => "ConceptMap",
+                    Resource::NamingSystem(_) => "NamingSystem",
                     Resource::OperationOutcome(_) => "OperationOutcome",
                     Resource::Parameters(_) => "Parameters",
                     Resource::Provenance(_) => "Provenance",

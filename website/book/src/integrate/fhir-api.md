@@ -294,7 +294,7 @@ it used. Designations carry their BCP 47 language and their use.
 ## Persisted resources
 
 A deployment that names a database in `FERROTERM__TERMINOLOGY__RESOURCES` accepts
-`CodeSystem`, `ValueSet`, `ConceptMap` and `Provenance` resources over the REST API and
+`CodeSystem`, `ValueSet`, `ConceptMap`, `NamingSystem` and `Provenance` resources over the REST API and
 keeps them across restarts. The interactions are the ones the FHIR RESTful API
 defines (<https://hl7.org/fhir/R4B/http.html>), under every version prefix:
 
@@ -410,6 +410,31 @@ The answer is a `searchset` of every `Provenance` whose `target.reference` is
 that string as written; `Provenance/{id}` reads one. A `Provenance` decodes in
 the FHIR version it was loaded or written in, and a base whose version cannot
 read it leaves it out, as it does for any persisted resource.
+
+## Identifier and code system namespaces
+
+A `NamingSystem` names an identifier or code system namespace and lists the
+identifiers it goes by: a URI, an OID, or a local name such as the assigning
+authority an HL7 v2 `CX.4` carries (<https://hl7.org/fhir/R4/namingsystem.html>).
+The server keeps the `NamingSystem` resources of every package directory under
+`FERROTERM__TERMINOLOGY__CODE_SYSTEMS`, and `ferroterm-build --fhir-package`
+keeps them on import; with a resource database, a client writes more. Look a
+namespace up by any of its identifiers:
+
+```console
+$ curl 'https://tx.example.org/r4/NamingSystem?kind=identifier&value=NATPAT'
+```
+
+The search answers `kind`, `value`, `type`, `id-type` and `status`
+(<https://hl7.org/fhir/R4/namingsystem.html#search>), with `_elements` and
+`_summary`. `value` matches any `uniqueId.value`: by default a value the
+identifier starts with, ignoring case and accents, `value:exact` the identifier
+as written, and `value:contains` a value anywhere in it
+(<https://hl7.org/fhir/R4/search.html#string>). `kind`, `status` and `id-type`
+take a code, or `system|code` under the code system their element is bound to;
+`type` matches a coding of `NamingSystem.type`. Several values of one parameter,
+separated by commas, match any of them, and several parameters must all match.
+Any other parameter or modifier is a `400`. `NamingSystem/{id}` reads one.
 
 ## Primitive lexical forms on local content
 

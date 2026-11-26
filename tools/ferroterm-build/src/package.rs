@@ -10,9 +10,10 @@
 //! A package is a gzipped tarball whose resources sit in `package/`, with the
 //! manifest `package/package.json` naming the package and its version (FHIR
 //! Package specification, <https://hl7.org/fhir/packages.html>). The import
-//! keeps the manifest and the `CodeSystem`, `ValueSet`, `ConceptMap` and
-//! `Provenance` resources at the top of `package/` byte for byte, so each resource keeps its
-//! canonical and version, and two releases land side by side.
+//! keeps the manifest and the `CodeSystem`, `ValueSet`, `ConceptMap`,
+//! `NamingSystem` and `Provenance` resources at the top of `package/` byte for
+//! byte, so each resource keeps its canonical and version, and two releases
+//! land side by side.
 
 use std::fs;
 use std::io::Read;
@@ -22,7 +23,13 @@ use sha2::{Digest, Sha256};
 
 /// The resource types the server serves from a package, the provenance of
 /// its maps among them.
-const SERVED: [&str; 4] = ["CodeSystem", "ValueSet", "ConceptMap", "Provenance"];
+const SERVED: [&str; 5] = [
+    "CodeSystem",
+    "ValueSet",
+    "ConceptMap",
+    "NamingSystem",
+    "Provenance",
+];
 
 /// What an import wrote.
 #[derive(Debug)]
@@ -34,8 +41,8 @@ pub struct Report {
     /// The sha256 of the package file, in lower-case hex.
     pub sha256: String,
     /// The resources written, by type: `CodeSystem`, `ValueSet`, `ConceptMap`,
-    /// then `Provenance`.
-    pub counts: [(&'static str, usize); 4],
+    /// `NamingSystem`, then `Provenance`.
+    pub counts: [(&'static str, usize); 5],
     /// The directory written, which `terminology.code_systems` names.
     pub dir: PathBuf,
 }

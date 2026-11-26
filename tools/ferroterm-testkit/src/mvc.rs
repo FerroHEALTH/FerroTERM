@@ -26,6 +26,15 @@ pub const NATIONAL: &str = "http://example.org/fhir/CodeSystem/national-allergy"
 pub const MAP: &str = "http://example.org/fhir/ConceptMap/national-to-mvc";
 /// Who validated the map of each release, as its `Provenance` names them.
 pub const VALIDATOR: &str = "Synthetic Terminology Board";
+/// The identifier namespace the package's `NamingSystem` of kind
+/// `identifier` names by URI.
+pub const PATIENT_ID_SYSTEM: &str = "http://example.org/fhir/sid/national-patient";
+/// The local name the same `NamingSystem` gives that namespace, as an HL7 v2
+/// assigning authority carries it.
+pub const PATIENT_ID_NAME: &str = "NATPAT";
+/// The OID the package's `NamingSystem` of kind `codesystem` gives
+/// [`NATIONAL`], under the `2.999` example arc.
+pub const NATIONAL_OID: &str = "2.999.1.1";
 /// Every value set a release of the package defines.
 pub const VALUE_SETS: [&str; 2] = [VS_ALLERGY, VS_UNSERVED];
 
@@ -90,6 +99,26 @@ fn files(version: &str) -> Vec<(String, serde_json::Value)> {
                     "code": "UPDATE"}]},
                 "agent": [{"type": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/provenance-participant-type",
                     "code": "verifier"}]}, "who": {"display": VALIDATOR}}]}),
+        ),
+        (
+            String::from("package/NamingSystem-national-patient.json"),
+            serde_json::json!({"resourceType": "NamingSystem",
+                "id": format!("national-patient-{}", version.replace('.', "-")),
+                "name": "NationalPatientId", "status": "active", "kind": "identifier",
+                "date": "2026-11-01",
+                "type": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/v2-0203",
+                    "code": "NI"}]},
+                "uniqueId": [{"type": "uri", "value": PATIENT_ID_SYSTEM, "preferred": true},
+                    {"type": "other", "value": PATIENT_ID_NAME}]}),
+        ),
+        (
+            String::from("package/NamingSystem-national-allergy.json"),
+            serde_json::json!({"resourceType": "NamingSystem",
+                "id": format!("national-allergy-{}", version.replace('.', "-")),
+                "name": "NationalAllergy", "status": "draft", "kind": "codesystem",
+                "date": "2026-11-01",
+                "uniqueId": [{"type": "uri", "value": NATIONAL, "preferred": true},
+                    {"type": "oid", "value": NATIONAL_OID}]}),
         ),
         (
             String::from("package/.index.json"),

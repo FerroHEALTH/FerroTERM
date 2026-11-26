@@ -382,6 +382,7 @@ macro_rules! family_map {
                         .map(|c| c.as_str().into())
                         .collect(),
                     used_system: Vec::new(),
+                    error: Vec::new(),
                     r#match: translation.matches.iter().map(translation_match).collect(),
                 }
                 .to_parameters()
@@ -479,6 +480,7 @@ macro_rules! family_map {
                         })
                         .collect(),
                     source: m.source.as_deref().map(Into::into),
+                    note: None,
                 }
             }
     };
@@ -506,6 +508,7 @@ macro_rules! family_map {
                         .collect(),
                     depends_on: Vec::new(),
                     origin_map: Some(m.origin.origin_map.as_str().into()),
+                    note: None,
                 }
             }
     };

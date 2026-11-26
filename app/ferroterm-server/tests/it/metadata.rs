@@ -293,7 +293,7 @@ async fn every_declared_operation_states_the_levels_its_definition_declares() {
             .as_array()
             .expect("resource is a list")
         {
-            // NOTE: a resource type with no operation, `Provenance`, carries no
+            // NOTE: a resource type with no operation, such as `Provenance`, carries no
             // `operation` element.
             for operation in resource["operation"].as_array().into_iter().flatten() {
                 assert!(

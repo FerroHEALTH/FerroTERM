@@ -401,6 +401,38 @@ macro_rules! metadata {
                 params
             }
 
+            /// The search parameters of `NamingSystem`
+            /// (<https://hl7.org/fhir/R4/namingsystem.html#search>), beside
+            /// `_elements` and `_summary`; `status` is the shared parameter of
+            /// the version's canonical resources.
+            fn naming_system_search_params() -> Vec<CapabilityStatementRestResourceSearchParam> {
+                let status = if FHIR_VERSION.starts_with("4.") {
+                    "http://hl7.org/fhir/SearchParameter/conformance-status"
+                } else {
+                    "http://hl7.org/fhir/SearchParameter/CanonicalResource-status"
+                };
+                let param = |name: &str, definition: &str, code: &str| {
+                    CapabilityStatementRestResourceSearchParam {
+                        name: name.into(),
+                        definition: Some(definition.into()),
+                        r#type: code.into(),
+                        ..Default::default()
+                    }
+                };
+                let mut params = vec![
+                    param("kind", "http://hl7.org/fhir/SearchParameter/NamingSystem-kind", "token"),
+                    param("value", "http://hl7.org/fhir/SearchParameter/NamingSystem-value", "string"),
+                    param("type", "http://hl7.org/fhir/SearchParameter/NamingSystem-type", "token"),
+                    param("id-type", "http://hl7.org/fhir/SearchParameter/NamingSystem-id-type", "token"),
+                    param("status", status, "token"),
+                ];
+                params.extend(search_params().into_iter().filter(|param| {
+                    param.name.value.as_deref() != Some("url")
+                        && param.name.value.as_deref() != Some("version")
+                }));
+                params
+            }
+
             /// The resource types this server serves, with their interactions,
             /// search parameters, and operations.
             fn rest_resources(state: &AppState) -> Vec<CapabilityStatementRestResource> {
@@ -431,6 +463,12 @@ macro_rules! metadata {
                         interaction: interactions(state),
                         search_param: search_params(),
                         operation: vec![declared(&CONCEPT_MAP_TRANSLATE)],
+                        ..Default::default()
+                    },
+                    CapabilityStatementRestResource {
+                        r#type: "NamingSystem".into(),
+                        interaction: interactions(state),
+                        search_param: naming_system_search_params(),
                         ..Default::default()
                     },
                     // NOTE: the provenance of a ConceptMap, read by the canonical its

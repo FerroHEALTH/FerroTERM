@@ -1,5 +1,5 @@
 {
-  "date": "2026-11-25T11:06:03.743075Z",
+  "date": "2026-11-26T04:48:20.288262Z",
   "description": "Serves the FHIR R6 ballot (version 6.0.0-snapshot1). Every behaviour grounded only in the ballot is re-verified against the published specification when it appears, and may change with it.",
   "extension": [
     {
@@ -217,7 +217,7 @@
           "operation": [
             {
               "definition": "http://hl7.org/fhir/OperationDefinition/ConceptMap-translate",
-              "documentation": "Beyond the R6 ballot definition, the server answers `used-conceptmap`, `used-system` (defined by the terminology ecosystem). See <https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>.",
+              "documentation": "Beyond the R6 ballot definition, the server answers `used-conceptmap`, `used-system`, `error` (defined by the terminology ecosystem). See <https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>.",
               "extension": [
                 {
                   "url": "https://ferroterm.eu/fhir/StructureDefinition/operation-level",
@@ -253,6 +253,55 @@
             }
           ],
           "type": "ConceptMap"
+        },
+        {
+          "interaction": [
+            {
+              "code": "read"
+            },
+            {
+              "code": "search-type"
+            }
+          ],
+          "searchParam": [
+            {
+              "definition": "http://hl7.org/fhir/SearchParameter/NamingSystem-kind",
+              "name": "kind",
+              "type": "token"
+            },
+            {
+              "definition": "http://hl7.org/fhir/SearchParameter/NamingSystem-value",
+              "name": "value",
+              "type": "string"
+            },
+            {
+              "definition": "http://hl7.org/fhir/SearchParameter/NamingSystem-type",
+              "name": "type",
+              "type": "token"
+            },
+            {
+              "definition": "http://hl7.org/fhir/SearchParameter/NamingSystem-id-type",
+              "name": "id-type",
+              "type": "token"
+            },
+            {
+              "definition": "http://hl7.org/fhir/SearchParameter/CanonicalResource-status",
+              "name": "status",
+              "type": "token"
+            },
+            {
+              "definition": "http://hl7.org/fhir/SearchParameter/Resource-elements",
+              "name": "_elements",
+              "type": "string"
+            },
+            {
+              "definition": "http://hl7.org/fhir/SearchParameter/Resource-summary",
+              "documentation": "`text`, `data`, `count` and `false`; `true` is refused as not supported",
+              "name": "_summary",
+              "type": "token"
+            }
+          ],
+          "type": "NamingSystem"
         },
         {
           "interaction": [

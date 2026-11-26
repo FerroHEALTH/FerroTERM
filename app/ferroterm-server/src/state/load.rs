@@ -136,16 +136,14 @@ pub(super) fn load_code_systems(
     Ok(())
 }
 
-/// The `Provenance` resources in the package directories `paths`, by id, each
-/// read in the FHIR version its directory's `package.json` declares.
+/// The `Provenance` and `NamingSystem` resources in the package directories
+/// `paths`, by type and id, each read in the FHIR version its directory's
+/// `package.json` declares.
 ///
 /// # Errors
 ///
-/// A manifest or file that cannot be read, and a `Provenance` the loader
-/// refuses.
-fn load_provenance(
-    paths: &[PathBuf],
-) -> Result<BTreeMap<String, super::provenance::Held>, LoadError> {
+/// A manifest or file that cannot be read, and a resource the loader refuses.
+fn load_held(paths: &[PathBuf]) -> Result<super::held::HeldResources, LoadError> {
     let mut held = BTreeMap::new();
     for path in paths {
         let version = package_version(path)
@@ -154,7 +152,7 @@ fn load_provenance(
                 source: Box::new(source),
             })?
             .unwrap_or(FhirVersion::R4B);
-        super::provenance::load(path, crate::served::version_label(version), &mut held)?;
+        super::held::load(path, crate::served::version_label(version), &mut held)?;
     }
     Ok(held)
 }
@@ -380,7 +378,7 @@ impl AppState {
                 &mut concept_maps,
             )?;
         }
-        let provenance = load_provenance(&config.terminology.code_systems)?;
+        let held = load_held(&config.terminology.code_systems)?;
         check_supplement_targets(&loaded, &supplements)?;
         check_distinct_ids(
             ResourceType::CodeSystem,
@@ -419,7 +417,7 @@ impl AppState {
             .security_services
             .clone_from(&config.fhir.security_services);
         state.base_url = config.base_url();
-        state.provenance = provenance;
+        state.held = held;
         state.register_supplements(supplements)?;
         state.register_instances(&value_sets, &concept_maps)?;
         state.base.value_sets = value_sets;
@@ -596,7 +594,7 @@ impl AppState {
             software_version: env!("CARGO_PKG_VERSION"),
             security_services: Vec::new(),
             base_url: None,
-            provenance: BTreeMap::new(),
+            held: BTreeMap::new(),
         }
     }
 
