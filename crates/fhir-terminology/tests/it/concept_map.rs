@@ -374,11 +374,17 @@ fn every_target_code_is_checked_against_its_code_system() {
     assert!(valid.errors.is_empty(), "{:?}", valid.errors);
     assert_eq!(valid.matches[0].origin.note, None);
     let invalid = translated("dog");
-    assert_eq!(target_code(&invalid.matches[0]), Some("MAUVE"), "the match stays");
+    assert_eq!(
+        target_code(&invalid.matches[0]),
+        Some("MAUVE"),
+        "the match stays"
+    );
     assert!(invalid.result);
     assert_eq!(
         invalid.errors,
-        [format!("The code 'MAUVE' is not valid in the code system '{COLOURS}'")]
+        [format!(
+            "The code 'MAUVE' is not valid in the code system '{COLOURS}'"
+        )]
     );
     assert_eq!(invalid.matches[0].origin.note, None);
     let unknown = translated("fish");
