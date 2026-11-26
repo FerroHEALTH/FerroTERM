@@ -18,6 +18,62 @@ fragments here under the version and its date.
 
 ## [Unreleased]
 
+## [0.4.9] - 2026-11-26
+
+### Added
+
+- `ConceptMap/$translate` checks every target code it returns against its
+  code system on every version, as the terminology ecosystem IG 1.11.0 asks:
+  a target code its code system does not hold keeps its match and adds one
+  `error` parameter, and a match whose target code system the server does not
+  know carries a `note` part saying the code has not been validated. A code
+  system whose content is not complete cannot call a code invalid, so it
+  triggers neither. The console shows both beside the server's message (#1308).
+- Every TLS listener and outbound client prefers the hybrid key exchange
+  X25519MLKEM768 (RFC 10024) and still connects to a classical-only peer,
+  through `ferrohealth-server` 0.12.4 and rustls's `prefer-post-quantum`,
+  which the offline build's ICD-API client now turns on as well. The
+  post-quantum inventory (`docs/post-quantum.md`,
+  `conformance/post-quantum.tsv`) lists every cryptographic use, CI holds
+  it to the tree, and the README badge counts its safe uses (#1321).
+- The server serves `NamingSystem` read and search on every version: it keeps
+  the `NamingSystem` resources of each package directory beside its
+  terminology (`ferroterm-build --fhir-package` imports them too), stores
+  written ones with a resource database, and answers the search parameters
+  `kind`, `value`, `type`, `id-type` and `status`, so a client resolves an
+  OID, a URI or a local name such as an HL7 v2 assigning authority to its
+  namespace. The capability statement declares the resource (#1322).
+
+### Changed
+
+- FerroTERM moves to `fhir-types` 0.3.0, whose `terminology` feature carries the `NamingSystem` model and the ecosystem `$translate` `error` output and `match.note` part, and `ferrobridge-term` 0.22.0, built on it (#1322).
+- A request that leaves out an input the operation needs (no code system,
+  no code) answers `issue.code` `invalid` with the `invalid-data`
+  `tx-issue-type`, and every refusal carries its sentence once, in
+  `issue.details.text`, with no copy in `issue.diagnostics`. The
+  `OperationError::Required` variant of `fhir-terminology` is gone; such
+  a request is `OperationError::Invalid` (#1326).
+
+### Fixed
+
+- `$lookup` with `property=*` returns `abstract` false and the
+  `notSelectable` property for a selectable concept, and returns
+  `definition` only when the request names no property, `*` or
+  `definition` (#1325).
+- `ValueSet/$validate-code` reports a coding with no system inside a
+  CodeableConcept that matches nothing as a warning at that coding, and
+  names a Coding with neither system nor code with the message id
+  `Coding_has_no_system_or_code__cannot_validate` (#1327).
+- An R4 and R4B value set's `compose.property`, carried in the R5
+  cross-version extension
+  `http://hl7.org/fhir/5.0/StructureDefinition/extension-ValueSet.compose.property`,
+  selects the properties of its expansion as `ValueSet.compose.property`
+  does on R5 (#1328).
+- An R4 and R4B `$translate` with `reverse=true` reports each match as the
+  map states it, the map's target in `concept` and its source in
+  `sourceConcept`, as R5's `targetCode` does, and a reverse translation
+  that finds nothing names the code, its system and the target system (#1329).
+
 ## [0.4.8] - 2026-11-25
 
 FerroTERM runs behind FerroSMART, the FerroHEALTH SMART App Launch
@@ -3063,7 +3119,8 @@ binary answers `GET /health` only.
 - No existing Rust terminology or FHIR crate is a dependency; the README
   records the evaluation and the reasons.
 
-[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.8...HEAD
+[Unreleased]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.9...HEAD
+[0.4.9]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.8...v0.4.9
 [0.4.8]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.7...v0.4.8
 [0.4.7]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.6...v0.4.7
 [0.4.6]: https://github.com/FerroHEALTH/FerroTERM/compare/v0.4.5...v0.4.6

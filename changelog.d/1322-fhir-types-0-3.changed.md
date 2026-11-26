@@ -1,1 +1,0 @@
-- FerroTERM moves to `fhir-types` 0.3.0, whose `terminology` feature carries the `NamingSystem` model and the ecosystem `$translate` `error` output and `match.note` part, and `ferrobridge-term` 0.22.0, built on it.
