@@ -349,10 +349,9 @@ macro_rules! version_extensions {
     }};
 }
 
-// NOTE: <https://hl7.org/fhir/6.0.0-snapshot1/terminologycapabilities.html>: R6 differs from
-// R5 only in an optional `codeSystem.content` and `version.value` for `version.code`, so
-// one macro with a flavour arm renders both.
-macro_rules! r5_family_capabilities {
+// NOTE: <https://hl7.org/fhir/R5/terminologycapabilities.html>: R4 and R4B lack
+// `codeSystem.content`, R6 makes it optional and names `version.code` `version.value`.
+macro_rules! terminology_capabilities {
     ($module:ident, $name:ident, $flavour:ident) => {
         impl Summary {
             /// The resource of the version; `date` is the statement's `dateTime`.
@@ -380,7 +379,7 @@ macro_rules! r5_family_capabilities {
                             .filters
                             .iter()
                             .filter_map(|filter| {
-                                let ops = r5_family_operators(&filter.operators);
+                                let ops = terminology_capabilities!(@operators $flavour, &filter.operators);
                                 // `filter.op` is 1..*, so an entry left with
                                 // none is left out.
                                 (!ops.is_empty()).then(|| {
@@ -402,7 +401,7 @@ macro_rules! r5_family_capabilities {
                     // NOTE: a FHIR `string` is never empty (<https://hl7.org/fhir/R4B/datatypes.html#string>),
                     // so a system without a version declares no `version.code`.
                     if !version.code.is_empty() {
-                        r5_family_capabilities!(@version_code $flavour, entry, version.code.as_str().into());
+                        terminology_capabilities!(@version_code $flavour, entry, version.code.as_str().into());
                     }
                     entry
                 };
@@ -413,12 +412,14 @@ macro_rules! r5_family_capabilities {
                     code_system: self
                         .systems
                         .iter()
-                        .map(|system| TerminologyCapabilitiesCodeSystem {
-                            uri: Some(system.url.as_str().into()),
-                            version: system.versions.iter().map(version_entry).collect(),
-                            content: r5_family_capabilities!(@content $flavour, system.content.code().into()),
-                            subsumption: Some(system.subsumption.into()),
-                            ..Default::default()
+                        .map(|system| {
+                            let entry = TerminologyCapabilitiesCodeSystem {
+                                uri: Some(system.url.as_str().into()),
+                                version: system.versions.iter().map(version_entry).collect(),
+                                subsumption: Some(system.subsumption.into()),
+                                ..Default::default()
+                            };
+                            terminology_capabilities!(@content $flavour, TerminologyCapabilitiesCodeSystem, entry, system.content.code().into())
                         })
                         .collect(),
                     expansion: Some(TerminologyCapabilitiesExpansion {
@@ -442,115 +443,33 @@ macro_rules! r5_family_capabilities {
             }
         }
     };
-    (@content r5, $value:expr) => {
-        $value
+    (@operators r4, $operators:expr) => {
+        r4_family_operators($operators)
     };
-    (@content r6, $value:expr) => {
-        Some($value)
+    (@operators $flavour:ident, $operators:expr) => {
+        r5_family_operators($operators)
     };
-    (@version_code r5, $entry:ident, $value:expr) => {
-        $entry.code = Some($value);
+    (@content r4, $type:ident, $entry:ident, $value:expr) => {
+        $entry
+    };
+    (@content r5, $type:ident, $entry:ident, $value:expr) => {
+        $type { content: $value, ..$entry }
+    };
+    (@content r6, $type:ident, $entry:ident, $value:expr) => {
+        $type { content: Some($value), ..$entry }
     };
     (@version_code r6, $entry:ident, $value:expr) => {
         $entry.value = Some($value);
     };
-}
-
-r5_family_capabilities!(r5, to_r5, r5);
-r5_family_capabilities!(r6, to_r6, r6);
-
-// NOTE: R4 (4.0.1) and R4B (4.3.0) declare the same TerminologyCapabilities
-// elements this render fills, so one macro produces both methods.
-macro_rules! terminology_capabilities {
-    ($module:ident, $name:ident) => {
-        impl Summary {
-            /// The resource of the version; `date` is the statement's `dateTime`.
-            #[must_use]
-            pub fn $name(
-                &self,
-                date: &str,
-            ) -> fhir_types::$module::terminology_capabilities::TerminologyCapabilities {
-                use fhir_types::$module::terminology_capabilities::{
-                    TerminologyCapabilities, TerminologyCapabilitiesCodeSystem,
-                    TerminologyCapabilitiesCodeSystemVersion,
-                    TerminologyCapabilitiesCodeSystemVersionFilter,
-                    TerminologyCapabilitiesExpansion, TerminologyCapabilitiesExpansionParameter,
-                };
-                TerminologyCapabilities {
-                    status: "active".into(),
-                    date: date.into(),
-                    kind: "instance".into(),
-                    code_system: self
-                        .systems
-                        .iter()
-                        .map(|system| TerminologyCapabilitiesCodeSystem {
-                            uri: Some(system.url.as_str().into()),
-                            version: system
-                                .versions
-                                .iter()
-                                .map(|version| TerminologyCapabilitiesCodeSystemVersion {
-                                    extension: version_extensions!($module, version),
-                                    code: (!version.code.is_empty())
-                                        .then(|| version.code.as_str().into()),
-                                    is_default: Some(version.is_default.into()),
-                                    compositional: Some(version.compositional.into()),
-                                    language: common_languages(&version.languages)
-                                        .into_iter()
-                                        .map(Into::into)
-                                        .collect(),
-                                    filter: version
-                                        .filters
-                                        .iter()
-                                        .filter_map(|filter| {
-                                            let ops = r4_family_operators(&filter.operators);
-                                            // `filter.op` is 1..*, so an entry
-                                            // left with none is left out.
-                                            (!ops.is_empty()).then(|| {
-                                                TerminologyCapabilitiesCodeSystemVersionFilter {
-                                                    code: filter.code.as_str().into(),
-                                                    op: ops.into_iter().map(Into::into).collect(),
-                                                    ..Default::default()
-                                                }
-                                            })
-                                        })
-                                        .collect(),
-                                    property: version
-                                        .properties
-                                        .iter()
-                                        .map(|p| p.as_str().into())
-                                        .collect(),
-                                    ..Default::default()
-                                })
-                                .collect(),
-                            subsumption: Some(system.subsumption.into()),
-                            ..Default::default()
-                        })
-                        .collect(),
-                    expansion: Some(TerminologyCapabilitiesExpansion {
-                        hierarchical: Some(false.into()),
-                        paging: Some(true.into()),
-                        incomplete: Some(false.into()),
-                        text_filter: Some(TEXT_FILTER.into()),
-                        parameter: expansion_parameters(
-                            &fhir_types::$module::operations::value_set_expand::VALUE_SET_EXPAND,
-                        )
-                        .into_iter()
-                        .map(|name| TerminologyCapabilitiesExpansionParameter {
-                            name: name.into(),
-                            ..Default::default()
-                        })
-                        .collect(),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                }
-            }
-        }
+    (@version_code $flavour:ident, $entry:ident, $value:expr) => {
+        $entry.code = Some($value);
     };
 }
 
-terminology_capabilities!(r4, to_r4);
-terminology_capabilities!(r4b, to_r4b);
+terminology_capabilities!(r4, to_r4, r4);
+terminology_capabilities!(r4b, to_r4b, r4);
+terminology_capabilities!(r5, to_r5, r5);
+terminology_capabilities!(r6, to_r6, r6);
 
 /// The `$expand` parameters a version advertises in `expansion.parameter`:
 /// the names of [`EXPANSION_PARAMETERS`] its generated `ValueSet/$expand`

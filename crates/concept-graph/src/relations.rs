@@ -15,6 +15,7 @@
 use std::io::{self, Read, Write};
 
 use crate::ordinal::{Ordinal, to_usize};
+use crate::persist::{read_u32, read_u32s, write_u32s};
 
 const MAGIC: &[u8; 8] = b"FTRELS\0\0";
 const VERSION: u32 = 1;
@@ -288,30 +289,6 @@ impl Relations {
             incoming,
         })
     }
-}
-
-fn write_u32s(out: &mut impl Write, values: &[u32]) -> io::Result<()> {
-    let len = crate::persist::u32_len(values.len(), "an array length")?;
-    out.write_all(&len.to_le_bytes())?;
-    for value in values {
-        out.write_all(&value.to_le_bytes())?;
-    }
-    Ok(())
-}
-
-fn read_u32(input: &mut impl Read) -> io::Result<u32> {
-    let mut buffer = [0_u8; 4];
-    input.read_exact(&mut buffer)?;
-    Ok(u32::from_le_bytes(buffer))
-}
-
-fn read_u32s(input: &mut impl Read) -> io::Result<Vec<u32>> {
-    let len = read_u32(input)?;
-    let mut values = Vec::with_capacity(to_usize(len));
-    for _ in 0..len {
-        values.push(read_u32(input)?);
-    }
-    Ok(values)
 }
 
 #[cfg(test)]

@@ -136,7 +136,7 @@ pub(crate) fn u32_len(len: usize, what: &'static str) -> io::Result<u32> {
     u32::try_from(len).map_err(|source| io::Error::other(TooLong { what, source }))
 }
 
-fn write_u32s(out: &mut impl Write, values: &[u32]) -> io::Result<()> {
+pub(crate) fn write_u32s(out: &mut impl Write, values: &[u32]) -> io::Result<()> {
     let len = u32_len(values.len(), "an array length")?;
     out.write_all(&len.to_le_bytes())?;
     for value in values {
@@ -145,13 +145,13 @@ fn write_u32s(out: &mut impl Write, values: &[u32]) -> io::Result<()> {
     Ok(())
 }
 
-fn read_u32(input: &mut impl Read) -> io::Result<u32> {
+pub(crate) fn read_u32(input: &mut impl Read) -> io::Result<u32> {
     let mut buffer = [0_u8; 4];
     input.read_exact(&mut buffer)?;
     Ok(u32::from_le_bytes(buffer))
 }
 
-fn read_u32s(input: &mut impl Read) -> io::Result<Vec<u32>> {
+pub(crate) fn read_u32s(input: &mut impl Read) -> io::Result<Vec<u32>> {
     let len = read_u32(input)?;
     let mut values = Vec::with_capacity(to_usize(len));
     for _ in 0..len {
