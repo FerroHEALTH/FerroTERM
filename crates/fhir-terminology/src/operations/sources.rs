@@ -40,21 +40,32 @@ impl<'a> Sources<'a> {
     }
 
     /// The value set an operation names: inline, stored by `url` (and
-    /// `version`), or a provider's implicit form.
+    /// `version`, both as `negotiation` settles them), or a provider's
+    /// implicit form.
     ///
     /// # Errors
     ///
     /// Returns [`OperationError::Invalid`] for both an inline and a `url`,
-    /// [`OperationError::Invalid`] for neither, and
-    /// [`OperationError::UnknownValueSet`] when nothing answers the `url`.
+    /// [`OperationError::Invalid`] for neither, the refusal of a version
+    /// `negotiation` does not admit, and [`OperationError::UnknownValueSet`]
+    /// when nothing answers the `url`.
     pub fn value_set(
         &self,
+        negotiation: &crate::compose::negotiation::Negotiation,
         inline: Option<
             Result<crate::valueset::model::ValueSetModel, crate::valueset::model::ModelError>,
         >,
         url: Option<&str>,
         version: Option<&str>,
     ) -> Result<Arc<crate::valueset::model::ValueSetModel>, OperationError> {
+        let (url, version) = match url {
+            Some(url) => {
+                let (url, version) = negotiation.value_set(url, version)?;
+                (Some(url), version)
+            }
+            None => (None, version.map(str::to_owned)),
+        };
+        let (url, version) = (url.as_deref(), version.as_deref());
         match (inline, url) {
             (Some(_), Some(_)) => Err(OperationError::Invalid(String::from(
                 "provide either `url` or an inline `valueSet`, not both",

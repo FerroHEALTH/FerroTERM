@@ -186,17 +186,11 @@ fn prepare(
         &input.check_valueset_version,
         &input.force_valueset_version,
     );
-    let (url, version) = match input.url.as_deref() {
-        Some(url) => {
-            let (url, version) = negotiation.value_set(url, input.value_set_version.as_deref())?;
-            (Some(url), version)
-        }
-        None => (None, input.value_set_version.clone()),
-    };
     let model = sources.value_set(
+        &negotiation,
         input.inline_value_set.clone(),
-        url.as_deref(),
-        version.as_deref(),
+        input.url.as_deref(),
+        input.value_set_version.as_deref(),
     )?;
     let negotiation = negotiation.with_include_versions(&model.compose);
     let model = Arc::new(ValueSetModel {
