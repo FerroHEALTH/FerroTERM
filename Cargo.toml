@@ -196,6 +196,8 @@ base64 = "0.23.1"
 criterion = "0.8.2"
 divan = "0.1.21"
 tempfile = "3.27.0"
+# The counting allocator the server's allocation budget test installs (#1339).
+dhat = "0.3.3"
 # The FHIR model: generated and published by the FerroBRIDGE repository, and
 # consumed here from crates.io like any other third-party crate. The pin is
 # recorded in docs/VERSIONS.md and `scripts/checks/versions.sh` fails when the
