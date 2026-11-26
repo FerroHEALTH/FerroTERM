@@ -515,7 +515,7 @@ dependencies = [
  "concept-store",
  "designation-index",
  "dhd-thesaurus",
- "fhir-types 0.3.0",
+ "fhir-types",
  "flate2",
  "gstandaard",
  "icd11",
@@ -540,7 +540,7 @@ version = "0.0.0"
 dependencies = [
  "ferroterm-testkit",
  "fhir-terminology",
- "fhir-types 0.2.0",
+ "fhir-types",
  "libfuzzer-sys",
  "rf2",
  "sct-ecl",
@@ -579,7 +579,7 @@ dependencies = [
  "concept-store",
  "csv",
  "designation-index",
- "fhir-types 0.3.0",
+ "fhir-types",
  "http",
  "icd11",
  "jiff",
@@ -594,18 +594,6 @@ dependencies = [
  "serde_json",
  "thiserror",
  "uuid",
-]
-
-[[package]]
-name = "fhir-types"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7dc799c13c2e292fbaae7c6aee40daf46d2e0ba4ead0275f6b51b67eeecdd524"
-dependencies = [
- "quick-xml",
- "regex",
- "serde",
- "serde_json",
 ]
 
 [[package]]
