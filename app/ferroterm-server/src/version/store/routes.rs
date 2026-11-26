@@ -466,7 +466,9 @@ macro_rules! store {
                 at: &dyn Fn(&str) -> Option<String>,
             ) -> Result<Vec<BundleEntry>, Failure> {
                 let mut out = Vec::new();
-                for (id, held) in state.held_matching(resource_type, |object| search.matches(object)) {
+                for (id, held) in
+                    state.held_matching(resource_type, |object| search.matches(object))
+                {
                     let Ok(object) = (surface().round_trip)(&held.object) else {
                         continue;
                     };

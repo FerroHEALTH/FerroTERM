@@ -112,9 +112,8 @@ impl Criteria {
                 .and_then(Value::as_object)
                 .is_some_and(|concept| concept_matches(tokens, concept)),
             Test::Value(matching, values) => unique_ids(object).any(|unique| {
-                text(unique, "value").is_some_and(|field| {
-                    values.iter().any(|value| matching.matches(field, value))
-                })
+                text(unique, "value")
+                    .is_some_and(|field| values.iter().any(|value| matching.matches(field, value)))
             }),
         })
     }

@@ -9,7 +9,9 @@ use serde_json::{Value, json};
 
 use crate::fixture::Server;
 use ferroterm_server::config::{Config, TerminologySection};
-use ferroterm_testkit::mvc::{NATIONAL, NATIONAL_OID, PATIENT_ID_NAME, PATIENT_ID_SYSTEM, imported};
+use ferroterm_testkit::mvc::{
+    NATIONAL, NATIONAL_OID, PATIENT_ID_NAME, PATIENT_ID_SYSTEM, imported,
+};
 
 /// The id the 10.1.0 release gives its `NamingSystem` of kind `identifier`.
 const PATIENT: &str = "national-patient-10-1-0";
@@ -129,7 +131,12 @@ async fn a_value_no_namespace_carries_finds_nothing() {
 #[tokio::test]
 async fn a_parameter_or_modifier_the_search_does_not_answer_is_refused() {
     let server = one_release();
-    for query in ["url=x", "kind:not=identifier", "value:text=x", "kind=a%7Cb%7Cc"] {
+    for query in [
+        "url=x",
+        "kind:not=identifier",
+        "value:text=x",
+        "kind=a%7Cb%7Cc",
+    ] {
         let (status, body) = server.get(&format!("/r4/NamingSystem?{query}")).await;
         assert_eq!(status, StatusCode::BAD_REQUEST, "{query}: {body}");
         assert_eq!(
@@ -178,8 +185,14 @@ async fn a_written_naming_system_is_found_beside_the_loaded_ones() {
 async fn the_capability_statement_declares_naming_system_read_and_search() {
     let server = one_release();
     for (base, status_definition) in [
-        ("r4", "http://hl7.org/fhir/SearchParameter/conformance-status"),
-        ("r5", "http://hl7.org/fhir/SearchParameter/CanonicalResource-status"),
+        (
+            "r4",
+            "http://hl7.org/fhir/SearchParameter/conformance-status",
+        ),
+        (
+            "r5",
+            "http://hl7.org/fhir/SearchParameter/CanonicalResource-status",
+        ),
     ] {
         let (_, statement) = server.get(&format!("/{base}/metadata")).await;
         let declared = statement
@@ -211,7 +224,9 @@ async fn the_capability_statement_declares_naming_system_read_and_search() {
             assert!(
                 params.contains(&(
                     &json!(name),
-                    &json!(format!("http://hl7.org/fhir/SearchParameter/NamingSystem-{name}"))
+                    &json!(format!(
+                        "http://hl7.org/fhir/SearchParameter/NamingSystem-{name}"
+                    ))
                 )),
                 "{base} {name}: {declared}"
             );
