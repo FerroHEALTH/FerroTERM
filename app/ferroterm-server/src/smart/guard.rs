@@ -23,7 +23,13 @@ use http::{Extensions, Method, Uri};
 use crate::smart::{Challenge, Smart};
 
 /// The resource types a client writes through the REST API.
-const WRITTEN: [&str; 4] = ["CodeSystem", "ValueSet", "ConceptMap", "Provenance"];
+const WRITTEN: [&str; 5] = [
+    "CodeSystem",
+    "ValueSet",
+    "ConceptMap",
+    "NamingSystem",
+    "Provenance",
+];
 
 /// The system-level route of `ConceptMap/$closure`.
 const CLOSURE: &str = "$closure";
@@ -122,8 +128,8 @@ where
 
 /// Refuses a write whose grant reaches only a patient's compartment.
 ///
-/// A written `CodeSystem`, `ValueSet` or `ConceptMap`, and the `Provenance`
-/// of one, belongs to no patient, so a `patient/` scope selects nothing on it
+/// A written `CodeSystem`, `ValueSet`, `ConceptMap` or `NamingSystem`, and
+/// the `Provenance` of one, belongs to no patient, so a `patient/` scope selects nothing on it
 /// (<https://hl7.org/fhir/smart-app-launch/scopes-and-launch-context.html>);
 /// a request the layer admitted with one answers `403`.
 async fn compartment(

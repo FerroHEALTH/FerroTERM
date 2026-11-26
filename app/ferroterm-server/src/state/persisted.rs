@@ -169,7 +169,7 @@ pub(super) fn core_holds(
             .any(|model| same_canonical((&model.url, model.version.as_deref()), (url, version))),
         // NOTE: the core terminology beneath a served version holds code systems and
         // value sets alone; no FHIR/SNOMED spec governs this: our own design.
-        ResourceType::ConceptMap | ResourceType::Provenance => false,
+        ResourceType::ConceptMap | ResourceType::Provenance | ResourceType::NamingSystem => false,
     }
 }
 
@@ -328,10 +328,9 @@ impl AppState {
                 .concept_map_instances
                 .get(id)
                 .map(|(url, version)| canonical(url, version.as_deref())),
-            ResourceType::Provenance => self
-                .provenance
-                .contains_key(id)
-                .then(|| format!("Provenance/{id}")),
+            ResourceType::Provenance | ResourceType::NamingSystem => self
+                .held_instance(resource_type, id)
+                .map(|_| format!("{}/{id}", resource_type.name())),
         }
     }
 

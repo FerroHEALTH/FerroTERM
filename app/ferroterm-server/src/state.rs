@@ -35,6 +35,7 @@ use crate::state::layer::Layer;
 use crate::state::persisted::{PersistError, Persisted};
 
 mod duplicate;
+pub mod held;
 mod ids;
 pub mod layer;
 pub mod load;
@@ -180,18 +181,20 @@ pub enum LoadError {
     #[error("cannot serve the persisted resources")]
     Persisted(#[source] PersistError),
     /// A package directory or one of its files cannot be read for its
-    /// `Provenance` resources.
-    #[error("cannot read {path} for its Provenance resources")]
-    ProvenanceDir {
+    /// `Provenance` and `NamingSystem` resources.
+    #[error("cannot read {path} for its Provenance and NamingSystem resources")]
+    PackageDir {
         /// The directory or file.
         path: PathBuf,
         /// The cause.
         #[source]
         source: std::io::Error,
     },
-    /// A loaded `Provenance` is refused.
-    #[error("the Provenance in {path} is refused: {reason}")]
-    Provenance {
+    /// A loaded `Provenance` or `NamingSystem` is refused.
+    #[error("the {resource_type} in {path} is refused: {reason}")]
+    Held {
+        /// The resource type.
+        resource_type: &'static str,
         /// The file.
         path: PathBuf,
         /// Why, with the element path the codec names.
@@ -308,8 +311,9 @@ pub struct AppState {
     /// The base URL clients reach this server at, when the deployment named
     /// one; the capability statements state it per version.
     base_url: Option<String>,
-    /// The `Provenance` resources the deployment loaded, by id.
-    provenance: BTreeMap<String, provenance::Held>,
+    /// The `Provenance` and `NamingSystem` resources the deployment loaded,
+    /// by type and id.
+    held: held::HeldResources,
 }
 
 impl AppState {
@@ -459,27 +463,28 @@ impl AppState {
         out
     }
 
-    /// The `Provenance` the deployment loaded under `id`.
+    /// The resource of `resource_type` the deployment loaded under `id`.
     #[must_use]
-    pub fn provenance_instance(&self, id: &str) -> Option<&provenance::Held> {
-        self.provenance.get(id)
+    pub fn held_instance(&self, resource_type: ResourceType, id: &str) -> Option<&held::Held> {
+        self.held.get(&(resource_type, id.to_owned()))
     }
 
-    /// The `Provenance` resources the deployment loaded whose `target` names
-    /// `target`, by id, the persisted ones left out because a search lists
-    /// those from their records.
-    #[must_use]
-    pub fn provenance_targeting(&self, target: Option<&str>) -> Vec<(&str, &provenance::Held)> {
-        self.provenance
+    /// The resources of `resource_type` the deployment loaded that `matches`
+    /// admits, by id, the persisted ones left out because a search lists those
+    /// from their records.
+    pub fn held_matching(
+        &self,
+        resource_type: ResourceType,
+        matches: impl Fn(&fhir_types::codec::Object) -> bool,
+    ) -> Vec<(&str, &held::Held)> {
+        self.held
             .iter()
-            .filter(|(id, held)| {
-                self.persisted_record(ResourceType::Provenance, id)
-                    .is_none()
-                    && target.is_none_or(|wanted| {
-                        provenance::targets(&held.object).any(|named| named == wanted)
-                    })
+            .filter(|((held_type, id), held)| {
+                *held_type == resource_type
+                    && self.persisted_record(resource_type, id).is_none()
+                    && matches(&held.object)
             })
-            .map(|(id, held)| (id.as_str(), held))
+            .map(|((_, id), held)| (id.as_str(), held))
             .collect()
     }
 

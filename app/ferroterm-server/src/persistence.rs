@@ -53,6 +53,9 @@ pub enum ResourceType {
     /// `Provenance`: who produced or validated a resource the server holds
     /// (<https://hl7.org/fhir/R4B/provenance.html>).
     Provenance,
+    /// `NamingSystem`: the identifiers of an identifier or code system
+    /// namespace (<https://hl7.org/fhir/R4/namingsystem.html>).
+    NamingSystem,
 }
 
 impl ResourceType {
@@ -64,6 +67,7 @@ impl ResourceType {
             Self::ValueSet => "ValueSet",
             Self::ConceptMap => "ConceptMap",
             Self::Provenance => "Provenance",
+            Self::NamingSystem => "NamingSystem",
         }
     }
 
@@ -75,6 +79,7 @@ impl ResourceType {
             "ValueSet" => Some(Self::ValueSet),
             "ConceptMap" => Some(Self::ConceptMap),
             "Provenance" => Some(Self::Provenance),
+            "NamingSystem" => Some(Self::NamingSystem),
             _ => None,
         }
     }

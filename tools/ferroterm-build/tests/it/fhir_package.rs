@@ -23,6 +23,7 @@ fn a_package_keeps_its_manifest_and_terminology_resources() {
             ("CodeSystem", 2),
             ("ValueSet", 2),
             ("ConceptMap", 1),
+            ("NamingSystem", 2),
             ("Provenance", 1)
         ]
     );
@@ -44,6 +45,8 @@ fn a_package_keeps_its_manifest_and_terminology_resources() {
             "CodeSystem-mvc-synthetic.json",
             "CodeSystem-national-allergy.json",
             "ConceptMap-national-to-mvc.json",
+            "NamingSystem-national-allergy.json",
+            "NamingSystem-national-patient.json",
             "Provenance-national-to-mvc.json",
             "ValueSet-eHDSIAllergyNoAllergy.json",
             "ValueSet-eHDSIUnserved.json",

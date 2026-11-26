@@ -37,9 +37,9 @@ pub enum Loaded {
     ValueSet(ValueSetModel),
     /// A `ConceptMap`.
     ConceptMap(ConceptMapModel),
-    /// A `Provenance`, which the terminology layer holds nothing of: it is
-    /// read and searched from its record.
-    Provenance,
+    /// A `Provenance` or `NamingSystem`, which the terminology layer holds
+    /// nothing of: it is read and searched from its record.
+    Record,
     /// One the server cannot use, held until a request reaches it.
     Unusable(Unusable),
 }

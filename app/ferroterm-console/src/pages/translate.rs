@@ -175,12 +175,19 @@ async fn answer(
                     &[("count", found.into())]
                 )),
             ));
-            let outcome = if answer.result() == Some(true) {
+            let errors = answer.errors();
+            let outcome = if answer.result() == Some(true) && errors.is_empty() {
                 Outcome::Ok
             } else {
                 Outcome::Warn
             };
-            let message = answer.message().map(|message| {
+            let said: Vec<String> = answer
+                .message()
+                .into_iter()
+                .chain(errors)
+                .chain(matches.iter().filter_map(|each| each.note.clone()))
+                .collect();
+            let message = (!said.is_empty()).then(|| {
                 panel_section(
                     locale,
                     Some(SectionHead {
@@ -188,7 +195,7 @@ async fn answer(
                         count: None,
                         actions: None,
                     }),
-                    p(Html::text(message)),
+                    Html::join(said.into_iter().map(|line| p(Html::text(line)))),
                 )
             });
             Html::join([

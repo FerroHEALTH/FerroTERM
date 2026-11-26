@@ -192,3 +192,60 @@ async fn translate_refuses_what_it_cannot_answer() {
         .expect("ConceptMap");
     assert_eq!(concept_map["operation"][0]["name"], "translate");
 }
+
+// The ecosystem IG 1.11.0, `$translate`, The result: an invalid target keeps its
+// match and adds one `error`, and an unknown target system adds a `note` part
+// (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
+#[tokio::test]
+async fn translate_checks_every_target_code_on_every_version() {
+    let server = Server::start_with_resources();
+    let nowhere = "http://example.org/fhir/CodeSystem/nowhere";
+    let map = "http://example.org/fhir/ConceptMap/checked";
+    for (base, relation, system_in, code_in) in [
+        ("r4", "equivalence", "system", "code"),
+        ("r4b", "equivalence", "system", "code"),
+        ("r5", "relationship", "sourceSystem", "sourceCode"),
+        ("r6", "relationship", "sourceSystem", "sourceCode"),
+    ] {
+        let group = |target: &str, code: &str, to: &str| {
+            json!({"source": ANIMALS, "target": target, "element": [
+                {"code": code, "target": [{"code": to, (relation): "equivalent"}]}]})
+        };
+        let concept_map = json!({"resourceType": "ConceptMap", "url": map,
+            "version": "1", "status": "draft", "group": [
+                group(COLOURS, "dog", "MAUVE"), group(nowhere, "fish", "x")]});
+        let ask = |code: &str| {
+            json!({"resourceType": "Parameters", "parameter": [
+                {"name": "url", "valueUri": map},
+                {"name": system_in, "valueUri": ANIMALS},
+                {"name": code_in, "valueCode": code},
+                {"name": "tx-resource", "resource": concept_map.clone()}]})
+        };
+        let path = format!("/{base}/ConceptMap/$translate");
+        let (status, body) = server.post(&path, &ask("dog")).await;
+        assert_eq!(status, StatusCode::OK, "{base}: {body}");
+        let m = param(&body, "match").expect("the match stays");
+        assert_eq!(
+            part(m, "concept").expect("concept")["valueCoding"]["code"],
+            "MAUVE",
+            "{base}"
+        );
+        assert_eq!(
+            param(&body, "error").expect("error")["valueString"],
+            format!("The code 'MAUVE' is not valid in the code system '{COLOURS}'"),
+            "{base}: {body}"
+        );
+        assert!(part(m, "note").is_none(), "{base}: {body}");
+        let (status, body) = server.post(&path, &ask("fish")).await;
+        assert_eq!(status, StatusCode::OK, "{base}: {body}");
+        assert!(param(&body, "error").is_none(), "{base}: {body}");
+        let m = param(&body, "match").expect("match");
+        assert_eq!(
+            part(m, "note").expect("note")["valueString"],
+            format!(
+                "The code system '{nowhere}' is not known, so the code 'x' has not been validated"
+            ),
+            "{base}: {body}"
+        );
+    }
+}

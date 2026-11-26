@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The REST interactions of the persisted `CodeSystem`, `ValueSet`, and
-//! `ConceptMap` resources.
+//! The REST interactions of the persisted `CodeSystem`, `ValueSet`,
+//! `ConceptMap`, `Provenance` and `NamingSystem` resources.
 //!
 //! The FHIR REST API defines create, update, read, version read, search,
 //! and delete, their status codes, and the `ETag` and `Last-Modified` headers
@@ -14,6 +14,7 @@
 //! to it.
 
 pub(crate) mod loaded;
+pub(crate) mod naming_system;
 pub(crate) mod routes;
 
 use axum::body::Bytes;
@@ -130,8 +131,8 @@ pub(crate) fn update(request: &Request<'_>, id: &str, body: &Bytes) -> Result<Re
 
 /// `GET {type}/{id}`: the current version of the resource.
 ///
-/// A `CodeSystem`, `ValueSet`, or `ConceptMap` id the deployment loaded reads
-/// here too, rendered from the model the engine holds; it carries no `ETag`,
+/// A resource the deployment loaded reads here too, rendered from the model
+/// the engine holds or from its package record; it carries no `ETag`,
 /// because a loaded resource has no version this server counts. `projection`
 /// is the `_summary` and `_elements` of the read
 /// (<https://hl7.org/fhir/R4B/http.html#read>).
@@ -167,8 +168,8 @@ pub(crate) fn read(
 /// The resource `id` names among the ones the deployment loaded, when there
 /// is one.
 ///
-/// The FHIR read is defined over any resource the server holds, and a code
-/// system, value set, or concept map the deployment loaded from disk is one
+/// The FHIR read is defined over any resource the server holds, and one the
+/// deployment loaded from disk is one
 /// (<https://hl7.org/fhir/R4B/http.html#read>); what comes back is the
 /// definition, with the concepts only where `content` says the resource
 /// carries them.
@@ -211,8 +212,8 @@ fn loaded(request: &Request<'_>, id: &str) -> Result<Option<Object>, Failure> {
                 .map(Some)
                 .map_err(|reason| rendering(&reason))
         }
-        ResourceType::Provenance => {
-            let Some(held) = request.state.provenance_instance(id) else {
+        ResourceType::Provenance | ResourceType::NamingSystem => {
+            let Some(held) = request.state.held_instance(request.resource_type, id) else {
                 return Ok(None);
             };
             (request.surface.round_trip)(&held.object)
@@ -222,8 +223,10 @@ fn loaded(request: &Request<'_>, id: &str) -> Result<Option<Object>, Failure> {
                         StatusCode::NOT_FOUND,
                         "not-supported",
                         format!(
-                            "Provenance/{id} was loaded as FHIR {} and does not read as FHIR {}: {reason}",
-                            held.fhir_version, request.surface.fhir_version
+                            "{}/{id} was loaded as FHIR {} and does not read as FHIR {}: {reason}",
+                            request.resource_type.name(),
+                            held.fhir_version,
+                            request.surface.fhir_version
                         ),
                     )
                 })
@@ -421,8 +424,8 @@ fn history_since(query: &[(String, String)]) -> Result<Option<jiff::Timestamp>, 
     Ok(since)
 }
 
-/// The records a search over `url` and `version` matches, sorted by id, or
-/// over `target` for a `Provenance`.
+/// The records a search matches, sorted by id: over `url` and `version`, or
+/// over the parameters of a held type ([`loaded::HeldSearch`]).
 ///
 /// # Errors
 ///
@@ -432,16 +435,11 @@ pub(crate) fn matches(
     resource_type: ResourceType,
     query: &[(String, String)],
 ) -> Result<Vec<Record>, Failure> {
-    if resource_type == ResourceType::Provenance {
-        let target = loaded::provenance_target(query)?;
+    if let Some(search) = loaded::HeldSearch::parse(resource_type, query)? {
         return Ok(state
             .persisted_records(resource_type)
             .into_iter()
-            .filter(|record| {
-                target.is_none_or(|wanted| {
-                    crate::state::provenance::targets(&record.resource).any(|named| named == wanted)
-                })
-            })
+            .filter(|record| search.matches(&record.resource))
             .collect());
     }
     let (url, version) = loaded::criteria(query)?;

@@ -5,7 +5,7 @@
 //! (<https://hl7.org/fhir/R4B/conceptmap-operation-translate.html>).
 
 use ferroterm_testkit::fhir::{
-    ANIMALS, CM_ANIMALS_COLOURS, CM_FALLBACK, COLOURS, VS_ALL, VS_COLOURS,
+    ANIMALS, CM_ANIMALS_COLOURS, CM_FALLBACK, COLOURS, SKETCH, VS_ALL, VS_COLOURS,
 };
 use fhir_terminology::conceptmap::convert;
 use fhir_terminology::operations::translate::{Match, TranslateInput, Translation, translate};
@@ -325,6 +325,82 @@ fn an_inline_map_translates_and_malformed_requests_are_refused() {
     let translation = run(&world, &other_system);
     assert!(!translation.result);
     assert!(translation.matches.is_empty(), "no group covers the system");
+}
+
+// The ecosystem IG 1.11.0, `$translate`, The result: every returned target is
+// checked against its code system
+// (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
+#[test]
+fn every_target_code_is_checked_against_its_code_system() {
+    let world = World::load();
+    let nowhere = "http://example.org/fhir/CodeSystem/nowhere";
+    let group = |target: &str, code: &str, to: &str| ConceptMapGroup {
+        source: Some(ANIMALS.into()),
+        target: Some(target.into()),
+        element: vec![ConceptMapGroupElement {
+            code: Some(code.into()),
+            target: vec![ConceptMapGroupElementTarget {
+                code: Some(to.into()),
+                equivalence: "equivalent".into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let inline = ConceptMap {
+        url: Some("http://example.org/checked-map".into()),
+        status: "draft".into(),
+        group: vec![
+            group(COLOURS, "cat", "RED"),
+            group(COLOURS, "dog", "MAUVE"),
+            group(nowhere, "fish", "x"),
+            group(SKETCH, "plant", "zzz"),
+        ],
+        ..Default::default()
+    };
+    let translated = |code: &str| {
+        run(
+            &world,
+            &TranslateInput {
+                inline_concept_map: Some(convert::r4b::convert(&inline)),
+                code: Some(code.to_owned()),
+                system: Some(ANIMALS.to_owned()),
+                ..TranslateInput::default()
+            },
+        )
+    };
+    let valid = translated("cat");
+    assert!(valid.errors.is_empty(), "{:?}", valid.errors);
+    assert_eq!(valid.matches[0].origin.note, None);
+    let invalid = translated("dog");
+    assert_eq!(
+        target_code(&invalid.matches[0]),
+        Some("MAUVE"),
+        "the match stays"
+    );
+    assert!(invalid.result);
+    assert_eq!(
+        invalid.errors,
+        [format!(
+            "The code 'MAUVE' is not valid in the code system '{COLOURS}'"
+        )]
+    );
+    assert_eq!(invalid.matches[0].origin.note, None);
+    let unknown = translated("fish");
+    assert!(unknown.errors.is_empty(), "{:?}", unknown.errors);
+    assert_eq!(
+        unknown.matches[0].origin.note.as_deref(),
+        Some(
+            format!(
+                "The code system '{nowhere}' is not known, so the code 'x' has not been validated"
+            )
+            .as_str()
+        )
+    );
+    let example = translated("plant");
+    assert!(example.errors.is_empty(), "{:?}", example.errors);
+    assert_eq!(example.matches[0].origin.note, None);
 }
 
 #[test]

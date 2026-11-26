@@ -30,6 +30,7 @@ ferrohealth-server = { workspace = true, features = ["otlp"] }
 ferrohealth-smart.workspace = true
 ferrohealth-telemetry = { workspace = true, features = ["axum", "prometheus", "otlp"] }
 ferrohealth-usage-report = { workspace = true, features = ["telemetry"] }
+fhir-search.workspace = true
 fhir-types.workspace = true
 fhir-terminology.workspace = true
 concept-graph.workspace = true

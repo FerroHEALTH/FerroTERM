@@ -370,7 +370,7 @@ macro_rules! family_map {
             $crate::version::map::family_map!(@translation_match $flavour);
 
             /// The `$translate` outcome as the `Parameters`: `result`, `message`, each
-            /// `match`, and the overlay's `used-conceptmap`.
+            /// `match`, and the overlay's `used-conceptmap` and `error`.
             #[must_use]
             pub fn translation_parameters(translation: &Translation) -> Parameters {
                 ConceptMapTranslateResponse {
@@ -382,6 +382,7 @@ macro_rules! family_map {
                         .map(|c| c.as_str().into())
                         .collect(),
                     used_system: Vec::new(),
+                    error: translation.errors.iter().map(|e| e.as_str().into()).collect(),
                     r#match: translation.matches.iter().map(translation_match).collect(),
                 }
                 .to_parameters()
@@ -459,8 +460,8 @@ macro_rules! family_map {
     (@translation_match r4) => {
             /// One `match` of the `$translate` response: `equivalence`, `concept`,
             /// `product`, and `source`, the declared shape, plus the overlay's
-            /// `originMap`, `sourceConcept`, the comments, and `noMap`; a `noMap` match
-            /// has no `equivalence`.
+            /// `originMap`, `sourceConcept`, the comments, `noMap` and `note`; a `noMap`
+            /// match has no `equivalence`.
             fn translation_match(m: &Match) -> ConceptMapTranslateResponseMatch {
                 ConceptMapTranslateResponseMatch {
                     equivalence: (!m.origin.no_map).then(|| m.relationship.equivalence().into()),
@@ -479,14 +480,15 @@ macro_rules! family_map {
                         })
                         .collect(),
                     source: m.source.as_deref().map(Into::into),
+                    note: m.origin.note.as_deref().map(Into::into),
                 }
             }
     };
     (@translation_match $flavour:ident) => {
             /// One `match` of the `$translate` response: `relationship`, `concept`,
             /// `product` (an `attribute` and a `value`), and `originMap`, plus the
-            /// overlay's `sourceConcept`, the comments, and `noMap`; a `noMap` match
-            /// has no `relationship`.
+            /// overlay's `sourceConcept`, the comments, `noMap` and `note`; a `noMap`
+            /// match has no `relationship`.
             fn translation_match(m: &Match) -> ConceptMapTranslateResponseMatch {
                 ConceptMapTranslateResponseMatch {
                     relationship: (!m.origin.no_map).then(|| m.relationship.relationship().into()),
@@ -506,6 +508,7 @@ macro_rules! family_map {
                         .collect(),
                     depends_on: Vec::new(),
                     origin_map: Some(m.origin.origin_map.as_str().into()),
+                    note: m.origin.note.as_deref().map(Into::into),
                 }
             }
     };

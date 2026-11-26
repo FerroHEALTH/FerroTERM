@@ -37,6 +37,7 @@ mod logical_id;
 mod metadata;
 mod metrics;
 mod mvc;
+mod naming_system;
 mod openehr;
 mod operations;
 mod persisted;
