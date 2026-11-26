@@ -389,6 +389,33 @@ declared workspace edges from `cargo metadata` and fails on either direction,
 the way `scripts/checks/console-boundary.sh` holds the console to its FHIR-client
 boundary.
 
+### One owner per concern
+
+No spec governs this, our own design. Each concern of the three services has
+exactly one module that owns it; a second module doing the same work is a
+defect to merge, and `scripts/checks/duplication.sh` and
+`scripts/checks/forwarders.sh` hold the code to it.
+
+| Concern | `app/ferroterm-server` | `app/ferroterm-sync` | `app/ferroterm-console` |
+|---|---|---|---|
+| Requests | `router` in `lib.rs` over the per-version routers of `version/` (`surface!`), with `wire` for the format and `outcome` for every failure | `admin` | `server` reads each request once into a `visit::Visit`, `routes` names the page |
+| State | `state::AppState` (the loaded layer, the persisted records, the held `Provenance` and `NamingSystem`), swapped whole by `reload::Serving` | `state` between runs, `record` per run | none beyond the request: the session is `ferrohealth-session`'s |
+| Persistence | `persistence` (the `redb` resource database) | `record` (one JSON file per run) | none |
+| Outbound calls | `usage_report` through `ferrohealth-usage-report`, the only one | `source` (the add-on seam), `reload::AdminClient`, `webhook` | `upstream::Upstream`, the one client, fed by `fhir` |
+| Background work | `reload::on_hangup` | `schedule` and `run` | none |
+| Configuration | `config` through `ferrohealth-config` | `config` through `ferrohealth-config` | `config` through `ferrohealth-config` |
+| Access and audit | `smart` (`guard` is the route table) over `ferrohealth-smart`, which writes the audit line | `auth` over `ferrohealth-smart` | `auth` over `ferrohealth-session` |
+
+The engine has the same rule inside the library: `fhir-terminology` resolves a
+code system through `registry::Registry`, a value set through
+`operations::sources::Sources::value_set` (which also settles its version), and
+renders `TerminologyCapabilities` through one per-version macro.
+
+FerroTERM keeps no PostgreSQL. Its terminology is read from the artifacts
+`ferroterm-build` writes, and the resources clients write go to one embedded
+`redb` file (`terminology.resources`), so there is no pool, no connection
+lifetime, and no statement or lock timeout to choose.
+
 ## Verification
 
 - **Snowstorm and Hermes as reference** for terminology answers: `$lookup`,

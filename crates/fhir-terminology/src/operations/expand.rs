@@ -114,17 +114,11 @@ pub fn expand(
     crate::language::check(input.display_language.as_deref())?;
     refuse_unsupported(input)?;
     let negotiation = negotiation(input);
-    let (url, version) = match input.url.as_deref() {
-        Some(url) => {
-            let (url, version) = negotiation.value_set(url, input.value_set_version.as_deref())?;
-            (Some(url), version)
-        }
-        None => (None, input.value_set_version.clone()),
-    };
     let model = sources.value_set(
+        &negotiation,
         input.inline_value_set.clone(),
-        url.as_deref(),
-        version.as_deref(),
+        input.url.as_deref(),
+        input.value_set_version.as_deref(),
     )?;
     let input = &with_defaults(input, &model);
     let compose = pinned_compose(&model.compose, input, &negotiation);
