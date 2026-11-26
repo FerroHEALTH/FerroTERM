@@ -25,9 +25,9 @@ count is two above the suite's own. The `snomed`, `icd-11`, `tx.fhir.org`,
 
 | mode | surface | pass list | passed of ran | needs | open failures |
 |---|---|---|---|---|---|
-| `general` | `/r4b` | `passing.txt` | 699 of 805 | nothing | #1067 to #1069, #1107, #507, #349, #1330, #1308 (the breakdown on the book's conformance page) |
-| `general` | `/r4` | `passing-r4.txt` | 713 of 805 | nothing | #1067 to #1069, #1107, #507, #349, #1330, #1308 (the breakdown on the book's conformance page) |
-| `general` | `/r5` | `passing-r5.txt` | 713 of 805 | nothing | #1067 to #1069, #1107, #507, #349, #1330, #1308 (the breakdown on the book's conformance page) |
+| `general` | `/r4b` | `passing.txt` | 702 of 805 | nothing | #1067 to #1069, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
+| `general` | `/r4` | `passing-r4.txt` | 716 of 805 | nothing | #1067 to #1069, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
+| `general` | `/r5` | `passing-r5.txt` | 716 of 805 | nothing | #1067 to #1069, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
 | `snomed` | `/r4b` | `passing-snomed.txt` | 2 of 170 | a SNOMED CT edition | #344, #352, #349 |
 | `icd-11` | `/r4b` | `passing-icd-11.txt` | 44 of 52 | the three ICD-11 artifacts | #350, #349, #117 |
 | `tx.fhir.org` | `/r4b` | `passing-tx.fhir.org.txt` | 57 of 227 | a LOINC release | #420, #421, #305, #349 |
@@ -412,4 +412,3 @@ its own issue, a server fix or the specification text that decides it:
   (<https://hl7.org/fhir/R4B/codesystem-issue-type.html>) and the closer
   reading of a missing input; they stay unpassed, with #1063 holding the rest
   of those cases.
-- **`translate-2b`, `translate-5` and `translate-5b`** are #995.

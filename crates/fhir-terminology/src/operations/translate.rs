@@ -24,6 +24,7 @@ use super::{CodeableConceptRef, CodingRef, OperationError};
 use crate::compose::ValueSetResolver;
 use crate::provider::MapSelection;
 use crate::provider::concept_map::{ConceptMapModel, ModelError, Relationship};
+use crate::provider::declaration::ContentMode;
 use crate::valueset::store::Resolver;
 use crate::versioned::Versioned;
 
@@ -42,6 +43,9 @@ pub struct MatchOrigin {
     pub target_comment: Option<String>,
     /// `noMap`: the element is explicitly not mapped.
     pub no_map: bool,
+    /// `note`: the target's code system is not known, so its code was not
+    /// checked.
+    pub note: Option<String>,
 }
 
 /// The outcome of a translation: the R4B response and, per match, its origin.
@@ -56,6 +60,8 @@ pub struct Translation {
     /// The canonicals of the maps an `other-map` rule chained to
     /// (`used-conceptmap`), beyond the ones the matches name.
     pub used_concept_maps: Vec<String>,
+    /// One `error` per returned target code its code system does not hold.
+    pub errors: Vec<String>,
 }
 
 /// One match of the translation.
@@ -161,6 +167,7 @@ pub fn translate(
     if input.target_input {
         report_source_to_target(&mut matches);
     }
+    let errors = check_targets(sources, &mut matches)?;
     // NOTE: R4B and R5 `$translate` `result`: true only if a returned match has
     // an equivalence other than unmatched or disjoint (R5: `not-related-to`),
     // <https://hl7.org/fhir/R4B/conceptmap-operation-translate.html>.
@@ -185,7 +192,56 @@ pub fn translate(
         message,
         matches,
         used_concept_maps: used,
+        errors,
     })
+}
+
+/// Checks the target concept of every match against its code system, noting
+/// a match whose system is not known and returning one error per target code
+/// the system does not hold.
+///
+/// The ecosystem's `$translate` result: an unknown target system puts a
+/// `note` on the match, an invalid target code keeps its match and adds an
+/// `error`, and a code system whose content is a fragment cannot say a code is
+/// not in it (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
+///
+/// # Errors
+///
+/// Returns [`OperationError`] when a provider cannot be read.
+fn check_targets(
+    sources: &Sources<'_>,
+    matches: &mut [Match],
+) -> Result<Vec<String>, OperationError> {
+    let mut errors: Vec<String> = Vec::new();
+    for found in matches {
+        let Some(CodingRef {
+            system: Some(system),
+            version,
+            code: Some(code),
+            ..
+        }) = &found.concept
+        else {
+            continue;
+        };
+        let Ok(resolved) = sources.registry.resolve(system, version.as_deref()) else {
+            found.origin.note = Some(format!(
+                "The code system '{system}' is not known, so the code '{code}' has not been validated"
+            ));
+            continue;
+        };
+        // NOTE: only a complete code system holds every code it defines, so no
+        // other can call one invalid (<https://hl7.org/fhir/R4B/codesystem-content-mode.html>).
+        if resolved.provider.declaration().content != ContentMode::Complete {
+            continue;
+        }
+        if resolved.provider.locate(code)?.is_none() {
+            let error = format!("The code '{code}' is not valid in the code system '{system}'");
+            if !errors.contains(&error) {
+                errors.push(error);
+            }
+        }
+    }
+    Ok(errors)
 }
 
 /// Whether a match translates the concept: a target an element names, with

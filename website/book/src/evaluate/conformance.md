@@ -38,7 +38,7 @@ hand; their lists live beside the general ones.
 ## Where the remaining cases stand
 
 The `general` mode counts 805 cases on every surface. With suite `9c2bbce`
-and validator 7.0.6, `/r4` passes 713, `/r4b` 699 and `/r5` 713. Every case
+and validator 7.0.6, `/r4` passes 716, `/r4b` 702 and `/r5` 716. Every case
 that does not pass falls into one of the rows below. None of them needs
 licensed content: the cases that do (SNOMED CT, LOINC, ICD-11, OMOP) sit in
 the suite's other modes, which run by hand and are not in these counts.
@@ -54,14 +54,12 @@ the suite's other modes, which run by hand and are not in these counts.
 | The cases turn on `versionsMatch`, an expansion parameter no publication defines. | [#507](https://github.com/FerroHEALTH/FerroTERM/issues/507) | 8 | 8 | 8 |
 | The cases expect R5's `$lookup` `definition` output, or send R5's `$translate` `targetcode`, on R4 and R4B, whose OperationDefinitions declare neither. | [#1330](https://github.com/FerroHEALTH/FerroTERM/issues/1330) | 3 | 3 | 0 |
 | The cases send an input the operation does not declare (`codingX` in a batch, `targetcode` on R4), and FerroTERM refuses an undeclared input. | [#349](https://github.com/FerroHEALTH/FerroTERM/issues/349) | 3 | 2 | 2 |
-| **Waiting on the FHIR model.** `$translate` checks each target code and answers `error`; the output enters through the `fhir-types` ecosystem overlay, which no release carries yet. | [#1308](https://github.com/FerroHEALTH/FerroTERM/issues/1308) | 3 | 3 | 3 |
-| **Total not passing** | | 92 | 106 | 92 |
+| **Total not passing** | | 89 | 103 | 89 |
 
 The rows marked as having no published definition are upstream reports:
 FerroTERM answers what the published OperationDefinitions and extensions
 define, and each report names the change upstream that would settle it.
-No case of the general mode is left as a gap in FerroTERM itself: the
-`$translate` cases wait on the FHIR model's next release, and every other
+No case of the general mode is left as a gap in FerroTERM itself: every
 row is a gate or an upstream report.
 
 ## What the numbers are not

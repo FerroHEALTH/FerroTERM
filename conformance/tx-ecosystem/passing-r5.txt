@@ -414,9 +414,12 @@ translate/translate-1
 translate/translate-1-codeableconcept
 translate/translate-1-coding
 translate/translate-2
+translate/translate-2b
 translate/translate-3
 translate/translate-4
+translate2/translate-5
 translate2/translate-5a
+translate2/translate-5b
 translate2/translate-6a
 translate2/translate-6b
 translate2/translate-reverse-r5plus
