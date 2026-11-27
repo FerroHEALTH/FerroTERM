@@ -46,6 +46,9 @@ pub struct MatchOrigin {
     /// `note`: the target's code system is not known, so its code was not
     /// checked.
     pub note: Option<String>,
+    /// `normalized-concept`: the target in its code system's normal form, when
+    /// the map states it otherwise.
+    pub normalized_concept: Option<CodingRef>,
 }
 
 /// The outcome of a translation: the R4B response and, per match, its origin.
@@ -231,10 +234,24 @@ fn check_targets(
         };
         // NOTE: only a complete code system holds every code it defines, so no
         // other can call one invalid (<https://hl7.org/fhir/R4B/codesystem-content-mode.html>).
+        let located = resolved.provider.locate(code)?;
+        // NOTE: a target not in its code system's normal form is also returned
+        // as `normalized-concept`, the concept as `concept` states it staying
+        // (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>, `$translate`).
+        if let Some(located) = &located
+            && located.code != *code
+        {
+            found.origin.normalized_concept = Some(CodingRef {
+                system: Some(system.clone()),
+                version: version.clone(),
+                code: Some(located.code.clone()),
+                display: None,
+            });
+        }
         if resolved.provider.declaration().content != ContentMode::Complete {
             continue;
         }
-        if resolved.provider.locate(code)?.is_none() {
+        if located.is_none() {
             let error = format!("The code '{code}' is not valid in the code system '{system}'");
             if !errors.contains(&error) {
                 errors.push(error);

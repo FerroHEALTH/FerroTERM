@@ -1192,7 +1192,7 @@ dependencies = [
  "async-trait",
  "backon",
  "ferrohealth-smart",
- "fhir-types",
+ "fhir-types 0.3.0",
  "http",
  "reqwest",
  "secrecy",
@@ -1423,7 +1423,7 @@ dependencies = [
  "designation-index",
  "dhd-thesaurus",
  "ferroterm-testkit",
- "fhir-types",
+ "fhir-types 0.4.0",
  "flate2",
  "gstandaard",
  "icd11",
@@ -1459,7 +1459,7 @@ dependencies = [
  "ferrohealth-smart",
  "ferrohealth-telemetry",
  "ferrohealth-ui",
- "fhir-types",
+ "fhir-types 0.4.0",
  "fluent-templates",
  "http",
  "jiff",
@@ -1512,7 +1512,7 @@ dependencies = [
  "ferroterm-testkit",
  "fhir-search",
  "fhir-terminology",
- "fhir-types",
+ "fhir-types 0.4.0",
  "http",
  "jiff",
  "jsonschema",
@@ -1620,7 +1620,7 @@ dependencies = [
  "designation-index",
  "dhd-thesaurus",
  "ferroterm-testkit",
- "fhir-types",
+ "fhir-types 0.4.0",
  "gstandaard",
  "http",
  "icd11",
@@ -1645,6 +1645,18 @@ name = "fhir-types"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6fb0d50e751cfb35de7aaf6f4a7652488faf6f2511b9c22c2f92831571060eb1"
+dependencies = [
+ "quick-xml",
+ "regex",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "fhir-types"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "780072312884125c474b96982eff506d3531af955091740f683d55afa5795676"
 dependencies = [
  "quick-xml",
  "regex",

@@ -312,6 +312,13 @@ macro_rules! family_input {
             /// the scope, and the direction. R4 keeps its names beside the pre-adopted
             /// R6 `sourceSystem` and `sourceVersion`.
             fn translate_inputs(request: &ConceptMapTranslateRequest, targeted: bool) -> TranslateInput {
+                // NOTE: "In R4, the `reverse` parameter does exist, and an R4 server SHALL
+                // support it, as well as the `targetcode` form" (tx-ecosystem IG,
+                // requirements, Reverse translation).
+                // Its `targetsystem` is then the system of that code, and `system` the
+                // one to translate into.
+                let targetcode = request.targetcode.is_some();
+                let targeted = targeted || targetcode;
                 let reverse = request
                     .reverse
                     .as_ref()
@@ -326,8 +333,11 @@ macro_rules! family_input {
                 TranslateInput {
                     code: text(&request.code)
                         .or_else(|| text(&request.source_code))
-                        .or_else(|| text(&request.target_code)),
-                    system: if targeted {
+                        .or_else(|| text(&request.target_code))
+                        .or_else(|| text(&request.targetcode)),
+                    system: if targetcode {
+                        uri(request.targetsystem.as_ref())
+                    } else if targeted {
                         uri(request.target_system.as_ref()).or_else(|| uri(request.system.as_ref()))
                     } else {
                         uri(request.system.as_ref()).or_else(|| uri(request.source_system.as_ref()))
@@ -351,7 +361,9 @@ macro_rules! family_input {
                         .map(concept_ref),
                     source: uri(request.source.as_ref()).or_else(|| uri(request.source_scope.as_ref())),
                     target: uri(request.target.as_ref()).or_else(|| uri(request.target_scope.as_ref())),
-                    target_system: if targeted {
+                    target_system: if targetcode {
+                        uri(request.system.as_ref())
+                    } else if targeted {
                         uri(request.source_system.as_ref())
                     } else {
                         uri(request.targetsystem.as_ref()).or_else(|| uri(request.target_system.as_ref()))
