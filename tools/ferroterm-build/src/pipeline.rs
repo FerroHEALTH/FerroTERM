@@ -228,18 +228,8 @@ fn io_error(path: &Path) -> impl FnOnce(io::Error) -> Error + '_ {
 }
 
 /// Builds the artifacts for the Snapshot under `rf2`, with every
-/// refset-only package under `refsets` layered onto it, into `out`.
-///
-/// # Errors
-///
-/// Returns [`Error`] when a release does not read, the edition cannot be
-/// identified, a layered package's module dependency is unmet, the hierarchy
-/// has a cycle, or an artifact cannot be written.
-pub fn build(rf2: &Path, refsets: &[PathBuf], out: &Path) -> Result<Report, Error> {
-    build_release(rf2, refsets, out, false)
-}
-
-/// [`build`], naming the edition as unpublished when `unpublished` is set.
+/// refset-only package under `refsets` layered onto it, into `out`, naming
+/// the edition as unpublished when `unpublished` is set.
 ///
 /// The URI Standard names a release that is not published under
 /// `http://snomed.info/xsct/`
@@ -247,8 +237,10 @@ pub fn build(rf2: &Path, refsets: &[PathBuf], out: &Path) -> Result<Report, Erro
 ///
 /// # Errors
 ///
-/// Returns the errors of [`build`].
-pub fn build_release(
+/// Returns [`Error`] when a release does not read, the edition cannot be
+/// identified, a layered package's module dependency is unmet, the hierarchy
+/// has a cycle, or an artifact cannot be written.
+pub fn build(
     rf2: &Path,
     refsets: &[PathBuf],
     out: &Path,

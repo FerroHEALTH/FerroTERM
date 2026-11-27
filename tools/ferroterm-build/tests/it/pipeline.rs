@@ -22,8 +22,8 @@ fn two_builds_of_the_same_release_are_byte_identical() {
     fixture::write_release(release.path());
     let first = tempfile::tempdir().expect("tempdir");
     let second = tempfile::tempdir().expect("tempdir");
-    let a = pipeline::build(release.path(), &[], first.path()).expect("first build");
-    let b = pipeline::build(release.path(), &[], second.path()).expect("second build");
+    let a = pipeline::build(release.path(), &[], first.path(), false).expect("first build");
+    let b = pipeline::build(release.path(), &[], second.path(), false).expect("second build");
     assert_eq!(
         (a.concepts, a.designations, a.is_a_edges),
         (b.concepts, b.designations, b.is_a_edges)
@@ -78,7 +78,7 @@ fn the_manifest_records_the_edition_and_the_counts() {
     let release = tempfile::tempdir().expect("tempdir");
     fixture::write_release(release.path());
     let out = tempfile::tempdir().expect("tempdir");
-    let report = pipeline::build(release.path(), &[], out.path()).expect("build");
+    let report = pipeline::build(release.path(), &[], out.path(), false).expect("build");
     let module = fixture::module();
     assert_eq!(
         report.edition_uri,
@@ -114,7 +114,7 @@ fn the_store_graph_and_text_crates_open_what_the_build_wrote() {
     let release = tempfile::tempdir().expect("tempdir");
     fixture::write_release(release.path());
     let out = tempfile::tempdir().expect("tempdir");
-    let report = pipeline::build(release.path(), &[], out.path()).expect("build");
+    let report = pipeline::build(release.path(), &[], out.path(), false).expect("build");
     let store = Store::open(&report.store).expect("store opens");
     assert_eq!(
         store.meta(tables::META_VERSION).expect("read"),
@@ -215,7 +215,7 @@ fn a_row_outside_the_inferred_view_defines_nothing() {
     let release = tempfile::tempdir().expect("tempdir");
     fixture::write_release(release.path());
     let out = tempfile::tempdir().expect("tempdir");
-    let report = pipeline::build(release.path(), &[], out.path()).expect("build");
+    let report = pipeline::build(release.path(), &[], out.path(), false).expect("build");
     assert_eq!(
         report.is_a_edges, 4,
         "the qualifying is-a row is not a hierarchy edge"
@@ -272,7 +272,7 @@ fn the_graph_and_text_files_open_beside_the_store() {
     let release = tempfile::tempdir().expect("tempdir");
     fixture::write_release(release.path());
     let out = tempfile::tempdir().expect("tempdir");
-    let report = pipeline::build(release.path(), &[], out.path()).expect("build");
+    let report = pipeline::build(release.path(), &[], out.path(), false).expect("build");
     let store = Store::open(&report.store).expect("store opens");
     let cat = store.ordinal(&concept(3)).expect("read").expect("cat");
     let animal = store.ordinal(&concept(2)).expect("read").expect("animal");
@@ -332,7 +332,7 @@ fn a_release_without_module_dependencies_is_refused() {
     fs::remove_file(dependency).expect("remove");
     let out = tempfile::tempdir().expect("tempdir");
     assert!(matches!(
-        pipeline::build(release.path(), &[], out.path()),
+        pipeline::build(release.path(), &[], out.path(), false),
         Err(pipeline::Error::MissingFile(_))
     ));
 }
@@ -342,7 +342,7 @@ fn the_reference_set_memberships_are_written_beside_the_store() {
     let release = tempfile::tempdir().expect("tempdir");
     fixture::write_release(release.path());
     let out = tempfile::tempdir().expect("tempdir");
-    let report = pipeline::build(release.path(), &[], out.path()).expect("builds");
+    let report = pipeline::build(release.path(), &[], out.path(), false).expect("builds");
     assert_eq!(
         report.refsets, 1,
         "the simple reference set; the language ones are acceptabilities"
@@ -376,7 +376,7 @@ fn the_attribute_graph_member_tables_and_identifiers_are_written_beside_the_stor
     let release = tempfile::tempdir().expect("tempdir");
     fixture::write_release(release.path());
     let out = tempfile::tempdir().expect("tempdir");
-    let report = pipeline::build(release.path(), &[], out.path()).expect("builds");
+    let report = pipeline::build(release.path(), &[], out.path(), false).expect("builds");
     assert_eq!(
         report.attributes, 2,
         "the cat's covering and leg count; the dog's inactive one is not"
@@ -481,8 +481,8 @@ fn every_concept_and_module_dependency_file_of_a_release_is_read() {
     );
     let out_whole = tempfile::tempdir().expect("tempdir");
     let out_split = tempfile::tempdir().expect("tempdir");
-    let a = pipeline::build(whole.path(), &[], out_whole.path()).expect("builds");
-    let b = pipeline::build(split.path(), &[], out_split.path()).expect("builds");
+    let a = pipeline::build(whole.path(), &[], out_whole.path(), false).expect("builds");
+    let b = pipeline::build(split.path(), &[], out_split.path(), false).expect("builds");
     assert_eq!(
         (a.concepts, a.designations, a.is_a_edges, &a.version_uri),
         (b.concepts, b.designations, b.is_a_edges, &b.version_uri)
@@ -497,7 +497,7 @@ fn an_unpublished_build_names_its_edition_under_xsct() {
     let release = tempfile::tempdir().expect("tempdir");
     fixture::write_release(release.path());
     let out = tempfile::tempdir().expect("tempdir");
-    let report = pipeline::build_release(release.path(), &[], out.path(), true).expect("builds");
+    let report = pipeline::build(release.path(), &[], out.path(), true).expect("builds");
     assert!(
         report.version_uri.starts_with("http://snomed.info/xsct/"),
         "{}",

@@ -317,12 +317,7 @@ fn run_snomed(cli: &Cli, out: &Path) -> Result<pipeline::Report, RunError> {
     for package in &cli.rf2_refset {
         refsets.push(unpack(package)?);
     }
-    Ok(pipeline::build_release(
-        &root,
-        &refsets,
-        out,
-        cli.rf2_unpublished,
-    )?)
+    Ok(pipeline::build(&root, &refsets, out, cli.rf2_unpublished)?)
 }
 
 /// The classification builds (`--claml`, `--atc`, `--icd10cm`), when the
