@@ -155,6 +155,7 @@ echo "conformance-badges: post-quantum.json $(jq -r .message "$out/post-quantum.
 # Every badge is its count alone, within the shared length limits; the
 # breakdown is the book's conformance page and conformance/tx-ecosystem/README.md.
 badge_length_check "$out"/*.json || exit 1
+badge_length_readme README.md || exit 1
 
 # The README shows exactly the badges this script writes.
 readme_badges=README.md
@@ -232,6 +233,13 @@ if [[ -n "$self_test" ]]; then
   fi
   rm "$out/long.json"
   badge_length_self_test > /dev/null || exit 1
+  badge_count_color_self_test > /dev/null || exit 1
+  printf '[![x](https://img.shields.io/badge/CRA-information%%20for%%20all%%20users-blue?logo=x)](x)\n' > "$out/long.md"
+  if badge_length_readme "$out/long.md" 2>/dev/null; then
+    echo "conformance-badges: self-test: a static badge past 20 characters passes" >&2
+    exit 1
+  fi
+  rm "$out/long.md"
   for claim in "FHIR R4 certified" "EHDS compliant" "Conformant terminology"; do
     if (badge probe.json "$claim" 1 1 "" eu) 2>/dev/null; then
       echo "conformance-badges: self-test: '$claim' was written" >&2
