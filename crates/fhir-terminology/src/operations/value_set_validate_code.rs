@@ -534,6 +534,7 @@ fn check(context: &Context<'_>, subject: &Subject<'_>) -> Result<Validation, Ope
     if !target.resolvable {
         return Ok(with_target(
             failed_target(&system, version, target),
+            subject.code,
             &located,
             display,
         ));

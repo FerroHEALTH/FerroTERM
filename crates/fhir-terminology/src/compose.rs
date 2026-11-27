@@ -707,7 +707,9 @@ impl<'a> Expander<'a> {
             if let Some(display) = &concept.display {
                 overrides.insert(located.concept.index(), display.clone());
             }
-            if located.code != concept.code {
+            // NOTE: an expression in normal form locates under the spelling it was
+            // sent in, which still differs from the code its handle reads back.
+            if located.code != concept.code || provider.is_postcoordinated(located.concept) {
                 spellings.insert(located.concept.index(), concept.code.clone());
             }
         }

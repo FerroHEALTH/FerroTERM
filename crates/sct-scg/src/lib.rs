@@ -41,6 +41,35 @@ pub fn parse(input: &str) -> Result<Expression, ParseError> {
     front::parse::<lexer::Kind, _>(input, "a valid expression", parser::whole)
 }
 
+/// The characters of an expression that carry its meaning: the text with
+/// its whitespace, its terms and a leading `===` removed.
+///
+/// The grammar ignores whitespace outside a term or a quoted value, a term is
+/// optional after every concept identifier, and `===` is the status assumed
+/// when none is written (§5), so two texts with one significant form say the
+/// same thing in the same order.
+///
+/// # Errors
+///
+/// Returns [`front::LexError`] at the first character no token starts with.
+///
+/// # Examples
+///
+/// ```
+/// let bare = sct_scg::significant("=== 39607008 |Lung| : 272741003 = 24028007")?;
+/// assert_eq!(bare, "39607008:272741003=24028007");
+/// # Ok::<(), sct_scg::front::LexError>(())
+/// ```
+pub fn significant(input: &str) -> Result<String, front::LexError> {
+    let tokens = front::lex::<lexer::Kind>(input)?;
+    let mut tokens = tokens.iter().peekable();
+    tokens.next_if(|token| token.kind == lexer::Kind::EquivalentTo);
+    Ok(tokens
+        .filter(|token| token.kind != lexer::Kind::Term)
+        .map(|token| token.text)
+        .collect())
+}
+
 impl std::str::FromStr for Expression {
     type Err = ParseError;
 

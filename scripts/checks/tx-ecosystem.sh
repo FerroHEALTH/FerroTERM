@@ -118,6 +118,12 @@ if [[ -z "$server" ]]; then
   if [[ -n "$index" ]]; then
     export FERROTERM__TERMINOLOGY__INDEX="$index"
   fi
+  # The snomed mode's expected displays are US English preferred terms, a
+  # deployment's choice of language reference set (the book's conformance page
+  # names it beside the count), so the run configures that dialect.
+  if [[ "$mode" == snomed ]]; then
+    export FERROTERM__TERMINOLOGY__DEFAULT_LANGUAGE=en-US
+  fi
   # `$closure` keeps its tables in the resource database, so the run gives the
   # server a fresh one of its own and removes it at exit. The write routes it
   # opens need [auth] or its explicit absence; the run is local to this host.
