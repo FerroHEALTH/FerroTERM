@@ -119,9 +119,16 @@ query string has to percent-encode every one of them.
 - `$validate-code` checks the syntax and that the version defines every concept
   the expression names. A syntax error answers `false` with the byte the parser
   stopped at; an unknown concept answers `false` naming it.
-- `$lookup` answers the expression in one canonical order as `code`, and a
-  `display` that is the expression with the edition's terms written in, since
-  SNOMED International publishes no terms for expressions. `normalForm` and
+- `$validate-code` answers `code` as you sent it. When your spelling differs
+  from the normal form by more than whitespace, terms, or a leading `===`, it
+  also answers the normal form as `normalized-code`, with an information
+  issue. The normal form is written with no whitespace, and `===` is left out
+  because the grammar assumes it: `39607008:272741003=24028007`.
+- `$validate-code` and `$lookup` answer a `display` that is the normal form
+  with terms written in, since SNOMED International publishes no terms for
+  expressions. A term you wrote is kept when it is an active description of
+  its concept. A missing term, or one that does not describe the concept, is
+  replaced by the edition's term in the requested language. `normalForm` and
   `normalFormTerse` answer the expression's necessary normal form, and the
   expression's own refinement comes back as the concept-model properties keyed
   by attribute concept id. An expression over an inactive concept validates
@@ -130,10 +137,13 @@ query string has to percent-encode every one of them.
 - `$closure` relates an expression to the concepts a table already holds.
 
 The `expressions` filter decides whether a *filtered* include admits one:
-`{"property": "expressions", "op": "=", "value": "true"}`. A filtered include
-that states `false`, or states no `expressions` filter at all, refuses an
-expression; one that states `true` admits an expression whose focus concepts it
-contains. An include that *enumerates* an expression in
+`{"property": "expressions", "op": "=", "value": "false"}` refuses every
+expression, and an include that states `true`, or states no `expressions`
+filter at all, admits one, as the terminology ecosystem IG requires. An
+admitted expression is tested against a `constraint` filter as ECL defines it
+over post-coordinated expressions: it sits below its focus concepts, with its
+own attributes beside theirs. So `39607008:272741003=24028007` is in
+`< 39607008`. Any other filter admits it when its focus concepts pass. An include that *enumerates* an expression in
 `compose.include.concept` contains it whichever way either side spells it, and
 carries no filter at all, since `vsd-3` forbids one beside enumerated concepts.
 An expansion lists only the expressions a value set enumerates, and

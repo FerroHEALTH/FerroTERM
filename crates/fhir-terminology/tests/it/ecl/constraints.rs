@@ -134,6 +134,18 @@ fn member_of_reads_the_tables_and_selects_fields() {
         refused(&p, &format!("^ {}", c(FUR))),
         EvalError::NotAReferenceSet(_)
     ));
+    assert_eq!(
+        set(&p, &format!("^ ( {} OR {} )", c(PETS), c(FUR))),
+        set(&p, &format!("^ {}", c(PETS))),
+        "in a set of reference sets, a concept with no concept members adds none"
+    );
+    assert_eq!(
+        set(
+            &p,
+            &format!("^ ( {} OR {} OR {} )", c(PETS), same_as(), c(FUR))
+        ),
+        [CAT, DOG, FISH]
+    );
     assert!(matches!(
         refused(&p, &format!("^ [nope] {}", same_as())),
         EvalError::UnknownField { field, .. } if field == "nope"
@@ -400,6 +412,12 @@ fn attribute_groups_hold_within_one_role_group() {
         [CAT],
         "attribute cardinality inside a group counts that group's rows"
     );
+    assert_eq!(
+        set(&p, &format!("< {animals} : {{ [1..1] * = * }}")),
+        [DOG],
+        "a group with one row is found though the concept has two rows in all"
+    );
+    assert_eq!(set(&p, &format!("< {animals} : [1..1] * = *")).len(), 0);
 }
 
 #[test]

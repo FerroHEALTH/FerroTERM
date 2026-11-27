@@ -15,6 +15,14 @@ use concept_store::record;
 use rf2::constants;
 use rf2::id::ConceptId;
 
+/// Whether a stored `definitionStatusId` names the defined status.
+pub(super) fn states_defined(status: &[record::PropertyValueRef<'_>]) -> bool {
+    status.iter().any(|value| {
+        matches!(value, record::PropertyValueRef::Code(code)
+            if code.parse::<u64>() == Ok(constants::DEFINED.value()))
+    })
+}
+
 impl SnomedProvider {
     /// The inactive concepts, scanned once from the store and kept.
     pub(super) fn inactive_set(&self) -> Result<ConceptSet, ProviderError> {
@@ -66,8 +74,17 @@ impl SnomedProvider {
         Ok(set)
     }
 
-    /// Whether the expression `record` passes `filter`: through its focus
-    /// concepts, which subsume it.
+    /// Whether the expression `record` passes `filter`: an expression
+    /// constraint is tested against the expression itself, since it defines
+    /// "a bounded set of clinical meanings represented by either precoordinated
+    /// or postcoordinated expressions" (ECL 1 Introduction); any other filter
+    /// through its focus concepts, which subsume it.
+    ///
+    /// "The meaning of the expression is a subtype of all the focus concepts"
+    /// (Compositional Grammar §5, Informative Comments), so `is-a` and
+    /// `descendent-of` on the concept, which hold every subtype of a member,
+    /// admit it when one focus concept is a member. Every other filter needs
+    /// all of them.
     pub(super) fn expression_passes(
         &self,
         record: &super::expression::Registered,
@@ -76,11 +93,24 @@ impl SnomedProvider {
         if filter.op == FilterOperator::Equal && filter.property == EXPRESSIONS {
             return Ok(filter.value.trim() == "true");
         }
+        if filter.op == FilterOperator::Equal && filter.property == "constraint" {
+            let parsed = self.parsed_constraint(&filter.value)?;
+            let candidate = self.candidate(record)?;
+            return sct_ecl::eval::expression::holds(self, &parsed, &candidate)
+                .map_err(|error| super::ecl::refusal(error, &filter.value));
+        }
         let selected = self.filter(filter)?;
-        Ok(record
-            .focus_concepts()
-            .iter()
-            .all(|focus| selected.contains(*focus)))
+        let mut focus = record.focus_concepts().iter();
+        let subtype_closed = matches!(filter.property.as_str(), "concept" | "code")
+            && matches!(
+                filter.op,
+                FilterOperator::IsA | FilterOperator::DescendentOf
+            );
+        Ok(if subtype_closed {
+            focus.any(|concept| selected.contains(*concept))
+        } else {
+            focus.all(|concept| selected.contains(*concept))
+        })
     }
 
     /// Whether the concept is sufficiently defined by its conditions.
@@ -89,15 +119,12 @@ impl SnomedProvider {
     /// `sufficientlyDefined` property is derived from
     /// (<https://hl7.org/fhir/R4B/snomedct.html>, "SNOMED CT Properties").
     pub(super) fn is_defined(&self, ordinal: Ordinal) -> Result<bool, ProviderError> {
-        let stored = self.stored().store.properties(ordinal).map_err(storage)?;
-        Ok(stored
-            .iter()
-            .filter(|(key, _)| *key == self.system().keys.definition_status)
-            .any(|(_, values)| {
-                values.iter().any(|value| {
-                    matches!(value, record::PropertyValue::Code(code) if *code == constants::DEFINED.to_string())
-                })
-            }))
+        let status = self
+            .stored()
+            .store
+            .property(ordinal, self.system().keys.definition_status)
+            .map_err(storage)?;
+        Ok(states_defined(&status))
     }
 
     /// The Necessary Normal Form of `concept`, with terms when `terms` asks.

@@ -43,9 +43,9 @@ fn ecl_arrives_as_the_constraint_filter_and_the_ecl_implicit_value_set() {
     assert!(
         matches!(
             p.filter(&filter("<< 999999999")),
-            Err(ProviderError::InvalidCode { code, .. }) if code == "999999999"
+            Err(ProviderError::UnusableConcept(unusable)) if unusable.code == "999999999"
         ),
-        "an unknown identifier in valid ECL is an invalid code"
+        "an unknown identifier in valid ECL is an unusable concept, not a syntax error"
     );
     assert!(matches!(
         p.filter(&filter("* {{ D moduleId = 900000000000207008 }}")),
@@ -240,7 +240,7 @@ fn a_post_coordinated_expression_is_refused_for_the_grammar_not_as_an_unknown_co
     let outcome = lookup::lookup(&registry, &Invocation::Type, &input).expect("looks up");
     assert_eq!(
         outcome.code,
-        format!("=== {} : {} = {}", code(CAT), code(COVERING), code(FUR)),
+        format!("{}:{}={}", code(CAT), code(COVERING), code(FUR)),
         "the answer is the expression in one canonical order"
     );
 

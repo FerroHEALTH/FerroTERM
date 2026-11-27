@@ -4,7 +4,7 @@
 //! The LOINC build over the testkit's release-shaped fixture.
 
 use concept_graph::persist::Hierarchy;
-use concept_store::record::PropertyValue;
+use concept_store::record::PropertyValueRef;
 use concept_store::store::{Store, Vocabulary};
 use designation_index::index::Query;
 use designation_index::persist::read_from;
@@ -64,28 +64,24 @@ fn the_loinc_release_builds_an_artifact_the_store_graph_and_text_open() {
             .find(|(k, _)| *k == keys(name))
             .map(|(_, v)| v.clone())
     };
-    assert_eq!(
-        of("CLASS"),
-        Some(vec![PropertyValue::String(String::from("CHEM"))])
-    );
+    assert_eq!(of("CLASS"), Some(vec![PropertyValueRef::String("CHEM")]));
     assert_eq!(
         of(COPYRIGHT_KEY),
-        Some(vec![PropertyValue::Code(String::from("LOINC"))])
+        Some(vec![PropertyValueRef::Code("LOINC")])
     );
-    assert_eq!(
-        of(KIND_KEY),
-        Some(vec![PropertyValue::Code(String::from("term"))])
-    );
+    assert_eq!(of(KIND_KEY), Some(vec![PropertyValueRef::Code("term")]));
     let sodium = store.ordinal(&code(SODIUM)).expect("read").expect("sodium");
     let sodium_props = store.properties(sodium).expect("read");
-    assert!(sodium_props.iter().any(|(k, v)| *k == keys(COPYRIGHT_KEY)
-        && *v == vec![PropertyValue::Code(String::from("3rdParty"))]));
+    assert!(
+        sodium_props
+            .iter()
+            .any(|(k, v)| *k == keys(COPYRIGHT_KEY)
+                && *v == vec![PropertyValueRef::Code("3rdParty")])
+    );
     let survey = store.ordinal(&code(SURVEY)).expect("read").expect("survey");
     let survey_props = store.properties(survey).expect("read");
-    assert!(
-        survey_props.iter().any(|(k, v)| *k == keys(ANSWER_LIST_KEY)
-            && *v == vec![PropertyValue::Code(code(ANSWER_LIST))])
-    );
+    assert!(survey_props.iter().any(|(k, v)| *k == keys(ANSWER_LIST_KEY)
+        && *v == vec![PropertyValueRef::Code(&code(ANSWER_LIST))]));
     assert!(
         store.ordinal(&code(YES)).expect("read").is_some(),
         "answers are codes too"

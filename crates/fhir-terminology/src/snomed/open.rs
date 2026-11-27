@@ -48,6 +48,11 @@ impl SnomedProvider {
         let (attributes, member_tables, identifiers) = Self::read_ecl_files(dir, &manifest)?;
         let keys = Self::resolve_keys(&artifact.store)?;
         let base_language = Self::base_language(default_language, &manifest.languages);
+        let default_tag = if primary_subtag(default_language) == base_language {
+            default_language.to_owned()
+        } else {
+            base_language.clone()
+        };
         // NOTE: no FHIR/SNOMED spec governs this: our own design, and the
         // release date is the edition identifier the build records.
         let source = Source::new(
@@ -131,6 +136,7 @@ impl SnomedProvider {
                 keys,
                 edition: manifest.edition,
                 base_language,
+                default_tag,
             },
         ))
     }
@@ -178,6 +184,9 @@ impl SnomedProvider {
             refsets.push((ordinal, name));
             ordinal = ordinal.saturating_add(1);
         }
+        // NOTE: no specification orders language reference sets: our own
+        // design, ascending SCTID, so a language with several decides one way.
+        refsets.sort_by(|(_, a), (_, b)| (a.len(), a).cmp(&(b.len(), b)));
         Ok(Keys {
             definition_status,
             module,

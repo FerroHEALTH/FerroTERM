@@ -6,7 +6,7 @@
 use concept_graph::ordinal::Ordinal;
 use concept_graph::relations::Relations;
 use concept_store::keys::KeyTable;
-use concept_store::record::PropertyValue;
+use concept_store::record::PropertyValueRef;
 use concept_store::store::{Store, Vocabulary};
 use ferroterm_build::rxnorm::{self, RXNORM, SAB_KEY, STY_KEY, SYSTEM, TTY_KEY};
 use ferroterm_testkit::rxnorm::{
@@ -68,27 +68,27 @@ fn the_release_builds_codes_designations_properties_relations_and_atoms() {
     assert_eq!(
         of(TTY_KEY),
         Some(vec![
-            PropertyValue::Code(String::from("PSN")),
-            PropertyValue::Code(String::from("SCD"))
+            PropertyValueRef::Code("PSN"),
+            PropertyValueRef::Code("SCD")
         ])
     );
     assert_eq!(
         of(SAB_KEY),
         Some(vec![
-            PropertyValue::Code(String::from("MTHSPL")),
-            PropertyValue::Code(String::from(RXNORM))
+            PropertyValueRef::Code("MTHSPL"),
+            PropertyValueRef::Code(RXNORM)
         ])
     );
     assert_eq!(
         of("NDC"),
         Some(vec![
-            PropertyValue::String(String::from("00000000101")),
-            PropertyValue::String(String::from("00000000102"))
+            PropertyValueRef::String("00000000101"),
+            PropertyValueRef::String("00000000102")
         ])
     );
     assert_eq!(
         of("RXN_AVAILABLE_STRENGTH"),
-        Some(vec![PropertyValue::String(String::from("81 MG"))])
+        Some(vec![PropertyValueRef::String("81 MG")])
     );
     assert!(
         store
@@ -104,7 +104,7 @@ fn the_release_builds_codes_designations_properties_relations_and_atoms() {
             .expect("read")
             .iter()
             .any(|(k, v)| *k == keys(STY_KEY)
-                && v.contains(&PropertyValue::String(String::from("Organic Chemical"))))
+                && v.contains(&PropertyValueRef::String("Organic Chemical")))
     );
     let old = store.ordinal(OLD_TABLET).expect("read").expect("old");
     assert!(!store.concept(old).expect("read").expect("record").active);

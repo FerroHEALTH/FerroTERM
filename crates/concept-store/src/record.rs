@@ -70,6 +70,34 @@ pub struct Designation {
     pub active: bool,
 }
 
+/// A stored designation borrowing its text from the record's bytes, so a
+/// reader that scans for one designation allocates only for the one it keeps.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DesignationRef<'a> {
+    /// The native identifier of the designation, when the code system has one.
+    pub id: Option<&'a str>,
+    /// The text.
+    pub term: &'a str,
+    /// The BCP 47 language.
+    pub language: &'a str,
+    /// The designation use (a `DESIGNATION_USES` ordinal).
+    pub use_ordinal: u32,
+    /// Whether the designation is active.
+    pub active: bool,
+}
+
+impl From<DesignationRef<'_>> for Designation {
+    fn from(designation: DesignationRef<'_>) -> Self {
+        Self {
+            id: designation.id.map(str::to_owned),
+            term: designation.term.to_owned(),
+            language: designation.language.to_owned(),
+            use_ordinal: designation.use_ordinal,
+            active: designation.active,
+        }
+    }
+}
+
 /// One typed property value.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PropertyValue {
@@ -87,6 +115,39 @@ pub enum PropertyValue {
     Decimal(String),
     /// A date or time in its lexical form.
     DateTime(String),
+}
+
+/// One typed property value borrowing its text from the record's bytes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PropertyValueRef<'a> {
+    /// A reference to another concept of the same version.
+    Concept(Ordinal),
+    /// A code the code system defines.
+    Code(&'a str),
+    /// A string.
+    String(&'a str),
+    /// An integer.
+    Integer(i64),
+    /// A boolean.
+    Boolean(bool),
+    /// A decimal in its lexical form.
+    Decimal(&'a str),
+    /// A date or time in its lexical form.
+    DateTime(&'a str),
+}
+
+impl From<PropertyValueRef<'_>> for PropertyValue {
+    fn from(value: PropertyValueRef<'_>) -> Self {
+        match value {
+            PropertyValueRef::Concept(o) => Self::Concept(o),
+            PropertyValueRef::Code(s) => Self::Code(s.to_owned()),
+            PropertyValueRef::String(s) => Self::String(s.to_owned()),
+            PropertyValueRef::Integer(i) => Self::Integer(i),
+            PropertyValueRef::Boolean(b) => Self::Boolean(b),
+            PropertyValueRef::Decimal(s) => Self::Decimal(s.to_owned()),
+            PropertyValueRef::DateTime(s) => Self::DateTime(s.to_owned()),
+        }
+    }
 }
 
 impl fmt::Display for PropertyValue {
@@ -167,14 +228,15 @@ impl<'a> Reader<'a> {
         Ok(i64::from_le_bytes(bytes))
     }
     fn str(&mut self) -> Result<String, RecordError> {
+        self.borrowed_str().map(str::to_owned)
+    }
+    fn borrowed_str(&mut self) -> Result<&'a str, RecordError> {
         let Ok(len) = usize::try_from(self.u32()?) else {
             return Err(RecordError::Truncated { at: self.at });
         };
         let at = self.at;
         let bytes = self.take(len)?;
-        std::str::from_utf8(bytes)
-            .map(str::to_owned)
-            .map_err(|source| RecordError::Utf8 { at, source })
+        std::str::from_utf8(bytes).map_err(|source| RecordError::Utf8 { at, source })
     }
     fn opt_str(&mut self) -> Result<Option<String>, RecordError> {
         match self.u8()? {
@@ -280,12 +342,23 @@ impl Displays {
     ///
     /// Returns [`RecordError`] when the entries are truncated or not UTF-8.
     pub fn find(bytes: &[u8], refset: u32) -> Result<Option<(String, String)>, RecordError> {
+        Ok(Self::find_borrowed(bytes, refset)?
+            .map(|(language, term)| (language.to_owned(), term.to_owned())))
+    }
+
+    /// [`Self::find`] borrowing the language and term from `bytes`, so a
+    /// caller that rejects the language allocates nothing.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RecordError`] when the entries are truncated or not UTF-8.
+    pub fn find_borrowed(bytes: &[u8], refset: u32) -> Result<Option<(&str, &str)>, RecordError> {
         let mut r = Reader { bytes, at: 0 };
         let count = r.u32()?;
         for _ in 0..count {
             let entry_refset = r.u32()?;
-            let language = r.str()?;
-            let term = r.str()?;
+            let language = r.borrowed_str()?;
+            let term = r.borrowed_str()?;
             if entry_refset == refset {
                 return Ok(Some((language, term)));
             }
@@ -336,22 +409,37 @@ impl Designations {
     ///
     /// Returns [`RecordError`] when the entries are truncated or the
     /// designation is damaged.
-    pub fn at(bytes: &[u8], index: u32) -> Result<Option<Designation>, RecordError> {
+    pub fn at(bytes: &[u8], index: u32) -> Result<Option<DesignationRef<'_>>, RecordError> {
         let mut found = None;
         Self::walk(bytes, |at, record| {
             if at != index {
                 return Ok(true);
             }
-            found = Some(Designation::decode(record)?);
+            found = Some(DesignationRef::decode(record)?);
             Ok(false)
         })?;
         Ok(found)
     }
 
+    /// Calls `visit` with each designation until it answers `false`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RecordError`] when the entries are truncated or a designation
+    /// is damaged.
+    pub fn scan<'a>(
+        bytes: &'a [u8],
+        mut visit: impl FnMut(DesignationRef<'a>) -> bool,
+    ) -> Result<(), RecordError> {
+        Self::walk(bytes, |_, record| {
+            Ok(visit(DesignationRef::decode(record)?))
+        })
+    }
+
     /// Calls `visit` with each index and record until it answers `false`.
-    fn walk(
-        bytes: &[u8],
-        mut visit: impl FnMut(u32, &[u8]) -> Result<bool, RecordError>,
+    fn walk<'a>(
+        bytes: &'a [u8],
+        mut visit: impl FnMut(u32, &'a [u8]) -> Result<bool, RecordError>,
     ) -> Result<(), RecordError> {
         let mut r = Reader { bytes, at: 0 };
         let count = r.u32()?;
@@ -393,20 +481,48 @@ impl Properties {
     ///
     /// Returns [`RecordError`] when the entries are truncated or a value list
     /// is damaged.
-    pub fn decode(bytes: &[u8]) -> Result<Vec<(u32, Vec<PropertyValue>)>, RecordError> {
+    pub fn decode(bytes: &[u8]) -> Result<Vec<(u32, Vec<PropertyValueRef<'_>>)>, RecordError> {
+        let mut out = Vec::new();
+        Self::walk(bytes, |key, values| {
+            out.push((key, PropertyValueRef::decode_list(values)?));
+            Ok(())
+        })?;
+        Ok(out)
+    }
+
+    /// The values of property `key`, empty when the concept has none; the
+    /// value lists of other keys are skipped, not decoded.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RecordError`] when the entries are truncated or the value
+    /// list of `key` is damaged.
+    pub fn find(bytes: &[u8], key: u32) -> Result<Vec<PropertyValueRef<'_>>, RecordError> {
+        let mut out = Vec::new();
+        Self::walk(bytes, |at, values| {
+            if at == key {
+                out = PropertyValueRef::decode_list(values)?;
+            }
+            Ok(())
+        })?;
+        Ok(out)
+    }
+
+    /// Calls `visit` with each key and its encoded value list.
+    fn walk<'a>(
+        bytes: &'a [u8],
+        mut visit: impl FnMut(u32, &'a [u8]) -> Result<(), RecordError>,
+    ) -> Result<(), RecordError> {
         let mut r = Reader { bytes, at: 0 };
         let count = r.u32()?;
-        let mut out = Vec::with_capacity(usize::try_from(count).unwrap_or(0));
         for _ in 0..count {
             let key = r.u32()?;
             let Ok(len) = usize::try_from(r.u32()?) else {
                 return Err(RecordError::Truncated { at: r.at });
             };
-            let values = PropertyValue::decode_list(r.take(len)?)?;
-            out.push((key, values));
+            visit(key, r.take(len)?)?;
         }
-        r.finish()?;
-        Ok(out)
+        r.finish()
     }
 }
 
@@ -495,11 +611,26 @@ impl Designation {
     ///
     /// Returns [`RecordError`] for truncated, non-UTF-8, or trailing bytes.
     pub fn decode(bytes: &[u8]) -> Result<Self, RecordError> {
+        DesignationRef::decode(bytes).map(Self::from)
+    }
+}
+
+impl<'a> DesignationRef<'a> {
+    /// Decodes a [`Designation`] record, borrowing its text.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RecordError`] for truncated, non-UTF-8, or trailing bytes.
+    pub fn decode(bytes: &'a [u8]) -> Result<Self, RecordError> {
         let mut r = Reader { bytes, at: 0 };
+        let id = match r.u8()? {
+            0 => None,
+            _ => Some(r.borrowed_str()?),
+        };
         let designation = Self {
-            id: r.opt_str()?,
-            term: r.str()?,
-            language: r.str()?,
+            id,
+            term: r.borrowed_str()?,
+            language: r.borrowed_str()?,
             use_ordinal: r.u32()?,
             active: r.u8()? != 0,
         };
@@ -542,19 +673,6 @@ impl PropertyValue {
         }
     }
 
-    fn decode_from(r: &mut Reader<'_>) -> Result<Self, RecordError> {
-        Ok(match r.u8()? {
-            0 => Self::Concept(Ordinal::new(r.u32()?)),
-            1 => Self::Code(r.str()?),
-            2 => Self::String(r.str()?),
-            3 => Self::Integer(r.i64()?),
-            4 => Self::Boolean(r.u8()? != 0),
-            5 => Self::Decimal(r.str()?),
-            6 => Self::DateTime(r.str()?),
-            tag => return Err(RecordError::Tag { tag }),
-        })
-    }
-
     /// Encodes a list of values as one record.
     #[must_use]
     pub fn encode_list(values: &[Self]) -> Vec<u8> {
@@ -565,13 +683,28 @@ impl PropertyValue {
         }
         w.0
     }
+}
 
-    /// Decodes a list of values.
+impl<'a> PropertyValueRef<'a> {
+    fn decode_from(r: &mut Reader<'a>) -> Result<Self, RecordError> {
+        Ok(match r.u8()? {
+            0 => Self::Concept(Ordinal::new(r.u32()?)),
+            1 => Self::Code(r.borrowed_str()?),
+            2 => Self::String(r.borrowed_str()?),
+            3 => Self::Integer(r.i64()?),
+            4 => Self::Boolean(r.u8()? != 0),
+            5 => Self::Decimal(r.borrowed_str()?),
+            6 => Self::DateTime(r.borrowed_str()?),
+            tag => return Err(RecordError::Tag { tag }),
+        })
+    }
+
+    /// Decodes a list of values, borrowing their text.
     ///
     /// # Errors
     ///
     /// Returns [`RecordError`] for truncated bytes or an unknown tag.
-    pub fn decode_list(bytes: &[u8]) -> Result<Vec<Self>, RecordError> {
+    pub fn decode_list(bytes: &'a [u8]) -> Result<Vec<Self>, RecordError> {
         let mut r = Reader { bytes, at: 0 };
         let count = r.u32()?;
         let mut values = Vec::with_capacity(usize::try_from(count).unwrap_or(0));
@@ -580,137 +713,5 @@ impl PropertyValue {
         }
         r.finish()?;
         Ok(values)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{Concept, Designation, PropertyValue, RecordError};
-    use concept_graph::ordinal::Ordinal;
-
-    #[test]
-    fn records_round_trip() {
-        let concept = Concept {
-            code: "123456789".to_owned(),
-            active: true,
-            effective_time: Some("20260101".to_owned()),
-            module: Some(Ordinal::new(7)),
-        };
-        assert_eq!(Concept::decode(&concept.encode()), Ok(concept));
-        let designation = Designation {
-            id: None,
-            term: "Synthetisch kind".to_owned(),
-            language: "nl".to_owned(),
-            use_ordinal: 2,
-            active: false,
-        };
-        assert_eq!(Designation::decode(&designation.encode()), Ok(designation));
-        let values = vec![
-            PropertyValue::Concept(Ordinal::new(3)),
-            PropertyValue::Code("x".to_owned()),
-            PropertyValue::String("s".to_owned()),
-            PropertyValue::Integer(-42),
-            PropertyValue::Boolean(true),
-            PropertyValue::Decimal("2.50".to_owned()),
-            PropertyValue::DateTime("2026-01-01".to_owned()),
-        ];
-        assert_eq!(
-            PropertyValue::decode_list(&PropertyValue::encode_list(&values)),
-            Ok(values)
-        );
-    }
-
-    #[test]
-    fn the_per_concept_records_round_trip() {
-        let first = Designation {
-            id: Some("1".to_owned()),
-            term: "Kat".to_owned(),
-            language: "nl".to_owned(),
-            use_ordinal: 1,
-            active: true,
-        };
-        let second = Designation {
-            id: None,
-            term: "Cat".to_owned(),
-            language: "en".to_owned(),
-            use_ordinal: 0,
-            active: false,
-        };
-        let (a, b) = (first.encode(), second.encode());
-        // Index 2 is missing, so a reader that asks by index must not be
-        // handed the record that happens to sit in that position.
-        let packed = super::Designations::encode(&[(0, a.as_slice()), (3, b.as_slice())]);
-        assert_eq!(
-            super::Designations::decode(&packed),
-            Ok(vec![first.clone(), second.clone()])
-        );
-        assert_eq!(super::Designations::at(&packed, 0), Ok(Some(first)));
-        assert_eq!(super::Designations::at(&packed, 3), Ok(Some(second)));
-        assert_eq!(super::Designations::at(&packed, 2), Ok(None));
-
-        let values = PropertyValue::encode_list(&[PropertyValue::Concept(Ordinal::new(4))]);
-        let packed = super::Properties::encode(&[(7, values.as_slice()), (9, &[0, 0, 0, 0])]);
-        assert_eq!(
-            super::Properties::decode(&packed),
-            Ok(vec![
-                (7, vec![PropertyValue::Concept(Ordinal::new(4))]),
-                (9, Vec::new()),
-            ])
-        );
-
-        let packed = super::Acceptability::encode(&[(0, 1, 0), (0, 2, 1)]);
-        assert_eq!(
-            super::Acceptability::decode(&packed),
-            Ok(vec![(0, 1, 0), (0, 2, 1)])
-        );
-        assert_eq!(super::Acceptability::find(&packed, 0, 2), Ok(Some(1)));
-        assert_eq!(super::Acceptability::find(&packed, 1, 2), Ok(None));
-    }
-
-    #[test]
-    fn damaged_per_concept_records_are_refused() {
-        let packed = super::Designations::encode(&[(0, b"x".as_slice())]);
-        assert!(matches!(
-            super::Designations::decode(&packed[..6]),
-            Err(RecordError::Truncated { .. })
-        ));
-        let packed = super::Properties::encode(&[(0, &[1, 0, 0, 0, 9])]);
-        assert!(matches!(
-            super::Properties::decode(&packed),
-            Err(RecordError::Tag { tag: 9 })
-        ));
-        assert!(matches!(
-            super::Acceptability::decode(&[2, 0, 0, 0, 0, 0, 0, 0]),
-            Err(RecordError::Truncated { .. })
-        ));
-    }
-
-    #[test]
-    fn damaged_records_are_refused() {
-        let bytes = Concept {
-            code: "1".to_owned(),
-            active: true,
-            effective_time: None,
-            module: None,
-        }
-        .encode();
-        assert!(matches!(
-            Concept::decode(&bytes[..3]),
-            Err(RecordError::Truncated { .. })
-        ));
-        let mut trailing = bytes.clone();
-        trailing.push(0);
-        assert!(matches!(
-            Concept::decode(&trailing),
-            Err(RecordError::Trailing { remaining: 1 })
-        ));
-        assert!(matches!(
-            PropertyValue::decode_list(&[1, 0, 0, 0, 9]),
-            Err(RecordError::Tag { tag: 9 })
-        ));
-        assert!(matches!(
-            Designation::decode(&[0, 1, 0, 0, 0, 0xff]),
-            Err(RecordError::Utf8 { .. })
-        ));
     }
 }

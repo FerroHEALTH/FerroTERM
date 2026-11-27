@@ -67,6 +67,19 @@ impl OperationError {
                     text: invalid.value.clone(),
                     position: invalid.position,
                 }),
+            (
+                crate::compose::ComposeError::Provider {
+                    source: ProviderError::UnusableConcept(unusable),
+                    ..
+                },
+                Some(compose),
+            ) => compose
+                .filter_at(&unusable.property, &unusable.value)
+                .map(|at| Refused {
+                    input: RefusedInput::Filter(at),
+                    text: unusable.value.clone(),
+                    position: None,
+                }),
             _ => None,
         };
         let converted = Self::from(error);
@@ -224,6 +237,10 @@ impl From<ProviderError> for OperationError {
             | ProviderError::MalformedImplicitValueSet { .. } => {
                 Self::value_set_invalid(error.to_string())
             }
+            // NOTE: tx-issue-type has `invalid-code` for "a provided code" and
+            // `vs-invalid` for "a problem processing a value set"; a concept a
+            // constraint names is part of the value set's definition.
+            ProviderError::UnusableConcept(_) => Self::value_set_invalid(error.to_string()),
             // NOTE: an implicit concept map URI the system does not answer is the
             // unknown-map outcome `$translate` already has for a `url` nothing serves
             // (<https://hl7.org/fhir/R4B/conceptmap-operation-translate.html>).

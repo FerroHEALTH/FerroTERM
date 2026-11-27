@@ -253,11 +253,12 @@ impl LoincProvider {
         regex: Option<&Regex>,
         part_names: &mut BTreeMap<u32, String>,
     ) -> Result<bool, ProviderError> {
-        let properties = self.stored().store.properties(ordinal).map_err(storage)?;
-        let Some((_, values)) = properties.iter().find(|(k, _)| *k == key) else {
-            return Ok(false);
-        };
-        for value in values {
+        let values = self
+            .stored()
+            .store
+            .property(ordinal, key)
+            .map_err(storage)?;
+        for value in &values {
             if self.axis_value_matches(value, wanted, parts, regex, part_names)? {
                 return Ok(true);
             }
@@ -269,15 +270,15 @@ impl LoincProvider {
     /// names, or column text the value or the regex matches.
     fn axis_value_matches(
         &self,
-        value: &record::PropertyValue,
+        value: &record::PropertyValueRef<'_>,
         wanted: &[&str],
         parts: &ConceptSet,
         regex: Option<&Regex>,
         part_names: &mut BTreeMap<u32, String>,
     ) -> Result<bool, ProviderError> {
         match (value, regex) {
-            (record::PropertyValue::Concept(part), None) => Ok(parts.contains(part.index())),
-            (record::PropertyValue::Concept(part), Some(regex)) => {
+            (record::PropertyValueRef::Concept(part), None) => Ok(parts.contains(part.index())),
+            (record::PropertyValueRef::Concept(part), Some(regex)) => {
                 let name = self.part_name(*part, part_names)?;
                 let code = self
                     .stored()
@@ -288,8 +289,8 @@ impl LoincProvider {
                     .unwrap_or_default();
                 Ok(regex.is_match(&name) || regex.is_match(&code))
             }
-            (record::PropertyValue::String(text), None) => Ok(wanted.iter().any(|w| w == text)),
-            (record::PropertyValue::String(text), Some(regex)) => Ok(regex.is_match(text)),
+            (record::PropertyValueRef::String(text), None) => Ok(wanted.contains(text)),
+            (record::PropertyValueRef::String(text), Some(regex)) => Ok(regex.is_match(text)),
             _ => Ok(false),
         }
     }
@@ -513,7 +514,7 @@ impl LoincProvider {
                 values
                     .into_iter()
                     .filter_map(|v| match v {
-                        record::PropertyValue::Code(c) => Some(c),
+                        record::PropertyValueRef::Code(c) => Some(c.to_owned()),
                         _ => None,
                     })
                     .collect()
@@ -549,14 +550,14 @@ impl LoincProvider {
         let Some(key) = self.stored().key_of(ANSWER_LIST_KEY) else {
             return Ok(Vec::new());
         };
-        let properties = self.stored().store.properties(ordinal).map_err(storage)?;
-        let Some((_, values)) = properties.iter().find(|(k, _)| *k == key) else {
-            return Ok(Vec::new());
-        };
-        Ok(values
-            .iter()
+        Ok(self
+            .stored()
+            .store
+            .property(ordinal, key)
+            .map_err(storage)?
+            .into_iter()
             .filter_map(|linked| match linked {
-                record::PropertyValue::Code(code) => Some(code.clone()),
+                record::PropertyValueRef::Code(code) => Some(code.to_owned()),
                 _ => None,
             })
             .collect())
@@ -580,10 +581,12 @@ impl LoincProvider {
             let mut set = ConceptSet::new();
             for index in 0..self.stored().concepts {
                 let ordinal = Ordinal::new(index);
-                let properties = self.stored().store.properties(ordinal).map_err(storage)?;
-                let has = properties
-                    .iter()
-                    .any(|(k, values)| *k == key && !values.is_empty());
+                let has = !self
+                    .stored()
+                    .store
+                    .property(ordinal, key)
+                    .map_err(storage)?
+                    .is_empty();
                 if has == wanted {
                     set.insert(index);
                 }

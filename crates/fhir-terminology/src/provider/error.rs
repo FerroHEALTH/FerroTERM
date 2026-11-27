@@ -31,6 +31,10 @@ pub enum ProviderError {
     /// The filter value is not what the operator expects.
     #[error(transparent)]
     InvalidFilterValue(Box<InvalidValue>),
+    /// A well-formed filter value names a concept it cannot use: one the
+    /// system does not have, or one that is not what the value asks of it.
+    #[error(transparent)]
+    UnusableConcept(Box<UnusableConcept>),
     /// A regular expression does not compile.
     #[error("invalid regular expression")]
     Regex(#[from] regex::Error),
@@ -155,6 +159,20 @@ pub struct InvalidValue {
     /// The parser's error, when a parser refused the value.
     #[source]
     pub source: Option<sct_scg::front::ParseError>,
+}
+
+/// A well-formed filter value naming a concept it cannot use.
+#[derive(Debug, thiserror::Error)]
+#[error("filter `{property}` value `{value}` is invalid: {code} {reason}")]
+pub struct UnusableConcept {
+    /// The filter property.
+    pub property: String,
+    /// The value, as the filter wrote it.
+    pub value: String,
+    /// The concept the value names.
+    pub code: String,
+    /// Why the value cannot use it.
+    pub reason: String,
 }
 
 /// An implicit value set URI a system refuses, and where a parser stopped

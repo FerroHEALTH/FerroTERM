@@ -29,7 +29,7 @@ use fhir_terminology::valueset;
 use fhir_terminology::valueset::store::ValueSetStore;
 
 use ferroterm_testkit::snomed;
-use ferroterm_testkit::snomed::{ANIMAL, CAT, COVERING, DOG, FISH, FUR, LEGS, VERSION, code};
+use ferroterm_testkit::snomed::{ANIMAL, CAT, COVERING, DOG, FISH, FUR, LEGS, TOP, VERSION, code};
 
 fn registry() -> (tempfile::TempDir, Registry) {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -79,15 +79,17 @@ fn a_well_formed_expression_over_defined_concepts_validates() {
     let (_dir, registry) = registry();
     // The Compositional Grammar specification, §7.3 Validating: the syntax and
     // that "All concept references included in the expression must be valid".
-    let outcome = validated(&registry, &refined(CAT, COVERING, FUR));
+    let sent = refined(CAT, COVERING, FUR);
+    let outcome = validated(&registry, &sent);
     assert!(outcome.result, "{:?}", outcome.message);
     assert_eq!(outcome.system.as_deref(), Some(SYSTEM));
     assert_eq!(outcome.version.as_deref(), Some(VERSION));
+    assert_eq!(outcome.code.as_deref(), Some(sent.as_str()));
     assert_eq!(
-        outcome.normalized_code.as_deref(),
-        Some(format!("=== {} : {} = {}", code(CAT), code(COVERING), code(FUR)).as_str()),
-        "the code the system spells is the expression in one canonical order"
+        outcome.normalized_code, None,
+        "whitespace carries no meaning (§5), so the code is already in normal form"
     );
+    assert!(outcome.issues.is_empty(), "{:?}", outcome.issues);
 }
 
 #[test]
@@ -124,10 +126,13 @@ fn an_expression_naming_a_concept_the_version_lacks_answers_false_and_names_it()
 #[test]
 fn lookup_answers_the_canonical_expression_and_a_display_carrying_the_terms() {
     let (_dir, registry) = registry();
-    let outcome = looked_up(&registry, &refined(CAT, COVERING, FUR));
+    let outcome = looked_up(
+        &registry,
+        &format!("{}:{}={}", code(CAT), code(COVERING), code(FUR)),
+    );
     assert_eq!(
         outcome.code,
-        format!("=== {} : {} = {}", code(CAT), code(COVERING), code(FUR))
+        format!("{}:{}={}", code(CAT), code(COVERING), code(FUR))
     );
     // "If no term or description template has been published, the full
     // expression with terms embedded may be used"
@@ -135,7 +140,7 @@ fn lookup_answers_the_canonical_expression_and_a_display_carrying_the_terms() {
     assert_eq!(
         outcome.display,
         format!(
-            "=== {} |Cat| : {} |Has covering| = {} |Fur|",
+            "{}|Cat|:{}|Has covering|={}|Fur|",
             code(CAT),
             code(COVERING),
             code(FUR)
@@ -189,7 +194,7 @@ fn lookup_generates_the_normal_form_of_an_expression() {
     assert_eq!(
         format!("{:?}", terse.value),
         format!(
-            "String(\"=== {} : {} = {}\")",
+            "String(\"{}:{}={}\")",
             code(ANIMAL),
             code(COVERING),
             code(FUR)
@@ -387,12 +392,12 @@ fn closure_relates_an_expression_to_the_concepts_a_table_holds() {
     );
 }
 
-/// The value set an `expressions` filter builds, with `value` when one is
-/// given and the concept filter alone otherwise.
-fn value_set(expressions: Option<&str>) -> serde_json::Value {
+/// The value set of `concept <op> <animal>` with an `expressions` filter of
+/// `value` when one is given and the concept filter alone otherwise.
+fn value_set(op: &str, expressions: Option<&str>) -> serde_json::Value {
     let mut filters = vec![serde_json::json!({
         "property": "concept",
-        "op": "is-a",
+        "op": op,
         "value": code(ANIMAL),
     })];
     if let Some(value) = expressions {
@@ -411,11 +416,19 @@ fn value_set(expressions: Option<&str>) -> serde_json::Value {
 }
 
 fn in_value_set(expressions: Option<&str>, code: &str) -> bool {
+    vs_validated("is-a", expressions, code).result
+}
+
+fn vs_validated(
+    op: &str,
+    expressions: Option<&str>,
+    code: &str,
+) -> value_set_validate_code::Validation {
     let (_dir, registry) = registry();
     let sets = tempfile::tempdir().expect("tempdir");
     std::fs::write(
         sets.path().join("valueset-animals.json"),
-        serde_json::to_string(&value_set(expressions)).expect("serialises"),
+        serde_json::to_string(&value_set(op, expressions)).expect("serialises"),
     )
     .expect("writes");
     let mut value_sets = ValueSetStore::default();
@@ -434,9 +447,39 @@ fn in_value_set(expressions: Option<&str>, code: &str) -> bool {
         code: Some(code.to_owned()),
         ..ValueSetValidateInput::default()
     };
-    value_set_validate_code::validate_code(&sources, &request)
-        .expect("validates")
-        .result
+    value_set_validate_code::validate_code(&sources, &request).expect("validates")
+}
+
+#[test]
+fn a_value_set_validation_echoes_the_code_as_sent() {
+    // `code` is "the code that was validated"
+    // (<https://hl7.org/fhir/R5/valueset-operation-validate-code.html>), and
+    // the normal form is the ecosystem's `normalized-code`.
+    let reversed = format!(
+        "{}+{} : {} = {}",
+        code(DOG),
+        code(CAT),
+        code(COVERING),
+        code(FUR)
+    );
+    let normal = format!(
+        "{}+{}:{}={}",
+        code(CAT),
+        code(DOG),
+        code(COVERING),
+        code(FUR)
+    );
+    for (expressions, member) in [(Some("true"), true), (Some("false"), false)] {
+        let outcome = vs_validated("is-a", expressions, &reversed);
+        assert_eq!(outcome.result, member, "{expressions:?}");
+        assert_eq!(outcome.code.as_deref(), Some(reversed.as_str()));
+        assert_eq!(outcome.normalized_code.as_deref(), Some(normal.as_str()));
+    }
+    let spaced = format!("{} |Cat| : {} = {}", code(CAT), code(COVERING), code(FUR));
+    let outcome = vs_validated("is-a", Some("true"), &spaced);
+    assert!(outcome.result);
+    assert_eq!(outcome.code.as_deref(), Some(spaced.as_str()));
+    assert_eq!(outcome.normalized_code, None);
 }
 
 #[test]
@@ -452,9 +495,11 @@ fn the_expressions_filter_decides_whether_a_value_set_admits_an_expression() {
         !in_value_set(Some("false"), &expression),
         "`expressions = false` refuses it"
     );
+    // "Any value set that does not say `expressions = false` admits
+    // post-coordinated expressions" (the ecosystem IG, requirements, SNOMED CT).
     assert!(
-        !in_value_set(None, &expression),
-        "a value set that states no `expressions` filter refuses it"
+        in_value_set(None, &expression),
+        "a value set that states no `expressions` filter admits it"
     );
     // The precoordinated concept is a member either way.
     for filter in [Some("true"), Some("false"), None] {
@@ -467,6 +512,26 @@ fn an_expression_outside_the_value_set_is_refused_even_where_expressions_are_all
     // The fish sits under no concept, so it is outside `is-a <animal>`.
     let outside = format!("=== {}", code(FISH));
     assert!(!in_value_set(Some("true"), &outside));
+}
+
+#[test]
+fn one_focus_concept_inside_a_hierarchy_filter_admits_the_expression() {
+    // "The meaning of the expression is a subtype of all the focus concepts"
+    // (Compositional Grammar §5), so the cat alone puts it under the animal.
+    let expression = format!(
+        "{}+{} : {} = {}",
+        code(CAT),
+        code(FUR),
+        code(COVERING),
+        code(FUR)
+    );
+    for op in ["is-a", "descendent-of"] {
+        assert!(vs_validated(op, Some("true"), &expression).result, "{op}");
+    }
+    let outside = format!("{}+{}", code(FUR), code(TOP));
+    for op in ["is-a", "descendent-of"] {
+        assert!(!vs_validated(op, Some("true"), &outside).result, "{op}");
+    }
 }
 
 #[test]
@@ -489,11 +554,12 @@ fn a_nested_sub_expression_validates_and_renders() {
     );
     let outcome = validated(&registry, &nested);
     assert!(outcome.result, "{:?}", outcome.message);
+    assert_eq!(outcome.normalized_code, None);
     assert_eq!(
-        outcome.normalized_code.as_deref(),
+        outcome.display.as_deref(),
         Some(
             format!(
-                "=== {} : {} = ({} : {} = #4)",
+                "{}|Animal|:{}|Has covering|=({}|Fur|:{}|Leg count|=#4)",
                 code(ANIMAL),
                 code(COVERING),
                 code(FUR),
@@ -505,16 +571,42 @@ fn a_nested_sub_expression_validates_and_renders() {
 }
 
 #[test]
-fn two_spellings_of_one_expression_answer_the_same_code() {
+fn two_spellings_of_one_expression_share_one_normal_form() {
     let (_dir, registry) = registry();
     // Whitespace is not significant outside a term or a quoted value (the
     // Compositional Grammar specification, §5), and the focus concepts of a
     // conjunction have no stated order.
     let spaced = format!("===   {}   +   {}   ", code(CAT), code(DOG));
     let reversed = format!("==={}+{}", code(DOG), code(CAT));
+    let normal = format!("{}+{}", code(CAT), code(DOG));
+    assert_eq!(validated(&registry, &spaced).normalized_code, None);
     assert_eq!(
-        looked_up(&registry, &spaced).code,
-        looked_up(&registry, &reversed).code
+        validated(&registry, &reversed).normalized_code.as_deref(),
+        Some(normal.as_str())
+    );
+    assert_eq!(
+        looked_up(&registry, &spaced).display,
+        looked_up(&registry, &reversed).display
+    );
+}
+
+#[test]
+fn a_code_outside_the_normal_form_is_noted_and_normalized() {
+    let (_dir, registry) = registry();
+    let reversed = format!("{}+{}", code(DOG), code(CAT));
+    let normal = format!("{}+{}", code(CAT), code(DOG));
+    let outcome = validated(&registry, &reversed);
+    assert!(outcome.result, "{:?}", outcome.message);
+    assert_eq!(outcome.code.as_deref(), Some(reversed.as_str()));
+    assert_eq!(outcome.normalized_code.as_deref(), Some(normal.as_str()));
+    let note = outcome.issues.first().expect("a note");
+    assert_eq!(note.severity, "information");
+    assert_eq!(note.message_id(), "CODE_NOT_IN_NORMAL_FORM");
+    assert_eq!(
+        note.text,
+        format!(
+            "The code '{reversed}' is valid, but it is not the normal form for the code system '{SYSTEM}|{VERSION}'; the normal form is '{normal}'"
+        )
     );
 }
 
@@ -680,5 +772,117 @@ fn an_expression_is_refused_by_a_system_that_is_not_snomed() {
     assert!(
         matches!(error, OperationError::UnknownSystem(_)),
         "{error:?}"
+    );
+}
+
+#[test]
+fn the_display_keeps_a_term_the_sender_wrote_when_it_describes_the_concept() {
+    let (_dir, registry) = registry();
+    // A term may be "the term from any SNOMED CT description" of the concept
+    // (the Compositional Grammar specification, §5), and §7.5 allows the
+    // expression as authored.
+    let sent = format!(
+        "{} |Cat (synthetic)| : {} |Not a covering term| = {}",
+        code(CAT),
+        code(COVERING),
+        code(FUR)
+    );
+    let outcome = validated(&registry, &sent);
+    assert!(outcome.result, "{:?}", outcome.message);
+    assert_eq!(
+        outcome.display.as_deref(),
+        Some(
+            format!(
+                "{}|Cat (synthetic)|:{}|Has covering|={}|Fur|",
+                code(CAT),
+                code(COVERING),
+                code(FUR)
+            )
+            .as_str()
+        ),
+        "a description of the concept is kept, a foreign term and a missing one are the edition's"
+    );
+}
+
+/// Whether `code` validates against a value set selecting `ecl`, with
+/// expressions allowed.
+fn in_constraint(ecl: &str, code: &str) -> bool {
+    let (_dir, registry) = registry();
+    let sets = tempfile::tempdir().expect("tempdir");
+    let value_set = serde_json::json!({
+        "resourceType": "ValueSet",
+        "url": "http://example.org/vs/constraint",
+        "status": "active",
+        "compose": { "include": [{ "system": SYSTEM, "filter": [
+            { "property": "constraint", "op": "=", "value": ecl },
+            { "property": "expressions", "op": "=", "value": "true" }
+        ] }] },
+    });
+    std::fs::write(
+        sets.path().join("valueset-constraint.json"),
+        serde_json::to_string(&value_set).expect("serialises"),
+    )
+    .expect("writes");
+    let mut value_sets = ValueSetStore::default();
+    for model in valueset::load::load_dir(sets.path(), FhirVersion::R4B).expect("loads") {
+        value_sets.insert(model).expect("stores");
+    }
+    let concept_maps = ConceptMapStore::default();
+    let sources = Sources {
+        registry: &registry,
+        value_sets: &value_sets,
+        concept_maps: &concept_maps,
+    };
+    let request = ValueSetValidateInput {
+        url: Some(String::from("http://example.org/vs/constraint")),
+        system: Some(SYSTEM.to_owned()),
+        code: Some(code.to_owned()),
+        ..ValueSetValidateInput::default()
+    };
+    value_set_validate_code::validate_code(&sources, &request)
+        .expect("validates")
+        .result
+}
+
+#[test]
+fn an_expression_constraint_is_tested_against_the_expression_itself() {
+    // An expression constraint defines "a bounded set of clinical meanings
+    // represented by either precoordinated or postcoordinated expressions"
+    // (ECL 1 Introduction).
+    let cat_with_fur = refined(CAT, COVERING, FUR);
+    assert!(
+        in_constraint(&format!("< {}", code(CAT)), &cat_with_fur),
+        "a refined expression is a proper subtype of its focus concept"
+    );
+    assert!(
+        !in_constraint(&format!("<! {}", code(CAT)), &cat_with_fur),
+        "a concept of the edition may sit between it and its focus concept"
+    );
+    assert!(!in_constraint(&code(CAT), &cat_with_fur));
+    assert!(in_constraint(
+        &format!("< {} : {} = {}", code(ANIMAL), code(COVERING), code(FUR)),
+        &cat_with_fur
+    ));
+    assert!(
+        !in_constraint(
+            &format!("< {} : [0..0] {} = *", code(ANIMAL), code(COVERING)),
+            &cat_with_fur
+        ),
+        "the expression states a covering"
+    );
+    assert!(in_constraint(
+        &format!("* MINUS << {}", code(FISH)),
+        &cat_with_fur
+    ));
+    assert!(!in_constraint(
+        &format!("<< {} MINUS << {}", code(ANIMAL), code(CAT)),
+        &cat_with_fur
+    ));
+    assert!(
+        in_constraint(
+            &format!("< {}", code(ANIMAL)),
+            &format!("=== {}", code(CAT))
+        ),
+        "an expression that refines nothing is its focus concept"
     );
 }

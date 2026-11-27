@@ -140,13 +140,13 @@ fn columns(artifact: &Artifact) -> Result<Columns, concept_store::store::StoreEr
                 continue;
             };
             for value in values {
-                let (record::PropertyValue::Code(text) | record::PropertyValue::String(text)) =
+                let (record::PropertyValueRef::Code(text) | record::PropertyValueRef::String(text)) =
                     value
                 else {
                     continue;
                 };
                 indexed
-                    .entry((name.clone(), text))
+                    .entry((name.clone(), text.to_owned()))
                     .or_default()
                     .insert(index);
             }

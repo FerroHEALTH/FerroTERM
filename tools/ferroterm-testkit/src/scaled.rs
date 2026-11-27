@@ -99,7 +99,10 @@ pub fn write(dir: &Path, concepts: u32) -> Result<(), FixtureError> {
     let mut builder =
         StoreBuilder::create(&dir.join("store.redb"), "http://snomed.info/sct", VERSION)?;
     edition::write_property_keys(&mut builder)?;
-    edition::write_designation_vocabularies(&mut builder, gb, nl)?;
+    edition::write_designation_vocabularies(
+        &mut builder,
+        edition::LanguageOrdinals { gb, nl, us: 2 },
+    )?;
 
     let mut text = IndexBuilder::default();
     let mut edges = Vec::new();

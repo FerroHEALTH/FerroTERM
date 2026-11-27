@@ -102,14 +102,17 @@ impl Origin {
         let at = |text: &str, offset: Option<usize>| offset.and_then(|offset| column(text, offset));
         match (&refused.input, self) {
             (RefusedInput::Filter(filter), Self::Body(names)) => {
-                let index = Self::index(names, "valueSet")?;
+                Self::index(names, "valueSet")?;
                 let side = match filter.side {
                     Side::Include => "include",
                     Side::Exclude => "exclude",
                 };
+                // NOTE: an issue names its part of the request "so that a validator
+                // can locate the issue in the resource being validated" (the ecosystem
+                // IG, requirements, Issues and Messages): the inline value set.
                 Some((
                     format!(
-                        "Parameters.parameter[{index}].resource.compose.{side}[{}].filter[{}].value",
+                        "ValueSet.compose.{side}[{}].filter[{}]",
                         filter.rule, filter.filter
                     ),
                     at(&refused.text, refused.position),

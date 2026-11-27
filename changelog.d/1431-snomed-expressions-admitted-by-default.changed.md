@@ -1,0 +1,1 @@
+- A SNOMED CT value set without an `expressions` filter now admits post-coordinated expressions, as the terminology ecosystem IG's agreed post-coordination scope requires ("Any value set that does not say `expressions = false` admits post-coordinated expressions"). Only `expressions = false` refuses them. Before, an include had to state `expressions = true`.

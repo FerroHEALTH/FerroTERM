@@ -277,8 +277,8 @@ impl CodeSystemProvider for Supplemented {
         self.inner.rejection(code)
     }
 
-    fn admits_post_coordination(&self, filter: &crate::provider::filter::Filter) -> bool {
-        self.inner.admits_post_coordination(filter)
+    fn admits_post_coordination(&self, filters: &[crate::provider::filter::Filter]) -> bool {
+        self.inner.admits_post_coordination(filters)
     }
 
     fn code(&self, concept: Concept) -> Result<Option<String>, ProviderError> {

@@ -409,7 +409,7 @@ fn the_normal_form_renders_the_inferred_view_of_a_concept() {
     assert_eq!(
         terse,
         format!(
-            "=== {animal} : {{ {covering} = {fur}, {legs} = #4 }}",
+            "{animal}:{{{covering}={fur},{legs}=#4}}",
             animal = sctid(item(ANIMAL)),
             covering = sctid(item(COVERING)),
             fur = sctid(item(FUR)),
@@ -420,7 +420,7 @@ fn the_normal_form_renders_the_inferred_view_of_a_concept() {
 
     let with_terms = ask(CAT, "normalForm").expect("the cat has a normal form");
     assert!(
-        with_terms.contains(&format!("{} |", sctid(item(ANIMAL)))),
+        with_terms.contains(&format!("{}|", sctid(item(ANIMAL)))),
         "the form with terms writes each reference as `id |term|`: {with_terms}"
     );
     assert!(
@@ -521,6 +521,47 @@ fn identity_and_declaration_follow_the_manifest() {
     );
     assert!(codes.contains(&sctid(item(COVERING)).as_str()));
     assert!(codes.contains(&sctid(item(LEGS)).as_str()));
-    assert_eq!(p.language_refsets(), [snomed::GB_REFSET, snomed::NL_REFSET]);
+    assert_eq!(
+        p.language_refsets(),
+        [snomed::NL_REFSET, snomed::GB_REFSET, snomed::US_REFSET],
+        "in ascending SCTID order"
+    );
     assert_eq!(p.all().expect("all").len(), 21);
+}
+
+// NOTE: the display is "the preferred term in the relevant language or dialect,
+// as specified in the associated language reference set"
+// (<https://hl7.org/fhir/R4B/snomedct.html>), and ECL Appendix C names each dialect's.
+#[test]
+fn a_dialect_selects_its_language_reference_set() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    snomed::write(dir.path()).expect("writes the fixture");
+    let display = |default: &str, requested: Option<&str>| {
+        let p = SnomedProvider::open(dir.path(), default).expect("opens");
+        let concept = p
+            .locate(&sctid(item(LEGS)))
+            .expect("locates")
+            .expect("a concept")
+            .concept;
+        p.display(concept, requested).expect("a display")
+    };
+    assert_eq!(
+        display("en", None).as_deref(),
+        Some("Leg count"),
+        "a bare language takes its reference sets in ascending SCTID order"
+    );
+    assert_eq!(
+        display("en", Some("en-US")).as_deref(),
+        Some("Number of legs")
+    );
+    assert_eq!(display("en", Some("en-gb")).as_deref(), Some("Leg count"));
+    assert_eq!(
+        display("en-US", None).as_deref(),
+        Some("Number of legs"),
+        "the configured default may name a dialect"
+    );
+    assert_eq!(
+        display("en-US", Some("en-GB")).as_deref(),
+        Some("Leg count")
+    );
 }

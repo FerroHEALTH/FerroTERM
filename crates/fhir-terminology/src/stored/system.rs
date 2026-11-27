@@ -115,7 +115,7 @@ pub trait StoredSystem: fmt::Debug + Send + Sync + Sized {
     }
 
     /// As [`CodeSystemProvider::admits_post_coordination`].
-    fn admits_post_coordination(_provider: &StoredProvider<Self>, _filter: &Filter) -> bool {
+    fn admits_post_coordination(_provider: &StoredProvider<Self>, _filters: &[Filter]) -> bool {
         false
     }
 
@@ -320,8 +320,8 @@ impl<S: StoredSystem> CodeSystemProvider for StoredProvider<S> {
         S::rejection(self, code)
     }
 
-    fn admits_post_coordination(&self, filter: &Filter) -> bool {
-        S::admits_post_coordination(self, filter)
+    fn admits_post_coordination(&self, filters: &[Filter]) -> bool {
+        S::admits_post_coordination(self, filters)
     }
 
     fn language(&self) -> Option<&str> {
