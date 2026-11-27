@@ -17,7 +17,10 @@
 # safe uses of conformance/post-quantum.tsv. Every run fails when the README
 # shows a badge this script does not write or leaves out one it writes, and
 # when the pass-list table of conformance/tx-ecosystem/README.md disagrees
-# with the lists, the suite total or hand-run.tsv.
+# with the lists, the suite total or hand-run.tsv, and when the book's
+# conformance page miscounts the cases not-applicable.tsv lists. A
+# badge whose label runs past 30 characters or whose message runs past 20
+# fails the run.
 #
 #   conformance-badges.sh <out-dir>
 #   conformance-badges.sh --self-test   # a claimed certification or a missing logo is refused
@@ -48,14 +51,13 @@ for version in r4 r4b r5 r6; do
   # The cases the runner counts that do not apply on this surface, from the
   # inventory scripts/checks/tx-ecosystem.sh holds to each run (#1361).
   inapplicable="$(awk -F'\t' -v surface="$version" '!/^#/ && $1 == surface' conformance/tx-ecosystem/not-applicable.tsv | wc -l | tr -d ' ')"
-  message="$passed / $total"
-  [[ "$inapplicable" = 0 ]] || message="$message ($inapplicable n/a)"
+  message="$passed/$total"
   colour="$(badge_count_color "$passed" "$total")"
   label="tx-ecosystem $suite $(printf '%s' "$version" | tr '[:lower:]' '[:upper:]')"
   jq -cn --arg label "$label" --arg message "$message" --arg color "$colour" \
     --argjson logo "$(badge_logo_fields shield-check)" \
     '{schemaVersion: 1, label: $label, message: $message, color: $color} + $logo' > "$out/$version.json"
-  echo "conformance-badges: $version $message ($colour)"
+  echo "conformance-badges: $version $message, $inapplicable n/a ($colour)"
 done
 
 # The EHDS badges, self-tested: each counts a committed corpus that a test or
@@ -110,8 +112,8 @@ while IFS=$'\t' read -r surface mode ran measured; do
     exit 1
   fi
   badge "hand-$(printf '%s' "$mode" | tr '.' '-')-$surface.json" \
-    "tx-ecosystem $suite $mode $(printf '%s' "$surface" | tr '[:lower:]' '[:upper:]')" \
-    "$passed" "$ran" ", by hand $measured" shield-check
+    "tx $suite $mode $(printf '%s' "$surface" | tr '[:lower:]' '[:upper:]')" \
+    "$passed" "$ran" " $measured" shield-check
 done < <(hand_rows)
 
 # The FHIR versions served, from the version table of the book's FHIR versions
@@ -119,7 +121,7 @@ done < <(hand_rows)
 versions_page=website/book/src/integrate/fhir-versions.md
 served="$(awk -F'|' '/served under `\/r[0-9a-z]+`/ {
   version = $2; gsub(/[[:space:]]/, "", version)
-  printf "%s%s%s", sep, version, ($4 ~ /ballot/ ? " ballot" : ""); sep = " · "
+  printf "%s%s%s", sep, version, ($4 ~ /ballot/ ? " ballot" : ""); sep = "·"
 }' "$versions_page")"
 [[ -n "$served" ]] || { echo "conformance-badges: $versions_page names no served version" >&2; exit 1; }
 jq -cn --arg message "$served" --argjson logo "$(badge_logo_fields exchange)" \
@@ -133,15 +135,15 @@ count_rows() {
 mvc=conformance/ehds/mvc-synthetic.tsv
 if [[ -f "$mvc" ]]; then
   listed="$(count_rows "$mvc")"
-  badge ehds-mvc.json "MyHealth@EU MVC 10.1.0 (CI) import" \
-    "$listed" "$listed" " value sets, synthetic fixture" eu
+  badge ehds-mvc.json "MyHealth@EU MVC 10.1.0 import" \
+    "$listed" "$listed" " value sets" eu
 fi
 
 matrix=conformance/ehds/art6-code-systems.tsv
 if [[ -f "$matrix" ]]; then
   systems="$(count_rows "$matrix")"
   proven="$(grep -vE '^(#|[[:space:]]*$)' "$matrix" | awk -F'\t' '$3 != "-"' | wc -l | tr -d ' ')"
-  badge ehds-art6.json "EEHRxF draft 2026-11-23 Art 6 code systems" \
+  badge ehds-art6.json "EEHRxF draft 2026-11-23 Art 6" \
     "$proven" "$systems" " loaders" eu
 fi
 
@@ -149,6 +151,10 @@ fi
 # shared helper; scripts/checks/post-quantum.sh holds the file to the tree.
 badge_post_quantum conformance/post-quantum.tsv > "$out/post-quantum.json"
 echo "conformance-badges: post-quantum.json $(jq -r .message "$out/post-quantum.json")"
+
+# Every badge is its count alone, within the shared length limits; the
+# breakdown is the book's conformance page and conformance/tx-ecosystem/README.md.
+badge_length_check "$out"/*.json || exit 1
 
 # The README shows exactly the badges this script writes.
 readme_badges=README.md
@@ -192,17 +198,40 @@ for measured in $(hand_rows | cut -f4 | sort -u); do
     table_failures=$((table_failures + 1))
   fi
 done
+# The book's conformance page names, per surface, the general cases that do
+# not apply there, as not-applicable.tsv counts them.
+book=website/book/src/evaluate/conformance.md
+not_applicable() {
+  awk -F'\t' -v surface="$1" '!/^#/ && $1 == surface' conformance/tx-ecosystem/not-applicable.tsv | wc -l | tr -d ' '
+}
+inapplicable_sentence="do not apply on their surface: $(not_applicable r4) cases on R4, $(not_applicable r4b) on R4B and $(not_applicable r5) on R5."
+if ! tr -s '[:space:]' ' ' < "$book" | grep -qF "$inapplicable_sentence"; then
+  echo "conformance-badges: $book does not say the first two rows $inapplicable_sentence" >&2
+  table_failures=$((table_failures + 1))
+fi
 [[ "$table_failures" -eq 0 ]] || exit 1
 
 if [[ -n "$self_test" ]]; then
-  # Each surface's badge names the cases that do not apply there.
+  # Each surface's badge is its count alone; the book page names the cases
+  # that do not apply there.
   for version in r4 r4b r5; do
-    want="$(awk -F'\t' -v surface="$version" '!/^#/ && $1 == surface' conformance/tx-ecosystem/not-applicable.tsv | wc -l | tr -d ' ')"
-    if ! jq -er --arg n "($want n/a)" '.message | endswith($n)' "$out/$version.json" > /dev/null; then
-      echo "conformance-badges: self-test: the $version badge does not name its $want cases that do not apply" >&2
+    if ! jq -er '.message | test("^[0-9]+/[0-9]+$")' "$out/$version.json" > /dev/null; then
+      echo "conformance-badges: self-test: the $version badge is more than its count" >&2
       exit 1
     fi
   done
+  if tr -s '[:space:]' ' ' < "$book" | grep -qF "do not apply on their surface: 999 cases on R4,"; then
+    echo "conformance-badges: self-test: the not-applicable sentence matches a wrong count" >&2
+    exit 1
+  fi
+  badge_length_check "$out"/*.json || exit 1
+  badge long.json "tx-ecosystem 1.11.0 tx.fhir.org R4B" 29 189 ", by hand 2026-11-27" shield-check > /dev/null
+  if badge_length_check "$out/long.json" 2>/dev/null; then
+    echo "conformance-badges: self-test: a badge past the length limits passes" >&2
+    exit 1
+  fi
+  rm "$out/long.json"
+  badge_length_self_test > /dev/null || exit 1
   for claim in "FHIR R4 certified" "EHDS compliant" "Conformant terminology"; do
     if (badge probe.json "$claim" 1 1 "" eu) 2>/dev/null; then
       echo "conformance-badges: self-test: '$claim' was written" >&2

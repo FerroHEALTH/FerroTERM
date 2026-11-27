@@ -25,9 +25,9 @@ runner skip them. `r4b-surface` rows are the cases that fail on `/r4b` only
 because the suite targets R4 and R5 (the IG's `r4.md`) and leaves `$version$`
 unsubstituted there. The script fails a `general` run whose skips differ
 from the `gated` rows, or in which an `r4b-surface` case passes or is
-missing. Each badge shows the count as `n/a` beside the pass count, so the
-cases a reader sees as not passing are the ones FerroTERM answers for
-(the upstream report is #1380).
+missing. The book's conformance page names each surface's count of them,
+and the script fails the page when it differs from the file; the badge
+shows the pass count alone (the upstream report is #1380).
 
 ## What is committed, per mode
 
