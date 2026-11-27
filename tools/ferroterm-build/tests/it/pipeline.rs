@@ -173,7 +173,9 @@ fn the_store_graph_and_text_crates_open_what_the_build_wrote() {
     };
     assert_eq!(
         parents(cat),
-        Some(vec![concept_store::record::PropertyValue::Concept(animal)])
+        Some(vec![concept_store::record::PropertyValueRef::Concept(
+            animal
+        )])
     );
     assert!(parents(fish).is_none(), "the inactive edge is not a parent");
 
@@ -193,13 +195,11 @@ fn the_store_graph_and_text_crates_open_what_the_build_wrote() {
     let fur = store.ordinal(&concept(7)).expect("read").expect("fur");
     assert_eq!(
         property(cat, &concept(6)),
-        Some(vec![concept_store::record::PropertyValue::Concept(fur)])
+        Some(vec![concept_store::record::PropertyValueRef::Concept(fur)])
     );
     assert_eq!(
         property(cat, &concept(8)),
-        Some(vec![concept_store::record::PropertyValue::Decimal(
-            String::from("4")
-        )])
+        Some(vec![concept_store::record::PropertyValueRef::Decimal("4")])
     );
     let dog = store.ordinal(&concept(4)).expect("read").expect("dog");
     assert!(

@@ -10,7 +10,7 @@ use concept_graph::attributes::Attributes;
 use concept_graph::identifiers::Identifiers;
 use concept_graph::ordinal::Ordinal;
 use concept_graph::refsets::RefsetMembers;
-use concept_store::record::{self, Designation};
+use concept_store::record::{self, DesignationRef};
 use concept_store::store::{StoreError, Vocabulary};
 use designation_index::index::Query;
 use rf2::constants;
@@ -102,23 +102,14 @@ impl SnomedProvider {
         if let Some(set) = self.system().defined.get() {
             return Ok(set);
         }
-        let defined = constants::DEFINED.to_string();
         let mut set = RoaringBitmap::new();
         for index in 0..self.stored().concepts {
-            let properties = self
+            let status = self
                 .stored()
                 .store
-                .properties(Ordinal::new(index))
+                .property(Ordinal::new(index), self.system().keys.definition_status)
                 .map_err(|e| storage(&e))?;
-            let is_defined = properties
-                .iter()
-                .find(|(k, _)| *k == self.system().keys.definition_status)
-                .is_some_and(|(_, values)| {
-                    values
-                        .iter()
-                        .any(|v| matches!(v, record::PropertyValue::Code(c) if *c == defined))
-                });
-            if is_defined {
+            if super::selection::states_defined(&status) {
                 set.insert(index);
             }
         }
@@ -127,19 +118,15 @@ impl SnomedProvider {
 
     /// The module SCTID of a concept, from its stored property.
     fn module_of(&self, concept: Ordinal) -> Result<Option<u64>, EvalError> {
-        let properties = self
+        let module = self
             .stored()
             .store
-            .properties(concept)
+            .property(concept, self.system().keys.module)
             .map_err(|e| storage(&e))?;
-        Ok(properties
-            .iter()
-            .find(|(k, _)| *k == self.system().keys.module)
-            .and_then(|(_, values)| values.first())
-            .and_then(|v| match v {
-                record::PropertyValue::Code(code) => code.parse().ok(),
-                _ => None,
-            }))
+        Ok(module.first().and_then(|v| match v {
+            record::PropertyValueRef::Code(code) => code.parse().ok(),
+            _ => None,
+        }))
     }
 
     /// The SCTID a designation use ordinal stands for.
@@ -157,18 +144,18 @@ impl SnomedProvider {
         &self,
         concept: Ordinal,
         index: u32,
-        designation: &Designation,
+        designation: &DesignationRef<'_>,
         predicates: &[DescriptionPredicate],
     ) -> Result<bool, EvalError> {
         let mut active_asked = false;
         for predicate in predicates {
             let passes = match predicate {
                 DescriptionPredicate::Term { operator, terms } => {
-                    terms.iter().any(|t| term_matches(t, &designation.term))
+                    terms.iter().any(|t| term_matches(t, designation.term))
                         == (*operator == Equality::Equal)
                 }
                 DescriptionPredicate::Language { operator, codes } => {
-                    let primary = super::primary_subtag(&designation.language);
+                    let primary = super::primary_subtag(designation.language);
                     codes.iter().any(|c| c.eq_ignore_ascii_case(&primary))
                         == (*operator == Equality::Equal)
                 }
@@ -185,10 +172,7 @@ impl SnomedProvider {
                     active.is_none_or(|active| designation.active == active)
                 }
                 DescriptionPredicate::Id { operator, ids } => {
-                    let actual = designation
-                        .id
-                        .as_deref()
-                        .and_then(|id| id.parse::<u64>().ok());
+                    let actual = designation.id.and_then(|id| id.parse::<u64>().ok());
                     actual.is_some_and(|a| ids.contains(&a)) == (*operator == Equality::Equal)
                 }
             };
@@ -290,16 +274,24 @@ impl SnomedProvider {
             if !within.contains(entry.concept.index()) || out.contains(entry.concept.index()) {
                 continue;
             }
-            let designations = self
-                .stored()
+            let mut at = 0_u32;
+            let mut outcome = Ok(false);
+            self.stored()
                 .store
-                .designations(entry.concept)
+                .scan_designations(entry.concept, |record| {
+                    if at == entry.index {
+                        outcome = self.designation_passes(
+                            entry.concept,
+                            entry.index,
+                            &record,
+                            predicates,
+                        );
+                    }
+                    at = at.saturating_add(1);
+                    at <= entry.index
+                })
                 .map_err(|e| storage(&e))?;
-            let Some(record) = designations.get(concept_graph::ordinal::to_usize(entry.index))
-            else {
-                continue;
-            };
-            if self.designation_passes(entry.concept, entry.index, record, predicates)? {
+            if outcome? {
                 out.insert(entry.concept.index());
             }
         }
@@ -316,19 +308,18 @@ impl SnomedProvider {
         let mut out = RoaringBitmap::new();
         for concept in within {
             let ordinal = Ordinal::new(concept);
-            for (index, record) in self
-                .stored()
+            let mut index = 0_u32;
+            let mut outcome = Ok(false);
+            self.stored()
                 .store
-                .designations(ordinal)
-                .map_err(|e| storage(&e))?
-                .iter()
-                .enumerate()
-            {
-                let index = u32::try_from(index).unwrap_or(u32::MAX);
-                if self.designation_passes(ordinal, index, record, predicates)? {
-                    out.insert(concept);
-                    break;
-                }
+                .scan_designations(ordinal, |record| {
+                    outcome = self.designation_passes(ordinal, index, &record, predicates);
+                    index = index.saturating_add(1);
+                    matches!(outcome, Ok(false))
+                })
+                .map_err(|e| storage(&e))?;
+            if outcome? {
+                out.insert(concept);
             }
         }
         Ok(out)
@@ -413,13 +404,14 @@ impl Model for SnomedProvider {
             let Some(ordinal) = self.concept(Sctid(scheme))? else {
                 continue;
             };
-            let named = self
-                .stored()
+            let mut named = false;
+            self.stored()
                 .store
-                .designations(ordinal)
-                .map_err(|e| storage(&e))?
-                .iter()
-                .any(|d| d.active && d.term.eq_ignore_ascii_case(alias));
+                .scan_designations(ordinal, |d| {
+                    named = d.active && d.term.eq_ignore_ascii_case(alias);
+                    !named
+                })
+                .map_err(|e| storage(&e))?;
             if named {
                 return Ok(Some(scheme));
             }

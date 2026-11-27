@@ -162,25 +162,30 @@ impl SnomedProvider {
         if let Some(term) = self.preferred_in(ordinal, tag, &wanted)? {
             return Ok(Some(term));
         }
-        let designations = self.stored().store.designations(ordinal).map_err(storage)?;
-        if let Some(synonym) = designations.iter().find(|d| {
-            d.active
-                && d.use_ordinal == self.system().keys.synonym
-                && primary_subtag(&d.language) == wanted
-        }) {
-            return Ok(Some(synonym.term.clone()));
+        let store = &self.stored().store;
+        let keys = &self.system().keys;
+        if let Some(synonym) = store
+            .find_designation(ordinal, |d| {
+                d.active && d.use_ordinal == keys.synonym && primary_subtag(d.language) == wanted
+            })
+            .map_err(storage)?
+        {
+            return Ok(Some(synonym.term));
         }
         if wanted != self.system().base_language
             && let Some(term) = self.preferred_in(ordinal, default, &self.system().base_language)?
         {
             return Ok(Some(term));
         }
-        if let Some(fsn) = designations
-            .iter()
-            .find(|d| d.active && d.use_ordinal == self.system().keys.fsn)
+        if let Some(fsn) = store
+            .find_designation(ordinal, |d| d.active && d.use_ordinal == keys.fsn)
+            .map_err(storage)?
         {
-            return Ok(Some(fsn.term.clone()));
+            return Ok(Some(fsn.term));
         }
-        Ok(designations.first().map(|d| d.term.clone()))
+        Ok(store
+            .find_designation(ordinal, |_| true)
+            .map_err(storage)?
+            .map(|d| d.term))
     }
 }
