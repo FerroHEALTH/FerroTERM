@@ -23,6 +23,7 @@ mimetypes/mimetype-filter-unregistered-params-in
 mimetypes/mimetype-filter-unregistered-params-out
 mimetypes/mimetype-subsumes-case
 mimetypes/mimetype-subsumes-equivalent
+mimetypes/mimetype-subsumes-invalid-code
 mimetypes/mimetype-subsumes-parameter
 mimetypes/mimetype-subsumes-parameter-added
 mimetypes/mimetype-subsumes-parameter-disjoint
