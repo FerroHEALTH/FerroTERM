@@ -77,20 +77,21 @@ const PAGE: &str = "_summary=true&_count=500";
 ///
 /// Returns [`SourceError::Request`] when a page cannot be fetched,
 /// [`SourceError::Status`] when the server answers a page with a status that
-/// is not a success, and [`SourceError::ApiParse`] when a page is not a
-/// JSON bundle.
+/// is not a success, [`SourceError::TooLarge`] when a page passes `limit`,
+/// and [`SourceError::ApiParse`] when a page is not a JSON bundle.
 pub async fn list(
     client: &reqwest::Client,
     base_url: &str,
     authorization: &Authorization,
     delays: &[std::time::Duration],
+    limit: u64,
 ) -> Result<Feed, SourceError> {
     let base = base_url.trim_end_matches('/');
     let mut entries = Vec::new();
     for resource_type in ResourceType::ALL {
         let mut next = Some(format!("{base}/{}?{PAGE}", resource_type.as_str()));
         while let Some(url) = next.take() {
-            let page = fetch_page(client, &url, authorization, delays).await?;
+            let page = fetch_page(client, &url, authorization, delays, limit).await?;
             next = next_link(&page);
             for resource in page
                 .get("entry")
@@ -116,6 +117,7 @@ async fn fetch_page(
     url: &str,
     authorization: &Authorization,
     delays: &[std::time::Duration],
+    limit: u64,
 ) -> Result<serde_json::Value, SourceError> {
     let response = crate::retry::send(
         authorization.apply(client.get(url).header(reqwest::header::ACCEPT, FHIR_JSON)),
@@ -133,13 +135,7 @@ async fn fetch_page(
             status,
         });
     }
-    let body = response
-        .bytes()
-        .await
-        .map_err(|source| SourceError::Request {
-            url: url.to_owned(),
-            source,
-        })?;
+    let body = crate::source::read_listing(response, url, limit).await?;
     serde_json::from_slice(&body).map_err(|source| SourceError::ApiParse {
         url: url.to_owned(),
         source,

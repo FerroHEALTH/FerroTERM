@@ -51,7 +51,7 @@ built from the WHO ICD-API local deployment of release 2026-01 in English.
 | `loinc` | `/r5` | `passing-r5-loinc.txt` | 57 of 110 | a LOINC release | #1383, #1068 |
 | `tx.fhir.org` | `/r4b` | `passing-tx.fhir.org.txt` | 29 of 189 | a LOINC release | #1384, #1381, #1068, #1380 |
 | `tx.fhir.org` | `/r5` | `passing-r5-tx.fhir.org.txt` | 31 of 189 | a LOINC release | #1384, #1381, #1068 |
-| `mimetypes` | `/r4b` | `passing-mimetypes.txt` | 36 of 52 | nothing | #1382, #1068, #1380 |
+| `mimetypes` | `/r4b` | `passing-mimetypes.txt` | 40 of 52 | nothing | #1068, #1380 |
 | `omop` | `/r4b` | `passing-omop.txt` | 1 of 40 | an OMOP vocabulary the server does not load | #345, #1364, #1068, #1380 |
 
 `general` is the only mode CI runs, on all three surfaces. The others need
@@ -91,8 +91,8 @@ hand before a release and their lists are refreshed in the same change.
   other servers to pass these tests". The section below clusters what stays
   open.
 - **`mimetypes`** needs nothing: BCP 13 is served from the vendored IANA media
-  types registry. The four `$subsumes` cases on parameter defaults and an
-  unknown parameter are FerroTERM work the IG states (#1382).
+  types registry. What stays open is the cross-mode `closure` and `/r4b`
+  `metadata` cases.
 - **`omop`** needs the OMOP standardized vocabularies, which this server does
   not load and which OHDSI distributes through Athena under per-vocabulary
   licences. Its setup ValueSet states no `ValueSet.status` (#1364), and its

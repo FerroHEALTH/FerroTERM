@@ -131,7 +131,10 @@ fn source(server: &MockServer) -> ApiSource {
 #[tokio::test]
 async fn the_api_is_listed_across_every_page_as_feed_entries() {
     let server = service().await;
-    let feed = source(&server).list_api().await.expect("the API lists");
+    let feed = source(&server)
+        .list_api(1 << 20)
+        .await
+        .expect("the API lists");
     let ids: Vec<&str> = feed.entries.iter().map(|entry| entry.id.as_str()).collect();
     assert_eq!(
         ids,
@@ -180,7 +183,7 @@ async fn the_api_lists_nothing_for_a_source_without_one() {
             Box::pin(async { Ok(Authorization::Open) })
         }
     }
-    let listed = FeedOnly(reqwest::Client::new()).list_api().await;
+    let listed = FeedOnly(reqwest::Client::new()).list_api(1 << 20).await;
     assert!(
         matches!(listed, Err(SourceError::NoFhirApi { .. })),
         "a source without an API says so: {listed:?}"
@@ -195,7 +198,7 @@ async fn a_page_the_server_refuses_fails_the_listing() {
         .respond_with(ResponseTemplate::new(403))
         .mount(&server)
         .await;
-    let listed = source(&server).list_api().await;
+    let listed = source(&server).list_api(1 << 20).await;
     assert!(
         matches!(listed, Err(SourceError::Status { .. })),
         "a refused page is a failed listing, never an empty one: {listed:?}"
@@ -240,7 +243,10 @@ async fn a_listed_resource_is_fetched_and_its_digest_computed() {
 #[tokio::test]
 async fn a_subscribed_canonical_no_listing_carries_is_named() {
     let server = service().await;
-    let api = source(&server).list_api().await.expect("the API lists");
+    let api = source(&server)
+        .list_api(1 << 20)
+        .await
+        .expect("the API lists");
     let subscription = Subscription::default()
         .with_system("https://example.invalid/ValueSet/a")
         .with_system("http://loinc.org")
@@ -286,7 +292,10 @@ async fn a_code_system_without_content_is_left_behind_with_its_term() {
             .mount(&server)
             .await;
     }
-    let feed = source(&server).list_api().await.expect("the API lists");
+    let feed = source(&server)
+        .list_api(1 << 20)
+        .await
+        .expect("the API lists");
     let selection = terminology_syndication::select::select(
         &feed,
         &Subscription::default().with_category(CategoryTerm::FhirCodeSystem),
@@ -312,4 +321,17 @@ fn sha256(bytes: &[u8]) -> String {
             write!(out, "{byte:02x}").expect("writing into a String cannot fail");
             out
         })
+}
+
+#[tokio::test]
+async fn a_page_past_the_listing_limit_is_refused() {
+    let server = service().await;
+    let error = source(&server)
+        .list_api(16)
+        .await
+        .expect_err("a search page passes a limit of 16 bytes");
+    assert!(
+        matches!(error, SourceError::TooLarge { limit: 16, .. }),
+        "{error:?}"
+    );
 }
