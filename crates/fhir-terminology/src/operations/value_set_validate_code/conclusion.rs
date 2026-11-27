@@ -81,7 +81,7 @@ fn deprecated_in_value_set(
         severity: "warning",
         code: "business-rule",
         kind: "code-comment",
-        message: crate::operations::MessageId::ConceptDeprecatedInValueSet,
+        message: Some(crate::operations::MessageId::ConceptDeprecatedInValueSet),
         text: format!(
             "The presence of the concept '{code}' in the system '{}' in the value set {} is marked with a status of deprecated and its use should be reviewed",
             item.system,

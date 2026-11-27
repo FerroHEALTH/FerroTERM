@@ -360,7 +360,7 @@ fn a_display_in_the_editions_language_does_not_satisfy_a_request_for_another_one
     assert_eq!(issue.kind, "invalid-display");
     assert_eq!(
         issue.message_id(),
-        "Display_Name_for__should_be_one_of__instead_of"
+        Some("Display_Name_for__should_be_one_of__instead_of")
     );
     assert!(issue.text.contains("Kat"), "{}", issue.text);
     assert_eq!(wrong.message.as_deref(), Some(issue.text.as_str()));
@@ -374,7 +374,7 @@ fn a_display_in_the_editions_language_does_not_satisfy_a_request_for_another_one
     assert_eq!(issue.kind, "invalid-display");
     assert_eq!(
         issue.message_id(),
-        "NO_VALID_DISPLAY_FOUND_NONE_FOR_LANG_OK"
+        Some("NO_VALID_DISPLAY_FOUND_NONE_FOR_LANG_OK")
     );
     assert!(none.message.is_some(), "{none:?}");
 }

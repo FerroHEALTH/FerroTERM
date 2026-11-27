@@ -601,7 +601,7 @@ fn a_code_outside_the_normal_form_is_noted_and_normalized() {
     assert_eq!(outcome.normalized_code.as_deref(), Some(normal.as_str()));
     let note = outcome.issues.first().expect("a note");
     assert_eq!(note.severity, "information");
-    assert_eq!(note.message_id(), "CODE_NOT_IN_NORMAL_FORM");
+    assert_eq!(note.message_id(), Some("CODE_NOT_IN_NORMAL_FORM"));
     assert_eq!(
         note.text,
         format!(

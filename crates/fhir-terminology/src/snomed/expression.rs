@@ -10,16 +10,16 @@
 //! every concept it names against the edition, and hands the operations an
 //! opaque concept handle they read the same way.
 //!
-//! Validation is the first and the third of the three checks §7.3 Validating
-//! lists: "Expressions must conform to the syntax defined before" and "All
-//! concept references included in the expression must be valid" (the
-//! Compositional Grammar specification). The second, conformance to the
-//! concept model, is not made here.
+//! Validation is the three checks §7.3 Validating lists: "Expressions must
+//! conform to the syntax defined before", conformance to the concept model
+//! (`mrcm`), and "All concept references included in the expression must be
+//! valid" (the Compositional Grammar specification).
 //!
 //! Subsumption is decided over the edition's inferred view, and its boundary
 //! is recorded on the `entails` method below.
 
 mod candidate;
+pub(super) mod mrcm;
 mod subsumption;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -64,6 +64,12 @@ pub enum ExpressionError {
     UnknownConcept {
         /// The concept identifier as the expression wrote it.
         code: String,
+    },
+    /// The expression breaks mandatory rules of the concept model.
+    #[error("the expression does not conform to the concept model: {}", mrcm::listed(.violations))]
+    ConceptModel {
+        /// Every mandatory rule it breaks, in the order found.
+        violations: Vec<mrcm::Violation>,
     },
 }
 
@@ -343,6 +349,10 @@ impl SnomedProvider {
             Ok(term) => term,
             Err(error) => return Ok(Err(error)),
         };
+        let violations = self.concept_model(&term)?.errors;
+        if !violations.is_empty() {
+            return Ok(Err(ExpressionError::ConceptModel { violations }));
+        }
         let defined = tree.status() == ast::DefinitionStatus::EquivalentTo;
         let canonical = self.render(&tree, defined, Terms::None)?;
         let mut key = canonical.clone();
@@ -605,6 +615,18 @@ impl SnomedProvider {
         language: Option<&str>,
     ) -> Result<String, ProviderError> {
         self.render(&record.tree, record.defined, Terms::In(language))
+    }
+
+    /// The optional concept model rules `record` breaks.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProviderError`] when the substrate fails.
+    pub(super) fn expression_warnings(
+        &self,
+        record: &Registered,
+    ) -> Result<Vec<mrcm::Violation>, ProviderError> {
+        Ok(self.concept_model(&record.term)?.warnings)
     }
 
     /// Whether every concept an expression names is active in this version.

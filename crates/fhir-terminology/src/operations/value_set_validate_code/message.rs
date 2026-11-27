@@ -58,7 +58,7 @@ mod tests {
             severity,
             code: "invalid",
             kind,
-            message: MessageId::TxGeneralError,
+            message: Some(MessageId::TxGeneralError),
             text: text.to_owned(),
             expression: None,
         }
@@ -95,7 +95,7 @@ mod tests {
             severity: "information",
             code: "invalid",
             kind: "invalid-display",
-            message: MessageId::NoValidDisplayFoundNoneForLangOk,
+            message: Some(MessageId::NoValidDisplayFoundNoneForLangOk),
             text: String::from("There are no valid display names found"),
             expression: None,
         }];

@@ -198,6 +198,8 @@ pub struct Snomed {
     attribute_ordinals: OnceLock<Vec<Option<u32>>>,
     /// The inactive concepts, read once on the first request that needs them.
     inactive: OnceLock<ConceptSet>,
+    /// The concept model, compiled on the first expression it checks.
+    mrcm: OnceLock<expression::mrcm::Mrcm>,
     keys: Keys,
     edition: String,
     base_language: String,
@@ -326,6 +328,22 @@ impl StoredSystem for Snomed {
             .ok()?
             .err()
             .map(|error| error.to_string())
+    }
+
+    /// The optional concept model rules an expression breaks, which "result in
+    /// a warning during validation" (MRCM §6 Considerations).
+    fn advisories(
+        provider: &SnomedProvider,
+        concept: Concept,
+    ) -> Result<Vec<String>, ProviderError> {
+        let Some(record) = provider.registered(concept)? else {
+            return Ok(Vec::new());
+        };
+        Ok(provider
+            .expression_warnings(&record)?
+            .iter()
+            .map(ToString::to_string)
+            .collect())
     }
 
     /// An expression carries no designation: "SNOMED International does not

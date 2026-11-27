@@ -172,7 +172,7 @@ fn code_system_validate_code_refuses_a_supplement_as_the_system() {
     );
     assert_eq!(
         outcome.issues[0].message_id(),
-        "CODESYSTEM_CS_NO_SUPPLEMENT"
+        Some("CODESYSTEM_CS_NO_SUPPLEMENT")
     );
     assert_eq!(outcome.unknown_systems, [ANIMALS_NL]);
     assert_eq!(outcome.code.as_deref(), Some("cat"));
