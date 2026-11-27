@@ -26,6 +26,7 @@ properties, implicit value sets, with their citations) are in
 | ICD-11 MMS | `http://id.who.int/icd/release/11/mms` | Any WHO release (`2026-01` style), in the languages fetched | `ferroterm-build --icd11 <cache> --icd11-api <local ICD-API>` | CC BY-ND 3.0 IGO |
 | ICD-11 ICF | `http://id.who.int/icd/release/11/icf` | The same WHO release | The same `--icd11` build | CC BY-ND 3.0 IGO |
 | ICD-11 Foundation | `http://id.who.int/icd/entity` | The same WHO release | The same `--icd11` build | CC BY-ND 3.0 IGO |
+| ICF (standalone) | `http://hl7.org/fhir/sid/icf` | The `2001a` and `2017a` releases, with the qualifier grammar (`s7300.183`) | The release's `CodeSystem` in `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` | Licensed by WHO; you supply the release |
 | ATC/DDD | `http://www.whocc.no/atc` | Any annual index (`2026` style) | `ferroterm-build --atc <index.csv or BST801T> --atc-version <year>` | Purchased from the WHO Collaborating Centre |
 | ICPC-2 | `http://hl7.org/fhir/sid/icpc-2` | Any ClaML release | `ferroterm-build --claml <xml or zip> --system http://hl7.org/fhir/sid/icpc-2` | Licensed by WONCA |
 | RxNorm | `http://www.nlm.nih.gov/research/umls/rxnorm` | Any monthly release, or the licence-free prescribable subset | `ferroterm-build --rxnorm <RRF zip or dir>` | UMLS licence for the full release; the prescribable subset is free |

@@ -94,7 +94,7 @@ with UCUM and the registries built in:
 
 <!-- code-systems:begin -->
 SNOMED CT, LOINC, UCUM, BCP 47, BCP 13, ISO 3166-1, ICD-10 (WHO), ICD-10-NL,
-ICD-10-CM, ICD-11 MMS, ICD-11 ICF, ICD-11 Foundation, ATC/DDD, ICPC-2, RxNorm,
+ICD-10-CM, ICD-11 MMS, ICD-11 ICF, ICD-11 Foundation, ICF (standalone), ATC/DDD, ICPC-2, RxNorm,
 the DHD Diagnosethesaurus and Verrichtingenthesaurus, the G-Standaard, the
 Nederlandse Labcodeset, the NHG ICPC-1 to SNOMED CT map, NPU, ICD-O-3, EMDN,
 ISCO-08, ORPHAcodes, the DICOM Controlled Terminology (DCM), EDQM Standard
