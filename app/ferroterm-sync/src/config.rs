@@ -448,10 +448,10 @@ mod tests {
                     .map(ToString::to_string)
                     .unwrap_or_default()
             );
-            for secret in ["s3cret", "token=", "pw@", "/synd.xml", "/realm"] {
+            for piece in ["s3cret", "token=", "pw@", "/synd.xml", "/realm"] {
                 assert!(
-                    !chain.contains(secret),
-                    "{key}: the refusal repeats `{secret}`: {chain}"
+                    !chain.contains(piece),
+                    "{key}: the refusal repeats a piece of the URL beyond its scheme and host"
                 );
             }
         }
