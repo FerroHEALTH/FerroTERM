@@ -76,6 +76,41 @@ The edition and version come from the release itself (the module and
 effective time), and `$lookup` returns them as the version URI
 (`http://snomed.info/sct/11000146104/version/20260630`).
 
+A release may ship one file per namespace for its
+concepts, descriptions, relationships and module dependencies (an
+extension's own beside the International ones); the build reads them all.
+
+### An unpublished edition
+
+The SNOMED CT URI Standard names a release that is not published under
+`http://snomed.info/xsct/` in place of `http://snomed.info/sct/`. A release
+does not say whether it is published, so you state it with
+`--rf2-unpublished`:
+
+```console
+$ ferroterm-build --rf2 /path/to/release --rf2-unpublished --out /path/to/ferroterm-index
+```
+
+The version URI is then `http://snomed.info/xsct/[module]/version/[date]`.
+
+### The terminology ecosystem's test edition
+
+The HL7 terminology ecosystem's `snomed` test mode runs over a small SNOMED CT
+test subontology that the IG repository ships under `tx-source/snomed`, to be
+imported as `http://snomed.info/xsct/31000003106/version/20250909`. It is
+SNOMED CT content under SNOMED International's licence: fetch it for your run
+and keep it out of anything you publish. The files sit in `Terminology/` and
+`Refset/` with no `Snapshot/` folder above them, so put them under one:
+
+```console
+$ mkdir -p test-edition/Snapshot
+$ cp -R tx-source/snomed/Terminology tx-source/snomed/Refset test-edition/Snapshot/
+$ ferroterm-build --rf2 test-edition --rf2-unpublished --out /path/to/test-index
+```
+
+`scripts/checks/tx-ecosystem.sh --mode snomed --index /path/to/test-index`
+then runs the mode against it.
+
 ## Loading LOINC
 
 The same tool builds a LOINC release into the same artifact layout. Download
