@@ -41,9 +41,9 @@ built from the WHO ICD-API local deployment of release 2026-01 in English.
 
 | mode | surface | pass list | passed of ran | needs | open failures |
 |---|---|---|---|---|---|
-| `general` | `/r4b` | `passing.txt` | 728 of 805 | nothing | #1068, #1069, #1376, #1377, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
-| `general` | `/r4` | `passing-r4.txt` | 742 of 805 | nothing | #1068, #1069, #1376, #1377, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
-| `general` | `/r5` | `passing-r5.txt` | 742 of 805 | nothing | #1068, #1069, #1376, #1377, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
+| `general` | `/r4b` | `passing.txt` | 730 of 805 | nothing | #1068, #1069, #1376, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
+| `general` | `/r4` | `passing-r4.txt` | 744 of 805 | nothing | #1068, #1069, #1376, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
+| `general` | `/r5` | `passing-r5.txt` | 744 of 805 | nothing | #1068, #1069, #1376, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
 | `snomed` | `/r4b` | `passing-snomed.txt` | 2 of 378 | a SNOMED CT edition | #344, #1068, #1380 |
 | `icd-11` | `/r4b` | `passing-icd-11.txt` | 10 of 145 | the three ICD-11 artifacts | #1391, #1068, #1380 |
 | `icf` | `/r4b` | `passing-icf.txt` | 1 of 96 | the three ICD-11 artifacts | #1391, #1068, #1380 |
