@@ -121,6 +121,7 @@ code 78 (`EX_CONFIG`, `sysexits(3)`), and `healthcheck` with `not up` and 1.
 | `timezone` | `UTC` | the zone a daily schedule is read in |
 | `build_command` | `ferroterm-build` | the offline build, on `PATH` or by path |
 | `[auth]` | on, no issuer | the credentials the admin listener admits (see [The admin listener](#the-admin-listener)) |
+| `[jose] post_quantum_only` | `false` | the admin listener verifies access tokens with ML-DSA-44, ML-DSA-65 or ML-DSA-87 (RFC 9964) alone: an issuer's `algorithms` left at the default becomes those three, and a list naming any other algorithm refuses the start |
 | `[nts]` | `url = "https://terminologieserver.nl"`, `timeout = "1h"`, the realm's issuer, no client | the NTS the add-on calls and the client it authenticates as (see [Credentials](#credentials)) |
 | `[telemetry]` | `auto` format, no export | the console log's `format` and `filter` (`RUST_LOG` sets the filter too), and the OTLP export of the service's metrics, the same section the server reads (see [Telemetry](configuration.md#telemetry)) |
 
@@ -216,6 +217,21 @@ scope = "__ferroterm.admin"
 | `oauth.refresh_margin` | how long before the token expires a new one is fetched | `"30s"` |
 | `oauth.timeout` | how long one call to the authorization server may take | `"10s"` |
 | `[server_admin.credentials.oauth.tls]` | the outbound TLS table of the token calls (see [Configuration](configuration.md#telemetry)) | none |
+
+A client that authenticates with `private_key_jwt` signs its assertion with
+the algorithm of its key. An ML-DSA-65 key (RFC 9964), made with OpenSSL 3.5
+or later as `openssl genpkey -algorithm ML-DSA-65 -out sync-assertion.pem`,
+signs ML-DSA-65; register its public half at the authorization server as an
+`AKP` key:
+
+```toml
+[server_admin.credentials.oauth]
+issuer = "https://auth.example.org/realms/tx"
+client_id = "ferroterm-sync"
+client_auth = "private_key_jwt"
+private_key_file = "/run/secrets/sync-assertion.pem"
+scope = "__ferroterm.admin"
+```
 
 With the table empty the call carries no credential, which only a server with
 `[auth]` turned off accepts. There is no static token, and the table takes no

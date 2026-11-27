@@ -98,7 +98,7 @@ fn none() -> BasicGrants {
 async fn guarded() -> Router {
     let harness = Harness::new().await;
     let service = harness.service(Vec::new(), TestClock::new("2026-10-01T03:00:00Z", 0));
-    let auth = AdminAuth::start(&section(), &grants())
+    let auth = AdminAuth::start(&section(), &grants(), false)
         .await
         .expect("the section starts")
         .expect("authentication is on");
@@ -211,7 +211,7 @@ async fn the_product_scope_reaches_the_records_and_the_metrics() {
 
 #[tokio::test]
 async fn a_section_admitting_no_credential_refuses_the_start() {
-    let refused = AdminAuth::start(&AuthSection::default(), &none()).await;
+    let refused = AdminAuth::start(&AuthSection::default(), &none(), false).await;
     assert!(
         matches!(refused, Err(AuthError::Config { .. })),
         "an enabled [auth] with no issuer and no Basic user fails closed: {refused:?}"
@@ -286,7 +286,7 @@ fn active(issuer: &str, scope: &str) -> String {
 async fn introspected(issuer: &MockServer) -> Router {
     let harness = Harness::new().await;
     let service = harness.service(Vec::new(), TestClock::new("2026-10-01T03:00:00Z", 0));
-    let auth = AdminAuth::start(&introspecting(&issuer.uri()), &none())
+    let auth = AdminAuth::start(&introspecting(&issuer.uri()), &none(), false)
         .await
         .expect("the introspecting section starts")
         .expect("authentication is on");
@@ -379,7 +379,7 @@ async fn an_issuer_without_an_introspection_endpoint_refuses_the_start() {
         ))
         .mount(&issuer)
         .await;
-    let refused = AdminAuth::start(&introspecting(&base), &none()).await;
+    let refused = AdminAuth::start(&introspecting(&base), &none(), false).await;
     assert!(
         matches!(refused, Err(AuthError::Introspector { .. })),
         "the refusal names the introspection endpoint: {refused:?}"
@@ -393,7 +393,7 @@ async fn enabled_false_turns_the_guard_off() {
         ..AuthSection::default()
     };
     assert!(
-        AdminAuth::start(&off, &none())
+        AdminAuth::start(&off, &none(), false)
             .await
             .expect("starts")
             .is_none()
@@ -406,7 +406,7 @@ async fn a_deployment_names_its_own_product_scope() {
         product_scope: String::from("__example.sync"),
         ..section()
     };
-    let auth = AdminAuth::start(&named, &grants())
+    let auth = AdminAuth::start(&named, &grants(), false)
         .await
         .expect("starts")
         .expect("on");
@@ -489,7 +489,7 @@ async fn every_refusal_and_error_is_a_problem_that_quotes_nothing_it_was_sent() 
 /// The reason the listener refuses to start under `section` and `grants`,
 /// with its causes.
 async fn refusal(section: &AuthSection, grants: &BasicGrants) -> String {
-    let error = AdminAuth::start(section, grants)
+    let error = AdminAuth::start(section, grants, false)
         .await
         .expect_err("the start is refused");
     let mut reason = error.to_string();
@@ -530,7 +530,7 @@ async fn a_basic_user_with_a_system_scope_refuses_the_start_naming_the_user() {
     let grants = BasicGrants {
         users: std::iter::once((String::from("batch-loader"), grant)).collect(),
     };
-    let error = AdminAuth::start(&machine, &grants)
+    let error = AdminAuth::start(&machine, &grants, false)
         .await
         .expect_err("the start is refused");
     let AuthError::BasicGrants {
@@ -553,7 +553,7 @@ async fn a_grant_naming_no_listed_user_refuses_the_start_naming_the_user() {
     let grants = granting(&[("opertor", SYNC_SCOPE)]);
     let issuer = introspecting_issuer().await;
     for section in [admitting(&["operator"]), introspecting(&issuer.uri())] {
-        let error = AdminAuth::start(&section, &grants)
+        let error = AdminAuth::start(&section, &grants, false)
             .await
             .expect_err("the start is refused");
         let AuthError::BasicGrants {
@@ -580,4 +580,37 @@ fn a_scope_or_a_role_under_the_basic_user_is_refused_by_the_strict_load() {
         let text = format!("{user}{key}\n");
         assert!(load(&text).is_err(), "{text}");
     }
+}
+
+// RFC 9964 §5: under `[jose] post_quantum_only` an issuer verifies ML-DSA
+// alone, so a list naming a classical algorithm refuses the start.
+#[tokio::test]
+async fn post_quantum_only_refuses_an_issuer_listing_a_classical_algorithm() {
+    let issuer = AuthSection {
+        issuer: std::iter::once((
+            String::from("idp"),
+            IssuerEntry {
+                issuer: ferrohealth_secret::secret_url::SecretUrl::new("https://idp.example.org"),
+                audience: vec![String::from("ferroterm-sync")],
+                algorithms: vec![
+                    ferrohealth_smart::jws::algorithm::Algorithm::MlDsa65,
+                    ferrohealth_smart::jws::algorithm::Algorithm::Rs256,
+                ],
+                ..IssuerEntry::default()
+            },
+        ))
+        .collect(),
+        ..AuthSection::default()
+    };
+    let error = AdminAuth::start(&issuer, &none(), true)
+        .await
+        .expect_err("the start is refused");
+    let AuthError::PostQuantum { issuer, algorithm } = &error else {
+        panic!("post_quantum_only refuses RS256: {error:?}");
+    };
+    assert_eq!(issuer, "https://idp.example.org");
+    assert_eq!(
+        *algorithm,
+        ferrohealth_smart::jws::algorithm::Algorithm::Rs256
+    );
 }

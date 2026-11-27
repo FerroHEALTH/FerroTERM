@@ -17,8 +17,8 @@ use ferrohealth_telemetry::section::TelemetrySection;
 use ferrohealth_ui::i18n::Locale;
 use url::Url;
 
-use crate::config::Config;
 use crate::config::error::Error;
+use crate::config::{Config, Jose};
 
 /// The resolved configuration.
 #[derive(Debug, Clone)]
@@ -37,6 +37,8 @@ pub struct Settings {
     pub oidc: Option<OidcSection>,
     /// The checked sign-in the session store and the relying party run on.
     pub sign_in: SignInSettings,
+    /// `[jose]`: the algorithms the sign-in's ID Token may be signed with.
+    pub jose: Jose,
     /// Where each key took its value from, and the configuration file the
     /// settings were read from, which the Configuration page names.
     pub provenance: Provenance,
@@ -204,6 +206,7 @@ impl Config {
             },
             session: self.session.clone(),
             oidc: self.oidc.clone(),
+            jose: self.jose.clone(),
             sign_in: SignInSettings {
                 store,
                 provider,
