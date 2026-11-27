@@ -48,7 +48,7 @@
       ]
     },
     {
-      "subsumption": false,
+      "subsumption": true,
       "uri": "http://example.org/fhir/CodeSystem/colours",
       "version": [
         {
@@ -62,7 +62,11 @@
                 "in",
                 "not-in",
                 "regex",
-                "exists"
+                "exists",
+                "is-a",
+                "descendent-of",
+                "is-not-a",
+                "generalizes"
               ]
             }
           ],
@@ -80,7 +84,7 @@
       ]
     },
     {
-      "subsumption": false,
+      "subsumption": true,
       "uri": "http://example.org/fhir/CodeSystem/sketch",
       "version": [
         {
@@ -94,7 +98,11 @@
                 "in",
                 "not-in",
                 "regex",
-                "exists"
+                "exists",
+                "is-a",
+                "descendent-of",
+                "is-not-a",
+                "generalizes"
               ]
             }
           ],
@@ -1003,7 +1011,7 @@
       ]
     },
     {
-      "subsumption": false,
+      "subsumption": true,
       "uri": "urn:iso:std:iso:3166",
       "version": [
         {
@@ -1017,7 +1025,11 @@
                 "in",
                 "not-in",
                 "regex",
-                "exists"
+                "exists",
+                "is-a",
+                "descendent-of",
+                "is-not-a",
+                "generalizes"
               ]
             },
             {
@@ -1027,7 +1039,11 @@
                 "in",
                 "not-in",
                 "regex",
-                "exists"
+                "exists",
+                "is-a",
+                "descendent-of",
+                "is-not-a",
+                "generalizes"
               ]
             }
           ],
@@ -1049,7 +1065,7 @@
       ]
     }
   ],
-  "date": "2026-11-26T06:41:29.794176Z",
+  "date": "2026-11-27T11:25:37.31379Z",
   "expansion": {
     "hierarchical": false,
     "incomplete": false,

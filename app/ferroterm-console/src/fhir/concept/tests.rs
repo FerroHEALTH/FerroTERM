@@ -119,13 +119,21 @@ fn a_version_declaring_no_hierarchy_operator_has_no_tree_on_every_root() {
 
 #[test]
 fn a_declared_parent_property_is_not_a_declared_hierarchy_filter() {
-    // This system declares the `parent` and `child` concept properties and
-    // no hierarchy filter operator, so the tree cannot select a level of it
-    // and the screen says so rather than drawing an empty tree.
+    // A system that declares the `parent` and `child` concept properties and
+    // no hierarchy filter operator cannot have a level of its tree selected,
+    // and the screen says so rather than drawing an empty tree. FerroTERM now
+    // declares the is-a operators on flat ISO 3166 (#1377), and the console
+    // reads any server, so the row keeps the system's properties and drops
+    // the hierarchy operators another server would not declare.
     let card = capabilities("r5", R5)
         .card("urn:iso:std:iso:3166")
         .expect("the fixture declares this system");
-    let row = chosen_version(&card, None).expect("the fixture serves a version");
+    let mut row = chosen_version(&card, None).expect("the fixture serves a version");
+    for filter in &mut row.filters {
+        filter
+            .operators
+            .retain(|operator| !HIERARCHY_OPERATORS.contains(&operator.as_str()));
+    }
     assert!(
         row.properties.iter().any(|property| property == "parent"),
         "the version declares the property the tree would read"
