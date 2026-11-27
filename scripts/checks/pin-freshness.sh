@@ -56,6 +56,8 @@ readonly SUITE_LABEL="HL7 terminology ecosystem test cases"
 readonly SUITE_PACKAGE=https://packages.fhir.org/hl7.fhir.uv.tx-ecosystem
 readonly R6_LABEL="FHIR R6 terminology bundles"
 readonly R6_PACKAGE=https://packages2.fhir.org/packages/hl7.fhir.r6.core
+readonly THO_LABEL="HL7 Terminology (THO)"
+readonly THO_PACKAGE=https://packages.fhir.org/hl7.terminology.r4
 readonly CHROME_LABEL="Chrome for Testing"
 readonly CHROME_FEED=https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
 
@@ -240,6 +242,16 @@ elif ! latest="$(curl --proto '=https' --tlsv1.2 -fsSL "$R6_PACKAGE" | registry_
   unreadable_pin "$R6_LABEL" "could not read the latest version at $R6_PACKAGE ($latest)"
 else
   report "$R6_LABEL" "$pinned" "$latest" "$R6_PACKAGE" "$(cell_held <<< "$cell")"
+fi
+
+cell="$(matrix_cell "$THO_LABEL")"
+pinned="$(cell_version <<< "$cell")"
+if [[ -z "$pinned" ]]; then
+  unreadable_pin "$THO_LABEL" "no pin row in $MATRIX"
+elif ! latest="$(curl --proto '=https' --tlsv1.2 -fsSL "$THO_PACKAGE" | registry_latest 2>&1)"; then
+  unreadable_pin "$THO_LABEL" "could not read the latest version at $THO_PACKAGE ($latest)"
+else
+  report "$THO_LABEL" "$pinned" "$latest" "$THO_PACKAGE" "$(cell_held <<< "$cell")"
 fi
 
 cell="$(matrix_cell "$CHROME_LABEL")"

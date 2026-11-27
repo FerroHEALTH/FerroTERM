@@ -13,7 +13,7 @@ UCUM/validate-all-canonical-good
 UCUM/validate-ucum-canonical-good
 bugs/no-system
 bugs/x12-bad
-langcodes/expand-lang-script
+langcodes/expand-lang-region
 langcodes/subsumes-lang-base-region
 langcodes/subsumes-lang-case
 langcodes/subsumes-lang-crossed
