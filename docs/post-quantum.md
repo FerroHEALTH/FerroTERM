@@ -32,7 +32,8 @@ documentation site is published.
   hybrid solutions are recommended (§4.1).
 - **RFC 10024:** the TLS 1.3 hybrid group X25519MLKEM768 (codepoint
   0x11EC), within the hybrid design of RFC 9954.
-- **RFC 9964:** ML-DSA for JOSE and COSE (key type `AKP`).
+- **RFC 9964:** ML-DSA for JOSE and COSE (key type `AKP`). **RFC 9881:**
+  ML-DSA in X.509.
 
 A row is `safe` when every key it depends on is established or verified by
 a post-quantum or hybrid mechanism, or when it is a symmetric primitive at
@@ -67,14 +68,49 @@ peer (`app/ferroterm-console/tests/it/post_quantum.rs`,
 
 The key exchange protects what a session carries against an attacker who
 records it now and decrypts it later. The certificate signatures that
-authenticate a TLS peer stay classical: no TLS 1.3 signature scheme for
-ML-DSA is published as an RFC yet, and the operator's certificates decide
-the algorithm. The resource guard accepts access tokens signed with ML-DSA
-(RFC 9964) beside the classical algorithms, and a client assertion signs
-with ML-DSA when its configured key is an ML-DSA key; both rows stay `no`
-while a classical signature is still accepted or configured. The MD5
-checksum row stays `no` because MD5 is broken without a quantum computer;
-FerroTERM checks it only where a feed publishes nothing else.
+authenticate a TLS peer stay classical. RFC 9881 (October 2025, Proposed
+Standard) defines ML-DSA keys and signatures in X.509 certificates. The TLS
+1.3 signature schemes for ML-DSA (`mldsa44` 0x0904, `mldsa65` 0x0905,
+`mldsa87` 0x0906) are defined by draft-ietf-tls-mldsa-06, which the IESG
+approved and which waits in the RFC Editor queue, not yet an RFC
+(<https://datatracker.ietf.org/doc/draft-ietf-tls-mldsa/>, read
+2026-11-27). The row stays `no` while that document is a draft and the
+operator's certificates decide the algorithm. The MD5 checksum row stays
+`no` because MD5 is broken without a quantum computer; FerroTERM checks it
+only where a feed publishes nothing else.
+
+## JOSE signatures
+
+`ferrohealth-smart` 0.35.0 signs and verifies every JWS in its `jws`
+module, ML-DSA-44, ML-DSA-65 and ML-DSA-87 (RFC 9964, `AKP` keys) among the
+algorithms. What it accepts on a verification is the list it is given:
+
+- **Access tokens and DPoP proofs:** an issuer's `algorithms` and
+  `[auth.dpop] algorithms` default to RS256, RS384, PS256, PS384, ES256 and
+  ES384. An ML-DSA parameter set is accepted where a list names it; it is
+  not accepted by default, which this page said before.
+- **The console's sign-in ID Token:** the relying party's default is RS256
+  to PS512, ES256, ES384 and EdDSA; the console adds the three ML-DSA
+  parameter sets to it.
+- **Client assertions:** a key signs with the algorithm of its kind, an
+  ML-DSA key (RFC 9881 §6) with its parameter set and an RSA key with RS384.
+- **DPoP proofs FerroTERM makes:** the crate's `DpopKey` reads a P-256 or
+  P-384 key alone and signs ES256 or ES384. RFC 9449 §4.2 asks only for an
+  asymmetric algorithm, so moving it to ML-DSA is a change in that crate.
+
+`[jose] post_quantum_only = true`, in the server's and the sync service's
+configuration, narrows every algorithm list of a JWT issuer (and of
+`[auth.dpop]` on the server) left at its default to the three ML-DSA
+parameter sets, and stops the start when a list names another algorithm.
+The console's own `[jose] post_quantum_only = true` accepts an ID Token
+signed with ML-DSA alone. All three are off by default, for the issuers
+that still sign classically.
+
+The badge counts the JOSE rows in that configuration: `post_quantum_only`
+on and ML-DSA keys for the client assertions, as the book's examples set
+them. A deployment that leaves the settings off accepts the classical
+algorithms the rows name, and those rows are then not post-quantum safe for
+it.
 
 ## The inventory
 
@@ -86,12 +122,12 @@ FerroTERM checks it only where a feed publishes nothing else.
 | TLS 1.3 key exchange of the WHO ICD-API client of the offline build | X25519MLKEM768 first (rustls prefer-post-quantum); X25519, P-256, P-384 for a peer without it | yes | RFC 10024 | `crates/icd11/src/api.rs, tools/ferroterm-build/Cargo.toml` |
 | TLS 1.3 key exchange of the family clients: the issuer key sets, the console's OpenID Provider, the token endpoints, the OTLP export and the FerroPULSE usage report | X25519MLKEM768 first (rustls prefer-post-quantum); X25519, P-256, P-384 for a peer without it | yes | RFC 10024 | `ferrohealth-smart, ferrohealth-session, ferrohealth-telemetry, ferrohealth-usage-report` |
 | TLS 1.2 key exchange where min_version lowers the floor | ECDHE over X25519, P-256 or P-384 | no | no standard yet | `ferrohealth-server tls (min_version)` |
-| TLS server and client certificate authentication | ECDSA, RSA or Ed25519, as the operator's certificates hold | no | no standard yet | `ferrohealth-server tls, ferrohealth-server tls_client` |
+| TLS server and client certificate authentication | ECDSA, RSA or Ed25519, as the operator's certificates hold | no | RFC 9881; draft-ietf-tls-mldsa-06 in the RFC Editor queue | `ferrohealth-server tls, ferrohealth-server tls_client` |
 | TLS record protection | AES-128-GCM, AES-256-GCM, ChaCha20-Poly1305 | yes | NIST IR 8547 4.1.3 | `ferrohealth-server tls` |
-| Access token and DPoP proof verification | ML-DSA-44, ML-DSA-65 or ML-DSA-87 (AKP) beside RS256, RS384, PS256, PS384, ES256 and ES384, as the issuer signs | no | RFC 9964 | `ferrohealth-smart resource, app/ferroterm-server/src/smart/mod.rs, app/ferroterm-sync/src/auth.rs` |
-| Client assertions of the outbound client credentials grant (private_key_jwt) | the configured key's algorithm: RS384 by default, RS256 to PS512, ES256, ES384, EdDSA, or ML-DSA-44, ML-DSA-65 or ML-DSA-87 with an ML-DSA key | no | RFC 9964 | `ferrohealth-smart client assertion, app/ferroterm-sync/src/revalidate.rs, addons/nts/src/source.rs` |
-| DPoP proofs of the outbound client credentials grant | ES256 or ES384 | no | RFC 9964 | `ferrohealth-smart client dpop, addons/nts/src/source.rs` |
-| Console sign-in ID token verification | RS256, RS384, RS512, PS256, PS384, PS512, ES256, ES384, EdDSA | no | RFC 9964 | `ferrohealth-smart oidc, app/ferroterm-console/src/config/settings.rs` |
+| Access token and DPoP proof verification with [jose] post_quantum_only = true | ML-DSA-44, ML-DSA-65 or ML-DSA-87 (AKP) alone; off (the default), RS256, RS384, PS256, PS384, ES256 and ES384, and an ML-DSA parameter set where an algorithms list names it | yes | RFC 9964 | `ferrohealth-smart resource, app/ferroterm-server/src/config.rs, app/ferroterm-server/src/smart/mod.rs, app/ferroterm-sync/src/auth.rs` |
+| Client assertions of the outbound client credentials grant (private_key_jwt) with an ML-DSA key, as the examples configure it | ML-DSA-44, ML-DSA-65 or ML-DSA-87, the parameter set of the key (ML-DSA-65 in the examples); with a classical key RS384 by default, RS256 to PS512, ES256, ES384 or EdDSA | yes | RFC 9964 | `ferrohealth-smart client assertion, app/ferroterm-sync/src/revalidate.rs, addons/nts/src/source.rs` |
+| DPoP proofs of the outbound client credentials grant | ES256 or ES384, the only algorithms ferrohealth-smart 0.35.0 signs a DPoP proof with | no | RFC 9964 | `ferrohealth-smart client dpop, addons/nts/src/source.rs` |
+| Console sign-in ID token verification with [jose] post_quantum_only = true | ML-DSA-44, ML-DSA-65 or ML-DSA-87 alone; off (the default), those beside RS256, RS384, RS512, PS256, PS384, PS512, ES256, ES384 and EdDSA | yes | RFC 9964 | `ferrohealth-smart oidc, app/ferroterm-console/src/config/mod.rs, app/ferroterm-console/src/server.rs` |
 | Console sign-in PKCE challenge | SHA-256 (S256) | yes | NIST IR 8547 4.1.3 | `ferrohealth-smart oidc, app/ferroterm-console/src/server.rs` |
 | Console session cookie in sealed mode | AES-256-GCM | yes | NIST IR 8547 4.1.3 | `ferrohealth-session sessions, app/ferroterm-console/src/config/settings.rs` |
 | Basic password hashing | Argon2id | yes | NIST IR 8547 4.1.3 | `ferrohealth-smart basic, app/ferroterm-server/src/smart/mod.rs, app/ferroterm-sync/src/auth.rs` |

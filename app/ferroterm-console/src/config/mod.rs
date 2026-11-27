@@ -62,6 +62,7 @@ use ferrohealth_config::units::Duration;
 use ferrohealth_secret::secret_url::SecretUrl;
 use ferrohealth_session::config::{OidcSection, SessionSection};
 use ferrohealth_smart::config::endpoint::EndpointSection;
+use ferrohealth_smart::jws::algorithm::Algorithm;
 use ferrohealth_telemetry::section::TelemetrySection;
 use serde::Deserialize;
 
@@ -101,8 +102,34 @@ pub struct Config {
     /// `[oidc]`: the OpenID Provider operators sign in with; without it the
     /// console offers no sign-in.
     pub oidc: Option<OidcSection>,
+    /// `[jose]`: whether the sign-in's ID Token verifies with ML-DSA alone.
+    pub jose: Jose,
     /// `[telemetry]`: the console log; `RUST_LOG` sets its filter too.
     pub telemetry: TelemetrySection,
+}
+
+/// `[jose]`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Jose {
+    /// Whether the console accepts an ID Token signed with ML-DSA alone
+    /// (RFC 9964 §5): ML-DSA-44, ML-DSA-65 or ML-DSA-87. Off, it accepts
+    /// those beside the classical algorithms.
+    pub post_quantum_only: bool,
+}
+
+impl Jose {
+    /// The algorithms an ID Token of the sign-in may be signed with: the
+    /// three ML-DSA parameter sets under `post_quantum_only`, else every
+    /// asymmetric algorithm `ferrohealth-smart` verifies, ML-DSA among them.
+    #[must_use]
+    pub fn id_token_algorithms(&self) -> Vec<Algorithm> {
+        Algorithm::all()
+            .iter()
+            .copied()
+            .filter(|algorithm| !self.post_quantum_only || algorithm.is_ml_dsa())
+            .collect()
+    }
 }
 
 impl Config {

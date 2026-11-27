@@ -127,6 +127,9 @@ pub struct Config {
     /// `[basic_grants]`: the scopes and roles each Basic user of
     /// `[[auth.basic.users]]` is granted, by user-id.
     pub basic_grants: BasicGrants,
+    /// `[jose]`: whether the access tokens of `[auth]` verify with ML-DSA
+    /// alone.
+    pub jose: JoseSection,
     /// `[nts]`: the family outbound endpoint table of the Nationale
     /// Terminologie Server, starting from [`addon_nts::config::endpoint`]:
     /// the base `url`, the timeouts, `retry`, `tls`, and the client
@@ -170,9 +173,21 @@ impl Default for Config {
             nts: addon_nts::config::endpoint(),
             auth: AuthSection::default(),
             basic_grants: BasicGrants::default(),
+            jose: JoseSection::default(),
             telemetry: TelemetrySection::default(),
         }
     }
+}
+
+/// `[jose]`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct JoseSection {
+    /// Whether the admin listener verifies access tokens with ML-DSA alone
+    /// (RFC 9964 §5): an issuer's `algorithms` left at the default becomes
+    /// ML-DSA-44, ML-DSA-65 and ML-DSA-87, and one naming any other algorithm
+    /// stops the start.
+    pub post_quantum_only: bool,
 }
 
 /// A configuration that could not be read.
