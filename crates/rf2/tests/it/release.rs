@@ -297,6 +297,29 @@ fn a_sibling_root_module_is_reported_and_the_release_date_picks_the_edition() {
     let edition = Edition::identify(&members, time(fixture::DATE)).expect("identifies");
     assert_eq!(edition.module.to_string(), extension);
     assert_eq!(edition.sibling_roots, vec![module(&mapping)]);
+    // A member naming its own module does not make that module depended on: the
+    // ecosystem's test subontology ships one, and its module stays the edition.
+    let mut with_self = members.clone();
+    with_self.push(dependency(
+        6,
+        &extension,
+        &extension,
+        fixture::DATE,
+        fixture::DATE,
+    ));
+    let identified = Edition::identify(&with_self, time(fixture::DATE)).expect("identifies");
+    assert_eq!(identified.module.to_string(), extension);
+    // The URI Standard names an unpublished release under `xsct`.
+    let mut unpublished = edition.clone();
+    unpublished.unpublished = true;
+    assert_eq!(
+        unpublished.version_uri(),
+        format!(
+            "http://snomed.info/xsct/{extension}/version/{}",
+            fixture::DATE
+        )
+    );
+    assert!(edition.version_uri().starts_with("http://snomed.info/sct/"));
     // Without a root at the release date the edition is ambiguous.
     assert!(matches!(
         Edition::identify(&members, time("20250101")),

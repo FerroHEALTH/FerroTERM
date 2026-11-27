@@ -65,6 +65,7 @@ fn a_release_zip_builds_the_same_bytes_as_the_directory() {
     ferroterm_build::run(&Cli {
         rf2: Some(release.path().to_path_buf()),
         rf2_refset: Vec::new(),
+        rf2_unpublished: false,
         loinc: None,
         loinc_version: None,
         claml: None,
@@ -95,6 +96,7 @@ fn a_release_zip_builds_the_same_bytes_as_the_directory() {
     ferroterm_build::run(&Cli {
         rf2: Some(zip_path),
         rf2_refset: Vec::new(),
+        rf2_unpublished: false,
         loinc: None,
         loinc_version: None,
         claml: None,
@@ -163,6 +165,7 @@ fn only_the_snapshot_is_unpacked_and_a_zip_without_one_is_refused() {
         ferroterm_build::run(&Cli {
             rf2: Some(empty),
             rf2_refset: Vec::new(),
+            rf2_unpublished: false,
             loinc: None,
             loinc_version: None,
             claml: None,

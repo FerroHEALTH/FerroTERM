@@ -441,3 +441,66 @@ fn the_attribute_graph_member_tables_and_identifiers_are_written_beside_the_stor
     .expect("reads");
     assert!(identifiers.is_empty());
 }
+
+/// Moves the last row of `name` under `Snapshot/<directory>` into a second
+/// file of the same kind and date, as a release with a second namespace
+/// ships one per namespace.
+fn split_off_last_row(release: &std::path::Path, directory: &str, name: &str, other: &str) {
+    let path = release.join("Snapshot").join(directory).join(name);
+    let text = fs::read_to_string(&path).expect("reads");
+    let mut lines: Vec<&str> = text.lines().collect();
+    let last = lines.pop().expect("a row");
+    let header = lines.first().copied().expect("a header");
+    fs::write(&path, format!("{}\n", lines.join("\n"))).expect("writes");
+    fs::write(
+        release.join("Snapshot").join(directory).join(other),
+        format!("{header}\n{last}\n"),
+    )
+    .expect("writes");
+}
+
+/// A release that ships its concepts and its module dependencies in one file
+/// per namespace builds as if they were in one file each.
+#[test]
+fn every_concept_and_module_dependency_file_of_a_release_is_read() {
+    let whole = tempfile::tempdir().expect("tempdir");
+    fixture::write_release(whole.path());
+    let split = tempfile::tempdir().expect("tempdir");
+    fixture::write_release(split.path());
+    split_off_last_row(
+        split.path(),
+        "Terminology",
+        &format!("sct2_Concept_Snapshot_XX1234567_{DATE}.txt"),
+        &format!("sct2_Concept_Snapshot_YY7654321_{DATE}.txt"),
+    );
+    split_off_last_row(
+        split.path(),
+        "Refset/Metadata",
+        &format!("der2_ssRefset_ModuleDependencySnapshot_XX1234567_{DATE}.txt"),
+        &format!("der2_ssRefset_ModuleDependencySnapshot_YY7654321_{DATE}.txt"),
+    );
+    let out_whole = tempfile::tempdir().expect("tempdir");
+    let out_split = tempfile::tempdir().expect("tempdir");
+    let a = pipeline::build(whole.path(), &[], out_whole.path()).expect("builds");
+    let b = pipeline::build(split.path(), &[], out_split.path()).expect("builds");
+    assert_eq!(
+        (a.concepts, a.designations, a.is_a_edges, &a.version_uri),
+        (b.concepts, b.designations, b.is_a_edges, &b.version_uri)
+    );
+}
+
+/// `--rf2-unpublished` names the edition under `xsct`, as the URI Standard
+/// names an unpublished release
+/// (<https://docs.snomed.org/snomed-ct-specifications/snomed-ct-uri-standard>).
+#[test]
+fn an_unpublished_build_names_its_edition_under_xsct() {
+    let release = tempfile::tempdir().expect("tempdir");
+    fixture::write_release(release.path());
+    let out = tempfile::tempdir().expect("tempdir");
+    let report = pipeline::build_release(release.path(), &[], out.path(), true).expect("builds");
+    assert!(
+        report.version_uri.starts_with("http://snomed.info/xsct/"),
+        "{}",
+        report.version_uri
+    );
+}

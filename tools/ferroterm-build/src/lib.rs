@@ -45,6 +45,10 @@ pub struct Cli {
     /// A refset-only RF2 package layered onto the edition `--rf2` names (repeatable).
     #[arg(long, value_name = "DIR_OR_ZIP", action = clap::ArgAction::Append, requires = "rf2")]
     pub rf2_refset: Vec<PathBuf>,
+    /// Names the `--rf2` edition as unpublished, under `http://snomed.info/xsct/`
+    /// (the HL7 terminology ecosystem's test subontology is imported so).
+    #[arg(long, requires = "rf2")]
+    pub rf2_unpublished: bool,
     /// The LOINC release: the unpacked `Loinc_<version>` directory, or the release zip.
     #[arg(long, value_name = "DIR_OR_ZIP", conflicts_with_all = ["claml", "icd10cm", "rxnorm", "release"])]
     pub loinc: Option<PathBuf>,
@@ -313,7 +317,12 @@ fn run_snomed(cli: &Cli, out: &Path) -> Result<pipeline::Report, RunError> {
     for package in &cli.rf2_refset {
         refsets.push(unpack(package)?);
     }
-    Ok(pipeline::build(&root, &refsets, out)?)
+    Ok(pipeline::build_release(
+        &root,
+        &refsets,
+        out,
+        cli.rf2_unpublished,
+    )?)
 }
 
 /// The classification builds (`--claml`, `--atc`, `--icd10cm`), when the

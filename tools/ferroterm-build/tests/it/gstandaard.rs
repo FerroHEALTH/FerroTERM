@@ -13,6 +13,7 @@ fn the_release_builds_the_four_rungs_under_the_output_directory() {
     let report = ferroterm_build::run(&ferroterm_build::Cli {
         rf2: None,
         rf2_refset: Vec::new(),
+        rf2_unpublished: false,
         loinc: None,
         loinc_version: None,
         claml: None,

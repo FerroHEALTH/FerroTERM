@@ -53,6 +53,10 @@ pub struct Edition {
     pub effective_time: EffectiveTime,
     /// Every module in the release with the version it is at.
     pub modules: BTreeMap<ModuleId, EffectiveTime>,
+    /// Whether the release is unpublished, which the URI Standard names under
+    /// `http://snomed.info/xsct/` rather than `http://snomed.info/sct/`. A
+    /// release does not say so itself, so the importer states it.
+    pub unpublished: bool,
 }
 
 impl Edition {
@@ -112,7 +116,12 @@ impl Edition {
                     target: member.member.referenced_component_id.to_string(),
                 });
             };
-            depended_on.insert(target);
+            // NOTE: no spec governs a member naming its own module, our own design: it
+            // says nothing about what the module depends on, so it does not make the
+            // module depended on (the ecosystem's test subontology ships one).
+            if target != source {
+                depended_on.insert(target);
+            }
             modules
                 .entry(target)
                 .and_modify(|t| *t = (*t).max(member.target_effective_time))
@@ -164,13 +173,17 @@ impl Edition {
             sibling_roots,
             effective_time,
             modules,
+            unpublished: false,
         })
     }
 
-    /// The edition URI, `http://snomed.info/sct/[moduleId]`.
+    /// The edition URI, `http://snomed.info/sct/[moduleId]`, or
+    /// `http://snomed.info/xsct/[moduleId]` for an unpublished release
+    /// (<https://docs.snomed.org/snomed-ct-specifications/snomed-ct-uri-standard>).
     #[must_use]
     pub fn edition_uri(&self) -> String {
-        format!("http://snomed.info/sct/{}", self.module)
+        let space = if self.unpublished { "xsct" } else { "sct" };
+        format!("http://snomed.info/{space}/{}", self.module)
     }
 
     /// The version URI, `http://snomed.info/sct/[moduleId]/version/[YYYYMMDD]`.
