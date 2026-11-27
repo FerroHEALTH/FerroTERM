@@ -466,22 +466,19 @@ impl StoredSystem for Snomed {
             value: PropertyValue::Boolean(!record.active),
             ..Property::default()
         }];
-        let defined = of(provider.system().keys.definition_status).is_some_and(|values| {
-            values
-                .iter()
-                .any(|v| matches!(v, record::PropertyValue::Code(c) if *c == constants::DEFINED.to_string()))
-        });
+        let defined = of(provider.system().keys.definition_status)
+            .is_some_and(|values| selection::states_defined(values));
         out.push(Property {
             code: String::from("sufficientlyDefined"),
             value: PropertyValue::Boolean(defined),
             ..Property::default()
         });
         if let Some(values) = of(provider.system().keys.module)
-            && let Some(record::PropertyValue::Code(module)) = values.first()
+            && let Some(record::PropertyValueRef::Code(module)) = values.first()
         {
             out.push(Property {
                 code: String::from("moduleId"),
-                value: PropertyValue::Code(module.clone()),
+                value: PropertyValue::Code((*module).to_owned()),
                 ..Property::default()
             });
         }
@@ -498,7 +495,7 @@ impl StoredSystem for Snomed {
                 continue;
             };
             for value in values {
-                let Some(value) = provider.stored().property_value(value.clone())? else {
+                let Some(value) = provider.stored().property_value(*value)? else {
                     continue;
                 };
                 out.push(Property {

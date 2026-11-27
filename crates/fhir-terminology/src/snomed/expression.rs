@@ -562,15 +562,18 @@ impl SnomedProvider {
                 .store
                 .ordinal(&concept.concept_id)
                 .map_err(storage)?
-            && self
-                .stored()
-                .store
-                .designations(ordinal)
-                .map_err(storage)?
-                .iter()
-                .any(|d| d.active && d.term == *written)
         {
-            return Ok(Some(written.clone()));
+            let mut described = false;
+            self.stored()
+                .store
+                .scan_designations(ordinal, |d| {
+                    described = d.active && d.term == written.as_str();
+                    !described
+                })
+                .map_err(storage)?;
+            if described {
+                return Ok(Some(written.clone()));
+            }
         }
         self.term_of(&concept.concept_id, language)
     }

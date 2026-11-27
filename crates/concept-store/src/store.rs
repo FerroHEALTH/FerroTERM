@@ -19,7 +19,7 @@ use concept_graph::ordinal::Ordinal;
 use redb::{ReadOnlyDatabase, ReadOnlyTable, ReadableDatabase, ReadableTable, TableHandle};
 
 use crate::column::{Column, ColumnError};
-use crate::record::{self, Concept, Designation, PropertyValue, RecordError};
+use crate::record::{self, Concept, Designation, DesignationRef, PropertyValueRef, RecordError};
 use crate::tables;
 
 /// A failure while opening or reading an artifact.
@@ -343,6 +343,48 @@ impl Store {
         })
     }
 
+    /// Calls `visit` with each designation of `ordinal`, in index order and
+    /// borrowing its text, until it answers `false`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StoreError`] when the database cannot be read or a record is damaged.
+    pub fn scan_designations(
+        &self,
+        ordinal: Ordinal,
+        visit: impl FnMut(DesignationRef<'_>) -> bool,
+    ) -> Result<(), StoreError> {
+        let Some(packed) = self.designation_rows.get(ordinal.index())? else {
+            return Ok(());
+        };
+        record::Designations::scan(packed.value(), visit).map_err(|source| StoreError::Record {
+            table: tables::DESIGNATIONS.name().to_owned(),
+            key: ordinal.to_string(),
+            source,
+        })
+    }
+
+    /// The first designation of `ordinal`, in index order, that `wanted`
+    /// accepts; the others are read without allocating.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StoreError`] when the database cannot be read or a record is damaged.
+    pub fn find_designation(
+        &self,
+        ordinal: Ordinal,
+        mut wanted: impl FnMut(&DesignationRef<'_>) -> bool,
+    ) -> Result<Option<Designation>, StoreError> {
+        let mut found = None;
+        self.scan_designations(ordinal, |designation| {
+            if wanted(&designation) {
+                found = Some(Designation::from(designation));
+            }
+            found.is_none()
+        })?;
+        Ok(found)
+    }
+
     /// The acceptability ordinal of a designation in a language reference set.
     ///
     /// # Errors
@@ -398,7 +440,7 @@ impl Store {
             key: ordinal.to_string(),
             source,
         };
-        let mut chosen: Option<(u32, Designation)> = None;
+        let mut chosen: Option<(u32, DesignationRef<'_>)> = None;
         for (index, refset, acceptability) in entries {
             if refset != language_refset || acceptability != preferred {
                 continue;
@@ -415,7 +457,7 @@ impl Store {
                 chosen = Some((index, designation));
             }
         }
-        Ok(chosen.map(|(_, designation)| designation))
+        Ok(chosen.map(|(_, designation)| Designation::from(designation)))
     }
 
     /// The display of `ordinal` from the first of `language_refsets` whose
@@ -456,7 +498,8 @@ impl Store {
         Ok(None)
     }
 
-    /// Every property of `ordinal`, as `(property key ordinal, values)`, in key order.
+    /// Every property of `ordinal`, as `(property key ordinal, values)`, in
+    /// key order, borrowing the text from the column.
     ///
     /// # Errors
     ///
@@ -464,15 +507,38 @@ impl Store {
     pub fn properties(
         &self,
         ordinal: Ordinal,
-    ) -> Result<Vec<(u32, Vec<PropertyValue>)>, StoreError> {
+    ) -> Result<Vec<(u32, Vec<PropertyValueRef<'_>>)>, StoreError> {
         let Some(bytes) = self.properties.get(ordinal) else {
             return Ok(Vec::new());
         };
-        record::Properties::decode(bytes).map_err(|source| StoreError::Record {
+        record::Properties::decode(bytes)
+            .map_err(|source| Self::damaged_properties(ordinal, source))
+    }
+
+    /// The values of property `key` of `ordinal`, empty when it has none,
+    /// borrowing the text from the column.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StoreError`] when the column is damaged.
+    pub fn property(
+        &self,
+        ordinal: Ordinal,
+        key: u32,
+    ) -> Result<Vec<PropertyValueRef<'_>>, StoreError> {
+        let Some(bytes) = self.properties.get(ordinal) else {
+            return Ok(Vec::new());
+        };
+        record::Properties::find(bytes, key)
+            .map_err(|source| Self::damaged_properties(ordinal, source))
+    }
+
+    fn damaged_properties(ordinal: Ordinal, source: RecordError) -> StoreError {
+        StoreError::Record {
             table: tables::COLUMN_PROPERTIES.to_owned(),
             key: ordinal.to_string(),
             source,
-        })
+        }
     }
 
     /// A vocabulary entry: the name of a property key, designation use,

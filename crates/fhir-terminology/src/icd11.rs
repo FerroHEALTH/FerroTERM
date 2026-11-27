@@ -159,16 +159,10 @@ fn entity_id(
     let Some(key) = id_key else {
         return Ok(String::new());
     };
-    let mut id = String::new();
-    for (k, values) in store.properties(ordinal)? {
-        if k == key
-            && let Some(record::PropertyValue::Code(uri)) = values.first()
-            && let Some(entity) = linearization.id_of(uri)
-        {
-            id = entity;
-        }
-    }
-    Ok(id)
+    Ok(match store.property(ordinal, key)?.first() {
+        Some(record::PropertyValueRef::Code(uri)) => linearization.id_of(uri).unwrap_or_default(),
+        _ => String::new(),
+    })
 }
 
 impl Icd11Provider {
@@ -384,15 +378,12 @@ impl StoredSystem for Icd11 {
         Ok(provider
             .stored()
             .store
-            .properties(Ordinal::new(concept.index()))
+            .property(Ordinal::new(concept.index()), key)
             .map_err(storage)?
             .into_iter()
-            .find(|(k, _)| *k == key)
-            .and_then(|(_, values)| {
-                values.into_iter().find_map(|v| match v {
-                    record::PropertyValue::String(s) => Some(s),
-                    _ => None,
-                })
+            .find_map(|v| match v {
+                record::PropertyValueRef::String(s) => Some(s.to_owned()),
+                _ => None,
             }))
     }
 
@@ -452,13 +443,13 @@ impl StoredSystem for Icd11 {
             }
             for value in values {
                 let value = match value {
-                    record::PropertyValue::Code(c) => PropertyValue::Code(c),
-                    record::PropertyValue::String(s) => PropertyValue::String(s),
-                    record::PropertyValue::Boolean(b) => PropertyValue::Boolean(b),
-                    record::PropertyValue::Integer(i) => PropertyValue::Integer(i),
-                    record::PropertyValue::Decimal(d) => PropertyValue::Decimal(d),
-                    record::PropertyValue::DateTime(d) => PropertyValue::DateTime(d),
-                    record::PropertyValue::Concept(_) => continue,
+                    record::PropertyValueRef::Code(c) => PropertyValue::Code(c.to_owned()),
+                    record::PropertyValueRef::String(s) => PropertyValue::String(s.to_owned()),
+                    record::PropertyValueRef::Boolean(b) => PropertyValue::Boolean(b),
+                    record::PropertyValueRef::Integer(i) => PropertyValue::Integer(i),
+                    record::PropertyValueRef::Decimal(d) => PropertyValue::Decimal(d.to_owned()),
+                    record::PropertyValueRef::DateTime(d) => PropertyValue::DateTime(d.to_owned()),
+                    record::PropertyValueRef::Concept(_) => continue,
                 };
                 out.push(Property {
                     code: name.clone(),
