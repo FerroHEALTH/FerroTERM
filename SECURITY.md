@@ -33,8 +33,8 @@ release itself is supported only while it is the newest.
 
 | Artifact | Supported version | Where fixes ship |
 | --- | --- | --- |
-| The `ferroterm` and `ferroterm-build` binaries (release tarballs) | the newest published release | the newest release |
-| The server and console container images | the newest published release | the newest release |
+| The `ferroterm`, `ferroterm-build` and `ferroterm-sync` binaries (release tarballs) | the newest published release | the newest release |
+| The server, synchronisation service and console container images (`ferroterm`, `ferroterm-sync`, `ferroterm-console`) | the newest published release | the newest release |
 | The library crates on crates.io | the newest published release | the newest release |
 
 `main` is unreleased and best effort.
@@ -55,8 +55,9 @@ published advisories,
 **Do not open a public issue for a security vulnerability.**
 
 This route covers the products this repository publishes: the FerroTERM
-server and its tools (release tarballs), the `ferroterm` and
-`ferroterm-console` container images, and the library crates on crates.io.
+server and its tools (release tarballs), the `ferroterm`, `ferroterm-sync`
+and `ferroterm-console` container images, and the library crates on
+crates.io.
 Report privately, through either route:
 
 - [GitHub private vulnerability reporting](https://github.com/FerroHEALTH/FerroTERM/security/advisories/new)
@@ -127,7 +128,7 @@ a misconfiguration outside FerroTERM's control.
   with the justification and an impact statement you can check. If you think
   one of those arguments is wrong, that is a valid report.
 - Every release carries its vulnerability record
-  (`ferroterm-<tag>-vulnerability-record.json`): a scan of both images and the
+  (`ferroterm-<tag>-vulnerability-record.json`): a scan of every image and the
   server tarballs at every severity, each finding joined with the statement
   that judges it. A release with an unjudged finding is not published, and
   its images are scanned before they are tagged.

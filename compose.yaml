@@ -45,7 +45,9 @@ services:
       FERROTERM__TERMINOLOGY__INDEX: /data/index
       # FHIR CodeSystem resources (a package's `package/` directory or JSON
       # files) are served from a second mount: add `FERROTERM__TERMINOLOGY__CODE_SYSTEMS:
-      # /data/codesystems` here and a read-only bind volume below.
+      # /data/codesystems` here and a read-only bind volume below. Separate
+      # several directories with commas (`/data/a,/data/b`); a colon is part
+      # of one path.
       # `pretty` for a person watching `docker compose up`; a log pipeline
       # sets `json` (one object per line). `RUST_LOG` filters.
       FERROTERM__TELEMETRY__FORMAT: ${FERROTERM__TELEMETRY__FORMAT:-pretty}
