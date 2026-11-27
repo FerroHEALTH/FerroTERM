@@ -38,15 +38,14 @@ FerroTERM's own part. The information and instructions Annex II asks for are on
 ## Scope and dates
 
 - **The product assessed.** Each tagged release as Cadasto B.V. publishes it:
-  the `ferroterm` and `ferroterm-build` binaries in the release tarballs, the
-  `ferroterm` container image, the console's `ferroterm-console` binaries and
-  image, and the source archive. The library crates FerroTERM
+  the `ferroterm`, `ferroterm-build` and `ferroterm-sync` binaries in the
+  release tarballs, the `ferroterm` and `ferroterm-sync` container images, the
+  console's `ferroterm-console` binaries and image, and the source archive. The library crates FerroTERM
   publishes on crates.io are products of their own; this page covers them only
   where a row says so, and [the crates](#the-crates-on-cratesio) says how.
 - **The synchronisation service.** `ferroterm-sync` ships in every release
-  tarball and as the `ghcr.io/ferrohealth/ferroterm-sync` image, from v0.3.0
-  of 2026-10-24. Version 1 of this assessment predates that release and does
-  not cover it.
+  tarball and as the `ghcr.io/ferrohealth/ferroterm-sync` image from v0.3.0
+  of 2026-10-24. Revision 2 assesses it; revision 1 predated that release.
 - **Who the requirements bind.** Annex I Part I sets properties of the product,
   which the manufacturer ensures (CRA Art. 6, Art. 13(1)). Part II sets the
   manufacturer's processes. A deploying organisation that runs an unmodified
@@ -81,10 +80,23 @@ database, keeps the `CodeSystem`, `ValueSet` and `ConceptMap` resources its
 clients write. The console is a browser interface over the same public FHIR
 API.
 
+The synchronisation service, `ferroterm-sync`, keeps a deployment current
+from a national terminology service: on a schedule it reads the service's
+Atom feed and its FHIR API, downloads the releases and resources the
+deployment subscribed to, builds an RF2 release with `ferroterm-build` as a
+child process, renames the result into the index root the server reads, asks
+the server to reload over its admin listener, and revalidates the
+deployment's own value sets and concept maps through the server's public FHIR
+API ([syncing from a national terminology service](../operate/sync.md)). It
+runs as its own process beside the server, with an admin listener of its own.
+
 **The data it processes** is terminology content and the resources clients
 author. A request names a code system, a code and sometimes a display or a
 search term. FerroTERM holds no patient record, and its read path receives no
-patient data in normal use.
+patient data in normal use. The synchronisation service processes the same
+kind of content: the releases and resources a terminology service publishes,
+its run records, and the credentials it presents to the terminology service
+and to the server's admin listener.
 
 **The operational environment** is a server on the deploying organisation's
 network, beside the systems that call it, behind a reverse proxy that
@@ -94,6 +106,9 @@ authenticated, and rate-limits
 server the organisation runs issues the tokens the write routes, the admin
 listener and the console's sign-in use
 ([authentication](../operate/configuration.md#authentication)).
+The synchronisation service runs on the same network, shares one filesystem
+with the server's index root and resource directory, and reaches the
+terminology service over the internet.
 
 **Reasonably foreseeable use and misuse**, each with what the product does:
 
@@ -104,13 +119,19 @@ listener and the console's sign-in use
 | The admin listener published beside the FHIR surface | every route on it requires the admin scope, and the book says to bind it to loopback or an internal address | a deployment that turns authentication off and publishes it lets anyone make the server re-read its disks |
 | A damaged or half-written index served | an artifact that does not open refuses the start, and a reload that meets one keeps the previous set ([a refused artifact stops the start](../operate/reloading.md#a-refused-artifact-stops-the-start)) | none |
 | Patient data sent as a search term | the request log never carries a body or a free-text parameter | a proxy's own access log may; the book says to keep it to the same standard |
+| The sync service's admin listener published | every route but the health routes requires the product scope, and the service refuses to start while `[auth]` admits no credential unless it says `enabled = false` | a deployment that turns authentication off and publishes it lets anyone start a run, activate what is staged, and read the run records |
+| A sync endpoint configured as plain `http` | the service calls the URL it is given; the shipped overlay calls the server over the compose network | a credential sent over plain HTTP outside a trusted network can be read in transit ([(e)](#e-confidentiality-of-stored-transmitted-and-processed-data)) |
+| A release that breaks answers activated by the sync service | `activation = "manual"` stops a run after staging; a reload the server refuses is rolled back; retention keeps the previous release; the revalidation reports what the release changed for the deployment's own content | `activation = "auto"`, the default, serves a release the server accepts without a person looking at it |
 | A release run after a newer one is published | the release notes and `SECURITY.md` say only the newest release is supported | the running server does not state its support end date ([(c)](#c-security-updates-notification-and-postponement)) |
 
 **The assets:** the licensed code-system content in the indexes, the
 resources clients wrote, the correctness of every terminology answer (a wrong
 answer that looks right reaches a clinical system downstream), the
 authentication configuration and its credentials (`[auth]` and the Basic users'
-password hashes, the console's OIDC client secret and sessions), the release
+password hashes, the console's OIDC client secret and sessions), the
+synchronisation service's credentials (its client at the terminology service
+and its client for the server's admin listener), the content of the index
+root and the resource directory it writes, its run records, the release
 artefacts, and availability.
 
 ## How the risks were analysed
@@ -135,6 +156,11 @@ levels (high, medium, low).
 | T8 | A tampered artefact reaches a deployment | high | low | SLSA Build Level 3 provenance; SBOM attestations; digest-pinned base image | (f) |
 | T9 | A console session is taken over, or the console is used to write on a reader's behalf | medium | low | server-held session behind one `HttpOnly` cookie; `SameSite=Lax`; PKCE; a nonce CSP with `frame-ancestors 'none'` | (d), (e) |
 | T10 | Request content leaks into logs or outbound reports | medium | low | no body or free-text parameter logged; the usage report carries no code, URL or request path | (e), (g) |
+| T11 | A tampered or substituted release reaches the index root through the sync service | high | low for a feed entry, medium for a resource from a FHIR API | a feed entry is streamed to a partial file and kept only when its digest matches the one the feed advertised; the build runs in staging and a failed build never reaches the index root; a resource read from a FHIR API carries no advertised digest, so it rests on the transport, and the run record keeps the digest of what arrived | (f) |
+| T12 | An unauthenticated caller starts a run, activates staged content or reads the run records | medium | low | the admin listener is a resource server over `ferrohealth-smart`; every route but the health routes requires the product scope; fail-closed start | (b), (d) |
+| T13 | The sync service's credentials leak | high: the reload client can make the server re-read its disks, and the terminology service account unlocks licensed content | low | each secret read from a mounted file or a variable, shown as `***` by `config check`, never logged; the reload call refuses a Basic credential and takes a client credentials token; tokens kept in memory | (d), (e) |
+| T14 | A release that changes answers is served without review | high | medium with `activation = "auto"` | `activation = "manual"`; a refused reload rolled back; retention keeps the previous release to roll back to; the revalidation reports inactive, absent and out-of-value-set codes in the run record and the webhook summary | (f), (h) |
+| T15 | A hostile feed or API response crashes the service or exhausts its disk | medium | low | memory-safe Rust with `unsafe` forbidden; downloads streamed to disk; retention prunes old releases and each run record states the bytes the index root uses; the feed parser is not fuzzed and a download has no size cap | (h), (k) |
 
 ## Annex I Part I(1): the level of cybersecurity
 
@@ -166,7 +192,8 @@ the evidence only).
 - **Evidence:** `deny.toml`; `.github/workflows/ci.yml` (`cargo-deny`);
   `.github/dependabot.yml`; `.github/workflows/release-build.yml`.
 - **Status:** partial. No advisory is accepted in `deny.toml`. No release
-  lane scans the container images before they are tagged.
+  lane scans the container images before they are tagged. The same holds for
+  the `ferroterm-sync` binary and image, built in the same lanes.
 
 ### (b) Secure by default, and reset to the original state
 
@@ -186,13 +213,20 @@ reset the product to its original state"
   start. The console offers no sign-in or editing without an `[oidc]` section,
   and its session cookie is `Secure` by default. The images run as uid 65532
   on distroless static, with no shell; the quickstart adds a read-only root
-  filesystem, all capabilities dropped and `no-new-privileges`.
+  filesystem, all capabilities dropped and `no-new-privileges`. The
+  synchronisation service binds its admin listener on `127.0.0.1:8181`,
+  refuses to start while `[auth]` admits no credential unless it says
+  `enabled = false`, and refuses an unknown key or `FERROTERM_SYNC__`
+  variable; its image runs as uid 65532 on distroless static.
 - **Reset:** FerroTERM keeps its state in files the deployment names: the
   index directories, the `FERROTERM__TERMINOLOGY__RESOURCES` database and the
   `FERROTERM__USAGE_REPORT__STATE_DIR` directory. Deleting the database and the state
   directory and restarting returns a server to its original state over the
   same indexes ([CRA information for users, 8(d)](cra-user-information.md#8d-secure-decommissioning-and-removing-user-data)).
+  The synchronisation service keeps its state in the `state`, `records` and
+  `staging` directories its configuration names.
 - **Evidence:** `app/ferroterm-server/src/config.rs`;
+  `app/ferroterm-sync/src/config.rs`; `docker/Dockerfile.sync`;
   [configuration](../operate/configuration.md); `docker/Dockerfile`;
   `docker/console/Dockerfile`; `compose.yaml`.
 - **Status:** met for the defaults. The image binds `0.0.0.0:8080` in plain
@@ -239,8 +273,12 @@ systems, and report on possible unauthorised access"
   readers. The console signs a user in with the authorization code flow and
   PKCE and keeps the token on its own server. A refused credential answers
   `401` and a missing permission `403`, each logged as a request line with its
-  status at `warn`.
-- **Evidence:** `app/ferroterm-server/src/smart/`;
+  status at `warn`. The synchronisation service's admin listener is a
+  resource server over the same crate and requires its product scope,
+  `__ferroterm.sync` by default, on every route but the health routes; the
+  service presents a client credentials token to the server's admin listener
+  and to the terminology service, and accepts no static token.
+- **Evidence:** `app/ferroterm-server/src/smart/`; `app/ferroterm-sync/src/auth.rs`;
   [authentication](../operate/configuration.md#authentication);
   [validating tokens in the server](../operate/reverse-proxy.md#validating-tokens-in-the-server);
   `app/ferroterm-console/src/auth/` over `ferrohealth-session`.
@@ -260,13 +298,19 @@ transit by state of the art mechanisms, and by using other technical means"
   `https` outside loopback. The console holds tokens server side and never in
   the browser. Other technical means: request bodies and free-text parameters
   are never logged; secrets are read from files; the Basic users carry
-  password hashes, never passwords.
+  password hashes, never passwords. The synchronisation service reads its
+  secrets from files or variables, shows them as `***` in `config check`, and
+  sends a client secret only to the token endpoint.
 - **Evidence:** [what the server logs](../operate/configuration.md#what-the-server-logs);
   [the console, signing in](../operate/console.md#signing-in).
 - **Status:** partial. The server and the console speak plain HTTP on their
   own listeners and rely on the proxy for TLS. FerroTERM does not encrypt the
   indexes or the resource database at rest
-  ([the justification](#encryption-at-rest-annex-i-part-i2e)).
+  ([the justification](#encryption-at-rest-annex-i-part-i2e)). The
+  synchronisation service calls the URLs its configuration names and does not
+  refuse a plain `http` one, so a token sent to an endpoint configured that
+  way crosses the network unencrypted; the shipped overlay calls the server
+  over the compose network.
 
 ### (f) Integrity, and reporting corruptions
 
@@ -282,10 +326,18 @@ corruptions"
   Programs: SLSA Build Level 3 provenance, Sigstore-signed SBOM attestations,
   checksums, and a base image pinned by digest. Configuration: a
   `FERROTERM__AUTH__` variable that names no key of `[auth]` stops the start.
+  The synchronisation service keeps a download only when its digest matches
+  the one the feed advertised, builds in staging, renames a release into the
+  index root in one step, and rolls an activation back when the server
+  refuses the reload.
 - **Evidence:** [a refused artifact stops the start](../operate/reloading.md#a-refused-artifact-stops-the-start);
   [verifying releases](../operate/verifying-releases.md);
-  `.github/workflows/release-build.yml`.
-- **Status:** met. The indexes carry no signature of their own: they are built
+  `.github/workflows/release-build.yml`;
+  `crates/terminology-syndication/src/download.rs`;
+  `app/ferroterm-sync/src/activate.rs`.
+- **Status:** met for the server. The synchronisation service is partial: a
+  resource read from a FHIR API has no advertised digest to check against.
+  The indexes carry no signature of their own: they are built
   by the deploying organisation from its own release, on its own machine, and
   stored on its own disks, so their protection against a writer who reaches
   those disks is the platform's.
@@ -318,7 +370,9 @@ denial-of-service attacks"
   proxy ([rate limits and timeouts](../operate/reverse-proxy.md#rate-limits-and-timeouts)).
 - **Status:** partial. The server has no rate limit, request timeout or body
   cap of its own beyond the framework's default body limit, so a deployment
-  without a proxy has none.
+  without a proxy has none. The synchronisation service runs apart from the
+  server, so a failed run leaves the served set answering; it prunes old
+  releases by retention and puts no cap on the size of a download.
 
 ### (i) Minimal impact on other devices and networks
 
@@ -329,8 +383,11 @@ on the availability of services provided by other devices or networks"
 - **How:** the server binary links no general HTTP client
   (`scripts/checks/no-client-in-server.sh`, run in CI). Its outbound calls are
   the issuer's metadata and keys, read at most once per
-  `jwks_refresh_interval_seconds`, and the usage report, at most one start
-  report per ten minutes and one daily report, each at most 64 KiB.
+  `jwks_refresh_interval`, and the usage report, at most one start
+  report per ten minutes and one daily report, each at most 64 KiB. The
+  synchronisation service calls the terminology service once per scheduled
+  run, or when a person asks for one, with the retry its endpoint table
+  bounds.
 - **Status:** met.
 
 ### (j) Limited attack surface
@@ -342,7 +399,9 @@ external interfaces"
 - **How:** the server has one listener by default; the admin listener serves
   `POST /reload` alone and is off by default; writes are off without a
   database; the images are distroless static with no shell or package manager;
-  the console is a separate program and the server serves no UI.
+  the console is a separate program and the server serves no UI; the
+  synchronisation service is a separate program, and only it links the
+  terminology service add-ons (`scripts/checks/addon-boundary.sh`).
 - **Evidence:** `docker/Dockerfile`; `docker/console/Dockerfile`;
   [the admin listener stays behind the proxy](../operate/reverse-proxy.md#the-admin-listener-stays-behind-the-proxy).
 - **Status:** met. `/health` and `/metrics` answer on the FHIR listener, and
@@ -361,7 +420,8 @@ appropriate exploitation mitigation mechanisms and techniques"
   with every capability dropped.
 - **Evidence:** `Cargo.toml` (`[workspace.lints.rust]`, `[profile.release]`);
   `fuzz/fuzz_targets/`; `.github/workflows/fuzz.yml`.
-- **Status:** met.
+- **Status:** met for the server. The synchronisation service is partial: the
+  Atom feed parser, which reads content from the internet, has no fuzz target.
 
 ### (l) Recording and monitoring, with an opt-out
 
@@ -377,7 +437,9 @@ or functions, with an opt-out mechanism for the user"
 - **Evidence:** [what the server logs](../operate/configuration.md#what-the-server-logs);
   [health, metrics, and request identifiers](../operate/observability.md).
 - **Status:** met. The request line does not name the authenticated subject of
-  a write.
+  a write. The synchronisation service writes one JSON record per run, with
+  everything it took, built, activated, rolled back and removed, and serves
+  them at `GET /runs`, with its metrics at `GET /metrics`.
 
 ### (m) Secure removal of all data and settings, and secure transfer
 
@@ -389,7 +451,9 @@ to other products or systems, ensure that this is done in a secure manner"
 - **How:** every piece of state is a file or directory the deployment names,
   so removing them removes all data and settings
   ([CRA information for users, 8(d)](cra-user-information.md#8d-secure-decommissioning-and-removing-user-data)).
-  A single resource is removed with `DELETE` over the REST API. Transfer is
+  A single resource is removed with `DELETE` over the REST API. The
+  synchronisation service's state is its `state`, `records` and `staging`
+  directories; it deletes nothing from the index root except by retention. Transfer is
   the FHIR API itself: any client reads every resource.
 - **Status:** met. FerroTERM has no erase command; sanitising the media is the
   deploying organisation's.
@@ -439,6 +503,12 @@ and why.
 |---|---|---|---|
 | Usage report to `report.ferropulse.eu` | on, when `FERROTERM__USAGE_REPORT__STATE_DIR` names a writable directory | instance id, version, licence type, deployment, uptime, host size, loaded code system families and coarse operation latency ([fields](../operate/usage-report.md#what-a-report-contains)) | the manufacturer's view of which versions and deployment sizes run; no code, URL or request path; `FERROTERM__USAGE_REPORT__ENABLED=false` turns it off |
 | Metadata and key set of the `[auth]` issuer | when an issuer is configured | the issuer's well-known URLs; no request data | verifying the tokens the write routes and the admin listener accept |
+| OTLP export of the server's and the sync service's spans and metrics | when `[telemetry.otlp]` is configured | spans and metrics, never a request body | the deployment's monitoring |
+| The sync service to the terminology service's feed and FHIR API | each run | the service's client credentials token; the subscribed canonicals in the searches | taking the releases and resources the deployment subscribed to |
+| The sync service to the terminology service's token endpoint | each run, when the cached token is near its expiry | the client id and secret | the client credentials grant |
+| The sync service to the server's admin listener | after each activation and retention | `POST /reload` with a client credentials token | putting a release in front of readers |
+| The sync service to the server's FHIR API | after an activation, when `[fhir]` is configured | `$validate-code` and `$expand` for the deployment's own resources | the revalidation |
+| The sync service to its webhook | once per run end, when `[webhook]` is configured | the run summary: outcome, times and counts | telling the operator a run ended |
 | The console to the terminology server | always | the FHIR requests a screen makes, with the signed-in user's token on a write | the console's purpose |
 | The console to the OpenID Provider | when `[oidc]` is configured | the authorization code exchange, refresh and revocation | signing a user in |
 
@@ -485,3 +555,4 @@ not name, and when the intended purpose changes.
 | Version | Date | Change |
 |---|---|---|
 | 1 | 2026-10-21 | First assessment (#790) |
+| 2 | 2026-11-27 | Assesses the synchronisation service, released from v0.3.0: its purpose and environment, three foreseeable misuses, its assets, risks T11 to T15, its controls and status under each point of Part I(2), and its outbound flows; adds the OTLP export to the flows (#1365) |
