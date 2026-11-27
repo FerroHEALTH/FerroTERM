@@ -91,6 +91,18 @@ outbound TLS table of [Configuration](configuration.md#telemetry)).
 `config check` reads no provider, so it works offline. Spans of time are
 durations such as `"30s"` or `"8h"`.
 
+The console accepts an ID Token signed with ML-DSA-44, ML-DSA-65 or
+ML-DSA-87 (RFC 9964) and with the classical RS256 to PS512, ES256, ES384 and
+EdDSA. `[jose] post_quantum_only = true` accepts the three ML-DSA parameter
+sets alone, for a provider that signs with ML-DSA.
+
+With the synchronisation overlay `compose.sync.yaml`, the server's admin
+listener binds `127.0.0.1:8081` and the sync service runs in the server's
+network namespace, so a console in another container reaches neither:
+**Reload the served set** and the run findings then need the console in the
+same namespace, or a listener bound to an interface the console reaches,
+with TLS ([Syncing from a national terminology service](sync.md#running-it)).
+
 `[ferroterm.server]`, `[ferroterm.sync]` and `[ferroterm.admin]` are the
 family's outbound endpoint table: `url`, `timeout`, `connect_timeout`, `retry` (`max_attempts`,
 `initial_backoff`, `max_backoff`; a read, update or delete is tried again

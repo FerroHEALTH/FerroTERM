@@ -181,8 +181,8 @@ if [[ "$total" = 0 ]]; then
 fi
 # The committed total feeds the conformance badges (conformance-badges.sh); a
 # suite bump that changes it is recorded in the same change. A mode run
-# (icd-11, tx.fhir.org, ...) selects a subset, so only the general run is held
-# to it.
+# (icd-11, tx.fhir.org, ...) selects a subset and is held to hand-run.tsv at
+# the end instead.
 committed_total=$(tr -d '[:space:]' < conformance/tx-ecosystem/total.txt)
 if [[ "$mode" = general ]] && [[ "$committed_total" != "$total" ]]; then
   echo "tx-ecosystem: the suite ran $total tests but conformance/tx-ecosystem/total.txt says $committed_total; update it in this change" >&2
@@ -191,6 +191,32 @@ fi
 jq -r '.test[] | select(.action[0].operation.result == "pass") | .name' "$report" | sort > "$out/passing.txt"
 passed=$(wc -l < "$out/passing.txt" | tr -d ' ')
 echo "tx-ecosystem: $passed of $total $mode tests pass on /$fhir ($(grep -a -o 'tests v[0-9.]*' "$out/runner.log" | head -1), runner $VALIDATOR_VERSION)"
+
+# The general-mode cases that do not apply on this surface are counted on the
+# badge beside the pass count (#1361), so the inventory has to be the run's
+# truth: the gated rows are exactly the cases the runner skipped, and a case
+# held as an R4B artefact still runs and still fails.
+if [[ "$mode" = general ]]; then
+  inventory=conformance/tx-ecosystem/not-applicable.tsv
+  jq -r '.test[] | select(.action[0].operation.result == "skip") | .name' "$report" | sort > "$out/skipped.txt"
+  awk -F'\t' -v surface="$fhir" '!/^#/ && $1 == surface && $3 == "gated" { print $2 }' "$inventory" | sort > "$out/gated.txt"
+  if ! diff -u "$out/gated.txt" "$out/skipped.txt" > "$out/gated.diff"; then
+    echo "tx-ecosystem: the runner's skips on /$fhir differ from the gated rows of $inventory (- listed, + skipped):" >&2
+    tail -n +3 "$out/gated.diff" >&2
+    exit 1
+  fi
+  jq -r '.test[].name' "$report" | sort > "$out/ran.txt"
+  awk -F'\t' -v surface="$fhir" '!/^#/ && $1 == surface && $3 == "r4b-surface" { print $2 }' "$inventory" | sort > "$out/surface.txt"
+  missing=$(comm -23 "$out/surface.txt" "$out/ran.txt")
+  passing_now=$(comm -12 "$out/surface.txt" "$out/passing.txt")
+  if [[ -n "$missing" || -n "$passing_now" ]]; then
+    echo "tx-ecosystem: $inventory holds /$fhir rows the run contradicts; drop them:" >&2
+    for name in $missing; do echo "  not in the run: $name" >&2; done
+    for name in $passing_now; do echo "  passes now: $name" >&2; done
+    exit 1
+  fi
+  echo "tx-ecosystem: $(wc -l < "$out/skipped.txt" | tr -d ' ') gated and $(wc -l < "$out/surface.txt" | tr -d ' ') R4B-surface cases match $inventory"
+fi
 
 regressions=$(comm -23 "$PASSING" "$out/passing.txt")
 gains=$(comm -13 "$PASSING" "$out/passing.txt")
@@ -207,3 +233,14 @@ if [[ -n "$regressions" ]]; then
   exit 1
 fi
 echo "tx-ecosystem: no regression against $PASSING"
+
+# A hand run is held to its row of hand-run.tsv, the denominator of its badge
+# (conformance-badges.sh); a new count goes there with the day of the run.
+if [[ "$mode" != general ]]; then
+  hand_run=conformance/tx-ecosystem/hand-run.tsv
+  hand_total=$(awk -F'\t' -v s="$fhir" -v m="$mode" '!/^#/ && $1 == s && $2 == m { print $3 }' "$hand_run")
+  if [[ "$hand_total" != "$total" ]]; then
+    echo "tx-ecosystem: the $mode run on /$fhir ran $total tests but $hand_run says ${hand_total:-nothing}; record the count and the day of this run there" >&2
+    exit 1
+  fi
+fi

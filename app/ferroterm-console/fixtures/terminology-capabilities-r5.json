@@ -52,7 +52,7 @@
     },
     {
       "content": "complete",
-      "subsumption": false,
+      "subsumption": true,
       "uri": "http://example.org/fhir/CodeSystem/colours",
       "version": [
         {
@@ -66,7 +66,13 @@
                 "in",
                 "not-in",
                 "regex",
-                "exists"
+                "exists",
+                "is-a",
+                "descendent-of",
+                "is-not-a",
+                "generalizes",
+                "child-of",
+                "descendent-leaf"
               ]
             }
           ],
@@ -85,7 +91,7 @@
     },
     {
       "content": "example",
-      "subsumption": false,
+      "subsumption": true,
       "uri": "http://example.org/fhir/CodeSystem/sketch",
       "version": [
         {
@@ -99,7 +105,13 @@
                 "in",
                 "not-in",
                 "regex",
-                "exists"
+                "exists",
+                "is-a",
+                "descendent-of",
+                "is-not-a",
+                "generalizes",
+                "child-of",
+                "descendent-leaf"
               ]
             }
           ],
@@ -1019,7 +1031,7 @@
     },
     {
       "content": "complete",
-      "subsumption": false,
+      "subsumption": true,
       "uri": "urn:iso:std:iso:3166",
       "version": [
         {
@@ -1033,7 +1045,13 @@
                 "in",
                 "not-in",
                 "regex",
-                "exists"
+                "exists",
+                "is-a",
+                "descendent-of",
+                "is-not-a",
+                "generalizes",
+                "child-of",
+                "descendent-leaf"
               ]
             },
             {
@@ -1043,7 +1061,13 @@
                 "in",
                 "not-in",
                 "regex",
-                "exists"
+                "exists",
+                "is-a",
+                "descendent-of",
+                "is-not-a",
+                "generalizes",
+                "child-of",
+                "descendent-leaf"
               ]
             }
           ],
@@ -1065,7 +1089,7 @@
       ]
     }
   ],
-  "date": "2026-11-26T06:41:29.808845Z",
+  "date": "2026-11-27T11:25:37.338522Z",
   "expansion": {
     "hierarchical": false,
     "incomplete": false,

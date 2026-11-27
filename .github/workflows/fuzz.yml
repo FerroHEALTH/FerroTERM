@@ -46,6 +46,7 @@ jobs:
           - fhir_xml
           - snomed_uri
           - rf2_row
+          - atom_feed
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

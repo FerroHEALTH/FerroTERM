@@ -116,7 +116,7 @@ pub struct FhirCodeSystem {
 
 impl FhirCodeSystem {
     /// Builds the provider; the hierarchy exists when `hierarchyMeaning` is
-    /// `is-a` and at least one concept names a parent.
+    /// `is-a` or absent, with no edges when no concept names a parent.
     ///
     /// # Errors
     ///
@@ -583,22 +583,24 @@ impl CodeSystemProvider for FhirCodeSystem {
     }
 }
 
-/// The is-a hierarchy of `model`, when `hierarchyMeaning` is `is-a` and a
-/// concept names a parent.
+/// The is-a hierarchy of `model`, when `hierarchyMeaning` is `is-a` or absent;
+/// a system whose concepts name no parent gets one with no edges.
 fn build_hierarchy(
     model: &CodeSystemModel,
     count: u32,
 ) -> Result<Option<ModelHierarchy>, BuildError> {
-    let has_parents = model.concepts.iter().any(|c| !c.parents.is_empty());
     // NOTE: no version defines the hierarchy when `hierarchyMeaning` is absent
     // (<https://hl7.org/fhir/R4B/codesystem.html>); the ecosystem suite reads nested
     // concepts as is-a, so only another stated meaning withholds subsumption.
     let is_a = model
         .hierarchy_meaning
         .is_none_or(|meaning| meaning == HierarchyMeaning::IsA);
-    if !is_a || !has_parents {
+    if !is_a {
         return Ok(None);
     }
+    // NOTE: `is-not-a` selects a code that "does not have an is-a relationship with the
+    // provided value" (<https://hl7.org/fhir/R4/codesystem-filter-operator.html>), so a
+    // flat system is an is-a hierarchy with no edges, never a refusal.
     let by_code: BTreeMap<&str, u32> = model
         .concepts
         .iter()

@@ -52,7 +52,7 @@
     },
     {
       "content": "complete",
-      "subsumption": false,
+      "subsumption": true,
       "uri": "http://example.org/fhir/CodeSystem/colours",
       "version": [
         {
@@ -65,7 +65,13 @@
                 "in",
                 "not-in",
                 "regex",
-                "exists"
+                "exists",
+                "is-a",
+                "descendent-of",
+                "is-not-a",
+                "generalizes",
+                "child-of",
+                "descendent-leaf"
               ]
             }
           ],
@@ -85,7 +91,7 @@
     },
     {
       "content": "example",
-      "subsumption": false,
+      "subsumption": true,
       "uri": "http://example.org/fhir/CodeSystem/sketch",
       "version": [
         {
@@ -98,7 +104,13 @@
                 "in",
                 "not-in",
                 "regex",
-                "exists"
+                "exists",
+                "is-a",
+                "descendent-of",
+                "is-not-a",
+                "generalizes",
+                "child-of",
+                "descendent-leaf"
               ]
             }
           ],
@@ -1019,7 +1031,7 @@
     },
     {
       "content": "complete",
-      "subsumption": false,
+      "subsumption": true,
       "uri": "urn:iso:std:iso:3166",
       "version": [
         {
@@ -1032,7 +1044,13 @@
                 "in",
                 "not-in",
                 "regex",
-                "exists"
+                "exists",
+                "is-a",
+                "descendent-of",
+                "is-not-a",
+                "generalizes",
+                "child-of",
+                "descendent-leaf"
               ]
             },
             {
@@ -1042,7 +1060,13 @@
                 "in",
                 "not-in",
                 "regex",
-                "exists"
+                "exists",
+                "is-a",
+                "descendent-of",
+                "is-not-a",
+                "generalizes",
+                "child-of",
+                "descendent-leaf"
               ]
             }
           ],
@@ -1065,7 +1089,7 @@
       ]
     }
   ],
-  "date": "2026-11-26T06:41:29.816152Z",
+  "date": "2026-11-27T11:25:37.350313Z",
   "description": "Serves the FHIR R6 ballot (version 6.0.0-snapshot1). Every behaviour grounded only in the ballot is re-verified against the published specification when it appears, and may change with it.",
   "expansion": {
     "hierarchical": false,

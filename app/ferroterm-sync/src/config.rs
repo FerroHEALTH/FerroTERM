@@ -20,7 +20,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
 
 use ferrohealth_config::loader::{Loaded, Loader};
-use ferrohealth_config::units::Duration;
+use ferrohealth_config::units::{ByteSize, Duration};
 use ferrohealth_secret::secret_url::SecretUrl;
 use ferrohealth_smart::config::AuthSection;
 use ferrohealth_smart::config::BasicGrants;
@@ -118,6 +118,9 @@ pub struct Config {
     pub timezone: String,
     /// The offline build binary, found on `PATH` when it is a bare name.
     pub build_command: PathBuf,
+    /// The most bytes one download takes, a data size such as `4GiB`: a
+    /// larger item is refused, its partial file removed.
+    pub download_limit: ByteSize,
     /// When a run starts by itself.
     pub schedule: ScheduleConfig,
     /// The credentials the admin listener admits: the issuers whose access
@@ -127,6 +130,9 @@ pub struct Config {
     /// `[basic_grants]`: the scopes and roles each Basic user of
     /// `[[auth.basic.users]]` is granted, by user-id.
     pub basic_grants: BasicGrants,
+    /// `[jose]`: whether the access tokens of `[auth]` verify with ML-DSA
+    /// alone.
+    pub jose: JoseSection,
     /// `[nts]`: the family outbound endpoint table of the Nationale
     /// Terminologie Server, starting from [`addon_nts::config::endpoint`]:
     /// the base `url`, the timeouts, `retry`, `tls`, and the client
@@ -165,14 +171,30 @@ impl Default for Config {
             webhook: None,
             timezone: String::from("UTC"),
             build_command: PathBuf::from("ferroterm-build"),
+            // A national edition's RF2 archive runs to about a gigabyte; four
+            // leave room for growth and stop a runaway body well before a
+            // staging volume fills.
+            download_limit: ByteSize::from_gib(4),
             schedule: ScheduleConfig::default(),
             source: Vec::new(),
             nts: addon_nts::config::endpoint(),
             auth: AuthSection::default(),
             basic_grants: BasicGrants::default(),
+            jose: JoseSection::default(),
             telemetry: TelemetrySection::default(),
         }
     }
+}
+
+/// `[jose]`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct JoseSection {
+    /// Whether the admin listener verifies access tokens with ML-DSA alone
+    /// (RFC 9964 §5): an issuer's `algorithms` left at the default becomes
+    /// ML-DSA-44, ML-DSA-65 and ML-DSA-87, and one naming any other algorithm
+    /// stops the start.
+    pub post_quantum_only: bool,
 }
 
 /// A configuration that could not be read.
@@ -404,6 +426,22 @@ mod tests {
             .iter()
             .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
             .collect()
+    }
+
+    #[test]
+    fn the_download_limit_reads_a_data_size_and_defaults_to_four_gibibytes()
+    -> Result<(), ConfigError> {
+        assert_eq!(
+            Config::from_sources(Some(""), &BTreeMap::new())?.download_limit,
+            super::ByteSize::from_gib(4)
+        );
+        let config = Config::from_sources(Some("download_limit = \"512MiB\"\n"), &BTreeMap::new())?;
+        assert_eq!(config.download_limit, super::ByteSize::from_mib(512));
+        assert!(
+            Config::from_sources(Some("download_limit = 1024\n"), &BTreeMap::new()).is_err(),
+            "a bare number is refused, as every data size is"
+        );
+        Ok(())
     }
 
     #[test]

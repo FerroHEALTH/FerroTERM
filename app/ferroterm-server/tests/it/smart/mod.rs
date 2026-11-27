@@ -34,6 +34,7 @@ mod discovery;
 mod ferrosmart;
 mod introspection;
 mod keys;
+mod post_quantum;
 mod scopes;
 mod shape;
 mod tokens;

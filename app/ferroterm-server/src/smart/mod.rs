@@ -45,7 +45,7 @@ use ferrohealth_smart::resource::{IssuerSet, ResourceError, ResourceServer, Sett
 use http::request::Parts;
 use http::{HeaderMap, StatusCode};
 
-use crate::config::Config;
+use crate::config::{ClassicalAlgorithm, Config};
 use crate::outcome::Failure;
 
 /// The `restful-security-service` code a SMART server declares
@@ -94,6 +94,14 @@ pub enum StartError {
         /// The rule.
         #[source]
         source: Box<ConfigError>,
+    },
+    /// `[jose] post_quantum_only` is on and an algorithm list of `[auth]`
+    /// names an algorithm that is no ML-DSA parameter set.
+    #[error("[auth] is refused under [jose]")]
+    PostQuantum {
+        /// The list and the algorithm.
+        #[source]
+        source: ClassicalAlgorithm,
     },
     /// `[basic_grants]` names a user `[[auth.basic.users]]` does not list,
     /// or grants a Basic user a scope or a role it may not hold.
@@ -181,7 +189,9 @@ impl Smart {
     /// # Errors
     ///
     /// Returns [`StartError::Unconfigured`] for a guarded surface without an
-    /// issuer, [`StartError::Auth`] for a section that breaks a rule,
+    /// issuer, [`StartError::PostQuantum`] for an algorithm list
+    /// `[jose] post_quantum_only` refuses, [`StartError::Auth`] for a
+    /// section that breaks a rule,
     /// [`StartError::BasicGrants`] for a `[basic_grants]` table naming a user
     /// `[[auth.basic.users]]` does not list or granting a Basic user a
     /// `system/` scope, [`StartError::Introspector`] for an introspecting
@@ -191,7 +201,10 @@ impl Smart {
     /// described, and [`StartError::NoTokenEndpoint`] when the described
     /// issuer names no token endpoint.
     pub async fn start(config: &Config) -> Result<Option<Self>, StartError> {
-        let auth = &config.auth;
+        let auth = &config
+            .jose
+            .narrow(&config.auth)
+            .map_err(|source| StartError::PostQuantum { source })?;
         if !auth.enabled {
             return Ok(None);
         }

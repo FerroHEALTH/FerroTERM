@@ -71,11 +71,13 @@ extension-codes/ec-validate-undefined
 extension-codes/ec-vs-expand-code-not-in
 extension-codes/ec-vs-expand-concept-in
 extension-codes/ec-vs-expand-concept-not-in
+extension-codes/ec-vs-expand-is-not-a
 extension-codes/ec-vs-expand-regex
 extension-codes/ec-vs-validate-all-undefined
 extension-codes/ec-vs-validate-code-not-in-undefined
 extension-codes/ec-vs-validate-concept-in-undefined
 extension-codes/ec-vs-validate-concept-not-in-undefined
+extension-codes/ec-vs-validate-is-not-a-undefined
 extension-codes/ec-vs-validate-listed-a2
 extension-codes/ec-vs-validate-listed-undefined
 extension-codes/ec-vs-validate-regex-undefined

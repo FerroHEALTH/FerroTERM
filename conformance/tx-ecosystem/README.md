@@ -11,29 +11,48 @@ line, sorted. CI runs the suite with the FHIR Validator's `txTests` command
 there) and fails when a listed test stops passing. A test that starts passing
 is printed by the script; add it to the list in the same change that earns it.
 `total.txt` records the number of cases the `general` mode runs; the script
-fails when a run disagrees with it, and `scripts/checks/conformance-badges.sh`
-turns the lists and the total into the README's badges at site build time.
+fails when a run disagrees with it. `hand-run.tsv` records, for each mode run
+by hand, the cases the run ran and the day it was measured; the script fails a
+hand run whose count differs from its row. `scripts/checks/conformance-badges.sh`
+turns the lists, the total and `hand-run.tsv` into the README's badges at site
+build time, each hand-run badge naming its day, and fails when the table below
+disagrees with them.
+
+`not-applicable.tsv` lists, per surface, the `general` cases the runner
+counts in that total and that do not apply there, each with its reason.
+`gated` rows are the cases whose own `mode` or `version` gate makes the
+runner skip them. `r4b-surface` rows are the cases that fail on `/r4b` only
+because the suite targets R4 and R5 (the IG's `r4.md`) and leaves `$version$`
+unsubstituted there. The script fails a `general` run whose skips differ
+from the `gated` rows, or in which an `r4b-surface` case passes or is
+missing. Each badge shows the count as `n/a` beside the pass count, so the
+cases a reader sees as not passing are the ones FerroTERM answers for
+(the upstream report is #1380).
 
 ## What is committed, per mode
 
 The `general` rows were recorded on 2026-11-24 with validator 7.0.6 and suite
 `9c2bbce57366319d6a5265cbfbf6697f094822e3` (test cases 1.11.0). Every
-mode run also carries the two mode-independent `metadata` cases, so a mode's
-count is two above the suite's own. The `snomed`, `icd-11`, `tx.fhir.org`,
-`mimetypes`, and `omop` rows were last measured on 2026-09-06, with validator
-6.10.4 and test cases 1.9.3, and are re-measured by hand on the new pins.
+mode run also carries the two mode-independent `metadata` cases and the 11
+`closure` cases, so a mode's count is 13 above the suite's own. The other
+rows were measured by hand on 2026-11-27 on the same pins, over the SNOMED CT
+International edition 20261101, LOINC 2.83, and the three ICD-11 artifacts
+built from the WHO ICD-API local deployment of release 2026-01 in English.
 
 | mode | surface | pass list | passed of ran | needs | open failures |
 |---|---|---|---|---|---|
-| `general` | `/r4b` | `passing.txt` | 728 of 805 | nothing | #1068, #1069, #1376, #1377, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
-| `general` | `/r4` | `passing-r4.txt` | 742 of 805 | nothing | #1068, #1069, #1376, #1377, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
-| `general` | `/r5` | `passing-r5.txt` | 742 of 805 | nothing | #1068, #1069, #1376, #1377, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
-| `snomed` | `/r4b` | `passing-snomed.txt` | 2 of 170 | a SNOMED CT edition | #344, #352, #349 |
-| `icd-11` | `/r4b` | `passing-icd-11.txt` | 44 of 52 | the three ICD-11 artifacts | #350, #349, #117 |
-| `tx.fhir.org` | `/r4b` | `passing-tx.fhir.org.txt` | 57 of 227 | a LOINC release | #420, #421, #305, #349 |
-| `tx.fhir.org` | `/r5` | `passing-r5-tx.fhir.org.txt` | 59 of 227 | a LOINC release | #420, #421, #305, #349 |
-| `mimetypes` | `/r4b` | `passing-mimetypes.txt` | 35 of 37 | nothing | #353 |
-| `omop` | `/r4b` | `passing-omop.txt` | 1 of 28 | an OMOP vocabulary the server does not load | #345 |
+| `general` | `/r4b` | `passing.txt` | 730 of 805 | nothing | #1068, #1069, #1376, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
+| `general` | `/r4` | `passing-r4.txt` | 744 of 805 | nothing | #1068, #1069, #1376, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
+| `general` | `/r5` | `passing-r5.txt` | 744 of 805 | nothing | #1068, #1069, #1376, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
+| `snomed` | `/r4b` | `passing-snomed.txt` | 2 of 378 | a SNOMED CT edition | #344, #1068, #1380 |
+| `icd-11` | `/r4b` | `passing-icd-11.txt` | 10 of 145 | the three ICD-11 artifacts | #1391, #1068, #1380 |
+| `icf` | `/r4b` | `passing-icf.txt` | 1 of 96 | the three ICD-11 artifacts | #1391, #1068, #1380 |
+| `loinc` | `/r4b` | `passing-loinc.txt` | 56 of 110 | a LOINC release | #1383, #1068, #1380 |
+| `loinc` | `/r5` | `passing-r5-loinc.txt` | 57 of 110 | a LOINC release | #1383, #1068 |
+| `tx.fhir.org` | `/r4b` | `passing-tx.fhir.org.txt` | 29 of 189 | a LOINC release | #1384, #1381, #1068, #1380 |
+| `tx.fhir.org` | `/r5` | `passing-r5-tx.fhir.org.txt` | 31 of 189 | a LOINC release | #1384, #1381, #1068 |
+| `mimetypes` | `/r4b` | `passing-mimetypes.txt` | 36 of 52 | nothing | #1382, #1068, #1380 |
+| `omop` | `/r4b` | `passing-omop.txt` | 1 of 40 | an OMOP vocabulary the server does not load | #345, #1364, #1068, #1380 |
 
 `general` is the only mode CI runs, on all three surfaces. The others need
 licensed content or a code system the server does not serve, so they are run by
@@ -44,192 +63,71 @@ hand before a release and their lists are refreshed in the same change.
 - **`general`** needs nothing to run: the runner supplies every code system and
   value set the cases declare in their own setup. Four of them reach past that
   setup for terminology the FHIR specification defines
-  (<https://hl7.org/fhir/R4B/terminologies-systems.html>), which the server does
-  not hold yet (#435).
-- **`snomed`** needs a SNOMED CT artifact
-  (`--mode snomed --index <edition>`). It scores 2 of 170 whatever edition you
-  point it at, because every case pins the reference server's own edition
-  (`http://snomed.info/xsct/31000003106/version/20250909`), which no release
-  centre distributes. #344 holds the evidence. The second case that passes,
-  `snomed/subsumes-bad-version`, passes because it asserts the refusal of an
-  edition the server does not have, which is the state the other 168 are stuck
-  in. The suite's runner takes five parameters (`-output`, `-externals`,
-  `-filter`, `-modes`, `-api-key`) and none of them points the cases at another
-  edition, so there is no override to reach for (the suite's own `tests/readme.md`). Its 30 `$subsumes` cases reach
-  the server now; 21 answer 404 on that pinned version and the other 9 differ
-  on the code or the text of the outcome. Five of its cases also send a
-  parameter no `OperationDefinition` declares (#349).
-- **`icd-11`** needs the three ICD-11 artifacts built from the WHO ICD-API
-  local deployment (`--mode icd-11 --index <mms>:<icf>:<entity>`); the
-  artifacts need the WHO container and its licence. Four of its cases send
-  `version` on `ValueSet/$validate-code`, which declares no such input, and
-  answer 400; they are the whole gap between the committed 44 and 48 (#349).
-  Of the remaining four, `metadata` is the cross-mode `/r4b` case below and
-  `lookup-mms-fr` and `cs-validate-lang` ask for the French display of `1A00`
-  in release `2026-01`. The WHO ICD-API local deployment publishes no French
-  bundle for that release: `include=2026-01_fr` aborts the container with
-  "Couldn't find the version", and `2025-01_fr` is the nearest bundle that
-  carries French. Both cases need a French artifact, so they stay unpassed
-  while the suite pins 2026-01 (#350). `expand-adhoc-enum` is the fourth: its
-  value set fixes `Shigellosis` as the display of `1A02` in
-  `compose.include.concept.display`, which every FHIR version defines as "the
-  text to display to the user for this concept in the context of this
-  valueset", and the case expects the expansion to carry the code system's
-  title instead. The compose display stands and the case stays unpassed
-  (#350).
-- **`tx.fhir.org`** needs a LOINC artifact (`--mode tx.fhir.org --index
-  <loinc>`), since the release needs a LOINC account. The suite's own
+  (<https://hl7.org/fhir/R4B/terminologies-systems.html>), which the server
+  serves itself.
+- **`snomed`** needs a SNOMED CT artifact (`--mode snomed --index
+  <edition>`). It scores 2 of 378 whatever edition you point it at, because
+  the cases pin the reference server's own edition
+  (`http://snomed.info/xsct/31000003106/version/20250909`, 991 times in the
+  suite at `9c2bbce`), which no release centre distributes, and the runner
+  has no parameter that points them at another edition (the suite's own
+  `tests/readme.md`). 216 of its cases answer 404 on that version. #344
+  holds the evidence. The two cases that pass assert the refusal of an
+  edition the server does not have.
+- **`icd-11`** and **`icf`** need the three ICD-11 artifacts built from the
+  WHO ICD-API local deployment (`--mode icd-11 --index <mms>,<icf>,<entity>`),
+  which needs the WHO container and its licence. Test cases 1.11.0 rewrite
+  `icd-11` (132 cases) against the IG's own `icd-11.md` and add `icf` (70)
+  and `icf-ec` (13) against `icf.md`. The 44 cases the 1.9.3 suite passed
+  now expect `post-coordination-metadata`, the `classificationCode` output
+  and ICF at `http://hl7.org/fhir/sid/icf`, which #1391 builds.
+- **`loinc`** needs a LOINC artifact (`--mode loinc --index <loinc>`), since
+  the release needs a LOINC account. Test cases 1.11.0 moved the LOINC cases
+  here from `tx.fhir.org`, and every request names LOINC 2.83. #1383
+  clusters what stays open by cause.
+- **`tx.fhir.org`** runs over the same LOINC artifact. The suite's own
   `tests/readme.md` says this mode is "for tests that are intended to be and
   written specifically for tx.fhir.org - internal QA. There is no need for
-  other servers to pass these tests", so the LOINC subset is the part this
-  project chases. The section below clusters what stays open.
+  other servers to pass these tests". The section below clusters what stays
+  open.
 - **`mimetypes`** needs nothing: BCP 13 is served from the vendored IANA media
-  types registry. Two cases are open: the cross-mode `/r4b` `metadata` case
-  below, and `mimetype-subsumes-invalid-code`, which asks for the `issue.code`
-  the next section settles (#353).
+  types registry. The four `$subsumes` cases on parameter defaults and an
+  unknown parameter are FerroTERM work the IG states (#1382).
 - **`omop`** needs the OMOP standardized vocabularies, which this server does
   not load and which OHDSI distributes through Athena under per-vocabulary
-  licences. The mode runs and scores 1 of 28. Its setup ValueSet states no
-  `ValueSet.status`; the server reads a supplied resource leniently and its
-  cases now reach the missing vocabulary. #345 holds the finding.
+  licences. Its setup ValueSet states no `ValueSet.status` (#1364), and its
+  27 cases reach the missing vocabulary (#345).
+- **Every mode** also runs the 11 `closure` cases (#1068) and, on `/r4b`, the
+  `metadata` case the suite writes for R4 (#1380).
 
 ## The `tx.fhir.org` mode, clustered by cause
 
-171 cases stay open on `/r5` and 172 on `/r4b`, the extra being the `metadata`
-case at the end of this file. Each cluster below is the whole reason its cases
-fail.
+160 cases stay open on `/r4b` and 158 on `/r5`. Beyond the 11 `closure`
+cases and the `/r4b` `metadata` case, #1384 holds the clusters that go past
+the IG's requirements:
 
-- **61 cases call `ValueSet/$compare`** (the `compare` and `related2` suites)
-  and answer 405. No `OperationDefinition` in `hl7.fhir.r4.core`,
-  `hl7.fhir.r4b.core`, `hl7.fhir.r5.core`, or `hl7.fhir.r6.core` declares a
-  `compare` operation on any resource. It is a reference-server operation, 405
-  is the right answer for an operation a version does not define, and the
-  cases stay unclaimed while that holds.
-- **20 cases of the `tx.fhir.org` suite ask for content this run does not
-  serve**: 19 SNOMED and one HGVS, against a server holding a LOINC artifact.
-  Point the mode at a SNOMED edition and the 19 meet the edition wall above
-  (#344).
-- **14 `langcodes` cases send `system` on `CodeSystem/$validate-code`.** Every
-  vendored version declares that operation's inputs as `url`, `codeSystem`,
-  `code`, `version`, `display`, `coding`, `codeableConcept`, `date`,
-  `abstract`, and `displayLanguage`; R5 and R6 declare `system` only as an
-  output. So each answers 400 before the behaviour the case is about is
-  reached, the same adjudication as #349.
-- **12 `langcodes` `ValueSet/$validate-code` cases differ on the answer's
-  parameters.** The server states `version`, the IANA registry's `File-Date`,
-  which R5 and R6 declare as an output of `$validate-code`; the expected files
-  carry no `version` and do not mark it `$optional$`, while the same suite's
-  LOINC cases do. Their composed displays also differ (`English (Latin, United
-  States)` here against `English (Script=Latin, Region=United States)`), and
-  no specification prescribes a display for a composed tag. Both spellings are
-  tx.fhir.org's own and stay unadopted.
-- **5 `langcodes` `$expand` cases** want the tag families the registry makes
-  finite enumerated (#420).
-- **2 LOINC cases want a DISCOURAGED concept to be inactive.**
-  `loinc-validate-filter-status-good` and `loinc-validate-discouraged-code`
-  expect `inactive = true` and `status = DISCOURAGED`. The FHIR LOINC page
-  says "Codes with Property STATUS = DEPRECATED are considered inactive for
-  use in ValueSet.compose.inactive"
-  (<https://hl7.org/fhir/R4B/loinc.html>, the same sentence on
-  <https://terminology.hl7.org/en/LOINC.html> where R5 and R6 redirect), and
-  neither page mentions DISCOURAGED at all. DEPRECATED alone is inactive here,
-  so both stay unpassed.
-- **5 cases send an `$expand` limit no `OperationDefinition` declares**: four
-  send `_limit` (#305) and `loinc-expand-all` sends the unprefixed `limit`
-  (#349). Both refusals stand.
-- **The `bugs` and `UCUM` suites are the reference server's own regression
-  corpora, triaged case by case on #421.** 24 `bugs` cases and 7 `UCUM` cases
-  stay open on `/r4b`:
-  - **13 reach for content this run does not serve**: nine SNOMED
-    (`sct-ver-ex`, `sct-parse`, `sct-parse-pc`, `sct-isa`, `sct-ver`,
-    `sct-msg-4`, `sct-msg-5`, `sct-display-1`, `sct-display-2`), three CPT
-    (`cpt`, `cpt-0`, `cpt-100`), and `ndc`. CPT is licensed by the AMA and NDC
-    is an FDA registry; neither is served here.
-  - **6 are ISO 3166**, and one of them was a defect that is now fixed. FHIR
-    selects all three code forms from `urn:iso:std:iso:3166` with a `code`
-    regex per form (`ValueSet/iso3166-1-2`, `-1-3`, `-1-N`), so an alpha-3 or
-    a numeric country code the specification binds has to validate; only the
-    alpha-2 form was served, and `NLD` and `528` were refused. All three forms
-    are codes now. The six still fail on figures that are the reference
-    server's data rather than the specification's requirement:
-    `country-codes` wants a total of 789 (263 territories in three forms)
-    against 906 here (302 in three forms, CLDR 48's set including the
-    user-assigned ranges), and `3166-a` and `3166-c` want the version `2018`,
-    the ISO edition year, where this server states `48`, the version of the
-    CLDR data it actually holds. Naming a version this server does not hold
-    would be a claim about content it cannot serve.
-  - **`lang-case` and `lang-case2`** are the BCP 47 `$validate-code` parameter
-    roster adjudicated for the `langcodes` suite above; same cause.
-  - **`undefined`, `no-system`, `country-code` and `provenance`** differ on
-    the parameter roster of a `$validate-code` answer. `provenance` passes on
-    `/r5`.
-  - **7 `UCUM` cases** want three designations and an `abstract` output where
-    this server answers two designations and none (`lookup`,
-    `lookup-with-annotation`), a canonical form `$expand` and `$validate-code`
-    do not compute (`expand-ucum-canonical`, `validate-ucum-canonical-bad`),
-    and two enumerations of a grammar-defined system (`expand-ucum-all-4`,
-    `-5`). `ucum-subsumes-invalid-code` was the `issue.code` split and now
-    passes on both surfaces.
-- **The remaining LOINC cases** are the subset this project chases, carried
-  from #13 and #245: the filters `$expand` still refuses, the `$lookup`
-  designation shapes, and the `$validate-code` message texts.
+- **61 cases call `ValueSet/$compare`** (the `compare` and `related2` suites).
+  The IG says `$compare` is "**not** a requirement for registration in the
+  ecosystem" (`requirements.md` §$compare at `9c2bbce`), and no FHIR
+  version's core package declares the operation.
+- **26 `langcodes` `$validate-code` cases**: 14 send `system` on
+  `CodeSystem/$validate-code`, which every version declares as an output only
+  (#349), and 12 forbid the `version` output that R5 declares.
+- **`langcodes/expand-lang-language` and `-both`** expand as the IG requires
+  and differ only on the wording of `valueset-unclosed-reason`.
+- **`extension-codes-3166` (6)** want ISO 3166's user-assigned codes as a
+  reserved code space of the server's ISO 3166 system.
+- **`bugs`, `UCUM` and `tx.fhir.org`** are the reference server's regression
+  corpora: SNOMED CT, CPT, NDC and HGVS content this run does not serve, and
+  that server's own data and wording (ISO 3166 totals and versions, composed
+  BCP 47 displays, UCUM canonical forms and designations).
 
-Its 12 `langcodes` `$subsumes` cases pass from #348 on: the
-`urn:ietf:bcp:47` provider reads each tag as the extended language range of
-the same spelling and matches it under RFC 4647 §3.3.2, whose own example has
-"de-\*-DE" and "its synonym `de-DE`" matching `de-Latn-DE` while `de-x-DE`
-fails on the singleton. A grandfathered tag is one opaque subtag, because RFC
-5646 §2.2.8 says such a tag "in its entirety, represents a language or
-collection of languages", so `zh` does not subsume `zh-min-nan`.
+The IG does require the two other `langcodes` `$expand` cases: a `region`
+filter alone answers `too-costly`, and all language codes expand to the
+common-languages value set, marked unclosed. That is FerroTERM work (#1381).
 
 ## Known failures that cut across every mode
 
-- **`$subsumes` reaches the server from validator 6.10.4 on.** 6.10.3 threw
-  `Unknown Operation subsumes` before it connected, so the suite's 98
-  `$subsumes` cases across four modes were scored against a request nobody
-  sent. 6.10.4 issues the operation, and 62 of the 98 pass: 24 of the 27
-  `general` cases on each surface, 12 of 13 in `mimetypes`, 26 of 28 in
-  `tx.fhir.org`, none of the 30 in `snomed`. Of the 36 that stay open, 30 are
-  the `snomed` edition wall above and 6 are the `issue.code` split below.
-  #346.
-- **An unknown code answers `not-found`, and the suite asks two operations for
-  two different codes.** 11 cases fail on `OperationOutcome.issue.code` alone,
-  each already carrying the `tx-issue-type` coding `invalid-code` the case
-  asks for: 3 in `general` on each surface, 1 in `mimetypes`, 2 in
-  `tx.fhir.org`, and 5 counted inside the `snomed` 30 above. The suite
-  expects `code-invalid` from `$subsumes` and `not-found` from `$lookup` for
-  the same fact, a code that is not in the code system: compare
-  `simple/simple-subsumes-unknown-code-response-parameters.json` with
-  `icd-11/lookup-bad-code-response.json`, both at the pinned commit. No FHIR
-  version's `CodeSystem/$subsumes` `OperationDefinition` fixes the value, and
-  R4B's `IssueType` admits both readings ("the code or system could not be
-  understood" against "the reference provided was not found"), so the server
-  keeps one answer for one fact and passes the `$lookup` shape.
-
-  The ecosystem's own guidance closes it. Of the two fields an issue carries,
-  the IG binds only one: "any issue entries in the OperationOutcome SHALL have
-  a severity, type, expression, details.coding, and details.text. The coding
-  SHALL be taken from the `http://hl7.org/fhir/tools/CodeSystem/tx-issue-type`
-  system", and then, of the other, "the correct value for issue.type and
-  issue.details.coding may be found in the text cases. At least with regard to
-  issue.type, the correct code is sometimes unclear, and more than one type is
-  accepted"
-  (<https://build.fhir.org/ig/HL7/fhir-tx-ecosystem-ig/requirements.html>,
-  `$validate-code` return parameters). These 11 answers carry the
-  `tx-issue-type` coding `invalid-code` the cases ask for, with the message id
-  and the text, so they meet the requirement the IG states; only the field it
-  says more than one value is accepted for differs. The refusal to answer one
-  fact with two issue codes stands, and the 11 stay unpassed. Upstream report
-  for the owner to post: the runner compares `issue.code` exactly, which is
-  stricter than the IG's own rule, and the two families disagree on the same
-  fact.
-
-  The server does spell the same fact two ways, and the suite asks for both:
-  a refused operation answers `not-found`, and one code itemised inside a
-  `$validate-code` answer is `code-invalid`. Compare
-  `icd-11/lookup-bad-code-response.json` with
-  `validation/simple-codeableconcept-bad-code-response-parameters.json`, both
-  passing. The two surfaces are separate on purpose.
 - **Nine cases send a parameter the operation does not declare.** Seven send
   `version` on `ValueSet/$validate-code`, which declares `systemVersion` and
   `valueSetVersion` as its inputs and `version` only as an output; one sends
@@ -237,182 +135,14 @@ collection of languages", so `zh` does not subsume `zh-min-nan`.
   `Observation/$stats`; one sends `allowMaximumSizeExpansion`, declared
   nowhere. The IG's own requirements page asks for none of the three and
   requires `count` for `$expand` instead. So each answers 400 before the
-  behaviour the case is about is reached, the same as `_limit` (#305) and
-  `mode`/`valueSetMode` (#289). #349 holds the adjudication.
+  behaviour the case is about is reached. #349 holds the adjudication.
 - **The `metadata` case fails on `/r4b`.** It asserts
   `CapabilityStatement.fhirVersion` is `4.0.1`; `/r4b` correctly reports
-  `4.3.0`. It is on the `/r4` and `/r5` lists and off every `/r4b` one.
+  `4.3.0`. It is on the `/r4` and `/r5` lists and off every `/r4b` one, and
+  `not-applicable.tsv` counts it on `/r4b` (#1380).
 
 ## What the `general` mode still holds open
 
-- **Some entries are skips, not failures: nine of the 805 on `/r4b`, five on
-  `/r4`.** `simple-expand-isa-o2`, `-c2`, and `-o2c2` declare `"mode":
-  "tx.fhir.org"`, so the general run lists them and runs none; eight
-  `translate`/`translate2` cases declare `"version"`, so the six `-r4` ones run
-  only on `/r4` and the two `r5plus` ones only on `/r4b` and `/r5`. Each surface
-  therefore reports its own skip set and no case is silently lost.
-- **`$lookup` answers `definition` in the `property` group on `/r4b` and
-  `/r4`, and the suite asks for a named parameter there.**
-  `simple-lookup-1`, `simple-lookup-2`, and `parameters-lookup-supplement-none`
-  expect a top-level `definition` output parameter on every surface. Only R5
-  and R6 declare one: `hl7.fhir.r4.core` 4.0.1 and `hl7.fhir.r4b.core` 4.3.0
-  declare `name`, `version`, `display`, `designation`, and `property` as the
-  outputs of `CodeSystem/$lookup`, and their `property` input says the defined
-  properties "are returned explicit in named parameters (when the names match),
-  and the rest (except for lang.X) in the property parameter group".
-  `definition` matches no R4-family output name, so it belongs in `property`
-  there, and so does `abstract`, which those two versions do not declare
-  either. All three pass on `/r5`, and the three stay unpassed on `/r4b` and
-  `/r4` because the case reads an R5 shape onto an R4-family surface.
-- **`reverse` on `$translate` is an R4-family input, and the suite refuses it
-  on `/r4b`.** `translate2/translate-reverse-r5plus` and
-  `translate-reverse-r5plus-a` run wherever the server is not R4, and the second
-  wants a 4xx "reverse is not allowed in R5". `hl7.fhir.r4b.core` 4.3.0
-  declares `reverse` among the inputs of `ConceptMap/$translate`, and
-  `hl7.fhir.r5.core` 5.0.0 does not, so `/r4b` honours it and `/r5` refuses
-  it. Both cases pass on `/r5` and stay unpassed on `/r4b`, where the case
-  reads an R5 restriction onto an R4-family surface. Upstream report for the
-  owner to post: gate the pair to `"version": "5.0"`, or give it an R4-family
-  response that translates in reverse.
-- **`versionsMatch` is a parameter no publication defines.** Eight `overload`
-  expansion cases turn on whether two codes from two versions of one code
-  system are one member: `expand-all-merged`, `expand-exclude`, and
-  `expand-exclude-merged` want them merged, `expand-exclude-versioned` wants
-  them kept apart, and `expand-all`, `expand-all-sysver`,
-  `expand-all-versioned`, and `expand-exclude-enum` differ only on which of two
-  entries with the same code comes first. The behaviour is carried by a
-  `valueset-expansion-parameter` extension naming `versionsMatch`, which
-  appears nowhere in `hl7.fhir.r4.core` 4.0.1,
-  `hl7.fhir.r4b.core` 4.3.0, `hl7.fhir.r5.core` 5.0.0, or `hl7.fhir.r6.core`
-  6.0.0-snapshot1, and nowhere in the ecosystem IG outside these fixtures. No
-  FHIR version prescribes the order of two `expansion.contains` entries
-  either. The server keeps one entry per include, in include order, and the
-  eight stay unpassed. #507 holds the upstream report: define `versionsMatch`,
-  its default, and the member order in the IG, or drop the cases.
-- **Seven cases compare against an unsubstituted placeholder on `/r4b`.**
-  `exclude/exclude-gender`, `exclude-gender2`, `exclude-combo`,
-  `include-combo`, `exclude-contained`, `exclude-valueset` and
-  `simple-cases/simple-expand-contained-nested` name `http://hl7.org/fhir/administrative-gender` and
-  `http://hl7.org/fhir/ValueSet/administrative-gender`
-  (<https://hl7.org/fhir/R4B/terminologies-systems.html>). #435 shipped those
-  systems, so all seven pass on `/r4` and `/r5`. On `/r4b` each compares
-  `expansion.parameter[i].valueUri` against the literal `$version$`: the
-  runner substitutes that placeholder on the two surfaces whose FHIR version
-  it knows and leaves it as written on `/r4b`, where the server correctly
-  answers `4.3.0` for a FHIR core code system. Same family as the `metadata`
-  case above.
-- **A supplied `tx-resource` is read leniently and refuses only the request
-  that resolves it.** Cardinality is an aspect of validating a resource, which
-  a server performs at its discretion, and an implementation "should be
-  conservative in its sending behavior, and liberal in its receiving behavior"
-  (<https://hl7.org/fhir/R4B/validation.html>). A required primitive that
-  states no value reads as the value-less element it would be with only an
-  extension, so `other/dual-filter` and the two `validation-dual-filter` cases
-  pass over a value set with no `status`. A resource the server still cannot
-  use is recorded, so `errors/unknown-system1`, `unknown-system2`,
-  `combination-ok`, and `combination-bad` are no longer refused for a broken
-  filter they never touch. The three `errors/broken-filter*` cases do resolve
-  it and answer `invalid` with the `vs-invalid` classification, the
-  `IssueType` reading of "content invalid against the specification"
-  (`structure` stays for a body the server cannot parse at all).
-
-## The cases test cases 1.11.0 added, triaged
-
-The 1.11.0 suite runs 805 `general` cases. Of the 43 it adds or renames, 14
-fail on `/r4b` and `/r4` and 12 on `/r5`:
-
-- **`extension-codes/ec-vs-*` (9)** pass from #1358 on, all but the two
-  `is-not-a` cases over a code system with no hierarchy (#1377).
-- **`extensions/expand-supplement-prop`, `-prop-base` and
-  `expand-supplement-version`** select the right codes and supplement now
-  (#1290), and differ only on the `order` and `label` concept properties
-  #1107 holds.
-- **`translate2/translate-reverse-r5plus` and `-a`** are the renamed
-  `r5+` pair above, unpassed on `/r4b` for the reason given there.
-
-The server now refuses a value set whose compose carries a modifier
-extension it does not know (#1288), refuses `inferSystem` past an include of
-an unheld code system (#1289), filters on a supplement's properties and
-applies one version of a supplement (#1290), and searches one language with
-the designations of supplements in use (#1291). The `global-lang-pack` setup
-supplies a supplement for a code system version the server does not hold,
-which it leaves dormant (#1287).
-
-## The cases test cases 1.10.0 added, triaged
-
-The 1.10.0 suite fails 125 `general` cases on `/r4b`, 113 on `/r4` and 112
-on `/r5` (CI run 41696759891). Besides the families above, each cluster has
-its own issue, a server fix or the specification text that decides it:
-
-- **`extension-codes` (23) and `global-lang-pack` (10)**: the ecosystem IG
-  states global supplements and reserved code spaces at SHALL
-  (`requirements.md` at `9c2bbce`, CodeSystem supplements), and the server
-  serves them from #1358 on. What stays open: six cases send `useSupplement`
-  on `CodeSystem/$validate-code` (#1068), six `$lookup` cases and
-  `ec-validate-outside` expect what no publication defines (#1376), and
-  `glp-lookup-other` expects the `warning` output (#1069).
-- **`closure` (11).** The run now gives the server a resource database of its
-  own, which `$closure` needs for its tables. `closure-init` still fails, on
-  the `tx-resource` it carries (#1070) and on `reset`, which no `$closure`
-  `OperationDefinition` declares, as `dispose` is not either (#1068); the
-  nine `closure-add-*` and `closure-resync-*` cases need the table it creates.
-- **`validation` (17) and `batch/batch-validate-bad`** (#1063). An
-  incomplete coding is a validation outcome (`result` false), since
-  `Coding.system` and `Coding.code` are both 0..1, and a bare `code` with no
-  system and no `inferSystem` is a request error: "If a code is provided, a
-  system or a context must be provided"
-  (<https://hl7.org/fhir/R4B/valueset-operation-validate-code.html>,
-  `code`). Seven cases stay unpassed as known differences that no
-  specification text decides: `-vs-coding-display-only`, `-vs-cc-no-system`
-  and `-vs-cc-no-system-infer` want a different issue roster;
-  `-cs-nothing`, `-cs-url-no-code` and `-cs-code-no-url` forbid the
-  `diagnostics` an `OperationOutcome` issue may carry
-  (<https://hl7.org/fhir/R4B/operationoutcome-definitions.html#OperationOutcome.issue.diagnostics>);
-  and `batch-validate-bad` wants its own wording for an undeclared
-  `codingX`.
-- **`batch/cs-batch-validate`, `-bad` and `-codings`**: `CodeSystem/$batch-validate-code`
-  reads its `url` as a value set (#1061).
-- **`simple-lookup-unknown-property` and `-only-unknown-property`**: a
-  property the code system does not define is refused (#1062).
-- **Six `$expand` cases want extension values the request did not name.**
-  The two `properties/expand-with-valueset.compose.property-*` cases pass on
-  `/r5`, where `ValueSet.compose.property` exists. `extensions-echo-all`,
-  `extensions-echo-enumerated`, `parameters-expand-supplement-good`,
-  `-supplement-none`, `-enum-definitions3` and `deprecated/vs-deprecation`
-  stay unpassed. `$expand` echoes the extensions the IG's §Extensions list
-  asks for where their contexts admit an expansion element (FHIR Extensions
-  Pack 5.4.0): `rendering-style`, `valueset-label`, `valueset-conceptOrder`
-  and, when definitions are asked, `valueset-concept-definition` on
-  `contains`, and `rendering-xhtml` on `contains.display`. An inactive
-  designation takes the SNOMED CT inactive use code (#1106). What the cases
-  want beyond that goes past the published definitions: `label`, `order` and
-  `weight` as concept properties, where `concept-properties` (HL7 Terminology
-  7.3.0) defines no `label` or `order`; `valueset-deprecated` on `contains`
-  and `standards-status` on `contains.designation`, which neither
-  extension's context admits; and the label and order as concept properties
-  in place of the extensions the IG lists. #1107 holds that upstream report.
-- **`extensions/validate-supplement-nolang-*` and
-  `validate-supplements-grandchild-wrong-display`** send `useSupplement` on
-  `CodeSystem/$validate-code`, which no version declares (#1068).
-- **`simple-lookup-zxx`** wants a `warning` output no `$lookup` declares
-  (#1069). **`lookup-supplements-hierarchy-child`, `-grandchild` and
-  `parameters-lookup-supplement-good`** want `used-supplement`, which the IG
-  requires and #1358 answers, and a designation `source` part no publication
-  defines (#1376).
-- **`case-insensitive-code1-2`, `-code1-3` and
-  `version-simple-codeableconcept-bad-version2`**: the message leaves out the
-  version it is about (#1065).
-- **`simple-expand-contained-nested` and `validation-contained-nested`
-  compare against an unsubstituted placeholder on `/r4b`.** Both pass on `/r4`
-  and `/r5`. On `/r4b` the expected answer carries the literal `$version$` as
-  the version of `http://hl7.org/fhir/administrative-gender`, which the
-  runner leaves as written there, and the server correctly states `4.3.0`.
-  Same family as the `exclude` cases above.
-- **`simple-subsumes-no-system`, `-no-system-coding` and
-  `validation-missing-cs-code-no-url`** want `issue.code` `invalid` where the
-  server answers `required` for a missing input. The IG accepts more than one
-  `issue.type` (the `issue.code` family above), and `required`, "A required
-  element is missing", is a child of `invalid` in the code system
-  (<https://hl7.org/fhir/R4B/codesystem-issue-type.html>) and the closer
-  reading of a missing input; they stay unpassed, with #1063 holding the rest
-  of those cases.
+The book's conformance page (`website/book/src/evaluate/conformance.md`,
+"Where the remaining cases stand") breaks down every `general` case that
+does not pass, per surface, and each row names its open issue or its gate.

@@ -16,6 +16,7 @@ shapes we thought of; these targets cover the ones we did not.
 | `fhir_xml` | arbitrary text to the FHIR XML reader over the generated schemas |
 | `snomed_uri` | arbitrary text to the implicit `?fhir_vs=` and `?fhir_cm=` resolution |
 | `rf2_row` | arbitrary text to the RF2 file-name, effective-time, and identifier parsers |
+| `atom_feed` | arbitrary text to the terminology syndication feed parser the sync service reads a service's Atom feed with |
 
 ## Running
 
