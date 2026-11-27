@@ -305,16 +305,18 @@ impl Artifact {
         preference: &[Option<&str>],
         shown: impl Fn(u32) -> bool,
     ) -> Result<Option<String>, ProviderError> {
-        let designations = self.store.designations(ordinal).map_err(storage)?;
-        Ok(preference.iter().find_map(|language| {
-            designations
-                .iter()
-                .find(|d| {
-                    shown(d.use_ordinal)
-                        && language.is_none_or(|l| primary_subtag(&d.language) == l)
+        for language in preference {
+            let found = self
+                .store
+                .find_designation(ordinal, |d| {
+                    shown(d.use_ordinal) && language.is_none_or(|l| primary_subtag(d.language) == l)
                 })
-                .map(|d| d.term.clone())
-        }))
+                .map_err(storage)?;
+            if let Some(designation) = found {
+                return Ok(Some(designation.term));
+            }
+        }
+        Ok(None)
     }
 
     /// The display of `concept` by a use `shown` admits: in `language`, else
@@ -367,21 +369,21 @@ impl Artifact {
     /// and `None` when the store holds no concept there.
     pub(crate) fn property_value(
         &self,
-        value: record::PropertyValue,
+        value: record::PropertyValueRef<'_>,
     ) -> Result<Option<PropertyValue>, ProviderError> {
         Ok(Some(match value {
-            record::PropertyValue::Concept(target) => {
+            record::PropertyValueRef::Concept(target) => {
                 match self.store.code(target).map_err(storage)? {
                     Some(code) => PropertyValue::Code(code.to_owned()),
                     None => return Ok(None),
                 }
             }
-            record::PropertyValue::Code(c) => PropertyValue::Code(c),
-            record::PropertyValue::String(s) => PropertyValue::String(s),
-            record::PropertyValue::Integer(i) => PropertyValue::Integer(i),
-            record::PropertyValue::Boolean(b) => PropertyValue::Boolean(b),
-            record::PropertyValue::Decimal(d) => PropertyValue::Decimal(d),
-            record::PropertyValue::DateTime(d) => PropertyValue::DateTime(d),
+            record::PropertyValueRef::Code(c) => PropertyValue::Code(c.to_owned()),
+            record::PropertyValueRef::String(s) => PropertyValue::String(s.to_owned()),
+            record::PropertyValueRef::Integer(i) => PropertyValue::Integer(i),
+            record::PropertyValueRef::Boolean(b) => PropertyValue::Boolean(b),
+            record::PropertyValueRef::Decimal(d) => PropertyValue::Decimal(d.to_owned()),
+            record::PropertyValueRef::DateTime(d) => PropertyValue::DateTime(d.to_owned()),
         }))
     }
 

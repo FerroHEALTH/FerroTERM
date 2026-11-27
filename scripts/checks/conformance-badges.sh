@@ -4,9 +4,9 @@
 # The conformance badges: one shields.io endpoint JSON per served FHIR version,
 # derived from the committed pass lists of the HL7 terminology ecosystem suite
 # (conformance/tx-ecosystem/, the lists CI gates on every push) and the suite
-# total the suite script records, one per mode run by hand before a release
-# (conformance/tx-ecosystem/hand-run.tsv, whose day conformance/tx-ecosystem/README.md
-# names), one naming the FHIR versions served, and the EHDS badges over
+# total the suite script records, one per other mode (the rows of
+# conformance/tx-ecosystem/ci-modes.tsv, which CI runs, and of hand-run.tsv,
+# measured by hand), one naming the FHIR versions served, and the EHDS badges over
 # conformance/ehds/. The numbers are never typed by hand: a badge
 # says what the pass list says. The docs lane writes them into the site under
 # /conformance/, and the README badges read them through
@@ -17,19 +17,58 @@
 # safe uses of conformance/post-quantum.tsv. Every run fails when the README
 # shows a badge this script does not write or leaves out one it writes, and
 # when the pass-list table of conformance/tx-ecosystem/README.md disagrees
-# with the lists, the suite total or hand-run.tsv, and when the book's
-# conformance page miscounts the cases not-applicable.tsv lists. A
-# badge whose label runs past 30 characters or whose message runs past 20
-# fails the run.
+# with the lists, the suite total or the mode rows, when the book's
+# conformance page miscounts the cases not-applicable.tsv lists, and when its
+# table of hand runs differs from the one hand-run.tsv renders. A badge whose
+# label runs past 30 characters or whose message runs past 20 fails the run.
 #
 #   conformance-badges.sh <out-dir>
-#   conformance-badges.sh --self-test   # a claimed certification or a missing logo is refused
+#   conformance-badges.sh --self-test         # a claimed certification or a missing logo is refused
+#   conformance-badges.sh --write-hand-runs   # rewrite the book's table of hand runs from hand-run.tsv
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 # shellcheck source=scripts/checks/badge-logos/logo.sh
 source scripts/checks/badge-logos/logo.sh
 
-out="${1:?usage: conformance-badges.sh <out-dir> | --self-test}"
+out="${1:?usage: conformance-badges.sh <out-dir> | --self-test | --write-hand-runs}"
+book=website/book/src/evaluate/conformance.md
+hand_run=conformance/tx-ecosystem/hand-run.tsv
+ci_modes=conformance/tx-ecosystem/ci-modes.tsv
+hand_open='<!-- hand-run.tsv: written by scripts/checks/conformance-badges.sh --write-hand-runs -->'
+hand_close='<!-- end of hand-run.tsv -->'
+
+# The rows of a mode table, header and comments left out.
+mode_rows() {
+  awk -F'\t' '!/^#/ && NF && $1 != "surface"' "$1"
+}
+
+# The book's table of hand runs, rendered from hand-run.tsv between its markers.
+hand_run_table() {
+  printf '%s\n| mode | surface | ran | measured | why by hand |\n|---|---|---|---|---|\n' "$hand_open"
+  mode_rows "$hand_run" | awk -F'\t' '{ printf "| `%s` | `/%s` | %s | %s | %s |\n", $2, $1, $3, $4, $5 }'
+  printf '%s\n' "$hand_close"
+}
+
+# The book page with its table of hand runs replaced by TABLE_FILE.
+book_with_table() {
+  awk -v first="$hand_open" -v last="$hand_close" -v table="$1" '
+    $0 == first { while ((getline line < table) > 0) print line; skip = 1; next }
+    $0 == last { skip = 0; next }
+    !skip { print }' "$book"
+}
+
+if [[ "$out" == "--write-hand-runs" ]]; then
+  table="$(mktemp)"
+  page="$(mktemp)"
+  trap 'rm -f "$table" "$page"' EXIT
+  hand_run_table > "$table"
+  grep -qxF "$hand_open" "$book" || { echo "conformance-badges: $book has no line $hand_open" >&2; exit 1; }
+  book_with_table "$table" > "$page"
+  cat "$page" > "$book"
+  echo "conformance-badges: wrote the table of hand runs into $book"
+  exit 0
+fi
+
 self_test=""
 if [[ "$out" == "--self-test" ]]; then
   self_test=1
@@ -93,28 +132,40 @@ pass_list() {
   printf '%s.txt' "$list"
 }
 
-# The rows of hand-run.tsv: surface, mode, the cases the run ran, and the day
-# it was measured. scripts/checks/tx-ecosystem.sh fails a hand run whose count
-# of cases differs from its row.
-hand_run=conformance/tx-ecosystem/hand-run.tsv
-hand_rows() {
-  awk -F'\t' '!/^#/ && NF && $1 != "surface"' "$hand_run"
-}
-while IFS=$'\t' read -r surface mode ran measured; do
+# The other modes: surface, mode and the cases the run ran, from ci-modes.tsv
+# for a mode CI runs and from hand-run.tsv, with the day and the reason, for
+# one measured by hand. scripts/checks/tx-ecosystem.sh fails a run whose count
+# of cases differs from its row. Each badge is the count alone; the day and
+# the reason of a hand run are on the book's conformance page.
+mode_keys="$( { mode_rows "$ci_modes"; mode_rows "$hand_run"; } | cut -f1-2 | sort)"
+if [[ -n "$(printf '%s\n' "$mode_keys" | uniq -d)" ]]; then
+  echo "conformance-badges: a mode has a row in both $ci_modes and $hand_run:" >&2
+  printf '%s\n' "$mode_keys" | uniq -d >&2
+  exit 1
+fi
+while IFS=$'\t' read -r surface mode ran measured reason; do
   list="$(pass_list "$surface" "$mode")"
-  if [[ ! -f "$list" || ! "$ran" =~ ^[0-9]+$ || ! "$measured" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
-    echo "conformance-badges: $hand_run row '$surface $mode $ran $measured' names no pass list, count, or date" >&2
+  if [[ ! -f "$list" || ! "$ran" =~ ^[0-9]+$ ]]; then
+    echo "conformance-badges: mode row '$surface $mode $ran' names no pass list or count" >&2
+    exit 1
+  fi
+  if [[ -n "$measured$reason" ]] && [[ ! "$measured" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ || -z "$reason" ]]; then
+    echo "conformance-badges: $hand_run row '$surface $mode' names no day or no reason" >&2
     exit 1
   fi
   passed="$(grep -c . "$list" || true)"
   if [[ "$passed" -gt "$ran" ]]; then
-    echo "conformance-badges: $list lists $passed cases, more than the $ran $hand_run says ran" >&2
+    echo "conformance-badges: $list lists $passed cases, more than the $ran its row says ran" >&2
     exit 1
   fi
-  badge "hand-$(printf '%s' "$mode" | tr '.' '-')-$surface.json" \
+  badge "$(printf '%s' "$mode" | tr '.' '-')-$surface.json" \
     "$mode $(printf '%s' "$surface" | tr '[:lower:]' '[:upper:]')" \
     "$passed" "$ran" "" shield-check
-done < <(hand_rows)
+done < <(mode_rows "$ci_modes"; mode_rows "$hand_run")
+if mode_rows "$hand_run" | awk -F'\t' '$4 == "" || $5 == "" { bad = 1 } END { exit !bad }'; then
+  echo "conformance-badges: every row of $hand_run names the day it was measured and why CI does not run it" >&2
+  exit 1
+fi
 
 # The FHIR versions served, from the version table of the book's FHIR versions
 # page; a version marked ballot-tracking there says so on the badge.
@@ -183,7 +234,7 @@ expected_rows() {
   for version in r4b r4 r5 r6; do
     [[ ! -f "$(pass_list "$version" general)" ]] || printf '%s\tgeneral\t%s\n' "$version" "$total"
   done
-  hand_rows | cut -f1-3
+  { mode_rows "$ci_modes"; mode_rows "$hand_run"; } | cut -f1-3
 }
 table_failures=0
 while IFS=$'\t' read -r surface mode ran; do
@@ -197,18 +248,25 @@ done < <(expected_rows)
 tick='`'
 table_row="^[|] ${tick}[^${tick}]+${tick} [|] ${tick}/"
 if [[ "$(grep -cE "$table_row" "$table")" != "$(expected_rows | wc -l | tr -d ' ')" ]]; then
-  echo "conformance-badges: $table has a pass-list row that no list or hand-run.tsv row accounts for" >&2
+  echo "conformance-badges: $table has a pass-list row that no list or mode row accounts for" >&2
   table_failures=$((table_failures + 1))
 fi
-for measured in $(hand_rows | cut -f4 | sort -u); do
+for measured in $(mode_rows "$hand_run" | cut -f4 | sort -u); do
   if ! tr -s '[:space:]' ' ' < "$table" | grep -qF "measured by hand on $measured"; then
     echo "conformance-badges: $table does not say the hand runs were measured by hand on $measured" >&2
     table_failures=$((table_failures + 1))
   fi
 done
+# The book's table of hand runs is the one hand-run.tsv renders.
+rendered="$(mktemp)"
+hand_run_table > "$rendered"
+if ! grep -qxF "$hand_open" "$book" || ! diff -q <(book_with_table "$rendered") "$book" > /dev/null; then
+  echo "conformance-badges: the table of hand runs in $book differs from $hand_run; run conformance-badges.sh --write-hand-runs" >&2
+  table_failures=$((table_failures + 1))
+fi
+rm -f "$rendered"
 # The book's conformance page names, per surface, the general cases that do
 # not apply there, as not-applicable.tsv counts them.
-book=website/book/src/evaluate/conformance.md
 not_applicable() {
   awk -F'\t' -v surface="$1" '!/^#/ && $1 == surface' conformance/tx-ecosystem/not-applicable.tsv | wc -l | tr -d ' '
 }
@@ -233,6 +291,13 @@ if [[ -n "$self_test" ]]; then
     exit 1
   fi
   badge_length_check "$out"/*.json || exit 1
+  # A book page whose table of hand runs lost a row is caught.
+  hand_run_table | sed '4d' > "$out/table.md"
+  if diff -q <(book_with_table "$out/table.md") "$book" > /dev/null; then
+    echo "conformance-badges: self-test: a table of hand runs short of a row passes" >&2
+    exit 1
+  fi
+  rm "$out/table.md"
   badge long.json "tx-ecosystem 1.11.0 tx.fhir.org R4B" 29 189 ", by hand 2026-11-27" shield-check > /dev/null
   if badge_length_check "$out/long.json" 2>/dev/null; then
     echo "conformance-badges: self-test: a badge past the length limits passes" >&2

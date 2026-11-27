@@ -32,8 +32,8 @@ deploy.
 
 The pass lists are the honest state, not a ceiling: the remaining cases and
 their clusters are tracked on the issue tracker, and the lists grow with the
-work. The suite's other modes (ICD-11, LOINC) need licensed content and run by
-hand; their lists live beside the general ones.
+work. The suite's other modes (SNOMED CT, ICD-11, LOINC and more) have their
+own lists beside the general ones, described [below](#the-other-modes).
 
 ## Where the remaining cases stand
 
@@ -41,7 +41,7 @@ The `general` mode counts 805 cases on every surface. With suite `9c2bbce`
 and validator 7.0.6, `/r4` passes 744, `/r4b` 730 and `/r5` 744. Every case
 that does not pass falls into one of the rows below. None of them needs
 licensed content: the cases that do (SNOMED CT, LOINC, ICD-11, OMOP) sit in
-the suite's other modes, which run by hand and are not in these counts.
+the suite's other modes, which are not in these counts.
 
 | Why the case does not pass | Tracked in | R4 | R4B | R5 |
 |---|---|---|---|---|
@@ -68,25 +68,46 @@ FerroTERM answers what the published OperationDefinitions and extensions
 define, and each report names the change upstream that would settle it.
 Every row is a gate or an upstream report.
 
-## The modes run by hand
+## The other modes
 
-The suite's other modes need licensed content or a code system FerroTERM does
-not load, so they run by hand before a release, not in CI. Each has its own
-badge, labelled `<mode> <surface>` under the README's suite heading, which
-reads `passed/ran`: `ran` is the number of cases that run executed. The day it
-was measured is recorded in `conformance/tx-ecosystem/hand-run.tsv` and named
-in `conformance/tx-ecosystem/README.md`; the badge is a record of that run,
-not a live result.
+Each of the suite's other modes has its own badge, labelled `<mode> <surface>`
+under the README's suite heading, which reads `passed/ran`: `ran` is the number
+of cases the mode runs.
 
-![tx-ecosystem snomed R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-snomed-r4b.json)
-![tx-ecosystem icd-11 R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-icd-11-r4b.json)
-![tx-ecosystem icf R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-icf-r4b.json)
-![tx-ecosystem loinc R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-loinc-r4b.json)
-![tx-ecosystem loinc R5](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-loinc-r5.json)
-![tx-ecosystem tx.fhir.org R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-tx-fhir-org-r4b.json)
-![tx-ecosystem tx.fhir.org R5](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-tx-fhir-org-r5.json)
-![tx-ecosystem mimetypes R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-mimetypes-r4b.json)
-![tx-ecosystem omop R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-omop-r4b.json)
+A mode whose content CI may fetch runs in CI, weekly and on demand
+(`.github/workflows/tx-ecosystem-modes.yml`), against its committed pass list
+and the count `conformance/tx-ecosystem/ci-modes.tsv` records. The lane fetches
+the content from its public source, checks it against a pinned sha256, and
+deletes it when the run ends; none of it is committed, cached or uploaded.
+`snomed` runs this way, over the suite's own SNOMED CT test edition.
+
+The modes CI does not run yet are measured by hand before a release. Their
+counts, the day of each run and the reason are in
+`conformance/tx-ecosystem/hand-run.tsv`, and the table below is written from
+it:
+
+<!-- hand-run.tsv: written by scripts/checks/conformance-badges.sh --write-hand-runs -->
+| mode | surface | ran | measured | why by hand |
+|---|---|---|---|---|
+| `icd-11` | `/r4b` | 145 | 2026-11-27 | needs the WHO ICD-API container; its CI lane is not built yet (#1437) |
+| `icf` | `/r4b` | 96 | 2026-11-27 | needs the ICF releases of fhir.tx.support; its CI lane is not built yet (#1437) |
+| `loinc` | `/r4b` | 110 | 2026-11-27 | needs a LOINC release; its CI lane is not built yet (#1437) |
+| `loinc` | `/r5` | 110 | 2026-11-27 | needs a LOINC release; its CI lane is not built yet (#1437) |
+| `tx.fhir.org` | `/r4b` | 189 | 2026-11-27 | needs a LOINC release; its CI lane is not built yet (#1437) |
+| `tx.fhir.org` | `/r5` | 189 | 2026-11-27 | needs a LOINC release; its CI lane is not built yet (#1437) |
+| `mimetypes` | `/r4b` | 52 | 2026-11-27 | its CI lane is not built yet (#1437) |
+| `omop` | `/r4b` | 40 | 2026-11-27 | its CI lane is not built yet (#1437) |
+<!-- end of hand-run.tsv -->
+
+![tx-ecosystem snomed R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fsnomed-r4b.json)
+![tx-ecosystem icd-11 R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Ficd-11-r4b.json)
+![tx-ecosystem icf R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Ficf-r4b.json)
+![tx-ecosystem loinc R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Floinc-r4b.json)
+![tx-ecosystem loinc R5](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Floinc-r5.json)
+![tx-ecosystem tx.fhir.org R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Ftx-fhir-org-r4b.json)
+![tx-ecosystem tx.fhir.org R5](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Ftx-fhir-org-r5.json)
+![tx-ecosystem mimetypes R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fmimetypes-r4b.json)
+![tx-ecosystem omop R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fomop-r4b.json)
 
 The `snomed` mode runs over the suite's own SNOMED CT test edition with
 `terminology.default_language = "en-US"`, because its expected displays are the

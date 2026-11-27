@@ -6,7 +6,7 @@ use std::path::Path;
 use concept_graph::ordinal::Ordinal;
 use concept_store::builder::{BuildError, PreferredRule, StoreBuilder};
 use concept_store::column::Column;
-use concept_store::record::{Concept, Designation, PropertyValue};
+use concept_store::record::{Concept, Designation, PropertyValue, PropertyValueRef};
 use concept_store::store::{Store, StoreError, Vocabulary};
 use concept_store::tables;
 
@@ -166,9 +166,20 @@ fn point_reads_return_what_the_build_wrote() {
     assert_eq!(
         properties,
         vec![
-            (STATUS, vec![PropertyValue::Code("inactive".to_owned())]),
-            (PARENT, vec![PropertyValue::Concept(Ordinal::new(0))])
+            (STATUS, vec![PropertyValueRef::Code("inactive")]),
+            (PARENT, vec![PropertyValueRef::Concept(Ordinal::new(0))])
         ]
+    );
+    assert_eq!(
+        store.property(Ordinal::new(1), PARENT).expect("property"),
+        vec![PropertyValueRef::Concept(Ordinal::new(0))]
+    );
+    assert_eq!(
+        store
+            .find_designation(Ordinal::new(0), |d| d.term.starts_with("Synthetic root"))
+            .expect("finds")
+            .map(|d| d.term),
+        Some(String::from("Synthetic root (synthetic)"))
     );
     assert_eq!(
         store
