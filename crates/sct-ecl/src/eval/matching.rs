@@ -413,6 +413,6 @@ mod tests {
             .map(|group| group.iter().map(|row| row.kind).collect())
             .collect();
         assert_eq!(kinds, [vec![3, 4], vec![5]]);
-        assert!(relationship_groups(&rows[..2]).is_empty());
+        assert_eq!(relationship_groups(&rows[..2]).len(), 0);
     }
 }
