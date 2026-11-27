@@ -80,13 +80,13 @@ fn each_hot_request_stays_within_its_allocation_budget() {
         Budget {
             name: "lookup",
             uri: format!("/r4b/CodeSystem/$lookup?system={system}&code={deep}"),
-            blocks: 268,
+            blocks: 265,
             bytes: 54_272,
         },
         Budget {
             name: "validate-code",
             uri: format!("/r4b/CodeSystem/$validate-code?url={system}&code={deep}"),
-            blocks: 142,
+            blocks: 139,
             bytes: 23_552,
         },
         Budget {
@@ -100,7 +100,7 @@ fn each_hot_request_stays_within_its_allocation_budget() {
             uri: format!(
                 "/r4b/ValueSet/$expand?url=http%3A%2F%2Fsnomed.info%2Fsct%3Ffhir_vs%3Disa%2F{root}&count=10&offset=1000"
             ),
-            blocks: 1298,
+            blocks: 1265,
             bytes: 235_520,
         },
         Budget {
@@ -109,7 +109,7 @@ fn each_hot_request_stays_within_its_allocation_budget() {
                 "/r4b/ConceptMap/$translate?url=http%3A%2F%2Fsnomed.info%2Fsct%3Ffhir_cm%3D{}&system={system}&code={deep}",
                 ferroterm_testkit::snomed::ICD10_MAP_SCTID
             ),
-            blocks: 521,
+            blocks: 515,
             bytes: 139_264,
         },
     ];

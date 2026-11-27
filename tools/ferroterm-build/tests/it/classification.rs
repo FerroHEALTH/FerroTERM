@@ -5,7 +5,7 @@
 
 use ::classification::claml::read;
 use concept_graph::persist::Hierarchy;
-use concept_store::record::PropertyValue;
+use concept_store::record::PropertyValueRef;
 use concept_store::store::{Store, Vocabulary};
 use designation_index::index::Query;
 use designation_index::persist::read_from;
@@ -50,15 +50,12 @@ fn the_claml_classification_builds_an_artifact_the_store_graph_and_text_open() {
             .find(|(k, _)| *k == keys(name))
             .map(|(_, v)| v.clone())
     };
-    assert_eq!(
-        of(KIND_KEY),
-        Some(vec![PropertyValue::Code(String::from("category"))])
-    );
+    assert_eq!(of(KIND_KEY), Some(vec![PropertyValueRef::Code("category")]));
     assert_eq!(
         of("exclusion"),
-        Some(vec![PropertyValue::String(String::from(
+        Some(vec![PropertyValueRef::String(
             "secundaire maligne nieuwvorming van lever (C78.7)"
-        ))])
+        )])
     );
     assert_eq!(of(USAGE_KEY), None);
     let bile = store.ordinal(BILE_DUCT).expect("read").expect("bile");
@@ -67,8 +64,7 @@ fn the_claml_classification_builds_an_artifact_the_store_graph_and_text_open() {
             .properties(bile)
             .expect("read")
             .iter()
-            .any(|(k, v)| *k == keys(USAGE_KEY)
-                && *v == vec![PropertyValue::Code(String::from("dagger"))])
+            .any(|(k, v)| *k == keys(USAGE_KEY) && *v == vec![PropertyValueRef::Code("dagger")])
     );
     let designations = store.designations(liver).expect("read");
     assert_eq!(designations.len(), 2, "the Dutch and English titles");
@@ -126,7 +122,7 @@ fn the_icd10cm_release_builds_with_the_valid_flag() {
             .properties(classical)
             .expect("read")
             .iter()
-            .any(|(k, v)| *k == valid && *v == vec![PropertyValue::Boolean(true)])
+            .any(|(k, v)| *k == valid && *v == vec![PropertyValueRef::Boolean(true)])
     );
     let chapter = store.ordinal(CM_CHAPTER).expect("read").expect("chapter");
     assert!(

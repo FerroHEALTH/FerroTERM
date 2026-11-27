@@ -199,6 +199,8 @@ pub struct Snomed {
     attribute_ordinals: OnceLock<Vec<Option<u32>>>,
     /// The inactive concepts, read once on the first request that needs them.
     inactive: OnceLock<ConceptSet>,
+    /// The concept model, compiled on the first expression it checks.
+    mrcm: OnceLock<expression::mrcm::Mrcm>,
     keys: Keys,
     edition: String,
     base_language: String,
@@ -327,6 +329,22 @@ impl StoredSystem for Snomed {
             .ok()?
             .err()
             .map(|error| error.to_string())
+    }
+
+    /// The optional concept model rules an expression breaks, which "result in
+    /// a warning during validation" (MRCM §6 Considerations).
+    fn advisories(
+        provider: &SnomedProvider,
+        concept: Concept,
+    ) -> Result<Vec<String>, ProviderError> {
+        let Some(record) = provider.registered(concept)? else {
+            return Ok(Vec::new());
+        };
+        Ok(provider
+            .expression_warnings(&record)?
+            .iter()
+            .map(ToString::to_string)
+            .collect())
     }
 
     /// An expression carries no designation: "SNOMED International does not
@@ -467,22 +485,19 @@ impl StoredSystem for Snomed {
             value: PropertyValue::Boolean(!record.active),
             ..Property::default()
         }];
-        let defined = of(provider.system().keys.definition_status).is_some_and(|values| {
-            values
-                .iter()
-                .any(|v| matches!(v, record::PropertyValue::Code(c) if *c == constants::DEFINED.to_string()))
-        });
+        let defined = of(provider.system().keys.definition_status)
+            .is_some_and(|values| selection::states_defined(values));
         out.push(Property {
             code: String::from("sufficientlyDefined"),
             value: PropertyValue::Boolean(defined),
             ..Property::default()
         });
         if let Some(values) = of(provider.system().keys.module)
-            && let Some(record::PropertyValue::Code(module)) = values.first()
+            && let Some(record::PropertyValueRef::Code(module)) = values.first()
         {
             out.push(Property {
                 code: String::from("moduleId"),
-                value: PropertyValue::Code(module.clone()),
+                value: PropertyValue::Code((*module).to_owned()),
                 ..Property::default()
             });
         }
@@ -499,7 +514,7 @@ impl StoredSystem for Snomed {
                 continue;
             };
             for value in values {
-                let Some(value) = provider.stored().property_value(value.clone())? else {
+                let Some(value) = provider.stored().property_value(*value)? else {
                     continue;
                 };
                 properties::push_once(

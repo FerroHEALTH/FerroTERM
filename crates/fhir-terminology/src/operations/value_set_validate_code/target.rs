@@ -70,7 +70,7 @@ pub(super) fn resolve_target(
             severity: "error",
             code: "exception",
             kind: "version-error",
-            message: crate::operations::MessageId::ValueSetVersionCheck,
+            message: Some(crate::operations::MessageId::ValueSetVersionCheck),
             text: error.to_string(),
             expression: super::super::at(expression, "version"),
         });
@@ -299,7 +299,7 @@ pub(super) fn vs_invalid(
         severity,
         code: "invalid",
         kind: "vs-invalid",
-        message,
+        message: Some(message),
         text,
         expression: super::super::at(expression, "version"),
     }
@@ -323,7 +323,7 @@ pub(super) fn supplement_as_system(
             severity: "error",
             code: "invalid",
             kind: "invalid-data",
-            message: crate::operations::MessageId::CodeSystemCsNoSupplement,
+            message: Some(crate::operations::MessageId::CodeSystemCsNoSupplement),
             text: format!(
                 "CodeSystem {canonical} is a supplement, so can't be used as a value in Coding.system"
             ),
@@ -394,7 +394,7 @@ pub(super) fn unserved_subject(
             severity: "error",
             code: "invalid",
             kind: "invalid-data",
-            message: crate::operations::MessageId::TerminologyTxSystemValueSet2,
+            message: Some(crate::operations::MessageId::TerminologyTxSystemValueSet2),
             text: format!("The Coding references a value set, not a code system ('{system}')"),
             expression: super::super::at(subject.expression, "system"),
         });
@@ -424,7 +424,7 @@ pub(super) fn local_system(system: &str, expression: &str) -> Option<Issue> {
         severity: "error",
         code: "invalid",
         kind: "invalid-data",
-        message: crate::operations::MessageId::TerminologyTxSystemRelative,
+        message: Some(crate::operations::MessageId::TerminologyTxSystemRelative),
         text: String::from("Coding.system must be an absolute reference, not a local reference"),
         expression: super::super::at(expression, "system"),
     })
@@ -495,7 +495,7 @@ pub(super) fn assess(
             severity: "error",
             code: "business-rule",
             kind: "code-rule",
-            message: crate::operations::MessageId::AbstractCodeNotAllowed,
+            message: Some(crate::operations::MessageId::AbstractCodeNotAllowed),
             text: format!(
                 "Code '{}' is abstract, and not allowed in this context",
                 system_code(&item.system, &located.code)
@@ -510,6 +510,13 @@ pub(super) fn assess(
             subject.expression,
         ));
     }
+    if !policy.membership_only {
+        issues.extend(super::super::display::advisories(
+            provider.as_ref(),
+            located.concept,
+            subject.expression,
+        )?);
+    }
     let status = provider.status(located.concept)?;
     if item.inactive {
         // NOTE: `activeOnly`, or a compose that excludes inactive codes
@@ -520,7 +527,7 @@ pub(super) fn assess(
                 severity: "error",
                 code: "business-rule",
                 kind: "code-rule",
-                message: crate::operations::MessageId::StatusCodeWarningCode,
+                message: Some(crate::operations::MessageId::StatusCodeWarningCode),
                 text: format!("The concept '{}' is valid but is not active", located.code),
                 expression: super::super::at(subject.expression, "code"),
             });
