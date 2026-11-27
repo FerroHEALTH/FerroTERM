@@ -13,7 +13,7 @@ use std::sync::Arc;
 use super::Issue;
 use crate::language;
 use crate::provider::declaration::ContentMode;
-use crate::provider::{CodeSystemProvider, Concept, error::ProviderError};
+use crate::provider::{CodeSystemProvider, Concept, DisplayStanding, error::ProviderError};
 use crate::text_match;
 
 /// One display a concept accepts, with the language it is in.
@@ -221,6 +221,11 @@ fn judgement(
         requested,
         lenient,
     } = asserted;
+    let lenient = match provider.display_standing(concept)? {
+        DisplayStanding::Placeholder => return Ok(None),
+        DisplayStanding::Suggested => true,
+        DisplayStanding::Defined => lenient,
+    };
     let all = candidates(provider, concept)?;
     let wanted = fold(given);
     let matches = |c: &&Candidate| fold(&c.text) == wanted;

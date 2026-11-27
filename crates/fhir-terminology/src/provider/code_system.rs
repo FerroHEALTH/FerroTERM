@@ -73,6 +73,54 @@ pub struct ConceptEntry {
     pub parents: Vec<String>,
 }
 
+/// The kind of a supplement, from the `codesystem-supplement-type` extension
+/// the terminology ecosystem names
+/// (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>, `CodeSystem`
+/// supplements).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum SupplementKind {
+    /// No kind stated, or one the ecosystem does not define.
+    #[default]
+    Unstated,
+    /// `lang-pack`: designations in other languages.
+    LanguagePack,
+    /// `extension-codes`: codes in a reserved code space, with their displays.
+    ExtensionCodes,
+}
+
+impl SupplementKind {
+    /// The kind a `codesystem-supplement-type` code names.
+    #[must_use]
+    pub fn from_code(code: &str) -> Self {
+        match code {
+            "lang-pack" => Self::LanguagePack,
+            "extension-codes" => Self::ExtensionCodes,
+            _ => Self::Unstated,
+        }
+    }
+}
+
+/// How a supplement applies: its kind, and whether it is global.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Supplementing {
+    /// `codesystem-supplement-type`.
+    pub kind: SupplementKind,
+    /// `codesystem-supplement-global` = `true`: the supplement applies to the
+    /// system it supplements whether or not a request or value set names it.
+    pub global: bool,
+}
+
+/// A code space a code system reserves for its users to define codes in
+/// (`codesystem-reservedCodeSpace`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReservedCodeSpace {
+    /// `reservedCodeSpace`: the regular expression a code matches in full.
+    pub pattern: String,
+    /// `default-display`: the display of a code in the space that nothing
+    /// defines.
+    pub default_display: Option<String>,
+}
+
 /// A `CodeSystem` resource reduced to what the provider serves.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CodeSystemModel {
@@ -114,6 +162,11 @@ pub struct CodeSystemModel {
     pub version_needed: bool,
     /// `CodeSystem.supplements`: the system this resource adds to, when it is one.
     pub supplements: Option<String>,
+    /// How this resource supplements its system, when it is a supplement.
+    pub supplementing: Supplementing,
+    /// The code spaces the system reserves for its users' own codes
+    /// (`codesystem-reservedCodeSpace`).
+    pub reserved_code_spaces: Vec<ReservedCodeSpace>,
     /// `CodeSystem.property`.
     pub properties: Vec<PropertyDefinition>,
     /// `CodeSystem.filter`.
@@ -259,6 +312,8 @@ impl CodeSystemModel {
             compositional: declaration.compositional.defined(),
             version_needed: identity.version_needed,
             supplements: None,
+            supplementing: Supplementing::default(),
+            reserved_code_spaces: Vec::new(),
             properties: declaration.properties.clone(),
             filters: declaration.filters.clone(),
             concepts: Vec::new(),

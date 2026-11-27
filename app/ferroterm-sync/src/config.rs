@@ -188,6 +188,27 @@ pub enum ConfigError {
         "[server_admin.credentials] takes no Basic user or password: write the client credentials grant under oauth"
     )]
     BasicReload,
+    /// An endpoint the service calls is plain `http` on a host that is not
+    /// loopback, so what the call carries would cross the network in clear.
+    #[error(
+        "`{key}` must be https, or plain http on localhost, 127.0.0.1 or ::1: the call carries a credential or the content the service serves"
+    )]
+    InsecureEndpoint {
+        /// The key that names the endpoint.
+        key: String,
+        /// The rule's refusal, naming the scheme and the host alone.
+        #[source]
+        source: Box<ferrohealth_smart::metadata::DiscoveryError>,
+    },
+    /// An endpoint the service calls is no URL.
+    #[error("`{key}` is no URL")]
+    EndpointUrl {
+        /// The key that names the endpoint.
+        key: String,
+        /// Why the value does not parse.
+        #[source]
+        source: url::ParseError,
+    },
     /// The schedule the tree describes does not read.
     #[error("the schedule does not read")]
     Schedule {
@@ -222,8 +243,10 @@ impl Config {
     /// # Errors
     ///
     /// Returns [`ConfigError::Load`] when the tree does not load,
-    /// [`ConfigError::BasicReload`] for a Basic credential on the reload, and
-    /// [`ConfigError::Schedule`] when the schedule it describes does not read.
+    /// [`ConfigError::BasicReload`] for a Basic credential on the reload,
+    /// [`ConfigError::InsecureEndpoint`] and [`ConfigError::EndpointUrl`] for
+    /// an endpoint outside the transport rule, and [`ConfigError::Schedule`]
+    /// when the schedule it describes does not read.
     pub fn load(
         path: Option<&Path>,
         sets: &[(String, String)],
@@ -250,8 +273,10 @@ impl Config {
         Ok(config)
     }
 
-    /// Refuses a Basic credential on the reload, then checks the schedule.
+    /// Refuses a Basic credential on the reload and an endpoint outside the
+    /// transport rule, then checks the schedule.
     fn check(&self) -> Result<(), ConfigError> {
+        self.check_endpoints()?;
         let credentials = &self.server_admin.credentials;
         if !credentials.user.is_empty()
             || credentials.password.is_some()
@@ -261,6 +286,27 @@ impl Config {
         }
         self.plan()
             .map_err(|source| ConfigError::Schedule { source })?;
+        Ok(())
+    }
+
+    /// Checks every URL the service calls with a credential or for content
+    /// it serves against the rule the server holds for its own issuer and
+    /// collector: `https`, or plain `http` on a loopback host.
+    fn check_endpoints(&self) -> Result<(), ConfigError> {
+        secure_endpoint("server_admin.url", self.server_admin.url.expose())?;
+        secure_grant("server_admin", &self.server_admin)?;
+        if let Some(webhook) = &self.webhook {
+            secure_endpoint("webhook.url", webhook.url.expose())?;
+        }
+        secure_endpoint("nts.url", self.nts.url.expose())?;
+        secure_grant("nts", &self.nts)?;
+        for (index, source) in self.source.iter().enumerate() {
+            for key in ["feed_url", "fhir_api_url"] {
+                if let Some(url) = source.config.get(key).and_then(toml::Value::as_str) {
+                    secure_endpoint(&format!("source[{index}].config.{key}"), url)?;
+                }
+            }
+        }
         Ok(())
     }
 
@@ -300,6 +346,52 @@ impl Config {
     }
 }
 
+/// Checks the issuer and the token endpoint of the client credentials grant
+/// of the endpoint table `table`.
+fn secure_grant(table: &str, endpoint: &EndpointSection) -> Result<(), ConfigError> {
+    if let Some(oauth) = &endpoint.credentials.oauth {
+        secure_endpoint(
+            &format!("{table}.credentials.oauth.issuer"),
+            oauth.issuer.expose(),
+        )?;
+        secure_endpoint(
+            &format!("{table}.credentials.oauth.token_endpoint"),
+            oauth.token_endpoint.expose(),
+        )?;
+    }
+    Ok(())
+}
+
+/// Checks that `url`, which `key` names, is `https` or plain `http` on a
+/// loopback host; an empty value names no endpoint.
+///
+/// The rule is `ferrohealth_smart::metadata::secure`, applied to the URL's
+/// scheme, host and port alone, so a refusal never repeats a credential, a
+/// path or a query the URL carries.
+fn secure_endpoint(key: &str, url: &str) -> Result<(), ConfigError> {
+    if url.is_empty() {
+        return Ok(());
+    }
+    let refused = |source| ConfigError::EndpointUrl {
+        key: key.to_owned(),
+        source,
+    };
+    let parsed = url::Url::parse(url).map_err(refused)?;
+    let host = parsed.host_str().unwrap_or_default();
+    let port = parsed
+        .port()
+        .map(|port| format!(":{port}"))
+        .unwrap_or_default();
+    let origin =
+        url::Url::parse(&format!("{}://{host}{port}", parsed.scheme())).map_err(refused)?;
+    ferrohealth_smart::metadata::secure(&origin, "the endpoint").map_err(|source| {
+        ConfigError::InsecureEndpoint {
+            key: key.to_owned(),
+            source: Box::new(source),
+        }
+    })
+}
+
 #[cfg(test)]
 #[expect(clippy::panic_in_result_fn, reason = "test assertions")]
 mod tests {
@@ -312,6 +404,75 @@ mod tests {
             .iter()
             .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
             .collect()
+    }
+
+    #[test]
+    fn a_plain_http_endpoint_off_loopback_is_refused_naming_its_key() {
+        for (file, key) in [
+            (
+                "[server_admin]\nurl = \"http://ferroterm:8081\"\n",
+                "server_admin.url",
+            ),
+            (
+                "[webhook]\nurl = \"http://hooks.example.org/run?token=s3cret\"\n",
+                "webhook.url",
+            ),
+            ("[nts]\nurl = \"http://terminologieserver.nl\"\n", "nts.url"),
+            (
+                "[nts.credentials.oauth]\nclient_id = \"c\"\nclient_secret = \"s\"\nissuer = \"http://idp.example.org/realm\"\n",
+                "nts.credentials.oauth.issuer",
+            ),
+            (
+                "[server_admin.credentials.oauth]\nclient_id = \"c\"\nclient_secret = \"s\"\ntoken_endpoint = \"http://idp.example.org/token\"\n",
+                "server_admin.credentials.oauth.token_endpoint",
+            ),
+            (
+                "[[source]]\nkind = \"nts\"\n[source.config]\nfeed_url = \"http://user:pw@feed.example.org/synd.xml\"\n",
+                "source[0].config.feed_url",
+            ),
+            (
+                "[[source]]\nkind = \"nts\"\n[source.config]\nfhir_api_url = \"http://fhir.example.org/fhir\"\n",
+                "source[0].config.fhir_api_url",
+            ),
+        ] {
+            let refused = Config::from_sources(Some(file), &BTreeMap::new())
+                .expect_err("a plain http endpoint off loopback is refused");
+            let text = refused.to_string();
+            assert!(
+                matches!(&refused, ConfigError::InsecureEndpoint { key: named, .. } if named == key),
+                "{key}: {text}"
+            );
+            let chain = format!(
+                "{text}: {}",
+                core::error::Error::source(&refused)
+                    .map(ToString::to_string)
+                    .unwrap_or_default()
+            );
+            for piece in ["s3cret", "token=", "pw@", "/synd.xml", "/realm"] {
+                assert!(
+                    !chain.contains(piece),
+                    "{key}: the refusal repeats a piece of the URL beyond its scheme and host"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn https_and_plain_http_on_loopback_are_admitted() -> Result<(), ConfigError> {
+        for url in [
+            "https://ferroterm:8081",
+            "http://127.0.0.1:8081",
+            "http://localhost:8081",
+            "http://[::1]:8081",
+        ] {
+            Config::from_sources(
+                Some(&format!(
+                    "[server_admin]\nurl = \"{url}\"\n[webhook]\nurl = \"{url}/hook\"\n"
+                )),
+                &BTreeMap::new(),
+            )?;
+        }
+        Ok(())
     }
 
     #[test]
@@ -331,7 +492,7 @@ mod tests {
     fn a_server_admin_table_written_with_only_its_url_keeps_the_reload_defaults()
     -> Result<(), ConfigError> {
         let config = Config::from_sources(
-            Some("[server_admin]\nurl = \"http://server:8081\"\n"),
+            Some("[server_admin]\nurl = \"https://server:8081\"\n"),
             &BTreeMap::new(),
         )?;
         assert_eq!(
@@ -345,7 +506,7 @@ mod tests {
         );
         assert_eq!(
             config.server_admin.url.expose(),
-            "http://server:8081",
+            "https://server:8081",
             "the url the file writes wins over the default"
         );
         Ok(())
@@ -364,7 +525,7 @@ activation = "manual"
 timezone = "Europe/Amsterdam"
 
 [server_admin]
-url = "http://server:8081"
+url = "https://server:8081"
 timeout = "30min"
 
 [webhook]

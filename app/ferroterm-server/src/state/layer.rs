@@ -96,8 +96,8 @@ impl Layer {
                             url: model.url.clone(),
                         }
                     })?;
-                    // NOTE: a persisted supplement stays dormant like a loaded one until a
-                    // request names it (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
+                    // NOTE: a persisted supplement stays dormant like a loaded one until a request
+                    // names it, unless it is global (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
                     self.registry
                         .register_supplement(target, Supplement::from_code_system(model));
                     return Ok(());

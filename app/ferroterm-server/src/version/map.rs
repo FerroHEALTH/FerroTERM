@@ -75,6 +75,7 @@ macro_rules! family_map {
             /// `abstract`.
             #[must_use]
             pub fn lookup_response(outcome: LookupOutcome) -> CodeSystemLookupResponse {
+                // TODO(#1358): answer `outcome.used_supplements` as `used-supplement` once fhir-types declares the output.
                 let r#abstract = abstract_of(&outcome);
                 CodeSystemLookupResponse {
                     name: outcome.name.into(),

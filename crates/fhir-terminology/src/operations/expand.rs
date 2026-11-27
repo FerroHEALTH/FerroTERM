@@ -125,7 +125,7 @@ pub fn expand(
     let options = options(input)?;
     let mut wanted = input.use_supplement.clone();
     wanted.extend(model.supplements.iter().cloned());
-    let used_supplements = sources.registry.applied_supplements(&wanted)?;
+    let mut used_supplements = sources.registry.applied_supplements(&wanted)?;
     let registry = sources.with_supplements(&wanted)?;
     let sources = &Sources {
         registry: &registry,
@@ -146,6 +146,19 @@ pub fn expand(
     // resolution has to answer first (#506).
     for used in &expansion.versions {
         negotiation.check_system(&used.url, &used.version)?;
+    }
+    // NOTE: "A server SHALL report a global language pack as a `used-supplement` in
+    // `$expand`" (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>, CodeSystem
+    // supplements); each global supplement of a system the expansion used is reported.
+    for used in &expansion.versions {
+        for global in sources
+            .registry
+            .global_supplements(&used.url, &used.version)
+        {
+            if !used_supplements.contains(&global) {
+                used_supplements.push(global);
+            }
+        }
     }
     let used_value_sets = resolver.used_value_sets();
     let open_systems = resolver.open_systems();
