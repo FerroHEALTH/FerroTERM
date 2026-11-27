@@ -216,7 +216,11 @@ pub(super) fn implicit_parts<'a>(url: &'a str, key: &str) -> Option<(&'a str, &'
         "" => "",
         rest => rest.strip_prefix('=')?,
     };
-    (base == SYSTEM || base.starts_with("http://snomed.info/sct/")).then_some((base, form))
+    // NOTE: an unpublished edition is named under `http://snomed.info/xsct/`
+    // (<https://docs.snomed.org/snomed-ct-specifications/snomed-ct-uri-standard>).
+    let named =
+        base.starts_with("http://snomed.info/sct/") || base.starts_with("http://snomed.info/xsct/");
+    (base == SYSTEM || named).then_some((base, form))
 }
 
 /// The implicit value set forms the provider resolves: the five `?fhir_vs`

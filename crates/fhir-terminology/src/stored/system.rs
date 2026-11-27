@@ -187,6 +187,15 @@ pub trait StoredSystem: fmt::Debug + Send + Sync + Sized {
         None
     }
 
+    /// As [`CodeSystemProvider::implicit_concept_maps`].
+    fn implicit_concept_maps(
+        _provider: &StoredProvider<Self>,
+        _source: &str,
+        _target: &str,
+    ) -> Vec<String> {
+        Vec::new()
+    }
+
     /// As [`CodeSystemProvider::unclosed`].
     fn unclosed(_provider: &StoredProvider<Self>, _filters: &[Filter]) -> bool {
         false
@@ -423,6 +432,10 @@ impl<S: StoredSystem> CodeSystemProvider for StoredProvider<S> {
         selection: MapSelection<'_>,
     ) -> Option<Result<ConceptMapModel, ProviderError>> {
         S::implicit_concept_map(self, url, selection)
+    }
+
+    fn implicit_concept_maps(&self, source: &str, target: &str) -> Vec<String> {
+        S::implicit_concept_maps(self, source, target)
     }
 
     fn filter(&self, filter: &Filter) -> Result<ConceptSet, ProviderError> {

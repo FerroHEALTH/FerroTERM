@@ -572,14 +572,32 @@ fn maps_for(
     subject: &Subject,
     reverse: bool,
 ) -> Result<Vec<Arc<ConceptMapModel>>, OperationError> {
-    let url = match candidates {
-        Candidates::Stored(maps) => return Ok(maps.clone()),
-        Candidates::Implicit(url) => url,
-    };
     let selection = if reverse {
         MapSelection::Target(&subject.code)
     } else {
         MapSelection::Source(&subject.code)
+    };
+    let url = match candidates {
+        Candidates::Stored(maps) => {
+            let mut maps = maps.clone();
+            // NOTE: a request that names no map has the server find the maps that fit
+            // it (tx-ecosystem IG, requirements, $translate), the implicit ones its
+            // code systems define between the source and the target system among them.
+            if let (None, None, Some(target)) =
+                (&input.url, &input.inline_concept_map, &input.target_system)
+            {
+                for url in sources
+                    .registry
+                    .implicit_concept_maps(&subject.system, target)
+                {
+                    if let Some(map) = sources.registry.implicit_concept_map(&url, selection) {
+                        maps.push(Arc::new(map?));
+                    }
+                }
+            }
+            return Ok(maps);
+        }
+        Candidates::Implicit(url) => url,
     };
     match sources.registry.implicit_concept_map(url, selection) {
         Some(Ok(map)) => Ok(vec![Arc::new(map)]),
