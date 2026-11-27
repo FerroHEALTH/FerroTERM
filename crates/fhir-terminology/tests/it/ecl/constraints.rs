@@ -134,6 +134,18 @@ fn member_of_reads_the_tables_and_selects_fields() {
         refused(&p, &format!("^ {}", c(FUR))),
         EvalError::NotAReferenceSet(_)
     ));
+    assert_eq!(
+        set(&p, &format!("^ ( {} OR {} )", c(PETS), c(FUR))),
+        set(&p, &format!("^ {}", c(PETS))),
+        "in a set of reference sets, a concept with no concept members adds none"
+    );
+    assert_eq!(
+        set(
+            &p,
+            &format!("^ ( {} OR {} OR {} )", c(PETS), same_as(), c(FUR))
+        ),
+        [CAT, DOG, FISH]
+    );
     assert!(matches!(
         refused(&p, &format!("^ [nope] {}", same_as())),
         EvalError::UnknownField { field, .. } if field == "nope"

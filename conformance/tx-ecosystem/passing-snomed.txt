@@ -88,7 +88,9 @@ sct-ecl/snomed-expand-ecl-history-min
 sct-ecl/snomed-expand-ecl-history-mod
 sct-ecl/snomed-expand-ecl-member-filter-date-in
 sct-ecl/snomed-expand-ecl-member-filter-date-out
+sct-ecl/snomed-expand-ecl-memberOf-any
 sct-ecl/snomed-expand-ecl-memberOf-extended-map
+sct-ecl/snomed-expand-ecl-memberOf-nested
 sct-ecl/snomed-expand-ecl-memberOf-refset
 sct-ecl/snomed-expand-ecl-memberOf-simple-map
 sct-ecl/snomed-expand-ecl-minus
