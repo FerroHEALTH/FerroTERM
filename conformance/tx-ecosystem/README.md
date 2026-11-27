@@ -14,6 +14,17 @@ is printed by the script; add it to the list in the same change that earns it.
 fails when a run disagrees with it, and `scripts/checks/conformance-badges.sh`
 turns the lists and the total into the README's badges at site build time.
 
+`not-applicable.tsv` lists, per surface, the `general` cases the runner
+counts in that total and that do not apply there, each with its reason.
+`gated` rows are the cases whose own `mode` or `version` gate makes the
+runner skip them. `r4b-surface` rows are the cases that fail on `/r4b` only
+because the suite targets R4 and R5 (the IG's `r4.md`) and leaves `$version$`
+unsubstituted there. The script fails a `general` run whose skips differ
+from the `gated` rows, or in which an `r4b-surface` case passes or is
+missing. Each badge shows the count as `n/a` beside the pass count, so the
+cases a reader sees as not passing are the ones FerroTERM answers for
+(#1361; the upstream report is #1380).
+
 ## What is committed, per mode
 
 The `general` rows were recorded on 2026-11-24 with validator 7.0.6 and suite
