@@ -6,7 +6,8 @@
 //!
 //! A media type is a code when it parses; `registered` says whether its
 //! `type/subtype` is in the registry. Parameters narrow a type, so
-//! `text/plain` subsumes `text/plain; charset=utf-8`. The system cannot be
+//! `application/fhir+json` subsumes `application/fhir+json; fhirversion=4.0`,
+//! and a parameter at the default its RFC defines is the bare type itself. The system cannot be
 //! enumerated, only the registered types can.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -81,6 +82,16 @@ const KNOWN_PARAMETERS: [&str; 10] = [
     "version",
 ];
 
+/// The parameter defaults the defining RFCs give, by `type/subtype`: a bare
+/// type already carries them, so writing one out names the same type.
+///
+/// `text/plain` keeps US-ASCII as its default charset (RFC 6657 §4, after RFC
+/// 2046 §4.1.2) and `Fixed` as its default format (RFC 3676 §4).
+const DEFAULTS: [(&str, &str, &str); 2] = [
+    ("text/plain", "charset", "us-ascii"),
+    ("text/plain", "format", "fixed"),
+];
+
 /// The registered `type/subtype` values, lower case, sorted.
 static REGISTERED: LazyLock<Vec<String>> = LazyLock::new(|| {
     let mut out = BTreeSet::new();
@@ -130,11 +141,21 @@ impl MediaType {
         text
     }
 
+    /// The parameters, with the RFC defaults of [`DEFAULTS`] filled in where
+    /// the type leaves them out.
     fn parameter_map(&self) -> BTreeMap<&str, &str> {
-        self.parameters
+        let mut map: BTreeMap<&str, &str> = self
+            .parameters
             .iter()
             .map(|(n, v)| (n.as_str(), v.as_str()))
-            .collect()
+            .collect();
+        let base = self.base();
+        for (media, name, value) in DEFAULTS {
+            if media == base {
+                map.entry(name).or_insert(value);
+            }
+        }
+        map
     }
 }
 
@@ -454,6 +475,21 @@ impl Grammar for MediaTypes {
         if let Some(unknown) = differing.iter().find(|n| !KNOWN_PARAMETERS.contains(n)) {
             return Err(ProviderError::CannotDetermine(format!(
                 "the parameter `{unknown}` of `{}` is not one the server knows the meaning of",
+                a.base()
+            )));
+        }
+        // NOTE: RFC 6657 §3 leaves a `text/*` type with no stated charset rule defaulting
+        // to US-ASCII or to none, so its absence is not a value the server can compare
+        // (ecosystem IG at `9c2bbce`, `requirements.md`, BCP 13: "SHALL return an error rather than guessing").
+        if a.kind == "text"
+            && differing.contains(&"charset")
+            && !DEFAULTS
+                .iter()
+                .any(|(media, name, _)| *media == a.base() && *name == "charset")
+            && (!pa.contains_key("charset") || !pb.contains_key("charset"))
+        {
+            return Err(ProviderError::CannotDetermine(format!(
+                "the default charset of `{}` is not stated, so a charset cannot be compared with its absence",
                 a.base()
             )));
         }
