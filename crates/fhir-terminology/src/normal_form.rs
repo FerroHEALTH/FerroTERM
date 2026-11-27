@@ -28,21 +28,14 @@
 //! each is marked where it is decided: the order of what is rendered, which
 //! term a concept reference carries, and the layout.
 
-/// The definition status prefix of a concept that is sufficiently defined.
-///
-/// "When the combination of focus concepts and attribute refinements are both
-/// necessary and sufficient to define the clinical meaning being represented,
-/// the 'equivalent to' definition status is used" (the Compositional Grammar
-/// specification, §6.7 Expressions With a Definition Status).
-const EQUIVALENT_TO: &str = "===";
-
 /// The definition status prefix of a primitive concept.
 ///
-/// The same section: a definition that is "necessary but not necessarily
-/// sufficient" carries the 'subtype of' status. The prefix is optional in the
-/// grammar and `===` is assumed when it is absent, so a primitive concept
-/// rendered without one would assert an equivalence the terminology denies.
-/// Both are therefore always written.
+/// A definition that is "necessary but not necessarily sufficient" carries the
+/// 'subtype of' status (the Compositional Grammar specification, §6.7
+/// Expressions With a Definition Status). The prefix is optional in the
+/// grammar and 'equivalent to' (`===`) is assumed when it is absent (§5), so a
+/// sufficiently defined concept is written with none and a primitive one
+/// always with this one.
 const SUBTYPE_OF: &str = "<<<";
 
 /// One concept reference: the identifier, and the term when one is rendered.
@@ -102,7 +95,7 @@ impl Reference {
     /// reference with no term is the identifier alone.
     fn render(&self) -> String {
         match &self.term {
-            Some(term) => format!("{} |{term}|", self.code),
+            Some(term) => format!("{}|{term}|", self.code),
             None => self.code.clone(),
         }
     }
@@ -155,12 +148,8 @@ impl Expression {
         if self.focus.is_empty() {
             return None;
         }
-        let prefix = if self.defined {
-            EQUIVALENT_TO
-        } else {
-            SUBTYPE_OF
-        };
-        Some(format!("{prefix} {}", self.body()))
+        let prefix = if self.defined { "" } else { SUBTYPE_OF };
+        Some(format!("{prefix}{}", self.body()))
     }
 
     /// The `subExpression` alone: the focus concepts and the refinement,
@@ -171,12 +160,14 @@ impl Expression {
         let mut focus: Vec<&Reference> = self.focus.iter().collect();
         focus.sort_by_key(|reference| numeric(&reference.code));
         let focus: Vec<String> = focus.iter().map(|reference| reference.render()).collect();
-        let body = focus.join(" + ");
+        // NOTE: §5 makes all whitespace optional and fixes no layout, so writing
+        // none is our own design.
+        let body = focus.join("+");
         let refinement = self.refinement();
         if refinement.is_empty() {
             return body;
         }
-        format!("{body} : {refinement}")
+        format!("{body}:{refinement}")
     }
 
     /// The refinement: the ungrouped attributes, then each role group.
@@ -206,7 +197,7 @@ impl Expression {
 
         let mut parts: Vec<String> = Vec::new();
         if !ungrouped.is_empty() {
-            parts.push(rendered(&ungrouped).join(", "));
+            parts.push(rendered(&ungrouped).join(","));
         }
         // NOTE: "there is no guarantee that they will be assigned
         // sequentially" (the Release File Specification §4.2.3), so groups sort
@@ -220,12 +211,12 @@ impl Expression {
                     .filter(|attribute| attribute.group == group)
                     .collect();
                 members.sort_by_key(|attribute| order(attribute));
-                format!("{{ {} }}", rendered(&members).join(", "))
+                format!("{{{}}}", rendered(&members).join(","))
             })
             .collect();
         written.sort();
         parts.extend(written);
-        parts.join(", ")
+        parts.join(",")
     }
 }
 
@@ -233,7 +224,7 @@ impl Expression {
 fn rendered(attributes: &[&Attribute]) -> Vec<String> {
     attributes
         .iter()
-        .map(|attribute| format!("{} = {}", attribute.kind.render(), attribute.value.render()))
+        .map(|attribute| format!("{}={}", attribute.kind.render(), attribute.value.render()))
         .collect()
 }
 
@@ -300,7 +291,7 @@ mod tests {
         };
         assert_eq!(
             expression.render().as_deref(),
-            Some("=== 100000001 + 100000002 : { 200000001 = 300000001 }")
+            Some("100000001+100000002:{200000001=300000001}")
         );
     }
 
@@ -313,7 +304,7 @@ mod tests {
         };
         assert_eq!(
             expression.render().as_deref(),
-            Some("<<< 100000001"),
+            Some("<<<100000001"),
             "a primitive rendered without the prefix would assert an equivalence the \
              terminology denies, because the grammar assumes `===` when none is written"
         );
@@ -331,7 +322,7 @@ mod tests {
         };
         assert_eq!(
             expression.render().as_deref(),
-            Some("<<< 100000001 : 200000001 = 300000001, { 200000002 = 300000002 }")
+            Some("<<<100000001:200000001=300000001,{200000002=300000002}")
         );
     }
 
@@ -347,7 +338,7 @@ mod tests {
         };
         assert_eq!(
             expression.render().as_deref(),
-            Some("=== 100000001 : { 200000001 = 300000002, 200000009 = 300000001 }")
+            Some("100000001:{200000001=300000002,200000009=300000001}")
         );
     }
 
@@ -381,7 +372,7 @@ mod tests {
         };
         assert_eq!(
             expression.render().as_deref(),
-            Some("=== 999999999 + 1000000000000001"),
+            Some("999999999+1000000000000001"),
             "an identifier is a number, so 16 digits sort after 9 rather than before"
         );
     }
@@ -399,10 +390,7 @@ mod tests {
         };
         assert_eq!(
             expression.render().as_deref(),
-            Some(
-                "=== 100000001 |A shaped procedure| : \
-                 { 200000001 |Method| = 300000001 |An action| }"
-            )
+            Some("100000001|A shaped procedure|:{200000001|Method|=300000001|An action|}")
         );
     }
 
@@ -426,7 +414,7 @@ mod tests {
         };
         assert_eq!(
             expression.render().as_deref(),
-            Some("=== 100000001 : { 200000001 = #500, 200000002 = \"a shaped \\\"label\\\"\" }"),
+            Some("100000001:{200000001=#500,200000002=\"a shaped \\\"label\\\"\"}"),
             "the reader strips the release's spelling and the grammar wants it back"
         );
     }
@@ -458,7 +446,7 @@ mod tests {
         };
         assert_eq!(
             expression.render().as_deref(),
-            Some("=== 100000001 : 200000001 = 300000001, 200000001 = 300000002"),
+            Some("100000001:200000001=300000001,200000001=300000002"),
             "the order is total, so one concept renders one way however the index held it"
         );
     }
