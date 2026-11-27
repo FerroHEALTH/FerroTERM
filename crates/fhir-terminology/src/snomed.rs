@@ -272,7 +272,16 @@ impl StoredSystem for Snomed {
             return Ok(provider
                 .resolve_expression(code)?
                 .ok()
-                .map(|(concept, code)| Located { concept, code }));
+                .map(|(concept, normal)| {
+                    // NOTE: whitespace, terms and a leading `===` carry no meaning in
+                    // the Compositional Grammar (§5), so a code that differs from
+                    // the normal form only in them is already in normal form.
+                    let spelled = sct_scg::significant(code).is_ok_and(|bare| bare == normal);
+                    Located {
+                        concept,
+                        code: if spelled { code.to_owned() } else { normal },
+                    }
+                }));
         }
         // NOTE: a string that is not a well-formed SCTID (check digit,
         // partition) is not a code of this system; that is "absent", not an

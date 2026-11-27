@@ -119,9 +119,16 @@ query string has to percent-encode every one of them.
 - `$validate-code` checks the syntax and that the version defines every concept
   the expression names. A syntax error answers `false` with the byte the parser
   stopped at; an unknown concept answers `false` naming it.
-- `$lookup` answers the expression in one canonical order as `code`, and a
-  `display` that is the expression with the edition's terms written in, since
-  SNOMED International publishes no terms for expressions. `normalForm` and
+- `$validate-code` answers `code` as you sent it. When your spelling differs
+  from the normal form by more than whitespace, terms, or a leading `===`, it
+  also answers the normal form as `normalized-code`, with an information
+  issue. The normal form is written with no whitespace, and `===` is left out
+  because the grammar assumes it: `39607008:272741003=24028007`.
+- `$validate-code` and `$lookup` answer a `display` that is the normal form
+  with terms written in, since SNOMED International publishes no terms for
+  expressions. A term you wrote is kept when it is an active description of
+  its concept. A missing term, or one that does not describe the concept, is
+  replaced by the edition's term in the requested language. `normalForm` and
   `normalFormTerse` answer the expression's necessary normal form, and the
   expression's own refinement comes back as the concept-model properties keyed
   by attribute concept id. An expression over an inactive concept validates

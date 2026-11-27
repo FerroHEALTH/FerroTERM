@@ -79,15 +79,17 @@ fn a_well_formed_expression_over_defined_concepts_validates() {
     let (_dir, registry) = registry();
     // The Compositional Grammar specification, §7.3 Validating: the syntax and
     // that "All concept references included in the expression must be valid".
-    let outcome = validated(&registry, &refined(CAT, COVERING, FUR));
+    let sent = refined(CAT, COVERING, FUR);
+    let outcome = validated(&registry, &sent);
     assert!(outcome.result, "{:?}", outcome.message);
     assert_eq!(outcome.system.as_deref(), Some(SYSTEM));
     assert_eq!(outcome.version.as_deref(), Some(VERSION));
+    assert_eq!(outcome.code.as_deref(), Some(sent.as_str()));
     assert_eq!(
-        outcome.normalized_code.as_deref(),
-        Some(format!("=== {} : {} = {}", code(CAT), code(COVERING), code(FUR)).as_str()),
-        "the code the system spells is the expression in one canonical order"
+        outcome.normalized_code, None,
+        "whitespace carries no meaning (§5), so the code is already in normal form"
     );
+    assert!(outcome.issues.is_empty(), "{:?}", outcome.issues);
 }
 
 #[test]
@@ -124,10 +126,13 @@ fn an_expression_naming_a_concept_the_version_lacks_answers_false_and_names_it()
 #[test]
 fn lookup_answers_the_canonical_expression_and_a_display_carrying_the_terms() {
     let (_dir, registry) = registry();
-    let outcome = looked_up(&registry, &refined(CAT, COVERING, FUR));
+    let outcome = looked_up(
+        &registry,
+        &format!("{}:{}={}", code(CAT), code(COVERING), code(FUR)),
+    );
     assert_eq!(
         outcome.code,
-        format!("=== {} : {} = {}", code(CAT), code(COVERING), code(FUR))
+        format!("{}:{}={}", code(CAT), code(COVERING), code(FUR))
     );
     // "If no term or description template has been published, the full
     // expression with terms embedded may be used"
@@ -135,7 +140,7 @@ fn lookup_answers_the_canonical_expression_and_a_display_carrying_the_terms() {
     assert_eq!(
         outcome.display,
         format!(
-            "=== {} |Cat| : {} |Has covering| = {} |Fur|",
+            "{}|Cat|:{}|Has covering|={}|Fur|",
             code(CAT),
             code(COVERING),
             code(FUR)
@@ -189,7 +194,7 @@ fn lookup_generates_the_normal_form_of_an_expression() {
     assert_eq!(
         format!("{:?}", terse.value),
         format!(
-            "String(\"=== {} : {} = {}\")",
+            "String(\"{}:{}={}\")",
             code(ANIMAL),
             code(COVERING),
             code(FUR)
@@ -411,6 +416,10 @@ fn value_set(expressions: Option<&str>) -> serde_json::Value {
 }
 
 fn in_value_set(expressions: Option<&str>, code: &str) -> bool {
+    vs_validated(expressions, code).result
+}
+
+fn vs_validated(expressions: Option<&str>, code: &str) -> value_set_validate_code::Validation {
     let (_dir, registry) = registry();
     let sets = tempfile::tempdir().expect("tempdir");
     std::fs::write(
@@ -434,9 +443,39 @@ fn in_value_set(expressions: Option<&str>, code: &str) -> bool {
         code: Some(code.to_owned()),
         ..ValueSetValidateInput::default()
     };
-    value_set_validate_code::validate_code(&sources, &request)
-        .expect("validates")
-        .result
+    value_set_validate_code::validate_code(&sources, &request).expect("validates")
+}
+
+#[test]
+fn a_value_set_validation_echoes_the_code_as_sent() {
+    // `code` is "the code that was validated"
+    // (<https://hl7.org/fhir/R5/valueset-operation-validate-code.html>), and
+    // the normal form is the ecosystem's `normalized-code`.
+    let reversed = format!(
+        "{}+{} : {} = {}",
+        code(DOG),
+        code(CAT),
+        code(COVERING),
+        code(FUR)
+    );
+    let normal = format!(
+        "{}+{}:{}={}",
+        code(CAT),
+        code(DOG),
+        code(COVERING),
+        code(FUR)
+    );
+    for (expressions, member) in [(Some("true"), true), (Some("false"), false)] {
+        let outcome = vs_validated(expressions, &reversed);
+        assert_eq!(outcome.result, member, "{expressions:?}");
+        assert_eq!(outcome.code.as_deref(), Some(reversed.as_str()));
+        assert_eq!(outcome.normalized_code.as_deref(), Some(normal.as_str()));
+    }
+    let spaced = format!("{} |Cat| : {} = {}", code(CAT), code(COVERING), code(FUR));
+    let outcome = vs_validated(Some("true"), &spaced);
+    assert!(outcome.result);
+    assert_eq!(outcome.code.as_deref(), Some(spaced.as_str()));
+    assert_eq!(outcome.normalized_code, None);
 }
 
 #[test]
@@ -489,11 +528,12 @@ fn a_nested_sub_expression_validates_and_renders() {
     );
     let outcome = validated(&registry, &nested);
     assert!(outcome.result, "{:?}", outcome.message);
+    assert_eq!(outcome.normalized_code, None);
     assert_eq!(
-        outcome.normalized_code.as_deref(),
+        outcome.display.as_deref(),
         Some(
             format!(
-                "=== {} : {} = ({} : {} = #4)",
+                "{}|Animal|:{}|Has covering|=({}|Fur|:{}|Leg count|=#4)",
                 code(ANIMAL),
                 code(COVERING),
                 code(FUR),
@@ -505,16 +545,42 @@ fn a_nested_sub_expression_validates_and_renders() {
 }
 
 #[test]
-fn two_spellings_of_one_expression_answer_the_same_code() {
+fn two_spellings_of_one_expression_share_one_normal_form() {
     let (_dir, registry) = registry();
     // Whitespace is not significant outside a term or a quoted value (the
     // Compositional Grammar specification, §5), and the focus concepts of a
     // conjunction have no stated order.
     let spaced = format!("===   {}   +   {}   ", code(CAT), code(DOG));
     let reversed = format!("==={}+{}", code(DOG), code(CAT));
+    let normal = format!("{}+{}", code(CAT), code(DOG));
+    assert_eq!(validated(&registry, &spaced).normalized_code, None);
     assert_eq!(
-        looked_up(&registry, &spaced).code,
-        looked_up(&registry, &reversed).code
+        validated(&registry, &reversed).normalized_code.as_deref(),
+        Some(normal.as_str())
+    );
+    assert_eq!(
+        looked_up(&registry, &spaced).display,
+        looked_up(&registry, &reversed).display
+    );
+}
+
+#[test]
+fn a_code_outside_the_normal_form_is_noted_and_normalized() {
+    let (_dir, registry) = registry();
+    let reversed = format!("{}+{}", code(DOG), code(CAT));
+    let normal = format!("{}+{}", code(CAT), code(DOG));
+    let outcome = validated(&registry, &reversed);
+    assert!(outcome.result, "{:?}", outcome.message);
+    assert_eq!(outcome.code.as_deref(), Some(reversed.as_str()));
+    assert_eq!(outcome.normalized_code.as_deref(), Some(normal.as_str()));
+    let note = outcome.issues.first().expect("a note");
+    assert_eq!(note.severity, "information");
+    assert_eq!(note.message_id(), "CODE_NOT_IN_NORMAL_FORM");
+    assert_eq!(
+        note.text,
+        format!(
+            "The code '{reversed}' is valid, but it is not the normal form for the code system '{SYSTEM}|{VERSION}'; the normal form is '{normal}'"
+        )
     );
 }
 
@@ -680,5 +746,34 @@ fn an_expression_is_refused_by_a_system_that_is_not_snomed() {
     assert!(
         matches!(error, OperationError::UnknownSystem(_)),
         "{error:?}"
+    );
+}
+
+#[test]
+fn the_display_keeps_a_term_the_sender_wrote_when_it_describes_the_concept() {
+    let (_dir, registry) = registry();
+    // A term may be "the term from any SNOMED CT description" of the concept
+    // (the Compositional Grammar specification, §5), and §7.5 allows the
+    // expression as authored.
+    let sent = format!(
+        "{} |Cat (synthetic)| : {} |Not a covering term| = {}",
+        code(CAT),
+        code(COVERING),
+        code(FUR)
+    );
+    let outcome = validated(&registry, &sent);
+    assert!(outcome.result, "{:?}", outcome.message);
+    assert_eq!(
+        outcome.display.as_deref(),
+        Some(
+            format!(
+                "{}|Cat (synthetic)|:{}|Has covering|={}|Fur|",
+                code(CAT),
+                code(COVERING),
+                code(FUR)
+            )
+            .as_str()
+        ),
+        "a description of the concept is kept, a foreign term and a missing one are the edition's"
     );
 }
