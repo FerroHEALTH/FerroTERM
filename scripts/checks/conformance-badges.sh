@@ -5,8 +5,8 @@
 # derived from the committed pass lists of the HL7 terminology ecosystem suite
 # (conformance/tx-ecosystem/, the lists CI gates on every push) and the suite
 # total the suite script records, one per mode run by hand before a release
-# (conformance/tx-ecosystem/hand-run.tsv, each badge naming the day it was
-# measured), one naming the FHIR versions served, and the EHDS badges over
+# (conformance/tx-ecosystem/hand-run.tsv, whose day conformance/tx-ecosystem/README.md
+# names), one naming the FHIR versions served, and the EHDS badges over
 # conformance/ehds/. The numbers are never typed by hand: a badge
 # says what the pass list says. The docs lane writes them into the site under
 # /conformance/, and the README badges read them through
@@ -53,7 +53,7 @@ for version in r4 r4b r5 r6; do
   inapplicable="$(awk -F'\t' -v surface="$version" '!/^#/ && $1 == surface' conformance/tx-ecosystem/not-applicable.tsv | wc -l | tr -d ' ')"
   message="$passed/$total"
   colour="$(badge_count_color "$passed" "$total")"
-  label="tx-ecosystem $suite $(printf '%s' "$version" | tr '[:lower:]' '[:upper:]')"
+  label="$(printf '%s' "$version" | tr '[:lower:]' '[:upper:]')"
   jq -cn --arg label "$label" --arg message "$message" --arg color "$colour" \
     --argjson logo "$(badge_logo_fields shield-check)" \
     '{schemaVersion: 1, label: $label, message: $message, color: $color} + $logo' > "$out/$version.json"
@@ -112,8 +112,8 @@ while IFS=$'\t' read -r surface mode ran measured; do
     exit 1
   fi
   badge "hand-$(printf '%s' "$mode" | tr '.' '-')-$surface.json" \
-    "tx $suite $mode $(printf '%s' "$surface" | tr '[:lower:]' '[:upper:]')" \
-    "$passed" "$ran" " $measured" shield-check
+    "$mode $(printf '%s' "$surface" | tr '[:lower:]' '[:upper:]')" \
+    "$passed" "$ran" "" shield-check
 done < <(hand_rows)
 
 # The FHIR versions served, from the version table of the book's FHIR versions
@@ -125,7 +125,7 @@ served="$(awk -F'|' '/served under `\/r[0-9a-z]+`/ {
 }' "$versions_page")"
 [[ -n "$served" ]] || { echo "conformance-badges: $versions_page names no served version" >&2; exit 1; }
 jq -cn --arg message "$served" --argjson logo "$(badge_logo_fields exchange)" \
-  '{schemaVersion: 1, label: "FHIR versions served", message: $message, color: "blue"} + $logo' > "$out/fhir-versions.json"
+  '{schemaVersion: 1, label: "versions served", message: $message, color: "blue"} + $logo' > "$out/fhir-versions.json"
 echo "conformance-badges: fhir-versions.json $served"
 
 count_rows() {
@@ -156,6 +156,13 @@ echo "conformance-badges: post-quantum.json $(jq -r .message "$out/post-quantum.
 # breakdown is the book's conformance page and conformance/tx-ecosystem/README.md.
 badge_length_check "$out"/*.json || exit 1
 badge_length_readme README.md || exit 1
+badge_block_check README.md || exit 1
+badge_render_check README.md || exit 1
+# The suite badges carry no suite version, so their README heading names it.
+grep -qxF "**HL7 tx-ecosystem $suite**<br>" README.md || {
+  echo "conformance-badges: README.md has no heading **HL7 tx-ecosystem $suite**<br> over the suite badges" >&2
+  exit 1
+}
 
 # The README shows exactly the badges this script writes.
 readme_badges=README.md

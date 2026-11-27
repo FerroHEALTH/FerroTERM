@@ -27,14 +27,11 @@
 [![Signed releases](https://img.shields.io/badge/releases-signed-brightgreen?logo=github)](https://ferroterm.eu/docs/operate/verifying-releases.html)
 [![SLSA Build Level 3](https://slsa.dev/images/gh-badge-level3.svg)](https://ferroterm.eu/docs/operate/verifying-releases.html)
 
-**Conformance and compliance**<br>
-<sub>(self-tested and self-assessed counts; none is a certification)</sub><br>
+<sub>Self-tested and self-assessed; none is a certification.</sub><br>
+**HL7 tx-ecosystem 1.11.0**<br>
 [![tx-ecosystem R4](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fr4.json)](https://ferroterm.eu/docs/evaluate/conformance.html)
 [![tx-ecosystem R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fr4b.json)](https://ferroterm.eu/docs/evaluate/conformance.html)
 [![tx-ecosystem R5](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fr5.json)](https://ferroterm.eu/docs/evaluate/conformance.html)
-[![FHIR versions served](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Ffhir-versions.json)](https://ferroterm.eu/docs/integrate/fhir-versions.html)
-<br>
-**tx-ecosystem modes run by hand**<br>
 [![tx-ecosystem snomed R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-snomed-r4b.json)](conformance/tx-ecosystem/passing-snomed.txt)
 [![tx-ecosystem icd-11 R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-icd-11-r4b.json)](conformance/tx-ecosystem/passing-icd-11.txt)
 [![tx-ecosystem icf R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-icf-r4b.json)](conformance/tx-ecosystem/passing-icf.txt)
@@ -44,11 +41,15 @@
 [![tx-ecosystem tx.fhir.org R5](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-tx-fhir-org-r5.json)](conformance/tx-ecosystem/passing-r5-tx.fhir.org.txt)
 [![tx-ecosystem mimetypes R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-mimetypes-r4b.json)](conformance/tx-ecosystem/passing-mimetypes.txt)
 [![tx-ecosystem omop R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-omop-r4b.json)](conformance/tx-ecosystem/passing-omop.txt)
-<br>
+
+**FHIR**<br>
+[![FHIR versions served](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Ffhir-versions.json)](https://ferroterm.eu/docs/integrate/fhir-versions.html)
+
 **EHDS**<br>
 [![MyHealth@EU MVC 10.1.0 (CI) import](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fehds-mvc.json)](https://ferroterm.eu/docs/evaluate/conformance.html)
 [![EEHRxF draft 2026-11-23 Art 6 code systems](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fehds-art6.json)](https://ferroterm.eu/docs/evaluate/conformance.html)
-<br>
+
+**Security and compliance**<br>
 [![Post-quantum safe uses, self-assessed](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fpost-quantum.json)](docs/post-quantum.md)
 [![CRA](https://img.shields.io/badge/CRA-risk%20assessment-blue?logo=europeanunion&labelColor=003399&logoColor=FFCC00)](https://ferroterm.eu/docs/evaluate/cra-risk-assessment.html)
 

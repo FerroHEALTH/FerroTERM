@@ -72,10 +72,11 @@ Every row is a gate or an upstream report.
 
 The suite's other modes need licensed content or a code system FerroTERM does
 not load, so they run by hand before a release, not in CI. Each has its own
-badge, labelled `tx <suite> <mode> <surface>`, which reads `passed/ran <day>`: `ran` is the number of cases
-that run executed and `<day>` the day it was measured, both recorded in
-`conformance/tx-ecosystem/hand-run.tsv`. A badge that names a day is a record
-of that run, not a live result.
+badge, labelled `<mode> <surface>` under the README's suite heading, which
+reads `passed/ran`: `ran` is the number of cases that run executed. The day it
+was measured is recorded in `conformance/tx-ecosystem/hand-run.tsv` and named
+in `conformance/tx-ecosystem/README.md`; the badge is a record of that run,
+not a live result.
 
 ![tx-ecosystem snomed R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-snomed-r4b.json)
 ![tx-ecosystem icd-11 R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-icd-11-r4b.json)
