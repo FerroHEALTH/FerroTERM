@@ -284,7 +284,7 @@ fn a_fixed_language_and_region_expand_to_the_registered_scripts() {
 /// primary language is the one subtag every tag carries, so a selection that
 /// leaves it open names no finite list this server enumerates.
 #[test]
-fn a_script_or_a_region_alone_leaves_the_language_open() {
+fn a_script_or_a_region_alone_is_too_costly() {
     let registry = registry();
     let value_sets = ValueSetStore::default();
     let concept_maps = ConceptMapStore::default();
@@ -293,27 +293,67 @@ fn a_script_or_a_region_alone_leaves_the_language_open() {
         value_sets: &value_sets,
         concept_maps: &concept_maps,
     };
-    for filters in [vec![("script", "=", "Latn")], vec![("region", "=", "US")]] {
-        let input = ExpandInput {
-            inline_value_set: Some(fhir_terminology::valueset::convert::r4b::convert(&inline(
-                bcp47::URL,
-                filters.clone(),
-            ))),
-            ..ExpandInput::default()
-        };
-        let error = expand::expand(&sources, &input).expect_err("no fixed language");
-        assert_eq!(
-            error.to_string(),
-            format!("This filter on {} cannot be expanded", bcp47::URL),
-            "{filters:?}: the system expands other selections"
-        );
+    let expanded = |filters: Vec<(&str, &str, &str)>| {
+        expand::expand(
+            &sources,
+            &ExpandInput {
+                inline_value_set: Some(fhir_terminology::valueset::convert::r4b::convert(&inline(
+                    bcp47::URL,
+                    filters,
+                ))),
+                ..ExpandInput::default()
+            },
+        )
+    };
+    // NOTE: "A `region` filter alone is finite but far too large, and a `script` filter
+    // alone leaves the language open: both SHALL answer `too-costly`" (the terminology
+    // ecosystem IG at `9c2bbce`, `requirements.md`, IETF Language Codes).
+    for filters in [vec![("region", "=", "US")], vec![("script", "=", "Latn")]] {
+        let error = expanded(filters.clone()).expect_err("every language varies");
         assert!(
-            matches!(error, OperationError::NotSupported(_)),
+            matches!(error, OperationError::TooCostly(_)),
             "{filters:?}: {error}"
         );
-        assert_eq!(error.issue_code(), "not-supported");
-        assert_eq!(error.message_id(), "CODESYSTEM_NOT_ENUMERABLE");
+        assert_eq!(error.issue_code(), "too-costly", "{filters:?}");
     }
+    // A filter on a position the registry does not bound selects nothing finite.
+    let error = expanded(vec![("variant", "=", "1996")]).expect_err("no fixed language");
+    assert!(
+        matches!(error, OperationError::NotSupported(_)),
+        "a variant alone: {error}"
+    );
+}
+
+/// "Expanding all language codes SHALL return the common-languages base value
+/// set, marked as unclosed" (the terminology ecosystem IG at `9c2bbce`,
+/// `requirements.md`, IETF Language Codes).
+#[test]
+fn an_expansion_of_all_language_tags_returns_the_common_languages_unclosed() {
+    let registry = registry();
+    let value_sets = ValueSetStore::default();
+    let concept_maps = ConceptMapStore::default();
+    let sources = Sources {
+        registry: &registry,
+        value_sets: &value_sets,
+        concept_maps: &concept_maps,
+    };
+    let input = ExpandInput {
+        inline_value_set: Some(fhir_terminology::valueset::convert::r4b::convert(&inline(
+            bcp47::URL,
+            Vec::new(),
+        ))),
+        ..ExpandInput::default()
+    };
+    let outcome = expand::expand(&sources, &input).expect("expands");
+    assert!(outcome.unclosed);
+    assert_eq!(outcome.total, 485);
+    let first: Vec<(&str, Option<&str>)> = outcome
+        .contains
+        .iter()
+        .take(2)
+        .map(|c| (c.code.as_str(), c.display.as_deref()))
+        .collect();
+    assert_eq!(first, [("aa", Some("Afar")), ("ab", Some("Abkhazian"))]);
 }
 
 /// An unpaged expansion past [`expand::EXPANSION_LIMIT`] answers `too-costly`,
@@ -391,8 +431,10 @@ fn a_language_tag_expansion_states_why_it_is_unclosed() {
     assert_eq!(
         outcome.unclosed_reasons,
         vec![String::from(
-            "The code System 'urn:ietf:bcp:47' has a grammar and so has infinite members"
-        )]
+            "The code System 'urn:ietf:bcp:47' has a grammar and so has infinite members. \
+             This extension is based on http://terminology.hl7.org/ValueSet/Languages"
+        )],
+        "the wording of the ecosystem's `langcodes` cases (test cases 1.11.0)"
     );
     let rendered = fhir_terminology::valueset::render::r4b::expansion(&outcome);
     let urls: Vec<&str> = rendered

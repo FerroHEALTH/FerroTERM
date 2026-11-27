@@ -7,11 +7,17 @@
 //! A tag is well-formed when it parses; it is valid when every subtag is
 //! registered for its position (RFC 5646 §2.2.9). Only a valid tag is a code
 //! of the system. The system cannot be enumerated
-//! (<https://hl7.org/fhir/R4B/valueset-all-languages.html>).
+//! (<https://hl7.org/fhir/R4B/valueset-all-languages.html>), so an expansion
+//! of all of it returns the common languages, marked unclosed.
+
+mod common_languages;
+mod matching;
 
 use std::collections::BTreeSet;
 
 use concept_graph::subsumption::Outcome;
+
+use matching::{extended_filter, match_subtags};
 
 use super::grammar::{Grammar, GrammarProvider, Table, outcome};
 use super::interned::Interned;
@@ -310,51 +316,6 @@ fn private_use(parts: &[&str]) -> Result<String, String> {
         .join("-"))
 }
 
-/// The subtags a tag is matched by, lower case (RFC 4647 §3.3.2, step 1).
-///
-/// A grandfathered tag is one opaque subtag: its subtags "either do not
-/// individually appear in the registry or appear but with a different semantic
-/// meaning", and the tag "in its entirety, represents a language or collection
-/// of languages" (RFC 5646 §2.2.8).
-fn match_subtags(tag: &Tag) -> Vec<String> {
-    if let Some(grandfathered) = &tag.grandfathered {
-        return vec![grandfathered.to_ascii_lowercase()];
-    }
-    tag.canonical()
-        .split('-')
-        .map(str::to_ascii_lowercase)
-        .collect()
-}
-
-/// Whether `range` matches `tag` under RFC 4647 §3.3.2 extended filtering.
-///
-/// Both lists come from [`match_subtags`], so neither carries the wildcard
-/// that steps 1 and 3.A admit, and every comparison is already case-folded.
-fn extended_filter(range: &[String], tag: &[String]) -> bool {
-    let (Some(first_range), Some(first_tag)) = (range.first(), tag.first()) else {
-        return false;
-    };
-    if first_range != first_tag {
-        return false;
-    }
-    let mut at_range = 1;
-    let mut at_tag = 1;
-    while let Some(wanted) = range.get(at_range) {
-        let Some(found) = tag.get(at_tag) else {
-            return false;
-        };
-        if wanted == found {
-            at_range += 1;
-            at_tag += 1;
-        } else if found.len() == 1 {
-            return false;
-        } else {
-            at_tag += 1;
-        }
-    }
-    true
-}
-
 /// The subtags one include fixes, of the positions the registry bounds.
 #[derive(Debug)]
 struct Selection {
@@ -557,6 +518,13 @@ impl LanguageTags {
         table: &Table<'_>,
         filters: &[Filter],
     ) -> Result<Option<Vec<u32>>, ProviderError> {
+        if filters.is_empty() {
+            let mut out = Vec::new();
+            for code in common_languages::codes()? {
+                out.push(table.intern(code)?.index());
+            }
+            return Ok(Some(out));
+        }
         let Some(selection) = Self::selection(filters) else {
             return Ok(None);
         };
@@ -576,6 +544,18 @@ impl LanguageTags {
             if let Err(refused) = table.declared(filter) {
                 return refused;
             }
+        }
+        // NOTE: "A `region` filter alone is finite but far too large, and a `script` filter
+        // alone leaves the language open: both SHALL answer `too-costly`" (the terminology
+        // ecosystem IG at `9c2bbce`, `requirements.md`, IETF Language Codes).
+        if let [only] = filters
+            && (only.property == "region" || only.property == "script")
+            && only.op == FilterOperator::Equal
+        {
+            return ProviderError::TooCostly(format!(
+                "A {} filter on {URL} leaves every language to vary, too many tags to expand",
+                only.property
+            ));
         }
         ProviderError::FilterNotEnumerable
     }
@@ -757,9 +737,12 @@ impl Grammar for LanguageTags {
         })
     }
 
+    // NOTE: no specification fixes the text; the ecosystem's `langcodes` cases word it
+    // naming the common-languages base (terminology ecosystem IG test cases 1.11.0).
     fn unclosed_reason(&self) -> Option<String> {
         Some(format!(
-            "The code System '{URL}' has a grammar and so has infinite members"
+            "The code System '{URL}' has a grammar and so has infinite members. This extension is based on {}",
+            common_languages::URL
         ))
     }
 

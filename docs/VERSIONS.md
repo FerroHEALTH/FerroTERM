@@ -98,6 +98,13 @@ date.
 | Unicode CLDR | 49.0.0 (the release tag of `unicode-org/cldr-json`; the English territory names and the ISO 3166-1 code mappings behind the ISO 3166 code system) |
 | UCUM | v2.2 (the release tag of `ucum-org/ucum`; `ucum-essence.xml` and its licence behind the UCUM code system, the bytes FerroBRIDGE pins) |
 
+`scripts/vendor/tho.sh` reads this pin and vendors the HL7 Terminology
+resources under `crates/fhir-terminology/data/tho/`.
+
+| Item | Pin |
+|---|---|
+| HL7 Terminology (THO) | 7.5.0 sha256 1da3004587602c3f5120061abc2309fef1f96668a477a9964354fa9af6fa6e60 (the `hl7.terminology.r4` package tarball; `ValueSet-Languages.json`, the common languages an expansion of all of BCP 47 returns) |
+
 ## Usage report contract
 
 | Item | Pin |
