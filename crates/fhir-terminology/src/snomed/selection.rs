@@ -66,8 +66,11 @@ impl SnomedProvider {
         Ok(set)
     }
 
-    /// Whether the expression `record` passes `filter`: through its focus
-    /// concepts, which subsume it.
+    /// Whether the expression `record` passes `filter`: an expression
+    /// constraint is tested against the expression itself, since it defines
+    /// "a bounded set of clinical meanings represented by either precoordinated
+    /// or postcoordinated expressions" (ECL 1 Introduction); any other filter
+    /// through its focus concepts, which subsume it.
     pub(super) fn expression_passes(
         &self,
         record: &super::expression::Registered,
@@ -75,6 +78,12 @@ impl SnomedProvider {
     ) -> Result<bool, ProviderError> {
         if filter.op == FilterOperator::Equal && filter.property == EXPRESSIONS {
             return Ok(filter.value.trim() == "true");
+        }
+        if filter.op == FilterOperator::Equal && filter.property == "constraint" {
+            let parsed = self.parsed_constraint(&filter.value)?;
+            let candidate = self.candidate(record)?;
+            return sct_ecl::eval::expression::holds(self, &parsed, &candidate)
+                .map_err(|error| super::ecl::refusal(error, &filter.value));
         }
         let selected = self.filter(filter)?;
         Ok(record

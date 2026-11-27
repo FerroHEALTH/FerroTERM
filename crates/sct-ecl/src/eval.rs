@@ -14,6 +14,7 @@
 //! is reached through [`Model`]; nothing here walks a graph edge by edge.
 
 mod descriptions;
+pub mod expression;
 mod members;
 mod refinement;
 use std::fmt;

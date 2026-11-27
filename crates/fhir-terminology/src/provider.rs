@@ -426,13 +426,12 @@ pub trait CodeSystemProvider: fmt::Debug + Send + Sync {
         None
     }
 
-    /// Whether `filter` is the one that admits post-coordinated expressions
-    /// into a selection.
+    /// Whether an include with `filters` admits post-coordinated expressions
+    /// into its selection.
     ///
     /// A value set states post-coordination with a filter its code system
-    /// defines, so the system names its own; the compose layer only asks
-    /// whether one of an include's filters says yes.
-    fn admits_post_coordination(&self, _filter: &Filter) -> bool {
+    /// defines, so the system reads its own; the compose layer only asks.
+    fn admits_post_coordination(&self, _filters: &[Filter]) -> bool {
         false
     }
 
