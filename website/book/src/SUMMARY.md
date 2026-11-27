@@ -15,7 +15,6 @@
   - [Writing resources](integrate/persisted-resources.md)
   - [Batch requests and closure tables](integrate/batch-and-closure.md)
 - [Value sets, implicit value sets, and ECL](integrate/ecl-value-sets.md)
-- [Worked examples](integrate/examples.md)
 
 # How-to guides: deploy and operate
 

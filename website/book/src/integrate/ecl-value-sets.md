@@ -5,12 +5,13 @@
 
 A value set names a set of codes. FerroTERM answers value sets defined as FHIR
 resources, brought with the request, or implied by a URL a code system
-defines. This page covers what is answered today and what the ECL milestone
-adds.
+defines. This page covers the value sets a code system defines by URL, the
+SNOMED CT forms, the Expression Constraint Language and post-coordinated
+expressions.
 
 <!-- toc -->
 
-## Implicit value sets today
+## Implicit value sets of other code systems
 
 Several code systems define value sets by URL convention, without a stored
 resource, and their providers answer them:

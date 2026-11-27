@@ -40,3 +40,8 @@ command = "mdbook-mermaid"
 [preprocessor.toc]
 command = "mdbook-toc"
 renderer = ["html"]
+
+# A page that went away keeps its address: the worked examples, which no
+# test ran, gave way to the tutorial, whose requests CI runs.
+[output.html.redirect]
+"/integrate/examples.html" = "../tutorials/first-requests.html"

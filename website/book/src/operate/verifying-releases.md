@@ -26,8 +26,8 @@ For each target (`x86_64` and `aarch64`, glibc and musl), the release holds:
 
 The container images carry the same provenance and SBOM attestations per
 platform: `ghcr.io/ferrohealth/ferroterm` (the server),
-`ghcr.io/ferrohealth/ferroterm-sync` (the synchronisation service, from
-v0.3.0), both signed by `release-image.yml`, and
+`ghcr.io/ferrohealth/ferroterm-sync` (the synchronisation service), both
+signed by `release-image.yml`, and
 `ghcr.io/ferrohealth/ferroterm-console` (the console), signed by
 `release-console.yml`. Verify the sync image the way the server image is
 verified below, with its name in the reference.
@@ -49,11 +49,6 @@ a signature from any other workflow or repository fails. FerroTERM builds its
 releases in reusable workflows to reach SLSA Build Level 3, where the signing
 identity is not reachable by user build steps.
 
-Releases up to v0.1.5 were built before the repository moved from the
-`rubentalstra` account to the `FerroHEALTH` organisation. Their attestations
-stay with the account that signed them, so verify one of those with
-`--owner rubentalstra --signer-workflow rubentalstra/FerroTERM/.github/workflows/release-build.yml`
-(or `release-image.yml`) in place of the two flags above.
 
 ## Check the checksum
 

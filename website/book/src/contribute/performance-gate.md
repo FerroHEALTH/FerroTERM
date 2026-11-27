@@ -14,19 +14,12 @@ service is busy at rest, or slower, heavier or busier under load than the
 build of its base, measured beside it on the same runner in the same job.
 `.github/workflows/perf.yml` pins the tool's version.
 
-The gate exists because of
-[FerroPIX #490](https://github.com/FerroHEALTH/FerroPIX/issues/490): a
-background sender polled its database about 8,000 times a second while it
-had nothing to send, and no check caught it before it shipped.
-
 ## Why the head is judged against its base
 
 GitHub's hosted runners differ: two runners that report the same CPU model
-and memory measured one commit 25 to 45 % apart in p50 latency and CPU per
-request
-([FerroEHR #5095](https://github.com/FerroHEALTH/FerroEHR/issues/5095)).
-A baseline stored from one machine failed unchanged code on another, so the
-gate keeps none. It builds the base of the change and the change itself,
+and memory can measure one commit a quarter or more apart in latency and CPU
+per request, so a baseline stored from one machine fails unchanged code on
+another, and the gate keeps none. It builds the base of the change and the change itself,
 the head, runs both on one runner, and judges the head over the base. The
 difference between machines reaches both alike and cancels.
 
@@ -43,8 +36,8 @@ The base is:
 `scripts/perf/gate.sh build` builds the release server, sync service and
 fixture writer of the base, from `git archive` of the base commit under
 `target/perf-base/`, and of the head. A base must define the server and the
-sync service; a base older than the fixture writer, such as v0.4.2, builds
-the two services alone. `scripts/perf/gate.sh run` writes the
+sync service; a base without the fixture writer builds the two services
+alone. `scripts/perf/gate.sh run` writes the
 scaled synthetic SNOMED CT edition of the testkit, 50,000 invented
 concepts, with each side's `ferroterm-fixture snomed-scaled`, the head's for
 a base without one, and starts
@@ -63,8 +56,8 @@ service:
    side. The two phases of a pair run at once, the arrivals of one side half
    an interval after the other's, so both sides meet the runner in the same
    state; run one after the other, the runner's speed moved by up to a third
-   between phases and put an unchanged head up to a third off its base
-   (#1162). For the server (`perf/server/plan.toml`):
+   between phases and put an unchanged head up to a third off its base.
+   For the server (`perf/server/plan.toml`):
    `$lookup`, `$validate-code` on a code system and on an ECL value set,
    `$expand` with a text filter, two ECL expansions, `$translate` over the
    implicit ICD-10 map and `$subsumes`, through the R4 base. For the sync
@@ -109,8 +102,7 @@ stalled, and a base that fell behind the schedule.
 ## Retries
 
 Some runners stall every route for a whole job: on an AMD EPYC 9V74 the
-tails reach 100 to 300 ms while the p50 holds
-([FerroPIX #511](https://github.com/FerroHEALTH/FerroPIX/issues/511)). A
+tails reach 100 to 300 ms while the p50 holds. A
 phase where every route's p99 is over ten times its p50 at once is a
 stalled runner: it is reported, left out of the judgement, and the run
 exits 2. An attempt that ends with exit 2 runs again on a fresh runner on

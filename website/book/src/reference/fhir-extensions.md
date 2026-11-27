@@ -85,7 +85,7 @@ The definition is the `StructureDefinition` at
 JSON is
 [`implicit-value-set.json`](https://ferroterm.eu/fhir/StructureDefinition/implicit-value-set.json).
 
-The forms declared today:
+The forms declared:
 
 | System | Patterns |
 |---|---|

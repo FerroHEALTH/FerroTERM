@@ -23,9 +23,8 @@ variable that names no key, and a value of the wrong type each refuse the
 start, naming the key or the variable and the closest known name, never the
 value. Any other variable that starts with `FERROTERM_` is left alone, so the
 console's `FERROTERM_CONSOLE__` and the synchronisation service's
-`FERROTERM_SYNC__` variables can share the server's environment; a flat name
-of an earlier release, such as `FERROTERM_LISTEN`, is not read. A list key reads a TOML
-array from the file and a comma-separated list from a variable
+`FERROTERM_SYNC__` variables can share the server's environment. A list key
+reads a TOML array from the file and a comma-separated list from a variable
 (`FERROTERM__TERMINOLOGY__INDEX=/srv/a,/srv/b`).
 
 `ferroterm config check` reads the configuration the way the server would and

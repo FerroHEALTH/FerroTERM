@@ -46,12 +46,12 @@ touched.
 
 The service runs as its own image, `ghcr.io/ferrohealth/ferroterm-sync`,
 carrying `ferroterm-sync` and `ferroterm-build`, and the Compose overlay runs
-it beside the server over one volume. Every release from v0.3.0 publishes the
+it beside the server over one volume. Every release publishes the
 image for `linux/amd64` and `linux/arm64`, with the same provenance and SBOM
 attestations as the server image ([Verifying releases](verifying-releases.md)),
 and `compose.sync.yaml` pulls it at the release's tag.
 
-To run a commit no release carries, or a release before v0.3.0, build the image
+To run a commit no release carries, build the image
 from `docker/Dockerfile.sync`. The file copies the two binaries from a staged
 `dist/linux/<arch>/` tree, built for the musl target of your platform (on
 Linux, with `musl-tools` installed):
@@ -396,17 +396,14 @@ authenticates before it can even see what is on offer.
 ### The account and the licences
 
 You need a personal account on the NTS. Nictiz issues it after you accept its
-terms, and each licensed system is unlocked per account. A run with an account
-on 2026-09-25 (issue #602) showed how that scoping looks from the outside:
+terms, and each licensed system is unlocked per account. Seen from the
+outside, that scoping looks like this:
 
-- The syndication feed listed 23 entries, all of them Ontoserver binary
-  indexes of the SNOMED CT Netherlands edition (releases 2023-03-31 through
-  2026-08-31, 1.4 to 1.6 GB each), each marked `onto:permission` `snomed.read`.
-  It carried no RF2 archive and no FHIR resource or package, so the feed
-  alone gives the sync nothing it can build or serve. The FHIR content lives
-  behind the FHIR API of the same service (1,024 `CodeSystem`, 1,593
-  `ValueSet`, and 45 `ConceptMap` resources for that account), which the
-  add-on lists beside the feed. The SNOMED CT `CodeSystem` resources there
+- The syndication feed lists Ontoserver binary indexes of the SNOMED CT
+  Netherlands edition, each marked `onto:permission` `snomed.read`, and no
+  RF2 archive and no FHIR resource or package, so the feed alone gives the
+  sync nothing it can build or serve. The FHIR content lives behind the FHIR
+  API of the same service, which the add-on lists beside the feed. The SNOMED CT `CodeSystem` resources there
   carry `content` `not-present` and are reported, never served.
 - The feed identifies SNOMED CT as `http://snomed.info/sct` and carries the
   edition in the version URI (`http://snomed.info/sct/11000146104/version/20260831`).
@@ -415,7 +412,7 @@ on 2026-09-25 (issue #602) showed how that scoping looks from the outside:
   (`http://loinc.org|2.83`, `http://hl7.org/fhir/sid/icpc-1-nl|12`), and a
   search by that URL returns zero resources. SNOMED CT, ICD-10-NL, the
   Labcodeset LOINC supplement and its three maps, UCUM, and the zib value sets
-  were visible to an account that had accepted the SNOMED CT terms only.
+  are visible to an account that accepted the SNOMED CT terms only.
 
 Ask Nictiz for each licence you need and check what your account sees before
 you subscribe to a canonical. The content stays licensed by its publisher.
@@ -460,6 +457,9 @@ document, at
 secret in the request body (`client_auth = "client_secret_post"`), and fetches
 a new token a minute before the cached one expires
 (`refresh_margin = "1m"`), so an unattended run on any day needs no person.
+No run against the live NTS has used the client credentials grant: the token
+endpoint and the listing were checked with a personal account's password
+grant, which the add-on does not offer.
 
 ### The first run
 
@@ -498,18 +498,6 @@ run made available.
 5. Check the corrections. The freely published NHG ICPC-1 to SNOMED CT map
    file writes `experimental` as the string `"true"`, and the add-on writes the
    boolean FHIR declares before the file is served. The service itself serves
-   `experimental` as a boolean on every resource it lists (checked over 2,662
-   summaries on 2026-09-25), so the correction concerns files taken from
+   `experimental` as a boolean on every resource it lists , so the correction concerns files taken from
    elsewhere. Every correction is listed with the element it changed; a file
    that needs none lands byte-identical.
-
-### What is verified so far
-
-The feed hop ran against the live service on 2026-09-25 with a personal
-account (the record is on issue #602): the token endpoint, the token
-lifetimes, and the listing were confirmed with the password grant the add-on
-then used. The client credentials grant it uses now has not yet run against
-the live service. The run
-also showed that the feed carries only the SNOMED CT binary index, so the RF2
-lane takes nothing from the NTS until Nictiz publishes RF2 there; the FHIR
-resources are taken through the API lane instead.
