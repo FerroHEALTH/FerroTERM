@@ -1,0 +1,98 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+
+# The HL7 terminology ecosystem suite's other modes that CI may run, one job
+# per row of conformance/tx-ecosystem/ci-modes.tsv, each gated on its
+# committed pass list and its count of cases (conformance/tx-ecosystem/README.md).
+#
+# A mode's content is fetched by scripts/checks/tx-ecosystem-mode.sh from its
+# public source, checked against a pinned sha256, and deleted when the run
+# ends. It lives outside target/, so the build cache never saves it, and the
+# lane uploads no artifact. The `general` mode runs on every push in ci.yml.
+
+name: tx-ecosystem modes
+
+on:
+  schedule:
+    - cron: "41 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: The mode to run; all runs every row of ci-modes.tsv.
+        type: choice
+        options: [all, snomed]
+        default: all
+  pull_request:
+    paths:
+      - .github/workflows/tx-ecosystem-modes.yml
+      - scripts/checks/tx-ecosystem.sh
+      - scripts/checks/tx-ecosystem-mode.sh
+      - conformance/tx-ecosystem/**
+
+permissions: {}
+
+# A server a lane starts is no installation, so it sends no usage report
+# (scripts/checks/usage-report-off.sh holds every launcher to this).
+env:
+  FERROTERM__USAGE_REPORT__ENABLED: "false"
+
+concurrency:
+  group: tx-ecosystem-modes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      rows: ${{ steps.rows.outputs.rows }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: The rows of ci-modes.tsv to run
+        id: rows
+        env:
+          MODE: ${{ inputs.mode || 'all' }}
+        run: |
+          set -euo pipefail
+          rows="$(awk -F'\t' -v want="$MODE" '!/^#/ && NF && $1 != "surface" && (want == "all" || $2 == want) { print $1 "\t" $2 }' conformance/tx-ecosystem/ci-modes.tsv \
+            | jq -Rnc '[inputs | split("\t") | {fhir: .[0], mode: .[1]}]')"
+          if [[ "$rows" == "[]" ]]; then
+            echo "conformance/tx-ecosystem/ci-modes.tsv has no row for '$MODE'" >&2
+            exit 1
+          fi
+          echo "rows=$rows" >> "$GITHUB_OUTPUT"
+          echo "running $rows"
+
+  mode:
+    name: ${{ matrix.mode }} ${{ matrix.fhir }}
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.rows) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-rust
+        with:
+          cache-key: tx-ecosystem-modes
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: cargo build --release --locked -p ferroterm-server -p ferroterm-build
+      - name: Run the mode over its fetched content
+        env:
+          MODE: ${{ matrix.mode }}
+          FHIR: ${{ matrix.fhir }}
+        run: scripts/checks/tx-ecosystem-mode.sh --mode "$MODE" --fhir "$FHIR"
