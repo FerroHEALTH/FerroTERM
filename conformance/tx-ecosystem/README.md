@@ -25,9 +25,9 @@ count is two above the suite's own. The `snomed`, `icd-11`, `tx.fhir.org`,
 
 | mode | surface | pass list | passed of ran | needs | open failures |
 |---|---|---|---|---|---|
-| `general` | `/r4b` | `passing.txt` | 702 of 805 | nothing | #1067 to #1069, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
-| `general` | `/r4` | `passing-r4.txt` | 716 of 805 | nothing | #1067 to #1069, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
-| `general` | `/r5` | `passing-r5.txt` | 716 of 805 | nothing | #1067 to #1069, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
+| `general` | `/r4b` | `passing.txt` | 728 of 805 | nothing | #1068, #1069, #1376, #1377, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
+| `general` | `/r4` | `passing-r4.txt` | 742 of 805 | nothing | #1068, #1069, #1376, #1377, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
+| `general` | `/r5` | `passing-r5.txt` | 742 of 805 | nothing | #1068, #1069, #1376, #1377, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
 | `snomed` | `/r4b` | `passing-snomed.txt` | 2 of 170 | a SNOMED CT edition | #344, #352, #349 |
 | `icd-11` | `/r4b` | `passing-icd-11.txt` | 44 of 52 | the three ICD-11 artifacts | #350, #349, #117 |
 | `tx.fhir.org` | `/r4b` | `passing-tx.fhir.org.txt` | 57 of 227 | a LOINC release | #420, #421, #305, #349 |
@@ -321,9 +321,8 @@ collection of languages", so `zh` does not subsume `zh-min-nan`.
 The 1.11.0 suite runs 805 `general` cases. Of the 43 it adds or renames, 14
 fail on `/r4b` and `/r4` and 12 on `/r5`:
 
-- **`extension-codes/ec-vs-*` (9)** rest on reserved code spaces and
-  `extension-codes` supplements, whose extensions the FHIR Extensions Pack
-  5.4.0 still does not define (#1067).
+- **`extension-codes/ec-vs-*` (9)** pass from #1358 on, all but the two
+  `is-not-a` cases over a code system with no hierarchy (#1377).
 - **`extensions/expand-supplement-prop`, `-prop-base` and
   `expand-supplement-version`** select the right codes and supplement now
   (#1290), and differ only on the `order` and `label` concept properties
@@ -345,10 +344,13 @@ The 1.10.0 suite fails 125 `general` cases on `/r4b`, 113 on `/r4` and 112
 on `/r5` (CI run 41696759891). Besides the families above, each cluster has
 its own issue, a server fix or the specification text that decides it:
 
-- **`extension-codes` (23) and `global-lang-pack` (10)** rest on
-  `codesystem-supplement-type`, `codesystem-supplement-global` and a
-  `default-display` sub-extension of `codesystem-reservedCodeSpace`, which the
-  FHIR Extensions Pack 5.4.0 does not define (#1067).
+- **`extension-codes` (23) and `global-lang-pack` (10)**: the ecosystem IG
+  states global supplements and reserved code spaces at SHALL
+  (`requirements.md` at `9c2bbce`, CodeSystem supplements), and the server
+  serves them from #1358 on. What stays open: six cases send `useSupplement`
+  on `CodeSystem/$validate-code` (#1068), six `$lookup` cases and
+  `ec-validate-outside` expect what no publication defines (#1376), and
+  `glp-lookup-other` expects the `warning` output (#1069).
 - **`closure` (11).** The run now gives the server a resource database of its
   own, which `$closure` needs for its tables. `closure-init` still fails, on
   the `tx-resource` it carries (#1070) and on `reset`, which no `$closure`
@@ -392,9 +394,11 @@ its own issue, a server fix or the specification text that decides it:
 - **`extensions/validate-supplement-nolang-*` and
   `validate-supplements-grandchild-wrong-display`** send `useSupplement` on
   `CodeSystem/$validate-code`, which no version declares (#1068).
-- **`simple-lookup-zxx`, `lookup-supplements-hierarchy-child`, `-grandchild`
-  and `parameters-lookup-supplement-good`** want `warning` and
-  `used-supplement` outputs no `$lookup` declares (#1069).
+- **`simple-lookup-zxx`** wants a `warning` output no `$lookup` declares
+  (#1069). **`lookup-supplements-hierarchy-child`, `-grandchild` and
+  `parameters-lookup-supplement-good`** want `used-supplement`, which the IG
+  requires and #1358 answers, and a designation `source` part no publication
+  defines (#1376).
 - **`case-insensitive-code1-2`, `-code1-3` and
   `version-simple-codeableconcept-bad-version2`**: the message leaves out the
   version it is about (#1065).

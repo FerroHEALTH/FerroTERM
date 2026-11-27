@@ -23,6 +23,7 @@ fn dutch(url: &str, code: &str, term: &str) -> Supplement {
     Supplement {
         url: String::from(url),
         version: Some(String::from("1")),
+        supplementing: fhir_terminology::provider::code_system::Supplementing::default(),
         concepts: BTreeMap::from([(
             String::from(code),
             Additions {
@@ -52,6 +53,7 @@ fn a_supplement_layers_designations_and_properties_over_the_system() {
     let supplement = Supplement {
         url: String::from("http://example.org/fixture-de"),
         version: Some(String::from("1")),
+        supplementing: fhir_terminology::provider::code_system::Supplementing::default(),
         concepts: BTreeMap::from([(
             String::from("cat"),
             Additions {
@@ -300,6 +302,7 @@ fn sized(version: &str) -> Supplement {
     Supplement {
         url: String::from("http://example.org/fixture-sizes"),
         version: Some(String::from(version)),
+        supplementing: fhir_terminology::provider::code_system::Supplementing::default(),
         concepts: BTreeMap::from([(
             String::from("cat"),
             Additions {

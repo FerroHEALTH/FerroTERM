@@ -16,7 +16,7 @@
 //! (<https://terminology.hl7.org/ISO3166.html>).
 
 use crate::fhir_codesystem::provider::{BuildError, FhirCodeSystem};
-use crate::provider::code_system::{CodeSystemModel, ConceptEntry};
+use crate::provider::code_system::{CodeSystemModel, ConceptEntry, Supplementing};
 use crate::provider::compose::Echoes;
 use crate::provider::declaration::{
     ContentMode, FilterDefinition, PropertyDefinition, PropertyKind,
@@ -187,6 +187,8 @@ fn from_json(
         compositional: false,
         version_needed: false,
         supplements: None,
+        supplementing: Supplementing::default(),
+        reserved_code_spaces: Vec::new(),
         properties: property_definitions(),
         filters: vec![FilterDefinition {
             code: String::from("code"),

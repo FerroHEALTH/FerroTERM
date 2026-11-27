@@ -368,6 +368,7 @@ fn a_supplement_layers_designations_and_properties_over_the_system() {
     let supplement = Supplement {
         url: supplement_model.url.clone(),
         version: Some(supplement_model.version.clone()),
+        supplementing: fhir_terminology::provider::code_system::Supplementing::default(),
         concepts,
     };
     let (_dir3, mut base) = load_all();
