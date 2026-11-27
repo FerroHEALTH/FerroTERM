@@ -66,6 +66,9 @@ sct-ecl/snomed-expand-ecl-dotted-single-concept
 sct-ecl/snomed-expand-ecl-filters-across-and
 sct-ecl/snomed-expand-ecl-filters-across-minus
 sct-ecl/snomed-expand-ecl-filters-across-or
+sct-ecl/snomed-expand-ecl-group-and-attribute-cardinality-zero-one-zero-one
+sct-ecl/snomed-expand-ecl-group-and-attribute-cardinality-zero-one-zero-zero
+sct-ecl/snomed-expand-ecl-group-and-attribute-cardinality-zero-zero
 sct-ecl/snomed-expand-ecl-group-and-attribute-cardinality-zero-zero-zero-one
 sct-ecl/snomed-expand-ecl-group-attribute-cardinality-zero
 sct-ecl/snomed-expand-ecl-group-attribute-cardinality-zero-not-equals
@@ -77,6 +80,7 @@ sct-ecl/snomed-expand-ecl-group-cardinality-zero
 sct-ecl/snomed-expand-ecl-group-cardinality-zero-to-many
 sct-ecl/snomed-expand-ecl-group-cardinality-zero-to-one
 sct-ecl/snomed-expand-ecl-group-cardinality-zero-to-one-not-equals
+sct-ecl/snomed-expand-ecl-group-mixed-attribute-cardinalities
 sct-ecl/snomed-expand-ecl-group-nested-and-or
 sct-ecl/snomed-expand-ecl-grouped-and
 sct-ecl/snomed-expand-ecl-grouped-or
@@ -110,6 +114,7 @@ sct-ecl/snomed-expand-ecl-refinement-cardinality
 sct-ecl/snomed-expand-ecl-refinement-cardinality-at-least-one
 sct-ecl/snomed-expand-ecl-refinement-cardinality-grouped
 sct-ecl/snomed-expand-ecl-refinement-cardinality-one-to-two
+sct-ecl/snomed-expand-ecl-refinement-cardinality-rolegroup
 sct-ecl/snomed-expand-ecl-refinement-cardinality-zero
 sct-ecl/snomed-expand-ecl-refinement-cardinality-zero-not-equals
 sct-ecl/snomed-expand-ecl-refinement-cardinality-zero-not-equals-single
