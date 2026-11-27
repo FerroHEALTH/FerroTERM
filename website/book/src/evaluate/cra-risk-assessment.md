@@ -160,7 +160,7 @@ levels (high, medium, low).
 | T12 | An unauthenticated caller starts a run, activates staged content or reads the run records | medium | low | the admin listener is a resource server over `ferrohealth-smart`; every route but the health routes requires the product scope; fail-closed start | (b), (d) |
 | T13 | The sync service's credentials leak | high: the reload client can make the server re-read its disks, and the terminology service account unlocks licensed content | low | each secret read from a mounted file or a variable, shown as `***` by `config check`, never logged; the reload call refuses a Basic credential and takes a client credentials token; tokens kept in memory | (d), (e) |
 | T14 | A release that changes answers is served without review | high | medium with `activation = "auto"` | `activation = "manual"`; a refused reload rolled back; retention keeps the previous release to roll back to; the revalidation reports inactive, absent and out-of-value-set codes in the run record and the webhook summary | (f), (h) |
-| T15 | A hostile feed or API response crashes the service or exhausts its disk | medium | low | memory-safe Rust with `unsafe` forbidden; the feed parser fuzzed; downloads streamed to disk; retention prunes old releases and each run record states the bytes the index root uses; a download has no size cap | (h), (k) |
+| T15 | A hostile feed or API response crashes the service or exhausts its disk | medium | low | memory-safe Rust with `unsafe` forbidden; the feed parser fuzzed; downloads streamed to disk; a download cut off at `download_limit` (4 GiB by default) while it streams; retention prunes old releases and each run record states the bytes the index root uses | (h), (k) |
 
 ## Annex I Part I(1): the level of cybersecurity
 
@@ -376,7 +376,10 @@ denial-of-service attacks"
   cap of its own beyond the framework's default body limit, so a deployment
   without a proxy has none. The synchronisation service runs apart from the
   server, so a failed run leaves the served set answering; it prunes old
-  releases by retention and puts no cap on the size of a download.
+  releases by retention and takes at most `download_limit` bytes per
+  download, refusing a longer `Content-Length` before writing and cutting a
+  body off at the limit while it streams
+  (`crates/terminology-syndication/src/download.rs` and its tests).
 
 ### (i) Minimal impact on other devices and networks
 
@@ -565,3 +568,4 @@ not name, and when the intended purpose changes.
 | 2 | 2026-11-27 | Assesses the synchronisation service, released from v0.3.0: its purpose and environment, three foreseeable misuses, its assets, risks T11 to T15, its controls and status under each point of Part I(2), and its outbound flows; adds the OTLP export to the flows (#1365) |
 | 3 | 2026-11-27 | The synchronisation service refuses a plain `http` endpoint outside loopback: the misuse row and (e) record the control (#1372) |
 | 4 | 2026-11-27 | The syndication feed parser is fuzzed: (k) and T15 record the target (#1373) |
+| 5 | 2026-11-27 | A download is capped by `download_limit`: (h) and T15 record the control (#1374) |

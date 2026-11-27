@@ -20,7 +20,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
 
 use ferrohealth_config::loader::{Loaded, Loader};
-use ferrohealth_config::units::Duration;
+use ferrohealth_config::units::{ByteSize, Duration};
 use ferrohealth_secret::secret_url::SecretUrl;
 use ferrohealth_smart::config::AuthSection;
 use ferrohealth_smart::config::BasicGrants;
@@ -118,6 +118,9 @@ pub struct Config {
     pub timezone: String,
     /// The offline build binary, found on `PATH` when it is a bare name.
     pub build_command: PathBuf,
+    /// The most bytes one download takes, a data size such as `4GiB`: a
+    /// larger item is refused, its partial file removed.
+    pub download_limit: ByteSize,
     /// When a run starts by itself.
     pub schedule: ScheduleConfig,
     /// The credentials the admin listener admits: the issuers whose access
@@ -168,6 +171,10 @@ impl Default for Config {
             webhook: None,
             timezone: String::from("UTC"),
             build_command: PathBuf::from("ferroterm-build"),
+            // A national edition's RF2 archive runs to about a gigabyte; four
+            // leave room for growth and stop a runaway body well before a
+            // staging volume fills.
+            download_limit: ByteSize::from_gib(4),
             schedule: ScheduleConfig::default(),
             source: Vec::new(),
             nts: addon_nts::config::endpoint(),
@@ -419,6 +426,22 @@ mod tests {
             .iter()
             .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
             .collect()
+    }
+
+    #[test]
+    fn the_download_limit_reads_a_data_size_and_defaults_to_four_gibibytes()
+    -> Result<(), ConfigError> {
+        assert_eq!(
+            Config::from_sources(Some(""), &BTreeMap::new())?.download_limit,
+            super::ByteSize::from_gib(4)
+        );
+        let config = Config::from_sources(Some("download_limit = \"512MiB\"\n"), &BTreeMap::new())?;
+        assert_eq!(config.download_limit, super::ByteSize::from_mib(512));
+        assert!(
+            Config::from_sources(Some("download_limit = 1024\n"), &BTreeMap::new()).is_err(),
+            "a bare number is refused, as every data size is"
+        );
+        Ok(())
     }
 
     #[test]

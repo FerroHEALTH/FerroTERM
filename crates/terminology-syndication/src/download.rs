@@ -44,6 +44,15 @@ pub enum DownloadError {
         #[source]
         source: std::io::Error,
     },
+    /// The content item is larger than the download limit: the length the
+    /// server announced, or the bytes that arrived, passed it.
+    #[error("{url} is larger than the download limit of {limit} bytes")]
+    TooLarge {
+        /// The address the bytes came from.
+        url: String,
+        /// The limit, in bytes.
+        limit: u64,
+    },
     /// The bytes that arrived do not carry the digest the feed advertised.
     #[error("{url} is {computed}, and the feed advertises {expected}")]
     ChecksumMismatch {
@@ -74,6 +83,10 @@ pub struct Fetched {
 /// The request is sent again after each of `delays` while it cannot reach
 /// the service or meets a `5xx` ([`crate::retry`]).
 ///
+/// At most `limit` bytes are taken: a response whose `Content-Length` passes
+/// it is refused before anything is written, and a body that passes it while
+/// it streams is cut off there.
+///
 /// The bytes go to `<destination>.part` while they arrive. On a digest match,
 /// or when nothing was expected, that file is renamed onto `destination`; on a
 /// mismatch it is removed, so a refused download leaves nothing behind for a
@@ -83,14 +96,16 @@ pub struct Fetched {
 ///
 /// Returns [`DownloadError::Request`] when the request fails,
 /// [`DownloadError::Status`] when the server answers with a status that is not
-/// a success, [`DownloadError::Write`] when the file cannot be written or
-/// moved, and [`DownloadError::ChecksumMismatch`] when the bytes that arrived
-/// do not carry the expected digest.
+/// a success, [`DownloadError::TooLarge`] when the item passes `limit`,
+/// [`DownloadError::Write`] when the file cannot be written or moved, and
+/// [`DownloadError::ChecksumMismatch`] when the bytes that arrived do not
+/// carry the expected digest.
 pub async fn to_file(
     request: reqwest::RequestBuilder,
     delays: &[std::time::Duration],
     destination: &Path,
     expected: Option<&Checksum>,
+    limit: u64,
 ) -> Result<Fetched, DownloadError> {
     let url = request_url(&request);
     let mut response = crate::retry::send(request, delays)
@@ -103,6 +118,12 @@ pub async fn to_file(
     if !status.is_success() {
         return Err(DownloadError::Status { url, status });
     }
+    if response
+        .content_length()
+        .is_some_and(|length| length > limit)
+    {
+        return Err(DownloadError::TooLarge { url, limit });
+    }
 
     let partial = partial_path(destination);
     let mut digest =
@@ -114,7 +135,12 @@ pub async fn to_file(
                 path: partial.clone(),
                 source,
             })?;
-    let written = stream(&mut response, &mut file, &mut digest, &url, &partial).await;
+    let target = Target {
+        url: &url,
+        partial: &partial,
+        limit,
+    };
+    let written = stream(&mut response, &mut file, &mut digest, &target).await;
     let flushed = file.flush().await.map_err(|source| DownloadError::Write {
         path: partial.clone(),
         source,
@@ -154,28 +180,43 @@ pub async fn to_file(
     })
 }
 
+/// Where a download goes and how much of it is taken.
+struct Target<'a> {
+    /// The address the bytes come from.
+    url: &'a str,
+    /// The partial file they are written to.
+    partial: &'a Path,
+    /// The most bytes taken.
+    limit: u64,
+}
+
 async fn stream(
     response: &mut reqwest::Response,
     file: &mut tokio::fs::File,
     digest: &mut Digest,
-    url: &str,
-    partial: &Path,
+    target: &Target<'_>,
 ) -> Result<u64, DownloadError> {
     let mut bytes: u64 = 0;
     while let Some(chunk) = response
         .chunk()
         .await
         .map_err(|source| DownloadError::Request {
-            url: url.to_owned(),
+            url: target.url.to_owned(),
             source,
         })?
     {
-        digest.update(&chunk);
         bytes = bytes.saturating_add(u64::try_from(chunk.len()).unwrap_or(u64::MAX));
+        if bytes > target.limit {
+            return Err(DownloadError::TooLarge {
+                url: target.url.to_owned(),
+                limit: target.limit,
+            });
+        }
+        digest.update(&chunk);
         file.write_all(&chunk)
             .await
             .map_err(|source| DownloadError::Write {
-                path: partial.to_path_buf(),
+                path: target.partial.to_path_buf(),
                 source,
             })?;
     }
