@@ -15,6 +15,14 @@ use concept_store::record;
 use rf2::constants;
 use rf2::id::ConceptId;
 
+/// Whether a stored `definitionStatusId` names the defined status.
+pub(super) fn states_defined(status: &[record::PropertyValueRef<'_>]) -> bool {
+    status.iter().any(|value| {
+        matches!(value, record::PropertyValueRef::Code(code)
+            if code.parse::<u64>() == Ok(constants::DEFINED.value()))
+    })
+}
+
 impl SnomedProvider {
     /// The inactive concepts, scanned once from the store and kept.
     pub(super) fn inactive_set(&self) -> Result<ConceptSet, ProviderError> {
@@ -98,15 +106,12 @@ impl SnomedProvider {
     /// `sufficientlyDefined` property is derived from
     /// (<https://hl7.org/fhir/R4B/snomedct.html>, "SNOMED CT Properties").
     pub(super) fn is_defined(&self, ordinal: Ordinal) -> Result<bool, ProviderError> {
-        let stored = self.stored().store.properties(ordinal).map_err(storage)?;
-        Ok(stored
-            .iter()
-            .filter(|(key, _)| *key == self.system().keys.definition_status)
-            .any(|(_, values)| {
-                values.iter().any(|value| {
-                    matches!(value, record::PropertyValue::Code(code) if *code == constants::DEFINED.to_string())
-                })
-            }))
+        let status = self
+            .stored()
+            .store
+            .property(ordinal, self.system().keys.definition_status)
+            .map_err(storage)?;
+        Ok(states_defined(&status))
     }
 
     /// The Necessary Normal Form of `concept`, with terms when `terms` asks.
