@@ -259,6 +259,7 @@ fn no_input() -> ferroterm_build::Cli {
     ferroterm_build::Cli {
         rf2: None,
         rf2_refset: Vec::new(),
+        rf2_unpublished: false,
         loinc: None,
         loinc_version: None,
         claml: None,

@@ -22,7 +22,7 @@ use concept_store::record;
 use concept_store::tables;
 use read::{
     place_acceptabilities, read_concepts, read_designations, read_identifiers, read_refsets,
-    read_relationships, refset_of,
+    read_relationships,
 };
 use rf2::component::Concept;
 use rf2::constants;
@@ -228,16 +228,27 @@ fn io_error(path: &Path) -> impl FnOnce(io::Error) -> Error + '_ {
 }
 
 /// Builds the artifacts for the Snapshot under `rf2`, with every
-/// refset-only package under `refsets` layered onto it, into `out`.
+/// refset-only package under `refsets` layered onto it, into `out`, naming
+/// the edition as unpublished when `unpublished` is set.
+///
+/// The URI Standard names a release that is not published under
+/// `http://snomed.info/xsct/`
+/// (<https://docs.snomed.org/snomed-ct-specifications/snomed-ct-uri-standard>).
 ///
 /// # Errors
 ///
 /// Returns [`Error`] when a release does not read, the edition cannot be
 /// identified, a layered package's module dependency is unmet, the hierarchy
 /// has a cycle, or an artifact cannot be written.
-pub fn build(rf2: &Path, refsets: &[PathBuf], out: &Path) -> Result<Report, Error> {
+pub fn build(
+    rf2: &Path,
+    refsets: &[PathBuf],
+    out: &Path,
+    unpublished: bool,
+) -> Result<Report, Error> {
     let release = Release::open(rf2, ReleaseType::Snapshot)?;
-    let edition = identify_edition(&release)?;
+    let mut edition = identify_edition(&release)?;
+    edition.unpublished = unpublished;
     let release_date = release.date();
     let (releases, layered) = open_layers(release, &edition, refsets)?;
     std::fs::create_dir_all(out).map_err(io_error(out))?;
@@ -470,22 +481,32 @@ fn identify_edition(release: &Release) -> Result<Edition, Error> {
 
 /// The module dependency reference set members of one release.
 ///
-/// The file is found by the columns its header names and the rows by their
-/// `refsetId`. A file name's summary is free-form and a derivative package
-/// writes its own name into it, so the columns decide (`rf2::refset::kind::read`).
+/// The files are found by the columns their headers name and the rows by
+/// their `refsetId`. A file name's summary is free-form and a derivative
+/// package writes its own name into it, so the columns decide
+/// (`rf2::refset::kind::read`). A release may carry one file per namespace
+/// (an extension's own beside the International one), so every one is read.
 fn module_dependencies(release: &Release) -> Result<Vec<ModuleDependencyMember>, Error> {
-    let file = refset_of(release, RefsetKind::ModuleDependency)?
-        .ok_or(Error::MissingFile("module dependency reference set"))?;
-    let ContentType::Refset(kinds) = &file.name.content_type else {
-        return Err(Error::MissingFile("module dependency reference set"));
-    };
     let mut members = Vec::new();
-    for member in Members::open(&file.path, kinds)? {
-        let member = member?;
-        if member.refset_id != constants::MODULE_DEPENDENCY_REFSET {
+    let mut found = false;
+    for file in release.refsets() {
+        if read::refset_kind(file)? != RefsetKind::ModuleDependency {
             continue;
         }
-        members.push(ModuleDependencyMember::try_from(member)?);
+        let ContentType::Refset(kinds) = &file.name.content_type else {
+            continue;
+        };
+        found = true;
+        for member in Members::open(&file.path, kinds)? {
+            let member = member?;
+            if member.refset_id != constants::MODULE_DEPENDENCY_REFSET {
+                continue;
+            }
+            members.push(ModuleDependencyMember::try_from(member)?);
+        }
+    }
+    if !found {
+        return Err(Error::MissingFile("module dependency reference set"));
     }
     Ok(members)
 }

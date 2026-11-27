@@ -45,7 +45,7 @@ the `icf` row over the ICF `CodeSystem` resources of `fhir.tx.support` 1.0.5.
 | `general` | `/r4b` | `passing.txt` | 730 of 805 | nothing | #1068, #1069, #1376, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
 | `general` | `/r4` | `passing-r4.txt` | 744 of 805 | nothing | #1068, #1069, #1376, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
 | `general` | `/r5` | `passing-r5.txt` | 744 of 805 | nothing | #1068, #1069, #1376, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
-| `snomed` | `/r4b` | `passing-snomed.txt` | 2 of 378 | a SNOMED CT edition | #344, #1068, #1380 |
+| `snomed` | `/r4b` | `passing-snomed.txt` | 189 of 378 | the suite's SNOMED CT test edition | #1413, #1068, #1380 |
 | `icd-11` | `/r4b` | `passing-icd-11.txt` | 10 of 145 | the three ICD-11 artifacts | #1391, #1068, #1380 |
 | `icf` | `/r4b` | `passing-icf.txt` | 79 of 96 | the standalone ICF releases | #1330, #1376, #1068, #1380 |
 | `loinc` | `/r4b` | `passing-loinc.txt` | 56 of 110 | a LOINC release | #1383, #1068, #1380 |
@@ -66,15 +66,14 @@ hand before a release and their lists are refreshed in the same change.
   setup for terminology the FHIR specification defines
   (<https://hl7.org/fhir/R4B/terminologies-systems.html>), which the server
   serves itself.
-- **`snomed`** needs a SNOMED CT artifact (`--mode snomed --index
-  <edition>`). It scores 2 of 378 whatever edition you point it at, because
-  the cases pin the reference server's own edition
-  (`http://snomed.info/xsct/31000003106/version/20250909`, 991 times in the
-  suite at `9c2bbce`), which no release centre distributes, and the runner
-  has no parameter that points them at another edition (the suite's own
-  `tests/readme.md`). 216 of its cases answer 404 on that version. #344
-  holds the evidence. The two cases that pass assert the refusal of an
-  edition the server does not have.
+- **`snomed`** needs the suite's own SNOMED CT test edition: the small
+  subontology the IG repository ships under `tx-source/snomed` (at
+  `9c2bbce`), which its `readme.md` says "must be imported with a specific
+  URI `http://snomed.info/xsct/31000003106/version/20250909`". Build it with
+  `ferroterm-build --rf2 <a directory holding Snapshot/ with its Terminology
+  and Refset folders> --rf2-unpublished` and run `--mode snomed --index
+  <artifact>`. It is SNOMED CT content under SNOMED International's licence,
+  so it is fetched for the run and never committed.
 - **`icd-11`** needs the three ICD-11 artifacts built from the WHO ICD-API
   local deployment (`--mode icd-11 --index <mms>,<icf>,<entity>`), which
   needs the WHO container and its licence. Test cases 1.11.0 rewrite it (132

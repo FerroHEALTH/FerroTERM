@@ -50,6 +50,7 @@ impl Layered {
             self.edition.path(),
             &[PathBuf::from(self.package.path())],
             self.out.path(),
+            false,
         )
     }
 }
@@ -153,7 +154,7 @@ fn a_build_without_a_package_writes_no_layered_key() {
     let release = tempfile::tempdir().expect("tempdir");
     fixture::write_release(release.path());
     let out = tempfile::tempdir().expect("tempdir");
-    let report = pipeline::build(release.path(), &[], out.path()).expect("builds");
+    let report = pipeline::build(release.path(), &[], out.path(), false).expect("builds");
     assert_eq!(report.concepts, 9);
     let manifest: Value =
         serde_json::from_str(&fs::read_to_string(&report.manifest).expect("manifest"))

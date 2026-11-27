@@ -313,13 +313,16 @@ fn group(record: &Record<'_>, index: usize) -> Result<u32, Rf2Error> {
     Ok(group)
 }
 
-/// A concrete value: a number (`#3`) or a string (`"text"`) with its RF2 marker.
+/// A concrete value: a number (`#3`), a string (`"text"`), or a boolean
+/// (`true`, `false`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConcreteValue {
     /// A number in its lexical form, after the `#`.
     Number(String),
     /// A string, after the quotes.
     String(String),
+    /// A boolean, written with no marker.
+    Boolean(bool),
 }
 
 impl ConcreteValue {
@@ -341,6 +344,13 @@ impl ConcreteValue {
         }
         if let Some(inner) = text.strip_prefix('"').and_then(|s| s.strip_suffix('"')) {
             return Ok(Self::String(inner.to_owned()));
+        }
+        // NOTE: ECL 2.3 compares a concrete boolean (`booleanvalue`, `ECL.g4`), and a release
+        // writes one bare: the ecosystem's test subontology (`tx-source/snomed` at `9c2bbce`).
+        match text {
+            "true" => return Ok(Self::Boolean(true)),
+            "false" => return Ok(Self::Boolean(false)),
+            _ => {}
         }
         Err(FieldError::Invalid {
             what: "concrete value",
@@ -453,6 +463,15 @@ mod tests {
             ConcreteValue::parse("\"mg\""),
             Ok(ConcreteValue::String("mg".to_owned()))
         );
+        assert_eq!(
+            ConcreteValue::parse("true"),
+            Ok(ConcreteValue::Boolean(true))
+        );
+        assert_eq!(
+            ConcreteValue::parse("false"),
+            Ok(ConcreteValue::Boolean(false))
+        );
+        assert!(ConcreteValue::parse("True").is_err());
         assert!(ConcreteValue::parse("3").is_err());
         assert!(ConcreteValue::parse("#").is_err());
         assert!(ConcreteValue::parse("\"open").is_err());

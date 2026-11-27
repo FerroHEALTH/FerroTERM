@@ -16,6 +16,7 @@ fn cli(labcodeset: std::path::PathBuf, out: &std::path::Path) -> ferroterm_build
     ferroterm_build::Cli {
         rf2: None,
         rf2_refset: Vec::new(),
+        rf2_unpublished: false,
         loinc: None,
         loinc_version: None,
         claml: None,

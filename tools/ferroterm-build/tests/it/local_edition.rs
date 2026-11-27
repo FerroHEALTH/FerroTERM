@@ -29,7 +29,7 @@ fn the_local_edition_builds_end_to_end() {
     };
     let out = tempfile::tempdir().expect("tempdir");
     let started = Instant::now();
-    let report = pipeline::build(&root, &[], out.path()).expect("builds");
+    let report = pipeline::build(&root, &[], out.path(), false).expect("builds");
     let built = started.elapsed();
     let size = std::fs::metadata(&report.store).expect("metadata").len();
     println!(

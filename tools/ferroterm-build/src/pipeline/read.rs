@@ -30,17 +30,23 @@ use std::path::Path;
 /// Every concept row of every release, sorted by identifier so ordinals are
 /// stable; a concept a layered package restates keeps the edition's row,
 /// which the stable sort leaves first.
+///
+/// A release may carry one concept file per namespace (an edition's own
+/// beside the International ones), so every concept file of a release is
+/// read, as the relationship and description files are.
 pub(super) fn read_concepts(releases: &[Release]) -> Result<Vec<Concept>, Error> {
-    let paths: Vec<&Path> = releases
-        .iter()
-        .map(|release| {
+    let mut paths: Vec<&Path> = Vec::new();
+    for release in releases {
+        let before = paths.len();
+        paths.extend(
             release
                 .of_type(&ContentType::Concept)
-                .next()
-                .map(|file| file.path.as_path())
-                .ok_or(Error::MissingFile("concept"))
-        })
-        .collect::<Result<_, Error>>()?;
+                .map(|file| file.path.as_path()),
+        );
+        if paths.len() == before {
+            return Err(Error::MissingFile("concept"));
+        }
+    }
     let mut concepts = concat(read_files(&paths, component_rows::<Concept>)?);
     // The sort is stable and the release order is fixed, so a concept a
     // layered package restates keeps the edition's row, which stays first.
@@ -155,6 +161,12 @@ pub(super) fn read_concrete_relationship_file(
                 record::PropertyValue::String(text.clone()),
                 attributes::Value::String(text),
             ),
+            // NOTE: the attribute table keeps a boolean as its text, which is how ECL's
+            // `booleanvalue` reads it back (`sct_ecl::eval::matching`).
+            ConcreteValue::Boolean(flag) => (
+                record::PropertyValue::Boolean(flag),
+                attributes::Value::String(flag.to_string()),
+            ),
         };
         out.attributes
             .entry((source, relationship.type_id))
@@ -266,24 +278,6 @@ pub(super) fn read_designations(
         *index = index.checked_add(1).ok_or(Error::TooMany("designations"))?;
     }
     Ok(placed)
-}
-
-/// The first reference set file of `release` of `wanted`, `None` when it has
-/// none.
-///
-/// # Errors
-///
-/// Returns [`Error`] when a reference set file cannot be read.
-pub(super) fn refset_of(
-    release: &Release,
-    wanted: RefsetKind,
-) -> Result<Option<&ReleaseFile>, Error> {
-    for file in release.refsets() {
-        if rf2::refset::kind::read(&file.path)? == wanted {
-            return Ok(Some(file));
-        }
-    }
-    Ok(None)
 }
 
 /// The kind of one reference set file, from the columns its header names.

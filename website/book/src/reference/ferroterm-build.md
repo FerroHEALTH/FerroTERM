@@ -24,6 +24,9 @@ Options:
       --rf2-refset <DIR_OR_ZIP>
           A refset-only RF2 package layered onto the edition `--rf2` names (repeatable)
 
+      --rf2-unpublished
+          Names the `--rf2` edition as unpublished, under `http://snomed.info/xsct/` (the HL7 terminology ecosystem's test subontology is imported so)
+
       --loinc <DIR_OR_ZIP>
           The LOINC release: the unpacked `Loinc_<version>` directory, or the release zip
 
