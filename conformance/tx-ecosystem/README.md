@@ -37,8 +37,9 @@ The `general` rows were recorded on 2026-11-24 with validator 7.0.6 and suite
 `9c2bbce57366319d6a5265cbfbf6697f094822e3` (test cases 1.11.0). Every
 mode run also carries the two mode-independent `metadata` cases and the 11
 `closure` cases, so a mode's count is 13 above the suite's own. The `snomed`
-row is held by its CI lane (`.github/workflows/tx-ecosystem-modes.yml`) over
-the suite's test edition. The other rows were measured by hand on 2026-11-27
+and `mimetypes` rows are held by their CI lanes
+(`.github/workflows/tx-ecosystem-modes.yml`), `snomed` over the suite's test
+edition. The other rows were measured by hand on 2026-11-27
 on the same pins, over LOINC 2.83 and the three ICD-11 artifacts built from
 the WHO ICD-API local deployment of release 2026-01 in English; the `icf` row
 over the ICF `CodeSystem` resources of `fhir.tx.support` 1.0.5.

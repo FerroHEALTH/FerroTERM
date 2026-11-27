@@ -22,7 +22,7 @@ on:
       mode:
         description: The mode to run; all runs every row of ci-modes.tsv.
         type: choice
-        options: [all, snomed]
+        options: [all, snomed, mimetypes]
         default: all
   pull_request:
     paths:
