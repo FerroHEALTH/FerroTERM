@@ -357,6 +357,15 @@ jobs:
         if: ${{ !cancelled() }}
         run: bash scripts/checks/code-systems.sh
 
+      # ---- conformance-table ---------------------------------------------
+      # conformance-table: the book's breakdown of the tx-ecosystem general mode
+      # agrees with the pass lists, total.txt and not-applicable.tsv (#1409).
+      - name: conformance-table
+        if: ${{ !cancelled() }}
+        run: |
+          bash scripts/checks/conformance-table.sh
+          bash scripts/checks/conformance-table.sh --self-test
+
       # ---- bench-table -------------------------------------------------
       # bench-table: the README's speed and footprint table is rendered from the
       # committed benchmark records, never typed by hand.
