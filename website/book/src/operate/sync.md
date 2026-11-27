@@ -80,9 +80,10 @@ then renames it into the index root, and a rename works only inside one
 filesystem. The server mounts `index/` and `codesystems/` read-only; the sync
 mounts the whole tree and writes to it as uid 65532.
 
-The overlay also sets `FERROTERM__ADMIN__LISTEN` on the server, because
-`POST /reload` on that listener is how the sync asks for the new release to be
-served. That listener is a guarded surface, so the server starts only once
+The overlay also sets `FERROTERM__ADMIN__LISTEN=127.0.0.1:8081` on the server,
+because `POST /reload` on that listener is how the sync asks for the new
+release to be served, and runs the sync in the server's network namespace, so
+it reaches that listener and the FHIR base over loopback. That listener is a guarded surface, so the server starts only once
 `[auth]` names an issuer in an `[auth.issuer.<name>]` table, with
 `[server_admin.credentials.oauth]` in the sync configuration, or turns
 authentication off (see
@@ -137,10 +138,10 @@ activation = "auto"
 timezone = "Europe/Amsterdam"
 
 [server_admin]
-url = "http://ferroterm:8081"
+url = "http://127.0.0.1:8081"
 
 [fhir]
-url = "http://ferroterm:8080/r4b"
+url = "http://127.0.0.1:8080/r4b"
 
 [schedule]
 at = "03:00"
@@ -162,6 +163,16 @@ reload call reads its own from the file `[server_admin.credentials.oauth]`
 names, so the file can stay safe to commit and safe to show.
 
 ### The outbound endpoints
+
+Every URL the service sends a credential to, or takes content from, is
+`https`, or plain `http` on a loopback host (`localhost`, `127.0.0.1` or
+`::1`): `[server_admin]`, `[webhook]`, `[nts]`, the issuer and token endpoint
+of each client credentials grant, and a source's `feed_url` and
+`fhir_api_url`. Any other plain `http` URL refuses the start, naming the key,
+the rule the server holds for its own issuer and usage report collector. To
+reach a server's admin listener on another host, give it `[server.tls]`
+([The HTTP server](configuration.md#the-http-server)) and the sync
+`[server_admin.tls]`.
 
 `[server_admin]`, `[fhir]`, `[webhook]` and `[nts]` are the family's outbound
 endpoint table, the keys every FerroHEALTH product writes for a call it
@@ -256,7 +267,7 @@ It reports and never edits. A finding is a decision for a terminologist, and
 the service changes nothing in your content, ever.
 
 Set `[fhir] url` to the server's FHIR base, such as
-`http://ferroterm:8080/r4b`, to turn the check on. Its last segment (`r4`,
+`http://127.0.0.1:8080/r4b`, to turn the check on. Its last segment (`r4`,
 `r4b`, `r5` or `r6`) names the FHIR release the check writes its requests in;
 a base whose last segment names none refuses the start. Without `[fhir]`
 the run record says the check did not run. The check reads the server's public FHIR API,

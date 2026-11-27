@@ -120,7 +120,7 @@ terminology service over the internet.
 | A damaged or half-written index served | an artifact that does not open refuses the start, and a reload that meets one keeps the previous set ([a refused artifact stops the start](../operate/reloading.md#a-refused-artifact-stops-the-start)) | none |
 | Patient data sent as a search term | the request log never carries a body or a free-text parameter | a proxy's own access log may; the book says to keep it to the same standard |
 | The sync service's admin listener published | every route but the health routes requires the product scope, and the service refuses to start while `[auth]` admits no credential unless it says `enabled = false` | a deployment that turns authentication off and publishes it lets anyone start a run, activate what is staged, and read the run records |
-| A sync endpoint configured as plain `http` | the service calls the URL it is given; the shipped overlay calls the server over the compose network | a credential sent over plain HTTP outside a trusted network can be read in transit ([(e)](#e-confidentiality-of-stored-transmitted-and-processed-data)) |
+| A sync endpoint configured as plain `http` | the service refuses to start on a plain `http` URL outside loopback, naming the key; the shipped overlay reaches the server over loopback | a server's admin listener on another host needs TLS on that listener ([(e)](#e-confidentiality-of-stored-transmitted-and-processed-data)) |
 | A release that breaks answers activated by the sync service | `activation = "manual"` stops a run after staging; a reload the server refuses is rolled back; retention keeps the previous release; the revalidation reports what the release changed for the deployment's own content | `activation = "auto"`, the default, serves a release the server accepts without a person looking at it |
 | A release run after a newer one is published | the release notes and `SECURITY.md` say only the newest release is supported | the running server does not state its support end date ([(c)](#c-security-updates-notification-and-postponement)) |
 
@@ -307,10 +307,14 @@ transit by state of the art mechanisms, and by using other technical means"
   own listeners and rely on the proxy for TLS. FerroTERM does not encrypt the
   indexes or the resource database at rest
   ([the justification](#encryption-at-rest-annex-i-part-i2e)). The
-  synchronisation service calls the URLs its configuration names and does not
-  refuse a plain `http` one, so a token sent to an endpoint configured that
-  way crosses the network unencrypted; the shipped overlay calls the server
-  over the compose network.
+  synchronisation service refuses to start on a plain `http` URL outside
+  loopback for every endpoint it sends a credential to or takes content
+  from (the feed and FHIR API of a source, the `[nts]` base, the issuer and
+  token endpoint of each client credentials grant, `[server_admin]` and
+  `[webhook]`), the rule the server holds for its own issuer; the shipped
+  overlay runs it in the server's network namespace, so the reload stays on
+  loopback (`app/ferroterm-sync/src/config.rs`, `check_endpoints`, and its
+  tests; `compose.sync.yaml`).
 
 ### (f) Integrity, and reporting corruptions
 
@@ -556,3 +560,4 @@ not name, and when the intended purpose changes.
 |---|---|---|
 | 1 | 2026-10-21 | First assessment (#790) |
 | 2 | 2026-11-27 | Assesses the synchronisation service, released from v0.3.0: its purpose and environment, three foreseeable misuses, its assets, risks T11 to T15, its controls and status under each point of Part I(2), and its outbound flows; adds the OTLP export to the flows (#1365) |
+| 3 | 2026-11-27 | The synchronisation service refuses a plain `http` endpoint outside loopback: the misuse row and (e) record the control (#1372) |
