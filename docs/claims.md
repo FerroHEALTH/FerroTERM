@@ -214,7 +214,7 @@ claim, not a test that merely touches the area.
 | The `general` mode runs once per served version on every pull request and push to `main` | `.github/workflows/ci.yml` job `tx-ecosystem` |
 | CI fails when a listed case stops passing | `scripts/checks/tx-ecosystem.sh` compares against the list |
 | Passing a case is not an HL7 certification | Correct as stated: HL7 issues no such certification |
-| "The suite's other modes (ICD-11, LOINC) ... their lists live beside the general ones" | Partly. `passing-icd-11.txt` holds 44 cases and `passing-tx.fhir.org.txt` 55, but `passing-snomed.txt` and `passing-sct-ecl.txt` are empty files. See [E1](#e1) |
+| "The suite's other modes (ICD-11, LOINC) ... their lists live beside the general ones" | Correct as stated. One list per hand-run mode and surface sits in `conformance/tx-ecosystem/`, and `hand-run.tsv` records the cases each run ran and the day it was measured. See [E1](#e1) |
 
 ### Code systems served
 
@@ -421,9 +421,14 @@ disagrees with the badges rendered from the same lists by
 
 <a id="e1"></a>**E1. "The suite's other modes (ICD-11, LOINC) ... their lists
 live beside the general ones"** (`website/book/src/evaluate/conformance.md`).
-Two of the four mode lists are empty files:
-`conformance/tx-ecosystem/passing-snomed.txt` and `passing-sct-ecl.txt` hold no
-cases. `passing-icd-11.txt` (44) and `passing-tx.fhir.org.txt` (55) do.
+Settled by the re-measure on validator 7.0.6 and test cases 1.11.0 (#1360,
+#1407). Every hand-run list holds the cases that pass: `passing-snomed.txt`
+(2), `passing-icd-11.txt` (10), `passing-icf.txt` (79), `passing-loinc.txt` and
+`passing-r5-loinc.txt` (56 and 57), `passing-tx.fhir.org.txt` and
+`passing-r5-tx.fhir.org.txt` (29 and 31), `passing-mimetypes.txt` (40) and
+`passing-omop.txt` (1). `conformance/tx-ecosystem/hand-run.tsv` records each
+run's denominator and date, and `scripts/checks/tx-ecosystem.sh` holds a hand
+run to it.
 
 ### Licence
 
