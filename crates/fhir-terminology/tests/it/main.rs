@@ -32,6 +32,7 @@ mod metadata;
 mod operations;
 mod registries;
 mod registry;
+mod reserved_codes;
 mod rxnorm;
 mod scaled;
 mod snomed;

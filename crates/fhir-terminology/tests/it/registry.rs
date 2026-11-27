@@ -86,6 +86,7 @@ fn supplement(url: &str, version: &str) -> fhir_terminology::supplement::Supplem
     fhir_terminology::supplement::Supplement {
         url: url.to_owned(),
         version: Some(version.to_owned()),
+        supplementing: fhir_terminology::provider::code_system::Supplementing::default(),
         concepts: std::collections::BTreeMap::new(),
     }
 }

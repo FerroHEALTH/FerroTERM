@@ -20,8 +20,8 @@ use crate::provider::declaration::{
 };
 use crate::provider::filter::Filter;
 use crate::provider::{
-    CodeSystemProvider, Concept, ConceptSet, Designation, Hierarchy, Identity, Located, Property,
-    PropertyValue, Status, error::ProviderError,
+    CodeSystemProvider, Concept, ConceptSet, Designation, DisplayStanding, Hierarchy, Identity,
+    Located, Property, PropertyValue, Status, error::ProviderError,
 };
 use crate::text_match;
 
@@ -51,6 +51,15 @@ pub enum BuildError {
     TooMany {
         /// The system.
         url: String,
+    },
+    /// A reserved code space states a pattern that is no regular expression.
+    #[error("a reserved code space of `{url}` is no regular expression")]
+    ReservedCodeSpace {
+        /// The system.
+        url: String,
+        /// The cause.
+        #[source]
+        source: regex::Error,
     },
 }
 
@@ -102,6 +111,7 @@ pub struct FhirCodeSystem {
     codes: BTreeMap<String, u32>,
     hierarchy: Option<ModelHierarchy>,
     all: RoaringBitmap,
+    reserved: super::reserved::Reserved,
 }
 
 impl FhirCodeSystem {
@@ -169,6 +179,12 @@ impl FhirCodeSystem {
         };
         let mut all = RoaringBitmap::new();
         all.insert_range(0..count);
+        let reserved = super::reserved::Reserved::new(&model.reserved_code_spaces, count).map_err(
+            |source| BuildError::ReservedCodeSpace {
+                url: model.url.clone(),
+                source,
+            },
+        )?;
         Ok(Self {
             identity,
             declaration,
@@ -176,6 +192,7 @@ impl FhirCodeSystem {
             codes,
             hierarchy,
             all,
+            reserved,
         })
     }
 
@@ -245,14 +262,14 @@ impl FhirCodeSystem {
                 (STATUS, PropertyValue::Code(status)) if status == DEPRECATED => deprecated = true,
                 (DEPRECATED | DEPRECATION_DATE, PropertyValue::DateTime(date)) => {
                     let now = *at.get_or_insert_with(crate::clock::now);
-                    deprecated = deprecated || retires_at(date, now);
+                    deprecated = deprecated || super::date_time::retires_at(date, now);
                 }
                 (RETIREMENT_DATE, PropertyValue::DateTime(date)) => {
                     // NOTE: no FHIR/SNOMED spec governs this: our own design
                     // reads the date as at the request, once per concept, and
                     // a value that is no `dateTime` as a retirement in force.
                     let now = *at.get_or_insert_with(crate::clock::now);
-                    retired_by_date = retired_by_date || retires_at(date, now);
+                    retired_by_date = retired_by_date || super::date_time::retires_at(date, now);
                 }
                 (code, PropertyValue::Boolean(true)) if self.abstract_property(code) => {
                     abstract_concept = true;
@@ -313,123 +330,6 @@ impl FhirCodeSystem {
     }
 }
 
-/// Whether the `retirementDate` in `text` retires the concept as at `now`.
-///
-/// Only a date still to come leaves the concept active; text that is no
-/// `dateTime` states no date to wait for, so the retirement is in force.
-fn retires_at(text: &str, now: jiff::Timestamp) -> bool {
-    earliest_instant(text).is_none_or(|instant| instant <= now)
-}
-
-/// The first instant the FHIR `dateTime` in `text` covers, or `None` when the
-/// text is not one.
-///
-/// `dateTime` is a year, a year and month, a date, or a date and a whole time
-/// with a timezone, and nothing else
-/// (<https://hl7.org/fhir/R5/datatypes.html#dateTime>).
-fn earliest_instant(text: &str) -> Option<jiff::Timestamp> {
-    let (date_text, time_text) = match text.split_once('T') {
-        Some((date, time)) => (date, Some(time)),
-        None => (text, None),
-    };
-    let date = period_start(date_text)?;
-    let Some(time_text) = time_text else {
-        // NOTE: no FHIR/SNOMED spec governs this: our own design compares a
-        // partial `dateTime` at the first instant of the period it names.
-        return date
-            .at(0, 0, 0, 0)
-            .to_zoned(jiff::tz::TimeZone::UTC)
-            .ok()
-            .map(|zoned| zoned.timestamp());
-    };
-    if date_text.split('-').count() != 3 || !is_time_with_zone(time_text) {
-        return None;
-    }
-    text.parse::<jiff::Timestamp>().ok()
-}
-
-/// The first day of the period a `YYYY`, `YYYY-MM`, or `YYYY-MM-DD` names.
-fn period_start(text: &str) -> Option<jiff::civil::Date> {
-    let mut parts = text.split('-');
-    let year = i16::try_from(digits(parts.next()?, 4)?).ok()?;
-    if year == 0 {
-        return None;
-    }
-    let month = match parts.next() {
-        Some(month) => i8::try_from(digits(month, 2)?).ok()?,
-        None => 1,
-    };
-    let day = match parts.next() {
-        Some(day) => i8::try_from(digits(day, 2)?).ok()?,
-        None => 1,
-    };
-    if parts.next().is_some() {
-        return None;
-    }
-    jiff::civil::Date::new(year, month, day).ok()
-}
-
-/// Whether `text` is `hh:mm:ss` with an optional fraction and a timezone.
-fn is_time_with_zone(text: &str) -> bool {
-    let Some(start) = text.rfind(['Z', '+', '-']) else {
-        return false;
-    };
-    let Some((time, zone)) = text.split_at_checked(start) else {
-        return false;
-    };
-    is_zone(zone) && is_time(time)
-}
-
-/// Whether `text` is `Z` or an offset of `+hh:mm` / `-hh:mm` up to 14:00.
-fn is_zone(text: &str) -> bool {
-    if text == "Z" {
-        return true;
-    }
-    let mut characters = text.chars();
-    if !matches!(characters.next(), Some('+' | '-')) {
-        return false;
-    }
-    let Some((hours, minutes)) = characters.as_str().split_once(':') else {
-        return false;
-    };
-    match (digits(hours, 2), digits(minutes, 2)) {
-        (Some(hours), Some(minutes)) => {
-            (hours < 14 && minutes < 60) || (hours == 14 && minutes == 0)
-        }
-        _ => false,
-    }
-}
-
-/// Whether `text` is `hh:mm:ss` with an optional decimal fraction of a second.
-fn is_time(text: &str) -> bool {
-    let mut parts = text.split(':');
-    let (Some(hours), Some(minutes), Some(rest), None) =
-        (parts.next(), parts.next(), parts.next(), parts.next())
-    else {
-        return false;
-    };
-    let (seconds, fraction) = match rest.split_once('.') {
-        Some((seconds, fraction)) => (seconds, Some(fraction)),
-        None => (rest, None),
-    };
-    if fraction.is_some_and(|f| f.is_empty() || !f.bytes().all(|b| b.is_ascii_digit())) {
-        return false;
-    }
-    match (digits(hours, 2), digits(minutes, 2), digits(seconds, 2)) {
-        // A leap second is `60` in the lexical form the specification gives.
-        (Some(hours), Some(minutes), Some(seconds)) => hours < 24 && minutes < 60 && seconds <= 60,
-        _ => false,
-    }
-}
-
-/// The value of `text` when it is exactly `count` ASCII digits.
-fn digits(text: &str, count: usize) -> Option<u32> {
-    if text.len() != count || !text.bytes().all(|b| b.is_ascii_digit()) {
-        return None;
-    }
-    text.parse().ok()
-}
-
 /// Whether `code` names a property `$lookup` renders from the concept's status
 /// or hierarchy instead of its stated properties.
 fn rendered_elsewhere(code: &str, abstract_concept: bool) -> bool {
@@ -459,7 +359,10 @@ impl CodeSystemProvider for FhirCodeSystem {
         } else {
             code.to_lowercase()
         };
-        Ok(self.codes.get(&key).map(|&ordinal| Located {
+        let Some(&ordinal) = self.codes.get(&key) else {
+            return self.reserved.locate(code);
+        };
+        Ok(Some(Located {
             concept: Concept::new(ordinal),
             code: self
                 .model
@@ -470,7 +373,18 @@ impl CodeSystemProvider for FhirCodeSystem {
     }
 
     fn code(&self, concept: Concept) -> Result<Option<String>, ProviderError> {
-        Ok(self.entry(concept).map(|c| c.code.clone()))
+        Ok(self
+            .entry(concept)
+            .map(|c| c.code.clone())
+            .or_else(|| self.reserved.code(concept)))
+    }
+
+    fn display_standing(&self, concept: Concept) -> Result<DisplayStanding, ProviderError> {
+        Ok(if self.reserved.code(concept).is_some() {
+            DisplayStanding::Placeholder
+        } else {
+            DisplayStanding::Defined
+        })
     }
 
     fn display(
@@ -479,7 +393,7 @@ impl CodeSystemProvider for FhirCodeSystem {
         language: Option<&str>,
     ) -> Result<Option<String>, ProviderError> {
         let Some(entry) = self.entry(concept) else {
-            return Ok(None);
+            return Ok(self.reserved.display(concept));
         };
         // NOTE: a concept's display is already in `CodeSystem.language`, so
         // a request for that language reads it, not a designation sharing it
@@ -523,10 +437,15 @@ impl CodeSystemProvider for FhirCodeSystem {
     }
 
     fn status(&self, concept: Concept) -> Result<Status, ProviderError> {
-        Ok(self
-            .entry(concept)
-            .map(|entry| self.status_of(entry))
-            .unwrap_or_default())
+        Ok(match self.entry(concept) {
+            Some(entry) => self.status_of(entry),
+            // NOTE: a reserved code is "a valid code in the code system"
+            // (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>), so it is active.
+            None => Status {
+                active: self.reserved.code(concept).is_some(),
+                ..Status::default()
+            },
+        })
     }
 
     fn designations(
@@ -554,7 +473,16 @@ impl CodeSystemProvider for FhirCodeSystem {
 
     fn properties(&self, concept: Concept) -> Result<Vec<Property>, ProviderError> {
         let Some(entry) = self.entry(concept) else {
-            return Ok(Vec::new());
+            return Ok(self
+                .reserved
+                .code(concept)
+                .map(|_| Property {
+                    code: INACTIVE.to_owned(),
+                    value: PropertyValue::Boolean(false),
+                    ..Property::default()
+                })
+                .into_iter()
+                .collect());
         };
         let status = self.status_of(entry);
         // NOTE: no FHIR/SNOMED spec governs this: our own design answers the
@@ -594,8 +522,21 @@ impl CodeSystemProvider for FhirCodeSystem {
     /// selection over it leaves out the codes the system defines outside the
     /// resource (<https://hl7.org/fhir/R4B/codesystem-content-mode.html>); a
     /// `complete` one holds every code the system defines.
-    fn unclosed(&self, _filters: &[Filter]) -> bool {
+    ///
+    /// A system with reserved code spaces holds codes no expansion can list,
+    /// so an include of all of it is unclosed too; a filter never selects a
+    /// reserved code, so a filtered include is not
+    /// (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>, `CodeSystem` supplements).
+    fn unclosed(&self, filters: &[Filter]) -> bool {
         matches!(self.model.content, ContentMode::Fragment)
+            || (filters.is_empty() && !self.reserved.is_empty())
+    }
+
+    // NOTE: "a filter never selects a code in a reserved code space - not even a
+    // `concept in` or `code in` filter that lists it"
+    // (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>), so a selection keeps defined concepts only.
+    fn filter(&self, filter: &Filter) -> Result<ConceptSet, ProviderError> {
+        Ok(crate::provider::filter::evaluate(self, filter)? & &self.all)
     }
 
     fn all(&self) -> Result<ConceptSet, ProviderError> {
@@ -729,62 +670,4 @@ fn with_standard_properties(declared: &[PropertyDefinition]) -> Vec<PropertyDefi
         }
     }
     properties
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{earliest_instant, retires_at};
-
-    /// The instant every case is judged against.
-    fn now() -> jiff::Timestamp {
-        "2026-01-01T00:00:00Z".parse().expect("a fixed timestamp")
-    }
-
-    #[test]
-    fn every_date_time_form_names_the_first_instant_it_covers() {
-        let instant = |text: &str| earliest_instant(text).expect("a dateTime").to_string();
-        assert_eq!(instant("2001"), "2001-01-01T00:00:00Z");
-        assert_eq!(instant("2001-06"), "2001-06-01T00:00:00Z");
-        assert_eq!(instant("2001-06-15"), "2001-06-15T00:00:00Z");
-        assert_eq!(instant("2001-06-15T12:30:00Z"), "2001-06-15T12:30:00Z");
-        assert_eq!(instant("2001-06-15T12:30:00.5Z"), "2001-06-15T12:30:00.5Z");
-        assert_eq!(instant("2001-06-15T12:30:00+02:00"), "2001-06-15T10:30:00Z");
-    }
-
-    // The `dateTime` regular expression admits a four-digit non-zero year, a
-    // two-digit month and day, and a whole time with a timezone, nothing else
-    // (<https://hl7.org/fhir/R5/datatypes.html#dateTime>).
-    #[test]
-    fn text_the_date_time_form_refuses_names_no_instant() {
-        for text in [
-            "",
-            "retired",
-            "0000",
-            "1",
-            "99",
-            "20010615",
-            "2001-6",
-            "2001-13",
-            "2001-02-30",
-            "2001-06-15-01",
-            "2001-06-15T12",
-            "2001-06-15T12:30",
-            "2001-06-15T12:30:00",
-            "2001-06-15T12:30:00+15:00",
-            "2001-06-15T12:30:00+02:00[Europe/Paris]",
-            "2001-06T12:30:00Z",
-        ] {
-            assert_eq!(earliest_instant(text), None, "{text:?}");
-        }
-    }
-
-    #[test]
-    fn only_a_date_still_to_come_leaves_the_concept_active() {
-        assert!(retires_at("2001-06-15", now()));
-        assert!(!retires_at("2999-01-01", now()));
-        assert!(
-            retires_at("yesterday", now()),
-            "text that states no date to wait for retires the concept"
-        );
-    }
 }

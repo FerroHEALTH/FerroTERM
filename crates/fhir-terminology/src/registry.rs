@@ -90,6 +90,15 @@ pub struct Registry {
     beneath: Option<Arc<Registry>>,
 }
 
+/// Whether the supplement target `target` (a `url` or `url|version`
+/// canonical) names version `version` of `url`.
+fn targets(target: &str, url: &str, version: &str) -> bool {
+    match target.split_once('|') {
+        Some((u, v)) => u == url && v == version,
+        None => target == url,
+    }
+}
+
 /// A `useSupplement` names no loaded supplement.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("Required supplement not found: {0}")]
@@ -154,6 +163,7 @@ impl Registry {
     ///
     /// Returns [`RegisterError::Duplicate`] when that system version is present.
     pub fn register(&mut self, provider: Arc<dyn CodeSystemProvider>) -> Result<(), RegisterError> {
+        let provider = self.with_globals(provider);
         let (url, version) = {
             let identity = provider.identity();
             (identity.url.clone(), identity.version.clone())
@@ -169,6 +179,31 @@ impl Registry {
     /// Adds a provider, replacing the one already registered for that system
     /// version (a request-scoped resource shadows a loaded one).
     pub fn register_or_replace(&mut self, provider: Arc<dyn CodeSystemProvider>) {
+        let provider = self.with_globals(provider);
+        self.replace(provider);
+    }
+
+    /// `provider` with the registered global supplements of its system
+    /// version layered on, so a system registered after its global supplement
+    /// still receives it.
+    fn with_globals(&self, provider: Arc<dyn CodeSystemProvider>) -> Arc<dyn CodeSystemProvider> {
+        let identity = provider.identity();
+        let globals: Vec<crate::supplement::Supplement> = self
+            .supplements
+            .values()
+            .filter(|(target, supplement)| {
+                supplement.supplementing.global && targets(target, &identity.url, &identity.version)
+            })
+            .map(|(_, supplement)| supplement.clone())
+            .collect();
+        if globals.is_empty() {
+            return provider;
+        }
+        Arc::new(crate::supplement::Supplemented::new(provider, globals))
+    }
+
+    /// Puts `provider` in place of the one registered for its system version.
+    fn replace(&mut self, provider: Arc<dyn CodeSystemProvider>) {
         let (url, version) = {
             let identity = provider.identity();
             (identity.url.clone(), identity.version.clone())
@@ -180,23 +215,61 @@ impl Registry {
             .insert(version, provider);
     }
 
-    /// Keeps `supplement` (which supplements the system `target`, a `url` or
-    /// `url|version` canonical) dormant until a request names it.
+    /// Registers `supplement`, which supplements the system `target` (a `url`
+    /// or `url|version` canonical).
     ///
     /// No FHIR version says when a supplement applies; the terminology
-    /// ecosystem does (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>):
-    /// when the request names it in `useSupplement`, supplies it, or the
-    /// value set asks for it, never by default.
+    /// ecosystem does (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>,
+    /// `CodeSystem` supplements): a global one "for the code system it
+    /// supplements, whether or not the request or the value set refers to
+    /// it", so it is layered over the system's registered versions now, and
+    /// "any other supplement SHALL only be used when it is referenced", so it
+    /// stays dormant until a request names it. A system registered later
+    /// receives the global supplements registered before it.
     pub fn register_supplement(
         &mut self,
         target: String,
         supplement: crate::supplement::Supplement,
     ) {
-        let canonical = match &supplement.version {
-            Some(version) => format!("{}|{version}", supplement.url),
-            None => supplement.url.clone(),
+        if supplement.supplementing.global {
+            self.layer_supplement(&target, &supplement);
+        }
+        self.supplements
+            .insert(supplement.canonical(), (target, supplement));
+    }
+
+    /// Layers `supplement` over every registered version of `target` it
+    /// supplements.
+    fn layer_supplement(&mut self, target: &str, supplement: &crate::supplement::Supplement) {
+        let (target_url, target_version) = match target.split_once('|') {
+            Some((u, v)) => (u, Some(v)),
+            None => (target, None),
         };
-        self.supplements.insert(canonical, (target, supplement));
+        let providers: Vec<Arc<dyn CodeSystemProvider>> = self
+            .versions(target_url)
+            .filter(|p| target_version.is_none_or(|v| p.identity().version == v))
+            .cloned()
+            .collect();
+        for provider in providers {
+            self.replace(Arc::new(crate::supplement::Supplemented::new(
+                provider,
+                vec![supplement.clone()],
+            )));
+        }
+    }
+
+    /// The canonicals of the global supplements that apply to version
+    /// `version` of `url`, which report as `used-supplement`
+    /// (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>, `CodeSystem` supplements).
+    #[must_use]
+    pub fn global_supplements(&self, url: &str, version: &str) -> Vec<String> {
+        self.supplements
+            .values()
+            .filter(|(target, supplement)| {
+                supplement.supplementing.global && targets(target, url, version)
+            })
+            .map(|(_, supplement)| supplement.canonical())
+            .collect()
     }
 
     /// The dormant supplement at `url`, when a system URI names a supplement
@@ -264,10 +337,7 @@ impl Registry {
         Ok(self
             .chosen_supplements(wanted)?
             .into_iter()
-            .map(|(_, supplement)| match &supplement.version {
-                Some(version) => format!("{}|{version}", supplement.url),
-                None => supplement.url.clone(),
-            })
+            .map(|(_, supplement)| supplement.canonical())
             .collect())
     }
 
@@ -280,26 +350,12 @@ impl Registry {
     /// answers to.
     pub fn with_supplements(&self, wanted: &[String]) -> Result<Self, UnknownSupplement> {
         let mut layered = self.clone();
-        for found in self.chosen_supplements(wanted)? {
-            let (target, supplement) = found.clone();
-            let (target_url, target_version) = match target.split_once('|') {
-                Some((u, v)) => (u.to_owned(), Some(v.to_owned())),
-                None => (target.clone(), None),
-            };
-            let providers: Vec<Arc<dyn CodeSystemProvider>> = layered
-                .versions(&target_url)
-                .filter(|p| {
-                    target_version
-                        .as_deref()
-                        .is_none_or(|v| p.identity().version == v)
-                })
-                .cloned()
-                .collect();
-            for provider in providers {
-                layered.register_or_replace(Arc::new(crate::supplement::Supplemented::new(
-                    provider,
-                    vec![supplement.clone()],
-                )));
+        for (target, supplement) in self.chosen_supplements(wanted)? {
+            // NOTE: a global supplement already applies, and one that is also
+            // referenced "is used once" (terminology ecosystem IG test cases
+            // 1.11.0, `ec-lookup-global-referenced`).
+            if !supplement.supplementing.global {
+                layered.layer_supplement(target, supplement);
             }
         }
         Ok(layered)
