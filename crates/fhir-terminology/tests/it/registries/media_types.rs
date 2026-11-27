@@ -121,33 +121,22 @@ fn bcp13_subsumes_by_parameters_and_cannot_decide_unknown_ones() {
         Some(Outcome::NotSubsumed),
         "a suffix is not a hierarchy"
     );
-    assert_eq!(
-        sub("text/plain", "text/plain; charset=utf-8").expect("decides"),
-        Some(Outcome::Subsumes)
-    );
-    assert_eq!(
-        sub("text/plain; charset=utf-8", "text/plain").expect("decides"),
-        Some(Outcome::SubsumedBy)
-    );
-    assert_eq!(
-        sub("text/plain; charset=utf-8", "text/plain; charset=utf-16").expect("decides"),
-        Some(Outcome::NotSubsumed)
-    );
+    // Parameters narrow a type that defines no default for them.
     assert_eq!(
         sub(
-            "text/plain; charset=utf-8",
-            "text/plain; charset=utf-8; format=flowed"
+            "application/fhir+json",
+            "application/fhir+json; fhirversion=4.0"
         )
         .expect("decides"),
         Some(Outcome::Subsumes)
     );
     assert_eq!(
-        sub("text/plain; charset=utf-8", "text/plain; format=flowed").expect("decides"),
-        Some(Outcome::NotSubsumed)
-    );
-    assert_eq!(
-        sub("text/plain; foo=bar", "text/plain; charset=utf-8; foo=bar").expect("decides"),
-        Some(Outcome::Subsumes)
+        sub(
+            "application/fhir+json; fhirversion=4.0",
+            "application/fhir+json"
+        )
+        .expect("decides"),
+        Some(Outcome::SubsumedBy)
     );
     assert!(matches!(
         sub("text/plain", "text/plain; foo=bar"),
@@ -157,6 +146,76 @@ fn bcp13_subsumes_by_parameters_and_cannot_decide_unknown_ones() {
         sub("text/plain; foo=bar", "text/plain; foo=baz"),
         Err(ProviderError::CannotDetermine(_))
     ));
+}
+
+#[test]
+fn bcp13_reads_the_rfc_parameter_defaults_into_the_bare_type() {
+    let provider = bcp13::Bcp13Provider::new();
+    let sub = |a: &str, b: &str| {
+        let a = provider.locate(a).expect("reads").expect("valid").concept;
+        let b = provider.locate(b).expect("reads").expect("valid").concept;
+        provider.subsumes(a, b)
+    };
+    // NOTE: "Where a parameter has a default defined by its RFC, the bare form already
+    // carries that default" (ecosystem IG at `9c2bbce`, `requirements.md`, BCP 13): text/plain
+    // is charset=us-ascii (RFC 6657 §4) and format=fixed (RFC 3676 §4), so these contradict.
+    assert_eq!(
+        sub("text/plain", "text/plain; charset=us-ascii").expect("decides"),
+        Some(Outcome::Equivalent)
+    );
+    assert_eq!(
+        sub("text/plain", "text/plain; charset=utf-8").expect("decides"),
+        Some(Outcome::NotSubsumed)
+    );
+    assert_eq!(
+        sub("text/plain; charset=utf-8", "text/plain").expect("decides"),
+        Some(Outcome::NotSubsumed)
+    );
+    assert_eq!(
+        sub("text/plain; charset=utf-8", "text/plain; charset=utf-16").expect("decides"),
+        Some(Outcome::NotSubsumed)
+    );
+    assert_eq!(
+        sub(
+            "text/plain; charset=utf-8",
+            "text/plain; charset=utf-8; format=fixed"
+        )
+        .expect("decides"),
+        Some(Outcome::Equivalent)
+    );
+    assert_eq!(
+        sub(
+            "text/plain; charset=utf-8",
+            "text/plain; charset=utf-8; format=flowed"
+        )
+        .expect("decides"),
+        Some(Outcome::NotSubsumed)
+    );
+    assert_eq!(
+        sub("text/plain; charset=utf-8", "text/plain; format=flowed").expect("decides"),
+        Some(Outcome::NotSubsumed)
+    );
+    assert_eq!(
+        sub(
+            "text/plain; foo=bar",
+            "text/plain; charset=us-ascii; foo=bar"
+        )
+        .expect("decides"),
+        Some(Outcome::Equivalent),
+        "a parameter both codes carry identically does not stop the server deciding"
+    );
+    // NOTE: RFC 6657 §3 leaves text/csv's default charset unstated, and "Where the server
+    // does not know a parameter ... [it] SHALL return an error rather than guessing"
+    // (ecosystem IG at `9c2bbce`, `requirements.md`, BCP 13).
+    assert!(matches!(
+        sub("text/csv", "text/csv; charset=utf-8"),
+        Err(ProviderError::CannotDetermine(_))
+    ));
+    assert_eq!(
+        sub("text/csv; charset=utf-8", "text/csv; charset=utf-8").expect("decides"),
+        Some(Outcome::Equivalent),
+        "a charset both codes state is compared like any other"
+    );
 }
 
 /// The IANA registry is finite, so `registered = true` walks it, but every

@@ -22,6 +22,10 @@ mimetypes/mimetype-filter-unregistered-out
 mimetypes/mimetype-filter-unregistered-params-in
 mimetypes/mimetype-filter-unregistered-params-out
 mimetypes/mimetype-subsumes-case
+mimetypes/mimetype-subsumes-charset-unknown-default
+mimetypes/mimetype-subsumes-default-contradicted
+mimetypes/mimetype-subsumes-default-explicit
+mimetypes/mimetype-subsumes-default-format
 mimetypes/mimetype-subsumes-equivalent
 mimetypes/mimetype-subsumes-invalid-code
 mimetypes/mimetype-subsumes-parameter
