@@ -91,6 +91,11 @@ outbound TLS table of [Configuration](configuration.md#telemetry)).
 `config check` reads no provider, so it works offline. Spans of time are
 durations such as `"30s"` or `"8h"`.
 
+The console accepts an ID Token signed with ML-DSA-44, ML-DSA-65 or
+ML-DSA-87 (RFC 9964) and with the classical RS256 to PS512, ES256, ES384 and
+EdDSA. `[jose] post_quantum_only = true` accepts the three ML-DSA parameter
+sets alone, for a provider that signs with ML-DSA.
+
 `[ferroterm.server]`, `[ferroterm.sync]` and `[ferroterm.admin]` are the
 family's outbound endpoint table: `url`, `timeout`, `connect_timeout`, `retry` (`max_attempts`,
 `initial_backoff`, `max_backoff`; a read, update or delete is tried again

@@ -42,8 +42,10 @@ use std::path::{Path, PathBuf};
 
 use ferrohealth_config::loader::{Loaded, Loader};
 use ferrohealth_server::section::ServerSection;
-use ferrohealth_smart::config::AuthSection;
 use ferrohealth_smart::config::BasicGrants;
+use ferrohealth_smart::config::{AuthMode, AuthSection, IssuerEntry};
+use ferrohealth_smart::jws::algorithm::Algorithm;
+use ferrohealth_smart::sender::proof::DpopSection;
 use ferrohealth_telemetry::section::TelemetrySection;
 use serde::{Deserialize, Serialize};
 
@@ -105,8 +107,94 @@ pub struct Config {
     /// `[basic_grants]`: the scopes and roles each Basic user of
     /// `[[auth.basic.users]]` is granted, by user-id.
     pub basic_grants: BasicGrants,
+    /// `[jose]`: whether the JOSE signatures of `[auth]` verify with ML-DSA
+    /// alone.
+    pub jose: JoseSection,
     /// `[usage_report]`: the usage report to `FerroPULSE`.
     pub usage_report: UsageReportSection,
+}
+
+/// The ML-DSA parameter sets of JOSE (RFC 9964 §5).
+pub const ML_DSA: [Algorithm; 3] = [Algorithm::MlDsa44, Algorithm::MlDsa65, Algorithm::MlDsa87];
+
+/// `[jose]`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct JoseSection {
+    /// Whether access token and `DPoP` proof signatures verify with ML-DSA
+    /// alone (RFC 9964 §5). On, every issuer's `algorithms` and
+    /// `[auth.dpop] algorithms` left at their default become ML-DSA-44,
+    /// ML-DSA-65 and ML-DSA-87, and a list naming any other algorithm stops
+    /// the start.
+    pub post_quantum_only: bool,
+}
+
+/// An algorithm list `[jose] post_quantum_only` refuses.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error(
+    "{key} names {algorithm}, which jose.post_quantum_only = true refuses: list ML-DSA-44, \
+     ML-DSA-65 or ML-DSA-87 alone, or leave the key unset"
+)]
+pub struct ClassicalAlgorithm {
+    /// The dotted key of the list.
+    pub key: String,
+    /// The first algorithm of it that is no ML-DSA parameter set.
+    pub algorithm: Algorithm,
+}
+
+impl JoseSection {
+    /// Returns `auth` with its signature algorithms held to ML-DSA under
+    /// `post_quantum_only`: a list at its default becomes [`ML_DSA`], and a
+    /// list naming any other algorithm is refused. An issuer under
+    /// `mode = "introspection"` keeps its list, since its authorization
+    /// server checks the token.
+    ///
+    /// # Errors
+    /// [`ClassicalAlgorithm`] naming the first list that names another
+    /// algorithm.
+    pub fn narrow(&self, auth: &AuthSection) -> Result<AuthSection, ClassicalAlgorithm> {
+        let mut auth = auth.clone();
+        if !self.post_quantum_only {
+            return Ok(auth);
+        }
+        let issuer_default = IssuerEntry::default().algorithms;
+        for (name, entry) in &mut auth.issuer {
+            if entry.mode == AuthMode::Introspection {
+                continue;
+            }
+            narrow(&mut entry.algorithms, &issuer_default, || {
+                format!("auth.issuer.{name}.algorithms")
+            })?;
+        }
+        if let Some(dpop) = &mut auth.dpop {
+            narrow(
+                &mut dpop.algorithms,
+                &DpopSection::default().algorithms,
+                || String::from("auth.dpop.algorithms"),
+            )?;
+        }
+        Ok(auth)
+    }
+}
+
+/// Replaces `list` with [`ML_DSA`] when it equals `default`, and refuses it
+/// under `key` when it names an algorithm that is no ML-DSA parameter set.
+fn narrow(
+    list: &mut Vec<Algorithm>,
+    default: &[Algorithm],
+    key: impl FnOnce() -> String,
+) -> Result<(), ClassicalAlgorithm> {
+    if list.as_slice() == default {
+        *list = ML_DSA.to_vec();
+        return Ok(());
+    }
+    match list.iter().find(|algorithm| !algorithm.is_ml_dsa()) {
+        Some(algorithm) => Err(ClassicalAlgorithm {
+            key: key(),
+            algorithm: *algorithm,
+        }),
+        None => Ok(()),
+    }
 }
 
 /// `[admin]`.
