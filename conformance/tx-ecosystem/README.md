@@ -49,8 +49,8 @@ built from the WHO ICD-API local deployment of release 2026-01 in English.
 | `icf` | `/r4b` | `passing-icf.txt` | 1 of 96 | the three ICD-11 artifacts | #1391, #1068, #1380 |
 | `loinc` | `/r4b` | `passing-loinc.txt` | 56 of 110 | a LOINC release | #1383, #1068, #1380 |
 | `loinc` | `/r5` | `passing-r5-loinc.txt` | 57 of 110 | a LOINC release | #1383, #1068 |
-| `tx.fhir.org` | `/r4b` | `passing-tx.fhir.org.txt` | 29 of 189 | a LOINC release | #1384, #1381, #1068, #1380 |
-| `tx.fhir.org` | `/r5` | `passing-r5-tx.fhir.org.txt` | 31 of 189 | a LOINC release | #1384, #1381, #1068 |
+| `tx.fhir.org` | `/r4b` | `passing-tx.fhir.org.txt` | 29 of 189 | a LOINC release | #1384, #1068, #1380 |
+| `tx.fhir.org` | `/r5` | `passing-r5-tx.fhir.org.txt` | 31 of 189 | a LOINC release | #1384, #1068 |
 | `mimetypes` | `/r4b` | `passing-mimetypes.txt` | 40 of 52 | nothing | #1068, #1380 |
 | `omop` | `/r4b` | `passing-omop.txt` | 1 of 40 | an OMOP vocabulary the server does not load | #345, #1364, #1068, #1380 |
 
@@ -122,9 +122,14 @@ the IG's requirements:
   that server's own data and wording (ISO 3166 totals and versions, composed
   BCP 47 displays, UCUM canonical forms and designations).
 
-The IG does require the two other `langcodes` `$expand` cases: a `region`
+The IG's own BCP 47 expansion rules are served: a `region` or a `script`
 filter alone answers `too-costly`, and all language codes expand to the
-common-languages value set, marked unclosed. That is FerroTERM work (#1381).
+common-languages value set, marked unclosed. `langcodes/expand-lang-script`
+left the pass lists for it: the case expects `not-supported`, where the IG
+says a `script` filter alone "SHALL answer `too-costly`" (`requirements.md`
+at `9c2bbce`, IETF Language Codes). `expand-langcodes-all` differs on the
+unversioned `used-codesystem`, the `total` and some displays. #1384 records
+both.
 
 ## Known failures that cut across every mode
 
