@@ -412,6 +412,12 @@ fn attribute_groups_hold_within_one_role_group() {
         [CAT],
         "attribute cardinality inside a group counts that group's rows"
     );
+    assert_eq!(
+        set(&p, &format!("< {animals} : {{ [1..1] * = * }}")),
+        [DOG],
+        "a group with one row is found though the concept has two rows in all"
+    );
+    assert_eq!(set(&p, &format!("< {animals} : [1..1] * = *")).len(), 0);
 }
 
 #[test]

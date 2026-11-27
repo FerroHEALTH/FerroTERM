@@ -71,10 +71,11 @@ impl<M: Model> Evaluator<'_, M> {
         let tests = self.compile_set(attributes)?;
         let graph = self.model.attributes();
         // A concept whose rows satisfy the set within one group satisfies
-        // it over all its rows, so the ungrouped answer (the inverted
-        // index) narrows the concepts whose groups are counted, unless
-        // zero groups may match.
-        let candidates = if cardinality.is_none_or(|c| c.min >= 1) {
+        // it over all its rows when no attribute caps or waives its count,
+        // so the ungrouped answer (the inverted index) then narrows the
+        // concepts whose groups are counted, unless zero groups may match.
+        let candidates = if cardinality.is_none_or(|c| c.min >= 1) && only_lower_bounds(attributes)
+        {
             self.attribute_set(focus, attributes)?
         } else {
             focus.clone()
@@ -282,5 +283,25 @@ impl<M: Model> Evaluator<'_, M> {
             value,
             cardinality: attribute.cardinality,
         })
+    }
+}
+
+/// Whether every attribute of `set` asks for at least one row and caps none,
+/// so the set holding in one group implies it holds over all the rows.
+fn only_lower_bounds(set: &AttributeSet) -> bool {
+    let item = |item: &SubAttributeSet| match item {
+        SubAttributeSet::Attribute(attribute) => {
+            !attribute.reverse
+                && attribute
+                    .cardinality
+                    .is_none_or(|c| c.min >= 1 && c.max.is_none())
+        }
+        SubAttributeSet::Nested(inner) => only_lower_bounds(inner),
+    };
+    match set {
+        AttributeSet::Single(one) => item(one),
+        AttributeSet::Conjunction(items) | AttributeSet::Disjunction(items) => {
+            items.iter().all(item)
+        }
     }
 }
