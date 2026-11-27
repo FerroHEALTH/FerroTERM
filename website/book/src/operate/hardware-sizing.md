@@ -36,31 +36,23 @@ issue, not called done.
 Every structure a served edition holds reports what its own allocations hold,
 and `ferroterm-residency --report` prints those counts beside the process
 footprint, so the accounting adds up from the structures rather than being
-inferred from a total. The two SNOMED editions below were measured on an
-Apple M2 with the release binaries. The top rows are the structures' own
-counts; the bottom three are the process that loaded them and nothing else, so
-they run under a serving process, which also holds the FHIR core code systems
-and the HTTP runtime. The benchmarks page reports the serving process, from
-whichever record set is committed there.
+inferred from a total. Run it over an artifact to see where that artifact's
+memory goes; the [benchmarks page](../evaluate/benchmarks.md) reports the
+serving process from the committed records. For a SNOMED CT edition the
+structures are these:
 
-| Structure | On disk (NL) | Resident (NL) | Resident (International) |
-|---|---|---|---|
-| Concept records, a dense column by ordinal | `store.concepts.col` 20.0 MB | 20.0 MB | 19.4 MB |
-| Preferred displays, a dense column by ordinal | `store.displays.col` 73.5 MB | 73.5 MB | 55.6 MB |
-| Properties, a dense column by ordinal | `store.properties.col` 62.9 MB | 62.9 MB | 61.1 MB |
-| Acceptability, a dense column by ordinal | `store.acceptability.col` 49.8 MB | 49.8 MB | 37.1 MB |
-| Transitive closure, both directions, roaring bitmaps | part of `hierarchy.bin` | 150.6 MB | 143.6 MB |
-| CSR is-a adjacency | part of `hierarchy.bin` | 4.9 MB | 4.7 MB |
-| CSR child adjacency, transposed when the edition opens | derived | 4.9 MB | 4.7 MB |
-| `fst` word dictionary and roaring postings | `text.bin` 76.6 MB | 115.7 MB | 69.1 MB |
-| Reference set member tables | `members.bin` 35.2 MB | 60.0 MB | 57.0 MB |
-| Attribute rows | `attributes.bin` 12.5 MB | 12.5 MB | 11.9 MB |
-| Attribute inverted index, derived when the edition opens | derived | 4.9 MB | 4.7 MB |
-| Reference set membership bitmaps | `refsets.bin` 0.7 MB | 0.7 MB | 0.6 MB |
-| Alternate identifiers | `identifiers.bin` | 0 MB | 0 MB |
-| **Every structure** | | **560.4 MB** | **469.5 MB** |
-| Unattributed: the `redb` page cache, the allocator, the binary, the runtime | | 55.1 MB | 49.6 MB |
-| **The process, measured** | | **615.5 MB** | **519.0 MB** |
+| Structure | On disk | Read by |
+|---|---|---|
+| Concept records, a dense column by ordinal | `store.concepts.col` | `$expand`, `$lookup` |
+| Preferred displays, a dense column by ordinal | `store.displays.col` | `$lookup`, `$expand` |
+| Properties, a dense column by ordinal | `store.properties.col` | `$lookup` |
+| Acceptability, a dense column by ordinal | `store.acceptability.col` | `$lookup`, `$validate-code` |
+| Transitive closure, both directions, roaring bitmaps | part of `hierarchy.bin` | `$subsumes`, `$expand`, ECL |
+| CSR is-a adjacency, and the child adjacency transposed when the edition opens | part of `hierarchy.bin` | hierarchy walks, nested `$expand` |
+| `fst` word dictionary and roaring postings | `text.bin` | a `filter` search |
+| Reference set member tables and membership bitmaps | `members.bin`, `refsets.bin` | `?fhir_vs=refset`, ECL `^` |
+| Attribute rows, and their inverted index derived when the edition opens | `attributes.bin` | ECL refinements |
+| Alternate identifiers | `identifiers.bin` | ECL alternate identifiers |
 
 The designation text is the one part of an edition that stays on disk: it is
 the largest thing an artifact holds and a point read through `redb` answers it
@@ -71,7 +63,7 @@ membership test on the closure, ECL reads the attributes and the membership
 bitmaps, and a `filter` search reads the word dictionary. Nothing in the list
 is loaded and never touched.
 
-The unattributed remainder is worth naming. Each column is its own file, read
+The process holds more than the structures count. Each column is its own file, read
 once into the structure it is served from, so nothing of it arrives twice; the
 `redb` page cache is capped at 64 MiB and fills only with the designation rows
 a request reads, against a default of a gibibyte. What is left is the
@@ -92,6 +84,5 @@ Serving is a point read or a bitmap operation, so a modest CPU handles it: a
 `$expand` is cut from the selection before any concept is read, so the
 concepts a page reads are the concepts it returns, not the whole selection;
 an unpaged expansion beyond 1,000 members is refused with `too-costly`.
-Finding the page still costs something on a large selection: the committed
-records put a hundred members of a SNOMED subtree at 253 microseconds and a
-thousand at 2.5 milliseconds on the Netherlands edition.
+Finding the page still costs something on a large selection; the
+benchmarks page records a small and a large `$expand` per code system.

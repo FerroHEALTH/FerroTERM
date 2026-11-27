@@ -157,7 +157,7 @@ Any other parameter or modifier is a `400`. `NamingSystem/{id}` reads one.
 ## Primitive lexical forms on local content
 
 A resource you write is decoded by the generated FHIR model of the version
-you send it to, and since `fhir-types` 0.1.105 that decode checks every
+you send it to, and that decode checks every
 primitive against the regex its FHIR package publishes for the type
 (<https://hl7.org/fhir/R5/datatypes.html#primitive>). A `date` of
 `yesterday`, a `valueDateTime` of `2001-6`, a `url` with a space, or a

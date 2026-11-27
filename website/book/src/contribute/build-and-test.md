@@ -24,13 +24,17 @@ One Cargo workspace, Rust 1.99, edition 2024: `crates/*` are the libraries
 (`rf2`, `loinc`, `classification`, `rxnorm-rrf`, `icd11` the release readers;
 `concept-graph`, `concept-store`, `designation-index` the substrates;
 `fhir-terminology` the engine and providers), `app/ferroterm-server` is the
-axum server, and `tools/*` are the offline build and the synthetic test
-fixtures. Every crate carries a `CLAUDE.md` with its
-local discipline.
+axum server, `app/ferroterm-sync` the synchronisation service and
+`app/ferroterm-console` the console, and `tools/*` are the offline build, the
+benchmark harness, the synthetic test fixtures and the forwarder detector.
+Every crate carries a `CLAUDE.md` with its local discipline.
 
 ## The local gates
 
-The local gates mirror CI. Run them before you open a pull request:
+`scripts/checks/fast.sh` is the default local gate: rustfmt, clippy, nextest
+and the doctests over the packages your change reaches (`--dry-run` prints the
+plan). CI runs every package and stays the full gate, with these commands
+over the whole workspace:
 
 ```console
 $ cargo fmt --all --check

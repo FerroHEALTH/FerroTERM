@@ -140,10 +140,7 @@ the menu under your name says what you may edit.
 
 The console signs you in at `/login`, the provider sends you back to
 `/auth/callback`, **Sign out** posts to `/logout`, and the page asks
-`/session` what your session has left. Releases up to 0.3.2 served these at
-`/auth/login`, `/auth/sign-out` and `/auth/session`; change any link or
-bookmark that names them. The redirect address registered at the provider
-stays `/auth/callback`.
+`/session` what your session has left.
 
 **Sign out** ends the session, revokes its token where the provider publishes
 a revocation endpoint (RFC 7009), and takes you to the provider's end-session
