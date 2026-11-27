@@ -14,6 +14,7 @@
 //! per request.
 
 pub mod edition;
+mod edition_map;
 mod implicit;
 mod open;
 mod selection;
@@ -632,6 +633,17 @@ impl StoredSystem for Snomed {
                 "`{form}` is not a percent-encoded SCTID"
             ))));
         };
+        if let Some(module) = decoded.trim().strip_prefix(edition_map::FORM) {
+            let Ok(module) = ConceptId::parse(module) else {
+                return Some(Err(malformed(format!("`{module}` is not an SCTID"))));
+            };
+            return Some(edition_map::concept_map(
+                provider,
+                url,
+                module.value(),
+                selection,
+            ));
+        }
         let Ok(refset) = ConceptId::parse(decoded.trim()) else {
             return Some(Err(malformed(format!("`{decoded}` is not an SCTID"))));
         };

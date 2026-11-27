@@ -113,6 +113,21 @@ impl SnomedProvider {
         })
     }
 
+    /// The module SCTID of a concept, from its stored property.
+    pub(super) fn module_of(
+        &self,
+        concept: Ordinal,
+    ) -> Result<Option<u64>, concept_store::store::StoreError> {
+        let module = self
+            .stored()
+            .store
+            .property(concept, self.system().keys.module)?;
+        Ok(module.first().and_then(|value| match value {
+            record::PropertyValueRef::Code(code) => code.parse().ok(),
+            _ => None,
+        }))
+    }
+
     /// Whether the concept is sufficiently defined by its conditions.
     ///
     /// The RF2 `definitionStatusId` decides it, which is the same field the
