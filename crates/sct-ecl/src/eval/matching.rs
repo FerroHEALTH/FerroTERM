@@ -205,10 +205,11 @@ pub(super) fn relationship_groups<'row, 'graph>(
 ) -> Vec<Vec<&'row Row<'graph>>> {
     let mut groups: Vec<Vec<&Row<'_>>> = Vec::new();
     let mut current: Option<u32> = None;
-    for row in rows {
-        // NOTE: ECL treats each ungrouped relationship (group 0) as
-        // its own group; the rows arrive sorted by group.
-        if row.group == 0 || current != Some(row.group) {
+    // NOTE: "A relationship with a relationshipGroup field value of '0' is
+    // considered not to be grouped" (RF2 specification §4.2.3), so it is in no
+    // group; the rows arrive sorted by group.
+    for row in rows.iter().filter(|row| row.group != 0) {
+        if current != Some(row.group) {
             groups.push(Vec::new());
             current = Some(row.group);
         }
@@ -268,9 +269,12 @@ pub(super) fn matching_rows<'r, 'g: 'r>(
 
 #[cfg(test)]
 mod tests {
-    use concept_graph::attributes::ValueRef;
+    use concept_graph::attributes::{Row, ValueRef};
+    use concept_graph::ordinal::Ordinal;
 
-    use super::{Cardinality, ValueTest, compare_numbers, number, time, within};
+    use super::{
+        Cardinality, ValueTest, compare_numbers, number, relationship_groups, time, within,
+    };
     use crate::ast::{Comparison, ConcreteString, Equality, TypedSearchTerm};
     use crate::eval::EvalError;
     use crate::eval::{term_matches, wild_matches};
@@ -391,5 +395,24 @@ mod tests {
             five.matches(ValueRef::Number("five")),
             Err(EvalError::InvalidNumber { .. })
         ));
+    }
+
+    /// RF2 §4.2.3: "A relationship with a relationshipGroup field value of '0'
+    /// is considered not to be grouped".
+    #[test]
+    fn an_ungrouped_relationship_is_in_no_group() {
+        let row = |group: u32, kind: u32| Row {
+            group,
+            kind,
+            value: ValueRef::Concept(Ordinal::new(1)),
+        };
+        let rows = [row(0, 1), row(0, 2), row(1, 3), row(1, 4), row(4, 5)];
+        let groups = relationship_groups(&rows);
+        let kinds: Vec<Vec<u32>> = groups
+            .iter()
+            .map(|group| group.iter().map(|row| row.kind).collect())
+            .collect();
+        assert_eq!(kinds, [vec![3, 4], vec![5]]);
+        assert!(relationship_groups(&rows[..2]).is_empty());
     }
 }
