@@ -144,6 +144,10 @@ pub enum DisplayStanding {
     /// The default display of a reserved code space, "a placeholder: another
     /// display is not an error or a warning".
     Placeholder,
+    /// A grammar generates the display (an ICF qualified code): an
+    /// extension-codes supplement's display for the code replaces it, "but the
+    /// display the grammar generates stays a valid display".
+    Generated,
 }
 
 /// The status of a concept, for `inactive` and `abstract` on the wire.

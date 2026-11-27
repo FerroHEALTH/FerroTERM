@@ -15,10 +15,10 @@
 
 use std::sync::Arc;
 
-use fhir_terminology::fhir_codesystem::provider::FhirCodeSystem;
 use fhir_terminology::operations::{OperationError, sources::Sources};
 use fhir_terminology::provider::declaration::ContentMode;
 use fhir_terminology::registry::Registry;
+use fhir_terminology::standalone_icf;
 use fhir_terminology::supplement::Supplement;
 use fhir_terminology::valueset::store::ValueSetStore;
 use http::{HeaderMap, StatusCode};
@@ -94,14 +94,14 @@ impl Scope {
                         supplements.push(model);
                         continue;
                     }
-                    let provider = FhirCodeSystem::new(model.clone()).map_err(|e| {
+                    let provider = standalone_icf::serve(model.clone()).map_err(|e| {
                         Failure::new(
                             StatusCode::BAD_REQUEST,
                             "invalid",
                             format!("a `{TX_RESOURCE}` cannot be served: {e}"),
                         )
                     })?;
-                    registry.register_or_replace(Arc::new(provider));
+                    registry.register_or_replace(provider);
                 }
                 Loaded::ValueSet(model) => value_sets.replace(model.clone()),
                 Loaded::ConceptMap(model) => concept_maps.replace(model.clone()),

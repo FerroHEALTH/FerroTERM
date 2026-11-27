@@ -345,6 +345,25 @@ and it does so **without reading an openEHR artefact**.
   cache and the artifacts stay local under the CC BY-ND terms.
 
 
+## ICF (standalone releases)
+
+- **Identity.** `http://hl7.org/fhir/sid/icf`, versions `2001a` and `2017a`,
+  `versionNeeded` true. This is the standalone classification with codes such
+  as `b1100`, a code system of its own beside the ICD-11 ICF linearization
+  (the terminology ecosystem IG, `icf.md`).
+- **Distribution and licence.** WHO's ICF terms. The releases are published
+  as FHIR `CodeSystem` resources in the `fhir.tx.support` package. FerroTERM
+  ships none of it: a deployment loads the release it is licensed for.
+- **Served.** Put the release's `CodeSystem` in a directory that
+  `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` names. The server reads its nesting as
+  the is-a tree, whatever `hierarchyMeaning` the release states, and adds the
+  qualifier grammar `icf.md` defines. A qualified code (`s7300.183`,
+  `e310+3`) is valid when its category is selectable and each digit is a
+  value of its position's scale. It has a generated display, reports its
+  qualifiers as properties, sits under its category for `$subsumes` and
+  `is-a`, and answers the `exists` and `qualified` filters. An include that
+  admits qualified codes expands to the plain codes, marked unclosed.
+
 ## ATC/DDD (WHO)
 
 - **Identity.** `http://www.whocc.no/atc` (OID 2.16.840.1.113883.6.73); no

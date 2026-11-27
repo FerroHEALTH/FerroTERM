@@ -37,7 +37,8 @@ mode run also carries the two mode-independent `metadata` cases and the 11
 `closure` cases, so a mode's count is 13 above the suite's own. The other
 rows were measured by hand on 2026-11-27 on the same pins, over the SNOMED CT
 International edition 20261101, LOINC 2.83, and the three ICD-11 artifacts
-built from the WHO ICD-API local deployment of release 2026-01 in English.
+built from the WHO ICD-API local deployment of release 2026-01 in English;
+the `icf` row over the ICF `CodeSystem` resources of `fhir.tx.support` 1.0.5.
 
 | mode | surface | pass list | passed of ran | needs | open failures |
 |---|---|---|---|---|---|
@@ -46,7 +47,7 @@ built from the WHO ICD-API local deployment of release 2026-01 in English.
 | `general` | `/r5` | `passing-r5.txt` | 744 of 805 | nothing | #1068, #1069, #1376, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
 | `snomed` | `/r4b` | `passing-snomed.txt` | 2 of 378 | a SNOMED CT edition | #344, #1068, #1380 |
 | `icd-11` | `/r4b` | `passing-icd-11.txt` | 10 of 145 | the three ICD-11 artifacts | #1391, #1068, #1380 |
-| `icf` | `/r4b` | `passing-icf.txt` | 1 of 96 | the three ICD-11 artifacts | #1391, #1068, #1380 |
+| `icf` | `/r4b` | `passing-icf.txt` | 79 of 96 | the standalone ICF releases | #1330, #1376, #1068, #1380 |
 | `loinc` | `/r4b` | `passing-loinc.txt` | 56 of 110 | a LOINC release | #1383, #1068, #1380 |
 | `loinc` | `/r5` | `passing-r5-loinc.txt` | 57 of 110 | a LOINC release | #1383, #1068 |
 | `tx.fhir.org` | `/r4b` | `passing-tx.fhir.org.txt` | 29 of 189 | a LOINC release | #1384, #1068, #1380 |
@@ -74,13 +75,20 @@ hand before a release and their lists are refreshed in the same change.
   `tests/readme.md`). 216 of its cases answer 404 on that version. #344
   holds the evidence. The two cases that pass assert the refusal of an
   edition the server does not have.
-- **`icd-11`** and **`icf`** need the three ICD-11 artifacts built from the
-  WHO ICD-API local deployment (`--mode icd-11 --index <mms>,<icf>,<entity>`),
-  which needs the WHO container and its licence. Test cases 1.11.0 rewrite
-  `icd-11` (132 cases) against the IG's own `icd-11.md` and add `icf` (70)
-  and `icf-ec` (13) against `icf.md`. The 44 cases the 1.9.3 suite passed
-  now expect `post-coordination-metadata`, the `classificationCode` output
-  and ICF at `http://hl7.org/fhir/sid/icf`, which #1391 builds.
+- **`icd-11`** needs the three ICD-11 artifacts built from the WHO ICD-API
+  local deployment (`--mode icd-11 --index <mms>,<icf>,<entity>`), which
+  needs the WHO container and its licence. Test cases 1.11.0 rewrite it (132
+  cases) against the IG's own `icd-11.md`. The 44 cases the 1.9.3 suite
+  passed now expect `post-coordination-metadata` and the `classificationCode`
+  output, which #1391 builds.
+- **`icf`** (70 cases, and `icf-ec` with 13) needs the standalone ICF releases
+  of `icf.md`, `http://hl7.org/fhir/sid/icf` `2001a` and `2017a`, in a
+  directory `FERROTERM__TERMINOLOGY__CODE_SYSTEMS` names. They come as
+  `CodeSystem` resources in the `fhir.tx.support` package, under WHO's terms,
+  and FerroTERM ships none of them. Every `icf` case passes. Of `icf-ec`, the
+  three `$lookup` cases want a top-level `definition` (#1330) or a designation
+  `source` (#1376), and two send `useSupplement` on `CodeSystem/$validate-code`
+  (#1068).
 - **`loinc`** needs a LOINC artifact (`--mode loinc --index <loinc>`), since
   the release needs a LOINC account. Test cases 1.11.0 moved the LOINC cases
   here from `tx.fhir.org`, and every request names LOINC 2.83. #1383

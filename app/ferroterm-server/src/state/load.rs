@@ -12,7 +12,6 @@ use fhir_terminology::classification::{self, ClassificationProvider};
 use fhir_terminology::conceptmap;
 use fhir_terminology::conceptmap::store::ConceptMapStore;
 use fhir_terminology::fhir_codesystem::load::{FhirVersion, load_dir, package_version};
-use fhir_terminology::fhir_codesystem::provider::FhirCodeSystem;
 use fhir_terminology::fhir_core::CoreTerminology;
 use fhir_terminology::icd11::{self, Icd11Provider};
 use fhir_terminology::loinc::{self, LoincProvider};
@@ -24,6 +23,7 @@ use fhir_terminology::registries::{bcp13, bcp47, iso3166};
 use fhir_terminology::registry::Registry;
 use fhir_terminology::rxnorm::{self, RxNormProvider};
 use fhir_terminology::snomed::{self, SnomedProvider};
+use fhir_terminology::standalone_icf;
 use fhir_terminology::supplement::Supplement;
 use fhir_terminology::valueset;
 use fhir_terminology::valueset::store::ValueSetStore;
@@ -117,14 +117,14 @@ pub(super) fn load_code_systems(
             continue;
         }
         let url = model.url.clone();
-        let provider = FhirCodeSystem::new(model).map_err(|source| LoadError::Build {
+        let provider = standalone_icf::serve(model).map_err(|source| LoadError::Build {
             path: path.to_path_buf(),
             url,
             source,
         })?;
         loaded.push(Loaded {
             path: path.to_path_buf(),
-            provider: Arc::new(provider),
+            provider,
         });
     }
     for model in valueset::load::load_dir(path, version).map_err(failed)? {
