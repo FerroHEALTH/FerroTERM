@@ -246,11 +246,15 @@ macro_rules! family_map {
                     issue: list
                         .iter()
                         .map(|issue| OperationOutcomeIssue {
-                            extension: vec![Extension {
-                                url: String::from(MESSAGE_ID_URL),
-                                value: Some(ExtensionValue::String(issue.message_id().into())),
-                                ..Default::default()
-                            }],
+                            extension: issue
+                                .message_id()
+                                .map(|id| Extension {
+                                    url: String::from(MESSAGE_ID_URL),
+                                    value: Some(ExtensionValue::String(id.into())),
+                                    ..Default::default()
+                                })
+                                .into_iter()
+                                .collect(),
                             severity: issue.severity.into(),
                             code: issue.code.into(),
                             details: Some(CodeableConcept {

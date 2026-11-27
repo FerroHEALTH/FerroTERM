@@ -56,7 +56,7 @@ fn validate_code_checks_display_case_and_inactive_codes() {
     );
     assert_eq!(
         validation.issues[0].message_id(),
-        "Display_Name_WS_for__should_be_one_of__instead_of"
+        Some("Display_Name_WS_for__should_be_one_of__instead_of")
     );
     let case = ValueSetValidateInput {
         url: Some(VS_ENUMERATED.to_owned()),
@@ -352,7 +352,14 @@ fn validate_code_passes_a_codeable_concept_whose_other_coding_names_an_unknown_s
     let shape: Vec<(&str, &str, &str, Option<&str>)> = validation
         .issues
         .iter()
-        .map(|i| (i.severity, i.kind, i.message_id(), i.expression.as_deref()))
+        .map(|i| {
+            (
+                i.severity,
+                i.kind,
+                i.message_id().expect("a message id"),
+                i.expression.as_deref(),
+            )
+        })
         .collect();
     assert_eq!(
         shape,

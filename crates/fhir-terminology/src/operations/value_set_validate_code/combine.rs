@@ -44,7 +44,7 @@ pub(super) fn this_code_not_in_vs(model: &ValueSetModel, coding: &CodingRef, bas
         severity: "information",
         code: "code-invalid",
         kind: "this-code-not-in-vs",
-        message: MessageId::NoneOfTheProvidedCodesAreInTheValueSetOne,
+        message: Some(MessageId::NoneOfTheProvidedCodesAreInTheValueSetOne),
         text: format!(
             "The provided code '{}' was not found in the value set '{}'",
             named_code(
@@ -68,7 +68,7 @@ pub(super) fn no_valid_coding(model: &ValueSetModel) -> Validation {
             severity: "error",
             code: "code-invalid",
             kind: "not-in-vs",
-            message: MessageId::TxGeneralCcErrorMessage,
+            message: Some(MessageId::TxGeneralCcErrorMessage),
             text: format!(
                 "No valid coding was found for the value set '{}'",
                 model.canonical()
@@ -182,10 +182,10 @@ pub(super) fn first_in_value_set(
                 answer
                     .issues
                     .push(this_code_not_in_vs(model, coding, &base(index)));
-            } else if unchecked && issue.message == MessageId::UnknownCodeSystem {
+            } else if unchecked && issue.message == Some(MessageId::UnknownCodeSystem) {
                 answer.issues.push(Issue {
                     severity: "warning",
-                    message: MessageId::UnknownCodeSystemCodingNotChecked,
+                    message: Some(MessageId::UnknownCodeSystemCodingNotChecked),
                     ..issue.clone()
                 });
             } else {
@@ -230,7 +230,7 @@ pub(super) fn none_in_value_set(
             other
                 .issues
                 .iter()
-                .filter(|issue| issue.message == MessageId::CodingHasNoSystemCannotValidate)
+                .filter(|issue| issue.message == Some(MessageId::CodingHasNoSystemCannotValidate))
                 .cloned(),
         );
     }

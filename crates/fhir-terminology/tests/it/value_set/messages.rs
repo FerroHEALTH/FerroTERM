@@ -483,7 +483,13 @@ fn validate_code_names_its_messages_and_shapes_the_unknown_system_answer() {
     let shape: Vec<(&str, &str, Option<&str>)> = unknown
         .issues
         .iter()
-        .map(|i| (i.kind, i.message_id(), i.expression.as_deref()))
+        .map(|i| {
+            (
+                i.kind,
+                i.message_id().expect("a message id"),
+                i.expression.as_deref(),
+            )
+        })
         .collect();
     assert_eq!(
         shape,
@@ -574,7 +580,11 @@ fn the_message_joins_the_errors_in_the_ecosystems_order() {
         },
     )
     .expect("a false result");
-    let ids: Vec<&str> = checked.issues.iter().map(Issue::message_id).collect();
+    let ids: Vec<&str> = checked
+        .issues
+        .iter()
+        .map(|i| i.message_id().expect("a message id"))
+        .collect();
     assert_eq!(
         ids,
         [

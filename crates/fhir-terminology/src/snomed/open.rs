@@ -133,6 +133,7 @@ impl SnomedProvider {
                 scg: Mutex::new(super::expression::Expressions::default()),
                 attribute_ordinals: OnceLock::new(),
                 inactive: OnceLock::new(),
+                mrcm: OnceLock::new(),
                 keys,
                 edition: manifest.edition,
                 base_language,
