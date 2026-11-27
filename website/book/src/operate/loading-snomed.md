@@ -41,8 +41,9 @@ graph LR
 ```
 
 Every source builds into the same layout, and the manifest names the system,
-so `FERROTERM__TERMINOLOGY__INDEX` takes any mix of them. When a new release arrives, rebuild
-its index and restart the server against it.
+so `FERROTERM__TERMINOLOGY__INDEX` takes any mix of them. When a new release arrives, build
+its index beside the old one and reload the server
+([Reloading and replacing content](reloading.md)).
 
 Each command below names its output directory with `--out`. Give
 `--index-root DIR` (or set `FERROTERM_INDEX_ROOT`) instead, and the build

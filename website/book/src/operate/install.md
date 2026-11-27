@@ -256,3 +256,12 @@ $ curl 'http://localhost:8080/r4b/metadata?mode=terminology'
 The `TerminologyCapabilities` names every code system and version this
 deployment serves, with its filters and properties. See
 [The FHIR terminology API](../integrate/fhir-api.md) for the operations.
+
+## Next steps
+
+- [Loading code systems](loading-snomed.md) builds an index from each release
+  you are licensed for.
+- [Configuration](configuration.md) lists every key, and
+  [Behind a reverse proxy](reverse-proxy.md) puts TLS and authentication in
+  front of the server.
+- [Upgrading](upgrades.md) moves a running deployment to a new release.

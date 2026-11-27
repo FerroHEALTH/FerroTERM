@@ -15,7 +15,7 @@ FerroTERM ships none.
 | You are | You want to | Start with | Then |
 |---|---|---|---|
 | An integrator | Call the terminology operations from a FHIR client, a validator or an EHR | [Your first requests](tutorials/first-requests.md) | [The FHIR terminology API](integrate/fhir-api.md), [Value sets, implicit value sets, and ECL](integrate/ecl-value-sets.md), [Writing resources](integrate/persisted-resources.md) |
-| An operator | Deploy, load content, configure, secure and upgrade the server | [Install and run](operate/install.md) | [Loading code systems](operate/loading-snomed.md), [Configuration](operate/configuration.md), [Behind a reverse proxy](operate/reverse-proxy.md), [Reloading and replacing content](operate/reloading.md) |
+| An operator | Deploy, load content, configure, secure and upgrade the server | [Install and run](operate/install.md) | [Loading code systems](operate/loading-snomed.md), [Configuration](operate/configuration.md), [Behind a reverse proxy](operate/reverse-proxy.md), [Upgrading](operate/upgrades.md) |
 | A terminologist | Browse the content, compose value sets and keep them current with each release | [The console](operate/console.md) | [Syncing from a national terminology service](operate/sync.md), [Writing resources](integrate/persisted-resources.md) |
 | A decision maker | Judge whether FerroTERM fits: what it serves, how it conforms, what it costs to run and to license | [How FerroTERM serves terminology](explanation/how-ferroterm-serves.md) | [Code systems served](evaluate/code-systems.md), [Conformance](evaluate/conformance.md), [Benchmarks](evaluate/benchmarks.md), [Licensing](evaluate/licensing.md), [CRA information for users](evaluate/cra-user-information.md) |
 
