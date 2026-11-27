@@ -17,7 +17,8 @@
 # safe uses of conformance/post-quantum.tsv. Every run fails when the README
 # shows a badge this script does not write or leaves out one it writes, and
 # when the pass-list table of conformance/tx-ecosystem/README.md disagrees
-# with the lists, the suite total, not-applicable.tsv or hand-run.tsv. A
+# with the lists, the suite total or hand-run.tsv, and when the book's
+# conformance page miscounts the cases not-applicable.tsv lists. A
 # badge whose label runs past 30 characters or whose message runs past 20
 # fails the run.
 #
@@ -180,10 +181,6 @@ table_failures=0
 while IFS=$'\t' read -r surface mode ran; do
   list="$(pass_list "$surface" "$mode")"
   row="| \`$mode\` | \`/$surface\` | \`${list##*/}\` | $(grep -c . "$list" || true) of $ran |"
-  if [[ "$mode" = general ]]; then
-    inapplicable="$(awk -F'\t' -v surface="$surface" '!/^#/ && $1 == surface' conformance/tx-ecosystem/not-applicable.tsv | wc -l | tr -d ' ')"
-    row="${row% |} ($inapplicable n/a) |"
-  fi
   if ! grep -qF -- "$row" "$table"; then
     echo "conformance-badges: $table has no row starting $row" >&2
     table_failures=$((table_failures + 1))
@@ -201,22 +198,32 @@ for measured in $(hand_rows | cut -f4 | sort -u); do
     table_failures=$((table_failures + 1))
   fi
 done
+# The book's conformance page names, per surface, the general cases that do
+# not apply there, as not-applicable.tsv counts them.
+book=website/book/src/evaluate/conformance.md
+not_applicable() {
+  awk -F'\t' -v surface="$1" '!/^#/ && $1 == surface' conformance/tx-ecosystem/not-applicable.tsv | wc -l | tr -d ' '
+}
+inapplicable_sentence="do not apply on their surface: $(not_applicable r4) cases on R4, $(not_applicable r4b) on R4B and $(not_applicable r5) on R5."
+if ! tr -s '[:space:]' ' ' < "$book" | grep -qF "$inapplicable_sentence"; then
+  echo "conformance-badges: $book does not say the first two rows $inapplicable_sentence" >&2
+  table_failures=$((table_failures + 1))
+fi
 [[ "$table_failures" -eq 0 ]] || exit 1
 
 if [[ -n "$self_test" ]]; then
-  # Each surface's badge is its count alone; the table names the cases that
-  # do not apply there.
+  # Each surface's badge is its count alone; the book page names the cases
+  # that do not apply there.
   for version in r4 r4b r5; do
-    want="$(awk -F'\t' -v surface="$version" '!/^#/ && $1 == surface' conformance/tx-ecosystem/not-applicable.tsv | wc -l | tr -d ' ')"
     if ! jq -er '.message | test("^[0-9]+/[0-9]+$")' "$out/$version.json" > /dev/null; then
       echo "conformance-badges: self-test: the $version badge is more than its count" >&2
       exit 1
     fi
-    if ! grep -F "| \`general\` | \`/$version\` |" "$table" | grep -qF "of $total ($want n/a) |"; then
-      echo "conformance-badges: self-test: $table does not name the $want cases that do not apply on $version" >&2
-      exit 1
-    fi
   done
+  if tr -s '[:space:]' ' ' < "$book" | grep -qF "do not apply on their surface: 999 cases on R4,"; then
+    echo "conformance-badges: self-test: the not-applicable sentence matches a wrong count" >&2
+    exit 1
+  fi
   badge_length_check "$out"/*.json || exit 1
   badge long.json "tx-ecosystem 1.11.0 tx.fhir.org R4B" 29 189 ", by hand 2026-11-27" shield-check > /dev/null
   if badge_length_check "$out/long.json" 2>/dev/null; then
