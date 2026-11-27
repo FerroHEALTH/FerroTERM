@@ -160,7 +160,7 @@ levels (high, medium, low).
 | T12 | An unauthenticated caller starts a run, activates staged content or reads the run records | medium | low | the admin listener is a resource server over `ferrohealth-smart`; every route but the health routes requires the product scope; fail-closed start | (b), (d) |
 | T13 | The sync service's credentials leak | high: the reload client can make the server re-read its disks, and the terminology service account unlocks licensed content | low | each secret read from a mounted file or a variable, shown as `***` by `config check`, never logged; the reload call refuses a Basic credential and takes a client credentials token; tokens kept in memory | (d), (e) |
 | T14 | A release that changes answers is served without review | high | medium with `activation = "auto"` | `activation = "manual"`; a refused reload rolled back; retention keeps the previous release to roll back to; the revalidation reports inactive, absent and out-of-value-set codes in the run record and the webhook summary | (f), (h) |
-| T15 | A hostile feed or API response crashes the service or exhausts its disk | medium | low | memory-safe Rust with `unsafe` forbidden; downloads streamed to disk; retention prunes old releases and each run record states the bytes the index root uses; the feed parser is not fuzzed and a download has no size cap | (h), (k) |
+| T15 | A hostile feed or API response crashes the service or exhausts its disk | medium | low | memory-safe Rust with `unsafe` forbidden; the feed parser fuzzed; downloads streamed to disk; retention prunes old releases and each run record states the bytes the index root uses; a download has no size cap | (h), (k) |
 
 ## Annex I Part I(1): the level of cybersecurity
 
@@ -415,13 +415,16 @@ appropriate exploitation mitigation mechanisms and techniques"
 - **Applies:** yes.
 - **How:** Rust with `unsafe_code = "forbid"` across the workspace and
   `overflow-checks = true` in release builds; fuzzing of the ECL parser, the
-  FHIR JSON and XML codecs, the RF2 row reader and the SNOMED URI parser; a
+  FHIR JSON and XML codecs, the RF2 row reader, the SNOMED URI parser and the
+  syndication feed parser; a
   non-root uid, no shell and, in the quickstart, a read-only root filesystem
   with every capability dropped.
 - **Evidence:** `Cargo.toml` (`[workspace.lints.rust]`, `[profile.release]`);
   `fuzz/fuzz_targets/`; `.github/workflows/fuzz.yml`.
-- **Status:** met for the server. The synchronisation service is partial: the
-  Atom feed parser, which reads content from the internet, has no fuzz target.
+- **Status:** met. The Atom feed parser the synchronisation service reads a
+  terminology service's feed with is fuzzed by the `atom_feed` target
+  (`fuzz/fuzz_targets/atom_feed.rs`, in the matrix of
+  `.github/workflows/fuzz.yml`).
 
 ### (l) Recording and monitoring, with an opt-out
 
@@ -556,3 +559,4 @@ not name, and when the intended purpose changes.
 |---|---|---|
 | 1 | 2026-10-21 | First assessment (#790) |
 | 2 | 2026-11-27 | Assesses the synchronisation service, released from v0.3.0: its purpose and environment, three foreseeable misuses, its assets, risks T11 to T15, its controls and status under each point of Part I(2), and its outbound flows; adds the OTLP export to the flows (#1365) |
+| 4 | 2026-11-27 | The syndication feed parser is fuzzed: (k) and T15 record the target (#1373) |
