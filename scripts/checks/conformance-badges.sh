@@ -39,12 +39,17 @@ for version in r4 r4b r5 r6; do
   [[ "$version" = r4b ]] || list="conformance/tx-ecosystem/passing-$version.txt"
   [[ -f "$list" ]] || continue
   passed="$(grep -c . "$list" || true)"
+  # The cases the runner counts that do not apply on this surface, from the
+  # inventory scripts/checks/tx-ecosystem.sh holds to each run (#1361).
+  inapplicable="$(awk -F'\t' -v surface="$version" '!/^#/ && $1 == surface' conformance/tx-ecosystem/not-applicable.tsv | wc -l | tr -d ' ')"
+  message="$passed / $total"
+  [[ "$inapplicable" = 0 ]] || message="$message ($inapplicable n/a)"
   colour="$(badge_count_color "$passed" "$total")"
   label="tx-ecosystem $suite $(printf '%s' "$version" | tr '[:lower:]' '[:upper:]')"
-  jq -cn --arg label "$label" --arg message "$passed / $total" --arg color "$colour" \
+  jq -cn --arg label "$label" --arg message "$message" --arg color "$colour" \
     --argjson logo "$(badge_logo_fields shield-check)" \
     '{schemaVersion: 1, label: $label, message: $message, color: $color} + $logo' > "$out/$version.json"
-  echo "conformance-badges: $version $passed / $total ($colour)"
+  echo "conformance-badges: $version $message ($colour)"
 done
 
 # The EHDS badges, self-tested: each counts a committed corpus that a test or
@@ -72,6 +77,14 @@ badge() {
 }
 
 if [[ -n "$self_test" ]]; then
+  # Each surface's badge names the cases that do not apply there.
+  for version in r4 r4b r5; do
+    want="$(awk -F'\t' -v surface="$version" '!/^#/ && $1 == surface' conformance/tx-ecosystem/not-applicable.tsv | wc -l | tr -d ' ')"
+    if ! jq -er --arg n "($want n/a)" '.message | endswith($n)' "$out/$version.json" > /dev/null; then
+      echo "conformance-badges: self-test: the $version badge does not name its $want cases that do not apply" >&2
+      exit 1
+    fi
+  done
   for claim in "FHIR R4 certified" "EHDS compliant" "Conformant terminology"; do
     if (badge probe.json "$claim" 1 1 "" eu) 2>/dev/null; then
       echo "conformance-badges: self-test: '$claim' was written" >&2
