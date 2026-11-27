@@ -5,8 +5,11 @@
 # pass list: a test on the list that fails is a regression, a test that
 # newly passes is reported so it can be added.
 #
-#   scripts/checks/tx-ecosystem.sh [--server URL] [--out DIR] [--mode NAME] [--fhir r4|r4b|r5] [--index DIRS] [--port N]
+#   scripts/checks/tx-ecosystem.sh [--server URL] [--out DIR] [--mode NAME] [--fhir r4|r4b|r5] [--index DIRS] [--port N] [--names-only]
 #
+# --names-only prints case names and counts and never a line of the runner's
+# log, the server's log or a case's message, which can quote licensed content;
+# a run over fetched content uses it, since a public workflow log is public.
 # Without --server the script starts target/release/ferroterm on the first free
 # port at or above 8098, or the one --port names
 # (build it first: cargo build --release -p ferroterm-server), serving the
@@ -39,6 +42,7 @@ out=target/tx-ecosystem/out
 mode=general
 fhir=r4b
 index=""
+names_only=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --server) server=$2; shift 2 ;;
@@ -47,6 +51,7 @@ while [[ $# -gt 0 ]]; do
     --index) index=$2; shift 2 ;;
     --fhir) fhir=$2; shift 2 ;;
     --port) port=$2; shift 2 ;;
+    --names-only) names_only=1; shift ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -92,6 +97,16 @@ fi
 # answers, so a port another process holds must never be measured (#425).
 # Bash connects on any redirection of a /dev/tcp path, and the subshell closes
 # the socket as it exits.
+# Prints the last lines of a log, or under --names-only only where it lies.
+show_log() {
+  local lines=$1 file=$2
+  if [[ -n "$names_only" ]]; then
+    echo "tx-ecosystem: $file is not printed under --names-only" >&2
+  else
+    tail -n "$lines" "$file" >&2 2>/dev/null || true
+  fi
+}
+
 port_taken() {
   local probe=$1
   (: <"/dev/tcp/127.0.0.1/$probe") 2>/dev/null
@@ -146,7 +161,7 @@ if [[ -z "$server" ]]; then
     # bind failure left the probe talking to the squatter (#425).
     if ! kill -0 "$started" 2>/dev/null; then
       echo "tx-ecosystem: the server exited before it was ready on port $port" >&2
-      cat "$out/server.log" >&2
+      show_log 200 "$out/server.log"
       exit 1
     fi
     if curl -sf "http://127.0.0.1:$port/health" >/dev/null 2>&1; then
@@ -157,7 +172,7 @@ if [[ -z "$server" ]]; then
   done
   if [[ -z "$ready" ]]; then
     echo "tx-ecosystem: the server did not answer /health on port $port within ${READY_TIMEOUT}s" >&2
-    cat "$out/server.log" >&2
+    show_log 200 "$out/server.log"
     exit 1
   fi
   echo "tx-ecosystem: serving on 127.0.0.1:$port (pid $started)"
@@ -176,16 +191,16 @@ java -jar "$jar" txTests -tx "$server" -test-version "$suite/tests" "${modes[@]}
   -output "$out" -ssrf-protection-enabled=false > "$out/runner.log" 2>&1 || true
 report=$out/report.json
 if [[ ! -f "$report" ]]; then
-  echo "the runner produced no report; see $out/runner.log" >&2
-  tail -n 40 "$out/runner.log" >&2
+  echo "tx-ecosystem: the runner produced no report; see $out/runner.log" >&2
+  show_log 40 "$out/runner.log"
   exit 1
 fi
 
 total=$(jq '(.test // []) | length' "$report")
 if [[ "$total" = 0 ]]; then
-  echo "the runner ran no test; see $out/runner.log and $out/server.log" >&2
-  tail -n 20 "$out/runner.log" >&2
-  tail -n 5 "$out/server.log" >&2 2>/dev/null || true
+  echo "tx-ecosystem: the runner ran no test; see $out/runner.log and $out/server.log" >&2
+  show_log 20 "$out/runner.log"
+  show_log 5 "$out/server.log"
   exit 1
 fi
 # The committed total feeds the conformance badges (conformance-badges.sh); a
@@ -237,6 +252,7 @@ if [[ -n "$regressions" ]]; then
   echo "REGRESSION: on the pass list but failing now:" >&2
   for name in $regressions; do
     echo "  - $name" >&2
+    [[ -z "$names_only" ]] || continue
     jq -r --arg n "$name" '.test[] | select(.name == $n) | "    \(.action[0].operation.message // "-" | .[0:300])"' "$report" >&2
   done
   exit 1
