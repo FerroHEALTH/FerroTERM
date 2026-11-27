@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The general-mode cases that do not apply on a surface, which the runner still
+# counts in the total: `gated` where the case's own mode or version gate skips
+# it (scripts/checks/tx-ecosystem.sh holds this set to the runner's skips), and
+# `r4b-surface` where the suite, which targets R4 and R5 (the IG's r4.md),
+# fails a case on /r4b only for that reason (#1361, #1380).
+surface	case	reason	why
+r4	simple-cases/simple-expand-isa-c2	gated	the case declares "mode": "tx.fhir.org"
+r4	simple-cases/simple-expand-isa-o2	gated	the case declares "mode": "tx.fhir.org"
+r4	simple-cases/simple-expand-isa-o2c2	gated	the case declares "mode": "tx.fhir.org"
+r4	translate2/translate-reverse-r5plus	gated	the case declares "version": "!4.0"
+r4	translate2/translate-reverse-r5plus-a	gated	the case declares "version": "!4.0"
+r4b	exclude/exclude-combo	r4b-surface	the runner leaves $version$ as written on /r4b, where the server answers 4.3.0
+r4b	exclude/exclude-contained	r4b-surface	the runner leaves $version$ as written on /r4b, where the server answers 4.3.0
+r4b	exclude/exclude-gender	r4b-surface	the runner leaves $version$ as written on /r4b, where the server answers 4.3.0
+r4b	exclude/exclude-gender2	r4b-surface	the runner leaves $version$ as written on /r4b, where the server answers 4.3.0
+r4b	exclude/exclude-valueset	r4b-surface	the runner leaves $version$ as written on /r4b, where the server answers 4.3.0
+r4b	exclude/include-combo	r4b-surface	the runner leaves $version$ as written on /r4b, where the server answers 4.3.0
+r4b	metadata/metadata	r4b-surface	the runner leaves $version$ as written on /r4b, where the server answers 4.3.0
+r4b	simple-cases/simple-expand-contained-nested	r4b-surface	the runner leaves $version$ as written on /r4b, where the server answers 4.3.0
+r4b	simple-cases/simple-expand-isa-c2	gated	the case declares "mode": "tx.fhir.org"
+r4b	simple-cases/simple-expand-isa-o2	gated	the case declares "mode": "tx.fhir.org"
+r4b	simple-cases/simple-expand-isa-o2c2	gated	the case declares "mode": "tx.fhir.org"
+r4b	translate/translate-1-r4-code	gated	the case declares "version": "4.0"
+r4b	translate/translate-1-r4-codeableconcept	gated	the case declares "version": "4.0"
+r4b	translate/translate-1-r4-coding	gated	the case declares "version": "4.0"
+r4b	translate2/translate-reverse-r4	gated	the case declares "version": "4.0"
+r4b	translate2/translate-reverse-r4-a	gated	the case declares "version": "4.0"
+r4b	translate2/translate-reverse-r4-b	gated	the case declares "version": "4.0"
+r4b	translate2/translate-reverse-r5plus	r4b-surface	the !4.0 gate runs an R5-only case on /r4b, whose $translate declares reverse
+r4b	translate2/translate-reverse-r5plus-a	r4b-surface	the !4.0 gate runs an R5-only case on /r4b, whose $translate declares reverse
+r4b	validation/validation-contained-nested	r4b-surface	the runner leaves $version$ as written on /r4b, where the server answers 4.3.0
+r5	simple-cases/simple-expand-isa-c2	gated	the case declares "mode": "tx.fhir.org"
+r5	simple-cases/simple-expand-isa-o2	gated	the case declares "mode": "tx.fhir.org"
+r5	simple-cases/simple-expand-isa-o2c2	gated	the case declares "mode": "tx.fhir.org"
+r5	translate/translate-1-r4-code	gated	the case declares "version": "4.0"
+r5	translate/translate-1-r4-codeableconcept	gated	the case declares "version": "4.0"
+r5	translate/translate-1-r4-coding	gated	the case declares "version": "4.0"
+r5	translate2/translate-reverse-r4	gated	the case declares "version": "4.0"
+r5	translate2/translate-reverse-r4-a	gated	the case declares "version": "4.0"
+r5	translate2/translate-reverse-r4-b	gated	the case declares "version": "4.0"

@@ -120,7 +120,7 @@ terminology service over the internet.
 | A damaged or half-written index served | an artifact that does not open refuses the start, and a reload that meets one keeps the previous set ([a refused artifact stops the start](../operate/reloading.md#a-refused-artifact-stops-the-start)) | none |
 | Patient data sent as a search term | the request log never carries a body or a free-text parameter | a proxy's own access log may; the book says to keep it to the same standard |
 | The sync service's admin listener published | every route but the health routes requires the product scope, and the service refuses to start while `[auth]` admits no credential unless it says `enabled = false` | a deployment that turns authentication off and publishes it lets anyone start a run, activate what is staged, and read the run records |
-| A sync endpoint configured as plain `http` | the service calls the URL it is given; the shipped overlay calls the server over the compose network | a credential sent over plain HTTP outside a trusted network can be read in transit ([(e)](#e-confidentiality-of-stored-transmitted-and-processed-data)) |
+| A sync endpoint configured as plain `http` | the service refuses to start on a plain `http` URL outside loopback, naming the key; the shipped overlay reaches the server over loopback | a server's admin listener on another host needs TLS on that listener ([(e)](#e-confidentiality-of-stored-transmitted-and-processed-data)) |
 | A release that breaks answers activated by the sync service | `activation = "manual"` stops a run after staging; a reload the server refuses is rolled back; retention keeps the previous release; the revalidation reports what the release changed for the deployment's own content | `activation = "auto"`, the default, serves a release the server accepts without a person looking at it |
 | A release run after a newer one is published | the release notes and `SECURITY.md` say only the newest release is supported | the running server does not state its support end date ([(c)](#c-security-updates-notification-and-postponement)) |
 
@@ -160,7 +160,7 @@ levels (high, medium, low).
 | T12 | An unauthenticated caller starts a run, activates staged content or reads the run records | medium | low | the admin listener is a resource server over `ferrohealth-smart`; every route but the health routes requires the product scope; fail-closed start | (b), (d) |
 | T13 | The sync service's credentials leak | high: the reload client can make the server re-read its disks, and the terminology service account unlocks licensed content | low | each secret read from a mounted file or a variable, shown as `***` by `config check`, never logged; the reload call refuses a Basic credential and takes a client credentials token; tokens kept in memory | (d), (e) |
 | T14 | A release that changes answers is served without review | high | medium with `activation = "auto"` | `activation = "manual"`; a refused reload rolled back; retention keeps the previous release to roll back to; the revalidation reports inactive, absent and out-of-value-set codes in the run record and the webhook summary | (f), (h) |
-| T15 | A hostile feed or API response crashes the service or exhausts its disk | medium | low | memory-safe Rust with `unsafe` forbidden; downloads streamed to disk; retention prunes old releases and each run record states the bytes the index root uses; a download is cut off at `download_limit` (4 GiB by default) while it streams; the feed parser is not fuzzed | (h), (k) |
+| T15 | A hostile feed or API response crashes the service or exhausts its disk | medium | low | memory-safe Rust with `unsafe` forbidden; the feed parser fuzzed; downloads streamed to disk; a download cut off at `download_limit` (4 GiB by default) while it streams; retention prunes old releases and each run record states the bytes the index root uses | (h), (k) |
 
 ## Annex I Part I(1): the level of cybersecurity
 
@@ -307,10 +307,14 @@ transit by state of the art mechanisms, and by using other technical means"
   own listeners and rely on the proxy for TLS. FerroTERM does not encrypt the
   indexes or the resource database at rest
   ([the justification](#encryption-at-rest-annex-i-part-i2e)). The
-  synchronisation service calls the URLs its configuration names and does not
-  refuse a plain `http` one, so a token sent to an endpoint configured that
-  way crosses the network unencrypted; the shipped overlay calls the server
-  over the compose network.
+  synchronisation service refuses to start on a plain `http` URL outside
+  loopback for every endpoint it sends a credential to or takes content
+  from (the feed and FHIR API of a source, the `[nts]` base, the issuer and
+  token endpoint of each client credentials grant, `[server_admin]` and
+  `[webhook]`), the rule the server holds for its own issuer; the shipped
+  overlay runs it in the server's network namespace, so the reload stays on
+  loopback (`app/ferroterm-sync/src/config.rs`, `check_endpoints`, and its
+  tests; `compose.sync.yaml`).
 
 ### (f) Integrity, and reporting corruptions
 
@@ -418,13 +422,16 @@ appropriate exploitation mitigation mechanisms and techniques"
 - **Applies:** yes.
 - **How:** Rust with `unsafe_code = "forbid"` across the workspace and
   `overflow-checks = true` in release builds; fuzzing of the ECL parser, the
-  FHIR JSON and XML codecs, the RF2 row reader and the SNOMED URI parser; a
+  FHIR JSON and XML codecs, the RF2 row reader, the SNOMED URI parser and the
+  syndication feed parser; a
   non-root uid, no shell and, in the quickstart, a read-only root filesystem
   with every capability dropped.
 - **Evidence:** `Cargo.toml` (`[workspace.lints.rust]`, `[profile.release]`);
   `fuzz/fuzz_targets/`; `.github/workflows/fuzz.yml`.
-- **Status:** met for the server. The synchronisation service is partial: the
-  Atom feed parser, which reads content from the internet, has no fuzz target.
+- **Status:** met. The Atom feed parser the synchronisation service reads a
+  terminology service's feed with is fuzzed by the `atom_feed` target
+  (`fuzz/fuzz_targets/atom_feed.rs`, in the matrix of
+  `.github/workflows/fuzz.yml`).
 
 ### (l) Recording and monitoring, with an opt-out
 
@@ -559,4 +566,6 @@ not name, and when the intended purpose changes.
 |---|---|---|
 | 1 | 2026-10-21 | First assessment (#790) |
 | 2 | 2026-11-27 | Assesses the synchronisation service, released from v0.3.0: its purpose and environment, three foreseeable misuses, its assets, risks T11 to T15, its controls and status under each point of Part I(2), and its outbound flows; adds the OTLP export to the flows (#1365) |
+| 3 | 2026-11-27 | The synchronisation service refuses a plain `http` endpoint outside loopback: the misuse row and (e) record the control (#1372) |
+| 4 | 2026-11-27 | The syndication feed parser is fuzzed: (k) and T15 record the target (#1373) |
 | 5 | 2026-11-27 | A download is capped by `download_limit`: (h) and T15 record the control (#1374) |

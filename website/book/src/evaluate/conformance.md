@@ -38,29 +38,36 @@ hand; their lists live beside the general ones.
 ## Where the remaining cases stand
 
 The `general` mode counts 805 cases on every surface. With suite `9c2bbce`
-and validator 7.0.6, `/r4` passes 716, `/r4b` 702 and `/r5` 716. Every case
+and validator 7.0.6, `/r4` passes 742, `/r4b` 728 and `/r5` 742. Every case
 that does not pass falls into one of the rows below. None of them needs
 licensed content: the cases that do (SNOMED CT, LOINC, ICD-11, OMOP) sit in
 the suite's other modes, which run by hand and are not in these counts.
 
 | Why the case does not pass | Tracked in | R4 | R4B | R5 |
 |---|---|---|---|---|
-| **Not run on this surface.** The case is gated to another FHIR version or to the `tx.fhir.org` mode, and the runner still counts it in the 805. | | 5 | 9 | 9 |
-| **The R4B surface.** The suite targets R4 and R5: on `/r4b` its `$version$` stands for R4's `4.0.1` (the `metadata`, `exclude` and two `contained-nested` cases), and its `!4.0` gate lets two R5-only reverse `$translate` cases run against R4B, which keeps `reverse`. | | 0 | 11 | 0 |
-| **No published definition.** The cases rest on extensions no released package defines (`extension-codes`, `global-lang-pack`). | [#1067](https://github.com/FerroHEALTH/FerroTERM/issues/1067) | 42 | 42 | 42 |
-| The cases send `reset` or `dispose` to `$closure`, or `useSupplement` to `CodeSystem/$validate-code`, which no OperationDefinition declares; nine more `closure` cases fail because the closure the first one sets up is never made. | [#1068](https://github.com/FerroHEALTH/FerroTERM/issues/1068) | 15 | 15 | 15 |
-| The cases expect `$lookup` outputs `warning` and `used-supplement`, which no OperationDefinition declares. | [#1069](https://github.com/FerroHEALTH/FerroTERM/issues/1069) | 4 | 4 | 4 |
+| **Not run on this surface.** The case is gated to another FHIR version or to the `tx.fhir.org` mode, and the runner still counts it in the 805. | [#1361](https://github.com/FerroHEALTH/FerroTERM/issues/1361), [#1380](https://github.com/FerroHEALTH/FerroTERM/issues/1380) | 5 | 9 | 9 |
+| **The R4B surface.** The suite targets R4 and R5: on `/r4b` its `$version$` stands for R4's `4.0.1` (the `metadata`, `exclude` and two `contained-nested` cases), and its `!4.0` gate lets two R5-only reverse `$translate` cases run against R4B, which keeps `reverse`. | [#1361](https://github.com/FerroHEALTH/FerroTERM/issues/1361), [#1380](https://github.com/FerroHEALTH/FerroTERM/issues/1380) | 0 | 11 | 0 |
+| **No published definition.** The `$lookup` cases expect a `source` part on a designation, and `ec-validate-outside` expects no `version`, which no publication defines. | [#1376](https://github.com/FerroHEALTH/FerroTERM/issues/1376) | 10 | 10 | 10 |
+| The cases send `reset` or `dispose` to `$closure`, or `useSupplement` to `CodeSystem/$validate-code`, which no OperationDefinition declares; nine more `closure` cases fail because the closure the first one sets up is never made. | [#1068](https://github.com/FerroHEALTH/FerroTERM/issues/1068) | 21 | 21 | 21 |
+| The cases expect the `$lookup` output `warning`, which no OperationDefinition declares. | [#1069](https://github.com/FerroHEALTH/FerroTERM/issues/1069) | 2 | 2 | 2 |
+| An `is-not-a` filter over a code system with no hierarchy is refused. | [#1377](https://github.com/FerroHEALTH/FerroTERM/issues/1377) | 2 | 2 | 2 |
 | The cases expect concept properties (`label`, `order`) and extension placements no published definition allows. | [#1107](https://github.com/FerroHEALTH/FerroTERM/issues/1107) | 9 | 9 | 9 |
 | The cases turn on `versionsMatch`, an expansion parameter no publication defines. | [#507](https://github.com/FerroHEALTH/FerroTERM/issues/507) | 8 | 8 | 8 |
 | The cases expect R5's `$lookup` `definition` output, or send R5's `$translate` `targetcode`, on R4 and R4B, whose OperationDefinitions declare neither. | [#1330](https://github.com/FerroHEALTH/FerroTERM/issues/1330) | 3 | 3 | 0 |
 | The cases send an input the operation does not declare (`codingX` in a batch, `targetcode` on R4), and FerroTERM refuses an undeclared input. | [#349](https://github.com/FerroHEALTH/FerroTERM/issues/349) | 3 | 2 | 2 |
-| **Total not passing** | | 89 | 103 | 89 |
+| **Total not passing** | | 63 | 77 | 63 |
+
+The first two rows do not apply on their surface. Each badge counts them
+as `n/a` beside the pass count, so R4 reads `742 / 805 (5 n/a)`: 58 of its
+cases are FerroTERM's to answer for, 54 on R5 and 57 on R4B. The cases and
+their reasons are listed in `conformance/tx-ecosystem/not-applicable.tsv`,
+which every CI run of the suite checks against the cases the runner skipped.
 
 The rows marked as having no published definition are upstream reports:
 FerroTERM answers what the published OperationDefinitions and extensions
 define, and each report names the change upstream that would settle it.
-No case of the general mode is left as a gap in FerroTERM itself: every
-row is a gate or an upstream report.
+Every row is a gate, an upstream report, or FerroTERM work its issue
+tracks (the flat `is-not-a` row).
 
 ## What the numbers are not
 

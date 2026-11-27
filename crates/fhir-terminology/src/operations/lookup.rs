@@ -112,6 +112,10 @@ pub struct LookupOutcome {
     pub designations: Vec<Designation>,
     /// The properties asked for, `definition` among them when the concept has one.
     pub properties: Vec<Property>,
+    /// The supplements the answer drew on, versioned: the ones the request
+    /// named and the global ones of the system (`used-supplement`, the
+    /// ecosystem's output).
+    pub used_supplements: Vec<String>,
 }
 
 /// What the `property` parameters ask for.
@@ -211,6 +215,7 @@ pub fn lookup(
     };
     // NOTE: the R4B definition says "If a code is provided, a system must be
     // provided"; the shared resolver reports the missing system.
+    let mut used_supplements = registry.applied_supplements(&input.use_supplement)?;
     let layered = if input.use_supplement.is_empty() {
         None
     } else {
@@ -222,6 +227,13 @@ pub fn lookup(
     let located = locate(provider, code)?;
     let concept = located.concept;
     let identity = provider.identity();
+    // NOTE: "A server SHALL report a global language pack as a `used-supplement` in
+    // `$lookup`" (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>, CodeSystem supplements).
+    for global in registry.global_supplements(&identity.url, &identity.version) {
+        if !used_supplements.contains(&global) {
+            used_supplements.push(global);
+        }
+    }
     let language = language::for_provider(provider.as_ref(), input.display_language.as_deref());
     let display = provider
         .display(concept, language.as_deref())?
@@ -282,6 +294,7 @@ pub fn lookup(
         },
         designations,
         properties,
+        used_supplements,
     })
 }
 

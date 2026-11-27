@@ -14,6 +14,15 @@ use crate::provider::declaration::{
 };
 use crate::provider::filter::FilterOperator;
 
+/// The extension that names a supplement's kind.
+const SUPPLEMENT_TYPE: &str = "http://hl7.org/fhir/StructureDefinition/codesystem-supplement-type";
+/// The extension that marks a supplement as applying without a reference.
+const SUPPLEMENT_GLOBAL: &str =
+    "http://hl7.org/fhir/StructureDefinition/codesystem-supplement-global";
+/// The extension that reserves a code space for a system's users.
+const RESERVED_CODE_SPACE: &str =
+    "http://hl7.org/fhir/StructureDefinition/codesystem-reservedCodeSpace";
+
 fn text<T: AsRef<str>>(value: Option<T>) -> Option<String> {
     value.map(|v| v.as_ref().to_owned())
 }
@@ -94,7 +103,10 @@ macro_rules! convert_code_system {
             };
 
             use crate::provider::code_system::{CodeSystemModel, ConceptEntry, ModelError, designation_use};
-            use super::{PARENT, SUBSUMED_BY, note_parent, text};
+            use super::{
+                PARENT, RESERVED_CODE_SPACE, SUBSUMED_BY, SUPPLEMENT_GLOBAL, SUPPLEMENT_TYPE,
+                note_parent, text,
+            };
             use crate::provider::{Designation, Property, PropertyValue};
 
             // NOTE: a primitive whose `value` is absent is legal FHIR
@@ -224,6 +236,51 @@ macro_rules! convert_code_system {
                 Ok(())
             }
 
+            /// The supplement marks and reserved code spaces `extensions` state.
+            ///
+            /// The terminology ecosystem names the three extensions and defines
+            /// their values (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>,
+            /// `CodeSystem` supplements).
+            fn supplement_extensions(
+                extensions: &[fhir_types::$module::extension::Extension],
+            ) -> (
+                crate::provider::code_system::Supplementing,
+                Vec<crate::provider::code_system::ReservedCodeSpace>,
+            ) {
+                use fhir_types::$module::extension::ExtensionValue;
+                let mut supplementing = crate::provider::code_system::Supplementing::default();
+                let mut reserved = Vec::new();
+                let string = |extensions: &[fhir_types::$module::extension::Extension], url: &str| {
+                    extensions.iter().find(|x| x.url == url).and_then(|x| match &x.value {
+                        Some(ExtensionValue::String(s)) => text(s.value.as_deref()),
+                        Some(ExtensionValue::Markdown(s)) => text(s.value.as_deref()),
+                        _ => None,
+                    })
+                };
+                for extension in extensions {
+                    match (extension.url.as_str(), &extension.value) {
+                        (SUPPLEMENT_TYPE, Some(ExtensionValue::Code(code))) => {
+                            supplementing.kind = crate::provider::code_system::SupplementKind::from_code(
+                                code.value.as_deref().unwrap_or_default(),
+                            );
+                        }
+                        (SUPPLEMENT_GLOBAL, Some(ExtensionValue::Boolean(flag))) => {
+                            supplementing.global = flag.value == Some(true);
+                        }
+                        (RESERVED_CODE_SPACE, _) => {
+                            if let Some(pattern) = string(&extension.extension, "reservedCodeSpace") {
+                                reserved.push(crate::provider::code_system::ReservedCodeSpace {
+                                    pattern,
+                                    default_display: string(&extension.extension, "default-display"),
+                                });
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                (supplementing, reserved)
+            }
+
             /// Reduces a `CodeSystem` of this FHIR version to the model.
             ///
             /// # Errors
@@ -261,6 +318,7 @@ macro_rules! convert_code_system {
                 }
                 let mut concepts = Vec::new();
                 flatten(&resource.concept, None, &mut concepts)?;
+                let (supplementing, reserved_code_spaces) = supplement_extensions(&resource.extension);
                 let flag = |value: &Option<fhir_types::$module::primitives::Boolean>, default: bool| {
                     value.as_ref().and_then(|b| b.value).unwrap_or(default)
                 };
@@ -296,6 +354,8 @@ macro_rules! convert_code_system {
                     supplements: text(
                         resource.supplements.as_ref().and_then(|s| s.value.as_deref()),
                     ),
+                    supplementing,
+                    reserved_code_spaces,
                     properties,
                     filters,
                     concepts,

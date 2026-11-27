@@ -128,6 +128,24 @@ pub struct ImplicitMetadata {
     pub copyright: Option<String>,
 }
 
+/// How binding a concept's display is when a client asserts another.
+///
+/// The terminology ecosystem sets the three readings for the codes of a
+/// reserved code space (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>,
+/// `CodeSystem` supplements).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum DisplayStanding {
+    /// The system defines the display: another one is an error.
+    #[default]
+    Defined,
+    /// A supplement that is not global gives the display, "but not the only
+    /// correct one": another one is a warning.
+    Suggested,
+    /// The default display of a reserved code space, "a placeholder: another
+    /// display is not an error or a warning".
+    Placeholder,
+}
+
 /// The status of a concept, for `inactive` and `abstract` on the wire.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[expect(
@@ -482,6 +500,16 @@ pub trait CodeSystemProvider: fmt::Debug + Send + Sync {
     /// has none.
     fn is_postcoordinated(&self, _concept: Concept) -> bool {
         false
+    }
+
+    /// How binding the display of `concept` is; the default is a display
+    /// the system defines.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProviderError::Storage`] when the substrate fails.
+    fn display_standing(&self, _concept: Concept) -> Result<DisplayStanding, ProviderError> {
+        Ok(DisplayStanding::Defined)
     }
 
     /// Every designation, optionally only those in `language`.

@@ -9,11 +9,13 @@ use std::sync::Arc;
 
 use concept_graph::subsumption::Outcome;
 
+use crate::provider::code_system::{SupplementKind, Supplementing};
 use crate::provider::compose::Compose;
 use crate::provider::declaration::Declaration;
 use crate::provider::{
-    CodeSystemProvider, Concept, ConceptSet, Designation, Hierarchy, Identity, ImplicitMetadata,
-    Located, MapSelection, Property, Standing, Status, Successor, error::ProviderError,
+    CodeSystemProvider, Concept, ConceptSet, Designation, DisplayStanding, Hierarchy, Identity,
+    ImplicitMetadata, Located, MapSelection, Property, Standing, Status, Successor,
+    error::ProviderError,
 };
 
 /// What a supplement adds to one concept.
@@ -34,6 +36,8 @@ pub struct Supplement {
     pub version: Option<String>,
     /// The additions per code.
     pub concepts: BTreeMap<String, Additions>,
+    /// Its kind, and whether it applies without a reference.
+    pub supplementing: Supplementing,
 }
 
 impl Supplement {
@@ -41,12 +45,26 @@ impl Supplement {
     /// its designations and properties keyed by the supplemented codes.
     #[must_use]
     pub fn from_code_system(model: &crate::provider::code_system::CodeSystemModel) -> Self {
+        let extension_codes = model.supplementing.kind == SupplementKind::ExtensionCodes;
         let mut concepts = BTreeMap::new();
         for entry in &model.concepts {
+            let mut designations = Vec::with_capacity(entry.designations.len() + 1);
+            // NOTE: an `extension-codes` supplement "defines codes in a reserved code
+            // space, with their displays" (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>),
+            // so its display is a term in the supplement's language.
+            if extension_codes && let Some(display) = &entry.display {
+                designations.push(Designation {
+                    language: model.language.clone(),
+                    use_: None,
+                    value: display.clone(),
+                    standards_status: None,
+                });
+            }
+            designations.extend(entry.designations.iter().cloned());
             concepts.insert(
                 entry.code.clone(),
                 Additions {
-                    designations: entry.designations.clone(),
+                    designations,
                     properties: entry.properties.clone(),
                 },
             );
@@ -55,7 +73,23 @@ impl Supplement {
             url: model.url.clone(),
             version: Some(model.version.clone()).filter(|v| !v.is_empty()),
             concepts,
+            supplementing: model.supplementing,
         }
+    }
+
+    /// The canonical, versioned when the supplement states a version.
+    #[must_use]
+    pub fn canonical(&self) -> String {
+        match &self.version {
+            Some(version) => format!("{}|{version}", self.url),
+            None => self.url.clone(),
+        }
+    }
+
+    /// Whether this supplement defines `code` as an extension code.
+    fn defines(&self, code: &str) -> bool {
+        self.supplementing.kind == SupplementKind::ExtensionCodes
+            && self.concepts.contains_key(code)
     }
 }
 
@@ -164,6 +198,18 @@ impl Supplemented {
         Ok(selected)
     }
 
+    /// The extension-codes supplement that defines `concept`, when the
+    /// supplemented system holds it only as a reserved code.
+    fn defining(&self, concept: Concept) -> Result<Option<&Supplement>, ProviderError> {
+        if self.inner.display_standing(concept)? != DisplayStanding::Placeholder {
+            return Ok(None);
+        }
+        let Some(code) = self.inner.code(concept)? else {
+            return Ok(None);
+        };
+        Ok(self.supplements.iter().find(|s| s.defines(&code)))
+    }
+
     fn additions(&self, concept: Concept) -> Result<Vec<&Additions>, ProviderError> {
         let code = self.inner.code(concept)?;
         Ok(self
@@ -241,6 +287,19 @@ impl CodeSystemProvider for Supplemented {
         concept: Concept,
         language: Option<&str>,
     ) -> Result<Option<String>, ProviderError> {
+        // NOTE: a reserved code an extension-codes supplement defines has the
+        // supplement's display (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
+        if let Some(defining) = self.defining(concept)?
+            && let Some(code) = self.inner.code(concept)?
+            && let Some(additions) = defining.concepts.get(&code)
+            && let Some(display) = additions
+                .designations
+                .iter()
+                .find(|d| language.is_none_or(|wanted| d.language.as_deref() == Some(wanted)))
+                .or_else(|| additions.designations.first())
+        {
+            return Ok(Some(display.value.clone()));
+        }
         // NOTE: a supplement adds designations the system lacks, so its term in
         // the requested language beats the system's fallback display
         // (<https://hl7.org/fhir/R4B/codesystem.html#supplements>).
@@ -269,6 +328,17 @@ impl CodeSystemProvider for Supplemented {
 
     fn language(&self) -> Option<&str> {
         self.inner.language()
+    }
+
+    // NOTE: a global extension-codes supplement is "as if the code system defined its
+    // codes", and another one's display "is a warning" when it differs
+    // (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>, CodeSystem supplements).
+    fn display_standing(&self, concept: Concept) -> Result<DisplayStanding, ProviderError> {
+        Ok(match self.defining(concept)? {
+            Some(defining) if defining.supplementing.global => DisplayStanding::Defined,
+            Some(_) => DisplayStanding::Suggested,
+            None => self.inner.display_standing(concept)?,
+        })
     }
 
     fn artifact(&self) -> Option<&crate::provider::source::Source> {

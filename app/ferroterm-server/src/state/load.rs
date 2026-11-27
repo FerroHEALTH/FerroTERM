@@ -401,8 +401,8 @@ impl AppState {
             }
             registry.register(provider)?;
         }
-        // NOTE: a loaded supplement stays dormant until a request names it
-        // (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
+        // NOTE: a loaded supplement stays dormant until a request names it, unless it is
+        // global (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>, CodeSystem supplements).
         for (target, model) in &supplements {
             origins.insert(model.url.clone(), Origin::CodeSystems);
             registry.register_supplement(target.clone(), Supplement::from_code_system(model));

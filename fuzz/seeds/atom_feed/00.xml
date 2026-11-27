@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:ncts="http://ns.electronichealth.net.au/ncts/syndication/asf/extensions/1.0.0">
+  <title>Example terminology service</title>
+  <id>urn:uuid:00000000-0000-4000-8000-000000000001</id>
+  <updated>2026-11-01T00:00:00Z</updated>
+  <ncts:atomSyndicationFormatProfile>http://ns.electronichealth.net.au/ncts/syndication/asf/profile/1.0.0</ncts:atomSyndicationFormatProfile>
+  <entry>
+    <title>Example code system 1.0.0</title>
+    <link rel="alternate" type="application/fhir+json" href="https://example.org/synd/codesystem-1.0.0.json" length="1024" ncts:sha256Hash="0000000000000000000000000000000000000000000000000000000000000000" />
+    <category term="FHIR_CodeSystem" label="FHIR CodeSystem" scheme="http://ns.electronichealth.net.au/ncts/syndication/asf/scheme/1.0.0" />
+    <id>urn:uuid:00000000-0000-4000-8000-000000000002</id>
+    <updated>2026-11-01T00:00:00Z</updated>
+    <ncts:contentItemIdentifier>https://example.org/fhir/CodeSystem/example</ncts:contentItemIdentifier>
+    <ncts:contentItemVersion>1.0.0</ncts:contentItemVersion>
+  </entry>
+</feed>

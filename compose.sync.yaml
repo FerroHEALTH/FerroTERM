@@ -48,16 +48,19 @@
 # [auth] (an [auth.issuer.<name>] table, or people under [[auth.basic.users]]), or
 # says `enabled = false` on a network only trusted callers reach; without
 # either it refuses to start.
-# Both listeners stay on the compose network here, and neither is published;
-# keep it that way.
+# The sync shares the server's network namespace (`network_mode`), so it
+# reaches the admin listener at 127.0.0.1:8081 over loopback, the one place
+# the sync accepts plain HTTP for a call that carries a credential; the admin
+# listener binds loopback alone. Neither listener is published; keep it that
+# way.
 
 services:
   ferroterm:
     environment:
       # The listener that serves POST /reload, which is what the sync calls.
-      # It is reachable as `ferroterm:8081` inside the compose network and is
-      # published nowhere.
-      FERROTERM__ADMIN__LISTEN: 0.0.0.0:8081
+      # It binds loopback, which the sync shares, and is reachable from no
+      # other container.
+      FERROTERM__ADMIN__LISTEN: 127.0.0.1:8081
       # The configuration file the server reads, the mount below; its
       # [auth.issuer.<name>] table names the issuer of the admin scope.
       FERROTERM_CONFIG: /etc/ferroterm/ferroterm.toml
@@ -88,6 +91,9 @@ services:
     image: ghcr.io/ferrohealth/ferroterm-sync:${FERROTERM_VERSION:-0.4.9}
     container_name: ferroterm-sync
     restart: unless-stopped
+    # The server's network namespace: 127.0.0.1 is the server's loopback, so
+    # the reload and the revalidation stay off the compose network.
+    network_mode: "service:ferroterm"
     environment:
       RUST_LOG: ${RUST_LOG:-info}
       # The configuration file the service reads, the mount below.

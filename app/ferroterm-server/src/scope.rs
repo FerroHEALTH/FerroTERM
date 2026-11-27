@@ -128,9 +128,9 @@ impl Scope {
             if registry.resolve(url, version).is_err() {
                 continue;
             }
-            // NOTE: a supplied supplement is dormant like a loaded one: a request
-            // applies it by naming it in `useSupplement`, or through the value set's
-            // `valueset-supplement` (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
+            // NOTE: a supplied supplement that is not global is dormant like a loaded one: a
+            // request applies it in `useSupplement` or the value set's `valueset-supplement`
+            // (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>, CodeSystem supplements).
             registry.register_supplement(target.clone(), Supplement::from_code_system(model));
         }
         Ok(Self {
