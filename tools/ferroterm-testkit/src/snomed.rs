@@ -37,6 +37,8 @@ pub const LATER_DATE: &str = "20260301";
 pub const GB_REFSET: &str = "900000000000508004";
 /// The Dutch language reference set (a published SCTID, metadata only).
 pub const NL_REFSET: &str = "31000146106";
+/// The US English language reference set (a published SCTID, metadata only).
+pub const US_REFSET: &str = "900000000000509007";
 
 /// An item number in the invented namespace, what [`sctid`] turns into a code.
 ///

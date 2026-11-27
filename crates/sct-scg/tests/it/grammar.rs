@@ -231,3 +231,29 @@ fn the_printer_writes_a_tree_back_in_the_grammar() {
                 { 200000002 = (300000001 : 200000003 = \"t\") }";
     assert_eq!(parsed(text).to_string(), text);
 }
+
+#[test]
+fn the_significant_form_drops_whitespace_terms_and_the_assumed_status() {
+    // `ws` is optional everywhere, a term is optional after an identifier, and
+    // `===` is assumed when no status is written (§5).
+    let significant = |text: &str| sct_scg::significant(text).unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(
+        significant("=== 100000001 |A term| : { 200000001 = #4 }"),
+        "100000001:{200000001=#4}"
+    );
+    assert_eq!(
+        significant("<<< 100000001 + 100000002"),
+        "<<<100000001+100000002",
+        "only the assumed status carries no meaning"
+    );
+    assert_eq!(
+        significant("100000001 : 200000001 = \"a quoted  value\""),
+        "100000001:200000001=\"a quoted  value\"",
+        "whitespace inside a quoted value is significant"
+    );
+    assert_eq!(
+        significant("100000001:200000001=#2{200000002=#5}"),
+        "100000001:200000001=#2{200000002=#5}",
+        "a separator the grammar makes optional is still a character the text has"
+    );
+}

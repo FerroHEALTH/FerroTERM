@@ -444,12 +444,13 @@ impl Store {
             source,
         };
         for refset in language_refsets {
-            let Some((language, term)) = record::Displays::find(bytes, refset).map_err(damaged)?
+            let Some((language, term)) =
+                record::Displays::find_borrowed(bytes, refset).map_err(damaged)?
             else {
                 continue;
             };
-            if accept(&language) {
-                return Ok(Some(term));
+            if accept(language) {
+                return Ok(Some(term.to_owned()));
             }
         }
         Ok(None)

@@ -87,6 +87,11 @@ of that run, not a live result.
 ![tx-ecosystem mimetypes R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-mimetypes-r4b.json)
 ![tx-ecosystem omop R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-omop-r4b.json)
 
+The `snomed` mode runs over the suite's own SNOMED CT test edition with
+`terminology.default_language = "en-US"`, because its expected displays are the
+US English preferred terms. That is a deployment's choice of language
+reference set: no specification picks one, and the shipped default is `en`.
+
 `conformance/tx-ecosystem/README.md` says what each mode needs and why its
 open cases stay open.
 

@@ -342,7 +342,7 @@ pub enum MessageId {
     ValueSetVersionCheck,
     /// An abstract code where `abstract = false`.
     AbstractCodeNotAllowed,
-    /// The code differs from the system's spelling by case or form.
+    /// The code differs from the system's spelling by case.
     CodeCaseDifference,
     /// The code is valid and inactive.
     StatusCodeWarningCode,
@@ -383,6 +383,8 @@ pub enum MessageId {
     ValueSetTooCostly,
     /// Any other failure.
     TxGeneralError,
+    /// The code is valid and is not in its system's normal form.
+    CodeNotInNormalForm,
 }
 
 impl MessageId {
@@ -418,6 +420,7 @@ impl MessageId {
             Self::ValueSetVersionCheck => "VALUESET_VERSION_CHECK",
             Self::AbstractCodeNotAllowed => "ABSTRACT_CODE_NOT_ALLOWED",
             Self::CodeCaseDifference => "CODE_CASE_DIFFERENCE",
+            Self::CodeNotInNormalForm => "CODE_NOT_IN_NORMAL_FORM",
             Self::StatusCodeWarningCode => "STATUS_CODE_WARNING_CODE",
             Self::ConceptDeprecatedInValueSet => "CONCEPT_DEPRECATED_IN_VALUESET",
             Self::DeprecatedConceptFound => "DEPRECATED_CONCEPT_FOUND",

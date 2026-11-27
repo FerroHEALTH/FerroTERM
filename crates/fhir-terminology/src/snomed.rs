@@ -174,7 +174,8 @@ struct Keys {
     fsn: u32,
     synonym: u32,
     definition: u32,
-    /// Language reference sets: (ordinal, SCTID as text), sorted by ordinal.
+    /// Language reference sets: (ordinal, SCTID as text), in ascending SCTID
+    /// order.
     refsets: Vec<(u32, String)>,
 }
 
@@ -200,6 +201,9 @@ pub struct Snomed {
     keys: Keys,
     edition: String,
     base_language: String,
+    /// The configured default tag when it is in the base language, so a
+    /// dialect such as `en-US` decides the default display.
+    default_tag: String,
 }
 
 impl std::fmt::Debug for Snomed {
@@ -272,7 +276,16 @@ impl StoredSystem for Snomed {
             return Ok(provider
                 .resolve_expression(code)?
                 .ok()
-                .map(|(concept, code)| Located { concept, code }));
+                .map(|(concept, normal)| {
+                    // NOTE: whitespace, terms and a leading `===` carry no meaning in
+                    // the Compositional Grammar (§5), so a code that differs from
+                    // the normal form only in them is already in normal form.
+                    let spelled = sct_scg::significant(code).is_ok_and(|bare| bare == normal);
+                    Located {
+                        concept,
+                        code: if spelled { code.to_owned() } else { normal },
+                    }
+                }));
         }
         // NOTE: a string that is not a well-formed SCTID (check digit,
         // partition) is not a code of this system; that is "absent", not an

@@ -340,9 +340,11 @@ fn no_display_for_language(
     )))
 }
 
-/// The `code-rule` note for a code a case-insensitive system located under
-/// another spelling or form; `None` when the spelling matches or the system is
-/// case-sensitive.
+/// The `code-rule` note for a code located under another spelling.
+///
+/// The note names the normal form when the two differ beyond case, and the
+/// case in a case-insensitive system; `None` when the spelling matches or
+/// only case differs in a case-sensitive system.
 #[must_use]
 pub fn case_note(
     provider: &Arc<dyn CodeSystemProvider>,
@@ -354,16 +356,21 @@ pub fn case_note(
         return None;
     }
     if given.to_lowercase() != located.to_lowercase() {
-        // NOTE: an alternate form the system admits (the ecosystem's icd-11
-        // `cs-validate-uri`: a URI for a code) is normalized with an information note.
+        // NOTE: a valid code in another form than the system's normal form is
+        // an information note naming that form (the ecosystem's `CODE_NOT_IN_NORMAL_FORM`).
+        let identity = provider.identity();
+        let system = if identity.version.is_empty() {
+            identity.url.clone()
+        } else {
+            format!("{}|{}", identity.url, identity.version)
+        };
         return Some(Issue {
             severity: "information",
             code: "business-rule",
             kind: "code-rule",
-            message: super::MessageId::CodeCaseDifference,
+            message: super::MessageId::CodeNotInNormalForm,
             text: format!(
-                "The code '{given}' is an alternate form of '{located}', the code as the code system '{}' spells it",
-                provider.identity().url
+                "The code '{given}' is valid, but it is not the normal form for the code system '{system}'; the normal form is '{located}'"
             ),
             expression,
         });

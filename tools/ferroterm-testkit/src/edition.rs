@@ -19,7 +19,7 @@ use concept_store::store::Vocabulary;
 use designation_index::index::IndexBuilder;
 use rf2::constants;
 
-use crate::snomed::{FixtureError, GB_REFSET, NL_REFSET};
+use crate::snomed::{FixtureError, GB_REFSET, NL_REFSET, US_REFSET};
 
 /// The property keys every concept carries, by ordinal.
 const PROPERTY_KEYS: [&str; 3] = ["parent", "definitionStatus", "module"];
@@ -38,13 +38,13 @@ pub(crate) fn write_property_keys(builder: &mut StoreBuilder) -> Result<(), Fixt
     Ok(())
 }
 
-/// Writes the designation uses, the acceptabilities, and the GB and NL
-/// language reference sets under the ordinals `gb` and `nl`.
+/// Writes the designation uses, the acceptabilities, and the GB, NL and US
+/// language reference sets under the ordinals `languages` names.
 pub(crate) fn write_designation_vocabularies(
     builder: &mut StoreBuilder,
-    gb: u32,
-    nl: u32,
+    languages: LanguageOrdinals,
 ) -> Result<(), FixtureError> {
+    let LanguageOrdinals { gb, nl, us } = languages;
     for (i, use_id) in [
         constants::FULLY_SPECIFIED_NAME,
         constants::SYNONYM,
@@ -67,7 +67,19 @@ pub(crate) fn write_designation_vocabularies(
     )?;
     builder.vocabulary(Vocabulary::LanguageRefsets, gb, GB_REFSET)?;
     builder.vocabulary(Vocabulary::LanguageRefsets, nl, NL_REFSET)?;
+    builder.vocabulary(Vocabulary::LanguageRefsets, us, US_REFSET)?;
     Ok(())
+}
+
+/// The vocabulary ordinals of the fixture's language reference sets.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct LanguageOrdinals {
+    /// GB English.
+    pub(crate) gb: u32,
+    /// Netherlands Dutch.
+    pub(crate) nl: u32,
+    /// US English.
+    pub(crate) us: u32,
 }
 
 /// Writes one graph part beside the store as `name`, from what `write` puts

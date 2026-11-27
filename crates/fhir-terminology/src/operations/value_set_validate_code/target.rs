@@ -452,13 +452,16 @@ pub(super) fn failed_target(system: &str, version: String, target: Target) -> Va
     validation
 }
 
-/// `validation` with the located code and its display filled in.
+/// `validation` with the code as sent, its normal form when that differs, and
+/// its display filled in.
 pub(super) fn with_target(
     mut validation: Validation,
+    given: &str,
     located: &Located,
     display: Option<String>,
 ) -> Validation {
-    validation.code = Some(located.code.clone());
+    validation.code = Some(given.to_owned());
+    validation.normalized_code = (located.code != given).then(|| located.code.clone());
     validation.display = display;
     validation
 }

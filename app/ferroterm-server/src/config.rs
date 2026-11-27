@@ -229,7 +229,8 @@ pub struct TerminologySection {
     /// the server starts only once `[auth]` names an issuer or turns
     /// authentication off.
     pub resources: Option<PathBuf>,
-    /// The display language (BCP 47) used when a request names none.
+    /// The display language (BCP 47) used when a request names none; a
+    /// SNOMED CT dialect (`en-US`) selects its language reference set.
     pub default_language: String,
 }
 
