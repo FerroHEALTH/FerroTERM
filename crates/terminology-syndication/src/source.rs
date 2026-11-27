@@ -272,7 +272,7 @@ pub trait Source: fmt::Debug + Send + Sync {
     /// Fetches one resource the FHIR API lists to `destination`.
     ///
     /// The API advertises no digest, so the digest of what arrived is computed
-    /// and answered rather than verified.
+    /// and answered rather than verified. At most `limit` bytes are taken.
     ///
     /// # Errors
     ///
@@ -282,6 +282,7 @@ pub trait Source: fmt::Debug + Send + Sync {
         &'a self,
         link: &'a ContentLink,
         destination: &'a Path,
+        limit: u64,
     ) -> BoxFuture<'a, Result<Fetched, SourceError>> {
         Box::pin(async move {
             let authorization = self.download_auth().await?;
@@ -290,11 +291,15 @@ pub trait Source: fmt::Debug + Send + Sync {
                     .get(&link.href)
                     .header(reqwest::header::ACCEPT, crate::fhir_api::FHIR_JSON),
             );
-            Ok(crate::download::to_file(request, self.retry_delays(), destination, None).await?)
+            Ok(
+                crate::download::to_file(request, self.retry_delays(), destination, None, limit)
+                    .await?,
+            )
         })
     }
 
-    /// Fetches one content link to `destination`, verifying its digest.
+    /// Fetches one content link to `destination`, verifying its digest and
+    /// taking at most `limit` bytes.
     ///
     /// # Errors
     ///
@@ -306,6 +311,7 @@ pub trait Source: fmt::Debug + Send + Sync {
         &'a self,
         link: &'a ContentLink,
         destination: &'a Path,
+        limit: u64,
     ) -> BoxFuture<'a, Result<Fetched, SourceError>> {
         Box::pin(async move {
             let Some(expected) = link.checksum.as_ref() else {
@@ -315,10 +321,14 @@ pub trait Source: fmt::Debug + Send + Sync {
             };
             let authorization = self.download_auth().await?;
             let request = authorization.apply(self.client().get(&link.href));
-            Ok(
-                crate::download::to_file(request, self.retry_delays(), destination, Some(expected))
-                    .await?,
+            Ok(crate::download::to_file(
+                request,
+                self.retry_delays(),
+                destination,
+                Some(expected),
+                limit,
             )
+            .await?)
         })
     }
 }

@@ -96,7 +96,7 @@ async fn a_public_listing_is_read_without_a_token_and_its_download_carries_one()
         Some(Checksum::Sha256(body_sha256())),
     );
     let fetched = source
-        .fetch(&content, &destination)
+        .fetch(&content, &destination, 1 << 20)
         .await
         .expect("the download is authorized");
     assert_eq!(fetched.bytes, 4);
@@ -137,7 +137,7 @@ async fn an_open_service_needs_no_credentials_at_all() {
         Some(Checksum::Sha256(body_sha256())),
     );
     source
-        .fetch(&content, &destination)
+        .fetch(&content, &destination, 1 << 20)
         .await
         .expect("the download is open");
 }
@@ -194,7 +194,7 @@ async fn the_listing_and_the_download_authenticate_separately() {
         Some(Checksum::Sha256(body_sha256())),
     );
     source
-        .fetch(&content, &destination)
+        .fetch(&content, &destination, 1 << 20)
         .await
         .expect("the download token is used");
 }
@@ -270,7 +270,7 @@ async fn an_entry_with_no_checksum_is_never_fetched() {
     let destination = directory.path().join("item.zip");
     let content = link(format!("{}/content/item.zip", server.uri()), None);
     let error = source
-        .fetch(&content, &destination)
+        .fetch(&content, &destination, 1 << 20)
         .await
         .expect_err("unverifiable bytes are not fetched");
     assert!(
@@ -300,7 +300,7 @@ async fn a_fetch_whose_checksum_does_not_match_leaves_nothing_behind() {
         Some(Checksum::Sha256(String::from(BODY_SHA256))),
     );
     let error = source
-        .fetch(&content, &destination)
+        .fetch(&content, &destination, 1 << 20)
         .await
         .expect_err("the digest does not match");
     assert!(
