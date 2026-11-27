@@ -180,7 +180,7 @@ fn a_language_reference_set_is_listed_and_its_member_forms_are_refused() {
             op: FilterOperator::Equal,
             value: format!("^ {}", snomed::NL_REFSET),
         }),
-        Err(ProviderError::InvalidCode { .. })
+        Err(ProviderError::UnusableConcept(unusable)) if unusable.code == snomed::NL_REFSET
     ));
 }
 

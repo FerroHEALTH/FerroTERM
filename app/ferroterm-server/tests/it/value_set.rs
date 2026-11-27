@@ -315,7 +315,13 @@ async fn expand_and_validate_code_answer_an_ecl_implicit_value_set() {
         .await;
     assert_ne!(status, StatusCode::INTERNAL_SERVER_ERROR, "{body}");
     assert_eq!(body["resourceType"], "OperationOutcome");
-    assert_eq!(body["issue"][0]["code"], "code-invalid", "{body}");
+    // tx-issue-type: `vs-invalid` is "a problem processing a value set", and the
+    // concept is part of the value set's definition, not a provided code.
+    assert_eq!(body["issue"][0]["code"], "invalid", "{body}");
+    assert_eq!(
+        body["issue"][0]["details"]["coding"][0]["code"], "vs-invalid",
+        "{body}"
+    );
 }
 
 #[tokio::test]
@@ -520,8 +526,8 @@ async fn a_malformed_filter_expression_states_the_filter_and_the_column() {
         assert_eq!(issue["code"], "invalid", "{version}: {body}");
         assert_eq!(
             issue["expression"],
-            json!(["Parameters.parameter[1].resource.compose.include[1].filter[1].value"]),
-            "{version}: the second filter of the second include of the second parameter"
+            json!(["ValueSet.compose.include[1].filter[1]"]),
+            "{version}: the second filter of the second include of the inline value set"
         );
         assert_eq!(
             line_and_column(issue),
@@ -644,7 +650,7 @@ async fn validate_code_against_an_inline_value_set_states_the_filter_and_the_col
         let issue = &body["issue"][0];
         assert_eq!(
             issue["expression"],
-            json!(["Parameters.parameter[0].resource.compose.exclude[0].filter[0].value"]),
+            json!(["ValueSet.compose.exclude[0].filter[0]"]),
             "{version}: {body}"
         );
         assert_eq!(
