@@ -1,16 +1,17 @@
 <!-- SPDX-FileCopyrightText: Cadasto B.V. -->
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 
-# What stable means in v0.1.0
+# What stable means
 
-v0.1.0 is the first release the project calls stable. Stable here is a promise
-about specific surfaces, not about all of them, so this page says which ones
-carry it and which do not. A surface that carries the promise changes only in
-ways your deployment survives; a surface that does not may change in any
-release, and this page is where you find out which is which.
+Stable is a promise about specific surfaces, so this page says which ones
+carry it and which do not. A surface that carries the promise changes inside
+a release line (`0.4.x`) only in ways your deployment survives; a surface
+that does not may change in any release.
 
-The version itself is still `0.x`, and it stays there until the surfaces below
-have been through real deployments. Read the promise, not the number.
+The version is `0.x`, and a release line is its minor version: `0.4.0`,
+`0.4.1` and every other `0.4.x` are one line, and `0.5.0` starts the next.
+Only the newest release is supported
+([`SECURITY.md`](https://github.com/FerroHEALTH/FerroTERM/blob/main/SECURITY.md#supported-versions)).
 
 ## What carries the promise
 
@@ -18,7 +19,8 @@ have been through real deployments. Read the promise, not the number.
 (`$lookup`, `$validate-code`, `$subsumes`, `$expand`, `$translate`), the
 parameters each version's `OperationDefinition` declares, the shape of the
 `Parameters` answer, and the `OperationOutcome` a refusal carries. A request
-that works against v0.1.0 works against every later 0.1.x. Where the
+that works against one release of a line works against every later release
+of that line. Where the
 specification and this server disagree, the specification wins and the change
 is a fix, which the [conformance page](conformance.md) records.
 
@@ -30,9 +32,11 @@ forms and `?fhir_cm`, as the
 [SNOMED CT URI standard](https://docs.snomed.org/snomed-ct-specifications/snomed-ct-uri-standard)
 defines them.
 
-**Configuration.** The `FERROTERM_*` environment variables keep their names
-and meanings. New ones may appear; an existing one does not change what it
-does, and one that is retired keeps working for the rest of the 0.1 line.
+**Configuration.** The keys of the configuration file and their
+`FERROTERM__<SECTION>__<KEY>` variables keep their names and meanings inside
+a line. New ones may appear; an existing one does not change what it does. A
+key removed or renamed in a new line refuses the start, naming the key, and
+the changelog names what replaces it.
 
 **The licence terms.** BUSL 1.1 with the change date and change licence each
 release states. A released version's terms never change after the fact.
@@ -42,7 +46,7 @@ release states. A released version's terms never change after the fact.
 **R6, which is ballot-tracking.** `/r6` answers in the shapes of
 `hl7.fhir.r6.core` 6.0.0-snapshot1. R6 is not published, so its shapes can
 change under us, and when the ballot moves this endpoint moves with it inside
-the 0.1 line. Build against `/r5` if you need the promise;
+a line. Build against `/r5` if you need the promise;
 [FHIR versions](../integrate/fhir-versions.md) has the detail.
 
 **The built artifact format.** The layout the offline build writes carries a
@@ -69,7 +73,8 @@ fix, and the promise does not protect a wrong answer.
 
 ## How a breaking change would arrive
 
-Inside the 0.1 line, a change to a promised surface happens only to follow the
+Inside a line, a change to a promised surface happens only to follow the
 specification or to fix a wrong answer. It arrives with the issue that
 adjudicated it, the spec citation, and a note in the changelog saying what
-moved. If a promised surface has to change for any other reason, that is 0.2.
+moved. A promised surface that has to change for any other reason starts the
+next line.

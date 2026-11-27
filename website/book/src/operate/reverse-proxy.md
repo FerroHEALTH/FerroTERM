@@ -40,7 +40,7 @@ and the server reads the artifacts that run writes.
 The one exception is the authorization server `[auth]` names, and only when
 you name one. With an issuer set the server reads that issuer's metadata and
 its key set at start, again when the key set is older than
-`jwks_max_age_seconds`, and again when a token names a key it has not read (see [Validating tokens in the server](#validating-tokens-in-the-server)).
+`jwks_max_age`, and again when a token names a key it has not read (see [Validating tokens in the server](#validating-tokens-in-the-server)).
 That is the whole of its outbound traffic, apart from the opt-out usage
 report; name no issuer and it makes none. Those reads go through the
 FerroHEALTH resource-server crate `ferrohealth-smart` and the report through
@@ -121,8 +121,13 @@ See
 
 ## Authentication
 
-The default is that FerroTERM validates no tokens: the proxy authenticates and
-the capability statement declares what it enforces. The FHIR security page puts
+The read surface asks for no credential, so a proxy authenticates readers
+when you want them authenticated, and the capability statement declares what
+it enforces. The writes and the admin listener are the server's own to guard:
+authentication is on by default, and a server that names
+`FERROTERM__TERMINOLOGY__RESOURCES` or `FERROTERM__ADMIN__LISTEN` refuses to
+start until `[auth]` names an issuer
+([Validating tokens in the server](#validating-tokens-in-the-server)). The FHIR security page puts
 it the same way, a server relies on the deployment's infrastructure and states
 what that is (<https://hl7.org/fhir/R4B/security.html>). Authenticate at the
 proxy, and tell clients what you did:
@@ -182,9 +187,10 @@ private one: the server uses the platform trust store.
 
 What changes once it is set:
 
-- `POST`, `PUT`, and `DELETE` on `CodeSystem`, `ValueSet`, and `ConceptMap`, on
-  every served FHIR version, require a credential. So does `POST [base]/`,
-  which keeps a stored closure table, and every route on the admin listener.
+- `POST`, `PUT`, and `DELETE` on `CodeSystem`, `ValueSet`, `ConceptMap`,
+  `NamingSystem` and `Provenance`, on every served FHIR version, require a
+  credential. So does `POST [base]/$closure`, which keeps a stored closure
+  table, and every route on the admin listener.
 - The read surface stays open. `$lookup`, `$expand`, `$validate-code`,
   `$subsumes`, `$translate`, `/metadata`, `/health`, and `/metrics` answer
   without a token, whichever HTTP method they use.
@@ -203,7 +209,7 @@ The scope for a route is the SMART version 2 one
 | `POST /r4b/$closure` | `system/ConceptMap.u` or `user/ConceptMap.u` |
 | Any admin-listener route | `[auth] product_scope`, `__ferroterm.admin` when unset |
 
-SMART names no scope for ``, so that row is our own reading: the
+SMART names no scope for `$closure`, so that row is our own reading: the
 operation maintains a stored `ConceptMap`
 (<https://hl7.org/fhir/R4B/conceptmap-operation-closure.html>). No
 specification governs the admin listener, so its scope is FerroTERM's own, in
@@ -318,9 +324,9 @@ What comes back on a refusal follows RFC 6750 §3:
 The outcome is written in the format the request asks for, JSON or XML.
 
 Key rotation needs nothing from you. The server reads the key set again when
-it is older than `jwks_max_age_seconds` (ten minutes), so a withdrawn key stops
+it is older than `jwks_max_age` (ten minutes), so a withdrawn key stops
 verifying, and a token naming a `kid` it has not read makes it read the set
-again, at most once per `jwks_refresh_interval_seconds` (a minute) counted from
+again, at most once per `jwks_refresh_interval` (a minute) counted from
 the last read, the one at start included. Publish the new key before you sign
 with it.
 

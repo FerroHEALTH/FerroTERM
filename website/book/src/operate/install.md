@@ -3,8 +3,9 @@
 
 # Install and run
 
-FerroTERM ships as a release tarball and as a container image. Each holds two
-binaries, the server and the build tool, so there is no JVM to install, no
+FerroTERM ships as a release tarball and as a container image. The image
+holds the server and the build tool; the tarball also holds the
+synchronisation service, `ferroterm-sync`. There is no JVM to install, no
 Elasticsearch to run, and no database to provision. The registry systems
 (UCUM, BCP 47, BCP 13, ISO 3166-1) are inside the binary; every other code
 system is an index you build from a release you are licensed for
@@ -154,8 +155,8 @@ fallback child is `claml` when `--system` ends in no plain name (an `urn:oid`).
 The Labcodeset resources and the DHD concept maps are FHIR resources, read
 through `FERROTERM__TERMINOLOGY__CODE_SYSTEMS`. They already sit on the index mount, so add
 the variable to the `ferroterm` service's `environment` in `compose.yaml`, with
-the paths separated by `:`, for example `FERROTERM__TERMINOLOGY__CODE_SYSTEMS:
-/data/index/labcodeset:/data/index/dhd/conceptmaps`. The release mount is
+the paths separated by commas, for example `FERROTERM__TERMINOLOGY__CODE_SYSTEMS:
+/data/index/labcodeset,/data/index/dhd/conceptmaps`. The release mount is
 read-only, so filling an ICD-11 cache with `--icd11-api` (which writes into
 the cache) runs with the binary; a build from a filled cache in `./releases`
 runs here. `docker compose run --rm build` with no arguments prints the
@@ -229,8 +230,8 @@ cleanly on `SIGTERM`, within the bound `server.shutdown_timeout` sets.
 ## Run the binary
 
 Each release carries a tarball per target (`x86_64` and `aarch64`, glibc and
-musl) holding `ferroterm` and `ferroterm-build`, with a checksum, a CycloneDX
-SBOM, and Sigstore attestations beside it. Download, verify, unpack, run:
+musl) holding `ferroterm`, `ferroterm-build` and `ferroterm-sync`, with a
+checksum, a CycloneDX SBOM per binary, and Sigstore attestations beside it. Download, verify, unpack, run:
 
 ```console
 $ gh release download v0.4.9 -R FerroHEALTH/FerroTERM -p 'ferroterm-v0.4.9-x86_64-unknown-linux-musl.tar.gz*'
