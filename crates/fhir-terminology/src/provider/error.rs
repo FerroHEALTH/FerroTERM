@@ -17,6 +17,9 @@ pub enum ProviderError {
     /// bound none of them.
     #[error("this filter cannot be expanded")]
     FilterNotEnumerable,
+    /// The filters bound a selection too large to expand.
+    #[error("{0}")]
+    TooCostly(String),
     /// The provider does not answer this filter.
     #[error("filter `{property}` with operator `{operator}` is not supported")]
     UnsupportedFilter {
