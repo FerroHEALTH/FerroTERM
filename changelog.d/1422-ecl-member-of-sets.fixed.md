@@ -1,0 +1,1 @@
+- `^` over a set of reference sets (`^ *`, `^ (< 900000000000455006 |Reference set|)`, a disjunction) answers the members of the concept reference sets in it, and a concept in the set with no concept members, such as a language reference set or a grouper, adds no concept. A concept `^` names directly that is not a reference set with concept members is still refused (ECL 7.3).
