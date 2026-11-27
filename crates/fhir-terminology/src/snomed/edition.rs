@@ -4,6 +4,8 @@
 //! What a served SNOMED CT edition holds: its accessors, its memory
 //! footprint, and the display rule over its language reference sets.
 
+use std::borrow::Cow;
+
 use concept_graph::attributes::Attributes;
 use concept_graph::identifiers::Identifiers;
 use concept_graph::ordinal::Ordinal;
@@ -11,7 +13,7 @@ use concept_graph::refsets::RefsetMembers;
 
 use super::SnomedProvider;
 use crate::provider::{Concept, error::ProviderError};
-use crate::stored::{primary_subtag, storage};
+use crate::stored::{has_primary_subtag, primary_subtag, storage};
 
 /// What each structure of a served edition holds in memory, in bytes.
 ///
@@ -141,7 +143,7 @@ impl SnomedProvider {
         self.stored()
             .store
             .display(ordinal, self.refsets_for(tag), |found| {
-                primary_subtag(found) == language
+                has_primary_subtag(found, language)
             })
             .map_err(storage)
     }
@@ -158,7 +160,11 @@ impl SnomedProvider {
     ) -> Result<Option<String>, ProviderError> {
         let default = &self.system().default_tag;
         let tag = language.unwrap_or(default);
-        let wanted = primary_subtag(tag);
+        // The default tag is in the base language, so its primary subtag is that.
+        let wanted = match language {
+            Some(tag) => Cow::Owned(primary_subtag(tag)),
+            None => Cow::Borrowed(self.system().base_language.as_str()),
+        };
         if let Some(term) = self.preferred_in(ordinal, tag, &wanted)? {
             return Ok(Some(term));
         }
@@ -166,11 +172,11 @@ impl SnomedProvider {
         if let Some(synonym) = designations.iter().find(|d| {
             d.active
                 && d.use_ordinal == self.system().keys.synonym
-                && primary_subtag(&d.language) == wanted
+                && has_primary_subtag(&d.language, &wanted)
         }) {
             return Ok(Some(synonym.term.clone()));
         }
-        if wanted != self.system().base_language
+        if *wanted != self.system().base_language
             && let Some(term) = self.preferred_in(ordinal, default, &self.system().base_language)?
         {
             return Ok(Some(term));

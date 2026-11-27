@@ -16,6 +16,7 @@
 pub mod edition;
 mod implicit;
 mod open;
+mod properties;
 mod selection;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
@@ -501,13 +502,17 @@ impl StoredSystem for Snomed {
                 let Some(value) = provider.stored().property_value(value.clone())? else {
                     continue;
                 };
-                out.push(Property {
-                    code: sctid.clone(),
-                    value,
-                    ..Property::default()
-                });
+                properties::push_once(
+                    &mut out,
+                    Property {
+                        code: sctid.clone(),
+                        value,
+                        ..Property::default()
+                    },
+                );
             }
         }
+        properties::describe(provider, &mut out)?;
         Ok(out)
     }
 
