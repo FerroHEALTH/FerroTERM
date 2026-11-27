@@ -61,7 +61,8 @@ over the ICF `CodeSystem` resources of `fhir.tx.support` 1.0.5.
 CI runs `general` on every push, on all three surfaces, and the modes of
 `ci-modes.tsv` weekly and on demand, each lane fetching its content from its
 public source, checking its pinned sha256 and deleting it at the end of the
-run. The modes of `hand-run.tsv` are run by hand before a release and their
+run. A lane's public log carries case names and counts only: a regression is
+named, and its message stays in the run's deleted output. The modes of `hand-run.tsv` are run by hand before a release and their
 lists are refreshed in the same change.
 
 ## What each mode needs to run

@@ -8,7 +8,9 @@
 # A mode's content is fetched by scripts/checks/tx-ecosystem-mode.sh from its
 # public source, checked against a pinned sha256, and deleted when the run
 # ends. It lives outside target/, so the build cache never saves it, and the
-# lane uploads no artifact. The `general` mode runs on every push in ci.yml.
+# lane uploads no artifact. This log is public, so the script prints only case
+# names, counts and its own messages; the runner's and the server's logs stay
+# in the temporary directory. The `general` mode runs on every push in ci.yml.
 
 name: tx-ecosystem modes
 
