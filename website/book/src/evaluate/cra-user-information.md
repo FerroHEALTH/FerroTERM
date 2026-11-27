@@ -178,7 +178,7 @@ lifetime of the product with digital elements to ensure its secure use;"
 - **Throughout its lifetime:** follow the release feed and the security
   advisories, upgrade to each new release, and replace an index by building it
   in a new directory and renaming it into place
-  ([reloading the served set](../operate/configuration.md#reloading-the-served-set)).
+  ([reloading the served set](../operate/reloading.md#reloading-the-served-set)).
 
 ### 8(b) How changes to the product can affect the security of data
 

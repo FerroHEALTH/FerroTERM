@@ -73,7 +73,7 @@ sets in the console.
 - [The FHIR terminology API](https://ferroterm.eu/docs/integrate/fhir-api.html): `$lookup`, `$validate-code`, `$subsumes`, `$expand`, `$translate` and `$closure`
 - [FHIR R4, R4B, R5 and the R6 ballot](https://ferroterm.eu/docs/integrate/fhir-versions.html), each in its own version's shapes, in JSON and XML
 - [Value sets, implicit value sets and ECL](https://ferroterm.eu/docs/integrate/ecl-value-sets.html), the SNOMED CT Expression Constraint Language
-- [Stored value sets, code systems and concept maps](https://ferroterm.eu/docs/integrate/fhir-api.html#persisted-resources) with history, when you name a database
+- [Stored value sets, code systems and concept maps](https://ferroterm.eu/docs/integrate/persisted-resources.html) with history, when you name a database
 - [Syncing from a national terminology service](https://ferroterm.eu/docs/operate/sync.html), one way into a running server
 - [The console](https://ferroterm.eu/docs/operate/console.html), its own image: browse, look up, expand and translate, and compose value sets
 
