@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The suite modes run by hand before a release, one row per mode and surface:
+# the cases the run ran and the day it was measured. scripts/checks/tx-ecosystem.sh
+# fails a hand run whose count of cases differs from its row, and
+# scripts/checks/conformance-badges.sh draws one badge per row, naming the day.
+surface	mode	ran	measured
+r4b	snomed	378	2026-11-27
+r4b	icd-11	145	2026-11-27
+r4b	icf	96	2026-11-27
+r4b	loinc	110	2026-11-27
+r5	loinc	110	2026-11-27
+r4b	tx.fhir.org	189	2026-11-27
+r5	tx.fhir.org	189	2026-11-27
+r4b	mimetypes	52	2026-11-27
+r4b	omop	40	2026-11-27

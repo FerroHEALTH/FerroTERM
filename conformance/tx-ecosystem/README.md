@@ -11,8 +11,12 @@ line, sorted. CI runs the suite with the FHIR Validator's `txTests` command
 there) and fails when a listed test stops passing. A test that starts passing
 is printed by the script; add it to the list in the same change that earns it.
 `total.txt` records the number of cases the `general` mode runs; the script
-fails when a run disagrees with it, and `scripts/checks/conformance-badges.sh`
-turns the lists and the total into the README's badges at site build time.
+fails when a run disagrees with it. `hand-run.tsv` records, for each mode run
+by hand, the cases the run ran and the day it was measured; the script fails a
+hand run whose count differs from its row. `scripts/checks/conformance-badges.sh`
+turns the lists, the total and `hand-run.tsv` into the README's badges at site
+build time, each hand-run badge naming its day, and fails when the table below
+disagrees with them.
 
 `not-applicable.tsv` lists, per surface, the `general` cases the runner
 counts in that total and that do not apply there, each with its reason.
