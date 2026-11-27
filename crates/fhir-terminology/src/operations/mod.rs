@@ -344,8 +344,6 @@ pub enum MessageId {
     AbstractCodeNotAllowed,
     /// The code differs from the system's spelling by case.
     CodeCaseDifference,
-    /// The code is valid and is not in its system's normal form.
-    CodeNotInNormalForm,
     /// The code is valid and inactive.
     StatusCodeWarningCode,
     /// The value set marks the concept deprecated.
@@ -385,6 +383,8 @@ pub enum MessageId {
     ValueSetTooCostly,
     /// Any other failure.
     TxGeneralError,
+    /// The code is valid and is not in its system's normal form.
+    CodeNotInNormalForm,
 }
 
 impl MessageId {
