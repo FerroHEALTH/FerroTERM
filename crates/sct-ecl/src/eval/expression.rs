@@ -114,10 +114,9 @@ impl<M: Model> Evaluator<'_, M> {
             Some(ConstraintOperator::DescendantOf | ConstraintOperator::DescendantOrSelfOf) => {
                 self.supertypes(&candidate.focus)
             }
-            // NOTE: a refined expression is a proper subtype of its focus concepts,
-            // so it is no concept a constraint names and an ancestor of none; whether
-            // a concept of the edition sits between it and a focus concept takes a
-            // classifier, so it is not claimed as a child, a top or a bottom either.
+            // NOTE: a refined expression is a proper subtype of its focus concepts, so
+            // it is no named concept and no ancestor; a child, top or bottom claim
+            // would take a classifier, so none is made (ECL 6.1, our own reading).
             _ => return Ok(false),
         };
         Ok(!above.is_disjoint(&reached))
