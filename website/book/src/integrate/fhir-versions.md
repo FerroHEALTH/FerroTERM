@@ -11,9 +11,10 @@ the R6 ballot (6.0.0-snapshot1) under `/r6`, marked ballot-tracking.
 ## Why one server can serve four versions
 
 HL7 publishes the whole type system and every operation as machine-readable
-resources, in versioned packages. FerroTERM vendors and pins those packages and
-generates per-version Rust modules from them, so each version's operation
-surface is correct by construction. An operation parameter that R5 adds appears
+resources, in versioned packages. The FerroBRIDGE repository pins those
+packages and generates the `fhir-types` crate from them, one module per
+version, and FerroTERM takes the crate from crates.io, so each version's
+operation surface is correct by construction. An operation parameter that R5 adds appears
 in the R5 module and is absent from R4 and R4B, because the generator emits
 what each package declares. The engine beneath is version-neutral; a version's
 endpoint maps the engine's answers into that version's shapes. R4 and R4B
