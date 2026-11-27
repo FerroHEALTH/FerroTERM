@@ -213,6 +213,7 @@ impl From<ProviderError> for OperationError {
             ProviderError::IncompleteContent { .. }
             | ProviderError::NotEnumerable
             | ProviderError::FilterNotEnumerable => Self::NotSupported(error.to_string()),
+            ProviderError::TooCostly(text) => Self::TooCostly(text),
             // NOTE: a filter the system cannot evaluate, an unknown filter value, or
             // a bad regular expression is a defect of the value set, a 422
             // (<https://hl7.org/fhir/R4B/http.html#status-codes>), never a 500.

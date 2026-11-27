@@ -59,7 +59,9 @@ timeout = "30s"
 
 [ferroterm.sync]
 # The synchronisation service's admin listener, which Synchronisation reads.
-url = "http://ferroterm-sync:8090/"
+# The service listens on 127.0.0.1:8181 unless its `listen` names an address
+# the console reaches, such as 0.0.0.0:8181 on a private network.
+url = "http://ferroterm-sync:8181/"
 
 [ferroterm.admin]
 # The server's admin listener, which Reload the served set posts to.
