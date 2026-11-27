@@ -472,8 +472,18 @@ impl Service {
         }
         let started = std::time::Instant::now();
         let fetched = match origin {
-            Origin::Feed => source.source().fetch(&taken.link, &download).await,
-            Origin::FhirApi => source.source().fetch_api(&taken.link, &download).await,
+            Origin::Feed => {
+                source
+                    .source()
+                    .fetch(&taken.link, &download, self.config.download_limit.bytes())
+                    .await
+            }
+            Origin::FhirApi => {
+                source
+                    .source()
+                    .fetch_api(&taken.link, &download, self.config.download_limit.bytes())
+                    .await
+            }
         };
         let fetched = match fetched {
             Ok(fetched) => fetched,

@@ -216,7 +216,7 @@ async fn a_listed_resource_is_fetched_and_its_digest_computed() {
         bytes,
         checksum,
     } = source(&server)
-        .fetch_api(&link, &destination)
+        .fetch_api(&link, &destination, 1 << 20)
         .await
         .expect("the resource is fetched");
     assert_eq!(written, destination, "the file lands where it was asked to");

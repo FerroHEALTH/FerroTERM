@@ -119,6 +119,7 @@ code 78 (`EX_CONFIG`, `sysexits(3)`), and `healthcheck` with `not up` and 1.
 | `[webhook]` | none | where one JSON summary per run is posted |
 | `timezone` | `UTC` | the zone a daily schedule is read in |
 | `build_command` | `ferroterm-build` | the offline build, on `PATH` or by path |
+| `download_limit` | `4GiB` | the most bytes one download takes, a data size; a larger item is refused, its partial file removed, and the run record names it |
 | `[auth]` | on, no issuer | the credentials the admin listener admits (see [The admin listener](#the-admin-listener)) |
 | `[nts]` | `url = "https://terminologieserver.nl"`, `timeout = "1h"`, the realm's issuer, no client | the NTS the add-on calls and the client it authenticates as (see [Credentials](#credentials)) |
 | `[telemetry]` | `auto` format, no export | the console log's `format` and `filter` (`RUST_LOG` sets the filter too), and the OTLP export of the service's metrics, the same section the server reads (see [Telemetry](configuration.md#telemetry)) |
