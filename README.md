@@ -34,16 +34,16 @@
 [![tx-ecosystem R5](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fr5.json)](https://ferroterm.eu/docs/evaluate/conformance.html)
 [![FHIR versions served](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Ffhir-versions.json)](https://ferroterm.eu/docs/integrate/fhir-versions.html)
 <br>
-**tx-ecosystem modes run by hand**<br>
-[![tx-ecosystem snomed R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-snomed-r4b.json)](conformance/tx-ecosystem/passing-snomed.txt)
-[![tx-ecosystem icd-11 R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-icd-11-r4b.json)](conformance/tx-ecosystem/passing-icd-11.txt)
-[![tx-ecosystem icf R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-icf-r4b.json)](conformance/tx-ecosystem/passing-icf.txt)
-[![tx-ecosystem loinc R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-loinc-r4b.json)](conformance/tx-ecosystem/passing-loinc.txt)
-[![tx-ecosystem loinc R5](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-loinc-r5.json)](conformance/tx-ecosystem/passing-r5-loinc.txt)
-[![tx-ecosystem tx.fhir.org R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-tx-fhir-org-r4b.json)](conformance/tx-ecosystem/passing-tx.fhir.org.txt)
-[![tx-ecosystem tx.fhir.org R5](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-tx-fhir-org-r5.json)](conformance/tx-ecosystem/passing-r5-tx.fhir.org.txt)
-[![tx-ecosystem mimetypes R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-mimetypes-r4b.json)](conformance/tx-ecosystem/passing-mimetypes.txt)
-[![tx-ecosystem omop R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-omop-r4b.json)](conformance/tx-ecosystem/passing-omop.txt)
+**tx-ecosystem modes**<br>
+[![tx-ecosystem snomed R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fsnomed-r4b.json)](https://ferroterm.eu/docs/evaluate/conformance.html#the-other-modes)
+[![tx-ecosystem icd-11 R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Ficd-11-r4b.json)](https://ferroterm.eu/docs/evaluate/conformance.html#the-other-modes)
+[![tx-ecosystem icf R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Ficf-r4b.json)](https://ferroterm.eu/docs/evaluate/conformance.html#the-other-modes)
+[![tx-ecosystem loinc R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Floinc-r4b.json)](https://ferroterm.eu/docs/evaluate/conformance.html#the-other-modes)
+[![tx-ecosystem loinc R5](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Floinc-r5.json)](https://ferroterm.eu/docs/evaluate/conformance.html#the-other-modes)
+[![tx-ecosystem tx.fhir.org R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Ftx-fhir-org-r4b.json)](https://ferroterm.eu/docs/evaluate/conformance.html#the-other-modes)
+[![tx-ecosystem tx.fhir.org R5](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Ftx-fhir-org-r5.json)](https://ferroterm.eu/docs/evaluate/conformance.html#the-other-modes)
+[![tx-ecosystem mimetypes R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fmimetypes-r4b.json)](https://ferroterm.eu/docs/evaluate/conformance.html#the-other-modes)
+[![tx-ecosystem omop R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fomop-r4b.json)](https://ferroterm.eu/docs/evaluate/conformance.html#the-other-modes)
 <br>
 **EHDS**<br>
 [![MyHealth@EU MVC 10.1.0 (CI) import](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fehds-mvc.json)](https://ferroterm.eu/docs/evaluate/conformance.html)

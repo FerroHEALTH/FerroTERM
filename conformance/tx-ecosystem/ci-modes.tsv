@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: Cadasto B.V.
+# SPDX-License-Identifier: BUSL-1.1
+# The suite modes CI runs, one row per mode and surface: the cases the run
+# runs. .github/workflows/tx-ecosystem-modes.yml runs each row weekly and on
+# demand through scripts/checks/tx-ecosystem-mode.sh, which fetches the content
+# the mode needs; scripts/checks/tx-ecosystem.sh fails a run whose count differs
+# from its row, and scripts/checks/conformance-badges.sh draws its badge.
+surface	mode	ran
+r4b	snomed	378

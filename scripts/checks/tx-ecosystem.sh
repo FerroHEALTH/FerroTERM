@@ -17,7 +17,9 @@
 # picks the served FHIR version (r4b by default; the runner reads the version
 # from the server's CapabilityStatement). The validator
 # jar and the suite are fetched into target/tx-ecosystem/ once and pinned by
-# digest and commit. A JVM runs here only, never in the server.
+# digest and commit. Everything a run writes, the server's log included, goes
+# under --out, so a run over licensed content leaves nothing of it in target/.
+# A JVM runs here only, never in the server.
 set -euo pipefail
 # target/ and conformance/ are named relative to the repository root, so run there.
 cd "$(dirname "$0")/../.."
@@ -95,6 +97,9 @@ port_taken() {
   (: <"/dev/tcp/127.0.0.1/$probe") 2>/dev/null
 }
 
+rm -rf "$out"
+mkdir -p "$out"
+
 started=""
 if [[ -z "$server" ]]; then
   if [[ -n "$port" ]]; then
@@ -127,8 +132,8 @@ if [[ -z "$server" ]]; then
   # `$closure` keeps its tables in the resource database, so the run gives the
   # server a fresh one of its own and removes it at exit. The write routes it
   # opens need [auth] or its explicit absence; the run is local to this host.
-  resources="$(mktemp -d "$work/resources.XXXXXX")"
-  FERROTERM__TERMINOLOGY__RESOURCES="$resources/resources.redb" FERROTERM__AUTH__ENABLED=false FERROTERM__USAGE_REPORT__ENABLED=false FERROTERM__SERVER__LISTEN=127.0.0.1:"$port" FERROTERM__TELEMETRY__FORMAT=json target/release/ferroterm > "$work/server.log" 2>&1 &
+  resources="$(mktemp -d "$out/resources.XXXXXX")"
+  FERROTERM__TERMINOLOGY__RESOURCES="$resources/resources.redb" FERROTERM__AUTH__ENABLED=false FERROTERM__USAGE_REPORT__ENABLED=false FERROTERM__SERVER__LISTEN=127.0.0.1:"$port" FERROTERM__TELEMETRY__FORMAT=json target/release/ferroterm > "$out/server.log" 2>&1 &
   started=$!
   trap 'kill "$started" 2>/dev/null || true; wait "$started" 2>/dev/null || true; rm -rf "$resources"' EXIT
   ready=""
@@ -141,7 +146,7 @@ if [[ -z "$server" ]]; then
     # bind failure left the probe talking to the squatter (#425).
     if ! kill -0 "$started" 2>/dev/null; then
       echo "tx-ecosystem: the server exited before it was ready on port $port" >&2
-      cat "$work/server.log" >&2
+      cat "$out/server.log" >&2
       exit 1
     fi
     if curl -sf "http://127.0.0.1:$port/health" >/dev/null 2>&1; then
@@ -152,7 +157,7 @@ if [[ -z "$server" ]]; then
   done
   if [[ -z "$ready" ]]; then
     echo "tx-ecosystem: the server did not answer /health on port $port within ${READY_TIMEOUT}s" >&2
-    cat "$work/server.log" >&2
+    cat "$out/server.log" >&2
     exit 1
   fi
   echo "tx-ecosystem: serving on 127.0.0.1:$port (pid $started)"
@@ -162,8 +167,6 @@ if [[ -z "$server" ]]; then
   scripts/checks/served-artifacts.sh --server "$server" --index "$index"
 fi
 
-rm -rf "$out"
-mkdir -p "$out"
 # The runner exits non-zero while any test fails; the pass list decides here.
 modes=(-mode "$mode")
 if [[ "$mode" != general ]]; then
@@ -180,15 +183,15 @@ fi
 
 total=$(jq '(.test // []) | length' "$report")
 if [[ "$total" = 0 ]]; then
-  echo "the runner ran no test; see $out/runner.log and $work/server.log" >&2
+  echo "the runner ran no test; see $out/runner.log and $out/server.log" >&2
   tail -n 20 "$out/runner.log" >&2
-  tail -n 5 "$work/server.log" >&2 2>/dev/null || true
+  tail -n 5 "$out/server.log" >&2 2>/dev/null || true
   exit 1
 fi
 # The committed total feeds the conformance badges (conformance-badges.sh); a
 # suite bump that changes it is recorded in the same change. A mode run
-# (icd-11, tx.fhir.org, ...) selects a subset and is held to hand-run.tsv at
-# the end instead.
+# (snomed, icd-11, ...) selects a subset and is held to its row of
+# ci-modes.tsv or hand-run.tsv at the end instead.
 committed_total=$(tr -d '[:space:]' < conformance/tx-ecosystem/total.txt)
 if [[ "$mode" = general ]] && [[ "$committed_total" != "$total" ]]; then
   echo "tx-ecosystem: the suite ran $total tests but conformance/tx-ecosystem/total.txt says $committed_total; update it in this change" >&2
@@ -240,13 +243,16 @@ if [[ -n "$regressions" ]]; then
 fi
 echo "tx-ecosystem: no regression against $PASSING"
 
-# A hand run is held to its row of hand-run.tsv, the denominator of its badge
-# (conformance-badges.sh); a new count goes there with the day of the run.
+# A mode run is held to its row, the denominator of its badge
+# (conformance-badges.sh): ci-modes.tsv for a mode CI runs, hand-run.tsv, with
+# the day of the run, for one measured by hand.
 if [[ "$mode" != general ]]; then
-  hand_run=conformance/tx-ecosystem/hand-run.tsv
-  hand_total=$(awk -F'\t' -v s="$fhir" -v m="$mode" '!/^#/ && $1 == s && $2 == m { print $3 }' "$hand_run")
-  if [[ "$hand_total" != "$total" ]]; then
-    echo "tx-ecosystem: the $mode run on /$fhir ran $total tests but $hand_run says ${hand_total:-nothing}; record the count and the day of this run there" >&2
+  for rows in conformance/tx-ecosystem/ci-modes.tsv conformance/tx-ecosystem/hand-run.tsv; do
+    mode_total=$(awk -F'\t' -v s="$fhir" -v m="$mode" '!/^#/ && $1 == s && $2 == m { print $3 }' "$rows")
+    [[ -z "$mode_total" ]] || break
+  done
+  if [[ "$mode_total" != "$total" ]]; then
+    echo "tx-ecosystem: the $mode run on /$fhir ran $total tests but its row says ${mode_total:-nothing}; record the count in ci-modes.tsv, or in hand-run.tsv with the day of this run" >&2
     exit 1
   fi
 fi
