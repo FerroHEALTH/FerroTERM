@@ -514,7 +514,7 @@ pub(super) fn assess(
         issues.extend(super::super::display::advisories(
             provider.as_ref(),
             located.concept,
-            super::super::at(subject.expression, "code").as_ref(),
+            subject.expression,
         )?);
     }
     let status = provider.status(located.concept)?;

@@ -512,11 +512,7 @@ fn check(
         issues.push(note);
         status_code = Some(code_status);
     }
-    for advisory in super::display::advisories(
-        provider.as_ref(),
-        concept,
-        super::at(expression, "code").as_ref(),
-    )? {
+    for advisory in super::display::advisories(provider.as_ref(), concept, expression)? {
         messages.push(advisory.text.clone());
         issues.push(advisory);
     }

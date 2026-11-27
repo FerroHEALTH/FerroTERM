@@ -413,7 +413,7 @@ fn named_system(provider: &dyn CodeSystemProvider) -> String {
 pub fn advisories(
     provider: &dyn CodeSystemProvider,
     concept: Concept,
-    expression: Option<&String>,
+    expression: &str,
 ) -> Result<Vec<Issue>, ProviderError> {
     Ok(provider
         .advisories(concept)?
@@ -424,7 +424,7 @@ pub fn advisories(
             kind: "code-rule",
             message: None,
             text,
-            expression: expression.cloned(),
+            expression: super::at(expression, "code"),
         })
         .collect())
 }
