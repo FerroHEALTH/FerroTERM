@@ -15,6 +15,7 @@
 
 pub mod edition;
 mod implicit;
+mod loinc_map;
 mod open;
 mod selection;
 use std::collections::BTreeSet;
@@ -104,6 +105,16 @@ pub const FHIR_PROPERTIES: [(&str, PropertyKind); 6] = [
     ("parent", PropertyKind::Code),
     ("child", PropertyKind::Code),
 ];
+
+/// `30051010000102 |LOINC code identifier|`, the identifier scheme of the
+/// LOINC codes the LOINC Extension states in the RF2 identifier file.
+const LOINC_SCHEME: u64 = 30_051_010_000_102;
+
+/// The property that carries a concept's LOINC code.
+const LOINC_PROPERTY: &str = "loinc";
+
+/// The code system of LOINC (<https://terminology.hl7.org/LOINC.html>).
+const LOINC_SYSTEM: &str = "http://loinc.org";
 
 /// A failure to open an artifact directory.
 #[derive(Debug, thiserror::Error)]
@@ -635,6 +646,9 @@ impl StoredSystem for Snomed {
         let Ok(refset) = ConceptId::parse(decoded.trim()) else {
             return Some(Err(malformed(format!("`{decoded}` is not an SCTID"))));
         };
+        if refset.value() == loinc_map::LOINC_MODULE {
+            return Some(loinc_map::concept_map(provider, url, selection));
+        }
         Some(conceptmap::concept_map(
             provider,
             url,
