@@ -22,6 +22,7 @@
 - [Loading code systems](operate/loading-snomed.md)
   - [Loading the EEHRxF code systems](operate/loading-eehrxf.md)
 - [Reloading and replacing content](operate/reloading.md)
+- [Upgrading](operate/upgrades.md)
 - [Syncing from a national terminology service](operate/sync.md)
 - [Behind a reverse proxy](operate/reverse-proxy.md)
   - [Running behind FerroSMART](operate/behind-ferrosmart.md)

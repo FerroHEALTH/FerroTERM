@@ -159,7 +159,7 @@ Options:
       --index-root <DIR>
           The index root the server reads: without `--out` the build writes under it, and an `--out` outside it is refused
           
-          [env: FERROTERM_INDEX_ROOT=]
+          [env: FERROTERM_INDEX_ROOT]
 
   -h, --help
           Print help
