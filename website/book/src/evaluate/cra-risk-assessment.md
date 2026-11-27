@@ -156,7 +156,7 @@ levels (high, medium, low).
 | T8 | A tampered artefact reaches a deployment | high | low | SLSA Build Level 3 provenance; SBOM attestations; digest-pinned base image | (f) |
 | T9 | A console session is taken over, or the console is used to write on a reader's behalf | medium | low | server-held session behind one `HttpOnly` cookie; `SameSite=Lax`; PKCE; a nonce CSP with `frame-ancestors 'none'` | (d), (e) |
 | T10 | Request content leaks into logs or outbound reports | medium | low | no body or free-text parameter logged; the usage report carries no code, URL or request path | (e), (g) |
-| T11 | A tampered or substituted release reaches the index root through the sync service | high | low for a feed entry, medium for a resource from a FHIR API | a feed entry is streamed to a partial file and kept only when its digest matches the one the feed advertised; the build runs in staging and a failed build never reaches the index root; a resource read from a FHIR API carries no advertised digest, so it rests on the transport, and the run record keeps the digest of what arrived | (f) |
+| T11 | A tampered or substituted release reaches the index root through the sync service | high | low for a feed entry, medium for a resource from a FHIR API | a feed entry is streamed to a partial file and kept only when its digest matches the one the feed advertised; the build runs in staging and a failed build never reaches the index root; a resource read from a FHIR API carries no integrity field to verify, since none of FHIR, the HL7 tx ecosystem IG and the NCTS syndication format defines one for it, so it rests on the transport, which the service holds to `https` outside loopback, and the run record keeps the digest of what arrived; this is a residual risk | (f) |
 | T12 | An unauthenticated caller starts a run, activates staged content or reads the run records | medium | low | the admin listener is a resource server over `ferrohealth-smart`; every route but the health routes requires the product scope; fail-closed start | (b), (d) |
 | T13 | The sync service's credentials leak | high: the reload client can make the server re-read its disks, and the terminology service account unlocks licensed content | low | each secret read from a mounted file or a variable, shown as `***` by `config check`, never logged; the reload call refuses a Basic credential and takes a client credentials token; tokens kept in memory | (d), (e) |
 | T14 | A release that changes answers is served without review | high | medium with `activation = "auto"` | `activation = "manual"`; a refused reload rolled back; retention keeps the previous release to roll back to; the revalidation reports inactive, absent and out-of-value-set codes in the run record and the webhook summary | (f), (h) |
@@ -339,8 +339,15 @@ corruptions"
   `.github/workflows/release-build.yml`;
   `crates/terminology-syndication/src/download.rs`;
   `app/ferroterm-sync/src/activate.rs`.
-- **Status:** met for the server. The synchronisation service is partial: a
-  resource read from a FHIR API has no advertised digest to check against.
+- **Status:** met for the server. The synchronisation service is partial, a
+  residual risk the specifications leave: a resource read from a FHIR API has
+  no integrity field to check. The NCTS Atom Syndication Format defines
+  `ncts:sha256Hash` on a feed entry's `link` only; a FHIR search answers a
+  `searchset` Bundle whose one integrity element, `Bundle.signature`, is
+  optional and its verification "implementation-environment specific"
+  (FHIR R4, Bundle.signature); the HL7 tx ecosystem IG defines none. The
+  transport is held to `https` outside loopback, and if a service signs its
+  Bundles, verifying the signature is the follow-up.
   The indexes carry no signature of their own: they are built
   by the deploying organisation from its own release, on its own machine, and
   stored on its own disks, so their protection against a writer who reaches
@@ -565,3 +572,4 @@ not name, and when the intended purpose changes.
 | 2 | 2026-11-27 | Assesses the synchronisation service, released from v0.3.0: its purpose and environment, three foreseeable misuses, its assets, risks T11 to T15, its controls and status under each point of Part I(2), and its outbound flows; adds the OTLP export to the flows (#1365) |
 | 3 | 2026-11-27 | The synchronisation service refuses a plain `http` endpoint outside loopback: the misuse row and (e) record the control (#1372) |
 | 4 | 2026-11-27 | The syndication feed parser is fuzzed: (k) and T15 record the target (#1373) |
+| 6 | 2026-11-27 | A resource from a FHIR API has no integrity field in any specification: (f) and T11 record it as a residual risk with its ground (#1375) |

@@ -83,7 +83,10 @@ mounts the whole tree and writes to it as uid 65532.
 The overlay also sets `FERROTERM__ADMIN__LISTEN=127.0.0.1:8081` on the server,
 because `POST /reload` on that listener is how the sync asks for the new
 release to be served, and runs the sync in the server's network namespace, so
-it reaches that listener and the FHIR base over loopback. That listener is a guarded surface, so the server starts only once
+it reaches that listener and the FHIR base over loopback. Nothing outside that
+namespace reaches the admin listener or the sync's own listener, the console
+included; the [console page](console.md) says what that means for Reload and
+the run findings. That listener is a guarded surface, so the server starts only once
 `[auth]` names an issuer in an `[auth.issuer.<name>]` table, with
 `[server_admin.credentials.oauth]` in the sync configuration, or turns
 authentication off (see
