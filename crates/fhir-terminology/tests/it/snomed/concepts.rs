@@ -409,7 +409,7 @@ fn the_normal_form_renders_the_inferred_view_of_a_concept() {
     assert_eq!(
         terse,
         format!(
-            "=== {animal} : {{ {covering} = {fur}, {legs} = #4 }}",
+            "{animal}:{{{covering}={fur},{legs}=#4}}",
             animal = sctid(item(ANIMAL)),
             covering = sctid(item(COVERING)),
             fur = sctid(item(FUR)),
@@ -420,7 +420,7 @@ fn the_normal_form_renders_the_inferred_view_of_a_concept() {
 
     let with_terms = ask(CAT, "normalForm").expect("the cat has a normal form");
     assert!(
-        with_terms.contains(&format!("{} |", sctid(item(ANIMAL)))),
+        with_terms.contains(&format!("{}|", sctid(item(ANIMAL)))),
         "the form with terms writes each reference as `id |term|`: {with_terms}"
     );
     assert!(

@@ -696,10 +696,10 @@ five SNOMED properties and all five are served.
 
 ```
 $lookup code=74400008&property=normalForm
--> === 64572001 |Disease| : { 116676008 |Associated morphology| = … }
+-> 64572001|Disease|:{116676008|Associated morphology|=…}
 
 $lookup code=74400008&property=normalFormTerse
--> === 64572001 : { 116676008 = … }
+-> 64572001:{116676008=…}
 ```
 
 The page defines the property and not the generation. The generation is a
@@ -714,9 +714,9 @@ and the read costs no more than the properties beside it.
 The syntax is the SNOMED CT Compositional Grammar specification §5, the
 definition status prefix its §6.7: `===` where the RF2 `definitionStatusId`
 says the concept is sufficiently defined, `<<<` where it does not. The prefix
-is optional in the grammar with `===` assumed when absent, so a primitive
-written without one would assert an equivalence the terminology denies; both
-are always written.
+is optional in the grammar with `===` assumed when absent (§5), so `===` is
+left out and `<<<` is always written: a primitive written without it would
+assert an equivalence the terminology denies.
 
 Three shapes are ours, because no specification fixes them, and each is marked
 where it is decided. **Order**: the glossary says a canonical form arranges
@@ -726,8 +726,11 @@ render to, which makes one concept render one way whatever order the index
 held it in. **Term**: §5 admits "the term from any SNOMED CT description that
 is associated with the concept", so `normalForm` carries the display this
 server would otherwise answer with. **Layout**: no specification mandates or
-suggests any, so the separators that the grammar makes optional are written
-anyway.
+suggests any, so no whitespace is written, while the separators that the
+grammar makes optional (the comma before a group, the braces around a lone
+group) are. A code that differs from this spelling only by whitespace, terms
+or a leading `===`, which §5 makes insignificant, is in normal form, so
+`$validate-code` answers no `normalized-code` for it.
 
 The root of the hierarchy has no inferred parent and the grammar makes a focus
 concept mandatory, so it has no expression; the property is absent for it

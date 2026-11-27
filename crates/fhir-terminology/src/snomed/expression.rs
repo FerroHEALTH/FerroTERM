@@ -123,6 +123,9 @@ pub(super) struct Registered {
     term: Term,
     /// The expression rendered in one canonical order, concept ids only.
     canonical: String,
+    /// What the table knows this spelling by: the canonical form and the
+    /// terms the sender wrote, since the display keeps them.
+    key: String,
     /// Whether the expression states conditions that are sufficient
     /// (`===`, the assumed status), rather than necessary only (`<<<`).
     defined: bool,
@@ -217,7 +220,7 @@ pub(super) struct Expressions {
 impl Expressions {
     /// The handle of `record`, minting one when the canonical form is new.
     fn intern(&mut self, record: Registered) -> u32 {
-        if let Some(handle) = self.handles.get(&record.canonical) {
+        if let Some(handle) = self.handles.get(&record.key) {
             return *handle;
         }
         if self.next >= BASE {
@@ -227,39 +230,52 @@ impl Expressions {
         }
         let handle = BASE.saturating_add(self.next);
         self.next = self.next.saturating_add(1);
-        self.handles.insert(record.canonical.clone(), handle);
+        self.handles.insert(record.key.clone(), handle);
         self.records.insert(handle, Arc::new(record));
         while self.records.len() > CAPACITY {
             let Some((_, evicted)) = self.records.pop_first() else {
                 break;
             };
-            self.handles.remove(&evicted.canonical);
+            self.handles.remove(&evicted.key);
         }
         handle
     }
 }
 
-/// Every concept identifier a sub-expression names, focus concepts, attribute
-/// types, attribute values, and everything a nested sub-expression names.
-fn named_concepts(sub: &ast::SubExpression) -> Vec<&str> {
-    let mut out: Vec<&str> = sub
-        .focus
-        .iter()
-        .map(|concept| concept.concept_id.as_str())
-        .collect();
+/// Every concept reference a sub-expression writes, in the order written:
+/// focus concepts, attribute types, attribute values, and everything a nested
+/// sub-expression writes.
+fn written_references(sub: &ast::SubExpression) -> Vec<&ast::ConceptReference> {
+    let mut out: Vec<&ast::ConceptReference> = sub.focus.iter().collect();
     let Some(refinement) = &sub.refinement else {
         return out;
     };
     let groups = refinement.groups.iter().flat_map(|g| g.attributes.iter());
     for attribute in refinement.ungrouped.iter().chain(groups) {
-        out.push(&attribute.name.concept_id);
+        out.push(&attribute.name);
         match &attribute.value {
-            ast::AttributeValue::Concept(concept) => out.push(&concept.concept_id),
-            ast::AttributeValue::Nested(nested) => out.extend(named_concepts(nested)),
+            ast::AttributeValue::Concept(concept) => out.push(concept),
+            ast::AttributeValue::Nested(nested) => out.extend(written_references(nested)),
             ast::AttributeValue::Text(_) | ast::AttributeValue::Number(_) => {}
         }
     }
     out
+}
+
+/// Every concept identifier a sub-expression names.
+fn named_concepts(sub: &ast::SubExpression) -> Vec<&str> {
+    written_references(sub)
+        .into_iter()
+        .map(|concept| concept.concept_id.as_str())
+        .collect()
+}
+
+/// The terms a sub-expression's references carry, in the order written.
+fn sent_terms(sub: &ast::SubExpression) -> Vec<&str> {
+    written_references(sub)
+        .into_iter()
+        .filter_map(|concept| concept.term.as_deref())
+        .collect()
 }
 
 /// A reference the renderer writes: the code, and the term when one is asked
@@ -328,9 +344,15 @@ impl SnomedProvider {
         };
         let defined = tree.status() == ast::DefinitionStatus::EquivalentTo;
         let canonical = self.render(&tree, defined, Terms::None)?;
+        let mut key = canonical.clone();
+        for written in sent_terms(&tree.sub_expression) {
+            key.push('|');
+            key.push_str(written);
+        }
         let record = Registered {
             tree,
             term,
+            key,
             canonical: canonical.clone(),
             defined,
         };
@@ -454,7 +476,7 @@ impl SnomedProvider {
         for concept in &sub.focus {
             out.push(reference(
                 &concept.concept_id,
-                self.term_of(&concept.concept_id, language)?,
+                self.term_for(concept, language)?,
             ));
         }
         Ok(out)
@@ -493,7 +515,7 @@ impl SnomedProvider {
         let value = match &attribute.value {
             ast::AttributeValue::Concept(concept) => normal_form::Value::Concept(reference(
                 &concept.concept_id,
-                self.term_of(&concept.concept_id, language)?,
+                self.term_for(concept, language)?,
             )),
             ast::AttributeValue::Nested(nested) => {
                 normal_form::Value::Nested(Box::new(normal_form::Expression {
@@ -509,7 +531,7 @@ impl SnomedProvider {
             group,
             kind: reference(
                 &attribute.name.concept_id,
-                self.term_of(&attribute.name.concept_id, language)?,
+                self.term_for(&attribute.name, language)?,
             ),
             value,
         })
@@ -522,6 +544,36 @@ impl SnomedProvider {
     /// no expression repository publishes one "the full expression with terms
     /// embedded may be used" (<https://hl7.org/fhir/R4B/snomedct.html>,
     /// "Display"), so the terms are this edition's own.
+    /// The term a reference the sender wrote is displayed with: the sender's
+    /// own when it is an active description of the concept, the edition's
+    /// otherwise.
+    fn term_for(
+        &self,
+        concept: &ast::ConceptReference,
+        language: Terms<'_>,
+    ) -> Result<Option<String>, ProviderError> {
+        // NOTE: a term may be "the term from any SNOMED CT description" of the
+        // concept (§5), and §7.5 allows the expression as authored, so a valid
+        // sent term is kept and only a missing or foreign one is the edition's.
+        if let (Terms::In(_), Some(written)) = (language, &concept.term)
+            && let Some(ordinal) = self
+                .stored()
+                .store
+                .ordinal(&concept.concept_id)
+                .map_err(storage)?
+            && self
+                .stored()
+                .store
+                .designations(ordinal)
+                .map_err(storage)?
+                .iter()
+                .any(|d| d.active && d.term == *written)
+        {
+            return Ok(Some(written.clone()));
+        }
+        self.term_of(&concept.concept_id, language)
+    }
+
     fn term_of(&self, code: &str, language: Terms<'_>) -> Result<Option<String>, ProviderError> {
         let Terms::In(language) = language else {
             return Ok(None);

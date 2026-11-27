@@ -158,7 +158,7 @@ async fn lookup_answers_the_canonical_expression_and_a_generated_display() {
         assert_eq!(
             parameter(&answer, "display").unwrap()["valueString"],
             format!(
-                "=== {} |Cat| : {} |Has covering| = {} |Fur|",
+                "{}|Cat|:{}|Has covering|={}|Fur|",
                 sctid(item(CAT)),
                 sctid(item(COVERING)),
                 sctid(item(FUR))

@@ -240,7 +240,7 @@ fn a_post_coordinated_expression_is_refused_for_the_grammar_not_as_an_unknown_co
     let outcome = lookup::lookup(&registry, &Invocation::Type, &input).expect("looks up");
     assert_eq!(
         outcome.code,
-        format!("=== {} : {} = {}", code(CAT), code(COVERING), code(FUR)),
+        format!("{}:{}={}", code(CAT), code(COVERING), code(FUR)),
         "the answer is the expression in one canonical order"
     );
 
