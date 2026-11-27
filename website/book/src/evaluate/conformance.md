@@ -56,9 +56,10 @@ the suite's other modes, which run by hand and are not in these counts.
 | The cases send an input the operation does not declare (`codingX` in a batch, `targetcode` on R4), and FerroTERM refuses an undeclared input. | [#349](https://github.com/FerroHEALTH/FerroTERM/issues/349) | 3 | 2 | 2 |
 | **Total not passing** | | 61 | 75 | 61 |
 
-The first two rows do not apply on their surface. Each badge counts them
-as `n/a` beside the pass count, so R4 reads `744 / 805 (5 n/a)`: 56 of its
-cases are FerroTERM's to answer for, 52 on R5 and 55 on R4B. The cases and
+The first two rows do not apply on their surface: 5 cases on R4, 20 on
+R4B and 9 on R5. Each badge shows the pass count alone, so R4 reads
+`744/805`, and of the 61 cases R4 does not pass, 56 are FerroTERM's to
+answer for, 52 on R5 and 55 on R4B. The cases and
 their reasons are listed in `conformance/tx-ecosystem/not-applicable.tsv`,
 which every CI run of the suite checks against the cases the runner skipped.
 
@@ -71,7 +72,7 @@ Every row is a gate or an upstream report.
 
 The suite's other modes need licensed content or a code system FerroTERM does
 not load, so they run by hand before a release, not in CI. Each has its own
-badge, which reads `passed/ran, by hand <day>`: `ran` is the number of cases
+badge, labelled `tx <suite> <mode> <surface>`, which reads `passed/ran <day>`: `ran` is the number of cases
 that run executed and `<day>` the day it was measured, both recorded in
 `conformance/tx-ecosystem/hand-run.tsv`. A badge that names a day is a record
 of that run, not a live result.
@@ -104,12 +105,12 @@ Health Data Space terminology work. Each counts a committed corpus that a
 test proves over synthetic or freely licensed data, because FerroTERM ships
 no licensed content; neither is a certification or a conformity assessment.
 
-- **MyHealth@EU MVC 10.1.0 (CI) import** counts the value sets of a synthetic
-  package shaped like the Master Value Sets Catalogue that the server answers
-  after `ferroterm-build --fhir-package` imports it
+- **MyHealth@EU MVC 10.1.0 import** counts the value sets of a synthetic
+  package shaped like the CI build of the Master Value Sets Catalogue 10.1.0
+  that the server answers after `ferroterm-build --fhir-package` imports it
   (`conformance/ehds/mvc-synthetic.tsv`, held to the fixture by a server
   test). The real catalogue is the operator's to load.
-- **EEHRxF draft 2026-11-23 Art 6 code systems** counts the coding systems of
+- **EEHRxF draft 2026-11-23 Art 6** counts the coding systems of
   the draft EEHRxF implementing act whose loader a test proves over a
   synthetic fixture, of the 16 the draft names
   (`conformance/ehds/art6-code-systems.tsv`, each row naming its test,

@@ -20,6 +20,11 @@
 #                            fails for each endpoint badge whose colour does
 #                            not follow its count, or, with no count, is not
 #                            the informational blue
+#   badge_length_check FILE...
+#                            fails for each endpoint badge whose label runs
+#                            past badge_label_max characters or whose
+#                            message runs past badge_message_max
+#   badge_length_self_test   the cases of the one above
 #   badge_post_quantum TSV   the endpoint JSON of the post-quantum badge of
 #                            the inventory TSV: label post-quantum, message
 #                            <safe>/<total>, coloured by the count
@@ -138,6 +143,53 @@ badge_color_check() {
     fi
   done
   [[ "$failures" -eq 0 ]]
+}
+
+# NOTE: owner decision 2026-11-27; the label names the specification, the message is the count, the breakdown sits on the linked page.
+badge_label_max=30
+badge_message_max=20
+
+badge_length_check() {
+  local file label message failures=0
+  for file in "$@"; do
+    label="$(jq -r .label "$file")"
+    message="$(jq -r .message "$file")"
+    if [[ "$(jq '.label | length' "$file")" -gt "$badge_label_max" ]]; then
+      echo "badge length: $file has a label longer than $badge_label_max characters: $label" >&2
+      failures=$((failures + 1))
+    fi
+    if [[ "$(jq '.message | length' "$file")" -gt "$badge_message_max" ]]; then
+      echo "badge length: $file has a message longer than $badge_message_max characters: $message" >&2
+      failures=$((failures + 1))
+    fi
+  done
+  [[ "$failures" -eq 0 ]]
+}
+
+badge_length_self_test() {
+  local work
+  work="$(mktemp -d)"
+  badge_length_case() {
+    jq -cn --arg label "$1" --arg message "$2" '{schemaVersion: 1, label: $label, message: $message, color: "blue"}' > "$work/b.json"
+    if badge_length_check "$work/b.json" 2> /dev/null; then
+      [[ "$3" == pass ]] && return 0
+    else
+      [[ "$3" == fail ]] && return 0
+    fi
+    echo "badge length: self-test FAILED: label '$1' and message '$2' should $3" >&2
+    rm -f "$work/b.json"
+    rmdir "$work"
+    return 1
+  }
+  badge_length_case "Federation Tier 1.0.1" "364/383" pass || return 1
+  badge_length_case "$(printf 'x%.0s' {1..30})" "$(printf '9%.0s' {1..20})" pass || return 1
+  badge_length_case "OpenID Connect Core 1.0 · OIDF" "1/2" pass || return 1
+  badge_length_case "$(printf 'x%.0s' {1..31})" "1/2" fail || return 1
+  badge_length_case "OIDC Core 1.0 OP" "$(printf '9%.0s' {1..21})" fail || return 1
+  badge_length_case "OIDC Core 1.0 OP" "3/36 passed, 30 failed; open: #933" fail || return 1
+  rm -f "$work/b.json"
+  rmdir "$work"
+  echo "badge length: self-test OK"
 }
 
 # The header of a post-quantum inventory.
