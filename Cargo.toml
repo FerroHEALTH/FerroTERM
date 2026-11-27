@@ -78,14 +78,14 @@ toml = { version = "1.1.6", default-features = false, features = ["std", "parse"
 # the caller from the token's standard claims, the issuer registry under
 # `[auth.issuer.<name>]`, the Basic users and the client-credentials grant.
 # `server-tls` builds an outbound `tls` table through ferrohealth-server's
-# TlsClient. Verified against crates.io on 2026-11-25.
-ferrohealth-smart = { version = "=0.35.0", features = ["axum", "server-tls"] }
+# TlsClient. Verified against crates.io on 2026-11-28.
+ferrohealth-smart = { version = "=0.36.0", features = ["axum", "server-tls"] }
 # The FerroHEALTH console sign-in and session: the authorization code flow
 # with PKCE over ferrohealth-smart's relying party, the session store with
 # its idle and absolute lifetimes, and the four sign-in routes. Pinned
-# exactly, at the release beside ferrohealth-smart 0.35, whose `oidc` types
-# it carries. Verified against crates.io on 2026-11-25.
-ferrohealth-session = { version = "=0.30.0", features = ["axum"] }
+# exactly, at the release beside ferrohealth-smart 0.36, whose `oidc` types
+# it carries. Verified against crates.io on 2026-11-28.
+ferrohealth-session = { version = "=0.33.0", features = ["axum"] }
 # The FerroHEALTH health family: the readiness document, the indicator
 # registry and the process lifecycle, and the HTTP plumbing whose `health`
 # module serves `/health`, `/health/liveness` and `/health/readiness` over
@@ -214,27 +214,27 @@ fhir-search = { version = "0.1.131", default-features = false }
 # Each FHIR release is its own feature: the same four, which the console offers.
 # It builds its client from a ferrohealth-smart endpoint table
 # (`Client::from_endpoint`, feature `smart`, which the sync service turns on),
-# 0.22 builds on fhir-types 0.3 and ferrohealth-smart 0.35.
-ferrobridge-term = { version = "0.22.0", default-features = false, features = ["r4", "r4b", "r5", "r6"] }
+# 0.24 builds on fhir-types 0.4.
+ferrobridge-term = { version = "0.24.0", default-features = false, features = ["r4", "r4b", "r5", "r6"] }
 # Workspace-internal crates. The `crates/*` members carry the published crate
 # line (lockstep, bumped with their packaged content, never the product
 # version); the tools stay on the workspace version.
-rf2 = { path = "crates/rf2", version = "0.13.0" }
-loinc = { path = "crates/loinc", version = "0.13.0" }
-classification = { path = "crates/classification", version = "0.13.0" }
-dhd-thesaurus = { path = "crates/dhd-thesaurus", version = "0.13.0" }
-gstandaard = { path = "crates/gstandaard", version = "0.13.0" }
-labcodeset = { path = "crates/labcodeset", version = "0.13.0" }
-icd11 = { path = "crates/icd11", version = "0.13.0" }
-rxnorm-rrf = { path = "crates/rxnorm-rrf", version = "0.13.0" }
-concept-graph = { path = "crates/concept-graph", version = "0.13.0" }
-concept-store = { path = "crates/concept-store", version = "0.13.0" }
-designation-index = { path = "crates/designation-index", version = "0.13.0" }
-sct-ecl = { path = "crates/sct-ecl", version = "0.13.0" }
-sct-scg = { path = "crates/sct-scg", version = "0.13.0" }
-fhir-terminology = { path = "crates/fhir-terminology", version = "0.13.0" }
-terminology-syndication = { path = "crates/terminology-syndication", version = "0.13.0" }
-ferroterm-problem = { path = "crates/ferroterm-problem", version = "0.13.0" }
+rf2 = { path = "crates/rf2", version = "0.14.0" }
+loinc = { path = "crates/loinc", version = "0.14.0" }
+classification = { path = "crates/classification", version = "0.14.0" }
+dhd-thesaurus = { path = "crates/dhd-thesaurus", version = "0.14.0" }
+gstandaard = { path = "crates/gstandaard", version = "0.14.0" }
+labcodeset = { path = "crates/labcodeset", version = "0.14.0" }
+icd11 = { path = "crates/icd11", version = "0.14.0" }
+rxnorm-rrf = { path = "crates/rxnorm-rrf", version = "0.14.0" }
+concept-graph = { path = "crates/concept-graph", version = "0.14.0" }
+concept-store = { path = "crates/concept-store", version = "0.14.0" }
+designation-index = { path = "crates/designation-index", version = "0.14.0" }
+sct-ecl = { path = "crates/sct-ecl", version = "0.14.0" }
+sct-scg = { path = "crates/sct-scg", version = "0.14.0" }
+fhir-terminology = { path = "crates/fhir-terminology", version = "0.14.0" }
+terminology-syndication = { path = "crates/terminology-syndication", version = "0.14.0" }
+ferroterm-problem = { path = "crates/ferroterm-problem", version = "0.14.0" }
 # The source add-ons. Path-only and never published; only app/ferroterm-sync
 # may take one (scripts/checks/addon-boundary.sh).
 addon-nts = { path = "addons/nts" }

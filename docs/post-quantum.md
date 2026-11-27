@@ -81,7 +81,7 @@ only where a feed publishes nothing else.
 
 ## JOSE signatures
 
-`ferrohealth-smart` 0.35.0 signs and verifies every JWS in its `jws`
+`ferrohealth-smart` 0.36.0 signs and verifies every JWS in its `jws`
 module, ML-DSA-44, ML-DSA-65 and ML-DSA-87 (RFC 9964, `AKP` keys) among the
 algorithms. What it accepts on a verification is the list it is given:
 
@@ -94,9 +94,9 @@ algorithms. What it accepts on a verification is the list it is given:
   parameter sets to it.
 - **Client assertions:** a key signs with the algorithm of its kind, an
   ML-DSA key (RFC 9881 §6) with its parameter set and an RSA key with RS384.
-- **DPoP proofs FerroTERM makes:** the crate's `DpopKey` reads a P-256 or
-  P-384 key alone and signs ES256 or ES384. RFC 9449 §4.2 asks only for an
-  asymmetric algorithm, so moving it to ML-DSA is a change in that crate.
+- **DPoP proofs FerroTERM makes:** the crate's `DpopKey` reads a P-256,
+  P-384 or ML-DSA key (RFC 9881 §6) and signs with the algorithm of its
+  kind, ES256, ES384 or the key's ML-DSA parameter set.
 
 `[jose] post_quantum_only = true`, in the server's and the sync service's
 configuration, narrows every algorithm list of a JWT issuer (and of
@@ -126,10 +126,9 @@ it.
 | TLS record protection | AES-128-GCM, AES-256-GCM, ChaCha20-Poly1305 | yes | NIST IR 8547 4.1.3 | `ferrohealth-server tls` |
 | Access token and DPoP proof verification with [jose] post_quantum_only = true | ML-DSA-44, ML-DSA-65 or ML-DSA-87 (AKP) alone; off (the default), RS256, RS384, PS256, PS384, ES256 and ES384, and an ML-DSA parameter set where an algorithms list names it | yes | RFC 9964 | `ferrohealth-smart resource, app/ferroterm-server/src/config.rs, app/ferroterm-server/src/smart/mod.rs, app/ferroterm-sync/src/auth.rs` |
 | Client assertions of the outbound client credentials grant (private_key_jwt) with an ML-DSA key, as the examples configure it | ML-DSA-44, ML-DSA-65 or ML-DSA-87, the parameter set of the key (ML-DSA-65 in the examples); with a classical key RS384 by default, RS256 to PS512, ES256, ES384 or EdDSA | yes | RFC 9964 | `ferrohealth-smart client assertion, app/ferroterm-sync/src/revalidate.rs, addons/nts/src/source.rs` |
-| DPoP proofs of the outbound client credentials grant | ES256 or ES384, the only algorithms ferrohealth-smart 0.35.0 signs a DPoP proof with | no | RFC 9964 | `ferrohealth-smart client dpop, addons/nts/src/source.rs` |
+| DPoP proofs of the outbound client credentials grant | ES256 or ES384 with a P-256 or P-384 key; ML-DSA-44, ML-DSA-65 or ML-DSA-87 with an ML-DSA key, which ferrohealth-smart 0.36.0 reads | no | RFC 9964 | `ferrohealth-smart client dpop, addons/nts/src/source.rs` |
 | Console sign-in ID token verification with [jose] post_quantum_only = true | ML-DSA-44, ML-DSA-65 or ML-DSA-87 alone; off (the default), those beside RS256, RS384, RS512, PS256, PS384, PS512, ES256, ES384 and EdDSA | yes | RFC 9964 | `ferrohealth-smart oidc, app/ferroterm-console/src/config/mod.rs, app/ferroterm-console/src/server.rs` |
 | Console sign-in PKCE challenge | SHA-256 (S256) | yes | NIST IR 8547 4.1.3 | `ferrohealth-smart oidc, app/ferroterm-console/src/server.rs` |
-| Console session cookie in sealed mode | AES-256-GCM | yes | NIST IR 8547 4.1.3 | `ferrohealth-session sessions, app/ferroterm-console/src/config/settings.rs` |
 | Basic password hashing | Argon2id | yes | NIST IR 8547 4.1.3 | `ferrohealth-smart basic, app/ferroterm-server/src/smart/mod.rs, app/ferroterm-sync/src/auth.rs` |
 | Syndication download checksums where the feed publishes a SHA-256 | SHA-256 | yes | NIST IR 8547 4.1.3 | `crates/terminology-syndication/src/download.rs, crates/terminology-syndication/src/model.rs` |
 | Syndication download checksums where the feed publishes only sct:md5Hash | MD5 | no | NIST IR 8547 4.1.3 | `crates/terminology-syndication/src/download.rs, crates/terminology-syndication/src/model.rs` |

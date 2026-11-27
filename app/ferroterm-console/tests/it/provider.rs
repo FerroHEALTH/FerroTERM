@@ -225,22 +225,12 @@ pub(crate) fn held(state: &ConsoleState, pair: &str) -> Held {
 
 /// How many sessions the console's memory store holds.
 pub(crate) fn sessions_held(state: &ConsoleState) -> usize {
-    state
-        .sessions()
-        .occupancy()
-        .expect("usable")
-        .expect("a memory store")
-        .sessions
+    state.sessions().occupancy().expect("usable").sessions
 }
 
 /// How many pending sign-ins the console's memory store holds.
 pub(crate) fn sign_ins_held(state: &ConsoleState) -> usize {
-    state
-        .sessions()
-        .occupancy()
-        .expect("usable")
-        .expect("a memory store")
-        .sign_ins
+    state.sessions().occupancy().expect("usable").sign_ins
 }
 
 /// Sends `request` through the console's whole router over `state`.
