@@ -105,6 +105,16 @@ pub const FHIR_PROPERTIES: [(&str, PropertyKind); 6] = [
     ("child", PropertyKind::Code),
 ];
 
+/// `30051010000102 |LOINC code identifier|`, the identifier scheme of the
+/// LOINC codes the LOINC Extension states in the RF2 identifier file.
+const LOINC_SCHEME: u64 = 30_051_010_000_102;
+
+/// The property that carries a concept's LOINC code.
+const LOINC_PROPERTY: &str = "loinc";
+
+/// The code system of LOINC (<https://terminology.hl7.org/LOINC.html>).
+const LOINC_SYSTEM: &str = "http://loinc.org";
+
 /// A failure to open an artifact directory.
 #[derive(Debug, thiserror::Error)]
 pub enum OpenError {
@@ -501,6 +511,22 @@ impl StoredSystem for Snomed {
                 out.push(Property {
                     code: sctid.clone(),
                     value,
+                    ..Property::default()
+                });
+            }
+        }
+        // NOTE: the `loinc` property, a Coding of the code the RF2 identifier file
+        // gives in scheme 30051010000102, is the tx-ecosystem IG's `tx-source` readme
+        // (LOINC Extension content), its only source, pending SNOMED review.
+        for (scheme, code) in provider.system().identifiers.of_concept(ordinal) {
+            if scheme == LOINC_SCHEME {
+                out.push(Property {
+                    code: LOINC_PROPERTY.to_owned(),
+                    value: PropertyValue::Coding {
+                        system: LOINC_SYSTEM.to_owned(),
+                        code: code.to_owned(),
+                        display: None,
+                    },
                     ..Property::default()
                 });
             }

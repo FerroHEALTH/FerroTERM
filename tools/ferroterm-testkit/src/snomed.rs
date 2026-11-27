@@ -115,6 +115,11 @@ pub const NL_LANGUAGE_REFSET: u32 = 20;
 /// The bird, under the animal and a member of the pets reference set; only the
 /// second edition ([`write_second`]) holds it.
 pub const BIRD: u32 = 21;
+/// The published SCTID of `30051010000102 |LOINC code identifier|`, the scheme
+/// under which the cat carries [`CAT_LOINC`].
+pub const LOINC_SCHEME: u64 = 30_051_010_000_102;
+/// The cat's code in [`LOINC_SCHEME`], invented and of no LOINC release.
+pub const CAT_LOINC: &str = "SYNTH-1";
 /// The published SCTID of the ICD-10 extended map reference set.
 pub const ICD10_MAP_SCTID: &str = "447562003";
 /// The code system the ICD-10 extended map reference set maps to.

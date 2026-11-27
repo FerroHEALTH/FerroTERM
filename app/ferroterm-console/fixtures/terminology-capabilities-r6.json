@@ -676,7 +676,8 @@
             "normalForm",
             "normalFormTerse",
             "71234567106",
-            "81234567108"
+            "81234567108",
+            "loinc"
           ],
           "value": "http://snomed.info/sct/91234567105/version/20260101"
         }
@@ -1089,7 +1090,7 @@
       ]
     }
   ],
-  "date": "2026-11-27T11:25:37.350313Z",
+  "date": "2026-11-27T23:15:51.390284Z",
   "description": "Serves the FHIR R6 ballot (version 6.0.0-snapshot1). Every behaviour grounded only in the ballot is re-verified against the published specification when it appears, and may change with it.",
   "expansion": {
     "hierarchical": false,

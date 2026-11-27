@@ -41,10 +41,29 @@ pub enum IdentifiersError {
     Text(#[from] std::string::FromUtf8Error),
 }
 
-/// The alternate identifiers, sorted by scheme then code.
+/// The alternate identifiers, sorted by scheme then code, with an index by
+/// concept.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Identifiers {
     entries: Vec<(u64, String, u32)>,
+    /// The positions in `entries`, ordered by concept, then by position.
+    by_concept: Vec<u32>,
+}
+
+/// The positions of `entries` ordered by their concept.
+fn by_concept(entries: &[(u64, String, u32)]) -> Vec<u32> {
+    let mut positions: Vec<u32> = (0..entries.len())
+        .filter_map(|position| u32::try_from(position).ok())
+        .collect();
+    positions.sort_by_key(|position| {
+        (
+            entries
+                .get(to_usize(*position))
+                .map(|(_, _, concept)| *concept),
+            *position,
+        )
+    });
+    positions
 }
 
 impl Identifiers {
@@ -53,11 +72,13 @@ impl Identifiers {
     pub fn new(mut entries: Vec<(u64, String, Ordinal)>) -> Self {
         entries.sort();
         entries.dedup();
+        let entries: Vec<(u64, String, u32)> = entries
+            .into_iter()
+            .map(|(scheme, code, concept)| (scheme, code, concept.index()))
+            .collect();
         Self {
-            entries: entries
-                .into_iter()
-                .map(|(scheme, code, concept)| (scheme, code, concept.index()))
-                .collect(),
+            by_concept: by_concept(&entries),
+            entries,
         }
     }
 
@@ -65,11 +86,11 @@ impl Identifiers {
     /// ([`crate::footprint`]).
     #[must_use]
     pub fn size_in_bytes(&self) -> usize {
-        self.entries
-            .iter()
-            .fold(crate::footprint::vector(&self.entries), |total, entry| {
-                total.saturating_add(entry.1.capacity())
-            })
+        self.entries.iter().fold(
+            crate::footprint::vector(&self.entries)
+                .saturating_add(crate::footprint::vector(&self.by_concept)),
+            |total, entry| total.saturating_add(entry.1.capacity()),
+        )
     }
 
     /// The concept identified by `code` in `scheme`.
@@ -79,6 +100,36 @@ impl Identifiers {
             .binary_search_by(|(s, c, _)| (*s, c.as_str()).cmp(&(scheme, code)))
             .ok()
             .and_then(|i| self.entries.get(i))
+            .map(|(_, _, concept)| Ordinal::new(*concept))
+    }
+
+    /// The `(scheme, code)` identifiers of `concept`, by scheme then code.
+    pub fn of_concept(&self, concept: Ordinal) -> impl Iterator<Item = (u64, &str)> + '_ {
+        let held = |position: &u32| {
+            self.entries
+                .get(to_usize(*position))
+                .map(|(_, _, held)| *held)
+        };
+        let start = self
+            .by_concept
+            .partition_point(|position| held(position) < Some(concept.index()));
+        self.by_concept
+            .get(start..)
+            .unwrap_or_default()
+            .iter()
+            .take_while(move |position| held(position) == Some(concept.index()))
+            .filter_map(|position| self.entries.get(to_usize(*position)))
+            .map(|(scheme, code, _)| (*scheme, code.as_str()))
+    }
+
+    /// The concepts that have an identifier in `scheme`, ascending by code.
+    pub fn concepts(&self, scheme: u64) -> impl Iterator<Item = Ordinal> + '_ {
+        let start = self.entries.partition_point(|(s, _, _)| *s < scheme);
+        self.entries
+            .get(start..)
+            .unwrap_or_default()
+            .iter()
+            .take_while(move |(s, _, _)| *s == scheme)
             .map(|(_, _, concept)| Ordinal::new(*concept))
     }
 
@@ -152,7 +203,10 @@ impl Identifiers {
             entries.push((u64::from_le_bytes(long), String::from_utf8(bytes)?, concept));
         }
         entries.sort();
-        Ok(Self { entries })
+        Ok(Self {
+            by_concept: by_concept(&entries),
+            entries,
+        })
     }
 }
 
@@ -181,6 +235,17 @@ mod tests {
         assert_eq!(identifiers.lookup(900, "54486-6"), Some(Ordinal::new(5)));
         assert_eq!(identifiers.lookup(705_114_005, "9999"), None);
         assert_eq!(identifiers.schemes(), [900, 705_114_005]);
+        let of = |concept| {
+            identifiers
+                .of_concept(Ordinal::new(concept))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(of(3), [(705_114_005, "54486-6")]);
+        assert_eq!(of(5), [(900, "54486-6")]);
+        assert!(of(6).is_empty());
+        let schemed: Vec<Ordinal> = identifiers.concepts(705_114_005).collect();
+        assert_eq!(schemed, [Ordinal::new(4), Ordinal::new(3)]);
+        assert_eq!(identifiers.concepts(1).count(), 0);
         let mut bytes = Vec::new();
         identifiers.write_to(&mut bytes).expect("writes");
         assert_eq!(

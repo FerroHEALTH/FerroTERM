@@ -6,8 +6,8 @@
 
 use super::implicit::implicit_forms;
 use super::{
-    EXPRESSIONS, FHIR_PROPERTIES, GENERATED_PROPERTIES, Keys, Manifest, OpenError, SYSTEM, Snomed,
-    SnomedProvider,
+    EXPRESSIONS, FHIR_PROPERTIES, GENERATED_PROPERTIES, Keys, LOINC_PROPERTY, LOINC_SCHEME,
+    Manifest, OpenError, SYSTEM, Snomed, SnomedProvider,
 };
 use crate::provider::Identity;
 use crate::provider::declaration::{
@@ -85,6 +85,16 @@ impl SnomedProvider {
             description: None,
             kind: PropertyKind::Code,
         }));
+        if identifiers.schemes().contains(&LOINC_SCHEME) {
+            properties.push(PropertyDefinition {
+                code: LOINC_PROPERTY.to_owned(),
+                uri: None,
+                description: Some(String::from(
+                    "The LOINC code the LOINC Extension gives the concept",
+                )),
+                kind: PropertyKind::Coding,
+            });
+        }
         let identity = Identity {
             url: SYSTEM.to_owned(),
             version: manifest.version,

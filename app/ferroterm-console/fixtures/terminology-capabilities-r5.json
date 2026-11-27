@@ -677,7 +677,8 @@
             "normalForm",
             "normalFormTerse",
             "71234567106",
-            "81234567108"
+            "81234567108",
+            "loinc"
           ]
         }
       ]
@@ -1089,7 +1090,7 @@
       ]
     }
   ],
-  "date": "2026-11-27T11:25:37.338522Z",
+  "date": "2026-11-27T23:15:51.377529Z",
   "expansion": {
     "hierarchical": false,
     "incomplete": false,
