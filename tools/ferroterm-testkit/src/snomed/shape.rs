@@ -32,7 +32,7 @@ pub(super) fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureEr
     let module = sctid(Item::raw(99));
     let fsn = 0;
     let syn = 1;
-    let (gb, nl) = (0, 1);
+    let (gb, nl, us) = (0, 1, 2);
     let (preferred, acceptable) = (0, 1);
     // The association reference set concepts share one shape: a published SCTID,
     // the metadata fully specified name, and the bare name as the synonym.
@@ -154,6 +154,7 @@ pub(super) fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureEr
                     vec![(gb, preferred)],
                 ),
                 ("Leg count", "en", syn, true, vec![(gb, preferred)]),
+                ("Number of legs", "en", syn, true, vec![(us, preferred)]),
             ],
         },
         Row {
@@ -369,7 +370,10 @@ pub(super) fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureEr
             .position(|(o, _)| *o == ordinal)
             .unwrap_or_default())
     };
-    edition::write_designation_vocabularies(&mut builder, gb, nl)?;
+    edition::write_designation_vocabularies(
+        &mut builder,
+        edition::LanguageOrdinals { gb, nl, us },
+    )?;
 
     let mut text = IndexBuilder::default();
     write_concepts(&mut builder, &mut text, &rows, &is_a, &module)?;

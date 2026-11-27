@@ -174,7 +174,8 @@ struct Keys {
     fsn: u32,
     synonym: u32,
     definition: u32,
-    /// Language reference sets: (ordinal, SCTID as text), sorted by ordinal.
+    /// Language reference sets: (ordinal, SCTID as text), in ascending SCTID
+    /// order.
     refsets: Vec<(u32, String)>,
 }
 
@@ -200,6 +201,9 @@ pub struct Snomed {
     keys: Keys,
     edition: String,
     base_language: String,
+    /// The configured default tag when it is in the base language, so a
+    /// dialect such as `en-US` decides the default display.
+    default_tag: String,
 }
 
 impl std::fmt::Debug for Snomed {
