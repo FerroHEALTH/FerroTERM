@@ -167,14 +167,15 @@ impl<'a> Reader<'a> {
         Ok(i64::from_le_bytes(bytes))
     }
     fn str(&mut self) -> Result<String, RecordError> {
+        self.borrowed_str().map(str::to_owned)
+    }
+    fn borrowed_str(&mut self) -> Result<&'a str, RecordError> {
         let Ok(len) = usize::try_from(self.u32()?) else {
             return Err(RecordError::Truncated { at: self.at });
         };
         let at = self.at;
         let bytes = self.take(len)?;
-        std::str::from_utf8(bytes)
-            .map(str::to_owned)
-            .map_err(|source| RecordError::Utf8 { at, source })
+        std::str::from_utf8(bytes).map_err(|source| RecordError::Utf8 { at, source })
     }
     fn opt_str(&mut self) -> Result<Option<String>, RecordError> {
         match self.u8()? {
@@ -280,12 +281,23 @@ impl Displays {
     ///
     /// Returns [`RecordError`] when the entries are truncated or not UTF-8.
     pub fn find(bytes: &[u8], refset: u32) -> Result<Option<(String, String)>, RecordError> {
+        Ok(Self::find_borrowed(bytes, refset)?
+            .map(|(language, term)| (language.to_owned(), term.to_owned())))
+    }
+
+    /// [`Self::find`] borrowing the language and term from `bytes`, so a
+    /// caller that rejects the language allocates nothing.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RecordError`] when the entries are truncated or not UTF-8.
+    pub fn find_borrowed(bytes: &[u8], refset: u32) -> Result<Option<(&str, &str)>, RecordError> {
         let mut r = Reader { bytes, at: 0 };
         let count = r.u32()?;
         for _ in 0..count {
             let entry_refset = r.u32()?;
-            let language = r.str()?;
-            let term = r.str()?;
+            let language = r.borrowed_str()?;
+            let term = r.borrowed_str()?;
             if entry_refset == refset {
                 return Ok(Some((language, term)));
             }
