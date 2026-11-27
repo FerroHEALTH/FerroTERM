@@ -29,7 +29,7 @@ use fhir_terminology::valueset;
 use fhir_terminology::valueset::store::ValueSetStore;
 
 use ferroterm_testkit::snomed;
-use ferroterm_testkit::snomed::{ANIMAL, CAT, COVERING, DOG, FISH, FUR, LEGS, VERSION, code};
+use ferroterm_testkit::snomed::{ANIMAL, CAT, COVERING, DOG, FISH, FUR, LEGS, TOP, VERSION, code};
 
 fn registry() -> (tempfile::TempDir, Registry) {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -392,12 +392,12 @@ fn closure_relates_an_expression_to_the_concepts_a_table_holds() {
     );
 }
 
-/// The value set an `expressions` filter builds, with `value` when one is
-/// given and the concept filter alone otherwise.
-fn value_set(expressions: Option<&str>) -> serde_json::Value {
+/// The value set of `concept <op> <animal>` with an `expressions` filter of
+/// `value` when one is given and the concept filter alone otherwise.
+fn value_set(op: &str, expressions: Option<&str>) -> serde_json::Value {
     let mut filters = vec![serde_json::json!({
         "property": "concept",
-        "op": "is-a",
+        "op": op,
         "value": code(ANIMAL),
     })];
     if let Some(value) = expressions {
@@ -416,15 +416,19 @@ fn value_set(expressions: Option<&str>) -> serde_json::Value {
 }
 
 fn in_value_set(expressions: Option<&str>, code: &str) -> bool {
-    vs_validated(expressions, code).result
+    vs_validated("is-a", expressions, code).result
 }
 
-fn vs_validated(expressions: Option<&str>, code: &str) -> value_set_validate_code::Validation {
+fn vs_validated(
+    op: &str,
+    expressions: Option<&str>,
+    code: &str,
+) -> value_set_validate_code::Validation {
     let (_dir, registry) = registry();
     let sets = tempfile::tempdir().expect("tempdir");
     std::fs::write(
         sets.path().join("valueset-animals.json"),
-        serde_json::to_string(&value_set(expressions)).expect("serialises"),
+        serde_json::to_string(&value_set(op, expressions)).expect("serialises"),
     )
     .expect("writes");
     let mut value_sets = ValueSetStore::default();
@@ -466,13 +470,13 @@ fn a_value_set_validation_echoes_the_code_as_sent() {
         code(FUR)
     );
     for (expressions, member) in [(Some("true"), true), (Some("false"), false)] {
-        let outcome = vs_validated(expressions, &reversed);
+        let outcome = vs_validated("is-a", expressions, &reversed);
         assert_eq!(outcome.result, member, "{expressions:?}");
         assert_eq!(outcome.code.as_deref(), Some(reversed.as_str()));
         assert_eq!(outcome.normalized_code.as_deref(), Some(normal.as_str()));
     }
     let spaced = format!("{} |Cat| : {} = {}", code(CAT), code(COVERING), code(FUR));
-    let outcome = vs_validated(Some("true"), &spaced);
+    let outcome = vs_validated("is-a", Some("true"), &spaced);
     assert!(outcome.result);
     assert_eq!(outcome.code.as_deref(), Some(spaced.as_str()));
     assert_eq!(outcome.normalized_code, None);
@@ -508,6 +512,26 @@ fn an_expression_outside_the_value_set_is_refused_even_where_expressions_are_all
     // The fish sits under no concept, so it is outside `is-a <animal>`.
     let outside = format!("=== {}", code(FISH));
     assert!(!in_value_set(Some("true"), &outside));
+}
+
+#[test]
+fn one_focus_concept_inside_a_hierarchy_filter_admits_the_expression() {
+    // "The meaning of the expression is a subtype of all the focus concepts"
+    // (Compositional Grammar §5), so the cat alone puts it under the animal.
+    let expression = format!(
+        "{}+{} : {} = {}",
+        code(CAT),
+        code(FUR),
+        code(COVERING),
+        code(FUR)
+    );
+    for op in ["is-a", "descendent-of"] {
+        assert!(vs_validated(op, Some("true"), &expression).result, "{op}");
+    }
+    let outside = format!("{}+{}", code(FUR), code(TOP));
+    for op in ["is-a", "descendent-of"] {
+        assert!(!vs_validated(op, Some("true"), &outside).result, "{op}");
+    }
 }
 
 #[test]
