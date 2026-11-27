@@ -299,6 +299,11 @@ jobs:
         run: |
           bash scripts/checks/ehds-matrix.sh
           bash scripts/checks/conformance-badges.sh --self-test
+      # A tx-ecosystem mode lane prints only case names and counts, never a
+      # line that may quote licensed content into the public log (#1437).
+      - name: tree-guards / tx-ecosystem-mode
+        if: ${{ !cancelled() }}
+        run: bash scripts/checks/tx-ecosystem-mode.sh --self-test
       # The post-quantum inventory is well formed, names files that exist and
       # matches the table of docs/post-quantum.md; the README carries its
       # badge (#1321).
