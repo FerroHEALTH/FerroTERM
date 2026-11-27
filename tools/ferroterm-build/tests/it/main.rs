@@ -12,6 +12,7 @@
 
 mod archive;
 mod classification;
+mod cli_reference;
 mod dhd;
 mod fhir_package;
 mod fixture;

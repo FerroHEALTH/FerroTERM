@@ -20,6 +20,7 @@
 mod admin;
 mod api;
 mod auth;
+mod cli_reference;
 mod credentials;
 mod exit;
 mod failure;

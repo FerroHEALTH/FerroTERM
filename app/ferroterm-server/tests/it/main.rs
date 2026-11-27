@@ -16,7 +16,9 @@
 
 mod batch;
 mod batch_validate;
+mod book_tutorial;
 mod canonical;
+mod cli_reference;
 mod closure;
 mod code_system;
 mod concept_map;
