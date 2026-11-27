@@ -225,7 +225,7 @@ impl<M: Model> Evaluator<'_, M> {
     }
 
     /// The compiled tests of an attribute set, for per-group evaluation.
-    fn compile_set(&self, set: &AttributeSet) -> Result<CompiledSet, EvalError> {
+    pub(super) fn compile_set(&self, set: &AttributeSet) -> Result<CompiledSet, EvalError> {
         Ok(match set {
             AttributeSet::Single(one) => CompiledSet::Single(Box::new(self.compile_item(one)?)),
             AttributeSet::Conjunction(items) => CompiledSet::Conjunction(
@@ -252,7 +252,7 @@ impl<M: Model> Evaluator<'_, M> {
         })
     }
 
-    fn compile(&self, attribute: &Attribute) -> Result<AttributeTest, EvalError> {
+    pub(super) fn compile(&self, attribute: &Attribute) -> Result<AttributeTest, EvalError> {
         let kinds = self.kinds(&attribute.name)?;
         let value = match &attribute.value {
             AttributeValue::Expression { operator, value } => {

@@ -491,9 +491,11 @@ fn the_expressions_filter_decides_whether_a_value_set_admits_an_expression() {
         !in_value_set(Some("false"), &expression),
         "`expressions = false` refuses it"
     );
+    // "Any value set that does not say `expressions = false` admits
+    // post-coordinated expressions" (the ecosystem IG, requirements, SNOMED CT).
     assert!(
-        !in_value_set(None, &expression),
-        "a value set that states no `expressions` filter refuses it"
+        in_value_set(None, &expression),
+        "a value set that states no `expressions` filter admits it"
     );
     // The precoordinated concept is a member either way.
     for filter in [Some("true"), Some("false"), None] {
@@ -775,5 +777,88 @@ fn the_display_keeps_a_term_the_sender_wrote_when_it_describes_the_concept() {
             .as_str()
         ),
         "a description of the concept is kept, a foreign term and a missing one are the edition's"
+    );
+}
+
+/// Whether `code` validates against a value set selecting `ecl`, with
+/// expressions allowed.
+fn in_constraint(ecl: &str, code: &str) -> bool {
+    let (_dir, registry) = registry();
+    let sets = tempfile::tempdir().expect("tempdir");
+    let value_set = serde_json::json!({
+        "resourceType": "ValueSet",
+        "url": "http://example.org/vs/constraint",
+        "status": "active",
+        "compose": { "include": [{ "system": SYSTEM, "filter": [
+            { "property": "constraint", "op": "=", "value": ecl },
+            { "property": "expressions", "op": "=", "value": "true" }
+        ] }] },
+    });
+    std::fs::write(
+        sets.path().join("valueset-constraint.json"),
+        serde_json::to_string(&value_set).expect("serialises"),
+    )
+    .expect("writes");
+    let mut value_sets = ValueSetStore::default();
+    for model in valueset::load::load_dir(sets.path(), FhirVersion::R4B).expect("loads") {
+        value_sets.insert(model).expect("stores");
+    }
+    let concept_maps = ConceptMapStore::default();
+    let sources = Sources {
+        registry: &registry,
+        value_sets: &value_sets,
+        concept_maps: &concept_maps,
+    };
+    let request = ValueSetValidateInput {
+        url: Some(String::from("http://example.org/vs/constraint")),
+        system: Some(SYSTEM.to_owned()),
+        code: Some(code.to_owned()),
+        ..ValueSetValidateInput::default()
+    };
+    value_set_validate_code::validate_code(&sources, &request)
+        .expect("validates")
+        .result
+}
+
+#[test]
+fn an_expression_constraint_is_tested_against_the_expression_itself() {
+    // An expression constraint defines "a bounded set of clinical meanings
+    // represented by either precoordinated or postcoordinated expressions"
+    // (ECL 1 Introduction).
+    let cat_with_fur = refined(CAT, COVERING, FUR);
+    assert!(
+        in_constraint(&format!("< {}", code(CAT)), &cat_with_fur),
+        "a refined expression is a proper subtype of its focus concept"
+    );
+    assert!(
+        !in_constraint(&format!("<! {}", code(CAT)), &cat_with_fur),
+        "a concept of the edition may sit between it and its focus concept"
+    );
+    assert!(!in_constraint(&code(CAT), &cat_with_fur));
+    assert!(in_constraint(
+        &format!("< {} : {} = {}", code(ANIMAL), code(COVERING), code(FUR)),
+        &cat_with_fur
+    ));
+    assert!(
+        !in_constraint(
+            &format!("< {} : [0..0] {} = *", code(ANIMAL), code(COVERING)),
+            &cat_with_fur
+        ),
+        "the expression states a covering"
+    );
+    assert!(in_constraint(
+        &format!("* MINUS << {}", code(FISH)),
+        &cat_with_fur
+    ));
+    assert!(!in_constraint(
+        &format!("<< {} MINUS << {}", code(ANIMAL), code(CAT)),
+        &cat_with_fur
+    ));
+    assert!(
+        in_constraint(
+            &format!("< {}", code(ANIMAL)),
+            &format!("=== {}", code(CAT))
+        ),
+        "an expression that refines nothing is its focus concept"
     );
 }

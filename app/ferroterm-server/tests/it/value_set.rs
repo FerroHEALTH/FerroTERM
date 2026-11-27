@@ -315,7 +315,13 @@ async fn expand_and_validate_code_answer_an_ecl_implicit_value_set() {
         .await;
     assert_ne!(status, StatusCode::INTERNAL_SERVER_ERROR, "{body}");
     assert_eq!(body["resourceType"], "OperationOutcome");
-    assert_eq!(body["issue"][0]["code"], "code-invalid", "{body}");
+    // tx-issue-type: `vs-invalid` is "a problem processing a value set", and the
+    // concept is part of the value set's definition, not a provided code.
+    assert_eq!(body["issue"][0]["code"], "invalid", "{body}");
+    assert_eq!(
+        body["issue"][0]["details"]["coding"][0]["code"], "vs-invalid",
+        "{body}"
+    );
 }
 
 #[tokio::test]
@@ -520,8 +526,8 @@ async fn a_malformed_filter_expression_states_the_filter_and_the_column() {
         assert_eq!(issue["code"], "invalid", "{version}: {body}");
         assert_eq!(
             issue["expression"],
-            json!(["Parameters.parameter[1].resource.compose.include[1].filter[1].value"]),
-            "{version}: the second filter of the second include of the second parameter"
+            json!(["ValueSet.compose.include[1].filter[1]"]),
+            "{version}: the second filter of the second include of the inline value set"
         );
         assert_eq!(
             line_and_column(issue),
@@ -644,7 +650,7 @@ async fn validate_code_against_an_inline_value_set_states_the_filter_and_the_col
         let issue = &body["issue"][0];
         assert_eq!(
             issue["expression"],
-            json!(["Parameters.parameter[0].resource.compose.exclude[0].filter[0].value"]),
+            json!(["ValueSet.compose.exclude[0].filter[0]"]),
             "{version}: {body}"
         );
         assert_eq!(
@@ -790,4 +796,48 @@ async fn a_concept_the_value_set_marks_deprecated_by_standards_status_is_warned_
                 .is_some_and(|t| t.contains("marked with a status of deprecated"))),
         "{body}"
     );
+}
+
+/// A well-formed constraint naming a concept the edition lacks makes the
+/// inline value set invalid: `vs-invalid` is "a problem processing a value
+/// set" (tx-issue-type), and the issue names the filter in that value set
+/// (the ecosystem IG, requirements, Issues and Messages).
+#[tokio::test]
+async fn an_unknown_concept_in_an_inline_constraint_is_a_value_set_refusal_at_its_filter() {
+    let server = Server::start();
+    for version in VERSIONS {
+        let (status, body) = server
+            .post(
+                &format!("/{version}/ValueSet/$expand"),
+                &json!({"resourceType": "Parameters", "parameter": [
+                    {"name": "valueSet", "resource": {"resourceType": "ValueSet", "status": "active",
+                        "compose": {"include": [{"system": "http://snomed.info/sct", "filter": [
+                            {"property": "constraint", "op": "=", "value": "< 999999999"}
+                        ]}]}}}
+                ]}),
+            )
+            .await;
+        assert_eq!(
+            status,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "{version}: {body}"
+        );
+        let issue = &body["issue"][0];
+        assert_eq!(issue["code"], "invalid", "{version}: {body}");
+        assert_eq!(
+            issue["details"]["coding"][0]["code"], "vs-invalid",
+            "{version}: {body}"
+        );
+        assert_eq!(
+            issue["expression"],
+            json!(["ValueSet.compose.include[0].filter[0]"]),
+            "{version}: {body}"
+        );
+        assert!(
+            issue["details"]["text"]
+                .as_str()
+                .is_some_and(|text| text.contains("999999999")),
+            "{version}: {body}"
+        );
+    }
 }

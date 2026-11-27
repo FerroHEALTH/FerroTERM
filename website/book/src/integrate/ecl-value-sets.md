@@ -137,10 +137,13 @@ query string has to percent-encode every one of them.
 - `$closure` relates an expression to the concepts a table already holds.
 
 The `expressions` filter decides whether a *filtered* include admits one:
-`{"property": "expressions", "op": "=", "value": "true"}`. A filtered include
-that states `false`, or states no `expressions` filter at all, refuses an
-expression; one that states `true` admits an expression whose focus concepts it
-contains. An include that *enumerates* an expression in
+`{"property": "expressions", "op": "=", "value": "false"}` refuses every
+expression, and an include that states `true`, or states no `expressions`
+filter at all, admits one, as the terminology ecosystem IG requires. An
+admitted expression is tested against a `constraint` filter as ECL defines it
+over post-coordinated expressions: it sits below its focus concepts, with its
+own attributes beside theirs. So `39607008:272741003=24028007` is in
+`< 39607008`. Any other filter admits it when its focus concepts pass. An include that *enumerates* an expression in
 `compose.include.concept` contains it whichever way either side spells it, and
 carries no filter at all, since `vsd-3` forbids one beside enumerated concepts.
 An expansion lists only the expressions a value set enumerates, and

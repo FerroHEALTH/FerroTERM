@@ -336,12 +336,15 @@ impl StoredSystem for Snomed {
         SnomedProvider::is_expression_handle(concept)
     }
 
-    /// `expressions = true` is the filter that admits post-coordination
-    /// (<https://hl7.org/fhir/R4B/snomedct.html>, "Filter Properties").
-    fn admits_post_coordination(_provider: &SnomedProvider, filter: &Filter) -> bool {
-        filter.op == FilterOperator::Equal
-            && filter.property == EXPRESSIONS
-            && filter.value.trim() == "true"
+    // NOTE: "Any value set that does not say `expressions = false` admits
+    // post-coordinated expressions" (tx-ecosystem IG, requirements, SNOMED CT,
+    // post-coordination agreed scope); the FHIR filter states no default.
+    fn admits_post_coordination(_provider: &SnomedProvider, filters: &[Filter]) -> bool {
+        !filters.iter().any(|filter| {
+            filter.op == FilterOperator::Equal
+                && filter.property == EXPRESSIONS
+                && filter.value.trim() == "false"
+        })
     }
 
     fn code(provider: &SnomedProvider, concept: Concept) -> Result<Option<String>, ProviderError> {

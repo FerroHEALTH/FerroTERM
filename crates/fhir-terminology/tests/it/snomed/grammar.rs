@@ -43,9 +43,9 @@ fn ecl_arrives_as_the_constraint_filter_and_the_ecl_implicit_value_set() {
     assert!(
         matches!(
             p.filter(&filter("<< 999999999")),
-            Err(ProviderError::InvalidCode { code, .. }) if code == "999999999"
+            Err(ProviderError::UnusableConcept(unusable)) if unusable.code == "999999999"
         ),
-        "an unknown identifier in valid ECL is an invalid code"
+        "an unknown identifier in valid ECL is an unusable concept, not a syntax error"
     );
     assert!(matches!(
         p.filter(&filter("* {{ D moduleId = 900000000000207008 }}")),

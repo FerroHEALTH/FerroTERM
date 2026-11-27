@@ -157,7 +157,17 @@ impl SnomedProvider {
     /// invalid filter value with the parser's position, an identifier the
     /// edition lacks an invalid code.
     pub(super) fn constraint(&self, text: &str) -> Result<ConceptSet, ProviderError> {
-        let parsed = self.expression(text).map_err(|error| {
+        let parsed = self.parsed_constraint(text)?;
+        sct_ecl::eval::evaluate(self, &parsed).map_err(|error| super::ecl::refusal(error, text))
+    }
+
+    /// The parsed constraint `text`; malformed text is an invalid filter value
+    /// with the parser's position.
+    pub(super) fn parsed_constraint(
+        &self,
+        text: &str,
+    ) -> Result<Arc<ExpressionConstraint>, ProviderError> {
+        self.expression(text).map_err(|error| {
             ProviderError::InvalidFilterValue(Box::new(InvalidValue {
                 property: String::from("constraint"),
                 value: text.to_owned(),
@@ -165,8 +175,7 @@ impl SnomedProvider {
                 position: Some(error.offset()),
                 source: Some(error),
             }))
-        })?;
-        sct_ecl::eval::evaluate(self, &parsed).map_err(|error| super::ecl::refusal(error, text))
+        })
     }
 }
 

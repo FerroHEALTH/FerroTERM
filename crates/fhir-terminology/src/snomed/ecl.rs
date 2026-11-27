@@ -19,7 +19,8 @@ use sct_ecl::ast::{Acceptability, Equality, Sctid, TypedSearchTerm};
 use sct_ecl::eval::{ConceptPredicate, DescriptionPredicate, EvalError, Model, term_matches};
 
 use super::SnomedProvider;
-use crate::provider::{CodeSystemProvider, error::ProviderError};
+use crate::provider::CodeSystemProvider;
+use crate::provider::error::{ProviderError, UnusableConcept};
 
 fn storage(error: &StoreError) -> EvalError {
     EvalError::Storage(error.to_string())
@@ -33,14 +34,12 @@ fn provider(error: &ProviderError) -> EvalError {
 /// evaluator refused.
 pub(super) fn refusal(error: EvalError, text: &str) -> ProviderError {
     match error {
-        EvalError::UnknownConcept(id) => ProviderError::InvalidCode {
-            code: id.to_string(),
-            reason: String::from("not a concept of the edition"),
-        },
-        EvalError::NotAReferenceSet(id) => ProviderError::InvalidCode {
-            code: id.to_string(),
-            reason: String::from("not a reference set with concept members in the edition"),
-        },
+        EvalError::UnknownConcept(id) => unusable(text, id, "is not a concept of the edition"),
+        EvalError::NotAReferenceSet(id) => unusable(
+            text,
+            id,
+            "is not a reference set with concept members in the edition",
+        ),
         EvalError::Unsupported(what) => ProviderError::UnsupportedFilter {
             property: String::from("constraint"),
             operator: format!("= ({what})"),
@@ -53,6 +52,17 @@ pub(super) fn refusal(error: EvalError, text: &str) -> ProviderError {
         }
         other => ProviderError::invalid_filter_value("constraint", text, other.to_string()),
     }
+}
+
+/// The refusal of a well-formed constraint `text` naming `id`, which it
+/// cannot use for `reason`.
+fn unusable(text: &str, id: Sctid, reason: &str) -> ProviderError {
+    ProviderError::UnusableConcept(Box::new(UnusableConcept {
+        property: String::from("constraint"),
+        value: text.to_owned(),
+        code: id.to_string(),
+        reason: reason.to_owned(),
+    }))
 }
 
 impl SnomedProvider {

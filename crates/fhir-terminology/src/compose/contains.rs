@@ -38,14 +38,10 @@ fn admits(
     if !include.concepts.is_empty() {
         return Ok(enumerated(provider, include, concept, code)?.is_some());
     }
-    // NOTE: an expression enters a filtered selection only where a filter says
-    // post-coordination is allowed (<https://hl7.org/fhir/R4B/snomedct.html>,
-    // "Filter Properties", the `expressions` filter).
-    if provider.is_postcoordinated(concept)
-        && !include
-            .filters
-            .iter()
-            .any(|filter| provider.admits_post_coordination(filter))
+    // NOTE: an expression enters a filtered selection only where its code
+    // system says the include's filters admit post-coordination
+    // (<https://hl7.org/fhir/R4B/snomedct.html>, "Filter Properties").
+    if provider.is_postcoordinated(concept) && !provider.admits_post_coordination(&include.filters)
     {
         return Ok(false);
     }

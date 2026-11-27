@@ -19,6 +19,7 @@
 //! Subsumption is decided over the edition's inferred view, and its boundary
 //! is recorded on the `entails` method below.
 
+mod candidate;
 mod subsumption;
 use std::collections::BTreeMap;
 use std::sync::Arc;
