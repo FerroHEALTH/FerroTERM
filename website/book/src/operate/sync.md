@@ -123,6 +123,7 @@ code 78 (`EX_CONFIG`, `sysexits(3)`), and `healthcheck` with `not up` and 1.
 | `[webhook]` | none | where one JSON summary per run is posted |
 | `timezone` | `UTC` | the zone a daily schedule is read in |
 | `build_command` | `ferroterm-build` | the offline build, on `PATH` or by path |
+| `listing_limit` | `64MiB` | the most bytes one listing answer takes, the feed or one page of a FHIR API search; a listing is read into memory to be parsed, so its bound sits far below `download_limit`, which bounds bytes streamed to disk |
 | `download_limit` | `4GiB` | the most bytes one download takes, a data size; a larger item is refused, its partial file removed, and the run record names it |
 | `[auth]` | on, no issuer | the credentials the admin listener admits (see [The admin listener](#the-admin-listener)) |
 | `[jose] post_quantum_only` | `false` | the admin listener verifies access tokens with ML-DSA-44, ML-DSA-65 or ML-DSA-87 (RFC 9964) alone: an issuer's `algorithms` left at the default becomes those three, and a list naming any other algorithm refuses the start |
