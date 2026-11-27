@@ -226,7 +226,8 @@ The server is a SMART App Launch resource server
 (<https://hl7.org/fhir/smart-app-launch/conformance.html>) over the FerroHEALTH
 crate `ferrohealth-smart`: it checks credentials and never issues one. The read
 surface stays open. The write routes (`POST`, `PUT` and `DELETE` on
-`CodeSystem`, `ValueSet` and `ConceptMap`, and `POST [base]/$closure`) and every
+`CodeSystem`, `ValueSet`, `ConceptMap`, `NamingSystem` and `Provenance`, and
+`POST [base]/$closure`) and every
 route of the admin listener require a credential.
 
 Authentication is on by default and fails closed: a server that names

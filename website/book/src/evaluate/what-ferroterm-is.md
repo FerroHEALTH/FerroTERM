@@ -13,7 +13,8 @@ providers, never special cases in an operation.
 
 ## What it does
 
-The server exposes the FHIR terminology API on R4B:
+The server exposes the FHIR terminology API on R4 (`/r4`), R4B (`/r4b`), R5
+(`/r5`) and the R6 ballot (`/r6`):
 
 - `CodeSystem/$lookup`: a concept's display, designations by language, and
   properties.
@@ -32,8 +33,9 @@ The server exposes the FHIR terminology API on R4B:
   the codes a client registers, answered as a `ConceptMap` delta.
 - `POST [base]` with a `batch` `Bundle`: every entry answered in the order it
   was sent, each one independent of the rest.
-- `POST`, `PUT`, `GET`, `DELETE`, `_history` reads, and `?url=` search of
-  `CodeSystem`, `ValueSet`, and `ConceptMap`, with `ETag` and `If-Match`, where
+- `POST`, `PUT`, `GET`, `DELETE`, `_history` reads, and search of
+  `CodeSystem`, `ValueSet`, `ConceptMap`, `NamingSystem` and `Provenance`,
+  with `ETag` and `If-Match`, where
   the deployment names a database in `FERROTERM__TERMINOLOGY__RESOURCES`. The closure tables
   live in the same database.
 - `metadata` and `metadata?mode=terminology`: what this deployment serves.
@@ -80,14 +82,12 @@ bindings. One such client is
 [FerroEHR](https://github.com/FerroHEALTH/FerroEHR), a pure-Rust openEHR
 clinical data repository by the same author. FerroTERM is independent of it.
 
-## What is not built yet
+## What it does not do
 
-The build order is the tracker's milestones.
-
-- Post-coordinated SNOMED expressions are not served: the SNOMED URI's
-  `expressions` parameter answers `false`. ECL, every implicit value set, and
-  the implicit concept maps (`?fhir_cm=`) are served.
-- MRCM validation of postcoordinated SNOMED expressions is not scheduled.
-- FerroTERM serves an index built from a finished release. It authors no
-  code system content, and it has no syndication client, so you download the
-  release yourself and run the build tool over it.
+- It runs no concept model (MRCM) check on a post-coordinated SNOMED CT
+  expression: an expression the concept model forbids still validates
+  ([Post-coordinated expressions](../integrate/ecl-value-sets.md#post-coordinated-expressions)).
+- It authors no code system content. The server serves an index built from a
+  finished release; you download the release and run the build tool over it,
+  or let the synchronisation service take it from a national terminology
+  service's feed ([Syncing from a national terminology service](../operate/sync.md)).

@@ -39,14 +39,14 @@ FerroTERM's own part. The information and instructions Annex II asks for are on
 
 - **The product assessed.** Each tagged release as Cadasto B.V. publishes it:
   the `ferroterm` and `ferroterm-build` binaries in the release tarballs, the
-  `ferroterm` container image, the console's `ferroterm-console` binaries, site
-  bundle and image, and the source archive. The library crates FerroTERM
+  `ferroterm` container image, the console's `ferroterm-console` binaries and
+  image, and the source archive. The library crates FerroTERM
   publishes on crates.io are products of their own; this page covers them only
   where a row says so, and [the crates](#the-crates-on-cratesio) says how.
-- **The synchronisation service.** `ferroterm-sync` is built in the repository
-  and documented in the book, but no release lane publishes its binary or its
-  image yet, so it is not placed on the market and this assessment does not
-  cover it.
+- **The synchronisation service.** `ferroterm-sync` ships in every release
+  tarball and as the `ghcr.io/ferrohealth/ferroterm-sync` image, from v0.3.0
+  of 2026-10-24. Version 1 of this assessment predates that release and does
+  not cover it.
 - **Who the requirements bind.** Annex I Part I sets properties of the product,
   which the manufacturer ensures (CRA Art. 6, Art. 13(1)). Part II sets the
   manufacturer's processes. A deploying organisation that runs an unmodified

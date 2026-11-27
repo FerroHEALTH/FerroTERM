@@ -12,9 +12,9 @@ page that already gives it.
 
 Annex II opens: "At minimum, the product with digital elements shall be
 accompanied by:". The product is each tagged FerroTERM release, as Cadasto
-B.V. publishes it: the `ferroterm` and `ferroterm-build` binaries, the
-`ferroterm` container image, the console's `ferroterm-console` binaries, site
-bundle and image, and the source archive
+B.V. publishes it: the `ferroterm`, `ferroterm-build` and `ferroterm-sync`
+binaries, the `ferroterm` and `ferroterm-sync` container images, the
+console's `ferroterm-console` binaries and image, and the source archive
 ([the scope of the risk assessment](cra-risk-assessment.md#scope-and-dates)).
 
 <!-- toc -->
@@ -269,7 +269,7 @@ to the user, information on where the software bill of materials can be
 accessed."
 
 Cadasto B.V. makes the software bills of materials available. Each release
-publishes a CycloneDX SBOM of the `ferroterm` and `ferroterm-build` binaries
-as release assets and an SBOM attestation per platform of each image, and the
+publishes a CycloneDX SBOM of the `ferroterm`, `ferroterm-build` and
+`ferroterm-sync` binaries as release assets and an SBOM attestation per platform of each image, and the
 release binaries embed their dependency lists
 ([what a release carries](../operate/verifying-releases.md#what-a-release-carries)).
