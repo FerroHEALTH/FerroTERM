@@ -117,26 +117,27 @@ impl SnomedProvider {
     /// The language reference sets in the order a request for `tag` asks
     /// them: the set its dialect alias names first, then the rest in ascending
     /// SCTID order.
-    fn refsets_for(&self, tag: &str) -> Vec<u32> {
+    fn refsets_for(&self, tag: &str) -> impl Iterator<Item = u32> + '_ {
         let refsets = &self.system().keys.refsets;
         // NOTE: ECL Appendix C names the language reference set of each dialect
         // alias (`en-us`, `en-gb`), and a display follows "the associated
         // language reference set" (<https://hl7.org/fhir/R4B/snomedct.html>).
-        let dialect = sct_ecl::dialects::refset(tag).map(|sctid| sctid.to_string());
-        let named = refsets
-            .iter()
-            .filter(|(_, sctid)| dialect.as_deref() == Some(sctid.as_str()));
-        let rest = refsets
-            .iter()
-            .filter(|(_, sctid)| dialect.as_deref() != Some(sctid.as_str()));
-        named.chain(rest).map(|(refset, _)| *refset).collect()
+        let dialect = sct_ecl::dialects::refset(tag);
+        let named = move |sctid: &str| dialect.is_some() && sctid.parse::<u64>().ok() == dialect;
+        let first = refsets.iter().filter(move |(_, sctid)| named(sctid));
+        let rest = refsets.iter().filter(move |(_, sctid)| !named(sctid));
+        first.chain(rest).map(|(refset, _)| *refset)
     }
 
-    /// The preferred synonym of `concept` for `tag`: the first language
-    /// reference set, in [`Self::refsets_for`] order, whose preferred synonym
-    /// is in the tag's language.
-    fn preferred_in(&self, ordinal: Ordinal, tag: &str) -> Result<Option<String>, ProviderError> {
-        let language = primary_subtag(tag);
+    /// The preferred synonym of `concept` for `tag`, whose primary language is
+    /// `language`: the first language reference set, in
+    /// [`Self::refsets_for`] order, whose preferred synonym is in it.
+    fn preferred_in(
+        &self,
+        ordinal: Ordinal,
+        tag: &str,
+        language: &str,
+    ) -> Result<Option<String>, ProviderError> {
         self.stored()
             .store
             .display(ordinal, self.refsets_for(tag), |found| {
@@ -158,7 +159,7 @@ impl SnomedProvider {
         let default = &self.system().default_tag;
         let tag = language.unwrap_or(default);
         let wanted = primary_subtag(tag);
-        if let Some(term) = self.preferred_in(ordinal, tag)? {
+        if let Some(term) = self.preferred_in(ordinal, tag, &wanted)? {
             return Ok(Some(term));
         }
         let designations = self.stored().store.designations(ordinal).map_err(storage)?;
@@ -170,7 +171,7 @@ impl SnomedProvider {
             return Ok(Some(synonym.term.clone()));
         }
         if wanted != self.system().base_language
-            && let Some(term) = self.preferred_in(ordinal, default)?
+            && let Some(term) = self.preferred_in(ordinal, default, &self.system().base_language)?
         {
             return Ok(Some(term));
         }
