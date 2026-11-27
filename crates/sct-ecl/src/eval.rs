@@ -391,7 +391,9 @@ impl<M: Model> Evaluator<'_, M> {
         let mut set = self.focus(&sub.focus)?;
         match &sub.refset_operator {
             Some(RefsetOperator::MemberOf(member_of)) => {
-                set = self.member_of(&set, member_of.fields.as_ref(), &sub.member_filters)?;
+                let named = matches!(sub.focus, FocusConcept::Reference(_));
+                set =
+                    self.member_of(&set, named, member_of.fields.as_ref(), &sub.member_filters)?;
             }
             Some(RefsetOperator::ContainingAny) => {
                 set = self.containing_any(&set, &sub.member_filters)?;

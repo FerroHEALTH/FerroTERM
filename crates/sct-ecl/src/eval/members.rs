@@ -17,10 +17,11 @@ use roaring::RoaringBitmap;
 impl<M: Model> Evaluator<'_, M> {
     /// `^`: the referenced components (or the selected fields) of the active
     /// members of the reference sets in `set`, those rows passing the member
-    /// filters.
+    /// filters. `named` says the focus was one concept reference.
     pub(super) fn member_of(
         &self,
         set: &RoaringBitmap,
+        named: bool,
         fields: Option<&RefsetFields>,
         filter_groups: &[Vec<MemberFilter>],
     ) -> Result<RoaringBitmap, EvalError> {
@@ -29,8 +30,14 @@ impl<M: Model> Evaluator<'_, M> {
             let Some(id) = self.model.sctid(Ordinal::new(concept))? else {
                 continue;
             };
+            // NOTE: a concept `^` names must be a reference set (ECL 7.3) with
+            // concept members (ECL 6.1, Member of); in a set of reference sets
+            // one without concept members adds no concept.
             let Some(table) = self.model.members().table(id.0) else {
-                return Err(EvalError::NotAReferenceSet(id));
+                if named {
+                    return Err(EvalError::NotAReferenceSet(id));
+                }
+                continue;
             };
             out |= self.table_members(id, table, fields, filter_groups)?;
         }
