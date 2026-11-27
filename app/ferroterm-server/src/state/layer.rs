@@ -3,13 +3,12 @@
 
 //! The layer an operation resolves in: code systems, value sets and concept maps.
 
-use std::sync::Arc;
-
 use fhir_terminology::conceptmap::store::ConceptMapStore;
-use fhir_terminology::fhir_codesystem::provider::{BuildError, FhirCodeSystem};
+use fhir_terminology::fhir_codesystem::provider::BuildError;
 use fhir_terminology::operations::sources::Sources;
 use fhir_terminology::provider::declaration::ContentMode;
 use fhir_terminology::registry::Registry;
+use fhir_terminology::standalone_icf;
 use fhir_terminology::valueset::store::ValueSetStore;
 
 use crate::artefact;
@@ -103,11 +102,11 @@ impl Layer {
                     return Ok(());
                 }
                 let provider =
-                    FhirCodeSystem::new(model.clone()).map_err(|source| LayerError::Build {
+                    standalone_icf::serve(model.clone()).map_err(|source| LayerError::Build {
                         url: model.url.clone(),
                         source,
                     })?;
-                self.registry.register_or_replace(Arc::new(provider));
+                self.registry.register_or_replace(provider);
             }
             artefact::Loaded::ValueSet(model) => self.value_sets.replace(model.clone()),
             artefact::Loaded::ConceptMap(model) => self.concept_maps.replace(model.clone()),

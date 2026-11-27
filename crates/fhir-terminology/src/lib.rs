@@ -32,6 +32,7 @@ pub mod registries;
 pub mod registry;
 pub mod rxnorm;
 pub mod snomed;
+pub mod standalone_icf;
 pub mod stored;
 pub mod supplement;
 pub mod text_match;

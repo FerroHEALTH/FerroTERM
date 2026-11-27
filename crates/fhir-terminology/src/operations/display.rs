@@ -224,7 +224,7 @@ fn judgement(
     let lenient = match provider.display_standing(concept)? {
         DisplayStanding::Placeholder => return Ok(None),
         DisplayStanding::Suggested => true,
-        DisplayStanding::Defined => lenient,
+        DisplayStanding::Defined | DisplayStanding::Generated => lenient,
     };
     let all = candidates(provider, concept)?;
     let wanted = fold(given);

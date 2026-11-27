@@ -201,7 +201,10 @@ impl Supplemented {
     /// The extension-codes supplement that defines `concept`, when the
     /// supplemented system holds it only as a reserved code.
     fn defining(&self, concept: Concept) -> Result<Option<&Supplement>, ProviderError> {
-        if self.inner.display_standing(concept)? != DisplayStanding::Placeholder {
+        if !matches!(
+            self.inner.display_standing(concept)?,
+            DisplayStanding::Placeholder | DisplayStanding::Generated
+        ) {
             return Ok(None);
         }
         let Some(code) = self.inner.code(concept)? else {
@@ -375,6 +378,19 @@ impl CodeSystemProvider for Supplemented {
         language: Option<&str>,
     ) -> Result<Vec<Designation>, ProviderError> {
         let mut designations = self.inner.designations(concept, language)?;
+        // NOTE: for a code a grammar makes, "the display the grammar generates stays a
+        // valid display" beside the supplement's (the terminology ecosystem IG, CodeSystem supplements).
+        if self.defining(concept)?.is_some()
+            && self.inner.display_standing(concept)? == DisplayStanding::Generated
+            && let Some(generated) = self.inner.display(concept, language)?
+        {
+            designations.push(Designation {
+                language: self.inner.language().map(str::to_owned),
+                use_: None,
+                value: generated,
+                standards_status: None,
+            });
+        }
         designations.extend(
             self.additions(concept)?
                 .into_iter()
