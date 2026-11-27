@@ -5,6 +5,10 @@
 
 [Introduction](introduction.md)
 
+# Tutorials
+
+- [Your first requests](tutorials/first-requests.md)
+
 # Evaluate
 
 - [What FerroTERM is](evaluate/what-ferroterm-is.md)
@@ -40,6 +44,12 @@
 - [Problem types](operate/problems.md)
 - [Usage report](operate/usage-report.md)
 - [Verifying releases](operate/verifying-releases.md)
+
+# Reference
+
+- [`ferroterm`](reference/ferroterm.md)
+- [`ferroterm-build`](reference/ferroterm-build.md)
+- [`ferroterm-sync`](reference/ferroterm-sync.md)
 
 # Contribute
 
