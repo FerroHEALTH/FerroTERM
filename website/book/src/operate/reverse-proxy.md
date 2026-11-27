@@ -336,7 +336,7 @@ with it.
 and nothing else. Every route on it requires the admin scope, and the server
 refuses to start with it until `[auth]` names an issuer or turns
 authentication off
-([Configuration](configuration.md#reloading-the-served-set)). Bind it to
+([Configuration](reloading.md#reloading-the-served-set)). Bind it to
 `127.0.0.1` or an address on your internal network, publish only the FHIR
 listener through the proxy, and reach the reload from the host or from the
 orchestration that writes the new artifacts. A deployment that puts the admin

@@ -102,7 +102,7 @@ listener and the console's sign-in use
 | The FHIR listener published to the internet without a proxy | the server speaks plain HTTP and serves its read surface to anyone who reaches it; the book says to put TLS and reader authentication in the proxy | the deployment decides; a licence that limits who may read the content is the deployment's to keep |
 | Writes switched on without authentication | a server that names `FERROTERM__TERMINOLOGY__RESOURCES` or `FERROTERM__ADMIN__LISTEN` refuses to start until `[auth]` names an issuer or says `enabled = false` | `enabled = false` is accepted, for a network only trusted callers reach |
 | The admin listener published beside the FHIR surface | every route on it requires the admin scope, and the book says to bind it to loopback or an internal address | a deployment that turns authentication off and publishes it lets anyone make the server re-read its disks |
-| A damaged or half-written index served | an artifact that does not open refuses the start, and a reload that meets one keeps the previous set ([a refused artifact stops the start](../operate/configuration.md#a-refused-artifact-stops-the-start)) | none |
+| A damaged or half-written index served | an artifact that does not open refuses the start, and a reload that meets one keeps the previous set ([a refused artifact stops the start](../operate/reloading.md#a-refused-artifact-stops-the-start)) | none |
 | Patient data sent as a search term | the request log never carries a body or a free-text parameter | a proxy's own access log may; the book says to keep it to the same standard |
 | A release run after a newer one is published | the release notes and `SECURITY.md` say only the newest release is supported | the running server does not state its support end date ([(c)](#c-security-updates-notification-and-postponement)) |
 
@@ -282,7 +282,7 @@ corruptions"
   Programs: SLSA Build Level 3 provenance, Sigstore-signed SBOM attestations,
   checksums, and a base image pinned by digest. Configuration: a
   `FERROTERM__AUTH__` variable that names no key of `[auth]` stops the start.
-- **Evidence:** [a refused artifact stops the start](../operate/configuration.md#a-refused-artifact-stops-the-start);
+- **Evidence:** [a refused artifact stops the start](../operate/reloading.md#a-refused-artifact-stops-the-start);
   [verifying releases](../operate/verifying-releases.md);
   `.github/workflows/release-build.yml`.
 - **Status:** met. The indexes carry no signature of their own: they are built

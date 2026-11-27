@@ -109,7 +109,7 @@ This walk-through uses LOINC 2.83, which needs a free account at
 When the next LOINC release arrives, build it into a child of its own, such as
 `--out /data/index/loinc-2.84`, and run `docker compose restart ferroterm`.
 Both releases are then served, and a request that names no version resolves to
-the newest (see [Index roots](configuration.md#index-roots)).
+the newest (see [Index roots](reloading.md#index-roots)).
 
 ### Where a build writes
 
@@ -170,7 +170,7 @@ an index root: a directory whose child directories are the artifacts, one per
 release. A root is the layout the sync service writes (one child per release,
 renamed into place when complete), so a deployment that starts with a root
 needs no re-layout when the sync is added later. A single artifact directory
-is accepted too (see [Configuration](configuration.md#index-roots)).
+is accepted too (see [Configuration](reloading.md#index-roots)).
 
 ```console
 $ FERROTERM_INDEX_DIR=/srv/ferroterm/index docker compose up

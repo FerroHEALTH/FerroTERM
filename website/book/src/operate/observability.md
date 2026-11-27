@@ -78,7 +78,7 @@ OpenTelemetry collector over OTLP/gRPC, beside the server's spans
 (see [Configuration](configuration.md#telemetry)).
 
 `ferroterm_code_system_loaded` describes the set the server answers from now:
-a [reload](configuration.md#reloading-the-served-set) that drops a version
+a [reload](reloading.md#reloading-the-served-set) that drops a version
 drops its series, and one that adds a version adds one. Both `outcome` series
 of `ferroterm_reloads_total` start at zero, so
 `increase(ferroterm_reloads_total{outcome="failed"}[1h]) > 0` is an alert you

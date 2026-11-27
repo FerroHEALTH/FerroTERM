@@ -161,7 +161,7 @@ finishes on the set it started on. An artifact that does not open stops the
 start, and refuses a reload while the old set keeps answering, because an
 answer of "not found" for a code system that failed to load reads the same
 as "this code does not exist". That rule is FerroTERM's own design, and
-[Configuration](../operate/configuration.md#a-refused-artifact-stops-the-start)
+[Configuration](../operate/reloading.md#a-refused-artifact-stops-the-start)
 gives it in full.
 
 ## How content stays current
