@@ -36,7 +36,7 @@ async fn the_listing_is_read_with_the_token_the_service_issued() {
     let clock = support::TestClock::start();
     let source = support::source(&server, support::client_account(), clock);
 
-    let feed = source.list().await.expect("the listing is served");
+    let feed = source.list(1 << 20).await.expect("the listing is served");
     assert_eq!(feed.entries.len(), 5, "every entry is read");
     assert_eq!(
         source.name(),
@@ -50,7 +50,7 @@ async fn an_unsubscribed_system_is_reported_as_skipped() {
     let server = service().await;
     let clock = support::TestClock::start();
     let source = support::source(&server, support::client_account(), clock);
-    let feed = source.list().await.expect("the listing is served");
+    let feed = source.list(1 << 20).await.expect("the listing is served");
 
     let selection = source.select(&feed, &Holdings::default());
     let skipped = selection
@@ -83,7 +83,7 @@ async fn a_system_offered_only_as_the_binary_index_is_not_syndicable() {
     let server = service().await;
     let clock = support::TestClock::start();
     let source = support::source(&server, support::client_account(), clock);
-    let feed = source.list().await.expect("the listing is served");
+    let feed = source.list(1 << 20).await.expect("the listing is served");
 
     let refused = source.not_syndicable(&feed);
     assert_eq!(
@@ -125,7 +125,7 @@ async fn the_subscribed_releases_are_taken() {
     let server = service().await;
     let clock = support::TestClock::start();
     let source = support::source(&server, support::client_account(), clock);
-    let feed = source.list().await.expect("the listing is served");
+    let feed = source.list(1 << 20).await.expect("the listing is served");
 
     let selection = source.select(&feed, &Holdings::default());
     let taken: Vec<&str> = selection
@@ -145,7 +145,7 @@ async fn a_release_already_served_is_not_taken_again() {
     let server = service().await;
     let clock = support::TestClock::start();
     let source = support::source(&server, support::client_account(), clock);
-    let feed = source.list().await.expect("the listing is served");
+    let feed = source.list(1 << 20).await.expect("the listing is served");
 
     let mut holdings = Holdings::default();
     holdings.record(

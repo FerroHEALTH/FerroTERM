@@ -121,6 +121,10 @@ pub struct Config {
     /// The most bytes one download takes, a data size such as `4GiB`: a
     /// larger item is refused, its partial file removed.
     pub download_limit: ByteSize,
+    /// The most bytes one listing answer takes: the feed, or one page of a
+    /// FHIR API search. A listing is parsed in memory, so this bound is far
+    /// below `download_limit`, which bounds bytes streamed to disk.
+    pub listing_limit: ByteSize,
     /// When a run starts by itself.
     pub schedule: ScheduleConfig,
     /// The credentials the admin listener admits: the issuers whose access
@@ -175,6 +179,9 @@ impl Default for Config {
             // leave room for growth and stop a runaway body well before a
             // staging volume fills.
             download_limit: ByteSize::from_gib(4),
+            // A national feed or a page of 500 search summaries runs to a few
+            // megabytes; 64 MiB leaves room and bounds the memory a listing holds.
+            listing_limit: ByteSize::from_mib(64),
             schedule: ScheduleConfig::default(),
             source: Vec::new(),
             nts: addon_nts::config::endpoint(),
