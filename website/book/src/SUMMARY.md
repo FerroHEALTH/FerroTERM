@@ -8,6 +8,7 @@
 # Evaluate
 
 - [What FerroTERM is](evaluate/what-ferroterm-is.md)
+- [How FerroTERM serves terminology](explanation/how-ferroterm-serves.md)
 - [What stable means](evaluate/what-stable-means.md)
 - [Architecture at a glance](evaluate/architecture.md)
 - [How it compares](evaluate/comparison.md)
