@@ -69,6 +69,28 @@ define, and each report names the change upstream that would settle it.
 Every row is a gate, an upstream report, or FerroTERM work its issue
 tracks (the flat `is-not-a` row).
 
+## The modes run by hand
+
+The suite's other modes need licensed content or a code system FerroTERM does
+not load, so they run by hand before a release, not in CI. Each has its own
+badge, which reads `passed/ran, by hand <day>`: `ran` is the number of cases
+that run executed and `<day>` the day it was measured, both recorded in
+`conformance/tx-ecosystem/hand-run.tsv`. A badge that names a day is a record
+of that run, not a live result.
+
+![tx-ecosystem snomed R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-snomed-r4b.json)
+![tx-ecosystem icd-11 R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-icd-11-r4b.json)
+![tx-ecosystem icf R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-icf-r4b.json)
+![tx-ecosystem loinc R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-loinc-r4b.json)
+![tx-ecosystem loinc R5](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-loinc-r5.json)
+![tx-ecosystem tx.fhir.org R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-tx-fhir-org-r4b.json)
+![tx-ecosystem tx.fhir.org R5](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-tx-fhir-org-r5.json)
+![tx-ecosystem mimetypes R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-mimetypes-r4b.json)
+![tx-ecosystem omop R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fhand-omop-r4b.json)
+
+`conformance/tx-ecosystem/README.md` says what each mode needs and why its
+open cases stay open.
+
 ## What the numbers are not
 
 The suite is the ecosystem's test suite, not a certification. Passing a case

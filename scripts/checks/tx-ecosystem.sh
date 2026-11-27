@@ -181,8 +181,8 @@ if [[ "$total" = 0 ]]; then
 fi
 # The committed total feeds the conformance badges (conformance-badges.sh); a
 # suite bump that changes it is recorded in the same change. A mode run
-# (icd-11, tx.fhir.org, ...) selects a subset, so only the general run is held
-# to it.
+# (icd-11, tx.fhir.org, ...) selects a subset and is held to hand-run.tsv at
+# the end instead.
 committed_total=$(tr -d '[:space:]' < conformance/tx-ecosystem/total.txt)
 if [[ "$mode" = general ]] && [[ "$committed_total" != "$total" ]]; then
   echo "tx-ecosystem: the suite ran $total tests but conformance/tx-ecosystem/total.txt says $committed_total; update it in this change" >&2
@@ -233,3 +233,14 @@ if [[ -n "$regressions" ]]; then
   exit 1
 fi
 echo "tx-ecosystem: no regression against $PASSING"
+
+# A hand run is held to its row of hand-run.tsv, the denominator of its badge
+# (conformance-badges.sh); a new count goes there with the day of the run.
+if [[ "$mode" != general ]]; then
+  hand_run=conformance/tx-ecosystem/hand-run.tsv
+  hand_total=$(awk -F'\t' -v s="$fhir" -v m="$mode" '!/^#/ && $1 == s && $2 == m { print $3 }' "$hand_run")
+  if [[ "$hand_total" != "$total" ]]; then
+    echo "tx-ecosystem: the $mode run on /$fhir ran $total tests but $hand_run says ${hand_total:-nothing}; record the count and the day of this run there" >&2
+    exit 1
+  fi
+fi
