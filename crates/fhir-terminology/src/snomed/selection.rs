@@ -79,6 +79,12 @@ impl SnomedProvider {
     /// "a bounded set of clinical meanings represented by either precoordinated
     /// or postcoordinated expressions" (ECL 1 Introduction); any other filter
     /// through its focus concepts, which subsume it.
+    ///
+    /// "The meaning of the expression is a subtype of all the focus concepts"
+    /// (Compositional Grammar §5, Informative Comments), so `is-a` and
+    /// `descendent-of` on the concept, which hold every subtype of a member,
+    /// admit it when one focus concept is a member. Every other filter needs
+    /// all of them.
     pub(super) fn expression_passes(
         &self,
         record: &super::expression::Registered,
@@ -94,10 +100,17 @@ impl SnomedProvider {
                 .map_err(|error| super::ecl::refusal(error, &filter.value));
         }
         let selected = self.filter(filter)?;
-        Ok(record
-            .focus_concepts()
-            .iter()
-            .all(|focus| selected.contains(*focus)))
+        let mut focus = record.focus_concepts().iter();
+        let subtype_closed = matches!(filter.property.as_str(), "concept" | "code")
+            && matches!(
+                filter.op,
+                FilterOperator::IsA | FilterOperator::DescendentOf
+            );
+        Ok(if subtype_closed {
+            focus.any(|concept| selected.contains(*concept))
+        } else {
+            focus.all(|concept| selected.contains(*concept))
+        })
     }
 
     /// Whether the concept is sufficiently defined by its conditions.

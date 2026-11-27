@@ -1,0 +1,1 @@
+- A post-coordinated expression passes an `is-a` or `descendent-of` filter on `concept` when one of its focus concepts is in the selection, since the meaning of an expression is a subtype of every focus concept. So an expression `A + B` is in `concept is-a A`. Every other filter still needs all focus concepts.
