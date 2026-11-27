@@ -22,6 +22,7 @@ fhir-terminology = { path = "../crates/fhir-terminology" }
 fhir-types = "0.3.0"
 rf2 = { path = "../crates/rf2" }
 sct-ecl = { path = "../crates/sct-ecl" }
+terminology-syndication = { path = "../crates/terminology-syndication" }
 ferroterm-testkit = { path = "../tools/ferroterm-testkit" }
 serde_json = "1"
 tempfile = "3"
@@ -64,6 +65,13 @@ bench = false
 [[bin]]
 name = "rf2_row"
 path = "fuzz_targets/rf2_row.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "atom_feed"
+path = "fuzz_targets/atom_feed.rs"
 test = false
 doc = false
 bench = false
