@@ -312,11 +312,9 @@ macro_rules! family_input {
             /// the scope, and the direction. R4 keeps its names beside the pre-adopted
             /// R6 `sourceSystem` and `sourceVersion`.
             fn translate_inputs(request: &ConceptMapTranslateRequest, targeted: bool) -> TranslateInput {
-                // NOTE: "In R4, the `reverse` parameter does exist, and an R4 server SHALL
-                // support it, as well as the `targetcode` form" (tx-ecosystem IG,
-                // requirements, Reverse translation).
-                // Its `targetsystem` is then the system of that code, and `system` the
-                // one to translate into.
+                // NOTE: tx-ecosystem IG, requirements, Reverse translation: an R4 server
+                // supports the `targetcode` form, whose `targetsystem` names that code's
+                // system and `system` the one to translate into.
                 let targetcode = request.targetcode.is_some();
                 let targeted = targeted || targetcode;
                 let reverse = request

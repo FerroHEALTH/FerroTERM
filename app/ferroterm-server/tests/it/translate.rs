@@ -158,6 +158,27 @@ async fn translate_on_r4b_accepts_the_pre_adopted_r6_names() {
             "{version}: {message}"
         );
     }
+    // NOTE: tx-ecosystem IG, requirements, Reverse translation: an R4 server
+    // supports the `targetcode` form, whose `targetsystem` names that code's system.
+    for version in ["r4", "r4b"] {
+        let (status, body) = server
+            .get(&format!(
+                "/{version}/ConceptMap/$translate?url={CM_ANIMALS_COLOURS}&targetcode=RED&targetsystem={COLOURS}&system={ANIMALS}"
+            ))
+            .await;
+        assert_eq!(status, StatusCode::OK, "{version}: {body}");
+        let m = param(&body, "match").expect("match");
+        assert_eq!(
+            part(m, "concept").expect("concept")["valueCoding"]["code"],
+            "RED",
+            "{version}: {body}"
+        );
+        assert_eq!(
+            part(m, "sourceConcept").expect("sourceConcept")["valueCoding"]["code"],
+            "cat",
+            "{version}: {body}"
+        );
+    }
     // R5 declares no `reverse`; the refusal names the target inputs.
     let (status, body) = server
         .get(&format!(
@@ -247,5 +268,49 @@ async fn translate_checks_every_target_code_on_every_version() {
             ),
             "{base}: {body}"
         );
+    }
+}
+
+// The ecosystem IG, `$translate`: a target not in its code system's normal form
+// keeps `concept` as the map states it and adds `normalized-concept`
+// (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
+#[tokio::test]
+async fn translate_adds_the_normalized_concept_on_every_version() {
+    let server = Server::start_with_resources();
+    let shades = "http://example.org/fhir/CodeSystem/shades";
+    let map = "http://example.org/fhir/ConceptMap/shades";
+    let code_system = json!({"resourceType": "CodeSystem", "url": shades, "version": "1",
+        "status": "draft", "content": "complete", "caseSensitive": false,
+        "concept": [{"code": "Mauve", "display": "Mauve"}]});
+    for (base, relation, system_in, code_in) in [
+        ("r4", "equivalence", "system", "code"),
+        ("r4b", "equivalence", "system", "code"),
+        ("r5", "relationship", "sourceSystem", "sourceCode"),
+        ("r6", "relationship", "sourceSystem", "sourceCode"),
+    ] {
+        let concept_map = json!({"resourceType": "ConceptMap", "url": map,
+            "version": "1", "status": "draft", "group": [
+                {"source": ANIMALS, "target": shades, "element": [
+                    {"code": "dog", "target": [{"code": "MAUVE", (relation): "equivalent"}]}]}]});
+        let ask = json!({"resourceType": "Parameters", "parameter": [
+            {"name": "url", "valueUri": map},
+            {"name": system_in, "valueUri": ANIMALS},
+            {"name": code_in, "valueCode": "dog"},
+            {"name": "tx-resource", "resource": code_system.clone()},
+            {"name": "tx-resource", "resource": concept_map}]});
+        let (status, body) = server
+            .post(&format!("/{base}/ConceptMap/$translate"), &ask)
+            .await;
+        assert_eq!(status, StatusCode::OK, "{base}: {body}");
+        assert!(param(&body, "error").is_none(), "{base}: {body}");
+        let m = param(&body, "match").expect("match");
+        assert_eq!(
+            part(m, "concept").expect("concept")["valueCoding"]["code"],
+            "MAUVE",
+            "{base}: {body}"
+        );
+        let normalized = &part(m, "normalized-concept").expect("normalized-concept")["valueCoding"];
+        assert_eq!(normalized["code"], "Mauve", "{base}: {body}");
+        assert_eq!(normalized["system"], shades, "{base}: {body}");
     }
 }
