@@ -498,7 +498,9 @@ fn the_hierarchy_operators_r5_added_reach_the_r5_family_alone() {
 fn a_declared_code_filter_states_the_operators_the_engine_answers_on_it() {
     // `evaluate` reads `concept` and `code` as the code itself, so a system
     // declaring `code` answers the generic set there beside its own. ISO 3166-1
-    // declares `code` with `regex`, `=`, and `in`.
+    // declares `code` with `regex`, `=`, and `in`, and as a flat is-a hierarchy it
+    // answers the hierarchy operators too, each defined over a system with no
+    // edges (<https://hl7.org/fhir/R4/codesystem-filter-operator.html>, #1377).
     let mut registry = Registry::default();
     registry
         .register(Arc::new(
@@ -514,7 +516,19 @@ fn a_declared_code_filter_states_the_operators_the_engine_answers_on_it() {
     let operators: Vec<&str> = code.operators.iter().map(|op| op.code()).collect();
     assert_eq!(
         operators,
-        ["=", "in", "not-in", "regex", "exists"],
+        [
+            "=",
+            "in",
+            "not-in",
+            "regex",
+            "exists",
+            "is-a",
+            "descendent-of",
+            "is-not-a",
+            "generalizes",
+            "child-of",
+            "descendent-leaf"
+        ],
         "the generic set, the declared operators folded into it"
     );
 }

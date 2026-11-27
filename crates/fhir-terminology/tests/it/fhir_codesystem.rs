@@ -219,19 +219,32 @@ fn properties_and_hierarchy_come_from_nesting_and_subsumed_by() {
         .filter(|p| p.code == "child")
         .count();
     assert_eq!(children_of_living, 2);
+    // A flat system with no `hierarchyMeaning` is an is-a hierarchy with no edges:
+    // `is-a` "includes all concept ids that have a transitive is-a relationship with the
+    // concept Id provided as the value, including the provided concept itself", and
+    // `is-not-a` selects a code that "does not have an is-a relationship with the
+    // provided value" (<https://hl7.org/fhir/R4/codesystem-filter-operator.html>).
     let colours = find(&providers, COLOURS);
+    assert!(colours.hierarchy().is_some(), "a flat is-a hierarchy");
+    let filter = |op, value: &str| {
+        colours
+            .filter(&Filter {
+                property: String::from("concept"),
+                op,
+                value: value.to_owned(),
+            })
+            .expect("filters")
+    };
+    assert_eq!(codes(colours, &filter(FilterOperator::IsA, "RED")), ["RED"]);
+    let not_red = codes(colours, &filter(FilterOperator::IsNotA, "RED"));
     assert!(
-        colours.hierarchy().is_none(),
-        "no hierarchyMeaning, no subsumption"
+        !not_red.is_empty() && !not_red.contains(&String::from("RED")),
+        "{not_red:?}"
     );
-    assert!(matches!(
-        colours.filter(&Filter {
-            property: String::from("concept"),
-            op: FilterOperator::IsA,
-            value: String::from("RED")
-        }),
-        Err(ProviderError::UnsupportedFilter { .. })
-    ));
+    assert_eq!(
+        codes(colours, &filter(FilterOperator::DescendentOf, "RED")),
+        Vec::<String>::new()
+    );
 }
 
 #[test]

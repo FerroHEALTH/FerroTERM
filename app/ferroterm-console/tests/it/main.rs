@@ -19,6 +19,7 @@ mod command;
 mod exchange;
 mod find;
 mod forms;
+mod id_token_ml_dsa;
 mod logout;
 mod post_quantum;
 mod provider;

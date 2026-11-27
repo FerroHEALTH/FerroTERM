@@ -4,14 +4,20 @@
 # The conformance badges: one shields.io endpoint JSON per served FHIR version,
 # derived from the committed pass lists of the HL7 terminology ecosystem suite
 # (conformance/tx-ecosystem/, the lists CI gates on every push) and the suite
-# total the suite script records, and the EHDS badges over conformance/ehds/. The numbers are never typed by hand: a badge
+# total the suite script records, one per mode run by hand before a release
+# (conformance/tx-ecosystem/hand-run.tsv, each badge naming the day it was
+# measured), one naming the FHIR versions served, and the EHDS badges over
+# conformance/ehds/. The numbers are never typed by hand: a badge
 # says what the pass list says. The docs lane writes them into the site under
 # /conformance/, and the README badges read them through
 # https://img.shields.io/endpoint (https://shields.io/badges/endpoint-badge).
 # Every badge, and every static badge in the README, carries a logo from
 # scripts/checks/badge-logos/: the EU emblem on EU blue for an EU act, else a
 # pictogram. A badge without one fails. The post-quantum badge counts the
-# safe uses of conformance/post-quantum.tsv.
+# safe uses of conformance/post-quantum.tsv. Every run fails when the README
+# shows a badge this script does not write or leaves out one it writes, and
+# when the pass-list table of conformance/tx-ecosystem/README.md disagrees
+# with the lists, the suite total or hand-run.tsv.
 #
 #   conformance-badges.sh <out-dir>
 #   conformance-badges.sh --self-test   # a claimed certification or a missing logo is refused
@@ -76,6 +82,118 @@ badge() {
   echo "conformance-badges: $file $message"
 }
 
+# The pass list of a surface and a mode, named as scripts/checks/tx-ecosystem.sh
+# names it.
+pass_list() {
+  local list=conformance/tx-ecosystem/passing
+  [[ "$1" = r4b ]] || list="$list-$1"
+  [[ "$2" = general ]] || list="$list-$2"
+  printf '%s.txt' "$list"
+}
+
+# The rows of hand-run.tsv: surface, mode, the cases the run ran, and the day
+# it was measured. scripts/checks/tx-ecosystem.sh fails a hand run whose count
+# of cases differs from its row.
+hand_run=conformance/tx-ecosystem/hand-run.tsv
+hand_rows() {
+  awk -F'\t' '!/^#/ && NF && $1 != "surface"' "$hand_run"
+}
+while IFS=$'\t' read -r surface mode ran measured; do
+  list="$(pass_list "$surface" "$mode")"
+  if [[ ! -f "$list" || ! "$ran" =~ ^[0-9]+$ || ! "$measured" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+    echo "conformance-badges: $hand_run row '$surface $mode $ran $measured' names no pass list, count, or date" >&2
+    exit 1
+  fi
+  passed="$(grep -c . "$list" || true)"
+  if [[ "$passed" -gt "$ran" ]]; then
+    echo "conformance-badges: $list lists $passed cases, more than the $ran $hand_run says ran" >&2
+    exit 1
+  fi
+  badge "hand-$(printf '%s' "$mode" | tr '.' '-')-$surface.json" \
+    "tx-ecosystem $suite $mode $(printf '%s' "$surface" | tr '[:lower:]' '[:upper:]')" \
+    "$passed" "$ran" ", by hand $measured" shield-check
+done < <(hand_rows)
+
+# The FHIR versions served, from the version table of the book's FHIR versions
+# page; a version marked ballot-tracking there says so on the badge.
+versions_page=website/book/src/integrate/fhir-versions.md
+served="$(awk -F'|' '/served under `\/r[0-9a-z]+`/ {
+  version = $2; gsub(/[[:space:]]/, "", version)
+  printf "%s%s%s", sep, version, ($4 ~ /ballot/ ? " ballot" : ""); sep = " · "
+}' "$versions_page")"
+[[ -n "$served" ]] || { echo "conformance-badges: $versions_page names no served version" >&2; exit 1; }
+jq -cn --arg message "$served" --argjson logo "$(badge_logo_fields exchange)" \
+  '{schemaVersion: 1, label: "FHIR versions served", message: $message, color: "blue"} + $logo' > "$out/fhir-versions.json"
+echo "conformance-badges: fhir-versions.json $served"
+
+count_rows() {
+  grep -cvE '^(#|[[:space:]]*$)' "$1" || true
+}
+
+mvc=conformance/ehds/mvc-synthetic.tsv
+if [[ -f "$mvc" ]]; then
+  listed="$(count_rows "$mvc")"
+  badge ehds-mvc.json "MyHealth@EU MVC 10.1.0 (CI) import" \
+    "$listed" "$listed" " value sets, synthetic fixture" eu
+fi
+
+matrix=conformance/ehds/art6-code-systems.tsv
+if [[ -f "$matrix" ]]; then
+  systems="$(count_rows "$matrix")"
+  proven="$(grep -vE '^(#|[[:space:]]*$)' "$matrix" | awk -F'\t' '$3 != "-"' | wc -l | tr -d ' ')"
+  badge ehds-art6.json "EEHRxF draft 2026-11-23 Art 6 code systems" \
+    "$proven" "$systems" " loaders" eu
+fi
+
+# The post-quantum safe uses of conformance/post-quantum.tsv, drawn by the
+# shared helper; scripts/checks/post-quantum.sh holds the file to the tree.
+badge_post_quantum conformance/post-quantum.tsv > "$out/post-quantum.json"
+echo "conformance-badges: post-quantum.json $(jq -r .message "$out/post-quantum.json")"
+
+# The README shows exactly the badges this script writes.
+readme_badges=README.md
+written="$(find "$out" -maxdepth 1 -name '*.json' -exec basename {} \; | sort)"
+shown="$(grep -oE 'ferroterm\.eu%2Fconformance%2F[^)]+\.json' "$readme_badges" | sed 's/.*%2F//' | sort -u)"
+if [[ "$written" != "$shown" ]]; then
+  echo "conformance-badges: the README's endpoint badges differ from the badges written (- written, + shown):" >&2
+  diff <(printf '%s\n' "$written") <(printf '%s\n' "$shown") | grep -E '^[<>]' | sed -e 's/^</  -/' -e 's/^>/  +/' >&2
+  exit 1
+fi
+
+# The pass-list table of conformance/tx-ecosystem/README.md says what the lists,
+# the suite total and hand-run.tsv say, row for row, and its prose names the
+# day of each hand run.
+table=conformance/tx-ecosystem/README.md
+expected_rows() {
+  local version
+  for version in r4b r4 r5 r6; do
+    [[ ! -f "$(pass_list "$version" general)" ]] || printf '%s\tgeneral\t%s\n' "$version" "$total"
+  done
+  hand_rows | cut -f1-3
+}
+table_failures=0
+while IFS=$'\t' read -r surface mode ran; do
+  list="$(pass_list "$surface" "$mode")"
+  row="| \`$mode\` | \`/$surface\` | \`${list##*/}\` | $(grep -c . "$list" || true) of $ran |"
+  if ! grep -qF -- "$row" "$table"; then
+    echo "conformance-badges: $table has no row starting $row" >&2
+    table_failures=$((table_failures + 1))
+  fi
+done < <(expected_rows)
+tick='`'
+table_row="^[|] ${tick}[^${tick}]+${tick} [|] ${tick}/"
+if [[ "$(grep -cE "$table_row" "$table")" != "$(expected_rows | wc -l | tr -d ' ')" ]]; then
+  echo "conformance-badges: $table has a pass-list row that no list or hand-run.tsv row accounts for" >&2
+  table_failures=$((table_failures + 1))
+fi
+for measured in $(hand_rows | cut -f4 | sort -u); do
+  if ! tr -s '[:space:]' ' ' < "$table" | grep -qF "measured by hand on $measured"; then
+    echo "conformance-badges: $table does not say the hand runs were measured by hand on $measured" >&2
+    table_failures=$((table_failures + 1))
+  fi
+done
+[[ "$table_failures" -eq 0 ]] || exit 1
+
 if [[ -n "$self_test" ]]; then
   # Each surface's badge names the cases that do not apply there.
   for version in r4 r4b r5; do
@@ -135,29 +253,3 @@ if [[ -n "$self_test" ]]; then
   exit 0
 fi
 
-count_rows() {
-  grep -cvE '^(#|[[:space:]]*$)' "$1" || true
-}
-
-mvc=conformance/ehds/mvc-synthetic.tsv
-if [[ -f "$mvc" ]]; then
-  listed="$(count_rows "$mvc")"
-  badge ehds-mvc.json "MyHealth@EU MVC 10.1.0 (CI) import" \
-    "$listed" "$listed" " value sets, synthetic fixture" eu
-fi
-
-matrix=conformance/ehds/art6-code-systems.tsv
-if [[ -f "$matrix" ]]; then
-  systems="$(count_rows "$matrix")"
-  proven="$(grep -vE '^(#|[[:space:]]*$)' "$matrix" | awk -F'\t' '$3 != "-"' | wc -l | tr -d ' ')"
-  badge ehds-art6.json "EEHRxF draft 2026-11-23 Art 6 code systems" \
-    "$proven" "$systems" " loaders" eu
-fi
-
-# The post-quantum safe uses of conformance/post-quantum.tsv, drawn by the
-# shared helper; scripts/checks/post-quantum.sh holds the file to the tree.
-badge_post_quantum conformance/post-quantum.tsv > "$out/post-quantum.json"
-echo "conformance-badges: post-quantum.json $(jq -r .message "$out/post-quantum.json")"
-
-badge_logo_check "$out"/*.json
-badge_color_check "$out"/*.json

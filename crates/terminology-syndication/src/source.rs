@@ -155,6 +155,15 @@ pub enum SourceError {
         #[source]
         source: serde_json::Error,
     },
+    /// A listing answer passed the listing limit: the length the server
+    /// announced, or the bytes that arrived.
+    #[error("the listing at {url} is larger than the listing limit of {limit} bytes")]
+    TooLarge {
+        /// The address the listing came from.
+        url: String,
+        /// The limit, in bytes.
+        limit: u64,
+    },
     /// The source offers no FHIR API to list.
     #[error("{source_name} offers no FHIR API")]
     NoFhirApi {
@@ -205,16 +214,17 @@ pub trait Source: fmt::Debug + Send + Sync {
     /// the credentials a download needs.
     fn download_auth(&self) -> BoxFuture<'_, Result<Authorization, SourceError>>;
 
-    /// Reads the source's feed.
+    /// Reads the source's feed, taking at most `limit` bytes of it.
     ///
     /// # Errors
     ///
     /// Returns [`SourceError::Authentication`] when the listing cannot be
     /// authorized, [`SourceError::Request`] when the request fails,
     /// [`SourceError::Status`] when the server answers with a status that is
-    /// not a success, and [`SourceError::Parse`] when the answer is not a
+    /// not a success, [`SourceError::TooLarge`] when the answer passes
+    /// `limit`, and [`SourceError::Parse`] when the answer is not a
     /// syndication document.
-    fn list(&self) -> BoxFuture<'_, Result<Feed, SourceError>> {
+    fn list(&self, limit: u64) -> BoxFuture<'_, Result<Feed, SourceError>> {
         Box::pin(async move {
             let url = self.feed_url().to_owned();
             let authorization = self.listing_auth().await?;
@@ -231,13 +241,8 @@ pub trait Source: fmt::Debug + Send + Sync {
             if !status.is_success() {
                 return Err(SourceError::Status { url, status });
             }
-            let body = response
-                .text()
-                .await
-                .map_err(|source| SourceError::Request {
-                    url: url.clone(),
-                    source,
-                })?;
+            let body = read_listing(response, &url, limit).await?;
+            let body = String::from_utf8_lossy(&body);
             crate::parse::feed(&body).map_err(|source| SourceError::Parse { url, source })
         })
     }
@@ -249,14 +254,15 @@ pub trait Source: fmt::Debug + Send + Sync {
         None
     }
 
-    /// Lists the source's FHIR API as a feed.
+    /// Lists the source's FHIR API as a feed, taking at most `limit` bytes of
+    /// each page.
     ///
     /// # Errors
     ///
     /// Returns [`SourceError::NoFhirApi`] when the source offers no FHIR API,
     /// [`SourceError::Authentication`] when the listing cannot be authorized,
     /// and the errors of [`crate::fhir_api::list`] when a page cannot be read.
-    fn list_api(&self) -> BoxFuture<'_, Result<Feed, SourceError>> {
+    fn list_api(&self, limit: u64) -> BoxFuture<'_, Result<Feed, SourceError>> {
         Box::pin(async move {
             let Some(base_url) = self.fhir_api_url() else {
                 return Err(SourceError::NoFhirApi {
@@ -264,15 +270,21 @@ pub trait Source: fmt::Debug + Send + Sync {
                 });
             };
             let authorization = self.listing_auth().await?;
-            crate::fhir_api::list(self.client(), base_url, &authorization, self.retry_delays())
-                .await
+            crate::fhir_api::list(
+                self.client(),
+                base_url,
+                &authorization,
+                self.retry_delays(),
+                limit,
+            )
+            .await
         })
     }
 
     /// Fetches one resource the FHIR API lists to `destination`.
     ///
     /// The API advertises no digest, so the digest of what arrived is computed
-    /// and answered rather than verified.
+    /// and answered rather than verified. At most `limit` bytes are taken.
     ///
     /// # Errors
     ///
@@ -282,6 +294,7 @@ pub trait Source: fmt::Debug + Send + Sync {
         &'a self,
         link: &'a ContentLink,
         destination: &'a Path,
+        limit: u64,
     ) -> BoxFuture<'a, Result<Fetched, SourceError>> {
         Box::pin(async move {
             let authorization = self.download_auth().await?;
@@ -290,11 +303,15 @@ pub trait Source: fmt::Debug + Send + Sync {
                     .get(&link.href)
                     .header(reqwest::header::ACCEPT, crate::fhir_api::FHIR_JSON),
             );
-            Ok(crate::download::to_file(request, self.retry_delays(), destination, None).await?)
+            Ok(
+                crate::download::to_file(request, self.retry_delays(), destination, None, limit)
+                    .await?,
+            )
         })
     }
 
-    /// Fetches one content link to `destination`, verifying its digest.
+    /// Fetches one content link to `destination`, verifying its digest and
+    /// taking at most `limit` bytes.
     ///
     /// # Errors
     ///
@@ -306,6 +323,7 @@ pub trait Source: fmt::Debug + Send + Sync {
         &'a self,
         link: &'a ContentLink,
         destination: &'a Path,
+        limit: u64,
     ) -> BoxFuture<'a, Result<Fetched, SourceError>> {
         Box::pin(async move {
             let Some(expected) = link.checksum.as_ref() else {
@@ -315,10 +333,56 @@ pub trait Source: fmt::Debug + Send + Sync {
             };
             let authorization = self.download_auth().await?;
             let request = authorization.apply(self.client().get(&link.href));
-            Ok(
-                crate::download::to_file(request, self.retry_delays(), destination, Some(expected))
-                    .await?,
+            Ok(crate::download::to_file(
+                request,
+                self.retry_delays(),
+                destination,
+                Some(expected),
+                limit,
             )
+            .await?)
         })
     }
+}
+
+/// Reads a listing answer whole, refusing a `Content-Length` past `limit`
+/// before reading and stopping once the bytes that arrive pass it.
+///
+/// A listing is parsed in memory, so its bound is a memory bound.
+///
+/// # Errors
+///
+/// Returns [`SourceError::TooLarge`] when the answer passes `limit` and
+/// [`SourceError::Request`] when the body cannot be read.
+pub(crate) async fn read_listing(
+    mut response: reqwest::Response,
+    url: &str,
+    limit: u64,
+) -> Result<Vec<u8>, SourceError> {
+    let too_large = || SourceError::TooLarge {
+        url: url.to_owned(),
+        limit,
+    };
+    if response
+        .content_length()
+        .is_some_and(|length| length > limit)
+    {
+        return Err(too_large());
+    }
+    let mut body = Vec::new();
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|source| SourceError::Request {
+            url: url.to_owned(),
+            source,
+        })?
+    {
+        let length = u64::try_from(body.len().saturating_add(chunk.len())).unwrap_or(u64::MAX);
+        if length > limit {
+            return Err(too_large());
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(body)
 }

@@ -293,7 +293,11 @@ impl Service {
         for source in &self.sources {
             let mut run = SourceRun::new(source.source().name(), source.source().feed_url());
             let mut listed = Vec::new();
-            match source.source().list().await {
+            match source
+                .source()
+                .list(self.config.listing_limit.bytes())
+                .await
+            {
                 Err(error) => {
                     let text = reason(&error);
                     tracing::error!(
@@ -313,7 +317,11 @@ impl Service {
             }
             if let Some(api_url) = source.source().fhir_api_url() {
                 run.fhir_api_url = Some(api_url.to_owned());
-                match source.source().list_api().await {
+                match source
+                    .source()
+                    .list_api(self.config.listing_limit.bytes())
+                    .await
+                {
                     Err(error) => {
                         let text = reason(&error);
                         tracing::error!(
@@ -472,8 +480,18 @@ impl Service {
         }
         let started = std::time::Instant::now();
         let fetched = match origin {
-            Origin::Feed => source.source().fetch(&taken.link, &download).await,
-            Origin::FhirApi => source.source().fetch_api(&taken.link, &download).await,
+            Origin::Feed => {
+                source
+                    .source()
+                    .fetch(&taken.link, &download, self.config.download_limit.bytes())
+                    .await
+            }
+            Origin::FhirApi => {
+                source
+                    .source()
+                    .fetch_api(&taken.link, &download, self.config.download_limit.bytes())
+                    .await
+            }
         };
         let fetched = match fetched {
             Ok(fetched) => fetched,

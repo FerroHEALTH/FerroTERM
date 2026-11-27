@@ -155,7 +155,8 @@ pub fn upstream_client(settings: &Settings) -> Result<Upstreams, StartError> {
 impl ConsoleState {
     /// The state for `settings`, with an empty session store and, when
     /// `[oidc]` is set, the relying party at its provider, whose metadata is
-    /// read here for every endpoint `[oidc]` leaves out.
+    /// read here for every endpoint `[oidc]` leaves out, accepting the ID
+    /// Token algorithms `[jose]` names.
     ///
     /// # Errors
     /// Returns [`StartError::Client`] when the terminology server's client
@@ -168,7 +169,8 @@ impl ConsoleState {
                 provider
                     .relying_party()
                     .await
-                    .map_err(|error| StartError::Provider(Box::new(error)))?,
+                    .map_err(|error| StartError::Provider(Box::new(error)))?
+                    .with_algorithms(settings.jose.id_token_algorithms()),
             ),
             None => None,
         };

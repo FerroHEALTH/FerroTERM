@@ -55,7 +55,7 @@ async fn a_string_experimental_is_corrected_and_recorded() {
     let destination = directory.path().join("ConceptMap-a-map.json");
 
     let taken = source
-        .fetch_resource(&link(&server, MAP_WITH_STRING), &destination)
+        .fetch_resource(&link(&server, MAP_WITH_STRING), &destination, 1 << 20)
         .await
         .expect("the resource is fetched and corrected");
 
@@ -98,7 +98,7 @@ async fn a_resource_that_needs_nothing_lands_byte_identical() {
     let destination = directory.path().join("CodeSystem-a-system.json");
 
     let taken = source
-        .fetch_resource(&link(&server, CLEAN_CODE_SYSTEM), &destination)
+        .fetch_resource(&link(&server, CLEAN_CODE_SYSTEM), &destination, 1 << 20)
         .await
         .expect("the resource is fetched");
 
@@ -125,7 +125,7 @@ async fn a_resource_whose_digest_does_not_match_never_lands() {
     let mut wrong = link(&server, MAP_WITH_STRING);
     wrong.checksum = Some(Checksum::Sha256(support::sha256_of("other bytes")));
     let error = source
-        .fetch_resource(&wrong, &destination)
+        .fetch_resource(&wrong, &destination, 1 << 20)
         .await
         .expect_err("the bytes do not verify");
 

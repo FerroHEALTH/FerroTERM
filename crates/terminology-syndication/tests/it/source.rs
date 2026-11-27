@@ -61,7 +61,7 @@ async fn a_listing_behind_a_bearer_challenge_is_read_with_the_listing_token() {
         &format!("{}/synd/syndication.xml", server.uri()),
     )
     .with_listing_auth(Authorization::Bearer(Secret::new("listing-token")));
-    let feed = source.list().await.expect("the listing is served");
+    let feed = source.list(1 << 20).await.expect("the listing is served");
     assert_eq!(feed.entries.len(), 13);
 }
 
@@ -86,7 +86,7 @@ async fn a_public_listing_is_read_without_a_token_and_its_download_carries_one()
         &format!("{}/synd/syndication.xml", server.uri()),
     )
     .with_download_auth(Authorization::Bearer(Secret::new("download-token")));
-    let feed = source.list().await.expect("the listing is public");
+    let feed = source.list(1 << 20).await.expect("the listing is public");
     assert_eq!(feed.entries.len(), 13);
 
     let directory = tempfile::tempdir().expect("a temporary directory");
@@ -96,7 +96,7 @@ async fn a_public_listing_is_read_without_a_token_and_its_download_carries_one()
         Some(Checksum::Sha256(body_sha256())),
     );
     let fetched = source
-        .fetch(&content, &destination)
+        .fetch(&content, &destination, 1 << 20)
         .await
         .expect("the download is authorized");
     assert_eq!(fetched.bytes, 4);
@@ -127,7 +127,11 @@ async fn an_open_service_needs_no_credentials_at_all() {
         &format!("{}/synd/syndication.xml", server.uri()),
     );
     assert_ne!(
-        source.list().await.expect("the listing is open").entries,
+        source
+            .list(1 << 20)
+            .await
+            .expect("the listing is open")
+            .entries,
         Vec::<terminology_syndication::model::Entry>::new()
     );
     let directory = tempfile::tempdir().expect("a temporary directory");
@@ -137,7 +141,7 @@ async fn an_open_service_needs_no_credentials_at_all() {
         Some(Checksum::Sha256(body_sha256())),
     );
     source
-        .fetch(&content, &destination)
+        .fetch(&content, &destination, 1 << 20)
         .await
         .expect("the download is open");
 }
@@ -159,7 +163,11 @@ async fn affiliate_credentials_travel_as_http_basic() {
             password: Secret::new("secret"),
         });
     assert_ne!(
-        source.list().await.expect("the listing is served").entries,
+        source
+            .list(1 << 20)
+            .await
+            .expect("the listing is served")
+            .entries,
         Vec::<terminology_syndication::model::Entry>::new()
     );
 }
@@ -186,7 +194,10 @@ async fn the_listing_and_the_download_authenticate_separately() {
     )
     .with_listing_auth(Authorization::Bearer(Secret::new("listing-token")))
     .with_download_auth(Authorization::Bearer(Secret::new("download-token")));
-    source.list().await.expect("the listing token is used");
+    source
+        .list(1 << 20)
+        .await
+        .expect("the listing token is used");
     let directory = tempfile::tempdir().expect("a temporary directory");
     let destination = directory.path().join("item.zip");
     let content = link(
@@ -194,7 +205,7 @@ async fn the_listing_and_the_download_authenticate_separately() {
         Some(Checksum::Sha256(body_sha256())),
     );
     source
-        .fetch(&content, &destination)
+        .fetch(&content, &destination, 1 << 20)
         .await
         .expect("the download token is used");
 }
@@ -212,7 +223,10 @@ async fn a_refused_listing_reports_the_status() {
         "reference",
         &format!("{}/synd/syndication.xml", server.uri()),
     );
-    let error = source.list().await.expect_err("the listing is refused");
+    let error = source
+        .list(1 << 20)
+        .await
+        .expect_err("the listing is refused");
     match error {
         SourceError::Status { status, .. } => {
             assert_eq!(status, reqwest::StatusCode::UNAUTHORIZED);
@@ -235,7 +249,7 @@ async fn a_listing_that_is_not_a_feed_reports_where_it_came_from() {
         &format!("{}/synd/syndication.xml", server.uri()),
     );
     let error = source
-        .list()
+        .list(1 << 20)
         .await
         .expect_err("an RSS document is not a feed");
     match error {
@@ -248,7 +262,7 @@ async fn a_listing_that_is_not_a_feed_reports_where_it_came_from() {
 async fn a_source_that_cannot_authenticate_reports_its_own_cause() {
     let source = UnauthenticatedSource::new("https://example.invalid/synd/syndication.xml");
     let error = source
-        .list()
+        .list(1 << 20)
         .await
         .expect_err("the credential store is empty");
     match &error {
@@ -270,7 +284,7 @@ async fn an_entry_with_no_checksum_is_never_fetched() {
     let destination = directory.path().join("item.zip");
     let content = link(format!("{}/content/item.zip", server.uri()), None);
     let error = source
-        .fetch(&content, &destination)
+        .fetch(&content, &destination, 1 << 20)
         .await
         .expect_err("unverifiable bytes are not fetched");
     assert!(
@@ -300,7 +314,7 @@ async fn a_fetch_whose_checksum_does_not_match_leaves_nothing_behind() {
         Some(Checksum::Sha256(String::from(BODY_SHA256))),
     );
     let error = source
-        .fetch(&content, &destination)
+        .fetch(&content, &destination, 1 << 20)
         .await
         .expect_err("the digest does not match");
     assert!(
@@ -356,4 +370,30 @@ fn an_authorization_never_renders_its_secret() {
         "{shown}"
     );
     assert_eq!(format!("{:?}", Authorization::Open), "Open");
+}
+
+#[tokio::test]
+async fn a_listing_past_the_listing_limit_is_refused() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/synd/syndication.xml"))
+        .respond_with(atom(feed_xml()))
+        .mount(&server)
+        .await;
+    let source = ReferenceSource::open(
+        "reference",
+        &format!("{}/synd/syndication.xml", server.uri()),
+    );
+    let error = source
+        .list(64)
+        .await
+        .expect_err("the feed passes a limit of 64 bytes");
+    assert!(
+        matches!(error, SourceError::TooLarge { limit: 64, .. }),
+        "{error:?}"
+    );
+    source
+        .list(1 << 20)
+        .await
+        .expect("the same feed is read under a limit it fits");
 }

@@ -215,8 +215,9 @@ impl NtsSource {
         &self,
         link: &ContentLink,
         destination: &Path,
+        limit: u64,
     ) -> Result<FetchedResource, NtsError> {
-        let fetched = self.fetch(link, destination).await?;
+        let fetched = self.fetch(link, destination, limit).await?;
         let arrived = tokio::fs::read(&fetched.path)
             .await
             .map_err(|source| NtsError::File {
