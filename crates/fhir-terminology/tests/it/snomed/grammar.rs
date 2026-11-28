@@ -3,6 +3,7 @@
 
 //! ECL and the compositional grammar on the SNOMED CT provider.
 
+use ferroterm_testkit::snomed;
 use ferroterm_testkit::snomed::{
     ANIMAL, CAT, COVERING, DOG, EDITION, FUR, VERSION, code, item, sctid,
 };
@@ -65,13 +66,6 @@ fn ecl_arrives_as_the_constraint_filter_and_the_ecl_implicit_value_set() {
         p.filter(&expressions("maybe")),
         Err(ProviderError::InvalidFilterValue(_))
     ));
-    let codes: Vec<&str> = p
-        .declaration()
-        .filters
-        .iter()
-        .map(|f| f.code.as_str())
-        .collect();
-    assert_eq!(codes, ["concept", "display", "constraint", "expressions"]);
 
     // The implicit value set carries the URI-encoded expression
     // (<https://hl7.org/fhir/R4B/snomedct.html>, "Implicit Value Sets").
@@ -314,4 +308,34 @@ fn a_selection_is_unclosed_unless_it_states_that_expressions_are_excluded() {
     };
     assert!(p.unclosed(std::slice::from_ref(&descendants)));
     assert!(!p.unclosed(&[descendants, no_expressions]));
+}
+
+#[test]
+fn the_declared_filters_are_the_page_ones_and_one_mapped_filter_per_scheme() {
+    let (_dir, p) = provider();
+    let codes: Vec<&str> = p
+        .declaration()
+        .filters
+        .iter()
+        .map(|f| f.code.as_str())
+        .collect();
+    let mapped: Vec<String> = [
+        sctid(item(snomed::SCHEME)),
+        snomed::LOINC_SCHEME.to_string(),
+    ]
+    .iter()
+    .map(|scheme| format!("mapped:{scheme}"))
+    .collect();
+    assert_eq!(
+        codes,
+        [
+            "concept",
+            "display",
+            "constraint",
+            "expressions",
+            &mapped[0],
+            &mapped[1]
+        ],
+        "one mapped filter per identifier scheme"
+    );
 }

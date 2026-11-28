@@ -469,11 +469,18 @@ fn a_value_set_validation_echoes_the_code_as_sent() {
         code(COVERING),
         code(FUR)
     );
+    // NOTE: requirements.md at 9c2bbce, `$validate-code`: `normalized-code` "where
+    // appropriate", which is a code valid in the value set; a not-in-vs answer has none.
     for (expressions, member) in [(Some("true"), true), (Some("false"), false)] {
         let outcome = vs_validated("is-a", expressions, &reversed);
         assert_eq!(outcome.result, member, "{expressions:?}");
         assert_eq!(outcome.code.as_deref(), Some(reversed.as_str()));
-        assert_eq!(outcome.normalized_code.as_deref(), Some(normal.as_str()));
+        let expected = member.then_some(normal.as_str());
+        assert_eq!(
+            outcome.normalized_code.as_deref(),
+            expected,
+            "{expressions:?}"
+        );
     }
     let spaced = format!("{} |Cat| : {} = {}", code(CAT), code(COVERING), code(FUR));
     let outcome = vs_validated("is-a", Some("true"), &spaced);

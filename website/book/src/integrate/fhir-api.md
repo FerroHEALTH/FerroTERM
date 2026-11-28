@@ -112,8 +112,12 @@ echoes every effective parameter plus one `used-codesystem` per system version
 the expansion drew on.
 
 An expansion nests where the compose is the system's own hierarchy: one include
-of one system, taken whole or narrowed by `is-a` or `descendent-of`, with
-nothing enumerated and nothing excluded. Each root then carries its children
+of one system the server holds as a `CodeSystem` resource, taken whole or
+narrowed by `is-a` or `descendent-of`, with nothing enumerated and nothing
+excluded. A system the server enumerates from its own release (SNOMED CT,
+LOINC, ICD-11 and the other loaded editions) expands flat: its hierarchy gives a
+concept many parents, which a tree would repeat. FHIR leaves the choice to the
+server (`excludeNested`), so this rule is FerroTERM's own. Each root then carries its children
 under `contains`
 (<https://hl7.org/fhir/R4B/valueset-definitions.html#ValueSet.expansion.contains>),
 `total` counts every member rather than the roots, and a page is the slice of
@@ -240,4 +244,24 @@ own design. An active concept has no successors.
 A `?fhir_cm=` naming a reference set the edition does not hold, or one that
 maps nothing, is a `not-found`; a base that is not the served edition, or an
 SCTID that does not parse, is a `400`.
+
+An unpublished edition, named under `http://snomed.info/xsct/` (the SNOMED CT
+URI Standard), takes implicit URIs on its own edition and version URIs too.
+
+### The LOINC Extension map (provisional)
+
+An edition that carries the SNOMED CT LOINC Extension answers
+`[edition]/version/[date]?fhir_cm=11010000107` both ways: from a concept to the
+LOINC code its RF2 identifier row gives it, and from a LOINC code back to the
+concept, each `equivalent`. `$lookup` returns the same code as the `loinc`
+property, and `$expand` takes the filter `mapped:30051010000102` `exists`
+`true` or `false` (one `mapped:[scheme]` filter per identifier scheme the
+edition carries). The tx-ecosystem IG's test edition notes are the only source
+of these, pending review by SNOMED International, so their shape is
+FerroTERM's own and may change.
+
+A `$translate` that names no map finds the implicit maps of the loaded code
+systems between the source system and `targetSystem`, which may carry
+`|version`, as the ecosystem IG requires ("the server SHALL find the
+ConceptMaps whose `sourceScope` and `targetScope` fit the request").
 

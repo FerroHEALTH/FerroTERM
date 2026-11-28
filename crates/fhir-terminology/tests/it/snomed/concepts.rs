@@ -240,6 +240,34 @@ fn display_regex_matches_active_terms_in_one_language() {
 }
 
 #[test]
+fn the_mapped_filter_selects_the_concepts_an_identifier_scheme_gives_a_code() {
+    let (_dir, p) = provider();
+    let mapped = |value: &str| {
+        p.filter(&Filter {
+            property: format!("mapped:{}", snomed::LOINC_SCHEME),
+            op: FilterOperator::Exists,
+            value: value.to_owned(),
+        })
+        .expect("filters")
+    };
+    assert_eq!(mapped("true").iter().collect::<Vec<_>>(), [CAT]);
+    let without = mapped("false");
+    assert!(!without.contains(CAT) && without.contains(DOG));
+    let refused = p.filter(&Filter {
+        property: String::from("mapped:loinc"),
+        op: FilterOperator::Exists,
+        value: String::from("true"),
+    });
+    assert!(refused.is_err(), "a scheme is an SCTID");
+    assert!(
+        p.declaration()
+            .filters
+            .iter()
+            .any(|f| f.code == format!("mapped:{}", snomed::LOINC_SCHEME))
+    );
+}
+
+#[test]
 fn the_hierarchy_answers_subsumption_and_the_filters_from_the_closure() {
     let (_dir, p) = provider();
     let hierarchy = p.hierarchy().expect("snomed has a hierarchy");

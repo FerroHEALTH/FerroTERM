@@ -39,6 +39,7 @@ mod snomed;
 mod snomed_concept_map;
 mod snomed_editions;
 mod snomed_expression;
+mod snomed_loinc_map;
 mod standalone_icf;
 mod supplement;
 mod ucum;

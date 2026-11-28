@@ -11,9 +11,7 @@ use ferrohealth_server::section::ServerSection;
 use ferrohealth_smart::config::{AuthSection, BasicGrants, IssuerEntry};
 use ferrohealth_telemetry::section::TelemetrySection;
 use ferrohealth_telemetry::telemetry::{Service, Telemetry};
-use ferroterm_server::config::{
-    AdminSection, Config, FhirSection, JoseSection, TerminologySection,
-};
+use ferroterm_server::config::{AdminSection, Config, FhirSection, TerminologySection};
 use ferroterm_server::reload::Serving;
 use ferroterm_server::state::AppState;
 use http::{Request, Response, StatusCode};
@@ -37,8 +35,6 @@ pub(crate) struct SmartSetup {
     pub(crate) basic_grants: BasicGrants,
     /// `FERROTERM__FHIR__BASE_URL`, the address clients reach this server at.
     pub(crate) base_url: Option<String>,
-    /// The `[jose]` table.
-    pub(crate) jose: JoseSection,
 }
 
 /// The name of the `[auth.issuer.<name>]` table [`SmartSetup::for_issuer`]
@@ -64,7 +60,6 @@ impl SmartSetup {
             },
             basic_grants: BasicGrants::default(),
             base_url: None,
-            jose: JoseSection::default(),
         }
     }
 
@@ -308,7 +303,6 @@ impl Server {
             auth,
             basic_grants,
             base_url,
-            jose,
         } = setup;
         ferroterm_testkit::snomed::write(dir).expect("writes the edition");
         let fhir = dir.join("fhir");
@@ -331,7 +325,6 @@ impl Server {
             },
             auth,
             basic_grants,
-            jose,
             ..Config::default()
         }
     }

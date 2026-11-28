@@ -125,8 +125,7 @@ code 78 (`EX_CONFIG`, `sysexits(3)`), and `healthcheck` with `not up` and 1.
 | `build_command` | `ferroterm-build` | the offline build, on `PATH` or by path |
 | `listing_limit` | `64MiB` | the most bytes one listing answer takes, the feed or one page of a FHIR API search; a listing is read into memory to be parsed, so its bound sits far below `download_limit`, which bounds bytes streamed to disk |
 | `download_limit` | `4GiB` | the most bytes one download takes, a data size; a larger item is refused, its partial file removed, and the run record names it |
-| `[auth]` | on, no issuer | the credentials the admin listener admits (see [The admin listener](#the-admin-listener)) |
-| `[jose] post_quantum_only` | `false` | the admin listener verifies access tokens with ML-DSA-44, ML-DSA-65 or ML-DSA-87 (RFC 9964) alone: an issuer's `algorithms` left at the default becomes those three, and a list naming any other algorithm refuses the start |
+| `[auth]` | on, no issuer | the credentials the admin listener admits (see [The admin listener](#the-admin-listener)); `[auth] post_quantum_only = true` holds every issuer to ML-DSA-44, ML-DSA-65 or ML-DSA-87 (RFC 9964), as on the server |
 | `[nts]` | `url = "https://terminologieserver.nl"`, `timeout = "1h"`, the realm's issuer, no client | the NTS the add-on calls and the client it authenticates as (see [Credentials](#credentials)) |
 | `[telemetry]` | `auto` format, no export | the console log's `format` and `filter` (`RUST_LOG` sets the filter too), and the OTLP export of the service's metrics, the same section the server reads (see [Telemetry](configuration.md#telemetry)) |
 
@@ -218,6 +217,7 @@ scope = "__ferroterm.admin"
 | `oauth.client_auth` | `client_secret_basic`, `client_secret_post` or `private_key_jwt` | `client_secret_basic` |
 | `oauth.client_secret` or `oauth.client_secret_file` | the client secret; exactly one | none |
 | `oauth.private_key_file`, `oauth.kid`, `oauth.assertion_alg` | the PEM key, `kid` and algorithm of a `private_key_jwt` assertion (RFC 7523) | the RFC 7638 thumbprint, the algorithm of the key |
+| `oauth.dpop_key_file` | the PEM key the tokens are bound to with DPoP (RFC 9449): a P-256 or P-384 key signs its proofs ES256 or ES384, an ML-DSA key its parameter set (RFC 9964) | none (bearer tokens) |
 | `oauth.scope`, `oauth.resource`, `oauth.audience` | the token request's `scope`, RFC 8707 `resource` and `audience` parameters | none |
 | `oauth.refresh_margin` | how long before the token expires a new one is fetched | `"30s"` |
 | `oauth.timeout` | how long one call to the authorization server may take | `"10s"` |
@@ -227,7 +227,9 @@ A client that authenticates with `private_key_jwt` signs its assertion with
 the algorithm of its key. An ML-DSA-65 key (RFC 9964), made with OpenSSL 3.5
 or later as `openssl genpkey -algorithm ML-DSA-65 -out sync-assertion.pem`,
 signs ML-DSA-65; register its public half at the authorization server as an
-`AKP` key:
+`AKP` key. A DPoP key works the same way: a second ML-DSA-65 key, made as
+`openssl genpkey -algorithm ML-DSA-65 -out sync-dpop.pem`, signs every DPoP
+proof with ML-DSA-65, and the authorization server binds the tokens to it:
 
 ```toml
 [server_admin.credentials.oauth]
@@ -235,6 +237,7 @@ issuer = "https://auth.example.org/realms/tx"
 client_id = "ferroterm-sync"
 client_auth = "private_key_jwt"
 private_key_file = "/run/secrets/sync-assertion.pem"
+dpop_key_file = "/run/secrets/sync-dpop.pem"
 scope = "__ferroterm.admin"
 ```
 

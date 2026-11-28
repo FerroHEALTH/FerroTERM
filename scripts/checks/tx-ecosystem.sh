@@ -22,7 +22,9 @@
 # jar and the suite are fetched into target/tx-ecosystem/ once and pinned by
 # digest and commit. Everything a run writes, the server's log included, goes
 # under --out, so a run over licensed content leaves nothing of it in target/.
-# A JVM runs here only, never in the server.
+# A JVM runs here only, never in the server: $JAVA_HOME/bin/java when
+# JAVA_HOME is set, otherwise the java on PATH, checked with -version before
+# anything starts.
 set -euo pipefail
 # target/ and conformance/ are named relative to the repository root, so run there.
 cd "$(dirname "$0")/../.."
@@ -67,6 +69,15 @@ if [[ "$mode" != general ]]; then
   PASSING=$PASSING-$mode
 fi
 PASSING=$PASSING.txt
+
+java=java
+if [[ -n "${JAVA_HOME:-}" ]]; then
+  java=$JAVA_HOME/bin/java
+fi
+if ! "$java" -version >/dev/null 2>&1; then
+  echo "tx-ecosystem: no Java runtime answers '$java -version'; install one, or set JAVA_HOME to a JDK or JRE home" >&2
+  exit 2
+fi
 
 work=target/tx-ecosystem
 mkdir -p "$work"
@@ -187,7 +198,7 @@ modes=(-mode "$mode")
 if [[ "$mode" != general ]]; then
   modes=(-mode '!general' -mode "$mode")
 fi
-java -jar "$jar" txTests -tx "$server" -test-version "$suite/tests" "${modes[@]}" \
+"$java" -jar "$jar" txTests -tx "$server" -test-version "$suite/tests" "${modes[@]}" \
   -output "$out" -ssrf-protection-enabled=false > "$out/runner.log" 2>&1 || true
 report=$out/report.json
 if [[ ! -f "$report" ]]; then

@@ -665,6 +665,18 @@
               "op": [
                 "="
               ]
+            },
+            {
+              "code": "mapped:131234567100",
+              "op": [
+                "exists"
+              ]
+            },
+            {
+              "code": "mapped:30051010000102",
+              "op": [
+                "exists"
+              ]
             }
           ],
           "isDefault": true,
@@ -1096,7 +1108,7 @@
       ]
     }
   ],
-  "date": "2026-11-28T03:38:24.056586Z",
+  "date": "2026-11-28T05:58:28.407637Z",
   "description": "Serves the FHIR R6 ballot (version 6.0.0-snapshot1). Every behaviour grounded only in the ballot is re-verified against the published specification when it appears, and may change with it.",
   "expansion": {
     "hierarchical": false,
