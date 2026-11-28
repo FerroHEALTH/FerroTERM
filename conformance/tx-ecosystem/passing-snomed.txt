@@ -238,6 +238,8 @@ snomed/snomed-expand-property-inactive-rel
 snomed/snomed-isa-in
 snomed/snomed-isa-out
 snomed/snomed-lookup-inactive-isa-child
+snomed/snomed-lookup-loinc
+snomed/snomed-lookup-loinc-inactive
 snomed/snomed-lookup-loinc-none
 snomed/snomed-validate-code-in
 snomed/snomed-validate-implied-refset-map
