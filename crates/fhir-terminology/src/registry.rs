@@ -104,6 +104,13 @@ fn targets(target: &str, url: &str, version: &str) -> bool {
 #[error("Required supplement not found: {0}")]
 pub struct UnknownSupplement(pub String);
 
+/// The host of an absolute URI, `snomed.info` of `http://snomed.info/sct`.
+fn uri_host(uri: &str) -> Option<&str> {
+    uri.split("://")
+        .nth(1)
+        .and_then(|rest| rest.split('/').next())
+}
+
 impl Registry {
     /// This registry with `beneath` under it.
     ///
@@ -473,17 +480,22 @@ impl Registry {
         let mut candidates = Vec::new();
         let base = url.split_once('?').map_or(url, |(base, _)| base);
         for canonical in self.canonicals() {
+            let prefixed = url.starts_with(canonical);
+            if !prefixed && uri_host(canonical) != uri_host(base) {
+                continue;
+            }
             let Some(system) = self.system(canonical) else {
                 continue;
             };
             // NOTE: a version that is itself a URI names its system too, as an
             // unpublished SNOMED CT edition's `http://snomed.info/xsct/` URI does
             // (<https://docs.snomed.org/snomed-ct-specifications/snomed-ct-uri-standard>).
-            let by_version = system
-                .versions
-                .keys()
-                .any(|version| version.contains("://") && version.starts_with(base));
-            if !url.starts_with(canonical) && !by_version {
+            if !prefixed
+                && !system
+                    .versions
+                    .keys()
+                    .any(|version| version.starts_with(base))
+            {
                 continue;
             }
             let Ok(resolved) = self.resolve(canonical, None) else {
