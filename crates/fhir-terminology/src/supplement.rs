@@ -11,11 +11,11 @@ use concept_graph::subsumption::Outcome;
 
 use crate::provider::code_system::{SupplementKind, Supplementing};
 use crate::provider::compose::Compose;
+use crate::provider::concept_map::{MapSelection, Successor};
 use crate::provider::declaration::Declaration;
 use crate::provider::{
     CodeSystemProvider, Concept, ConceptSet, Designation, DisplayStanding, Hierarchy, Identity,
-    ImplicitMetadata, Located, MapSelection, Property, PropertyValue, Standing, Status, Successor,
-    error::ProviderError,
+    ImplicitMetadata, Located, Property, PropertyValue, Standing, Status, error::ProviderError,
 };
 
 /// What a supplement adds to one concept.
@@ -198,6 +198,57 @@ impl Supplemented {
         Ok(selected)
     }
 
+    /// The display of `concept`, as the request spelled it when `spelling`
+    /// names it: the supplement's own where it decides, else the system's.
+    fn supplemented_display(
+        &self,
+        concept: Concept,
+        spelling: Option<&str>,
+        language: Option<&str>,
+    ) -> Result<Option<String>, ProviderError> {
+        // NOTE: a reserved code an extension-codes supplement defines has the
+        // supplement's display (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
+        if let Some(defining) = self.defining(concept)?
+            && let Some(code) = self.inner.code(concept)?
+            && let Some(additions) = defining.concepts.get(&code)
+            && let Some(display) = additions
+                .designations
+                .iter()
+                .find(|d| language.is_none_or(|wanted| d.language.as_deref() == Some(wanted)))
+                .or_else(|| additions.designations.first())
+        {
+            return Ok(Some(display.value.clone()));
+        }
+        // NOTE: a supplement adds designations the system lacks, so its term in
+        // the requested language beats the system's fallback display
+        // (<https://hl7.org/fhir/R4B/codesystem.html#supplements>).
+        if let Some(wanted) = language
+            && self.inner.designations(concept, Some(wanted))?.is_empty()
+            && let Some(added) = self
+                .additions(concept)?
+                .into_iter()
+                .flat_map(|additions| additions.designations.iter())
+                .find(|designation| designation.language.as_deref() == Some(wanted))
+        {
+            return Ok(Some(added.value.clone()));
+        }
+        let inner = match spelling {
+            Some(spelling) => self.inner.spelled_display(concept, spelling, language)?,
+            None => self.inner.display(concept, language)?,
+        };
+        if let Some(display) = inner {
+            return Ok(Some(display));
+        }
+        Ok(self
+            .additions(concept)?
+            .into_iter()
+            .flat_map(|additions| additions.designations.iter())
+            .find(|designation| {
+                language.is_none_or(|wanted| designation.language.as_deref() == Some(wanted))
+            })
+            .map(|designation| designation.value.clone()))
+    }
+
     /// The extension-codes supplement that defines `concept`, when the
     /// supplemented system holds it only as a reserved code.
     fn defining(&self, concept: Concept) -> Result<Option<&Supplement>, ProviderError> {
@@ -298,43 +349,16 @@ impl CodeSystemProvider for Supplemented {
         concept: Concept,
         language: Option<&str>,
     ) -> Result<Option<String>, ProviderError> {
-        // NOTE: a reserved code an extension-codes supplement defines has the
-        // supplement's display (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
-        if let Some(defining) = self.defining(concept)?
-            && let Some(code) = self.inner.code(concept)?
-            && let Some(additions) = defining.concepts.get(&code)
-            && let Some(display) = additions
-                .designations
-                .iter()
-                .find(|d| language.is_none_or(|wanted| d.language.as_deref() == Some(wanted)))
-                .or_else(|| additions.designations.first())
-        {
-            return Ok(Some(display.value.clone()));
-        }
-        // NOTE: a supplement adds designations the system lacks, so its term in
-        // the requested language beats the system's fallback display
-        // (<https://hl7.org/fhir/R4B/codesystem.html#supplements>).
-        if let Some(wanted) = language
-            && self.inner.designations(concept, Some(wanted))?.is_empty()
-            && let Some(added) = self
-                .additions(concept)?
-                .into_iter()
-                .flat_map(|additions| additions.designations.iter())
-                .find(|designation| designation.language.as_deref() == Some(wanted))
-        {
-            return Ok(Some(added.value.clone()));
-        }
-        if let Some(display) = self.inner.display(concept, language)? {
-            return Ok(Some(display));
-        }
-        Ok(self
-            .additions(concept)?
-            .into_iter()
-            .flat_map(|additions| additions.designations.iter())
-            .find(|designation| {
-                language.is_none_or(|wanted| designation.language.as_deref() == Some(wanted))
-            })
-            .map(|designation| designation.value.clone()))
+        self.supplemented_display(concept, None, language)
+    }
+
+    fn spelled_display(
+        &self,
+        concept: Concept,
+        spelling: &str,
+        language: Option<&str>,
+    ) -> Result<Option<String>, ProviderError> {
+        self.supplemented_display(concept, Some(spelling), language)
     }
 
     fn language(&self) -> Option<&str> {

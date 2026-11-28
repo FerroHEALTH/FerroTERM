@@ -241,7 +241,7 @@ pub fn lookup(
     }
     let language = language::for_provider(provider.as_ref(), input.display_language.as_deref());
     let display = provider
-        .display(concept, language.as_deref())?
+        .spelled_display(concept, code, language.as_deref())?
         .unwrap_or_else(|| located.code.clone());
     check_properties(provider.as_ref(), &input.properties)?;
     let asked = Asked::from(&input.properties);

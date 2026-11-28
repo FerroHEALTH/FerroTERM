@@ -12,12 +12,13 @@ use super::artifact::Artifact;
 use super::primary_subtag;
 use crate::provider::compose::Compose;
 use crate::provider::concept_map::ConceptMapModel;
+use crate::provider::concept_map::{MapSelection, Successor};
 use crate::provider::declaration::{Capability, Declaration};
 use crate::provider::filter::Filter;
 use crate::provider::source::Source;
 use crate::provider::{
     CodeSystemProvider, Concept, ConceptSet, Designation, DesignationUse, Hierarchy, Identity,
-    ImplicitMetadata, Located, MapSelection, Property, Status, Successor, error::ProviderError,
+    ImplicitMetadata, Located, Property, Status, error::ProviderError,
 };
 
 /// One stored system behind a [`StoredProvider`]: what its specification
@@ -53,6 +54,20 @@ pub trait StoredSystem: fmt::Debug + Send + Sync + Sized {
         concept: Concept,
         language: Option<&str>,
     ) -> Result<Option<String>, ProviderError>;
+
+    /// As [`CodeSystemProvider::spelled_display`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProviderError`] when the substrate fails.
+    fn spelled_display(
+        provider: &StoredProvider<Self>,
+        concept: Concept,
+        _spelling: &str,
+        language: Option<&str>,
+    ) -> Result<Option<String>, ProviderError> {
+        Self::display(provider, concept, language)
+    }
 
     /// The status, as [`CodeSystemProvider::status`].
     ///
@@ -373,6 +388,15 @@ impl<S: StoredSystem> CodeSystemProvider for StoredProvider<S> {
         language: Option<&str>,
     ) -> Result<Option<String>, ProviderError> {
         S::display(self, concept, language)
+    }
+
+    fn spelled_display(
+        &self,
+        concept: Concept,
+        spelling: &str,
+        language: Option<&str>,
+    ) -> Result<Option<String>, ProviderError> {
+        S::spelled_display(self, concept, spelling, language)
     }
 
     fn definition(&self, concept: Concept) -> Result<Option<String>, ProviderError> {

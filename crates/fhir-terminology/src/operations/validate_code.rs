@@ -466,7 +466,7 @@ fn check(
     let requested_language = language;
     let language = language::for_provider(provider.as_ref(), language);
     let language = language.as_deref();
-    let preferred = provider.display(concept, language)?;
+    let preferred = provider.spelled_display(concept, code, language)?;
     let mut messages = Vec::new();
     let mut issues = Vec::new();
     let mut result = true;
@@ -482,6 +482,7 @@ fn check(
             super::display::Asserted {
                 system: &identity.url,
                 code: &located.code,
+                sent: code,
                 given: display,
                 requested: requested_language,
                 lenient,

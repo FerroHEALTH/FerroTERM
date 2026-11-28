@@ -22,7 +22,7 @@ use std::sync::Arc;
 use super::sources::Sources;
 use super::{CodeableConceptRef, CodingRef, OperationError};
 use crate::compose::ValueSetResolver;
-use crate::provider::MapSelection;
+use crate::provider::concept_map::MapSelection;
 use crate::provider::concept_map::{ConceptMapModel, ModelError, Relationship};
 use crate::provider::declaration::ContentMode;
 use crate::valueset::store::Resolver;
