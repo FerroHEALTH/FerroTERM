@@ -47,7 +47,7 @@ local deployment of release 2026-01 in English.
 | mode | surface | pass list | passed of ran | needs | open failures |
 |---|---|---|---|---|---|
 | `general` | `/r4b` | `passing.txt` | 730 of 805 | nothing | #1068, #1069, #1376, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
-| `general` | `/r4` | `passing-r4.txt` | 744 of 805 | nothing | #1068, #1069, #1376, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
+| `general` | `/r4` | `passing-r4.txt` | 745 of 805 | nothing | #1068, #1069, #1376, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
 | `general` | `/r5` | `passing-r5.txt` | 744 of 805 | nothing | #1068, #1069, #1376, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
 | `snomed` | `/r4b` | `passing-snomed.txt` | 295 of 378 | the suite's SNOMED CT test edition, with `terminology.default_language = "en-US"` (the script sets it) | #1413, #1068, #1380 |
 | `icd-11` | `/r4b` | `passing-icd-11.txt` | 10 of 145 | the three ICD-11 artifacts | #1391, #1068, #1380 |

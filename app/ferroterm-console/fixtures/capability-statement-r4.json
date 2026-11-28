@@ -1,5 +1,5 @@
 {
-  "date": "2026-11-26T06:41:29.790104Z",
+  "date": "2026-11-28T00:14:03.733536Z",
   "extension": [
     {
       "extension": [
@@ -79,7 +79,7 @@
           "operation": [
             {
               "definition": "http://hl7.org/fhir/OperationDefinition/CodeSystem-lookup",
-              "documentation": "Beyond the R4 definition, the server accepts `useSupplement` (pre-adopted from the FHIR R6 ballot for the terminology ecosystem). Beyond the R4 definition, the server answers `code`, `system`, `abstract` (defined by the terminology ecosystem). See <https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>.",
+              "documentation": "Beyond the R4 definition, the server accepts `useSupplement` (pre-adopted from the FHIR R6 ballot for the terminology ecosystem). Beyond the R4 definition, the server answers `code`, `system`, `abstract`, `used-supplement` (defined by the terminology ecosystem). See <https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>.",
               "extension": [
                 {
                   "url": "https://ferroterm.eu/fhir/StructureDefinition/operation-level",
@@ -217,7 +217,7 @@
           "operation": [
             {
               "definition": "http://hl7.org/fhir/OperationDefinition/ConceptMap-translate",
-              "documentation": "Beyond the R4 definition, the server accepts `sourceCode`, `sourceSystem`, `sourceVersion`, `sourceScope`, `sourceCoding`, `sourceCodeableConcept`, `targetCode`, `targetCoding`, `targetCodeableConcept`, `targetScope`, `targetSystem` (pre-adopted from the FHIR R6 ballot for the terminology ecosystem). Beyond the R4 definition, the server answers `used-conceptmap`, `used-system`, `error` (defined by the terminology ecosystem). See <https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>.",
+              "documentation": "Beyond the R4 definition, the server accepts `sourceCode`, `sourceSystem`, `sourceVersion`, `sourceScope`, `sourceCoding`, `sourceCodeableConcept`, `targetCode`, `targetCoding`, `targetCodeableConcept`, `targetScope`, `targetSystem` (pre-adopted from the FHIR R6 ballot for the terminology ecosystem). Beyond the R4 definition, the server accepts `targetcode` and answers `used-conceptmap`, `used-system`, `error` (defined by the terminology ecosystem). See <https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>.",
               "extension": [
                 {
                   "url": "https://ferroterm.eu/fhir/StructureDefinition/operation-level",

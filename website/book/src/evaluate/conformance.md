@@ -38,7 +38,7 @@ own lists beside the general ones, described [below](#the-other-modes).
 ## Where the remaining cases stand
 
 The `general` mode counts 805 cases on every surface. With suite `9c2bbce`
-and validator 7.0.6, `/r4` passes 744, `/r4b` 730 and `/r5` 744. Every case
+and validator 7.0.6, `/r4` passes 745, `/r4b` 730 and `/r5` 744. Every case
 that does not pass falls into one of the rows below. None of them needs
 licensed content: the cases that do (SNOMED CT, LOINC, ICD-11, OMOP) sit in
 the suite's other modes, which are not in these counts.
@@ -52,13 +52,13 @@ the suite's other modes, which are not in these counts.
 | The cases expect the `$lookup` output `warning`, which no OperationDefinition declares. | [#1069](https://github.com/FerroHEALTH/FerroTERM/issues/1069) | 2 | 2 | 2 |
 | The cases expect concept properties (`label`, `order`) and extension placements no published definition allows. | [#1107](https://github.com/FerroHEALTH/FerroTERM/issues/1107) | 9 | 9 | 9 |
 | The cases turn on `versionsMatch`, an expansion parameter no publication defines. | [#507](https://github.com/FerroHEALTH/FerroTERM/issues/507) | 8 | 8 | 8 |
-| The cases expect R5's `$lookup` `definition` output, or send R5's `$translate` `targetcode`, on R4 and R4B, whose OperationDefinitions declare neither. | [#1330](https://github.com/FerroHEALTH/FerroTERM/issues/1330) | 3 | 3 | 0 |
-| The cases send an input the operation does not declare (`codingX` in a batch, `targetcode` on R4), and FerroTERM refuses an undeclared input. | [#349](https://github.com/FerroHEALTH/FerroTERM/issues/349) | 3 | 2 | 2 |
-| **Total not passing** | | 61 | 75 | 61 |
+| The cases expect R5's `$lookup` `definition` output on R4 and R4B, whose OperationDefinitions do not declare it. | [#1330](https://github.com/FerroHEALTH/FerroTERM/issues/1330) | 3 | 3 | 0 |
+| The cases send an input the operation does not declare (`codingX` in a batch), and FerroTERM refuses an undeclared input. | [#349](https://github.com/FerroHEALTH/FerroTERM/issues/349) | 2 | 2 | 2 |
+| **Total not passing** | | 60 | 75 | 61 |
 
 The first two rows do not apply on their surface: 5 cases on R4, 20 on
 R4B and 9 on R5. Each badge shows the pass count alone, so R4 reads
-`744/805`, and of the 61 cases R4 does not pass, 56 are FerroTERM's to
+`745/805`, and of the 60 cases R4 does not pass, 55 are FerroTERM's to
 answer for, 52 on R5 and 55 on R4B. The cases and
 their reasons are listed in `conformance/tx-ecosystem/not-applicable.tsv`,
 which every CI run of the suite checks against the cases the runner skipped.

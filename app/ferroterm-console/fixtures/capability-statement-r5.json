@@ -1,5 +1,5 @@
 {
-  "date": "2026-11-26T06:41:29.805238Z",
+  "date": "2026-11-28T00:14:03.755651Z",
   "extension": [
     {
       "extension": [
@@ -79,7 +79,7 @@
           "operation": [
             {
               "definition": "http://hl7.org/fhir/OperationDefinition/CodeSystem-lookup",
-              "documentation": "Beyond the R5 definition, the server answers `code`, `system`, `abstract` (defined by the terminology ecosystem). See <https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>.",
+              "documentation": "Beyond the R5 definition, the server answers `code`, `system`, `abstract`, `used-supplement` (defined by the terminology ecosystem). See <https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>.",
               "extension": [
                 {
                   "url": "https://ferroterm.eu/fhir/StructureDefinition/operation-level",

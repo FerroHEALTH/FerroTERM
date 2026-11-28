@@ -452,6 +452,7 @@ translate2/translate-6a
 translate2/translate-6b
 translate2/translate-reverse-r4
 translate2/translate-reverse-r4-a
+translate2/translate-reverse-r4-b
 validation/validation-complex-codeableconcept-full
 validation/validation-complex-codeableconcept-vsonly
 validation/validation-contained-bad
