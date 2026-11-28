@@ -242,7 +242,7 @@ mod tests {
         };
         assert_eq!(of(3), [(705_114_005, "54486-6")]);
         assert_eq!(of(5), [(900, "54486-6")]);
-        assert!(of(6).is_empty());
+        assert_eq!(of(6), []);
         let schemed: Vec<Ordinal> = identifiers.concepts(705_114_005).collect();
         assert_eq!(schemed, [Ordinal::new(4), Ordinal::new(3)]);
         assert_eq!(identifiers.concepts(1).count(), 0);
