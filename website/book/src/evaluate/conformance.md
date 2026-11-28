@@ -70,9 +70,9 @@ Every row is a gate or an upstream report.
 
 ## The other modes
 
-Each of the suite's other modes has its own badge, labelled
-`tx <suite> <mode> <surface>`, which reads `passed/ran`: `ran` is the number of
-cases the mode runs.
+Each of the suite's other modes has its own badge, labelled `<mode> <surface>`
+under the README's suite heading, which reads `passed/ran`: `ran` is the number
+of cases the mode runs.
 
 A mode whose content CI may fetch runs in CI, weekly and on demand
 (`.github/workflows/tx-ecosystem-modes.yml`), against its committed pass list
