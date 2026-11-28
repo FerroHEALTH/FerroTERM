@@ -20,6 +20,8 @@ use std::collections::BTreeMap;
 use concept_graph::ordinal::Ordinal;
 use concept_graph::refsets::{Table, ValueRef};
 
+use sct_scg::ast;
+
 use super::{Attribute, Term, Value};
 use crate::provider::error::ProviderError;
 use crate::snomed::SnomedProvider;
@@ -324,6 +326,86 @@ impl SnomedProvider {
             .code(Ordinal::new(ordinal))
             .map_err(storage)?
             .map_or_else(|| ordinal.to_string(), ToOwned::to_owned))
+    }
+
+    /// Moves each loose attribute the concept model groups in the domain of
+    /// `sub`'s focus concepts into a relationship group of its own, nested
+    /// sub-expressions included.
+    ///
+    /// This is the "Adding a Self-grouped Attribute" transformation (SNOMED CT
+    /// Postcoordination Guide, Transformation Level 1), which the tx-ecosystem
+    /// IG requires for every attribute the MRCM marks as grouped, so that
+    /// `40468003:363698007=10200004` is `40468003:{363698007=10200004}` "for
+    /// validation, rendering and subsumption" (requirements, SNOMED CT). The
+    /// guide applies it to an attribute stated once, so one stated more often
+    /// stays as written.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProviderError`] when the substrate fails.
+    pub(super) fn self_group(&self, sub: &mut ast::SubExpression) -> Result<(), ProviderError> {
+        let Some(refinement) = sub.refinement.as_mut() else {
+            return Ok(());
+        };
+        for attribute in refinement.ungrouped.iter_mut().chain(
+            refinement
+                .groups
+                .iter_mut()
+                .flat_map(|g| g.attributes.iter_mut()),
+        ) {
+            if let ast::AttributeValue::Nested(nested) = &mut attribute.value {
+                self.self_group(nested)?;
+            }
+        }
+        if self.mrcm()?.attributes.is_empty() {
+            return Ok(());
+        }
+        let store = &self.stored().store;
+        let mut focus = Vec::with_capacity(sub.focus.len());
+        for concept in &sub.focus {
+            if let Some(ordinal) = store.ordinal(&concept.concept_id).map_err(storage)? {
+                focus.push(ordinal.index());
+            }
+        }
+        let term = Term {
+            focus,
+            ..Term::default()
+        };
+        let stated = std::mem::take(&mut refinement.ungrouped);
+        let named = |name: &str| {
+            stated
+                .iter()
+                .filter(|held| held.name.concept_id == name)
+                .count()
+        };
+        let once: Vec<bool> = stated
+            .iter()
+            .map(|held| named(&held.name.concept_id) == 1)
+            .collect();
+        let mut loose = Vec::with_capacity(stated.len());
+        let mut grouped = Vec::new();
+        for (attribute, once) in stated.into_iter().zip(once) {
+            let kind = store.ordinal(&attribute.name.concept_id).map_err(storage)?;
+            let self_grouped = match kind {
+                Some(kind) => self
+                    .matching_domains(&term, kind.index())?
+                    .iter()
+                    .any(|rule| rule.grouped),
+                None => false,
+            };
+            if self_grouped && once {
+                grouped.push(attribute);
+            } else {
+                loose.push(attribute);
+            }
+        }
+        refinement.ungrouped = loose;
+        refinement
+            .groups
+            .extend(grouped.into_iter().map(|attribute| ast::AttributeGroup {
+                attributes: vec![attribute],
+            }));
+        Ok(())
     }
 
     /// The concept model findings of `term`, nested values included; none when

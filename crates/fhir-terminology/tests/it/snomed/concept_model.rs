@@ -168,3 +168,33 @@ fn an_edition_without_a_concept_model_checks_none() {
         validate_code::validate_code(&registry, &Invocation::Type, &request).expect("validates");
     assert!(outcome.result, "{:?}", outcome.issues);
 }
+
+#[test]
+fn a_loose_attribute_the_concept_model_groups_is_written_in_a_group_of_its_own() {
+    // "Adding a Self-grouped Attribute" (SNOMED CT Postcoordination Guide,
+    // Transformation Level 1), which the tx-ecosystem IG requires.
+    let grouped = format!("{}:{{{}={}}}", code(CAT), code(COVERING), code(FUR));
+    let outcome = validated(&format!("{}:{}={}", code(CAT), code(COVERING), code(FUR)));
+    assert!(outcome.result, "{:?}", outcome.issues);
+    assert_eq!(outcome.normalized_code.as_deref(), Some(grouped.as_str()));
+    // An ungrouped attribute stays loose, and so does one stated twice.
+    let loose = format!("{}:{}=#4", code(CAT), code(LEGS));
+    assert_eq!(validated(&loose).normalized_code, None);
+    let twice = format!(
+        "{}:{}={},{}={}",
+        code(CAT),
+        code(COVERING),
+        code(FUR),
+        code(COVERING),
+        code(FUR)
+    );
+    let outcome = validated(&twice);
+    assert!(
+        outcome
+            .normalized_code
+            .as_deref()
+            .is_none_or(|normal| !normal.contains('{')),
+        "{:?}",
+        outcome.normalized_code
+    );
+}

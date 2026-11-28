@@ -144,6 +144,7 @@ fn group_matches(
         target_comment: None,
         no_map: element.is_some_and(|e| e.no_map),
         note: None,
+        normalized_concept: None,
     };
     let mut found = false;
     for (element, targets) in element_targets(group, subject, reverse) {
@@ -272,6 +273,7 @@ fn unmapped_matches(
         target_comment: None,
         no_map: false,
         note: None,
+        normalized_concept: None,
     };
     let fixed = |code: Option<&str>, display: Option<&str>, relationship: Relationship| Match {
         relationship,

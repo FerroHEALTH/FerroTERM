@@ -37,19 +37,19 @@ The `general` rows were recorded on 2026-11-24 with validator 7.0.6 and suite
 `9c2bbce57366319d6a5265cbfbf6697f094822e3` (test cases 1.11.0). Every
 mode run also carries the two mode-independent `metadata` cases and the 11
 `closure` cases, so a mode's count is 13 above the suite's own. The `snomed`,
-`mimetypes` and `omop` rows are held by their CI lanes
+`mimetypes`, `omop`, `icf` and `icd-11` rows are held by their CI lanes
 (`.github/workflows/tx-ecosystem-modes.yml`), `snomed` over the suite's test
-edition. The other rows were measured by hand on 2026-11-27
-on the same pins, over LOINC 2.83 and the three ICD-11 artifacts built from
-the WHO ICD-API local deployment of release 2026-01 in English; the `icf` row
-over the ICF `CodeSystem` resources of `fhir.tx.support` 1.0.5.
+edition, `icf` over the ICF `CodeSystem` resources of `fhir.tx.support` 1.0.5,
+and `icd-11` over the three artifacts built from the WHO ICD-API local
+deployment of release 2026-01 in English. The other rows were measured by hand
+on 2026-11-27 on the same pins, over LOINC 2.83.
 
 | mode | surface | pass list | passed of ran | needs | open failures |
 |---|---|---|---|---|---|
 | `general` | `/r4b` | `passing.txt` | 730 of 805 | nothing | #1068, #1069, #1376, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
-| `general` | `/r4` | `passing-r4.txt` | 744 of 805 | nothing | #1068, #1069, #1376, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
+| `general` | `/r4` | `passing-r4.txt` | 745 of 805 | nothing | #1068, #1069, #1376, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
 | `general` | `/r5` | `passing-r5.txt` | 744 of 805 | nothing | #1068, #1069, #1376, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
-| `snomed` | `/r4b` | `passing-snomed.txt` | 297 of 378 | the suite's SNOMED CT test edition, with `terminology.default_language = "en-US"` (the script sets it) | #1413, #1068, #1380 |
+| `snomed` | `/r4b` | `passing-snomed.txt` | 301 of 378 | the suite's SNOMED CT test edition, with `terminology.default_language = "en-US"` (the script sets it) | #1413, #1068, #1380 |
 | `icd-11` | `/r4b` | `passing-icd-11.txt` | 10 of 145 | the three ICD-11 artifacts | #1391, #1068, #1380 |
 | `icf` | `/r4b` | `passing-icf.txt` | 79 of 96 | the standalone ICF releases | #1330, #1376, #1068, #1380 |
 | `loinc` | `/r4b` | `passing-loinc.txt` | 56 of 110 | a LOINC release | #1383, #1068, #1380 |
@@ -83,8 +83,10 @@ lists are refreshed in the same change.
   it. It is SNOMED CT content under SNOMED International's licence (its
   `Readme.txt`), so it is fetched for the run and never committed.
 - **`icd-11`** needs the three ICD-11 artifacts built from the WHO ICD-API
-  local deployment (`--mode icd-11 --index <mms>,<icf>,<entity>`), which
-  needs the WHO container and its licence. Test cases 1.11.0 rewrite it (132
+  local deployment (`--mode icd-11 --index <mms>,<icf>,<entity>`);
+  `scripts/checks/tx-ecosystem-mode.sh --mode icd-11` starts the container by
+  digest under WHO's terms (section 2.3 of the ICD-11 Terms of Use and License
+  Agreement), walks it and deletes the cache. Test cases 1.11.0 rewrite it (132
   cases) against the IG's own `icd-11.md`. The 44 cases the 1.9.3 suite
   passed now expect `post-coordination-metadata` and the `classificationCode`
   output, which #1391 builds.
