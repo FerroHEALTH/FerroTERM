@@ -7,6 +7,7 @@
 use super::{ComposeError, Gathered, Item, Options, Page, STATUS_SCAN_LIMIT, Selection};
 use crate::language;
 use crate::provider::compose::Compose;
+use crate::provider::declaration::ContentMode;
 use crate::provider::filter::{Filter, FilterOperator};
 use crate::provider::{CodeSystemProvider, Concept, ConceptSet, Hierarchy, error::ProviderError};
 
@@ -39,7 +40,11 @@ pub(super) fn paged(
             continue;
         }
         let wanted = skip.saturating_add(remaining);
-        let cut: Vec<(u32, usize)> = match nests(compose, options)
+        // NOTE: an expansion "may nest codes" (`excludeNested`,
+        // <https://hl7.org/fhir/R4B/valueset-operation-expand.html>); a system the server
+        // enumerates is a polyhierarchy a tree repeats concepts in, so it expands flat.
+        let held_as_resource = selection.provider.declaration().content != ContentMode::NotPresent;
+        let cut: Vec<(u32, usize)> = match (held_as_resource && nests(compose, options))
             .then(|| preorder(selection, wanted))
             .flatten()
         {
