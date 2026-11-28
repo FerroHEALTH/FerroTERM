@@ -91,7 +91,7 @@ pub struct LookupInput {
 /// The outcome of `$lookup`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LookupOutcome {
-    /// The code as the system spells it (`code`, the ecosystem's output).
+    /// The code as the request sent it (`code`, the ecosystem's output).
     pub code: String,
     /// The code system URI (`system`, the ecosystem's output).
     pub system: String,
@@ -274,10 +274,9 @@ pub fn lookup(
         });
     }
     Ok(LookupOutcome {
-        // NOTE: no FHIR/SNOMED spec governs this: our own design. The code as
-        // the system spells it, which for an expression is its canonical form
-        // and for every other system is the code as given.
-        code: located.code.clone(),
+        // NOTE: every tx-ecosystem `$lookup` case at 9c2bbce echoes the code as sent, as
+        // `$validate-code` does (#1418); a system's normal form is its `code` property.
+        code: code.to_owned(),
         system: identity.url.clone(),
         abstract_concept,
         name: identity

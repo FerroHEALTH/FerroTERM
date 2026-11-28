@@ -971,3 +971,12 @@ fn an_expression_display_is_generated_and_a_concept_display_defined() {
         fhir_terminology::provider::DisplayStanding::Defined
     );
 }
+
+// NOTE: every tx-ecosystem `$lookup` case at 9c2bbce echoes the code as sent, as
+// `$validate-code` does (#1418).
+#[test]
+fn lookup_answers_an_expression_as_sent() {
+    let (_dir, registry) = registry();
+    let sent = refined(CAT, COVERING, FUR);
+    assert_eq!(looked_up(&registry, &sent).code, sent);
+}
