@@ -561,7 +561,7 @@ impl StoredSystem for Snomed {
     fn successors(
         provider: &SnomedProvider,
         concept: Concept,
-    ) -> Result<Vec<crate::provider::Successor>, ProviderError> {
+    ) -> Result<Vec<crate::provider::concept_map::Successor>, ProviderError> {
         conceptmap::successors(provider, concept)
     }
 
@@ -572,7 +572,7 @@ impl StoredSystem for Snomed {
     fn implicit_concept_map(
         provider: &SnomedProvider,
         url: &str,
-        selection: crate::provider::MapSelection<'_>,
+        selection: crate::provider::concept_map::MapSelection<'_>,
     ) -> Option<Result<crate::provider::concept_map::ConceptMapModel, ProviderError>> {
         let (base, form) = implicit_parts(url, FHIR_CM)?;
         // NOTE: the base must be this edition or the bare system URI; the map itself

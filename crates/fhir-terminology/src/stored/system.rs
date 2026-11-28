@@ -12,12 +12,13 @@ use super::artifact::Artifact;
 use super::primary_subtag;
 use crate::provider::compose::Compose;
 use crate::provider::concept_map::ConceptMapModel;
+use crate::provider::concept_map::{MapSelection, Successor};
 use crate::provider::declaration::{Capability, Declaration};
 use crate::provider::filter::Filter;
 use crate::provider::source::Source;
 use crate::provider::{
     CodeSystemProvider, Concept, ConceptSet, Designation, DesignationUse, Hierarchy, Identity,
-    ImplicitMetadata, Located, MapSelection, Property, Status, Successor, error::ProviderError,
+    ImplicitMetadata, Located, Property, Status, error::ProviderError,
 };
 
 /// One stored system behind a [`StoredProvider`]: what its specification

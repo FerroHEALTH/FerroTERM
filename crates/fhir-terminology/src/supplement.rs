@@ -11,11 +11,11 @@ use concept_graph::subsumption::Outcome;
 
 use crate::provider::code_system::{SupplementKind, Supplementing};
 use crate::provider::compose::Compose;
+use crate::provider::concept_map::{MapSelection, Successor};
 use crate::provider::declaration::Declaration;
 use crate::provider::{
     CodeSystemProvider, Concept, ConceptSet, Designation, DisplayStanding, Hierarchy, Identity,
-    ImplicitMetadata, Located, MapSelection, Property, PropertyValue, Standing, Status, Successor,
-    error::ProviderError,
+    ImplicitMetadata, Located, Property, PropertyValue, Standing, Status, error::ProviderError,
 };
 
 /// What a supplement adds to one concept.
