@@ -677,7 +677,7 @@ impl SnomedProvider {
             };
             out.push(Property {
                 code: attribute.name.concept_id.clone(),
-                value,
+                value: Some(value),
                 ..Property::default()
             });
         }

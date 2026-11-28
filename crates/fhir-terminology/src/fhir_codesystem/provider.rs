@@ -254,24 +254,28 @@ impl FhirCodeSystem {
         let mut at: Option<jiff::Timestamp> = None;
         for property in &entry.properties {
             match (property.code.as_str(), &property.value) {
-                (INACTIVE, PropertyValue::Boolean(true)) => flagged = true,
+                (INACTIVE, Some(PropertyValue::Boolean(true))) => flagged = true,
                 // NOTE: a concept "deprecated but not inactive can still be
                 // used", so no deprecation marker retires one
                 // (<https://hl7.org/fhir/R5/codesystem-concept-properties.html>).
-                (STATUS, PropertyValue::Code(status)) if status == RETIRED => stated_retired = true,
-                (STATUS, PropertyValue::Code(status)) if status == DEPRECATED => deprecated = true,
-                (DEPRECATED | DEPRECATION_DATE, PropertyValue::DateTime(date)) => {
+                (STATUS, Some(PropertyValue::Code(status))) if status == RETIRED => {
+                    stated_retired = true;
+                }
+                (STATUS, Some(PropertyValue::Code(status))) if status == DEPRECATED => {
+                    deprecated = true;
+                }
+                (DEPRECATED | DEPRECATION_DATE, Some(PropertyValue::DateTime(date))) => {
                     let now = *at.get_or_insert_with(crate::clock::now);
                     deprecated = deprecated || super::date_time::retires_at(date, now);
                 }
-                (RETIREMENT_DATE, PropertyValue::DateTime(date)) => {
+                (RETIREMENT_DATE, Some(PropertyValue::DateTime(date))) => {
                     // NOTE: no FHIR/SNOMED spec governs this: our own design
                     // reads the date as at the request, once per concept, and
                     // a value that is no `dateTime` as a retirement in force.
                     let now = *at.get_or_insert_with(crate::clock::now);
                     retired_by_date = retired_by_date || super::date_time::retires_at(date, now);
                 }
-                (code, PropertyValue::Boolean(true)) if self.abstract_property(code) => {
+                (code, Some(PropertyValue::Boolean(true))) if self.abstract_property(code) => {
                     abstract_concept = true;
                 }
                 _ => {}
@@ -320,7 +324,7 @@ impl FhirCodeSystem {
                 if let Some(related_code) = self.code(Concept::new(index))? {
                     out.push(Property {
                         code: code.to_owned(),
-                        value: PropertyValue::Code(related_code),
+                        value: Some(PropertyValue::Code(related_code)),
                         ..Property::default()
                     });
                 }
@@ -478,7 +482,7 @@ impl CodeSystemProvider for FhirCodeSystem {
                 .code(concept)
                 .map(|_| Property {
                     code: INACTIVE.to_owned(),
-                    value: PropertyValue::Boolean(false),
+                    value: Some(PropertyValue::Boolean(false)),
                     ..Property::default()
                 })
                 .into_iter()
@@ -490,13 +494,13 @@ impl CodeSystemProvider for FhirCodeSystem {
         // the publisher wrote where another marker contradicts it.
         let mut out = vec![Property {
             code: INACTIVE.to_owned(),
-            value: PropertyValue::Boolean(!status.active),
+            value: Some(PropertyValue::Boolean(!status.active)),
             ..Property::default()
         }];
         if status.abstract_concept {
             out.push(Property {
                 code: NOT_SELECTABLE.to_owned(),
-                value: PropertyValue::Boolean(true),
+                value: Some(PropertyValue::Boolean(true)),
                 ..Property::default()
             });
         }

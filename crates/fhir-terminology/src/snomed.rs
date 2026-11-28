@@ -247,7 +247,7 @@ impl StoredSystem for Snomed {
         };
         Ok(Some(Property {
             code: name.to_owned(),
-            value: PropertyValue::String(expression),
+            value: Some(PropertyValue::String(expression)),
             ..Property::default()
         }))
     }

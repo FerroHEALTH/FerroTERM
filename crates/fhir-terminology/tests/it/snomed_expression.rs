@@ -218,7 +218,7 @@ fn lookup_generates_the_normal_form_of_an_expression() {
     // The focus concept keeps its own definition's attributes beside the
     // expression's refinement; the animal has none of its own.
     assert_eq!(
-        format!("{:?}", terse.value),
+        format!("{:?}", terse.value.as_ref().expect("a value")),
         format!(
             "String(\"{}:{}={}\")",
             code(ANIMAL),
@@ -232,7 +232,7 @@ fn lookup_generates_the_normal_form_of_an_expression() {
         .find(|p| p.code == "normalForm")
         .expect("normalForm");
     assert!(
-        format!("{:?}", with_terms.value).contains("|Animal|"),
+        format!("{:?}", with_terms.value.as_ref().expect("a value")).contains("|Animal|"),
         "{:?}",
         with_terms.value
     );
@@ -253,6 +253,8 @@ fn an_expression_states_its_own_definition_status_as_a_property() {
                 .find(|p| p.code == "sufficientlyDefined")
                 .expect("sufficientlyDefined")
                 .value
+                .as_ref()
+                .expect("a value")
         )
     };
     assert_eq!(sufficiently_defined(&assumed), "Boolean(true)");
@@ -689,7 +691,10 @@ fn an_expression_over_an_inactive_concept_validates_and_is_marked_inactive() {
         .iter()
         .find(|p| p.code == "inactive")
         .expect("inactive");
-    assert_eq!(format!("{:?}", inactive.value), "Boolean(true)");
+    assert_eq!(
+        format!("{:?}", inactive.value.as_ref().expect("a value")),
+        "Boolean(true)"
+    );
     // An expression over active concepts alone stays active.
     assert_eq!(
         validated(&registry, &refined(CAT, COVERING, FUR)).inactive,
@@ -710,7 +715,7 @@ fn an_expression_answers_its_own_refinement_as_concept_model_properties() {
         .find(|p| p.code == code(COVERING))
         .expect("the covering attribute");
     assert_eq!(
-        format!("{:?}", covering.value),
+        format!("{:?}", covering.value.as_ref().expect("a value")),
         format!("Code({:?})", code(FUR))
     );
 }

@@ -288,7 +288,7 @@ impl StoredSystem for RxNorm {
             };
             out.push(Property {
                 code: name.clone(),
-                value: PropertyValue::Code(code.clone()),
+                value: Some(PropertyValue::Code(code.clone())),
                 ..Property::default()
             });
         }

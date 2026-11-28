@@ -113,7 +113,13 @@ fn properties_carry_every_field_and_the_hierarchy() {
         .properties(glucose.concept)
         .expect("reads")
         .into_iter()
-        .map(|p| format!("{}={}", p.code, p.value.as_text()))
+        .map(|p| {
+            format!(
+                "{}={}",
+                p.code,
+                p.value.as_ref().expect("a value").as_text()
+            )
+        })
         .collect();
     assert!(props.contains(&String::from("CLASS=CHEM")));
     assert!(
@@ -135,7 +141,13 @@ fn properties_carry_every_field_and_the_hierarchy() {
         .properties(sodium.concept)
         .expect("reads")
         .into_iter()
-        .map(|p| format!("{}={}", p.code, p.value.as_text()))
+        .map(|p| {
+            format!(
+                "{}={}",
+                p.code,
+                p.value.as_ref().expect("a value").as_text()
+            )
+        })
         .collect();
     assert!(sodium_props.contains(&String::from("copyright=3rdParty")));
     let survey = provider
@@ -146,7 +158,13 @@ fn properties_carry_every_field_and_the_hierarchy() {
         .properties(survey.concept)
         .expect("reads")
         .into_iter()
-        .map(|p| format!("{}={}", p.code, p.value.as_text()))
+        .map(|p| {
+            format!(
+                "{}={}",
+                p.code,
+                p.value.as_ref().expect("a value").as_text()
+            )
+        })
         .collect();
     assert!(survey_props.contains(&format!("answer-list={}", code(ANSWER_LIST))));
     let hierarchy = provider.hierarchy().expect("a hierarchy");

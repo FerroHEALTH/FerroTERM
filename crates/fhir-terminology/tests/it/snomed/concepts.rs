@@ -105,7 +105,7 @@ fn properties_follow_the_snomed_on_fhir_list() {
         props
             .iter()
             .filter(|p| p.code == code)
-            .map(|p| &p.value)
+            .map(|p| p.value.as_ref().expect("a value"))
             .collect()
     };
     assert_eq!(find("inactive"), [&PropertyValue::Boolean(false)]);
@@ -138,7 +138,7 @@ fn properties_follow_the_snomed_on_fhir_list() {
     let children: Vec<&PropertyValue> = animal
         .iter()
         .filter(|p| p.code == "child")
-        .map(|p| &p.value)
+        .map(|p| p.value.as_ref().expect("a value"))
         .collect();
     assert_eq!(
         children,
@@ -150,11 +150,12 @@ fn properties_follow_the_snomed_on_fhir_list() {
     let fish = p.properties(Concept::new(FISH)).expect("reads");
     assert!(
         fish.iter()
-            .any(|p| p.code == "inactive" && p.value == PropertyValue::Boolean(true))
+            .any(|p| p.code == "inactive" && p.value == Some(PropertyValue::Boolean(true)))
     );
     assert!(
         fish.iter()
-            .any(|p| p.code == "sufficientlyDefined" && p.value == PropertyValue::Boolean(false))
+            .any(|p| p.code == "sufficientlyDefined"
+                && p.value == Some(PropertyValue::Boolean(false)))
     );
     assert!(!p.status(Concept::new(FISH)).expect("reads").active);
     assert!(p.status(Concept::new(CAT)).expect("reads").active);
@@ -168,7 +169,7 @@ fn a_concept_with_a_loinc_identifier_carries_it_as_the_loinc_property() {
             .expect("reads")
             .into_iter()
             .filter(|p| p.code == "loinc")
-            .map(|p| p.value)
+            .map(|p| p.value.expect("a value"))
             .collect()
     };
     assert_eq!(
@@ -517,7 +518,7 @@ fn the_normal_form_renders_the_inferred_view_of_a_concept() {
             .concept;
         match p.generated_property(concept, property).expect("generates") {
             Some(property) => match property.value {
-                PropertyValue::String(text) => Some(text),
+                Some(PropertyValue::String(text)) => Some(text),
                 other => panic!("a string, not {other:?}"),
             },
             None => None,

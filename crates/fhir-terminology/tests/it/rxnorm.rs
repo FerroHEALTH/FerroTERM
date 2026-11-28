@@ -89,7 +89,13 @@ fn properties_carry_the_term_types_sources_attributes_and_relationships() {
         .properties(tablet)
         .expect("reads")
         .into_iter()
-        .map(|p| format!("{}={}", p.code, p.value.as_text()))
+        .map(|p| {
+            format!(
+                "{}={}",
+                p.code,
+                p.value.as_ref().expect("a value").as_text()
+            )
+        })
         .collect();
     assert!(props.contains(&String::from("TTY=SCD")));
     assert!(props.contains(&String::from("SAB=MTHSPL")));
@@ -104,7 +110,13 @@ fn properties_carry_the_term_types_sources_attributes_and_relationships() {
         .properties(located(&provider, ASPIRIN))
         .expect("reads")
         .into_iter()
-        .map(|p| format!("{}={}", p.code, p.value.as_text()))
+        .map(|p| {
+            format!(
+                "{}={}",
+                p.code,
+                p.value.as_ref().expect("a value").as_text()
+            )
+        })
         .collect();
     assert!(aspirin.contains(&String::from("STY=Organic Chemical")));
     let names: Vec<&str> = provider

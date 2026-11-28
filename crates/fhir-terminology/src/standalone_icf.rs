@@ -103,7 +103,8 @@ impl StandaloneIcf {
             return Ok(false);
         }
         Ok(self.inner.properties(concept)?.iter().any(|property| {
-            property.code == "kind" && property.value == PropertyValue::Code(PRIMARY.to_owned())
+            property.code == "kind"
+                && property.value == Some(PropertyValue::Code(PRIMARY.to_owned()))
         }))
     }
 
@@ -312,7 +313,7 @@ impl CodeSystemProvider for StandaloneIcf {
         if let Some(parent) = self.inner.code(category)? {
             out.push(Property {
                 code: String::from("parent"),
-                value: PropertyValue::Code(parent),
+                value: Some(PropertyValue::Code(parent)),
                 ..Property::default()
             });
         }
@@ -320,7 +321,7 @@ impl CodeSystemProvider for StandaloneIcf {
             for (position, digit) in parts.values() {
                 out.push(Property {
                     code: position.property.to_owned(),
-                    value: PropertyValue::Code(Qualified::scale_value(position, digit)),
+                    value: Some(PropertyValue::Code(Qualified::scale_value(position, digit))),
                     ..Property::default()
                 });
             }
