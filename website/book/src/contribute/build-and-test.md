@@ -58,7 +58,9 @@ mode (the one place a JVM runs, in CI, never in the server) and compares the
 result with the committed pass list under `conformance/tx-ecosystem/`. A
 listed test that fails is a regression; a test that starts passing is added in
 the same change. `--mode icd-11 --index <dirs>` runs a code system mode by
-hand over local artifacts.
+hand over local artifacts. A local run needs a Java runtime: the script uses
+`$JAVA_HOME/bin/java` when `JAVA_HOME` is set, the `java` on `PATH` otherwise,
+and stops before it starts the server when neither answers `java -version`.
 
 ## The two layers
 
