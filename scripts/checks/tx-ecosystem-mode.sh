@@ -34,7 +34,7 @@ ICF_SHA256=1de150b9c1d277280309f94ae7bea9e1b57c20685c898c00e10e2938cac46a1a
 # Agreement (section 2.3). The digest of the walked cache pins the content.
 ICD_API_IMAGE=whoicd/icd-api@sha256:1b77eb6dc43e0c65a12e9e9340ad178493c93488e728d0d936507cc57ada1b7c
 ICD11_RELEASE=2026-01
-ICD11_SHA256=unpinned
+ICD11_SHA256=59632f6e71c3c4d7138bd07600c9a18a142dd3492f51d24217d7cbb6a1f47edf
 
 # The lines a run may print. None can carry a term: a case name is the suite's
 # identifier, and the scripts' messages name counts, paths and system URIs.

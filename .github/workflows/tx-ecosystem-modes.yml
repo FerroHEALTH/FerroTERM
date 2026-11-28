@@ -76,8 +76,7 @@ jobs:
     name: ${{ matrix.mode }} ${{ matrix.fhir }}
     needs: plan
     runs-on: ubuntu-latest
-    # The icd-11 recipe starts WHO's ICD-API deployment and walks it.
-    timeout-minutes: 150
+    timeout-minutes: 60
     permissions:
       contents: read
       # A failed scheduled or dispatched run is filed where the work is tracked.
