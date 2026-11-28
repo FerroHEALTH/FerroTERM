@@ -15,7 +15,8 @@ use concept_graph::ordinal::Ordinal;
 
 use crate::provider::concept_map::{ConceptMapModel, Element, Group, Relationship, Target};
 use crate::provider::{CodeSystemProvider, Concept, MapSelection, error::ProviderError};
-use crate::snomed::{LOINC_SCHEME, LOINC_SYSTEM, SYSTEM, SnomedProvider};
+use crate::snomed::properties::{LOINC_SCHEME, LOINC_SYSTEM};
+use crate::snomed::{SYSTEM, SnomedProvider};
 use crate::stored::storage;
 
 /// `11010000107 |LOINC Extension module|`, the map's id.
