@@ -5,8 +5,8 @@
 //! what the HL7 terminology ecosystem test cases for ICD-11 assert.
 
 use ferroterm_testkit::icd11::{
-    BLOCK, CHOLERA, CLASSICAL, OTHER_VIBRIO, RELEASE, RESIDUAL, SEPSIS, SEPTIC_SHOCK, SEVERE,
-    VIBRIO, write_artifacts,
+    BLOCK, CHOLERA, CLASSICAL, ELTOR, OTHER_VIBRIO, RELEASE, RESIDUAL, SEPSIS, SEPTIC_SHOCK,
+    SEVERE, VIBRIO, write_artifacts,
 };
 use fhir_terminology::icd11::{Icd11Provider, OpenError};
 use fhir_terminology::provider::declaration::{Compositional, HierarchyMeaning};
@@ -39,28 +39,41 @@ fn located(provider: &Icd11Provider, code: &str) -> Concept {
         .concept
 }
 
+/// A value as text, a `Coding` as `system|code (display)`.
+fn text(value: &PropertyValue) -> String {
+    match value {
+        PropertyValue::Coding {
+            system,
+            code,
+            display,
+        } => match display {
+            Some(display) => format!("{system}|{code} ({display})"),
+            None => format!("{system}|{code}"),
+        },
+        other => other.as_text(),
+    }
+}
+
+/// Each property as `code=value [sub=value; ...]`, or `code [...]` with no value.
 fn props(provider: &Icd11Provider, concept: Concept) -> Vec<String> {
     provider
         .properties(concept)
         .expect("reads")
         .into_iter()
         .map(|p| {
+            let head = match &p.value {
+                Some(value) => format!("{}={}", p.code, text(value)),
+                None => p.code.clone(),
+            };
             let parts: Vec<String> = p
                 .subproperties
                 .iter()
-                .map(|s| {
-                    let description = s
-                        .description
-                        .as_deref()
-                        .map(|d| format!(" ({d})"))
-                        .unwrap_or_default();
-                    format!("{}={}{description}", s.code, s.value.as_text())
-                })
+                .map(|s| format!("{}={}", s.code, text(&s.value)))
                 .collect();
             if parts.is_empty() {
-                format!("{}={}", p.code, p.value.as_text())
+                head
             } else {
-                format!("{}={} [{}]", p.code, p.value.as_text(), parts.join("; "))
+                format!("{head} [{}]", parts.join("; "))
             }
         })
         .collect()
@@ -139,9 +152,13 @@ fn the_entity_id_is_the_code_and_the_classification_code_spells_it_too() {
     assert!(p.contains(&format!("parent={BLOCK}")), "{p:?}");
     assert!(p.contains(&String::from("classKind=category")));
     assert!(p.contains(&String::from("exclusion=Vibrio vulnificus infection")));
-    assert!(p.iter().any(|x| x.starts_with(
-        "postcoordinationScale=http://id.who.int/icd/schema/infectiousAgent [valueSet="
-    )));
+    // NOTE: tx-ecosystem IG `icd-11.md` at 9c2bbce, Properties: "A plain (not
+    // postcoordinated) concept therefore lists its axes only when
+    // post-coordination-metadata=true".
+    assert!(
+        !p.iter().any(|x| x.starts_with("postcoordination")),
+        "{p:?}"
+    );
     assert!(!p.iter().any(|x| x.starts_with("notSelectable")));
     assert_eq!(
         mms.definition(by_code).expect("reads").as_deref(),
@@ -233,12 +250,23 @@ fn postcoordination_expressions_validate_against_the_axes() {
         "{p:?}"
     );
     assert!(!p.iter().any(|x| x.starts_with("id=")), "{p:?}");
-    assert!(p.contains(&format!(
-        "stem={CHOLERA} [stemLabel=Cholera; stemUri={MMS}/{CHOLERA}]"
-    )));
-    assert!(p.contains(&format!(
-        "postcoordinationValues=http://id.who.int/icd/schema/infectiousAgent [{CLASSICAL}={MMS}/{CLASSICAL} (Vibrio cholerae O1, biovar cholerae)]"
-    )));
+    assert!(
+        p.contains(&format!("stem={MMS}|{CHOLERA} (Cholera)")),
+        "{p:?}"
+    );
+    assert!(
+        p.contains(&format!(
+            "postcoordination [axis=http://id.who.int/icd/schema|infectiousAgent (Infectious agent); value={MMS}|{CLASSICAL} (Vibrio cholerae O1, biovar cholerae)]"
+        )),
+        "{p:?}"
+    );
+    assert_eq!(
+        p.iter()
+            .filter(|x| x.starts_with("postcoordination"))
+            .count(),
+        1,
+        "only the axis with a value: {p:?}"
+    );
     assert!(
         mms.locate(&format!("{MMS}/{CHOLERA} & {MMS}/{CLASSICAL}"))
             .expect("reads")
@@ -261,29 +289,11 @@ fn postcoordination_expressions_validate_against_the_axes() {
         mms.locate("XXXX9&XN8P1").expect("reads").is_none(),
         "an unknown stem is not a code"
     );
-    let cluster = located(&mms, "1A01/1G41/1G40");
-    assert_eq!(
-        mms.display(cluster, None).expect("reads").as_deref(),
-        Some(
-            "Intestinal infection due to other Vibrio / Sepsis with septic shock / Sepsis without septic shock"
-        )
-    );
-    let p = props(&mms, cluster);
-    assert!(
-        p.contains(&format!("code={OTHER_VIBRIO}/{SEPTIC_SHOCK}/{SEPSIS}")),
-        "{p:?}"
-    );
-    assert!(p.contains(&format!(
-        "postcoordinationValues=http://id.who.int/icd/schema/hasCausingCondition [{SEPTIC_SHOCK}={MMS}/{SEPTIC_SHOCK} (Sepsis with septic shock)]"
-    )), "the required axis gets the first value: {p:?}");
-    assert!(p.contains(&format!(
-        "postcoordinationValues=http://id.who.int/icd/schema/hasManifestation [{SEPSIS}={MMS}/{SEPSIS} (Sepsis without septic shock)]"
-    )));
     let two_stems = located(&mms, "1A00&XN8P1/XN62R");
     assert_eq!(
         mms.display(two_stems, None).expect("reads").as_deref(),
         Some("Cholera [Vibrio cholerae O1, biovar cholerae] / Vibrio cholerae O1, biovar eltor"),
-        "the second member fits the unfilled infectious-agent axis or starts a stem; the display renders the syntax either way"
+        "the display renders the syntax"
     );
     let dot = located(&icf, "d5409.qp3");
     assert_eq!(
@@ -291,15 +301,170 @@ fn postcoordination_expressions_validate_against_the_axes() {
         Some("Dressing, unspecified [SEVERE performance difficulty (high, extreme,...) 50-95 %]")
     );
     assert!(props(&icf, dot).iter().any(|x| {
-        x.starts_with(&format!(
-            "postcoordinationValues=http://id.who.int/icd/schema/performance [{SEVERE}="
-        ))
+        x.starts_with(
+            "postcoordination [axis=http://id.who.int/icd/schema|performance (Performance); value=",
+        ) && x.contains(SEVERE)
     }));
     assert!(
         icf.locate("d5409.3").expect("reads").is_none(),
         "the pre-2026 qualifier syntax names no code"
     );
     assert_eq!(located(&icf, "d540"), located(&icf, "d540"));
+}
+
+/// The code `provider` locates `text` at: its normal form.
+fn normal(provider: &Icd11Provider, text: &str) -> String {
+    provider
+        .locate(text)
+        .expect("reads")
+        .expect("a concept with the code")
+        .code
+}
+
+// NOTE: tx-ecosystem IG `icd-11.md` at 9c2bbce, Post Coordination Expressions: the normal form
+// is the root, each qualifier group in its code's axis order and by entity id within an axis,
+// the members likewise against the root's axes and those on none last, duplicates deleted.
+#[test]
+fn the_normal_form_orders_each_group_by_axis_then_entity_id() {
+    let (_dir, mms, icf, _foundation) = providers();
+    let ids = |codes: &[&str]| codes.join("&");
+    assert_eq!(
+        normal(&mms, &ids(&[CHOLERA, ELTOR, CLASSICAL])),
+        ids(&[CHOLERA, CLASSICAL, ELTOR]),
+        "two values on one axis, by entity id"
+    );
+    assert_eq!(
+        normal(&mms, &ids(&[CHOLERA, SEPSIS, CLASSICAL])),
+        ids(&[CHOLERA, CLASSICAL, SEPSIS]),
+        "infectiousAgent before associatedWith, as the stem declares them"
+    );
+    let duplicate = ids(&[CHOLERA, CLASSICAL, CLASSICAL]);
+    assert_eq!(normal(&mms, &duplicate), ids(&[CHOLERA, CLASSICAL]));
+    assert_eq!(
+        mms.display(located(&mms, &duplicate), None)
+            .expect("reads")
+            .as_deref(),
+        Some("Cholera [Vibrio cholerae O1, biovar cholerae] [Vibrio cholerae O1, biovar cholerae]"),
+        "the display keeps what was written"
+    );
+    let members = format!("{CHOLERA}/{OTHER_VIBRIO}/{SEPSIS}");
+    assert_eq!(
+        normal(&mms, &members),
+        format!("{CHOLERA}/{SEPSIS}/{OTHER_VIBRIO}"),
+        "a member on an axis of the root before one on none"
+    );
+    assert_eq!(
+        mms.display(located(&mms, &members), None)
+            .expect("reads")
+            .as_deref(),
+        Some("Cholera / Intestinal infection due to other Vibrio / Sepsis without septic shock")
+    );
+    assert_eq!(
+        normal(&mms, &format!("{CHOLERA}/{SEPSIS}/{SEPSIS}")),
+        format!("{CHOLERA}/{SEPSIS}")
+    );
+    assert_eq!(
+        normal(
+            &mms,
+            &format!("{CHOLERA}/{OTHER_VIBRIO}&{SEPTIC_SHOCK}/{OTHER_VIBRIO}&{SEPSIS}")
+        ),
+        format!("{CHOLERA}/{OTHER_VIBRIO}&{SEPSIS}/{OTHER_VIBRIO}&{SEPTIC_SHOCK}"),
+        "the same member with other qualifiers is no duplicate"
+    );
+    let kept = format!("{CHOLERA}/{CLASSICAL}");
+    assert_eq!(normal(&mms, &kept), kept, "a `/` stays a `/`");
+    assert_eq!(
+        normal(&mms, "1A00&XN62R&XN8P1"),
+        ids(&[CHOLERA, CLASSICAL, ELTOR]),
+        "short codes normalize to entity ids"
+    );
+    assert!(
+        props(&mms, located(&mms, &ids(&[CHOLERA, ELTOR, CLASSICAL])))
+            .contains(&String::from("classificationCode=1A00&XN8P1&XN62R")),
+        "the classification code is the normal form's"
+    );
+    assert_eq!(
+        normal(&mms, &format!("{CHOLERA}/{RESIDUAL}")),
+        format!("{CHOLERA}/{RESIDUAL}"),
+        "a residual's `/other` is part of its id"
+    );
+    let dotted = format!(
+        "{}.{SEVERE}",
+        ferroterm_testkit::icd11::DRESSING_UNSPECIFIED
+    );
+    assert_eq!(normal(&icf, &dotted), dotted, "ICF's `.` stays a `.`");
+    assert_eq!(normal(&icf, "d5409.qp3"), dotted);
+}
+
+// NOTE: tx-ecosystem `tests/icd-11/doco.txt` at 9c2bbce, "How an expression is read": the axis
+// a value binds to "is decided in entity id order, so neither the binding nor the normal form
+// depends on the order written".
+#[test]
+fn members_bind_to_the_roots_axes_in_entity_id_order() {
+    let (_dir, mms, _icf, _foundation) = providers();
+    let one = located(&mms, &format!("{OTHER_VIBRIO}/{SEPTIC_SHOCK}/{SEPSIS}"));
+    let other = located(&mms, &format!("{OTHER_VIBRIO}/{SEPSIS}/{SEPTIC_SHOCK}"));
+    assert_eq!(one, other);
+    assert_eq!(
+        mms.code(one).expect("reads").as_deref(),
+        Some(format!("{OTHER_VIBRIO}/{SEPTIC_SHOCK}/{SEPSIS}").as_str()),
+        "hasManifestation before hasCausingCondition, as the root declares them"
+    );
+    let p = props(&mms, one);
+    assert!(
+        p.contains(&format!(
+            "postcoordination [axis=http://id.who.int/icd/schema|hasCausingCondition (Has causing condition); value={MMS}|{SEPSIS} (Sepsis without septic shock)]"
+        )),
+        "the lower entity id takes the required axis first: {p:?}"
+    );
+    assert!(
+        p.contains(&format!(
+            "postcoordination [axis=http://id.who.int/icd/schema|hasManifestation (Has manifestation); value={MMS}|{SEPTIC_SHOCK} (Sepsis with septic shock)]"
+        )),
+        "{p:?}"
+    );
+    let off = props(
+        &mms,
+        located(
+            &mms,
+            &format!("{CHOLERA}&{CLASSICAL}/{SEPSIS}/{OTHER_VIBRIO}"),
+        ),
+    );
+    assert!(
+        off.contains(&format!(
+            "postcoordination [value={MMS}|{OTHER_VIBRIO} (Intestinal infection due to other Vibrio)]"
+        )),
+        "a member on no axis of the root has a property of its own, with no axis: {off:?}"
+    );
+    assert!(
+        off.contains(&format!(
+            "postcoordination [axis=http://id.who.int/icd/schema|associatedWith (Associated with); value={MMS}|{SEPSIS} (Sepsis without septic shock)]"
+        )),
+        "{off:?}"
+    );
+}
+
+// NOTE: tx-ecosystem `cs-validate-nf-axis-not-multiple` at 9c2bbce: several values on an axis
+// that takes one is valid and in normal form, with a warning naming the axis.
+#[test]
+fn several_values_on_an_axis_that_takes_one_is_a_warning() {
+    let (_dir, mms, _icf, _foundation) = providers();
+    let crowded = format!("{RESIDUAL}&{CLASSICAL}&{ELTOR}");
+    assert_eq!(normal(&mms, &crowded), crowded);
+    let advisories = mms.advisories(located(&mms, &crowded)).expect("reads");
+    assert_eq!(advisories.len(), 1, "{advisories:?}");
+    assert!(advisories[0].contains("laterality"), "{advisories:?}");
+    assert_eq!(
+        mms.advisories(located(&mms, &format!("{RESIDUAL}&{CLASSICAL}")))
+            .expect("reads"),
+        Vec::<String>::new()
+    );
+    assert_eq!(
+        mms.advisories(located(&mms, &format!("{CHOLERA}&{CLASSICAL}&{ELTOR}")))
+            .expect("reads"),
+        Vec::<String>::new(),
+        "an AllowAlways axis takes several"
+    );
 }
 
 #[test]

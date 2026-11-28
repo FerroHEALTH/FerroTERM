@@ -324,6 +324,11 @@ impl<S> StoredProvider<S> {
     pub(crate) fn system(&self) -> &S {
         &self.system
     }
+
+    /// The system's own state, to configure before the provider is shared.
+    pub(crate) fn system_mut(&mut self) -> &mut S {
+        &mut self.system
+    }
 }
 
 impl<S> fmt::Debug for StoredProvider<S> {

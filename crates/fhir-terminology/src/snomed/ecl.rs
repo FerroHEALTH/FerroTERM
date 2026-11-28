@@ -6,6 +6,8 @@
 //! artifact's, the concept and description filters are answered from the
 //! store and the designation index.
 
+use std::collections::BTreeMap;
+
 use concept_graph::attributes::Attributes;
 use concept_graph::identifiers::Identifiers;
 use concept_graph::ordinal::Ordinal;
@@ -66,6 +68,15 @@ fn unusable(text: &str, id: Sctid, reason: &str) -> ProviderError {
 }
 
 impl SnomedProvider {
+    /// The provider with the ECL alternate identifier scheme aliases
+    /// `aliases`, each alias (`LOINC` in `LOINC#14394-1`) to the SCTID of its
+    /// identifier scheme concept; an alias it does not hold is refused.
+    #[must_use]
+    pub fn with_scheme_aliases(mut self, aliases: BTreeMap<String, u64>) -> Self {
+        self.system_mut().scheme_aliases = aliases;
+        self
+    }
+
     /// The concepts with no parent, computed once.
     fn root_set(&self) -> &RoaringBitmap {
         self.system().roots.get_or_init(|| {
@@ -383,27 +394,16 @@ impl Model for SnomedProvider {
         &self.system().identifiers
     }
 
-    /// An alias is an active term of one of the scheme concepts the
-    /// identifier file names, compared without case. No specification
-    /// defines the alias table: our own design.
+    /// The configured scheme of `alias`, compared without case.
+    // NOTE: ECL 2.3 6.1 writes `LOINC#54486-6` and defines no alias table, and the
+    // tx-ecosystem IG tx-source readme names only the scheme: our own design.
     fn scheme(&self, alias: &str) -> Result<Option<u64>, EvalError> {
-        for scheme in self.system().identifiers.schemes() {
-            let Some(ordinal) = self.concept(Sctid(scheme))? else {
-                continue;
-            };
-            let mut named = false;
-            self.stored()
-                .store
-                .scan_designations(ordinal, |d| {
-                    named = d.active && d.term.eq_ignore_ascii_case(alias);
-                    !named
-                })
-                .map_err(|e| storage(&e))?;
-            if named {
-                return Ok(Some(scheme));
-            }
-        }
-        Ok(None)
+        Ok(self
+            .system()
+            .scheme_aliases
+            .iter()
+            .find(|(name, _)| name.eq_ignore_ascii_case(alias))
+            .map(|(_, scheme)| *scheme))
     }
 
     fn filter_concepts(

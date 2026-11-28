@@ -332,13 +332,13 @@ impl CodeSystemProvider for UcumProvider {
         };
         let mut out = vec![Property {
             code: String::from("canonical"),
-            value: PropertyValue::Code(canonical.text(self.essence)),
+            value: Some(PropertyValue::Code(canonical.text(self.essence))),
             ..Property::default()
         }];
         if let Some(property) = self.property(&expression, &canonical) {
             out.push(Property {
                 code: String::from("property"),
-                value: PropertyValue::Code(property),
+                value: Some(PropertyValue::Code(property)),
                 ..Property::default()
             });
         }

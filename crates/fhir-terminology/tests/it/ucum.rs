@@ -157,7 +157,7 @@ fn the_provider_locates_describes_and_filters_expressions() {
         .properties(located.concept)
         .expect("reads")
         .into_iter()
-        .map(|p| format!("{}={}", p.code, p.value.as_text()))
+        .map(|p| format!("{}={}", p.code, p.value.expect("a value").as_text()))
         .collect();
     assert_eq!(props, ["canonical=m-3.g"]);
     let kg = provider.locate("kg").expect("reads").expect("valid");
@@ -165,7 +165,7 @@ fn the_provider_locates_describes_and_filters_expressions() {
         .properties(kg.concept)
         .expect("reads")
         .into_iter()
-        .map(|p| format!("{}={}", p.code, p.value.as_text()))
+        .map(|p| format!("{}={}", p.code, p.value.expect("a value").as_text()))
         .collect();
     assert_eq!(props, ["canonical=g", "property=mass"]);
     assert!(provider.locate("kgXX").expect("reads").is_none());

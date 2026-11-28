@@ -256,12 +256,12 @@ pub(super) fn open_artifact(
     })?;
     Ok(match described.system.as_str() {
         snomed::SYSTEM => Arc::new(
-            SnomedProvider::open(path, &config.terminology.default_language).map_err(|source| {
-                LoadError::Open {
+            SnomedProvider::open(path, &config.terminology.default_language)
+                .map_err(|source| LoadError::Open {
                     path: path.to_path_buf(),
                     source: Box::new(source),
-                }
-            })?,
+                })?
+                .with_scheme_aliases(config.terminology.ecl_scheme_aliases.clone()),
         ),
         loinc::SYSTEM => {
             Arc::new(

@@ -406,7 +406,7 @@ impl Artifact {
         };
         let mut out = vec![Property {
             code: String::from("inactive"),
-            value: PropertyValue::Boolean(!record.active),
+            value: Some(PropertyValue::Boolean(!record.active)),
             ..Property::default()
         }];
         for (key, values) in self.store.properties(ordinal).map_err(storage)? {
@@ -417,7 +417,7 @@ impl Artifact {
                 if let Some(value) = self.property_value(value)? {
                     out.push(Property {
                         code: name.clone(),
-                        value,
+                        value: Some(value),
                         ..Property::default()
                     });
                 }
@@ -455,7 +455,7 @@ impl Artifact {
             for value in self.codes(set)? {
                 out.push(Property {
                     code: code.to_owned(),
-                    value,
+                    value: Some(value),
                     ..Property::default()
                 });
             }

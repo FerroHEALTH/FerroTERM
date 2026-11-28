@@ -3,6 +3,7 @@ icd-11/cs-validate-bad-display
 icd-11/cs-validate-case
 icd-11/cs-validate-good
 icd-11/cs-validate-good-display
+icd-11/cs-validate-nf-short-codes
 icd-11/cs-validate-pc
 icd-11/cs-validate-pc-injury-fall
 icd-11/cs-validate-pc-pneumonia-cluster
@@ -11,6 +12,7 @@ icd-11/expand-adhoc-bad-code
 icd-11/expand-adhoc-enum-uri
 icd-11/expand-bad-url
 icd-11/lookup-mms-pc-scales-no-metadata
+icd-11/lookup-pc-breast-no-metadata
 icd-11/subsumes-chapter
 icd-11/subsumes-subsumed-by
 icd-11/subsumes-unrelated

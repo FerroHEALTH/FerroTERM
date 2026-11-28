@@ -151,8 +151,8 @@ macro_rules! render_value_set {
             .map(|p| {
                 let mut parts = vec![
                     part("code", fhir_types::$module::extension::ExtensionValue::Code(p.code.as_str().into())),
-                    part("value", extension_value(&p.value)),
                 ];
+                parts.extend(p.value.as_ref().map(|v| part("value", extension_value(v))));
                 parts.extend(p.subproperties.iter().map(|s| {
                     fhir_types::$module::extension::Extension {
                         url: String::from("subProperty"),
@@ -176,12 +176,15 @@ macro_rules! render_value_set {
         entry.property = $item
             .properties
             .iter()
-            .map(|p| fhir_types::$module::value_set::ValueSetExpansionContainsProperty {
+            // NOTE: `ValueSet.expansion.contains.property.value[x]` is `1..1`
+            // (<https://hl7.org/fhir/R5/valueset-definitions.html#ValueSet.expansion.contains.property.value_x_>),
+            // so a property with no value of its own has no place there.
+            .filter_map(|p| Some(fhir_types::$module::value_set::ValueSetExpansionContainsProperty {
                 id: None,
                 extension: Vec::new(),
                 modifier_extension: Vec::new(),
                 code: p.code.as_str().into(),
-                value: property_value(&p.value),
+                value: property_value(p.value.as_ref()?),
                 sub_property: p
                     .subproperties
                     .iter()
@@ -195,7 +198,7 @@ macro_rules! render_value_set {
                         }
                     })
                     .collect(),
-            })
+            }))
             .collect();
         entry
     }};

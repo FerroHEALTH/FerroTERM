@@ -14,7 +14,7 @@ use crate::provider::compose::Compose;
 use crate::provider::declaration::Declaration;
 use crate::provider::{
     CodeSystemProvider, Concept, ConceptSet, Designation, DisplayStanding, Hierarchy, Identity,
-    ImplicitMetadata, Located, MapSelection, Property, Standing, Status, Successor,
+    ImplicitMetadata, Located, MapSelection, Property, PropertyValue, Standing, Status, Successor,
     error::ProviderError,
 };
 
@@ -161,7 +161,7 @@ impl Supplemented {
             .iter()
             .flat_map(|additions| additions.properties.iter())
             .filter(|property| property.code == filter.property)
-            .map(|property| property.value.as_text());
+            .filter_map(|property| property.value.as_ref().map(PropertyValue::as_text));
         match filter.op {
             FilterOperator::Equal => Some(values.any(|value| value == filter.value)),
             FilterOperator::In => {

@@ -221,7 +221,7 @@ fn expand_returns_the_properties_asked_for() {
     let kitten = entry(&by_code.contains, "kitten").expect("kitten");
     assert_eq!(kitten.properties.len(), 1);
     assert_eq!(kitten.properties[0].code, "legs");
-    assert_eq!(kitten.properties[0].value, PropertyValue::Integer(4));
+    assert_eq!(kitten.properties[0].value, Some(PropertyValue::Integer(4)));
     let pet = entry(&by_code.contains, "pet").expect("pet");
     assert!(pet.properties.is_empty(), "pet declares no leg count");
     assert_eq!(by_code.properties.len(), 1);
@@ -313,7 +313,7 @@ fn expand_lists_every_designation_and_flags_inactive_concepts() {
     );
     assert_eq!(
         fish.properties[1].value,
-        PropertyValue::Code(String::from("retired"))
+        Some(PropertyValue::Code(String::from("retired")))
     );
     let cat = entry(&vs.contains, "cat").expect("cat");
     let mut languages: Vec<Option<&str>> = cat

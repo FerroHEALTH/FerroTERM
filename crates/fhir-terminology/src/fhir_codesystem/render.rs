@@ -121,18 +121,15 @@ macro_rules! render_code_system {
                         value: CodeSystemConceptPropertyValue::Code(parent.as_str().into()),
                     })
                     .collect();
-                property.extend(
-                    entry
-                        .properties
-                        .iter()
-                        .map(|held| CodeSystemConceptProperty {
-                            id: None,
-                            extension: Vec::new(),
-                            modifier_extension: Vec::new(),
-                            code: held.code.as_str().into(),
-                            value: value(&held.value),
-                        }),
-                );
+                property.extend(entry.properties.iter().filter_map(|held| {
+                    Some(CodeSystemConceptProperty {
+                        id: None,
+                        extension: Vec::new(),
+                        modifier_extension: Vec::new(),
+                        code: held.code.as_str().into(),
+                        value: value(held.value.as_ref()?),
+                    })
+                }));
                 CodeSystemConcept {
                     code: entry.code.as_str().into(),
                     display: entry.display.as_deref().map(Into::into),

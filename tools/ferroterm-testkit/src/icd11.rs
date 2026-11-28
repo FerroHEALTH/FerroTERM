@@ -25,7 +25,7 @@ pub const BLOCK: &str = "1001";
 pub const CHOLERA: &str = "1002";
 /// The category `1A01` with a required causing-condition scale and a manifestation scale.
 pub const OTHER_VIBRIO: &str = "1003";
-/// The residual `1A0Y` under the block.
+/// The residual `1A0Y` under the block, with a laterality scale that takes one value.
 pub const RESIDUAL: &str = "1001/other";
 /// The extension chapter `X`.
 pub const EXTENSION_CHAPTER: &str = "9000";
@@ -223,7 +223,11 @@ fn mms_diseases() -> Vec<(&'static str, Value)> {
             Some(BLOCK),
             &[],
             "Other specified bacterial intestinal infections",
-            json!({}),
+            json!({
+                "postcoordinationScale": [
+                    scale(MMS, "laterality", false, "NotAllowed", &[VIBRIO]),
+                ],
+            }),
         ),
         mms(
             SEPSIS,
