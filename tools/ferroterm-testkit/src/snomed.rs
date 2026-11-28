@@ -171,7 +171,7 @@ fn write_concepts(
     text: &mut IndexBuilder,
     rows: &[Row],
     is_a: &[(u32, u32)],
-    module: &str,
+    module_of: &dyn Fn(u32) -> String,
 ) -> Result<(), FixtureError> {
     for row in rows {
         let ordinal = Ordinal::new(row.ordinal);
@@ -198,7 +198,7 @@ fn write_concepts(
             constants::PRIMITIVE
         };
         builder.properties(ordinal, 1, &[PropertyValue::Code(status.to_string())])?;
-        builder.properties(ordinal, 2, &[PropertyValue::Code(module.to_owned())])?;
+        builder.properties(ordinal, 2, &[PropertyValue::Code(module_of(row.ordinal))])?;
         for (index, (term, language, use_ordinal, active, memberships)) in
             row.designations.iter().enumerate()
         {
@@ -280,6 +280,10 @@ struct Shape<'a> {
     bird: bool,
     /// Whether the edition carries the concept model of [`mrcm`].
     mrcm: bool,
+    /// Whether the dog and the bird are the edition's own concepts, on an
+    /// edition that depends on [`MODULE_CONCEPT`] for the rest
+    /// ([`write_with_extension`]).
+    extension: bool,
 }
 
 /// The edition URI of the second synthetic edition ([`write_second`]).
@@ -309,6 +313,7 @@ pub fn write(dir: &Path) -> Result<(), FixtureError> {
             release_date: DATE,
             bird: false,
             mrcm: false,
+            extension: false,
         },
     )
 }
@@ -329,6 +334,36 @@ pub fn write_with_concept_model(dir: &Path) -> Result<(), FixtureError> {
             release_date: DATE,
             bird: true,
             mrcm: true,
+            extension: false,
+        },
+    )
+}
+
+/// The version of the edition [`MODULE_CONCEPT`] heads that the extension
+/// edition of [`write_with_extension`] depends on.
+pub const DEPENDED_DATE: &str = "20250101";
+
+/// Writes the first edition as an extension under `dir`, for the tests of the
+/// edition map.
+///
+/// The dog and the bird are its own concepts, and every other concept belongs
+/// to the edition [`MODULE_CONCEPT`] heads, which it depends on at
+/// [`DEPENDED_DATE`].
+///
+/// # Errors
+///
+/// Returns [`FixtureError`] when a writer fails; the fixture is fixed content,
+/// so a failure means the writers or the directory are at fault.
+pub fn write_with_extension(dir: &Path) -> Result<(), FixtureError> {
+    write_shape(
+        dir,
+        &Shape {
+            edition: EDITION,
+            version: VERSION,
+            release_date: DATE,
+            bird: true,
+            mrcm: false,
+            extension: true,
         },
     )
 }
@@ -354,6 +389,7 @@ pub fn write_unpublished(dir: &Path) -> Result<(), FixtureError> {
             release_date: DATE,
             bird: false,
             mrcm: false,
+            extension: false,
         },
     )
 }
@@ -384,6 +420,7 @@ pub fn write_later(dir: &Path) -> Result<(), FixtureError> {
             release_date: LATER_DATE,
             bird: true,
             mrcm: false,
+            extension: false,
         },
     )
 }
@@ -408,6 +445,7 @@ pub fn write_second(dir: &Path) -> Result<(), FixtureError> {
             release_date: SECOND_DATE,
             bird: true,
             mrcm: false,
+            extension: false,
         },
     )
 }
