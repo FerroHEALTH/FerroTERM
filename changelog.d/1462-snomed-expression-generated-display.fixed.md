@@ -1,0 +1,1 @@
+- A SNOMED CT post-coordinated expression's display is the one its grammar generates, so an `extension-codes` supplement that gives the expression a display applies to it: a global one's display is the display, another one's a suggestion, and the generated display stays valid.
