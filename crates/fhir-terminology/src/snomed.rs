@@ -511,6 +511,7 @@ impl StoredSystem for Snomed {
                 );
             }
         }
+        properties::push_loinc(provider, ordinal, &mut out);
         properties::describe(provider, &mut out)?;
         Ok(out)
     }
