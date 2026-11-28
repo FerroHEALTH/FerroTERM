@@ -172,7 +172,11 @@ subsumption. No other close-to-user transformation runs.
 
 One boundary is deliberate. Subsumption is decided over the edition's inferred view without a description logic
 classifier: what the server answers `subsumes` or `subsumed-by` holds, and
-what it answers `not-subsumed` is what that view does not state. SNOMED
+what it answers `not-subsumed` is what that view does not state. A
+sufficiently defined concept is met by its definition over its proximal
+primitive supertypes, since a normal form references no fully defined
+concept, so `9551004 |Hepatic amyloidosis|` and
+`64572001:{116676008=68790008,363698007=10200004}` are equivalent. SNOMED
 International withdrew normal-form comparison as a subsumption test in the
 July 2019 International Edition and directs implementers to a classifier
 (<https://docs.snomed.org/snomed-international-documents/snomed-ct-glossary/n/normal-form>).
