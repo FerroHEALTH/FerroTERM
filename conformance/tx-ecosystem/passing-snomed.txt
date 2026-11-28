@@ -230,10 +230,14 @@ snomed/lookup-pc-unbracketed
 snomed/snomed-expand-code-in
 snomed/snomed-expand-descendent-leaf
 snomed/snomed-expand-implicit-ecl
+snomed/snomed-expand-implicit-edition
 snomed/snomed-expand-implicit-system-version
+snomed/snomed-expand-implicit-version
 snomed/snomed-expand-include-exclude
 snomed/snomed-expand-include-exclude-multi
 snomed/snomed-expand-is-not-a
+snomed/snomed-expand-isa
+snomed/snomed-expand-isa-inactive-isa
 snomed/snomed-expand-property-inactive-rel
 snomed/snomed-isa-in
 snomed/snomed-isa-out

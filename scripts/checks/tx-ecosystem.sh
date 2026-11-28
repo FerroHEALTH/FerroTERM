@@ -214,7 +214,11 @@ if [[ "$mode" = general ]] && [[ "$committed_total" != "$total" ]]; then
 fi
 jq -r '.test[] | select(.action[0].operation.result == "pass") | .name' "$report" | sort > "$out/passing.txt"
 passed=$(wc -l < "$out/passing.txt" | tr -d ' ')
-echo "tx-ecosystem: $passed of $total $mode tests pass on /$fhir ($(grep -a -o 'tests v[0-9.]*' "$out/runner.log" | head -1), runner $VALIDATOR_VERSION)"
+# The suite's version is the one its publication-request.json names: the
+# runner reports the last entry of tests/history.json, which the suite keeps
+# frozen at 1.9.3 ("retained because the TxTester reads the current version").
+suite_version=$(jq -er '.version' "$suite/publication-request.json")
+echo "tx-ecosystem: $passed of $total $mode tests pass on /$fhir (test cases $suite_version at ${SUITE_COMMIT:0:7}, runner $VALIDATOR_VERSION)"
 
 # The general-mode cases that do not apply on this surface are counted on the
 # badge beside the pass count (#1361), so the inventory has to be the run's
