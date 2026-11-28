@@ -71,7 +71,7 @@ fn props(provider: &Icd11Provider, concept: Concept) -> Vec<String> {
 // spelling, and the full entity uri no code in MMS or ICF.
 #[test]
 fn the_entity_id_is_the_code_and_the_classification_code_spells_it_too() {
-    let (_dir, mms, _icf, foundation) = providers();
+    let (_dir, mms, _icf, _foundation) = providers();
     assert_eq!(mms.identity().url, MMS);
     assert_eq!(mms.identity().version, RELEASE);
     assert_eq!(
@@ -147,6 +147,11 @@ fn the_entity_id_is_the_code_and_the_classification_code_spells_it_too() {
         mms.definition(by_code).expect("reads").as_deref(),
         Some("An infection of the intestine by Vibrio cholerae.")
     );
+}
+
+#[test]
+fn a_grouper_and_a_residual_are_named_by_their_ids() {
+    let (_dir, mms, _icf, _foundation) = providers();
     let block = located(&mms, BLOCK);
     let block_props = props(&mms, block);
     assert!(block_props.contains(&String::from("notSelectable=true")));
@@ -172,7 +177,11 @@ fn the_entity_id_is_the_code_and_the_classification_code_spells_it_too() {
         mms.locate("1A0Y").expect("reads").expect("located").code,
         RESIDUAL
     );
+}
 
+#[test]
+fn the_foundation_code_is_the_entity_uri() {
+    let (_dir, _mms, _icf, foundation) = providers();
     let entity = located(
         &foundation,
         &format!("http://id.who.int/icd/entity/{CHOLERA}"),

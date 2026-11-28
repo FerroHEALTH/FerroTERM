@@ -4,19 +4,18 @@
 //! The ICD-11 provider: one of the three WHO code systems (the MMS and ICF
 //! linearizations, the Foundation) read from its artifact directory.
 //!
-//! The contract is the HL7 terminology ecosystem test cases for ICD-11 over
-//! THO's identity page (<https://terminology.hl7.org/CodeSystem-ICD11MMS.html>):
-//! a code is a short code (`1A00`), an entity URI in the unversioned or the
-//! versioned form, or, in a linearization, a postcoordination expression;
-//! `id`, `code`, `parent`, and `child` are URI-valued properties; an entity
-//! without a short code is `notSelectable`; a stem's postcoordination scales
-//! are properties and implicit value sets
-//! (`<uri>/postcoordinationScale/<axis>`); an expression's `stem` and
-//! `postcoordinationValues` report how its values bound to the axes. The
-//! axis binding rule (an unfilled axis first, then required axes, then WHO's
-//! order) and the reading of `/` (a value when it fits an unfilled axis of the
-//! stem before it, else a new stem) are the suite's, recorded in its
-//! documentation; no FHIR specification governs them.
+//! The contract is the HL7 terminology ecosystem IG's ICD-11 page
+//! (`HL7/fhir-tx-ecosystem-ig` at `9c2bbce`, `input/pagecontent/icd-11.md`):
+//! in a linearization the entity id is the code and the normal form, the
+//! short classification code an alternative spelling, and an expression's
+//! code its entity-id form; the Foundation's code is the entity URI. A stem's
+//! postcoordination scales are properties and implicit value sets
+//! (`<uri>/postcoordinationScale/<axis>`), and an expression's `stem` and
+//! `postcoordinationValues` report how its values bound to the axes. The axis
+//! binding rule (an unfilled axis first, then required axes, then WHO's order)
+//! and the reading of `/` (a value when it fits an unfilled axis of the stem
+//! before it, else a new stem) are the earlier suite's; no FHIR specification
+//! governs them.
 
 mod postcoordination;
 

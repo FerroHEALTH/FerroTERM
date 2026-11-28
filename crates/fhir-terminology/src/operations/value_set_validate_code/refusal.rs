@@ -399,7 +399,7 @@ pub(super) fn outside_value_set(
             expression: super::super::at(expression, "code"),
         });
     }
-    issues.push(not_in_vs(model, system, &located.code, given, expression));
+    issues.push(not_in_vs(model, system, subject.code, given, expression));
     if !policy.membership_only {
         if let Some((note, _)) = super::super::inactive_note(
             &located.code,
@@ -416,6 +416,9 @@ pub(super) fn outside_value_set(
         }
     }
     let (inactive, status) = inactive_outputs(concept_status);
+    // NOTE: no specification governs this: the IG asks for `normalized-code`
+    // "where appropriate" (requirements, `$validate-code`), and its `icd-11`
+    // `vs-validate-out` case answers none for a code outside the value set.
     let mut validation = Validation {
         result: false,
         message: None,
@@ -423,7 +426,7 @@ pub(super) fn outside_value_set(
         system: Some(system.to_owned()),
         version: Some(version).filter(|v| !v.is_empty()),
         code: Some(subject.code.to_owned()),
-        normalized_code: (located.code != subject.code).then(|| located.code.clone()),
+        normalized_code: None,
         issues,
         unknown_systems: Vec::new(),
         x_unknown_systems: Vec::new(),
