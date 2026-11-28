@@ -238,6 +238,9 @@ snomed/snomed-expand-include-exclude-multi
 snomed/snomed-expand-is-not-a
 snomed/snomed-expand-isa
 snomed/snomed-expand-isa-inactive-isa
+snomed/snomed-expand-loinc
+snomed/snomed-expand-loinc-isa
+snomed/snomed-expand-loinc-isa-none
 snomed/snomed-expand-property-inactive-rel
 snomed/snomed-isa-in
 snomed/snomed-isa-out

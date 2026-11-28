@@ -26,13 +26,12 @@ use axum::http::request::Parts;
 use axum::http::{Extensions, Method, Uri};
 use axum::response::Response;
 use ferrohealth_smart::basic::{PasswordStore, StoreError};
-use ferrohealth_smart::config::{AuthSection, BasicGrants, ConfigError, IssuerEntry, ServerTls};
+use ferrohealth_smart::config::{AuthSection, BasicGrants, ConfigError, ServerTls};
 use ferrohealth_smart::extract::HeaderOnly;
 use ferrohealth_smart::guard::{AuthLayer, Gate, Render, Requirement, Target};
-use ferrohealth_smart::jws::algorithm::Algorithm;
 use ferrohealth_smart::refusal::{Denied, Refusal};
 use ferrohealth_smart::resource::introspection::{IntrospectionError, Introspector};
-use ferrohealth_smart::resource::{IssuerSet, ResourceError, ResourceServer, Settings};
+use ferrohealth_smart::resource::{IssuerSet, ResourceError, ResourceServer};
 
 /// The product scope of a deployment whose `[auth] product_scope` names none.
 ///
@@ -84,17 +83,6 @@ pub enum AuthError {
         #[source]
         source: Box<IntrospectionError>,
     },
-    /// `[jose] post_quantum_only` is on and an issuer's `algorithms` names
-    /// an algorithm that is no ML-DSA parameter set (RFC 9964 §5).
-    #[error(
-        "the algorithms of the issuer {issuer} name {algorithm}, which jose.post_quantum_only = true refuses: list ML-DSA-44, ML-DSA-65 or ML-DSA-87 alone, or leave the key unset"
-    )]
-    PostQuantum {
-        /// The issuer identifier.
-        issuer: String,
-        /// The first algorithm of its list that is no ML-DSA parameter set.
-        algorithm: Algorithm,
-    },
     /// An issuer's metadata or key set could not be read, or breaks a rule.
     #[error("the authorization server {issuer} could not be read")]
     Issuer {
@@ -120,10 +108,8 @@ pub struct AdminAuth {
 impl AdminAuth {
     /// Reads the metadata and the key set of every issuer `section` names and
     /// grants each Basic user its entry of `grants`, or answers `None` when
-    /// the section says `enabled = false`. Under `post_quantum_only`
-    /// (`[jose]`), an issuer's `algorithms` left at the default becomes
-    /// ML-DSA-44, ML-DSA-65 and ML-DSA-87 (RFC 9964 §5), and one naming any
-    /// other algorithm is refused.
+    /// the section says `enabled = false`. Under `[auth] post_quantum_only`
+    /// the section's own check holds every issuer to ML-DSA (RFC 9964 §5).
     ///
     /// Each issuer is read once here, so an authorization server that cannot
     /// be reached refuses the start rather than the first request.
@@ -131,30 +117,25 @@ impl AdminAuth {
     /// # Errors
     ///
     /// Returns [`AuthError::Config`] for a section that breaks a rule, an
-    /// enabled one admitting no credential and the removed flat `issuer`
-    /// among them, [`AuthError::BasicGrants`] for a `[basic_grants]` table
+    /// enabled one admitting no credential, the removed flat `issuer` and an
+    /// algorithm list `post_quantum_only` refuses among them, [`AuthError::BasicGrants`] for a `[basic_grants]` table
     /// naming a user `[[auth.basic.users]]` does not list or granting a
-    /// Basic user a `system/` scope, [`AuthError::PostQuantum`] for an
-    /// issuer list `post_quantum_only` refuses, [`AuthError::Introspector`] for an introspecting issuer that cannot be
+    /// Basic user a `system/` scope, [`AuthError::Introspector`] for an introspecting issuer that cannot be
     /// set up, and
     /// [`AuthError::Issuer`] for an issuer whose metadata or key set could
     /// not be read.
     pub async fn start(
         section: &AuthSection,
         grants: &BasicGrants,
-        post_quantum_only: bool,
     ) -> Result<Option<Self>, AuthError> {
         if !section.enabled {
             return Ok(None);
         }
-        let mut resolved = section
+        let resolved = section
             .resolve_with_tls(&ServerTls, &[])
             .map_err(|source| AuthError::Config {
                 source: Box::new(source),
             })?;
-        if post_quantum_only {
-            hold_to_ml_dsa(&mut resolved.issuers)?;
-        }
         let realm = resolved.realm.unwrap_or_else(|| String::from(REALM));
         let mut gate = Gate::open().with_realm(realm.clone());
         if !resolved.issuers.is_empty() || !resolved.introspection.is_empty() {
@@ -235,27 +216,6 @@ impl AdminAuth {
         };
         router.layer(AuthLayer::new(self.gate.clone(), classify).with_render(render))
     }
-}
-
-/// The ML-DSA parameter sets of JOSE (RFC 9964 §5).
-const ML_DSA: [Algorithm; 3] = [Algorithm::MlDsa44, Algorithm::MlDsa65, Algorithm::MlDsa87];
-
-/// Holds every issuer of `issuers` to ML-DSA: a list at the default of
-/// `[auth.issuer.<name>] algorithms` becomes [`ML_DSA`], and one naming any
-/// other algorithm is refused.
-fn hold_to_ml_dsa(issuers: &mut [Settings]) -> Result<(), AuthError> {
-    let default = IssuerEntry::default().algorithms;
-    for settings in issuers {
-        if settings.algorithms == default {
-            settings.algorithms = ML_DSA.to_vec();
-        } else if let Some(algorithm) = settings.algorithms.iter().find(|alg| !alg.is_ml_dsa()) {
-            return Err(AuthError::PostQuantum {
-                issuer: settings.issuer.clone(),
-                algorithm: *algorithm,
-            });
-        }
-    }
-    Ok(())
 }
 
 /// The route template the audit line records for `path`.
