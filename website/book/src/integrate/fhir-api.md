@@ -28,7 +28,7 @@ extensions](../reference/fhir-extensions.md).
 
 | Operation | Answers | How |
 |---|---|---|
-| `CodeSystem/$lookup` | a concept's display, designations, and properties | a point read in the store; `property` narrows, `displayLanguage` picks the language |
+| `CodeSystem/$lookup` | a concept's display, designations, and properties | a point read in the store; `property` narrows, `displayLanguage` picks the language. For SNOMED CT, `sufficientlyDefined` and `semanticTag` come back when named or for `*`, and the normal forms only when named |
 | `CodeSystem/$validate-code` | whether the code exists and the display is right | the store; the right display comes back when the given one is wrong; inactive codes validate with a message |
 | `CodeSystem/$subsumes` | `subsumes`, `subsumed-by`, `equivalent`, or `not-subsumed` | a bitmap membership test in the closure; either side may be a SNOMED CT expression ([Post-coordinated expressions](ecl-value-sets.md#post-coordinated-expressions)) |
 | `ValueSet/$expand` | the members of a value set, paged | the compose layer over the providers' filters and bitmaps |

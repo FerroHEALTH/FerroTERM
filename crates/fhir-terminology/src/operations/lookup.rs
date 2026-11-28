@@ -157,6 +157,11 @@ impl<'a> Asked<'a> {
         self.names.contains(&code) || self.names.contains(&EVERY_PROPERTY)
     }
 
+    /// Whether the request named the property by its own name.
+    fn by_name(&self, code: &str) -> bool {
+        self.names.contains(&code)
+    }
+
     // NOTE: the R4B `property` parameter lists `designation` and `lang.X` among
     // the properties a client asks for, so naming other properties only leaves
     // designations out (<https://hl7.org/fhir/R4B/codesystem-operation-lookup.html>).
@@ -379,14 +384,23 @@ fn properties(
             ..Property::default()
         });
     }
+    let requested = provider.requested_properties();
     for property in provider.properties(concept)? {
-        if NAMED_ELSEWHERE.contains(&property.code.as_str()) || !asked.property(&property.code) {
+        let code = property.code.as_str();
+        let wanted = if requested.contains(&code) {
+            asked.named(code)
+        } else {
+            asked.property(code)
+        };
+        if NAMED_ELSEWHERE.contains(&code) || !wanted {
             continue;
         }
         properties.push(property);
     }
+    // NOTE: the tx-ecosystem IG (requirements, SNOMED CT) returns the normal forms
+    // "only when they are asked for by name": not by default, and not for `*`.
     for name in provider.generated_properties() {
-        if !asked.named(name) {
+        if !asked.by_name(name) {
             continue;
         }
         if let Some(property) = provider.generated_property(concept, name)? {

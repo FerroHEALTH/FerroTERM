@@ -588,6 +588,16 @@ pub trait CodeSystemProvider: fmt::Debug + Send + Sync {
         false
     }
 
+    /// The property codes this provider reads but answers only where the
+    /// request names them or asks for `*`, never when it names none.
+    ///
+    /// "If no properties are specified, the server chooses what to return"
+    /// (`OperationDefinition/CodeSystem-lookup`, the `property` parameter), so
+    /// each provider chooses its own. The default holds none back.
+    fn requested_properties(&self) -> &[&'static str] {
+        &[]
+    }
+
     /// The property codes this provider generates on request.
     ///
     /// Each is answered by [`CodeSystemProvider::generated_property`] and only

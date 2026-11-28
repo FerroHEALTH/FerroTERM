@@ -97,15 +97,24 @@ const NORMAL_FORM_TERSE: &str = "normalFormTerse";
 const GENERATED_PROPERTIES: [&str; 2] = [NORMAL_FORM, NORMAL_FORM_TERSE];
 
 /// The FHIR-defined SNOMED properties this provider serves, in output order
-/// (<https://hl7.org/fhir/R4B/snomedct.html>, the properties section).
-pub const FHIR_PROPERTIES: [(&str, PropertyKind); 6] = [
+/// (<https://terminology.hl7.org/SNOMEDCT.html>, the properties section).
+pub const FHIR_PROPERTIES: [(&str, PropertyKind); 7] = [
     ("inactive", PropertyKind::Boolean),
     ("sufficientlyDefined", PropertyKind::Boolean),
     ("moduleId", PropertyKind::Code),
-    ("effectiveTime", PropertyKind::String),
+    ("effectiveTime", PropertyKind::DateTime),
     ("parent", PropertyKind::Code),
     ("child", PropertyKind::Code),
+    (SEMANTIC_TAG, PropertyKind::Code),
 ];
+
+/// "The phrase inside the last set of brackets of its Fully Specified Name"
+/// (<https://terminology.hl7.org/SNOMEDCT.html>, the properties section).
+const SEMANTIC_TAG: &str = "semanticTag";
+
+// NOTE: `$lookup` leaves the properties of a request naming none to the server
+// (R4B CodeSystem-lookup, `property`), so these two wait to be asked: our own design.
+const REQUESTED_PROPERTIES: [&str; 2] = ["sufficientlyDefined", SEMANTIC_TAG];
 
 /// A failure to open an artifact directory.
 #[derive(Debug, thiserror::Error)]
@@ -207,6 +216,10 @@ impl StoredSystem for Snomed {
 
     fn unserved_properties(_provider: &SnomedProvider) -> &[&'static str] {
         &UNSERVED_PROPERTIES
+    }
+
+    fn requested_properties(_provider: &SnomedProvider) -> &[&'static str] {
+        &REQUESTED_PROPERTIES
     }
 
     fn generated_properties(_provider: &SnomedProvider) -> &[&'static str] {
@@ -464,7 +477,14 @@ impl StoredSystem for Snomed {
         if let Some(time) = record.effective_time {
             out.push(Property {
                 code: String::from("effectiveTime"),
-                value: PropertyValue::String(time),
+                value: PropertyValue::DateTime(properties::date_of(&time)),
+                ..Property::default()
+            });
+        }
+        if let Some(tag) = provider.semantic_tag(ordinal)? {
+            out.push(Property {
+                code: String::from(SEMANTIC_TAG),
+                value: PropertyValue::Code(tag),
                 ..Property::default()
             });
         }

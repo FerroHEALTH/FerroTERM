@@ -64,6 +64,51 @@ pub(super) fn of_expression(
     Ok(out)
 }
 
+/// An RF2 `effectiveTime` (`YYYYMMDD`) as the FHIR `date` the `effectiveTime`
+/// property's `dateTime` takes (<https://terminology.hl7.org/SNOMEDCT.html>);
+/// a value of another shape is passed on as it is.
+pub(super) fn date_of(time: &str) -> String {
+    match (time.get(0..4), time.get(4..6), time.get(6..8), time.len()) {
+        (Some(year), Some(month), Some(day), 8) if time.bytes().all(|b| b.is_ascii_digit()) => {
+            format!("{year}-{month}-{day}")
+        }
+        _ => time.to_owned(),
+    }
+}
+
+impl SnomedProvider {
+    /// The semantic tag of a concept: the text in the last brackets of its
+    /// active fully specified name in the edition's own language.
+    pub(super) fn semantic_tag(&self, concept: Ordinal) -> Result<Option<String>, ProviderError> {
+        let keys = &self.system().keys;
+        let wanted = crate::stored::primary_subtag(&self.system().base_language);
+        let mut tag = None;
+        self.stored()
+            .store
+            .scan_designations(concept, |d| {
+                if d.active
+                    && d.use_ordinal == keys.fsn
+                    && crate::stored::has_primary_subtag(d.language, &wanted)
+                {
+                    tag = tag_of(d.term);
+                }
+                tag.is_none()
+            })
+            .map_err(storage)?;
+        Ok(tag)
+    }
+}
+
+/// The phrase inside the last brackets that close a fully specified name.
+fn tag_of(term: &str) -> Option<String> {
+    let inner = term.trim_end().strip_suffix(')')?;
+    let open = inner.rfind('(')?;
+    inner
+        .get(open.saturating_add(1)..)
+        .filter(|tag| !tag.is_empty())
+        .map(str::to_owned)
+}
+
 /// Adds `property` unless `out` holds the same code and value.
 ///
 /// A value a concept carries in more than one role group is one value of its
@@ -100,7 +145,23 @@ pub(super) fn describe(
 
 #[cfg(test)]
 mod tests {
-    use super::push_once;
+    use super::{date_of, push_once, tag_of};
+
+    #[test]
+    fn the_semantic_tag_is_the_last_bracketed_phrase_and_the_date_is_iso() {
+        assert_eq!(
+            tag_of("Repair of tendon of hand (procedure)").as_deref(),
+            Some("procedure")
+        );
+        assert_eq!(
+            tag_of("Structure (body structure) of hand (body structure)").as_deref(),
+            Some("body structure")
+        );
+        assert_eq!(tag_of("No tag"), None);
+        assert_eq!(tag_of("Empty ()"), None);
+        assert_eq!(date_of("20050131"), "2005-01-31");
+        assert_eq!(date_of("2005"), "2005");
+    }
     use crate::provider::{Property, PropertyValue};
 
     #[test]
