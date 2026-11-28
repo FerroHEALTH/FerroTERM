@@ -394,7 +394,10 @@ pub(super) fn read_refset_file(
         };
         let refset = member.refset_id.concept().value();
         out.memberships.push((refset, ordinal));
-        if kind != RefsetKind::Content {
+        // NOTE: the Module Dependency rows keep their effective times, which name the
+        // version of each module an edition depends on (RF2 §5.2.4.2, Module
+        // Dependency Reference Set).
+        if kind != RefsetKind::Content && kind != RefsetKind::ModuleDependency {
             continue;
         }
         let entry = out

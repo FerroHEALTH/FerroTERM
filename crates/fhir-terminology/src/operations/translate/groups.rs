@@ -103,11 +103,23 @@ fn group_applies(
         let (system, version) = wanted
             .split_once('|')
             .map_or((wanted, None), |(s, v)| (s, Some(v)));
-        if to != Some(system) || version.is_some_and(|v| to_version.is_some_and(|held| held != v)) {
+        if to != Some(system)
+            || version.is_some_and(|v| to_version.is_some_and(|held| !names(v, held)))
+        {
             return false;
         }
     }
     true
+}
+
+/// Whether the version `asked` names `held`: the same, or the edition of a
+/// SNOMED CT version URI, which "may default to the most recent version of the
+/// named SNOMED CT distribution" (<https://hl7.org/fhir/R4B/snomedct.html>, "Versions").
+fn names(asked: &str, held: &str) -> bool {
+    held == asked
+        || held
+            .strip_prefix(asked)
+            .is_some_and(|rest| rest.starts_with("/version/"))
 }
 
 /// Appends the matches `group` states for `subject` to `out`; whether any
