@@ -312,22 +312,33 @@ fn wild_at(pattern: &[char], text: &[char]) -> bool {
 
 /// Whether every word of a match term is a prefix of some word of `text`,
 /// case-insensitively, or a wild pattern matches the whole text.
+///
+/// Both sides split into words at every character that is not a letter or a
+/// digit, so `"J45.9"` finds the `mapTarget` `J45.9` and `"J45"` finds `J45.0`
+/// (ECL 2.3, 6.10 Member Filters).
 #[must_use]
 pub fn term_matches(term: &TypedSearchTerm, text: &str) -> bool {
     match term {
         TypedSearchTerm::Match(words) => {
             let lower = text.to_lowercase();
-            let text_words: Vec<&str> = lower
-                .split(|c: char| !c.is_alphanumeric())
-                .filter(|w| !w.is_empty())
-                .collect();
+            let text_words: Vec<&str> = words_of(&lower).collect();
             words.iter().all(|word| {
                 let word = unescape(word).to_lowercase();
-                text_words.iter().any(|t| t.starts_with(word.as_str()))
+                let mut parts = words_of(&word).peekable();
+                parts.peek().is_some()
+                    && parts.all(|part| text_words.iter().any(|t| t.starts_with(part)))
             })
         }
         TypedSearchTerm::Wild(pattern) => wild_matches(pattern, text),
     }
+}
+
+/// The words of `text`: its runs of letters and digits.
+// NOTE: ECL 2.3, 6.8 Description Filters, names the word-prefix-any-order match
+// and no word delimiters, so a run of letters and digits is a word: our own design.
+fn words_of(text: &str) -> impl Iterator<Item = &str> {
+    text.split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
 }
 
 /// `\"` and `\\` to the character they escape.

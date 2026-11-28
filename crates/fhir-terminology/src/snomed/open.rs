@@ -25,6 +25,7 @@ use concept_graph::members::Memberships;
 use concept_graph::refsets::RefsetMembers;
 use concept_store::store::{Store, Vocabulary};
 use rf2::constants;
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::path::Path;
@@ -137,6 +138,7 @@ impl SnomedProvider {
                 attributes,
                 member_tables,
                 identifiers,
+                scheme_aliases: BTreeMap::new(),
                 roots: OnceLock::new(),
                 leaves: OnceLock::new(),
                 defined: OnceLock::new(),
