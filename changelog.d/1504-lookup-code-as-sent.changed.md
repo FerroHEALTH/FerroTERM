@@ -1,0 +1,1 @@
+- `$lookup` answers its `code` output as the request sent it, as `$validate-code` already does, for every code system. A code system's normal form, such as an ICD-11 expression's entity-id form, stays the `code` property, and the tx-ecosystem `icd-11` mode passes 28 of 145. Before, an ICD-11 short code or an expression written out of order came back as its normal form.

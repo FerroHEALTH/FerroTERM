@@ -1027,3 +1027,48 @@ fn a_classification_code_validates_and_names_the_entity_id_as_its_normal_form() 
         "a full entity uri is no MMS code: {by_uri:?}"
     );
 }
+
+// NOTE: every tx-ecosystem `$lookup` case at 9c2bbce echoes the code as sent (the icd-11
+// `lookup-pc-pneumonia-cluster-no-metadata`); the normal form is the `code` property.
+#[test]
+fn lookup_answers_the_code_as_sent_and_the_normal_form_as_a_property() {
+    use std::sync::Arc;
+
+    use fhir_terminology::operations::Invocation;
+    use fhir_terminology::operations::lookup::{LookupInput, lookup};
+    use fhir_terminology::registry::Registry;
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    write_artifacts(dir.path()).expect("builds");
+    let mut registry = Registry::default();
+    registry
+        .register(Arc::new(
+            Icd11Provider::open(&dir.path().join("mms")).expect("opens mms"),
+        ))
+        .expect("registers");
+    for (sent, normal) in [
+        ("1A00&XN62R&XN8P1", format!("{CHOLERA}&{CLASSICAL}&{ELTOR}")),
+        ("1A00", CHOLERA.to_owned()),
+    ] {
+        let outcome = lookup(
+            &registry,
+            &Invocation::Type,
+            &LookupInput {
+                system: Some(MMS.to_owned()),
+                code: Some(sent.to_owned()),
+                properties: vec![String::from("code")],
+                ..LookupInput::default()
+            },
+        )
+        .expect("looks up");
+        assert_eq!(outcome.code, sent);
+        assert!(
+            outcome
+                .properties
+                .iter()
+                .any(|p| p.code == "code" && p.value == Some(PropertyValue::Code(normal.clone()))),
+            "{:?}",
+            outcome.properties
+        );
+    }
+}
