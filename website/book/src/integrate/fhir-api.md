@@ -112,8 +112,12 @@ echoes every effective parameter plus one `used-codesystem` per system version
 the expansion drew on.
 
 An expansion nests where the compose is the system's own hierarchy: one include
-of one system, taken whole or narrowed by `is-a` or `descendent-of`, with
-nothing enumerated and nothing excluded. Each root then carries its children
+of one system the server holds as a `CodeSystem` resource, taken whole or
+narrowed by `is-a` or `descendent-of`, with nothing enumerated and nothing
+excluded. A system the server enumerates from its own release (SNOMED CT,
+LOINC, ICD-11 and the other loaded editions) expands flat: its hierarchy gives a
+concept many parents, which a tree would repeat. FHIR leaves the choice to the
+server (`excludeNested`), so this rule is FerroTERM's own. Each root then carries its children
 under `contains`
 (<https://hl7.org/fhir/R4B/valueset-definitions.html#ValueSet.expansion.contains>),
 `total` counts every member rather than the roots, and a page is the slice of
