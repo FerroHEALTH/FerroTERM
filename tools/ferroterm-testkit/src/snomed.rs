@@ -328,6 +328,31 @@ pub fn write_with_concept_model(dir: &Path) -> Result<(), FixtureError> {
     )
 }
 
+/// The first edition as an unpublished release, under `http://snomed.info/xsct/`.
+pub const UNPUBLISHED_EDITION: &str = "http://snomed.info/xsct/91234567105";
+/// Its version URI.
+pub const UNPUBLISHED_VERSION: &str = "http://snomed.info/xsct/91234567105/version/20260101";
+
+/// Writes the first edition under `dir` as an unpublished release, named under
+/// `http://snomed.info/xsct/` (the SNOMED CT URI Standard).
+///
+/// # Errors
+///
+/// Returns [`FixtureError`] when a writer fails; the fixture is fixed content,
+/// so a failure means the writers or the directory are at fault.
+pub fn write_unpublished(dir: &Path) -> Result<(), FixtureError> {
+    write_shape(
+        dir,
+        &Shape {
+            edition: UNPUBLISHED_EDITION,
+            version: UNPUBLISHED_VERSION,
+            release_date: DATE,
+            bird: false,
+            mrcm: false,
+        },
+    )
+}
+
 /// The edition version URI of the later release of the first edition.
 #[must_use]
 pub fn later_version() -> String {
