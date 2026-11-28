@@ -346,6 +346,39 @@ fn axis_filters_reach_the_linked_parts_and_class_parts_carry_their_terms() {
     );
 }
 
+/// The FHIR LOINC page's templates for the implicit value sets
+/// (<https://hl7.org/fhir/R4B/loinc.html>, "Implicit Value Sets").
+#[test]
+fn implicit_value_sets_carry_the_template_fields() {
+    let (_dir, provider) = provider();
+    let list = provider.implicit_metadata(&format!("http://loinc.org/vs/{}", code(ANSWER_LIST)));
+    assert_eq!(list.version.as_deref(), Some(VERSION));
+    assert_eq!(list.name.as_deref(), Some("Yes or no"));
+    assert_eq!(
+        list.description.as_deref(),
+        Some("LOINC Answer List for Yes or no")
+    );
+    let part = provider.implicit_metadata(&format!(
+        "http://loinc.org/vs/{}",
+        code(GLUCOSE_PART).to_ascii_lowercase()
+    ));
+    assert_eq!(part.version.as_deref(), Some(VERSION));
+    assert_eq!(
+        part.name,
+        Some(format!(
+            "LOINC Value Set from Multi-Axial Hierarchy code {}",
+            code(GLUCOSE_PART)
+        ))
+    );
+    assert_eq!(
+        part.description.as_deref(),
+        Some("All LOINC codes for Glucose")
+    );
+    let all = provider.implicit_metadata("http://loinc.org/vs");
+    assert_eq!(all.version.as_deref(), Some(VERSION));
+    assert_eq!(all.name, None, "the page prints no template for every code");
+}
+
 /// A property the loaded release does not carry is not declared.
 ///
 /// The FHIR LOINC page's property table still lists `DOCUMENT_SECTION`

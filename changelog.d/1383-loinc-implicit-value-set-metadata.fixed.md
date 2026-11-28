@@ -1,0 +1,1 @@
+- LOINC's implicit value sets carry the fields the FHIR LOINC page's templates give them: the LOINC version on every form, and for an answer list (`http://loinc.org/vs/[id]`) or a Multi-Axial Hierarchy Part (`http://loinc.org/vs/[partcode]`) the template's `name` and `description`.

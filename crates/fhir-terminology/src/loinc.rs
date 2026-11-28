@@ -464,6 +464,64 @@ impl StoredSystem for Loinc {
         }))
     }
 
+    /// The template fields of an implicit value set of the FHIR LOINC page
+    /// (<https://hl7.org/fhir/R4B/loinc.html>, "Implicit Value Sets"): the
+    /// LOINC version, and for an answer list or a Part the `name` and
+    /// `description` its template gives. The page prints no template for
+    /// `http://loinc.org/vs`, so that form carries the version alone.
+    fn implicit_metadata(provider: &LoincProvider, url: &str) -> crate::provider::ImplicitMetadata {
+        let version = Some(
+            crate::provider::CodeSystemProvider::identity(provider)
+                .version
+                .clone(),
+        );
+        let Some(code) = url
+            .strip_prefix(SYSTEM)
+            .and_then(|rest| rest.strip_prefix("/vs/"))
+        else {
+            return crate::provider::ImplicitMetadata {
+                version,
+                ..crate::provider::ImplicitMetadata::default()
+            };
+        };
+        let upper = code.to_ascii_uppercase();
+        // NOTE: the seam returns no error; a store that does not read fails the compose
+        // read of the same URL, which reports it, so the name falls back to the code here.
+        let named = provider
+            .stored()
+            .located(&upper)
+            .ok()
+            .flatten()
+            .and_then(|located| {
+                Loinc::display(provider, located.concept, None)
+                    .ok()
+                    .flatten()
+            });
+        let (name, description) = if upper.starts_with("LL") {
+            let list = named.unwrap_or_else(|| upper.clone());
+            (
+                Some(list.clone()),
+                Some(format!("LOINC Answer List for {list}")),
+            )
+        } else {
+            (
+                Some(format!(
+                    "LOINC Value Set from Multi-Axial Hierarchy code {upper}"
+                )),
+                Some(format!(
+                    "All LOINC codes for {}",
+                    named.unwrap_or_else(|| upper.clone())
+                )),
+            )
+        };
+        crate::provider::ImplicitMetadata {
+            version,
+            name,
+            description,
+            ..crate::provider::ImplicitMetadata::default()
+        }
+    }
+
     /// `parent` and `ancestor` over the multiaxial hierarchy; an axis property
     /// (`COMPONENT`, `PROPERTY`, `TIME_ASPCT`, `SYSTEM`, `SCALE_TYP`,
     /// `METHOD_TYP`) with `=` or `in` matches the linked part by its code or
