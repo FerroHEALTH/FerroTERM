@@ -498,6 +498,14 @@ impl CodeSystemProvider for Supplemented {
         self.inner.filter(filter)
     }
 
+    fn filter_in_language(
+        &self,
+        filter: &crate::provider::filter::Filter,
+        requested: Option<&str>,
+    ) -> Option<Result<ConceptSet, ProviderError>> {
+        self.inner.filter_in_language(filter, requested)
+    }
+
     fn filter_all(
         &self,
         filters: &[crate::provider::filter::Filter],

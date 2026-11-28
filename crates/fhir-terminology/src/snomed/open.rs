@@ -227,6 +227,14 @@ impl SnomedProvider {
                 value: String::from("an SCTID"),
             },
             FilterDefinition {
+                code: String::from("display"),
+                description: Some(String::from(
+                    "`regex`: an active fully specified name or synonym in the request's language matches",
+                )),
+                operators: vec![FilterOperator::Regex],
+                value: String::from("a regular expression over the whole term"),
+            },
+            FilterDefinition {
                 code: String::from("constraint"),
                 description: Some(String::from(
                     "the concepts the SNOMED CT expression constraint selects",

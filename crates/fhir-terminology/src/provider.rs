@@ -675,6 +675,21 @@ pub trait CodeSystemProvider: fmt::Debug + Send + Sync {
         filter::evaluate(self, filter)
     }
 
+    /// The concepts `filter` selects when what it selects depends on the
+    /// display language of the request (`requested`, its `displayLanguage`);
+    /// `None` for a filter that does not, which [`Self::filter`] answers.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::filter`].
+    fn filter_in_language(
+        &self,
+        _filter: &Filter,
+        _requested: Option<&str>,
+    ) -> Option<Result<ConceptSet, ProviderError>> {
+        None
+    }
+
     /// The concepts every filter of one include selects, all of them.
     ///
     /// The default intersects [`CodeSystemProvider::filter`] per filter; a
