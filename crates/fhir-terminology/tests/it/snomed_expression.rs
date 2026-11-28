@@ -21,9 +21,9 @@ use fhir_terminology::operations::{
     Invocation, OperationError, closure, lookup, sources::Sources, subsumes, validate_code,
     value_set_validate_code,
 };
-use fhir_terminology::provider::CodeSystemProvider;
 use fhir_terminology::provider::compose::{Compose, ConceptRef, Echoes, Include, SystemRef};
 use fhir_terminology::provider::concept_map::Relationship;
+use fhir_terminology::provider::{CodeSystemProvider, PropertyValue};
 use fhir_terminology::registry::Registry;
 use fhir_terminology::snomed::{SYSTEM, SnomedProvider};
 use fhir_terminology::valueset;
@@ -988,4 +988,33 @@ fn lookup_answers_an_expression_as_sent() {
     let (_dir, registry) = registry();
     let sent = refined(CAT, COVERING, FUR);
     assert_eq!(looked_up(&registry, &sent).code, sent);
+}
+
+#[test]
+fn a_nested_attribute_value_is_a_property_in_its_terse_form() {
+    // An expression is a code of the system, so the nested value of an
+    // attribute is the code its terse form writes.
+    let (_dir, registry) = registry();
+    let expression = format!(
+        "{}:{}=({}:{}=#4)",
+        code(ANIMAL),
+        code(COVERING),
+        code(FUR),
+        code(LEGS)
+    );
+    let outcome = looked_up(&registry, &expression);
+    let covering: Vec<_> = outcome
+        .properties
+        .iter()
+        .filter(|p| p.code == code(COVERING))
+        .filter_map(|p| p.value.clone())
+        .collect();
+    assert_eq!(
+        covering,
+        [PropertyValue::Code(format!(
+            "{}:{}=#4",
+            code(FUR),
+            code(LEGS)
+        ))]
+    );
 }
