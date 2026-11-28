@@ -78,7 +78,8 @@ impl SnomedProvider {
         Ok(self.system().inactive.get_or_init(|| set).clone())
     }
 
-    /// The members of the reference sets a `concept in` filter names.
+    /// The concepts a `concept in` filter lists, each reference set among them
+    /// standing for its members.
     pub(super) fn reference_set_members(
         &self,
         filter: &Filter,
@@ -98,12 +99,20 @@ impl SnomedProvider {
                     "not an SCTID",
                 ));
             };
-            let members = self
-                .system()
-                .memberships
-                .members(refset.value())
+            // NOTE: `in` selects the codes the value lists ("the set of codes or concepts
+            // specified", R4B filter-operator), and a reference set among them stands for
+            // its members (<https://hl7.org/fhir/R4B/snomedct.html>, "Filter Properties").
+            if let Some(members) = self.system().memberships.members(refset.value()) {
+                set |= members;
+                continue;
+            }
+            let concept = self
+                .stored()
+                .store
+                .ordinal(value)
+                .map_err(storage)?
                 .ok_or_else(|| ProviderError::UnknownCode(value.to_owned()))?;
-            set |= members;
+            set.insert(concept.index());
         }
         Ok(set)
     }

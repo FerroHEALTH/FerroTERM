@@ -61,13 +61,27 @@ fn validated(registry: &Registry, code: &str) -> validate_code::ValidationOutcom
 }
 
 fn outcome(registry: &Registry, a: &str, b: &str) -> Outcome {
+    tested(registry, a, b).expect("subsumes")
+}
+
+fn tested(registry: &Registry, a: &str, b: &str) -> Result<Outcome, OperationError> {
     let input = subsumes::SubsumesInput {
         system: Some(SYSTEM.to_owned()),
         code_a: Some(a.to_owned()),
         code_b: Some(b.to_owned()),
         ..subsumes::SubsumesInput::default()
     };
-    subsumes::subsumes(registry, &Invocation::Type, &input).expect("subsumes")
+    subsumes::subsumes(registry, &Invocation::Type, &input)
+}
+
+/// Whether the structure of `a` and `b` leaves their relationship open:
+/// "Finding no relationship is not the same as establishing that there is
+/// none" (tx-ecosystem IG, requirements, SNOMED CT).
+fn undetermined(registry: &Registry, a: &str, b: &str) -> bool {
+    matches!(
+        tested(registry, a, b),
+        Err(OperationError::CannotDetermine(_))
+    )
 }
 
 /// `=== <cat> : <covering> = <fur>`, the shape of a refined focus concept.
@@ -335,10 +349,9 @@ fn a_concrete_value_is_compared_for_equality_only() {
     let four = format!("=== {} : {} = #4", code(ANIMAL), code(LEGS));
     let three = format!("=== {} : {} = #3", code(ANIMAL), code(LEGS));
     assert_eq!(outcome(&registry, &four, &code(CAT)), Outcome::Subsumes);
-    assert_eq!(
-        outcome(&registry, &three, &code(CAT)),
-        Outcome::NotSubsumed,
-        "a concrete value the concept does not carry is not matched"
+    assert!(
+        undetermined(&registry, &three, &code(CAT)),
+        "a concrete value the concept does not carry leaves the relationship open"
     );
 }
 
@@ -357,9 +370,11 @@ fn an_expression_is_compared_with_another_expression_both_ways() {
     assert_eq!(outcome(&registry, &narrow, &broad), Outcome::SubsumedBy);
     assert_eq!(outcome(&registry, &narrow, &narrow), Outcome::Equivalent);
     let unrelated = format!("=== {}", code(FISH));
-    assert_eq!(
-        outcome(&registry, &narrow, &unrelated),
-        Outcome::NotSubsumed
+    assert!(undetermined(&registry, &narrow, &unrelated));
+    let other = format!("=== {} : {} = #3", code(ANIMAL), code(LEGS));
+    assert!(
+        undetermined(&registry, &narrow, &other),
+        "the same attribute with different values settles nothing"
     );
 }
 
