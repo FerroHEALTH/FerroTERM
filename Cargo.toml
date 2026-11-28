@@ -97,7 +97,7 @@ ferrohealth-health = { version = "=0.1.1", features = ["registry"] }
 # The listener, its TLS and the outbound TlsClient; 0.12.4 prefers the TLS 1.3
 # hybrid group X25519MLKEM768 (RFC 10024) on both, and on every default-provider
 # rustls client. Verified against crates.io on 2026-11-25.
-ferrohealth-server = { version = "=0.12.4" }
+ferrohealth-server = { version = "=0.13.0" }
 # The FerroHEALTH configuration loader and its secrets: one TOML tree per
 # binary under `--config` or `<PREFIX>_CONFIG`, `<PREFIX>__SECTION__KEY`
 # overrides, `--set`, strict refusals and provenance, and the `<key>_file`
