@@ -94,10 +94,10 @@ it:
 <!-- hand-run.tsv: written by scripts/checks/conformance-badges.sh --write-hand-runs -->
 | mode | surface | ran | measured | why by hand |
 |---|---|---|---|---|
-| `loinc` | `/r4b` | 110 | 2026-11-27 | needs a full LOINC 2.83 release, which needs a loinc.org account; the suite's LOINC subset carries no licence text and 213 of the 1777 codes the cases name (#1437) |
-| `loinc` | `/r5` | 110 | 2026-11-27 | needs a full LOINC 2.83 release, which needs a loinc.org account; the suite's LOINC subset carries no licence text and 213 of the 1777 codes the cases name (#1437) |
-| `tx.fhir.org` | `/r4b` | 189 | 2026-11-27 | needs a full LOINC 2.83 release, which needs a loinc.org account; the suite's LOINC subset carries no licence text and 213 of the 1777 codes the cases name (#1437) |
-| `tx.fhir.org` | `/r5` | 189 | 2026-11-27 | needs a full LOINC 2.83 release, which needs a loinc.org account; the suite's LOINC subset carries no licence text and 213 of the 1777 codes the cases name (#1437) |
+| `loinc` | `/r4b` | 110 | 2026-11-28 | needs a full LOINC 2.83 release, which needs a loinc.org account; the suite's LOINC subset carries no licence text and 213 of the 1777 codes the cases name (#1437) |
+| `loinc` | `/r5` | 110 | 2026-11-28 | needs a full LOINC 2.83 release, which needs a loinc.org account; the suite's LOINC subset carries no licence text and 213 of the 1777 codes the cases name (#1437) |
+| `tx.fhir.org` | `/r4b` | 189 | 2026-11-28 | needs a full LOINC 2.83 release, which needs a loinc.org account; the suite's LOINC subset carries no licence text and 213 of the 1777 codes the cases name (#1437) |
+| `tx.fhir.org` | `/r5` | 189 | 2026-11-28 | needs a full LOINC 2.83 release, which needs a loinc.org account; the suite's LOINC subset carries no licence text and 213 of the 1777 codes the cases name (#1437) |
 <!-- end of hand-run.tsv -->
 
 ![tx-ecosystem snomed R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fsnomed-r4b.json)
