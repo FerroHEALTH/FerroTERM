@@ -368,6 +368,15 @@ mod tests {
         let term = TypedSearchTerm::Match(vec![String::from("hea"), String::from("att")]);
         assert!(term_matches(&term, "Heart attack"));
         assert!(!term_matches(&term, "Heart"));
+        // ECL 2.3, 6.10 Member Filters: the mapTarget examples.
+        let code = |word: &str| TypedSearchTerm::Match(vec![word.to_owned()]);
+        assert!(term_matches(&code("J45.9"), "J45.9"));
+        assert!(term_matches(&code("J45"), "J45.0"));
+        assert!(!term_matches(&code("J45.9"), "J45.19"));
+        assert!(
+            !term_matches(&code("-"), "J45.9"),
+            "a word of punctuation alone"
+        );
         assert!(compare_numbers(Comparison::GreaterOrEqual, 500.0, 500.0));
         assert!(!compare_numbers(Comparison::Less, 500.0, 500.0));
     }

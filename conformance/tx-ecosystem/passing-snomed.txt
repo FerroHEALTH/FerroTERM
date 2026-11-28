@@ -7,6 +7,8 @@ sct-ec/ec-sct-validate-global-generated-display
 sct-ec/ec-sct-validate-global-wrong-display
 sct-ec/ec-sct-validate-global-wrong-display-lenient
 sct-ec/ec-sct-validate-local-unreferenced
+sct-ecl/snomed-expand-ecl-alt-identifier
+sct-ecl/snomed-expand-ecl-alt-identifier-quoted-operator
 sct-ecl/snomed-expand-ecl-alt-identifier-unknown
 sct-ecl/snomed-expand-ecl-ambiguous-or-in-refinement
 sct-ecl/snomed-expand-ecl-ambiguous-precedence
@@ -104,6 +106,7 @@ sct-ecl/snomed-expand-ecl-history-mod
 sct-ecl/snomed-expand-ecl-invalid-sctid
 sct-ecl/snomed-expand-ecl-member-filter-date-in
 sct-ecl/snomed-expand-ecl-member-filter-date-out
+sct-ecl/snomed-expand-ecl-member-filter-map-target
 sct-ecl/snomed-expand-ecl-member-filter-misplaced
 sct-ecl/snomed-expand-ecl-memberOf-any
 sct-ecl/snomed-expand-ecl-memberOf-descriptions
@@ -124,6 +127,8 @@ sct-ecl/snomed-expand-ecl-or
 sct-ecl/snomed-expand-ecl-or-chain
 sct-ecl/snomed-expand-ecl-parents
 sct-ecl/snomed-expand-ecl-parentsOrSelf
+sct-ecl/snomed-expand-ecl-refinement-ambiguous-and-or
+sct-ecl/snomed-expand-ecl-refinement-ambiguous-or-and
 sct-ecl/snomed-expand-ecl-refinement-and
 sct-ecl/snomed-expand-ecl-refinement-attribute-and-value-sets
 sct-ecl/snomed-expand-ecl-refinement-cardinality
@@ -235,7 +240,10 @@ snomed/expand-pc-list
 snomed/expand-pc-none
 snomed/lookup-pc-unbracketed
 snomed/snomed-expand-code-in
+snomed/snomed-expand-concept-in
 snomed/snomed-expand-descendent-leaf
+snomed/snomed-expand-display-regex
+snomed/snomed-expand-display-regex-nl
 snomed/snomed-expand-implicit-ecl
 snomed/snomed-expand-implicit-edition
 snomed/snomed-expand-implicit-system-version
@@ -256,14 +264,18 @@ snomed/snomed-lookup-loinc
 snomed/snomed-lookup-loinc-inactive
 snomed/snomed-lookup-loinc-none
 snomed/snomed-validate-code-in
+snomed/snomed-validate-concept-in
+snomed/snomed-validate-display-regex
 snomed/snomed-validate-implied-refset-map
 snomed/subsumes-bad-version
 snomed/subsumes-coding
 snomed/subsumes-disjoint
 snomed/subsumes-equivalent
+snomed/subsumes-expr-attr-unrelated
 snomed/subsumes-expr-attr-value
 snomed/subsumes-expr-attr-value-reverse
 snomed/subsumes-expr-conjunction
+snomed/subsumes-expr-different-attributes
 snomed/subsumes-expr-extra-attribute
 snomed/subsumes-expr-grouped-ungrouped
 snomed/subsumes-expr-normal-form
@@ -286,7 +298,9 @@ snomed/subsumes-transitive
 snomed/subsumes-unknown-code-a
 snomed/subsumes-unknown-code-b
 snomed/validate-code-implied-1
+snomed/validate-code-implied-1b
 snomed/validate-code-implied-2
+snomed/validate-code-implied-2b
 snomed/validate-code-pc-bad1
 snomed/validate-code-pc-bad2
 snomed/validate-code-pc-concrete-good

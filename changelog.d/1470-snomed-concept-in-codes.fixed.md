@@ -1,0 +1,1 @@
+- A SNOMED CT `concept in` filter selects each concept it lists, as the `in` operator defines, and the members of each reference set it lists; before, a listed concept that was not a reference set was refused as unknown.

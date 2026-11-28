@@ -51,8 +51,8 @@ reference sets are read as acceptabilities instead.
 
 The same sets are reachable through a `compose`, inline or loaded, with the
 filters the provider declares: `concept is-a [sctid]`, `concept descendent-of
-[sctid]`, and `concept in [refset]` (reference set membership, as the page
-defines `in` for SNOMED CT), plus the generic `is-not-a`, `generalizes`,
+[sctid]`, and `concept in [sctid,...]` (each listed concept, and the members of
+each listed reference set, as the page defines `in` for SNOMED CT), plus the generic `is-not-a`, `generalizes`,
 `not-in`, and `regex`:
 
 ```json
@@ -67,6 +67,13 @@ defines `in` for SNOMED CT), plus the generic `is-not-a`, `generalizes`,
   }
 }
 ```
+
+A `display` filter with `regex` selects the concepts with an active fully
+specified name or synonym whose whole term matches the pattern,
+case-sensitively, in one language: the first language of `displayLanguage`
+the edition has descriptions in, else the edition's own, as the terminology
+ecosystem IG defines it. Text definitions and inactive descriptions do not
+count.
 
 ## ECL
 

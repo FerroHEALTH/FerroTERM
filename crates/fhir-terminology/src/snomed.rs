@@ -20,6 +20,7 @@ mod loinc_map;
 mod open;
 mod properties;
 mod selection;
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -163,6 +164,8 @@ pub struct Snomed {
     attributes: Attributes,
     member_tables: RefsetMembers,
     identifiers: Identifiers,
+    /// The ECL alternate identifier scheme aliases, each to its scheme concept.
+    scheme_aliases: BTreeMap<String, u64>,
     roots: OnceLock<RoaringBitmap>,
     leaves: OnceLock<RoaringBitmap>,
     defined: OnceLock<RoaringBitmap>,
@@ -526,6 +529,9 @@ impl StoredSystem for Snomed {
                 _ => {}
             }
         }
+        if filter.property == "display" && filter.op == FilterOperator::Regex {
+            return Some(provider.display_regex(&filter.value, None));
+        }
         if let Some(scheme) = filter.property.strip_prefix(selection::MAPPED)
             && filter.op == FilterOperator::Exists
         {
@@ -533,6 +539,16 @@ impl StoredSystem for Snomed {
         }
         (filter.property == "concept" && filter.op == FilterOperator::In)
             .then(|| provider.reference_set_members(filter))
+    }
+
+    /// `display regex` searches the one language the request names.
+    fn filter_in_language(
+        provider: &SnomedProvider,
+        filter: &Filter,
+        requested: Option<&str>,
+    ) -> Option<Result<ConceptSet, ProviderError>> {
+        (filter.property == "display" && filter.op == FilterOperator::Regex)
+            .then(|| provider.display_regex(&filter.value, requested))
     }
 
     /// A SNOMED CT selection admits the post-coordinated expressions its

@@ -93,7 +93,7 @@ pub const CODES_MAP: u32 = 9;
 pub const HISTORICAL: u32 = 10;
 /// The SAME AS association reference set (a published SCTID); the fish is SAME AS the cat.
 pub const SAME_AS: u32 = 11;
-/// An identifier scheme whose alias is `ZOO`; the cat is `ZOO#cat-1`, the dog `ZOO#dog-1`.
+/// An identifier scheme named `ZOO`; the cat is `cat-1` in it, the dog `dog-1`.
 pub const SCHEME: u32 = 12;
 /// The REPLACED BY association reference set (a published SCTID); the fish is REPLACED BY the dog.
 pub const REPLACED_BY: u32 = 13;
