@@ -79,9 +79,10 @@ A mode whose content CI may fetch runs in CI, weekly and on demand
 and the count `conformance/tx-ecosystem/ci-modes.tsv` records. The lane fetches
 the content from its public source, checks it against a pinned sha256, and
 deletes it when the run ends; none of it is committed, cached or uploaded.
-`snomed` runs this way, over the suite's own SNOMED CT test edition, and
+`snomed` runs this way, over the suite's own SNOMED CT test edition, with
 `mimetypes`, which needs no content beyond the IANA media types registry the
-server ships.
+server ships, and `omop`, which fetches nothing because the server loads no
+OMOP vocabulary.
 
 The modes CI does not run yet are measured by hand before a release. Their
 counts, the day of each run and the reason are in
@@ -97,7 +98,6 @@ it:
 | `loinc` | `/r5` | 110 | 2026-11-27 | needs a LOINC release; its CI lane is not built yet (#1437) |
 | `tx.fhir.org` | `/r4b` | 189 | 2026-11-27 | needs a LOINC release; its CI lane is not built yet (#1437) |
 | `tx.fhir.org` | `/r5` | 189 | 2026-11-27 | needs a LOINC release; its CI lane is not built yet (#1437) |
-| `omop` | `/r4b` | 40 | 2026-11-27 | its CI lane is not built yet (#1437) |
 <!-- end of hand-run.tsv -->
 
 ![tx-ecosystem snomed R4B](https://img.shields.io/endpoint?url=https%3A%2F%2Fferroterm.eu%2Fconformance%2Fsnomed-r4b.json)

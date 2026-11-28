@@ -36,8 +36,8 @@ shows the pass count alone (the upstream report is #1380).
 The `general` rows were recorded on 2026-11-24 with validator 7.0.6 and suite
 `9c2bbce57366319d6a5265cbfbf6697f094822e3` (test cases 1.11.0). Every
 mode run also carries the two mode-independent `metadata` cases and the 11
-`closure` cases, so a mode's count is 13 above the suite's own. The `snomed`
-and `mimetypes` rows are held by their CI lanes
+`closure` cases, so a mode's count is 13 above the suite's own. The `snomed`,
+`mimetypes` and `omop` rows are held by their CI lanes
 (`.github/workflows/tx-ecosystem-modes.yml`), `snomed` over the suite's test
 edition. The other rows were measured by hand on 2026-11-27
 on the same pins, over LOINC 2.83 and the three ICD-11 artifacts built from
