@@ -15,6 +15,7 @@
 
 pub mod edition;
 mod implicit;
+mod loinc_map;
 mod open;
 mod properties;
 mod selection;
@@ -36,7 +37,6 @@ use rf2::constants;
 use rf2::id::ConceptId;
 use roaring::RoaringBitmap;
 use sct_ecl::ast::ExpressionConstraint;
-use serde::Deserialize;
 
 use crate::provider::compose::{Compose, ConceptRef, Include, SystemRef};
 use crate::provider::declaration::PropertyKind;
@@ -138,31 +138,6 @@ pub enum OpenError {
     /// The alternate identifiers file does not read.
     #[error("cannot read the alternate identifiers")]
     Identifiers(#[from] IdentifiersError),
-}
-
-#[derive(Debug, Deserialize)]
-struct Manifest {
-    system: String,
-    edition: String,
-    version: String,
-    /// The release date the offline build recorded for the edition.
-    #[serde(default, rename = "releaseDate")]
-    release_date: Option<String>,
-    /// The reference set memberships; an artifact built before they were
-    /// written has none.
-    #[serde(default)]
-    refsets: Option<String>,
-    /// The attribute relationships, the reference set member rows, and the
-    /// alternate identifiers the ECL evaluator reads; an artifact built before
-    /// they were written has none.
-    #[serde(default)]
-    attributes: Option<String>,
-    #[serde(default)]
-    members: Option<String>,
-    #[serde(default)]
-    identifiers: Option<String>,
-    #[serde(default)]
-    languages: Vec<String>,
 }
 
 /// The vocabulary ordinals the provider resolves once at open.
@@ -643,12 +618,35 @@ impl StoredSystem for Snomed {
         let Ok(refset) = ConceptId::parse(decoded.trim()) else {
             return Some(Err(malformed(format!("`{decoded}` is not an SCTID"))));
         };
+        if refset.value() == loinc_map::LOINC_MODULE {
+            return Some(loinc_map::concept_map(provider, url, selection));
+        }
         Some(conceptmap::concept_map(
             provider,
             url,
             refset.value(),
             selection,
         ))
+    }
+
+    /// The LOINC Extension map (`loinc_map`), between this edition and LOINC
+    /// either way, when the edition carries LOINC codes.
+    fn implicit_concept_maps(
+        provider: &SnomedProvider,
+        source: &str,
+        target: &str,
+    ) -> Result<Vec<String>, ProviderError> {
+        let (target, version) = target
+            .split_once('|')
+            .map_or((target, None), |(s, v)| (s, Some(v)));
+        let this_version = version.is_none_or(|v| provider.implicit_version(v).is_ok());
+        let between = (source == SYSTEM && target == properties::LOINC_SYSTEM)
+            || (source == properties::LOINC_SYSTEM && target == SYSTEM && this_version);
+        Ok(if between && loinc_map::held(provider) {
+            vec![loinc_map::url(&provider.identity().version)]
+        } else {
+            Vec::new()
+        })
     }
 
     /// The implicit value sets of the FHIR SNOMED CT page

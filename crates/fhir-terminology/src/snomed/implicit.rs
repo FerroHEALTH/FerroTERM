@@ -298,6 +298,14 @@ mod tests {
             Some(("http://snomed.info/sct", "1"))
         );
         assert_eq!(
+            implicit_parts(
+                "http://snomed.info/xsct/31000003106/version/20250909?fhir_cm=1",
+                FHIR_CM
+            ),
+            Some(("http://snomed.info/xsct/31000003106/version/20250909", "1")),
+            "an unpublished edition is named under xsct"
+        );
+        assert_eq!(
             implicit_parts("http://snomed.info/sct?fhir_cm=1", FHIR_VS),
             None,
             "one key never reads the other's URI"

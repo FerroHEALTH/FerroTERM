@@ -125,8 +125,7 @@ code 78 (`EX_CONFIG`, `sysexits(3)`), and `healthcheck` with `not up` and 1.
 | `build_command` | `ferroterm-build` | the offline build, on `PATH` or by path |
 | `listing_limit` | `64MiB` | the most bytes one listing answer takes, the feed or one page of a FHIR API search; a listing is read into memory to be parsed, so its bound sits far below `download_limit`, which bounds bytes streamed to disk |
 | `download_limit` | `4GiB` | the most bytes one download takes, a data size; a larger item is refused, its partial file removed, and the run record names it |
-| `[auth]` | on, no issuer | the credentials the admin listener admits (see [The admin listener](#the-admin-listener)) |
-| `[jose] post_quantum_only` | `false` | the admin listener verifies access tokens with ML-DSA-44, ML-DSA-65 or ML-DSA-87 (RFC 9964) alone: an issuer's `algorithms` left at the default becomes those three, and a list naming any other algorithm refuses the start |
+| `[auth]` | on, no issuer | the credentials the admin listener admits (see [The admin listener](#the-admin-listener)); `[auth] post_quantum_only = true` holds every issuer to ML-DSA-44, ML-DSA-65 or ML-DSA-87 (RFC 9964), as on the server |
 | `[nts]` | `url = "https://terminologieserver.nl"`, `timeout = "1h"`, the realm's issuer, no client | the NTS the add-on calls and the client it authenticates as (see [Credentials](#credentials)) |
 | `[telemetry]` | `auto` format, no export | the console log's `format` and `filter` (`RUST_LOG` sets the filter too), and the OTLP export of the service's metrics, the same section the server reads (see [Telemetry](configuration.md#telemetry)) |
 
