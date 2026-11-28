@@ -24,7 +24,7 @@ on:
       mode:
         description: The mode to run; all runs every row of ci-modes.tsv.
         type: choice
-        options: [all, snomed, mimetypes, omop, icf]
+        options: [all, snomed, mimetypes, omop, icf, icd-11]
         default: all
   pull_request:
     paths:
@@ -89,9 +89,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # Every mode builds the same two binaries under one key, so the first job
+      # saves the cache and the others only restore it.
       - uses: ./.github/actions/setup-rust
         with:
           cache-key: tx-ecosystem-modes
+          cache-save-if: ${{ strategy.job-index == 0 }}
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin

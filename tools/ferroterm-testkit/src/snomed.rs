@@ -116,6 +116,11 @@ pub const NL_LANGUAGE_REFSET: u32 = 20;
 /// The bird, under the animal and a member of the pets reference set; only the
 /// second edition ([`write_second`]) holds it.
 pub const BIRD: u32 = 21;
+/// The published SCTID of `30051010000102 |LOINC code identifier|`, the scheme
+/// under which the cat carries [`CAT_LOINC`].
+pub const LOINC_SCHEME: u64 = 30_051_010_000_102;
+/// The cat's code in [`LOINC_SCHEME`], invented and of no LOINC release.
+pub const CAT_LOINC: &str = "SYNTH-1";
 /// The published SCTID of the ICD-10 extended map reference set.
 pub const ICD10_MAP_SCTID: &str = "447562003";
 /// The code system the ICD-10 extended map reference set maps to.
@@ -324,6 +329,31 @@ pub fn write_with_concept_model(dir: &Path) -> Result<(), FixtureError> {
             release_date: DATE,
             bird: true,
             mrcm: true,
+        },
+    )
+}
+
+/// The first edition as an unpublished release, under `http://snomed.info/xsct/`.
+pub const UNPUBLISHED_EDITION: &str = "http://snomed.info/xsct/91234567105";
+/// Its version URI.
+pub const UNPUBLISHED_VERSION: &str = "http://snomed.info/xsct/91234567105/version/20260101";
+
+/// Writes the first edition under `dir` as an unpublished release, named under
+/// `http://snomed.info/xsct/` (the SNOMED CT URI Standard).
+///
+/// # Errors
+///
+/// Returns [`FixtureError`] when a writer fails; the fixture is fixed content,
+/// so a failure means the writers or the directory are at fault.
+pub fn write_unpublished(dir: &Path) -> Result<(), FixtureError> {
+    write_shape(
+        dir,
+        &Shape {
+            edition: UNPUBLISHED_EDITION,
+            version: UNPUBLISHED_VERSION,
+            release_date: DATE,
+            bird: false,
+            mrcm: false,
         },
     )
 }

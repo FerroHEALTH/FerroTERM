@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //! Access tokens signed with ML-DSA-65 (RFC 9964 §5) under the issuer's
-//! default algorithms and under `[jose] post_quantum_only`, which narrows
+//! default algorithms and under `[auth] post_quantum_only`, which narrows
 //! them to the ML-DSA parameter sets and refuses a classical list.
 
+use ferrohealth_smart::config::ConfigError;
 use ferrohealth_smart::jws::algorithm::Algorithm;
 use ferrohealth_smart::jws::compact::{Header, encode};
 use ferrohealth_smart::jws::key::{PrivateKey, SigningKey as JwsKey};
-use ferroterm_server::config::{Config, JoseSection};
+use ferroterm_server::config::Config;
 use ferroterm_server::smart::{Smart, StartError};
 use http::StatusCode;
 use serde_json::{Value, json};
@@ -60,14 +61,10 @@ async fn issuer(es256: &SigningKey) -> MockServer {
     server
 }
 
-/// The server trusting `issuer`, `[jose] post_quantum_only` set to `on`.
+/// The server trusting `issuer`, `[auth] post_quantum_only` set to `on`.
 async fn server(issuer: &str, on: bool) -> Server {
-    let setup = SmartSetup {
-        jose: JoseSection {
-            post_quantum_only: on,
-        },
-        ..SmartSetup::for_issuer(issuer)
-    };
+    let mut setup = SmartSetup::for_issuer(issuer);
+    setup.auth.post_quantum_only = on;
     Server::start_persisting_with_smart_setup(setup).await
 }
 
@@ -101,17 +98,14 @@ async fn post_quantum_only_refuses_an_issuer_listing_a_classical_algorithm() {
     let mock = issuer(&es256).await;
     let mut setup = SmartSetup::for_issuer(&mock.uri());
     setup.issuer_mut().algorithms = vec![Algorithm::MlDsa65, Algorithm::Es256];
+    setup.auth.post_quantum_only = true;
     let dir = tempfile::tempdir().expect("tempdir");
-    let config = Config {
-        jose: JoseSection {
-            post_quantum_only: true,
-        },
-        ..Server::smart_config(dir.path(), setup)
-    };
+    let config: Config = Server::smart_config(dir.path(), setup);
     let refused = Smart::start(&config).await;
     assert!(
-        matches!(&refused, Err(StartError::PostQuantum { source })
-            if source.key == "auth.issuer.idp.algorithms" && source.algorithm == Algorithm::Es256),
+        matches!(&refused, Err(StartError::Auth { source })
+            if matches!(source.as_ref(), ConfigError::ClassicalAlgorithm { key, algorithm }
+                if key == "auth.issuer.idp.algorithms" && *algorithm == Algorithm::Es256)),
         "{refused:?}"
     );
 }

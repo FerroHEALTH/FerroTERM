@@ -155,6 +155,32 @@ fn properties_follow_the_snomed_on_fhir_list() {
 }
 
 #[test]
+fn a_concept_with_a_loinc_identifier_carries_it_as_the_loinc_property() {
+    let (_dir, p) = provider();
+    let loinc = |concept: u32| -> Vec<PropertyValue> {
+        p.properties(Concept::new(concept))
+            .expect("reads")
+            .into_iter()
+            .filter(|p| p.code == "loinc")
+            .map(|p| p.value)
+            .collect()
+    };
+    assert_eq!(
+        loinc(CAT),
+        [PropertyValue::Coding {
+            system: String::from("http://loinc.org"),
+            code: String::from(snomed::CAT_LOINC),
+            display: None,
+        }]
+    );
+    assert!(loinc(DOG).is_empty(), "the dog has no LOINC identifier");
+    assert!(
+        p.declaration().properties.iter().any(|d| d.code == "loinc"),
+        "an edition with LOINC identifiers declares the property"
+    );
+}
+
+#[test]
 fn a_property_naming_a_concept_describes_it_with_its_display() {
     // `property.description`: "Human Readable representation of the property
     // value (e.g. display for a code)" (`OperationDefinition/CodeSystem-lookup`).
@@ -175,6 +201,34 @@ fn a_property_naming_a_concept_describes_it_with_its_display() {
         "a number names no concept"
     );
     assert_eq!(described("inactive"), [None]);
+}
+
+#[test]
+fn the_mapped_filter_selects_the_concepts_an_identifier_scheme_gives_a_code() {
+    let (_dir, p) = provider();
+    let mapped = |value: &str| {
+        p.filter(&Filter {
+            property: format!("mapped:{}", snomed::LOINC_SCHEME),
+            op: FilterOperator::Exists,
+            value: value.to_owned(),
+        })
+        .expect("filters")
+    };
+    assert_eq!(mapped("true").iter().collect::<Vec<_>>(), [CAT]);
+    let without = mapped("false");
+    assert!(!without.contains(CAT) && without.contains(DOG));
+    let refused = p.filter(&Filter {
+        property: String::from("mapped:loinc"),
+        op: FilterOperator::Exists,
+        value: String::from("true"),
+    });
+    assert!(refused.is_err(), "a scheme is an SCTID");
+    assert!(
+        p.declaration()
+            .filters
+            .iter()
+            .any(|f| f.code == format!("mapped:{}", snomed::LOINC_SCHEME))
+    );
 }
 
 #[test]

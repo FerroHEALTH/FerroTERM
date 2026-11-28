@@ -477,6 +477,14 @@ impl CodeSystemProvider for Supplemented {
         self.inner.implicit_concept_map(url, selection)
     }
 
+    fn implicit_concept_maps(
+        &self,
+        source: &str,
+        target: &str,
+    ) -> Result<Vec<String>, ProviderError> {
+        self.inner.implicit_concept_maps(source, target)
+    }
+
     // NOTE: a supplement adds properties to the concepts of the code system it
     // supplements (<https://hl7.org/fhir/R5/codesystem-definitions.html#CodeSystem.supplements>),
     // so a filter on one selects by the supplement's values.
