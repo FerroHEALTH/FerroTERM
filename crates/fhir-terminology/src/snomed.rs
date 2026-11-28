@@ -550,8 +550,21 @@ impl StoredSystem for Snomed {
                 _ => {}
             }
         }
+        if filter.property == "display" && filter.op == FilterOperator::Regex {
+            return Some(provider.display_regex(&filter.value, None));
+        }
         (filter.property == "concept" && filter.op == FilterOperator::In)
             .then(|| provider.reference_set_members(filter))
+    }
+
+    /// `display regex` searches the one language the request names.
+    fn filter_in_language(
+        provider: &SnomedProvider,
+        filter: &Filter,
+        requested: Option<&str>,
+    ) -> Option<Result<ConceptSet, ProviderError>> {
+        (filter.property == "display" && filter.op == FilterOperator::Regex)
+            .then(|| provider.display_regex(&filter.value, requested))
     }
 
     /// A SNOMED CT selection admits the post-coordinated expressions its

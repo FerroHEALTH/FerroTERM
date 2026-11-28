@@ -204,6 +204,42 @@ fn a_property_naming_a_concept_describes_it_with_its_display() {
 }
 
 #[test]
+fn display_regex_matches_active_terms_in_one_language() {
+    // tx-ecosystem IG, requirements, SNOMED CT: the whole term, case-sensitive,
+    // active fully specified names and synonyms, one language.
+    let (_dir, p) = provider();
+    let regex = |pattern: &str| Filter {
+        property: String::from("display"),
+        op: FilterOperator::Regex,
+        value: pattern.to_owned(),
+    };
+    let codes = |set: fhir_terminology::provider::ConceptSet| set.iter().collect::<Vec<_>>();
+    assert_eq!(codes(p.filter(&regex("Cat")).expect("filters")), [CAT]);
+    assert_eq!(
+        codes(p.filter(&regex("cat")).expect("filters")),
+        Vec::<u32>::new()
+    );
+    assert_eq!(
+        codes(p.filter(&regex("Kat")).expect("filters")),
+        Vec::<u32>::new()
+    );
+    assert_eq!(
+        codes(p.filter(&regex("Moggy")).expect("filters")),
+        Vec::<u32>::new()
+    );
+    let dutch = p
+        .filter_in_language(&regex("Kat|Poes"), Some("nl"))
+        .expect("a language filter")
+        .expect("filters");
+    assert_eq!(codes(dutch), [CAT]);
+    let english = p
+        .filter_in_language(&regex("Kat"), Some("en"))
+        .expect("a language filter")
+        .expect("filters");
+    assert_eq!(codes(english), Vec::<u32>::new());
+}
+
+#[test]
 fn the_hierarchy_answers_subsumption_and_the_filters_from_the_closure() {
     let (_dir, p) = provider();
     let hierarchy = p.hierarchy().expect("snomed has a hierarchy");

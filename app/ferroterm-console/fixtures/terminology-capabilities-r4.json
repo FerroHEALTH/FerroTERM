@@ -635,6 +635,12 @@
               ]
             },
             {
+              "code": "display",
+              "op": [
+                "regex"
+              ]
+            },
+            {
               "code": "constraint",
               "op": [
                 "="
@@ -1066,7 +1072,7 @@
       ]
     }
   ],
-  "date": "2026-11-27T23:15:51.354595Z",
+  "date": "2026-11-28T03:38:24.032817Z",
   "expansion": {
     "hierarchical": false,
     "incomplete": false,

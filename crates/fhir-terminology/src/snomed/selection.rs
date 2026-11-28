@@ -24,6 +24,43 @@ pub(super) fn states_defined(status: &[record::PropertyValueRef<'_>]) -> bool {
 }
 
 impl SnomedProvider {
+    /// The concepts with an active fully specified name or synonym in one
+    /// language whose whole term matches `pattern`, case-sensitively: the
+    /// language `requested` names first that the edition has descriptions in,
+    /// else the edition's own (tx-ecosystem IG, requirements, SNOMED CT: "A
+    /// concept matches when at least one of its active descriptions in the
+    /// chosen language matches the pattern", and "Only one language is
+    /// searched").
+    pub(super) fn display_regex(
+        &self,
+        pattern: &str,
+        requested: Option<&str>,
+    ) -> Result<ConceptSet, ProviderError> {
+        let regex = crate::provider::filter::anchored(pattern)?;
+        let language = crate::language::answered(self, requested)
+            .unwrap_or_else(|| self.system().base_language.clone());
+        let wanted = crate::stored::primary_subtag(&language);
+        let keys = &self.system().keys;
+        let mut set = ConceptSet::new();
+        for index in 0..self.stored().concepts {
+            let mut matched = false;
+            self.stored()
+                .store
+                .scan_designations(Ordinal::new(index), |d| {
+                    matched = d.active
+                        && (d.use_ordinal == keys.fsn || d.use_ordinal == keys.synonym)
+                        && crate::stored::has_primary_subtag(d.language, &wanted)
+                        && regex.is_match(d.term);
+                    !matched
+                })
+                .map_err(storage)?;
+            if matched {
+                set.insert(index);
+            }
+        }
+        Ok(set)
+    }
+
     /// The inactive concepts, scanned once from the store and kept.
     pub(super) fn inactive_set(&self) -> Result<ConceptSet, ProviderError> {
         if let Some(set) = self.system().inactive.get() {

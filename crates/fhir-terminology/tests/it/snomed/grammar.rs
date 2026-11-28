@@ -71,7 +71,7 @@ fn ecl_arrives_as_the_constraint_filter_and_the_ecl_implicit_value_set() {
         .iter()
         .map(|f| f.code.as_str())
         .collect();
-    assert_eq!(codes, ["concept", "constraint", "expressions"]);
+    assert_eq!(codes, ["concept", "display", "constraint", "expressions"]);
 
     // The implicit value set carries the URI-encoded expression
     // (<https://hl7.org/fhir/R4B/snomedct.html>, "Implicit Value Sets").
