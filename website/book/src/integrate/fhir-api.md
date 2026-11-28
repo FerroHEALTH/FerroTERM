@@ -244,6 +244,26 @@ SCTID that does not parse, is a `400`.
 An unpublished edition, named under `http://snomed.info/xsct/` (the SNOMED CT
 URI Standard), takes implicit URIs on its own edition and version URIs too.
 
+### Edition maps
+
+An extension edition translates its concepts into an edition it depends on
+through `[edition]/version/[date]?fhir_cm=edition/[module]`, which a
+`$translate` naming `targetSystem=http://snomed.info/sct|http://snomed.info/sct/[module]`
+finds by itself. The tx-ecosystem IG requires the conversion and leaves its
+form open, so the rules are FerroTERM's own:
+
+- the target edition is the module and every module it depends on, by the
+  edition's Module Dependency reference set, whose row gives the target version;
+- a concept of the target translates to itself, and an inactive concept to
+  what its `SAME AS` or `REPLACED BY` association names;
+- a sufficiently defined concept translates to the target concept with the
+  same inferred definition, else to an expression: its proximal primitive
+  supertypes in the target, refined by its inferred attributes, all of them
+  target concepts;
+- a primitive concept translates to its nearest supertypes in the target as
+  `wider` (`source-is-narrower-than-target`), unless they are top-level
+  concepts, which say nothing useful.
+
 ### The LOINC Extension map (provisional)
 
 An edition that carries the SNOMED CT LOINC Extension answers
