@@ -22,6 +22,7 @@ resource, and their providers answer them:
 | LOINC | `http://loinc.org/vs/LL…` | the answers of the answer list |
 | LOINC | `http://loinc.org/vs/LP…` | everything under the part in the multiaxial hierarchy |
 | UCUM | `http://unitsofmeasure.org/vs` | every valid unit (validation only; it cannot be enumerated) |
+| UCUM | `http://unitsofmeasure.org/vs/[expression]` | every unit comparable to the expression; the expansion lists the essence's units, unclosed |
 | RxNorm | `http://www.nlm.nih.gov/research/umls/rxnorm/vs` | every RXCUI |
 | ICD-11 | `<entity URI>/postcoordinationScale/<axis>` | the values a stem takes on that axis |
 
