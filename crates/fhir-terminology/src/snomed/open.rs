@@ -25,6 +25,7 @@ use concept_graph::members::Memberships;
 use concept_graph::refsets::RefsetMembers;
 use concept_store::store::{Store, Vocabulary};
 use rf2::constants;
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::path::Path;
@@ -137,6 +138,7 @@ impl SnomedProvider {
                 attributes,
                 member_tables,
                 identifiers,
+                scheme_aliases: BTreeMap::new(),
                 roots: OnceLock::new(),
                 leaves: OnceLock::new(),
                 defined: OnceLock::new(),
@@ -225,6 +227,14 @@ impl SnomedProvider {
                     FilterOperator::In,
                 ],
                 value: String::from("an SCTID"),
+            },
+            FilterDefinition {
+                code: String::from("display"),
+                description: Some(String::from(
+                    "`regex`: an active fully specified name or synonym in the request's language matches",
+                )),
+                operators: vec![FilterOperator::Regex],
+                value: String::from("a regular expression over the whole term"),
             },
             FilterDefinition {
                 code: String::from("constraint"),

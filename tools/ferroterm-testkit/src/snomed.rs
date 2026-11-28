@@ -93,7 +93,7 @@ pub const CODES_MAP: u32 = 9;
 pub const HISTORICAL: u32 = 10;
 /// The SAME AS association reference set (a published SCTID); the fish is SAME AS the cat.
 pub const SAME_AS: u32 = 11;
-/// An identifier scheme whose alias is `ZOO`; the cat is `ZOO#cat-1`, the dog `ZOO#dog-1`.
+/// An identifier scheme named `ZOO`; the cat is `cat-1` in it, the dog `dog-1`.
 pub const SCHEME: u32 = 12;
 /// The REPLACED BY association reference set (a published SCTID); the fish is REPLACED BY the dog.
 pub const REPLACED_BY: u32 = 13;
@@ -116,6 +116,9 @@ pub const NL_LANGUAGE_REFSET: u32 = 20;
 /// The bird, under the animal and a member of the pets reference set; only the
 /// second edition ([`write_second`]) holds it.
 pub const BIRD: u32 = 21;
+/// The kitten, sufficiently defined under the sufficiently defined cat with
+/// the cat's attributes; only [`write_with_kitten`] holds it, after [`BIRD`].
+pub const KITTEN: u32 = 22;
 /// The published SCTID of `30051010000102 |LOINC code identifier|`, the scheme
 /// under which the cat carries [`CAT_LOINC`].
 pub const LOINC_SCHEME: u64 = 30_051_010_000_102;
@@ -276,14 +279,37 @@ struct Shape<'a> {
     edition: &'a str,
     version: &'a str,
     release_date: &'a str,
-    /// Whether the edition holds [`BIRD`].
-    bird: bool,
+    /// The concepts the edition holds beyond the base set.
+    extras: Extras,
     /// Whether the edition carries the concept model of [`mrcm`].
     mrcm: bool,
     /// Whether the dog and the bird are the edition's own concepts, on an
     /// edition that depends on [`MODULE_CONCEPT`] for the rest
     /// ([`write_with_extension`]).
     extension: bool,
+}
+
+/// The concepts an edition holds beyond the base set.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Extras {
+    /// None.
+    None,
+    /// [`BIRD`].
+    Bird,
+    /// [`BIRD`] and [`KITTEN`] ([`write_with_kitten`]).
+    Kitten,
+}
+
+impl Extras {
+    /// Whether the edition holds [`BIRD`].
+    fn bird(self) -> bool {
+        self != Self::None
+    }
+
+    /// Whether the edition holds [`KITTEN`].
+    fn kitten(self) -> bool {
+        self == Self::Kitten
+    }
 }
 
 /// The edition URI of the second synthetic edition ([`write_second`]).
@@ -311,7 +337,7 @@ pub fn write(dir: &Path) -> Result<(), FixtureError> {
             edition: EDITION,
             version: VERSION,
             release_date: DATE,
-            bird: false,
+            extras: Extras::None,
             mrcm: false,
             extension: false,
         },
@@ -332,8 +358,29 @@ pub fn write_with_concept_model(dir: &Path) -> Result<(), FixtureError> {
             edition: EDITION,
             version: VERSION,
             release_date: DATE,
-            bird: true,
+            extras: Extras::Bird,
             mrcm: true,
+            extension: false,
+        },
+    )
+}
+
+/// Writes the first edition with [`BIRD`] and [`KITTEN`] under `dir`, for the
+/// tests of a defined concept whose parent is defined too.
+///
+/// # Errors
+///
+/// Returns [`FixtureError`] when a writer fails; the fixture is fixed content,
+/// so a failure means the writers or the directory are at fault.
+pub fn write_with_kitten(dir: &Path) -> Result<(), FixtureError> {
+    write_shape(
+        dir,
+        &Shape {
+            edition: EDITION,
+            version: VERSION,
+            release_date: DATE,
+            extras: Extras::Kitten,
+            mrcm: false,
             extension: false,
         },
     )
@@ -361,7 +408,7 @@ pub fn write_with_extension(dir: &Path) -> Result<(), FixtureError> {
             edition: EDITION,
             version: VERSION,
             release_date: DATE,
-            bird: true,
+            extras: Extras::Bird,
             mrcm: false,
             extension: true,
         },
@@ -387,7 +434,7 @@ pub fn write_unpublished(dir: &Path) -> Result<(), FixtureError> {
             edition: UNPUBLISHED_EDITION,
             version: UNPUBLISHED_VERSION,
             release_date: DATE,
-            bird: false,
+            extras: Extras::None,
             mrcm: false,
             extension: false,
         },
@@ -418,7 +465,7 @@ pub fn write_later(dir: &Path) -> Result<(), FixtureError> {
             edition: EDITION,
             version: &later_version(),
             release_date: LATER_DATE,
-            bird: true,
+            extras: Extras::Bird,
             mrcm: false,
             extension: false,
         },
@@ -443,7 +490,7 @@ pub fn write_second(dir: &Path) -> Result<(), FixtureError> {
             edition: &second_edition(),
             version: &second_version(),
             release_date: SECOND_DATE,
-            bird: true,
+            extras: Extras::Bird,
             mrcm: false,
             extension: false,
         },

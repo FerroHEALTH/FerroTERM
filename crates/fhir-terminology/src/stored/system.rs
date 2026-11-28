@@ -267,6 +267,15 @@ pub trait StoredSystem: fmt::Debug + Send + Sync + Sized {
         None
     }
 
+    /// As [`CodeSystemProvider::filter_in_language`].
+    fn filter_in_language(
+        _provider: &StoredProvider<Self>,
+        _filter: &Filter,
+        _requested: Option<&str>,
+    ) -> Option<Result<ConceptSet, ProviderError>> {
+        None
+    }
+
     /// Whether `concept` passes `filter`, when the system decides it from the
     /// concept; `None` leaves it to [`crate::provider::filter::selected_by`].
     fn filter_matches(
@@ -319,6 +328,11 @@ impl<S> StoredProvider<S> {
     /// The system's own state.
     pub(crate) fn system(&self) -> &S {
         &self.system
+    }
+
+    /// The system's own state, to configure before the provider is shared.
+    pub(crate) fn system_mut(&mut self) -> &mut S {
+        &mut self.system
     }
 }
 
@@ -508,6 +522,14 @@ impl<S: StoredSystem> CodeSystemProvider for StoredProvider<S> {
 
     fn unclosed(&self, filters: &[Filter]) -> bool {
         S::unclosed(self, filters)
+    }
+
+    fn filter_in_language(
+        &self,
+        filter: &Filter,
+        requested: Option<&str>,
+    ) -> Option<Result<ConceptSet, ProviderError>> {
+        S::filter_in_language(self, filter, requested)
     }
 
     fn filter_matches(&self, concept: Concept, filter: &Filter) -> Result<bool, ProviderError> {

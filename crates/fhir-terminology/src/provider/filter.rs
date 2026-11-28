@@ -219,7 +219,7 @@ fn values(value: &str) -> impl Iterator<Item = &str> {
 
 // NOTE: `regex` matches the whole property value ("matches the regex specified",
 // <https://hl7.org/fhir/R4B/codesystem-filter-operator.html>), so the pattern is anchored.
-fn anchored(value: &str) -> Result<Regex, regex::Error> {
+pub(crate) fn anchored(value: &str) -> Result<Regex, regex::Error> {
     Regex::new(&format!("^(?:{value})$"))
 }
 

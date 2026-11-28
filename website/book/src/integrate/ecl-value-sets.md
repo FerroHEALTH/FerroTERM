@@ -68,6 +68,13 @@ each listed reference set, as the page defines `in` for SNOMED CT), plus the gen
 }
 ```
 
+A `display` filter with `regex` selects the concepts with an active fully
+specified name or synonym whose whole term matches the pattern,
+case-sensitively, in one language: the first language of `displayLanguage`
+the edition has descriptions in, else the edition's own, as the terminology
+ecosystem IG defines it. Text definitions and inactive descriptions do not
+count.
+
 ## ECL
 
 An expression constraint names a set of concepts, and the evaluator answers it
@@ -167,7 +174,11 @@ subsumption. No other close-to-user transformation runs.
 
 One boundary is deliberate. Subsumption is decided over the edition's inferred view without a description logic
 classifier: what the server answers `subsumes` or `subsumed-by` holds, and
-what it answers `not-subsumed` is what that view does not state. SNOMED
+what it answers `not-subsumed` is what that view does not state. A
+sufficiently defined concept is met by its definition over its proximal
+primitive supertypes, since a normal form references no fully defined
+concept, so `9551004 |Hepatic amyloidosis|` and
+`64572001:{116676008=68790008,363698007=10200004}` are equivalent. SNOMED
 International withdrew normal-form comparison as a subsumption test in the
 July 2019 International Edition and directs implementers to a classifier
 (<https://docs.snomed.org/snomed-international-documents/snomed-ct-glossary/n/normal-form>).

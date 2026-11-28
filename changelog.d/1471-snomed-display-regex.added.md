@@ -1,0 +1,1 @@
+- SNOMED CT value sets take the `display` `regex` filter the terminology ecosystem IG requires: a concept matches when an active fully specified name or synonym in one language matches the whole pattern, case-sensitively, the language being the first of `displayLanguage` the edition has descriptions in, else the edition's own.

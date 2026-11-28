@@ -31,10 +31,12 @@ use sct_scg::front::{
 };
 
 mod filter;
+mod junction;
 
 use self::filter::{
     concept_filter_constraint, description_filter_constraint, member_filter_constraint,
 };
+use self::junction::{Junction, joins, operand};
 
 /// A word, compared case-insensitively (every keyword of the grammar spells
 /// each letter as `(CAP_X | X)`).
@@ -750,12 +752,21 @@ fn sub_refinement(i: &mut Tokens<'_, Kind>) -> PResult<SubRefinement> {
 }
 
 /// `eclrefinement`.
+///
+/// "Where a conjunction and disjunction are both used together in a
+/// refinement, it is mandatory to use brackets" (ECL 6.4 Conjunction and
+/// Disjunction), so an unbracketed attribute set joined by one junction is
+/// never an operand of the other.
 fn refinement(i: &mut Tokens<'_, Kind>) -> PResult<Refinement> {
     let first = sub_refinement.parse_next(i)?;
-    if let Some(all) = joined(&first, conjunction, cut_err(sub_refinement), i)? {
+    if !joins(&first, Junction::Or)
+        && let Some(all) = joined(&first, conjunction, cut_err(operand(Junction::And)), i)?
+    {
         return Ok(Refinement::Conjunction(all));
     }
-    if let Some(all) = joined(&first, disjunction, cut_err(sub_refinement), i)? {
+    if !joins(&first, Junction::And)
+        && let Some(all) = joined(&first, disjunction, cut_err(operand(Junction::Or)), i)?
+    {
         return Ok(Refinement::Disjunction(all));
     }
     Ok(Refinement::Single(Box::new(first)))

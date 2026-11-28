@@ -330,6 +330,7 @@ fn the_declared_filters_are_the_page_ones_and_one_mapped_filter_per_scheme() {
         codes,
         [
             "concept",
+            "display",
             "constraint",
             "expressions",
             &mapped[0],
