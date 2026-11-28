@@ -1,5 +1,7 @@
 metadata/term-caps
 sct-ec/ec-sct-validate-local-unreferenced
+sct-ecl/snomed-expand-ecl-alt-identifier
+sct-ecl/snomed-expand-ecl-alt-identifier-quoted-operator
 sct-ecl/snomed-expand-ecl-alt-identifier-unknown
 sct-ecl/snomed-expand-ecl-ambiguous-or-in-refinement
 sct-ecl/snomed-expand-ecl-ambiguous-precedence
@@ -97,6 +99,7 @@ sct-ecl/snomed-expand-ecl-history-mod
 sct-ecl/snomed-expand-ecl-invalid-sctid
 sct-ecl/snomed-expand-ecl-member-filter-date-in
 sct-ecl/snomed-expand-ecl-member-filter-date-out
+sct-ecl/snomed-expand-ecl-member-filter-map-target
 sct-ecl/snomed-expand-ecl-member-filter-misplaced
 sct-ecl/snomed-expand-ecl-memberOf-any
 sct-ecl/snomed-expand-ecl-memberOf-descriptions
@@ -117,6 +120,8 @@ sct-ecl/snomed-expand-ecl-or
 sct-ecl/snomed-expand-ecl-or-chain
 sct-ecl/snomed-expand-ecl-parents
 sct-ecl/snomed-expand-ecl-parentsOrSelf
+sct-ecl/snomed-expand-ecl-refinement-ambiguous-and-or
+sct-ecl/snomed-expand-ecl-refinement-ambiguous-or-and
 sct-ecl/snomed-expand-ecl-refinement-and
 sct-ecl/snomed-expand-ecl-refinement-attribute-and-value-sets
 sct-ecl/snomed-expand-ecl-refinement-cardinality
