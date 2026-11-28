@@ -278,6 +278,7 @@ snomed/subsumes-expr-conjunction
 snomed/subsumes-expr-different-attributes
 snomed/subsumes-expr-extra-attribute
 snomed/subsumes-expr-grouped-ungrouped
+snomed/subsumes-expr-normal-form
 snomed/subsumes-expr-parent-vs-refined
 snomed/subsumes-expr-precoordinated-match
 snomed/subsumes-expr-primitive-focus
