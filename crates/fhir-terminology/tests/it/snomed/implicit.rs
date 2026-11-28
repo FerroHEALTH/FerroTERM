@@ -292,3 +292,25 @@ fn every_declared_implicit_value_set_form_resolves() {
         ],
     );
 }
+
+#[test]
+fn concept_in_selects_the_listed_concepts_and_the_members_of_a_listed_reference_set() {
+    // `in`: "the set of codes or concepts specified in the provided value"
+    // (R4B filter-operator); a reference set stands for its members.
+    let (_dir, p) = provider();
+    let selected = |value: String| {
+        p.filter(&Filter {
+            property: String::from("concept"),
+            op: FilterOperator::In,
+            value,
+        })
+    };
+    let fur = selected(format!("{},{}", sctid(item(FUR)), sctid(item(PETS)))).expect("filters");
+    let mut members: Vec<u32> = fur.iter().collect();
+    members.sort_unstable();
+    assert_eq!(members, [CAT, DOG, FUR]);
+    assert!(matches!(
+        selected(sctid(Item::raw(4242))),
+        Err(ProviderError::UnknownCode(_))
+    ));
+}
