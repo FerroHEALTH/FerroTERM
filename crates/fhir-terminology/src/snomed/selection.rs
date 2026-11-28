@@ -49,7 +49,7 @@ impl SnomedProvider {
             .system()
             .identifiers
             .concepts(id.value())
-            .map(|concept| concept.index())
+            .map(Ordinal::index)
             .collect();
         if crate::provider::filter::boolean(filter)? {
             Ok(held)
