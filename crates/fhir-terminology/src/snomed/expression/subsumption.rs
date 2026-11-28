@@ -15,12 +15,24 @@ use concept_graph::subsumption::Outcome;
 use roaring::RoaringBitmap;
 use std::collections::BTreeMap;
 
+/// Whether a side states a refinement of its own.
+fn refined(subject: &Subject) -> bool {
+    match subject {
+        Subject::Concept { .. } => false,
+        Subject::Expression(record) => {
+            !record.term.ungrouped.is_empty() || !record.term.groups.is_empty()
+        }
+    }
+}
+
 impl SnomedProvider {
     /// The subsumption between two codes when at least one is an expression.
     ///
     /// # Errors
     ///
-    /// Returns [`ProviderError`] when the substrate fails.
+    /// Returns [`ProviderError::CannotDetermine`] when neither side entails the
+    /// other and a side states a refinement, and [`ProviderError`] when the
+    /// substrate fails.
     pub(in crate::snomed) fn expression_subsumes(
         &self,
         a: Concept,
@@ -34,6 +46,14 @@ impl SnomedProvider {
             (true, true) => Outcome::Equivalent,
             (true, false) => Outcome::SubsumedBy,
             (false, true) => Outcome::Subsumes,
+            // NOTE: where a refinement leaves both tests unmet, "Finding no relationship is
+            // not the same as establishing that there is none" (tx-ecosystem IG, SNOMED CT);
+            // concepts and their conjunctions the inferred hierarchy decides.
+            (false, false) if refined(&a) || refined(&b) => {
+                return Err(ProviderError::CannotDetermine(String::from(
+                    "the structure of the expressions does not settle their relationship",
+                )));
+            }
             (false, false) => Outcome::NotSubsumed,
         })
     }

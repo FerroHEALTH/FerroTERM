@@ -119,8 +119,13 @@ fn outcome(
     let provider = &resolved.provider;
     let a = locate(provider, &source.code)?.concept;
     let b = locate(provider, &target.code)?.concept;
-    if let Some(found) = provider.subsumes(a, b)? {
-        return Ok(Some(found));
+    // NOTE: a relationship the system cannot determine is no entry of the table,
+    // which records only the relationships that hold: our own design.
+    match provider.subsumes(a, b) {
+        Ok(Some(found)) => return Ok(Some(found)),
+        Ok(None) => {}
+        Err(crate::provider::error::ProviderError::CannotDetermine(_)) => return Ok(None),
+        Err(error) => return Err(error.into()),
     }
     let hierarchy = provider.hierarchy().ok_or_else(|| {
         OperationError::NotSupported(format!(
