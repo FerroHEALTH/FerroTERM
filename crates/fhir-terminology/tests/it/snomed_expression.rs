@@ -30,7 +30,9 @@ use fhir_terminology::valueset;
 use fhir_terminology::valueset::store::ValueSetStore;
 
 use ferroterm_testkit::snomed;
-use ferroterm_testkit::snomed::{ANIMAL, CAT, COVERING, DOG, FISH, FUR, LEGS, TOP, VERSION, code};
+use ferroterm_testkit::snomed::{
+    ANIMAL, CAT, COVERING, DOG, FISH, FUR, KITTEN, LEGS, TOP, VERSION, code,
+};
 
 fn registry() -> (tempfile::TempDir, Registry) {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -303,6 +305,34 @@ fn a_grouped_attribute_is_more_specific_than_the_same_attribute_ungrouped() {
         Outcome::SubsumedBy
     );
     assert_eq!(outcome(&registry, &ungrouped, &grouped), Outcome::Subsumes);
+}
+
+#[test]
+fn a_defined_concept_under_a_defined_parent_is_its_definition_over_primitives() {
+    // A normal form references no fully defined concept (SNOMED CT Glossary,
+    // "normal form"), so the kitten's definition is over the primitive animal.
+    let dir = tempfile::tempdir().expect("tempdir");
+    snomed::write_with_kitten(dir.path()).expect("writes the fixture");
+    let provider = SnomedProvider::open(dir.path(), "en").expect("opens");
+    let mut registry = Registry::default();
+    registry.register(Arc::new(provider)).expect("registers");
+    let definition = format!(
+        "{} : {{ {} = {}, {} = #4 }}",
+        code(ANIMAL),
+        code(COVERING),
+        code(FUR),
+        code(LEGS)
+    );
+    assert_eq!(
+        outcome(&registry, &code(KITTEN), &definition),
+        Outcome::Equivalent
+    );
+    let wider = format!("{} : {} = {}", code(ANIMAL), code(COVERING), code(FUR));
+    assert_eq!(
+        outcome(&registry, &code(KITTEN), &wider),
+        Outcome::SubsumedBy,
+        "an animal with fur needs no legs"
+    );
 }
 
 #[test]

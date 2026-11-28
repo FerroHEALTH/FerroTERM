@@ -120,16 +120,36 @@ impl SnomedProvider {
         }
     }
 
-    /// The inferred definition of a concept as a term: its `is a` parents as
-    /// focus concepts and its other inferred rows as the refinement.
+    /// The definition of a sufficiently defined concept as a term: its
+    /// proximal primitive supertypes as focus concepts and its inferred rows as
+    /// the refinement.
+    ///
+    /// A normal form is "a SNOMED CT expression in which none of the
+    /// referenced concepts are fully defined"
+    /// (<https://docs.snomed.org/snomed-international-documents/snomed-ct-glossary/n/normal-form>),
+    /// so a defined `is a` parent gives way to the primitive supertypes it
+    /// stands for, which an expression refining one of them can meet.
     pub(super) fn definition_term(&self, ordinal: Ordinal) -> Result<Term, ProviderError> {
-        let focus = self.stored().tree.graph.is_a.neighbours(ordinal).to_vec();
+        let focus = self.proximal_primitives(ordinal)?;
         let (ungrouped, groups) = self.inferred_term(ordinal)?;
         Ok(Term {
             focus,
             ungrouped,
             groups,
         })
+    }
+
+    /// The proximal primitive supertypes of a concept: its primitive
+    /// supertypes that no other of them is a supertype of (the SNOMED CT SQL
+    /// Practical Guide, 4.7 Enabling Subtype Testing).
+    fn proximal_primitives(&self, ordinal: Ordinal) -> Result<Vec<u32>, ProviderError> {
+        let mut primitives = Vec::new();
+        for ancestor in self.stored().tree.graph.closure.ancestors(ordinal) {
+            if !self.is_defined(Ordinal::new(ancestor))? {
+                primitives.push(ancestor);
+            }
+        }
+        Ok(self.minimal_focus(&primitives))
     }
 
     /// What a term necessarily is: every supertype of its focus concepts, and

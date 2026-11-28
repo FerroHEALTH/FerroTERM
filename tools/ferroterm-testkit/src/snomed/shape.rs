@@ -6,7 +6,7 @@
 use super::{
     ALTERNATIVE, ALTERNATIVE_SCTID, ANIMAL, BIRD, CAT, CAT_LOINC, CODES_MAP, COVERING,
     DEPENDED_DATE, DOG, FISH, FUR, FixtureError, GB_LANGUAGE_REFSET, GB_REFSET, HISTORICAL,
-    HISTORICAL_SCTID, ICD10_MAP, ICD10_MAP_SCTID, Item, LEGS, LOINC_SCHEME, MODULE_CONCEPT,
+    HISTORICAL_SCTID, ICD10_MAP, ICD10_MAP_SCTID, Item, KITTEN, LEGS, LOINC_SCHEME, MODULE_CONCEPT,
     MODULE_DEPENDENCY, MODULE_DEPENDENCY_SCTID, NL_LANGUAGE_REFSET, NL_REFSET, PETS,
     POSSIBLY_EQUIVALENT_TO, POSSIBLY_EQUIVALENT_TO_SCTID, REPLACED_BY, REPLACED_BY_SCTID, Row,
     SAME_AS, SAME_AS_SCTID, SCHEME, Shape, TOP, code_of, item, sctid, write_concepts,
@@ -358,6 +358,19 @@ pub(super) fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureEr
         });
         is_a.push((BIRD, ANIMAL));
     }
+    if shape.kitten {
+        rows.push(Row {
+            ordinal: KITTEN,
+            code: None,
+            active: true,
+            defined: true,
+            designations: vec![
+                ("Kitten (synthetic)", "en", fsn, true, vec![(gb, preferred)]),
+                ("Kitten", "en", syn, true, vec![(gb, preferred)]),
+            ],
+        });
+        is_a.push((KITTEN, CAT));
+    }
     if shape.mrcm {
         rows.extend(super::mrcm::rows(|ordinal, code, name| {
             metadata_refset(ordinal, code, name)
@@ -407,7 +420,12 @@ pub(super) fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureEr
     write_concepts(&mut builder, &mut text, &rows, &is_a, &module_of)?;
     // The cat and the dog have covering fur and four legs; the cat states both
     // in one role group, the dog in two.
-    for animal in [CAT, DOG] {
+    let animals: &[u32] = if shape.kitten {
+        &[CAT, DOG, KITTEN]
+    } else {
+        &[CAT, DOG]
+    };
+    for &animal in animals {
         builder.properties(
             Ordinal::new(animal),
             attribute_key(COVERING),
@@ -459,7 +477,31 @@ pub(super) fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureEr
                 attributes::Value::Concept(Ordinal::new(FUR)),
             ),
             edge(DOG, 2, LEGS, attributes::Value::Number(String::from("4"))),
-        ],
+        ]
+        .into_iter()
+        .chain(
+            shape
+                .kitten
+                .then(|| {
+                    [
+                        edge(
+                            KITTEN,
+                            1,
+                            COVERING,
+                            attributes::Value::Concept(Ordinal::new(FUR)),
+                        ),
+                        edge(
+                            KITTEN,
+                            1,
+                            LEGS,
+                            attributes::Value::Number(String::from("4")),
+                        ),
+                    ]
+                })
+                .into_iter()
+                .flatten(),
+        )
+        .collect(),
     )
     .map_err(|e| FixtureError::Graph(e.to_string()))?;
     edition::write_graph_part(dir, "attributes.bin", |bytes| attributes.write_to(bytes))?;

@@ -116,6 +116,9 @@ pub const NL_LANGUAGE_REFSET: u32 = 20;
 /// The bird, under the animal and a member of the pets reference set; only the
 /// second edition ([`write_second`]) holds it.
 pub const BIRD: u32 = 21;
+/// The kitten, sufficiently defined under the sufficiently defined cat with
+/// the cat's attributes; only [`write_with_kitten`] holds it, after [`BIRD`].
+pub const KITTEN: u32 = 22;
 /// The published SCTID of `30051010000102 |LOINC code identifier|`, the scheme
 /// under which the cat carries [`CAT_LOINC`].
 pub const LOINC_SCHEME: u64 = 30_051_010_000_102;
@@ -284,6 +287,8 @@ struct Shape<'a> {
     /// edition that depends on [`MODULE_CONCEPT`] for the rest
     /// ([`write_with_extension`]).
     extension: bool,
+    /// Whether the edition holds [`KITTEN`] ([`write_with_kitten`]).
+    kitten: bool,
 }
 
 /// The edition URI of the second synthetic edition ([`write_second`]).
@@ -314,6 +319,7 @@ pub fn write(dir: &Path) -> Result<(), FixtureError> {
             bird: false,
             mrcm: false,
             extension: false,
+            kitten: false,
         },
     )
 }
@@ -335,6 +341,29 @@ pub fn write_with_concept_model(dir: &Path) -> Result<(), FixtureError> {
             bird: true,
             mrcm: true,
             extension: false,
+            kitten: false,
+        },
+    )
+}
+
+/// Writes the first edition with [`BIRD`] and [`KITTEN`] under `dir`, for the
+/// tests of a defined concept whose parent is defined too.
+///
+/// # Errors
+///
+/// Returns [`FixtureError`] when a writer fails; the fixture is fixed content,
+/// so a failure means the writers or the directory are at fault.
+pub fn write_with_kitten(dir: &Path) -> Result<(), FixtureError> {
+    write_shape(
+        dir,
+        &Shape {
+            edition: EDITION,
+            version: VERSION,
+            release_date: DATE,
+            bird: true,
+            mrcm: false,
+            extension: false,
+            kitten: true,
         },
     )
 }
@@ -364,6 +393,7 @@ pub fn write_with_extension(dir: &Path) -> Result<(), FixtureError> {
             bird: true,
             mrcm: false,
             extension: true,
+            kitten: false,
         },
     )
 }
@@ -390,6 +420,7 @@ pub fn write_unpublished(dir: &Path) -> Result<(), FixtureError> {
             bird: false,
             mrcm: false,
             extension: false,
+            kitten: false,
         },
     )
 }
@@ -421,6 +452,7 @@ pub fn write_later(dir: &Path) -> Result<(), FixtureError> {
             bird: true,
             mrcm: false,
             extension: false,
+            kitten: false,
         },
     )
 }
@@ -446,6 +478,7 @@ pub fn write_second(dir: &Path) -> Result<(), FixtureError> {
             bird: true,
             mrcm: false,
             extension: false,
+            kitten: false,
         },
     )
 }
