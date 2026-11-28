@@ -24,7 +24,7 @@ on:
       mode:
         description: The mode to run; all runs every row of ci-modes.tsv.
         type: choice
-        options: [all, snomed, mimetypes, omop, icf]
+        options: [all, snomed, mimetypes, omop, icf, icd-11]
         default: all
   pull_request:
     paths:
