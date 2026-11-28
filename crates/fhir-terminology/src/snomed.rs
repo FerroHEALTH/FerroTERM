@@ -16,6 +16,7 @@
 pub mod edition;
 mod implicit;
 mod open;
+mod properties;
 mod selection;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
@@ -104,16 +105,6 @@ pub const FHIR_PROPERTIES: [(&str, PropertyKind); 6] = [
     ("parent", PropertyKind::Code),
     ("child", PropertyKind::Code),
 ];
-
-/// `30051010000102 |LOINC code identifier|`, the identifier scheme of the
-/// LOINC codes the LOINC Extension states in the RF2 identifier file.
-const LOINC_SCHEME: u64 = 30_051_010_000_102;
-
-/// The property that carries a concept's LOINC code.
-const LOINC_PROPERTY: &str = "loinc";
-
-/// The code system of LOINC (<https://terminology.hl7.org/LOINC.html>).
-const LOINC_SYSTEM: &str = "http://loinc.org";
 
 /// A failure to open an artifact directory.
 #[derive(Debug, thiserror::Error)]
@@ -460,24 +451,8 @@ impl StoredSystem for Snomed {
         provider: &SnomedProvider,
         concept: Concept,
     ) -> Result<Vec<Property>, ProviderError> {
-        // NOTE: the FHIR-defined properties of "the given code or expression"
-        // that an expression itself states (<https://hl7.org/fhir/R4B/snomedct.html>,
-        // "SNOMED CT Properties"): its status and its own refinement.
         if let Some(record) = provider.registered(concept)? {
-            let mut out = vec![
-                Property {
-                    code: String::from("inactive"),
-                    value: PropertyValue::Boolean(!provider.expression_is_active(&record)?),
-                    ..Property::default()
-                },
-                Property {
-                    code: String::from("sufficientlyDefined"),
-                    value: PropertyValue::Boolean(record.sufficiently_defined()),
-                    ..Property::default()
-                },
-            ];
-            out.extend(SnomedProvider::expression_attributes(&record));
-            return Ok(out);
+            return properties::of_expression(provider, &record);
         }
         let ordinal = SnomedProvider::ordinal(concept);
         let Some(record) = provider.stored().store.concept(ordinal).map_err(storage)? else {
@@ -526,29 +501,18 @@ impl StoredSystem for Snomed {
                 let Some(value) = provider.stored().property_value(*value)? else {
                     continue;
                 };
-                out.push(Property {
-                    code: sctid.clone(),
-                    value,
-                    ..Property::default()
-                });
-            }
-        }
-        // NOTE: the `loinc` property, a Coding of the code the RF2 identifier file
-        // gives in scheme 30051010000102, is the tx-ecosystem IG's `tx-source` readme
-        // (LOINC Extension content), its only source, pending SNOMED review.
-        for (scheme, code) in provider.system().identifiers.of_concept(ordinal) {
-            if scheme == LOINC_SCHEME {
-                out.push(Property {
-                    code: LOINC_PROPERTY.to_owned(),
-                    value: PropertyValue::Coding {
-                        system: LOINC_SYSTEM.to_owned(),
-                        code: code.to_owned(),
-                        display: None,
+                properties::push_once(
+                    &mut out,
+                    Property {
+                        code: sctid.clone(),
+                        value,
+                        ..Property::default()
                     },
-                    ..Property::default()
-                });
+                );
             }
         }
+        properties::push_loinc(provider, ordinal, &mut out);
+        properties::describe(provider, &mut out)?;
         Ok(out)
     }
 

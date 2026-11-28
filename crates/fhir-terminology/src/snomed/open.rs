@@ -5,9 +5,10 @@
 //! reads, the vocabulary keys, and the base language.
 
 use super::implicit::implicit_forms;
+use super::properties::{LOINC_PROPERTY, LOINC_SCHEME};
 use super::{
-    EXPRESSIONS, FHIR_PROPERTIES, GENERATED_PROPERTIES, Keys, LOINC_PROPERTY, LOINC_SCHEME,
-    Manifest, OpenError, SYSTEM, Snomed, SnomedProvider,
+    EXPRESSIONS, FHIR_PROPERTIES, GENERATED_PROPERTIES, Keys, Manifest, OpenError, SYSTEM, Snomed,
+    SnomedProvider,
 };
 use crate::provider::Identity;
 use crate::provider::declaration::{
