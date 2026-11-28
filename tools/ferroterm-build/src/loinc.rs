@@ -54,6 +54,8 @@ pub const ANSWER_LIST_KEY: &str = "answer-list";
 pub const ANSWERS_KEY: &str = "answers";
 /// The kind of code: `term`, `part`, `answer-list`, or `answer`.
 pub const KIND_KEY: &str = "kind";
+/// A part's `PartTypeName` (`COMPONENT`, `CLASS`, …).
+pub const PART_TYPE_KEY: &str = "part-type";
 
 /// What the build wrote.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -311,7 +313,16 @@ fn resolve_version(version: Option<&str>, terms: &term::Terms) -> Result<String,
 /// axis the release names.
 fn property_key_names(terms: &term::Terms, linked: &Linked<'_>) -> Vec<String> {
     let mut names: Vec<String> = terms.columns.clone();
-    names.extend([COPYRIGHT_KEY, ANSWER_LIST_KEY, ANSWERS_KEY, KIND_KEY].map(str::to_owned));
+    names.extend(
+        [
+            COPYRIGHT_KEY,
+            ANSWER_LIST_KEY,
+            ANSWERS_KEY,
+            KIND_KEY,
+            PART_TYPE_KEY,
+        ]
+        .map(str::to_owned),
+    );
     // The linked axes: the six of `Loinc.csv` under their column names, every
     // other link type under its own name.
     for axis in linked.values().flat_map(BTreeMap::keys) {
@@ -497,6 +508,11 @@ fn write_parts(
             ordinal,
             keys.key("STATUS")?,
             &[PropertyValue::String(part.status.clone())],
+        )?;
+        builder.properties(
+            ordinal,
+            keys.key(PART_TYPE_KEY)?,
+            &[PropertyValue::Code(part.type_name.clone())],
         )?;
         builder.properties(
             ordinal,

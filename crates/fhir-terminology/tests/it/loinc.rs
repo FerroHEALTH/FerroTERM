@@ -5,8 +5,8 @@
 //! (<https://hl7.org/fhir/R4B/loinc.html>).
 
 use ferroterm_testkit::loinc::{
-    ANSWER_LIST, CHEMISTRY_PART, GLUCOSE, GLUCOSE_PART, NO, OLD_GLUCOSE, SODIUM, SURVEY, VERSION,
-    YES, code, write_artifact,
+    ANSWER_LIST, CHEM_CLASS, CHEMISTRY_PART, GLUCOSE, GLUCOSE_PART, NO, OLD_GLUCOSE, SODIUM,
+    SURVEY, VERSION, YES, code, write_artifact,
 };
 use fhir_terminology::loinc::{LoincProvider, OpenError, SYSTEM};
 use fhir_terminology::provider::filter::{Filter, FilterOperator};
@@ -191,7 +191,11 @@ fn filters_follow_the_fhir_page() {
     let regex = provider
         .filter(&filter("COMPONENT", FilterOperator::Regex, "^Gluc"))
         .expect("filters");
-    assert_eq!(regex.len(), 2);
+    assert_eq!(
+        regex.len(),
+        3,
+        "the two glucose terms and the survey term, by their part names"
+    );
     let third_party = provider
         .filter(&filter("copyright", FilterOperator::Equal, "3rdParty"))
         .expect("filters");
@@ -226,8 +230,8 @@ fn filters_follow_the_fhir_page() {
     ));
     assert_eq!(
         provider.all().expect("all").len(),
-        11,
-        "4 terms, 3 parts, 1 list, 2 answers"
+        13,
+        "4 terms, 5 parts, the class part only the hierarchy names, 1 list, 2 answers"
     );
     let hits = provider.search("bloed", Some("nl")).expect("searches");
     assert_eq!(hits.len(), 1);
@@ -306,7 +310,11 @@ fn axis_filters_reach_the_linked_parts_and_class_parts_carry_their_terms() {
     let by_name = provider
         .filter(&filter("COMPONENT", FilterOperator::Equal, "Glucose"))
         .expect("filters");
-    assert_eq!(codes(&provider, by_name), glucoses, "the part name");
+    assert_eq!(
+        codes(&provider, by_name),
+        glucoses,
+        "the part name, never another part's display name"
+    );
     let by_text = provider
         .filter(&filter("COMPONENT", FilterOperator::Equal, "Sodium"))
         .expect("filters");
@@ -343,6 +351,57 @@ fn axis_filters_reach_the_linked_parts_and_class_parts_carry_their_terms() {
         codes(&provider, under_class),
         expected,
         "the term hangs under the class part"
+    );
+}
+
+/// The tx ecosystem IG, LOINC: "Servers SHALL also accept the Part code for
+/// the class as the value of a `CLASS` filter"
+/// (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
+#[test]
+fn a_class_filter_takes_the_class_part_code() {
+    let (_dir, provider) = provider();
+    let mut chemistry = vec![code(GLUCOSE), code(OLD_GLUCOSE), code(SODIUM)];
+    chemistry.sort();
+    let by_part = provider
+        .filter(&filter("CLASS", FilterOperator::Equal, &code(CHEM_CLASS)))
+        .expect("filters");
+    assert_eq!(codes(&provider, by_part), chemistry);
+    let listed = provider
+        .filter(&filter(
+            "CLASS",
+            FilterOperator::In,
+            &format!("{},PANEL.CHEM", code(CHEM_CLASS).to_ascii_lowercase()),
+        ))
+        .expect("filters");
+    chemistry.push(code(SURVEY));
+    chemistry.sort();
+    assert_eq!(
+        codes(&provider, listed),
+        chemistry,
+        "a part code and a name"
+    );
+    let not_a_class = provider
+        .filter(&filter("CLASS", FilterOperator::Equal, &code(GLUCOSE_PART)))
+        .expect("filters");
+    assert!(not_a_class.is_empty(), "a component part names no class");
+    let class = provider
+        .locate(&code(CHEM_CLASS))
+        .expect("reads")
+        .expect("the class part");
+    assert!(
+        provider
+            .properties(class.concept)
+            .expect("reads")
+            .iter()
+            .all(|p| p.code != "part-type"),
+        "the part type is the provider's own, never a listed property"
+    );
+    assert!(
+        provider
+            .declaration()
+            .filters
+            .iter()
+            .all(|f| f.code != "part-type")
     );
 }
 
