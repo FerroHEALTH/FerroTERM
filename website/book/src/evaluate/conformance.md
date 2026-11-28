@@ -81,8 +81,9 @@ the content from its public source, checks it against a pinned sha256, and
 deletes it when the run ends; none of it is committed, cached or uploaded.
 `snomed` runs this way, over the suite's own SNOMED CT test edition, with
 `mimetypes`, which needs no content beyond the IANA media types registry the
-server ships, and `omop`, which fetches nothing because the server loads no
-OMOP vocabulary.
+server ships, `omop`, which fetches nothing because the server loads no
+OMOP vocabulary, and `icf`, over the ICF releases of the `fhir.tx.support`
+package.
 
 The modes CI does not run yet are measured by hand before a release. Their
 counts, the day of each run and the reason are in
@@ -93,7 +94,6 @@ it:
 | mode | surface | ran | measured | why by hand |
 |---|---|---|---|---|
 | `icd-11` | `/r4b` | 145 | 2026-11-27 | needs the WHO ICD-API container; its CI lane is not built yet (#1437) |
-| `icf` | `/r4b` | 96 | 2026-11-27 | needs the ICF releases of fhir.tx.support; its CI lane is not built yet (#1437) |
 | `loinc` | `/r4b` | 110 | 2026-11-27 | needs a LOINC release; its CI lane is not built yet (#1437) |
 | `loinc` | `/r5` | 110 | 2026-11-27 | needs a LOINC release; its CI lane is not built yet (#1437) |
 | `tx.fhir.org` | `/r4b` | 189 | 2026-11-27 | needs a LOINC release; its CI lane is not built yet (#1437) |
