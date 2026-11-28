@@ -119,7 +119,7 @@ impl SnomedProvider {
             properties,
             // NOTE: the FHIR SNOMED CT page defines `concept is-a` and `concept in`
             // (<https://hl7.org/fhir/R4B/snomedct.html>, "Filter Properties").
-            filters: Self::filter_definitions(),
+            filters: Self::filter_definitions(&identifiers),
             capabilities: BTreeSet::from([
                 Capability::Subsumption,
                 Capability::Enumeration,
@@ -212,8 +212,8 @@ impl SnomedProvider {
 
     /// The filters of the FHIR SNOMED CT page
     /// (<https://hl7.org/fhir/R4B/snomedct.html>, "Filter Properties").
-    pub(super) fn filter_definitions() -> Vec<FilterDefinition> {
-        vec![
+    pub(super) fn filter_definitions(identifiers: &Identifiers) -> Vec<FilterDefinition> {
+        let mut filters = vec![
             FilterDefinition {
                 code: String::from("concept"),
                 description: Some(String::from(
@@ -242,7 +242,21 @@ impl SnomedProvider {
                 operators: vec![FilterOperator::Equal],
                 value: String::from("true or false"),
             },
-        ]
+        ];
+        filters.extend(
+            identifiers
+                .schemes()
+                .into_iter()
+                .map(|scheme| FilterDefinition {
+                    code: format!("{}{scheme}", super::selection::MAPPED),
+                    description: Some(String::from(
+                        "whether the concept has an identifier in the scheme",
+                    )),
+                    operators: vec![FilterOperator::Exists],
+                    value: String::from("true or false"),
+                }),
+        );
+        filters
     }
 
     /// The files the ECL evaluator reads, when the artifact has them.

@@ -254,9 +254,11 @@ An edition that carries the SNOMED CT LOINC Extension answers
 `[edition]/version/[date]?fhir_cm=11010000107` both ways: from a concept to the
 LOINC code its RF2 identifier row gives it, and from a LOINC code back to the
 concept, each `equivalent`. `$lookup` returns the same code as the `loinc`
-property. The tx-ecosystem IG's test edition notes are the only source of
-these, pending review by SNOMED International, so their shape is FerroTERM's
-own and may change.
+property, and `$expand` takes the filter `mapped:30051010000102` `exists`
+`true` or `false` (one `mapped:[scheme]` filter per identifier scheme the
+edition carries). The tx-ecosystem IG's test edition notes are the only source
+of these, pending review by SNOMED International, so their shape is
+FerroTERM's own and may change.
 
 A `$translate` that names no map finds the implicit maps of the loaded code
 systems between the source system and `targetSystem`, which may carry
