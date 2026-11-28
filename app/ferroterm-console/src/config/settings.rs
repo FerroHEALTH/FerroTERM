@@ -168,11 +168,7 @@ impl Config {
             .as_ref()
             .map(|oidc| oidc.check_with_tls(&ServerTls).map_err(refused))
             .transpose()?;
-        let store = match &provider {
-            Some(provider) => self.session.check(provider),
-            None => self.session.check_with(false),
-        }
-        .map_err(refused)?;
+        let store = self.session.check().map_err(refused)?;
         // NOTE: `ferrohealth_session::config::OidcSection::check_with_tls` parsed the
         // redirect URI, so a URL that does not parse here names no origin.
         let redirect = self

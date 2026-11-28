@@ -25,10 +25,20 @@ cd "$(dirname "$0")/../.."
 SUITE_REPO=https://github.com/HL7/fhir-tx-ecosystem-ig
 SUITE_COMMIT=9c2bbce57366319d6a5265cbfbf6697f094822e3
 SNOMED_SHA256=b70fb3a4f7e565b34c832670171133d3d69a8844eb35deb29d6e60d0f0bd29b5
+# The ICF releases 2001a and 2017a, as the CodeSystem resources of the
+# fhir.tx.support package (CC0-1.0, publisher WHO) on the FHIR package registry.
+ICF_PACKAGE=https://packages-cdn.fhir.org/web/fhir.tx.support-1.0.5.tgz
+ICF_SHA256=1de150b9c1d277280309f94ae7bea9e1b57c20685c898c00e10e2938cac46a1a
+# WHO's local deployment of the ICD-API, image 2.6.0 by digest, serving
+# release 2026-01 in English under WHO's ICD-11 Terms of Use and License
+# Agreement (section 2.3). The digest of the walked cache pins the content.
+ICD_API_IMAGE=whoicd/icd-api@sha256:1b77eb6dc43e0c65a12e9e9340ad178493c93488e728d0d936507cc57ada1b7c
+ICD11_RELEASE=2026-01
+ICD11_SHA256=59632f6e71c3c4d7138bd07600c9a18a142dd3492f51d24217d7cbb6a1f47edf
 
 # The lines a run may print. None can carry a term: a case name is the suite's
 # identifier, and the scripts' messages name counts, paths and system URIs.
-ALLOWED='^(tx-ecosystem: |tx-ecosystem-mode: |served-artifacts: |fetching (validator_cli\.jar [0-9.]+|the suite at [0-9a-f]{40})$|newly passing \(add them to [A-Za-z0-9._/-]+\):$|REGRESSION: on the pass list but failing now:$|  [+-] [A-Za-z0-9._/-]+$|[a-z]+://[^ ]+: [0-9]+ concepts, [0-9]+ designations, [0-9]+ is-a edges, [0-9]+ words, written to [^ ]+$)'
+ALLOWED='^(tx-ecosystem: |tx-ecosystem-mode: |served-artifacts: |fetching (validator_cli\.jar [0-9.]+|the suite at [0-9a-f]{40})$|newly passing \(add them to [A-Za-z0-9._/-]+\):$|REGRESSION: on the pass list but failing now:$|  [+-] [A-Za-z0-9._/-]+$|[a-z]+://[^ ]+: [0-9]+ concepts, [0-9]+ designations, [0-9]+ is-a edges, [0-9]+ words, written to [^ ]+$|[a-z]+://[^ ]+ [0-9-]+: [0-9]+ concepts, [0-9]+ designations, [0-9]+ postcoordination scales, [0-9]+ words, written to [^ ]+$)'
 
 # Prints the lines of FILE the allow-list admits, and fails naming how many it
 # withheld.
@@ -81,7 +91,9 @@ if [[ "$(grep -c "^SUITE_COMMIT=$SUITE_COMMIT\$" scripts/checks/tx-ecosystem.sh)
 fi
 
 scratch="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/tx-ecosystem-mode.XXXXXX")"
-trap 'rm -rf "$scratch"' EXIT
+# A container a recipe starts is removed with its volumes.
+container=""
+trap '[[ -z "$container" ]] || docker rm -f -v "$container" > /dev/null 2>&1 || true; rm -rf "$scratch"' EXIT
 
 # The sha256 of a directory: the sorted listing of its files' digests, hashed.
 tree_digest() {
@@ -118,6 +130,54 @@ case "$mode" in
     ;;
   omop)
     # The server loads no OMOP vocabulary, so the run measures what it serves.
+    ;;
+  icf)
+    curl --proto '=https' --tlsv1.2 -sSfL -o "$scratch/package.tgz" "$ICF_PACKAGE"
+    digest="$(shasum -a 256 "$scratch/package.tgz" | cut -d' ' -f1)"
+    if [[ "$digest" != "$ICF_SHA256" ]]; then
+      echo "tx-ecosystem-mode: the fhir.tx.support package hashes to $digest, not $ICF_SHA256" >&2
+      exit 1
+    fi
+    mkdir -p "$scratch/code-systems"
+    tar -xzf "$scratch/package.tgz" -C "$scratch/code-systems" --strip-components 1 \
+      package/CodeSystem-icf-2001a.json package/CodeSystem-icf-2017a.json
+    rm "$scratch/package.tgz"
+    export FERROTERM__TERMINOLOGY__CODE_SYSTEMS="$scratch/code-systems"
+    ;;
+  icd-11)
+    # The deployment downloads the release on first start; no request leaves
+    # the runner afterwards, and analytics stay off.
+    container="tx-ecosystem-icd-api-$$"
+    docker run -d --name "$container" -p 127.0.0.1:8382:80 -e acceptLicense=true \
+      -e saveAnalytics=false -e include="${ICD11_RELEASE}_en" "$ICD_API_IMAGE" > /dev/null
+    api=http://127.0.0.1:8382
+    ready=""
+    for _ in $(seq 1 360); do
+      if curl -sf -H 'API-Version: v2' -H 'Accept-Language: en' "$api/icd/release/11/$ICD11_RELEASE/mms" > /dev/null 2>&1; then
+        ready=1
+        break
+      fi
+      sleep 5
+    done
+    [[ -n "$ready" ]] || { echo "tx-ecosystem-mode: the ICD-API deployment did not answer within 30 minutes" >&2; exit 1; }
+    echo "tx-ecosystem-mode: the ICD-API deployment answered after $SECONDS s"
+    walk_start=$SECONDS
+    index="$scratch/index/icd11"
+    status=0
+    target/release/ferroterm-build --icd11 "$scratch/cache" --icd11-api "$api" --icd11-release "$ICD11_RELEASE" \
+      --icd11-languages en --out "$index" > "$scratch/build.log" 2>&1 || status=$?
+    print_allowed "$scratch/build.log" || status=1
+    [[ "$status" == 0 ]] || { echo "tx-ecosystem-mode: the walk and build of ICD-11 failed" >&2; exit 1; }
+    echo "tx-ecosystem-mode: walked and built ICD-11 in $((SECONDS - walk_start)) s"
+    docker rm -f -v "$container" > /dev/null
+    container=""
+    digest="$(tree_digest "$scratch/cache")"
+    if [[ "$digest" != "$ICD11_SHA256" ]]; then
+      echo "tx-ecosystem-mode: the walked ICD-11 cache hashes to $digest, not $ICD11_SHA256" >&2
+      exit 1
+    fi
+    rm -rf "$scratch/cache"
+    index="$index/mms,$index/icf,$index/entity"
     ;;
   *)
     echo "tx-ecosystem-mode: no content recipe for $mode" >&2
