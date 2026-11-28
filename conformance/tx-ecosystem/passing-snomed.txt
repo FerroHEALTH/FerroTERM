@@ -1,4 +1,11 @@
 metadata/term-caps
+sct-ec/ec-sct-expand
+sct-ec/ec-sct-expand-referenced
+sct-ec/ec-sct-validate-global
+sct-ec/ec-sct-validate-global-display
+sct-ec/ec-sct-validate-global-generated-display
+sct-ec/ec-sct-validate-global-wrong-display
+sct-ec/ec-sct-validate-global-wrong-display-lenient
 sct-ec/ec-sct-validate-local-unreferenced
 sct-ecl/snomed-expand-ecl-alt-identifier-unknown
 sct-ecl/snomed-expand-ecl-ambiguous-or-in-refinement
