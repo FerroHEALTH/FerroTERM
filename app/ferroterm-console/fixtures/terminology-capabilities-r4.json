@@ -677,6 +677,7 @@
             "effectiveTime",
             "parent",
             "child",
+            "semanticTag",
             "normalForm",
             "normalFormTerse",
             "71234567106",
@@ -1084,7 +1085,7 @@
       ]
     }
   ],
-  "date": "2026-11-28T05:58:28.377395Z",
+  "date": "2026-11-28T09:26:24.368027Z",
   "expansion": {
     "hierarchical": false,
     "incomplete": false,

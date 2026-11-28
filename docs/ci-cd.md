@@ -228,7 +228,9 @@ commit. The jobs that read a pull-request payload (`changelog-guard`,
 `dependency-review`) skip on a merge group: each pull request passed them on
 its own before it joined the queue, and `conclusion` counts a skip as a pass.
 `crate-version-guard` runs in the merge group too, against the queue base, so
-a crate line the entries ahead already reached fails before it merges.
+a crate line at or below its crates.io release, or below the queue base,
+fails before it merges; the line steps once per publish, so entries ahead
+that share an unpublished version do not fail the ones behind them.
 `cargo-semver-checks` judges the public APIs on the pull request (#1208).
 
 The merge-group run is light (owner, 2026-11-25): the pull request already

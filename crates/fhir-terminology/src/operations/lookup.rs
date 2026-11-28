@@ -91,7 +91,7 @@ pub struct LookupInput {
 /// The outcome of `$lookup`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LookupOutcome {
-    /// The code as the system spells it (`code`, the ecosystem's output).
+    /// The code as the request sent it (`code`, the ecosystem's output).
     pub code: String,
     /// The code system URI (`system`, the ecosystem's output).
     pub system: String,
@@ -155,6 +155,11 @@ impl<'a> Asked<'a> {
     /// return" admits.
     fn named(&self, code: &str) -> bool {
         self.names.contains(&code) || self.names.contains(&EVERY_PROPERTY)
+    }
+
+    /// Whether the request named the property by its own name.
+    fn by_name(&self, code: &str) -> bool {
+        self.names.contains(&code)
     }
 
     // NOTE: the R4B `property` parameter lists `designation` and `lang.X` among
@@ -274,10 +279,9 @@ pub fn lookup(
         });
     }
     Ok(LookupOutcome {
-        // NOTE: no FHIR/SNOMED spec governs this: our own design. The code as
-        // the system spells it, which for an expression is its canonical form
-        // and for every other system is the code as given.
-        code: located.code.clone(),
+        // NOTE: every tx-ecosystem `$lookup` case at 9c2bbce echoes the code as sent, as
+        // `$validate-code` does (#1418); a system's normal form is its `code` property.
+        code: code.to_owned(),
         system: identity.url.clone(),
         abstract_concept,
         name: identity
@@ -379,14 +383,23 @@ fn properties(
             ..Property::default()
         });
     }
+    let requested = provider.requested_properties();
     for property in provider.properties(concept)? {
-        if NAMED_ELSEWHERE.contains(&property.code.as_str()) || !asked.property(&property.code) {
+        let code = property.code.as_str();
+        let wanted = if requested.contains(&code) {
+            asked.named(code)
+        } else {
+            asked.property(code)
+        };
+        if NAMED_ELSEWHERE.contains(&code) || !wanted {
             continue;
         }
         properties.push(property);
     }
+    // NOTE: the tx-ecosystem IG (requirements, SNOMED CT) returns the normal forms
+    // "only when they are asked for by name": not by default, and not for `*`.
     for name in provider.generated_properties() {
-        if !asked.named(name) {
+        if !asked.by_name(name) {
             continue;
         }
         if let Some(property) = provider.generated_property(concept, name)? {

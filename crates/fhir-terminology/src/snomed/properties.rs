@@ -4,9 +4,10 @@
 //! What the `$lookup` properties of a concept say beside their values.
 
 use concept_graph::ordinal::Ordinal;
+use concept_store::record;
 
 use super::SnomedProvider;
-use crate::provider::{Property, PropertyValue, error::ProviderError};
+use crate::provider::{Concept, Property, PropertyValue, error::ProviderError};
 use crate::stored::storage;
 
 /// `30051010000102 |LOINC code identifier|`, the identifier scheme of the
@@ -41,6 +42,81 @@ pub(super) fn push_loinc(provider: &SnomedProvider, concept: Ordinal, out: &mut 
     }
 }
 
+/// The properties of a precoordinated concept: the FHIR-defined ones, its
+/// defining relationships and its LOINC codes, each concept value described.
+pub(super) fn of_concept(
+    provider: &SnomedProvider,
+    concept: Concept,
+) -> Result<Vec<Property>, ProviderError> {
+    let ordinal = SnomedProvider::ordinal(concept);
+    let Some(record) = provider.stored().store.concept(ordinal).map_err(storage)? else {
+        return Ok(Vec::new());
+    };
+    let stored = provider
+        .stored()
+        .store
+        .properties(ordinal)
+        .map_err(storage)?;
+    let of = |key: u32| stored.iter().find(|(k, _)| *k == key).map(|(_, v)| v);
+    let mut out = vec![Property {
+        code: String::from("inactive"),
+        value: Some(PropertyValue::Boolean(!record.active)),
+        ..Property::default()
+    }];
+    let defined = of(provider.system().keys.definition_status)
+        .is_some_and(|values| super::selection::states_defined(values));
+    out.push(Property {
+        code: String::from("sufficientlyDefined"),
+        value: Some(PropertyValue::Boolean(defined)),
+        ..Property::default()
+    });
+    if let Some(values) = of(provider.system().keys.module)
+        && let Some(record::PropertyValueRef::Code(module)) = values.first()
+    {
+        out.push(Property {
+            code: String::from("moduleId"),
+            value: Some(PropertyValue::Code((*module).to_owned())),
+            ..Property::default()
+        });
+    }
+    if let Some(time) = record.effective_time {
+        out.push(Property {
+            code: String::from("effectiveTime"),
+            value: Some(PropertyValue::DateTime(date_of(&time))),
+            ..Property::default()
+        });
+    }
+    if let Some(tag) = provider.semantic_tag(ordinal)? {
+        out.push(Property {
+            code: String::from(super::SEMANTIC_TAG),
+            value: Some(PropertyValue::Code(tag)),
+            ..Property::default()
+        });
+    }
+    provider.stored().relatives(concept, &mut out)?;
+    for (key, sctid) in &provider.system().keys.attributes {
+        let Some(values) = of(*key) else {
+            continue;
+        };
+        for value in values {
+            let Some(value) = provider.stored().property_value(*value)? else {
+                continue;
+            };
+            push_once(
+                &mut out,
+                Property {
+                    code: sctid.clone(),
+                    value: Some(value),
+                    ..Property::default()
+                },
+            );
+        }
+    }
+    push_loinc(provider, ordinal, &mut out);
+    describe(provider, &mut out)?;
+    Ok(out)
+}
+
 /// The FHIR-defined properties of "the given code or expression" that an
 /// expression itself states (<https://hl7.org/fhir/R4B/snomedct.html>, "SNOMED
 /// CT Properties"): its status and its own refinement.
@@ -64,6 +140,51 @@ pub(super) fn of_expression(
     ];
     out.extend(SnomedProvider::expression_attributes(record));
     Ok(out)
+}
+
+/// An RF2 `effectiveTime` (`YYYYMMDD`) as the FHIR `date` the `effectiveTime`
+/// property's `dateTime` takes (<https://terminology.hl7.org/SNOMEDCT.html>);
+/// a value of another shape is passed on as it is.
+pub(super) fn date_of(time: &str) -> String {
+    match (time.get(0..4), time.get(4..6), time.get(6..8), time.len()) {
+        (Some(year), Some(month), Some(day), 8) if time.bytes().all(|b| b.is_ascii_digit()) => {
+            format!("{year}-{month}-{day}")
+        }
+        _ => time.to_owned(),
+    }
+}
+
+impl SnomedProvider {
+    /// The semantic tag of a concept: the text in the last brackets of its
+    /// active fully specified name in the edition's own language.
+    pub(super) fn semantic_tag(&self, concept: Ordinal) -> Result<Option<String>, ProviderError> {
+        let keys = &self.system().keys;
+        let wanted = crate::stored::primary_subtag(&self.system().base_language);
+        let mut tag = None;
+        self.stored()
+            .store
+            .scan_designations(concept, |d| {
+                if d.active
+                    && d.use_ordinal == keys.fsn
+                    && crate::stored::has_primary_subtag(d.language, &wanted)
+                {
+                    tag = tag_of(d.term);
+                }
+                tag.is_none()
+            })
+            .map_err(storage)?;
+        Ok(tag)
+    }
+}
+
+/// The phrase inside the last brackets that close a fully specified name.
+fn tag_of(term: &str) -> Option<String> {
+    let inner = term.trim_end().strip_suffix(')')?;
+    let open = inner.rfind('(')?;
+    inner
+        .get(open.saturating_add(1)..)
+        .filter(|tag| !tag.is_empty())
+        .map(str::to_owned)
 }
 
 /// Adds `property` unless `out` holds the same code and value.
@@ -102,7 +223,23 @@ pub(super) fn describe(
 
 #[cfg(test)]
 mod tests {
-    use super::push_once;
+    use super::{date_of, push_once, tag_of};
+
+    #[test]
+    fn the_semantic_tag_is_the_last_bracketed_phrase_and_the_date_is_iso() {
+        assert_eq!(
+            tag_of("Repair of tendon of hand (procedure)").as_deref(),
+            Some("procedure")
+        );
+        assert_eq!(
+            tag_of("Structure (body structure) of hand (body structure)").as_deref(),
+            Some("body structure")
+        );
+        assert_eq!(tag_of("No tag"), None);
+        assert_eq!(tag_of("Empty ()"), None);
+        assert_eq!(date_of("20050131"), "2005-01-31");
+        assert_eq!(date_of("2005"), "2005");
+    }
     use crate::provider::{Property, PropertyValue};
 
     #[test]

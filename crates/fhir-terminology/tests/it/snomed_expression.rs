@@ -44,10 +44,14 @@ fn registry() -> (tempfile::TempDir, Registry) {
 }
 
 fn looked_up(registry: &Registry, code: &str) -> lookup::LookupOutcome {
+    looked_up_with(registry, code, &["*"])
+}
+
+fn looked_up_with(registry: &Registry, code: &str, properties: &[&str]) -> lookup::LookupOutcome {
     let input = lookup::LookupInput {
         system: Some(SYSTEM.to_owned()),
         code: Some(code.to_owned()),
-        properties: vec![String::from("*")],
+        properties: properties.iter().map(|p| (*p).to_owned()).collect(),
         ..lookup::LookupInput::default()
     };
     lookup::lookup(registry, &Invocation::Type, &input).expect("looks up")
@@ -200,7 +204,12 @@ fn lookup_answers_the_display_in_the_language_the_request_asks_for() {
 #[test]
 fn lookup_generates_the_normal_form_of_an_expression() {
     let (_dir, registry) = registry();
-    let outcome = looked_up(&registry, &refined(ANIMAL, COVERING, FUR));
+    // The normal forms answer only when named (tx-ecosystem IG, requirements).
+    let outcome = looked_up_with(
+        &registry,
+        &refined(ANIMAL, COVERING, FUR),
+        &["normalForm", "normalFormTerse"],
+    );
     let terse = outcome
         .properties
         .iter()
@@ -970,4 +979,13 @@ fn an_expression_display_is_generated_and_a_concept_display_defined() {
         provider.display_standing(cat.concept).expect("reads"),
         fhir_terminology::provider::DisplayStanding::Defined
     );
+}
+
+// NOTE: every tx-ecosystem `$lookup` case at 9c2bbce echoes the code as sent, as
+// `$validate-code` does (#1418).
+#[test]
+fn lookup_answers_an_expression_as_sent() {
+    let (_dir, registry) = registry();
+    let sent = refined(CAT, COVERING, FUR);
+    assert_eq!(looked_up(&registry, &sent).code, sent);
 }

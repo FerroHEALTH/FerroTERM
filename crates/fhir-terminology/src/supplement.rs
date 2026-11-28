@@ -250,6 +250,10 @@ impl CodeSystemProvider for Supplemented {
         self.inner.unserved_properties()
     }
 
+    fn requested_properties(&self) -> &[&'static str] {
+        self.inner.requested_properties()
+    }
+
     fn generated_properties(&self) -> &[&'static str] {
         self.inner.generated_properties()
     }

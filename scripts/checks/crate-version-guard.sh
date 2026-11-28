@@ -1,15 +1,24 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
-# The crate-line bump rule (.claude/rules/crates-publishing.md): a change that
+# The crate-line rule (.claude/rules/crates-publishing.md): a change that
 # alters the PACKAGED content of any `crates/*` member (what its `include`
-# ships: `src/**`, `data/**`, `README.md`, `LICENSE`, `Cargo.toml`) bumps the
-# lockstep crate version in the same change, because a published version is
-# immutable. A root `[workspace.dependencies]` entry a published member
-# consumes is packaged content too: `cargo package` renders the concrete
-# requirement.
+# ships: `src/**`, `data/**`, `README.md`, `LICENSE`, `Cargo.toml`) leaves the
+# lockstep crate line above its newest release on crates.io, because a
+# published version is immutable. A root `[workspace.dependencies]` entry a
+# published member consumes is packaged content too: `cargo package` renders
+# the concrete requirement.
 #
-# The step follows The Cargo Book, "SemVer Compatibility"
+# The line steps once per publish, not once per merge: a base already above
+# the release holds an unpublished version that every change until the next
+# publish shares, so two pull requests never race on the manifests, and a base
+# at the release takes the step. The release is the newest stable, unyanked
+# version of any published member on the crates.io sparse index
+# (https://doc.rust-lang.org/cargo/reference/registry-index.html), or on
+# CRATE_GUARD_INDEX (a URL, or file:// for a tree in the same layout); an
+# index that cannot be read fails the guard, never passes it.
+#
+# The step from the release follows The Cargo Book, "SemVer Compatibility"
 # (https://doc.rust-lang.org/cargo/reference/semver.html): it moves upward, and
 # a step to another compatibility line (the minor while the line is 0.x)
 # resets what lies below it, so a breaking change moves 0.1.148 to 0.2.0. Which
@@ -25,19 +34,18 @@
 #
 # The diff runs from the merge base of the base ref and the head, so a crate
 # change the base gained after the head forked is not counted against the
-# head, and the version is compared with the base ref's, so a version the
-# base already reached fails.
+# head, and the line never moves below the base ref's version.
 #
-# Exit 0 when no packaged content changed, or it changed and the version moved
-# (in every member and every internal requirement, and Cargo.lock followed).
-# Exit 1 on a packaged change without a bump, a split bump, a stale lock, or
-# a step SemVer does not allow.
+# Exit 0 when no packaged content changed, or it changed and the line sits
+# above its release (in every member and every internal requirement, and
+# Cargo.lock followed). Exit 1 on a packaged change at the released version,
+# a split line, a stale lock, a line below the base, a step SemVer does not
+# allow, or an index that cannot be read.
 # The `no-crate-bump` PR label is the CI escape for a diff that provably does
 # not alter packaged bytes; this script does not read labels.
 #
-# `--self-test` runs the guard over synthetic repositories: a moved workspace
-# dependency that only a `publish = false` member consumes passes, the same
-# move consumed by a published member without a bump fails.
+# `--self-test` runs the guard over synthetic repositories and a scratch
+# index.
 set -euo pipefail
 
 self_test() {
@@ -49,7 +57,17 @@ self_test() {
 
   # A fresh repository: the published `rf2`, the unpublished `quiet`, and the
   # workspace dependencies `alpha` (rf2's) and `beta` (quiet's).
+  export CRATE_GUARD_INDEX="file://$dir/index"
+  # released VERSION...: the releases of rf2 the scratch index lists.
+  released() {
+    rm -rf "$dir/index"
+    mkdir -p "$dir/index/3/r"
+    : >"$dir/index/3/r/rf2"
+    local v
+    for v in "$@"; do printf '{"name":"rf2","vers":"%s","yanked":false}\n' "$v" >>"$dir/index/3/r/rf2"; done
+  }
   fresh() {
+    released 0.1.0
     rm -rf "$dir/repo"
     mkdir -p "$dir/repo/scripts/checks/lib" "$dir/repo/crates/rf2/src" "$dir/repo/crates/quiet/src"
     cp "$self" "$dir/repo/scripts/checks/crate-version-guard.sh"
@@ -89,6 +107,11 @@ self_test() {
     rm "$dir/repo/Cargo.lock.bak"
   }
   change() { echo "// $1" >>"$dir/repo/crates/rf2/src/lib.rs"; }
+  # rebase: commits the working tree as the next base.
+  rebase() {
+    git -C "$dir/repo" add -A
+    git -C "$dir/repo" -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit -qm base
+  }
 
   fresh
   sed -i.bak 's/^beta = "1.0.0"/beta = "1.1.0"/' "$dir/repo/Cargo.toml" && rm "$dir/repo/Cargo.toml.bak"
@@ -127,6 +150,45 @@ self_test() {
   sed -i.bak 's/^fhir-types = "0.1.130"/fhir-types = "0.1.131"/' "$dir/repo/Cargo.toml" && rm "$dir/repo/Cargo.toml.bak"
   bump 0.1.1
   case_ a-public-dependency-on-its-own-line-under-a-patch 0
+  fresh
+  change unbumped
+  case_ a-change-at-the-released-version 1
+  fresh
+  bump 0.1.1
+  rebase
+  change shared
+  case_ a-change-sharing-the-bases-unpublished-patch 0
+  fresh
+  bump 0.1.1
+  rebase
+  released 0.1.0 0.1.1
+  change after-publish
+  case_ a-change-at-a-version-published-since 1
+  fresh
+  bump 0.1.1
+  rebase
+  change break
+  bump 0.2.0
+  case_ a-minor-step-over-an-unpublished-patch 0
+  fresh
+  bump 0.2.0
+  rebase
+  change back
+  bump 0.1.1
+  case_ a-line-below-the-base 1
+  fresh
+  change split
+  bump 0.1.1
+  sed -i.bak -E '/^\[package\]/,/^$/s/^version = "0.1.1"/version = "0.1.2"/' "$dir/repo/crates/quiet/Cargo.toml" && rm "$dir/repo/crates/quiet/Cargo.toml.bak"
+  case_ a-split-line 1
+  fresh
+  released
+  change unreleased
+  case_ a-line-never-released 0
+  fresh
+  change unread
+  bump 0.1.1
+  CRATE_GUARD_INDEX="file://$dir/missing" case_ an-index-that-cannot-be-read 1
   echo "crate-version-guard: self-test passed"
 }
 
@@ -193,10 +255,6 @@ package_version() {
 }
 old_ver="$(git show "$base:crates/rf2/Cargo.toml" 2>/dev/null | package_version || true)"
 new_ver="$(package_version < crates/rf2/Cargo.toml)"
-if [[ -n "$old_ver" ]] && [[ "$old_ver" = "$new_ver" ]]; then
-  echo "::error::packaged content of crates/* changed but the crate version is still $new_ver. Bump every crates/*/Cargo.toml 'version' and every internal 'version =' requirement in the root Cargo.toml to the next 0.x, refresh Cargo.lock, or apply the 'no-crate-bump' label when the diff provably does not alter packaged bytes." >&2
-  exit 1
-fi
 
 fail=0
 for manifest in crates/*/Cargo.toml; do
@@ -213,19 +271,73 @@ done
 # The compatibility line of version $1 (the Cargo caret rule).
 line_of() { compat_line "$1"; }
 
-if [[ -n "$old_ver" ]]; then
-  IFS=. read -r o_major o_minor o_patch <<<"$old_ver"
-  IFS=. read -r n_major n_minor n_patch <<<"$new_ver"
-  if ((n_major < o_major)) ||
-    ((n_major == o_major && n_minor < o_minor)) ||
-    ((n_major == o_major && n_minor == o_minor && n_patch <= o_patch)); then
-    echo "::error::the crate line moves from $old_ver down to $new_ver; a version only moves upward." >&2
+# Whether version $1 sorts strictly above version $2.
+version_above() {
+  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n 1)" = "$1" ]]
+}
+
+# The sparse index path of crate $1 (Cargo Book, "Registry Index", Index
+# files): 1/, 2/, 3/<first char>/ or <first two>/<next two>/ before the name.
+index_path() {
+  local name
+  name="$(tr '[:upper:]' '[:lower:]' <<<"$1")"
+  case "${#name}" in
+    1) echo "1/$name" ;;
+    2) echo "2/$name" ;;
+    3) echo "3/${name:0:1}/$name" ;;
+    *) echo "${name:0:2}/${name:2:2}/$name" ;;
+  esac
+}
+
+# The newest stable, unyanked release of crate $1 on the index; empty when the
+# index has none. Exits the guard when the index cannot be read.
+published_version() {
+  local index="${CRATE_GUARD_INDEX:-https://index.crates.io}" path body status file
+  path="$(index_path "$1")"
+  if [[ "$index" == file://* ]]; then
+    [[ -d "${index#file://}" ]] || { echo "::error::crate-version-guard: the index ${index} is not a directory." >&2; exit 1; }
+    [[ -f "${index#file://}/$path" ]] || return 0
+    body="$(cat "${index#file://}/$path")"
+  else
+    file="$(mktemp)"
+    status="$(curl --proto '=https' --tlsv1.2 -sS -m 30 -A 'ferroterm-crate-version-guard' \
+      -o "$file" -w '%{http_code}' "$index/$path" 2>/dev/null)" || status="000"
+    case "$status" in
+      200) body="$(cat "$file")"; rm -f "$file" ;;
+      404) rm -f "$file"; return 0 ;;
+      *) rm -f "$file"; echo "::error::crate-version-guard: the index answered $status for $1 at $index/$path; the newest release cannot be read." >&2; exit 1 ;;
+    esac
+  fi
+  jq -r 'select(.yanked | not) | .vers | select(test("-") | not)' <<<"$body" | sort -V | tail -n 1
+}
+
+if [[ -n "$old_ver" ]] && version_above "$old_ver" "$new_ver"; then
+  echo "::error::the crate line moves from the base's $old_ver down to $new_ver; a version only moves upward." >&2
+  exit 1
+fi
+
+# The line's release: the newest release of any published member, since the
+# line publishes them together.
+pub_ver=""
+for manifest in "${published[@]}"; do
+  name="$(git show "$head:$manifest" | awk -F'"' '/^\[package\]/{p=1} p && /^name = /{print $2; exit}')"
+  release="$(published_version "$name")"
+  if [[ -n "$release" ]] && { [[ -z "$pub_ver" ]] || version_above "$release" "$pub_ver"; }; then
+    pub_ver="$release"
+  fi
+done
+
+if [[ -n "$pub_ver" ]]; then
+  if ! version_above "$new_ver" "$pub_ver"; then
+    echo "::error::packaged content of crates/* changed but the crate line $new_ver is not above its newest release on crates.io, $pub_ver. Move every crates/*/Cargo.toml 'version' and every internal 'version =' requirement in the root Cargo.toml one step above $pub_ver, refresh Cargo.lock, or apply the 'no-crate-bump' label when the diff provably does not alter packaged bytes." >&2
     exit 1
   fi
-  if [[ "$(line_of "$old_ver")" != "$(line_of "$new_ver")" ]]; then
+  IFS=. read -r o_major o_minor _ <<<"$pub_ver"
+  IFS=. read -r n_major n_minor n_patch <<<"$new_ver"
+  if [[ "$(line_of "$pub_ver")" != "$(line_of "$new_ver")" ]]; then
     if [[ "$n_major" != "$o_major" && ( "$n_minor" != 0 || "$n_patch" != 0 ) ]] ||
       [[ "$n_major" == 0 && "$n_minor" != "$o_minor" && "$n_patch" != 0 ]]; then
-      echo "::error::the crate line leaves $old_ver for another compatibility line at $new_ver without resetting what lies below it; a breaking change moves 0.y.z to 0.(y+1).0 (The Cargo Book, SemVer Compatibility)." >&2
+      echo "::error::the crate line leaves its release $pub_ver for another compatibility line at $new_ver without resetting what lies below it; a breaking change moves 0.y.z to 0.(y+1).0 (The Cargo Book, SemVer Compatibility)." >&2
       exit 1
     fi
   else
@@ -239,7 +351,7 @@ if [[ -n "$old_ver" ]]; then
       [[ -z "$step" ]] || moved="$moved $crate ($step)"
     done
     if [[ -n "$moved" ]]; then
-      echo "::error::a public dependency moves to another compatibility line:$moved; that breaks the crates' consumers, so the line moves its minor ($old_ver to $o_major.$((o_minor + 1)).0), never the patch (The Cargo Book, SemVer Compatibility)." >&2
+      echo "::error::a public dependency moves to another compatibility line:$moved; that breaks the crates' consumers, so the line moves its minor ($pub_ver to $o_major.$((o_minor + 1)).0), never the patch (The Cargo Book, SemVer Compatibility)." >&2
       exit 1
     fi
   fi
@@ -252,4 +364,4 @@ if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
   done
   echo "judged=${judged# }" >> "$GITHUB_OUTPUT"
 fi
-echo "crate-version-guard: packaged content changed and the crate line moved ${old_ver:-<new>} -> $new_ver, lockstep and locked."
+echo "crate-version-guard: packaged content changed and the crate line is $new_ver, above its release ${pub_ver:-<none>}, lockstep and locked."
