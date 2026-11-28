@@ -55,6 +55,7 @@ loinc/loinc-validate-filter-scale-type-part-good
 loinc/loinc-validate-filter-status-bad
 loinc/loinc-validate-invalid
 loinc/loinc-validate-list
+loinc/loinc-validate-list-bad
 loinc/loinc-validate-list-good
 loinc/loinc-validate-part
 metadata/term-caps

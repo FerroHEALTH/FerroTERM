@@ -11,7 +11,7 @@
 //! hierarchy, and the implicit value sets `http://loinc.org/vs`,
 //! `http://loinc.org/vs/[LL id]`, and `http://loinc.org/vs/[part code]`.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use concept_graph::ordinal::Ordinal;
@@ -21,10 +21,7 @@ use regex::Regex;
 use serde::Deserialize;
 
 use crate::provider::compose::{Compose, ConceptRef, Include, SystemRef};
-use crate::provider::declaration::{
-    Capability, Compositional, ContentMode, Declaration, FilterDefinition, HierarchyMeaning,
-    ImplicitArgument, ImplicitForm, PropertyDefinition, PropertyKind,
-};
+use crate::provider::declaration::PropertyKind;
 use crate::provider::filter::{Filter, FilterOperator};
 use crate::provider::source::Source;
 use crate::provider::{
@@ -33,6 +30,8 @@ use crate::provider::{
 use crate::stored::artifact::{Artifact, Layout};
 use crate::stored::system::{StoredProvider, StoredSystem};
 use crate::stored::{self, storage};
+
+mod declaration;
 
 /// The system URI.
 pub const SYSTEM: &str = "http://loinc.org";
@@ -155,7 +154,7 @@ impl LoincProvider {
                 version_needed: false,
                 version: manifest.version.clone(),
             },
-            declaration(&artifact.keys, manifest.languages),
+            declaration::declaration(&artifact.keys, manifest.languages),
             Source::new(dir, &manifest.version),
             artifact,
             Loinc {
@@ -510,6 +509,64 @@ impl StoredSystem for Loinc {
         }))
     }
 
+    /// The template fields of an implicit value set of the FHIR LOINC page
+    /// (<https://hl7.org/fhir/R4B/loinc.html>, "Implicit Value Sets"): the
+    /// LOINC version, and for an answer list or a Part the `name` and
+    /// `description` its template gives. The page prints no template for
+    /// `http://loinc.org/vs`, so that form carries the version alone.
+    fn implicit_metadata(provider: &LoincProvider, url: &str) -> crate::provider::ImplicitMetadata {
+        let version = Some(
+            crate::provider::CodeSystemProvider::identity(provider)
+                .version
+                .clone(),
+        );
+        let Some(code) = url
+            .strip_prefix(SYSTEM)
+            .and_then(|rest| rest.strip_prefix("/vs/"))
+        else {
+            return crate::provider::ImplicitMetadata {
+                version,
+                ..crate::provider::ImplicitMetadata::default()
+            };
+        };
+        let upper = code.to_ascii_uppercase();
+        // NOTE: the seam returns no error; a store that does not read fails the compose
+        // read of the same URL, which reports it, so the name falls back to the code here.
+        let named = provider
+            .stored()
+            .located(&upper)
+            .ok()
+            .flatten()
+            .and_then(|located| {
+                Loinc::display(provider, located.concept, None)
+                    .ok()
+                    .flatten()
+            });
+        let (name, description) = if upper.starts_with("LL") {
+            let list = named.unwrap_or_else(|| upper.clone());
+            (
+                Some(list.clone()),
+                Some(format!("LOINC Answer List for {list}")),
+            )
+        } else {
+            (
+                Some(format!(
+                    "LOINC Value Set from Multi-Axial Hierarchy code {upper}"
+                )),
+                Some(format!(
+                    "All LOINC codes for {}",
+                    named.unwrap_or_else(|| upper.clone())
+                )),
+            )
+        };
+        crate::provider::ImplicitMetadata {
+            version,
+            name,
+            description,
+            ..crate::provider::ImplicitMetadata::default()
+        }
+    }
+
     /// `parent` and `ancestor` over the multiaxial hierarchy; an axis property
     /// (`COMPONENT`, `PROPERTY`, `TIME_ASPCT`, `SYSTEM`, `SCALE_TYP`,
     /// `METHOD_TYP`) with `=` or `in` matches the linked part by its code or
@@ -647,113 +704,5 @@ impl LoincProvider {
             op: filter.op,
             value: filter.value.clone(),
         })
-    }
-}
-
-/// What the provider declares: the FHIR page's properties, every table field
-/// as a filter, `copyright`, `parent`, and `ancestor`.
-fn declaration(keys: &BTreeMap<u32, String>, languages: Vec<String>) -> Declaration {
-    // NOTE: a property the loaded release does not carry is not declared: the FHIR
-    // page still lists `DOCUMENT_SECTION`, which `Loinc.csv` dropped (#278).
-    let mut properties: Vec<PropertyDefinition> = FHIR_PROPERTIES
-        .iter()
-        .filter(|(code, _)| keys.values().any(|key| key == code))
-        .map(|(code, kind)| PropertyDefinition {
-            code: (*code).to_owned(),
-            uri: None,
-            description: None,
-            kind: *kind,
-        })
-        .collect();
-    for (code, kind) in [
-        ("parent", PropertyKind::Code),
-        ("child", PropertyKind::Code),
-        (COPYRIGHT_KEY, PropertyKind::Code),
-        (ANSWER_LIST_KEY, PropertyKind::Code),
-        (ANSWERS_KEY, PropertyKind::Code),
-        (KIND_KEY, PropertyKind::Code),
-    ] {
-        properties.push(PropertyDefinition {
-            code: code.to_owned(),
-            uri: None,
-            description: None,
-            kind,
-        });
-    }
-    let mut filters: Vec<FilterDefinition> = keys
-        .values()
-        .filter(|name| {
-            !matches!(
-                name.as_str(),
-                COPYRIGHT_KEY | ANSWER_LIST_KEY | ANSWERS_KEY | KIND_KEY | PART_TYPE_KEY
-            )
-        })
-        .map(|name| FilterDefinition {
-            code: name.clone(),
-            description: Some(format!("The `{name}` field of the term table")),
-            operators: vec![FilterOperator::Equal, FilterOperator::Regex],
-            value: String::from("a field value"),
-        })
-        .collect();
-    filters.push(FilterDefinition {
-        code: COPYRIGHT_KEY.to_owned(),
-        description: Some(String::from("`LOINC` or `3rdParty`")),
-        operators: vec![FilterOperator::Equal],
-        value: String::from("LOINC | 3rdParty"),
-    });
-    for (code, description) in [
-        ("parent", "Codes whose immediate parent is the part"),
-        ("ancestor", "Codes under the part, transitively"),
-    ] {
-        filters.push(FilterDefinition {
-            code: code.to_owned(),
-            description: Some(description.to_owned()),
-            operators: vec![FilterOperator::Equal, FilterOperator::In],
-            value: String::from("a part code"),
-        });
-    }
-    // NOTE: no specification defines these four; they are what tx.fhir.org
-    // answers, and the FHIR LOINC page has carried a `TODO: Document Ontology`
-    // placeholder since STU3 (<https://hl7.org/fhir/R4B/loinc.html>, #277).
-    for (code, description) in [
-        (LIST_FILTER, "The answers of the answer list"),
-        (
-            ANSWERS_FOR_FILTER,
-            "The answers of the answer list, or of the list the term is linked to",
-        ),
-    ] {
-        filters.push(FilterDefinition {
-            code: code.to_owned(),
-            description: Some(description.to_owned()),
-            operators: vec![FilterOperator::Equal],
-            value: String::from("an answer list code, or a term code"),
-        });
-    }
-    for (code, key) in DOCUMENT_AXES {
-        if keys.values().any(|name| name == key) {
-            filters.push(FilterDefinition {
-                code: code.to_owned(),
-                description: Some(format!("The Document Ontology `{key}` axis of the term")),
-                operators: vec![FilterOperator::Equal, FilterOperator::Exists],
-                value: String::from("a part code or name, or a boolean for `exists`"),
-            });
-        }
-    }
-    Declaration {
-        content: ContentMode::NotPresent,
-        case_sensitive: false,
-        hierarchy_meaning: Some(HierarchyMeaning::IsA),
-        compositional: Compositional::None,
-        languages,
-        properties,
-        filters,
-        capabilities: BTreeSet::from([Capability::Subsumption, Capability::Enumeration]),
-        // NOTE: the `/vs`, `/vs/[id]`, and `/vs/[partcode]` forms of
-        // <https://hl7.org/fhir/R4B/loinc.html>, "Implicit Value Sets".
-        implicit_forms: vec![
-            ImplicitForm::new("http://loinc.org/vs", ImplicitArgument::None),
-            ImplicitForm::new("http://loinc.org/vs/[id]", ImplicitArgument::Code),
-            ImplicitForm::new("http://loinc.org/vs/[partcode]", ImplicitArgument::Code),
-        ],
     }
 }

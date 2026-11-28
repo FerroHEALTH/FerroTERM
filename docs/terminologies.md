@@ -213,9 +213,13 @@ and it does so **without reading an openEHR artefact**.
   the multiaxial hierarchy is the graph, every table field is a property and a
   filter (`=`, `regex`), the six axes carry their linked part as the value
   (the page types them as `Coding`) and match a filter by the part's code or
-  name, and the names and translations are designations indexed for search. The
-  provider answers `copyright`, `parent`, and `ancestor`, the three implicit
-  value set forms, and `LONG_COMMON_NAME` as the display (a translation when
+  `PartName`, `CLASS` matches the class name or the class Part's code (both
+  rules from the HL7 terminology ecosystem IG's LOINC section), and the names
+  and translations are designations indexed for search. The provider answers
+  `copyright`, `parent`, and `ancestor`, the three implicit value set forms
+  with the LOINC version and, for an answer list or a Part, the `name` and
+  `description` of the FHIR page's template, and `LONG_COMMON_NAME` as the
+  display (a translation when
   the language asks for one); `STATUS = DEPRECATED` is inactive. The server
   opens a LOINC artifact from `FERROTERM__TERMINOLOGY__INDEX` like an edition; the manifest
   says which system a directory serves.
