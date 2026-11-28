@@ -109,8 +109,8 @@ ID Token signed with ML-DSA alone. All three are off by default, for the
 issuers that still sign classically.
 
 The badge counts the JOSE rows in that configuration: `post_quantum_only`
-on and ML-DSA keys for the client assertions, as the book's examples set
-them. A deployment that leaves the settings off accepts the classical
+on and ML-DSA keys for the client assertions and the DPoP proofs, as the
+book's examples set them. A deployment that leaves the settings off accepts the classical
 algorithms the rows name, and those rows are then not post-quantum safe for
 it.
 
@@ -128,7 +128,7 @@ it.
 | TLS record protection | AES-128-GCM, AES-256-GCM, ChaCha20-Poly1305 | yes | NIST IR 8547 4.1.3 | `ferrohealth-server tls` |
 | Access token and DPoP proof verification with [auth] post_quantum_only = true | ML-DSA-44, ML-DSA-65 or ML-DSA-87 (AKP) alone; off (the default), RS256, RS384, PS256, PS384, ES256 and ES384, and an ML-DSA parameter set where an algorithms list names it | yes | RFC 9964 | `ferrohealth-smart config, ferrohealth-smart resource, app/ferroterm-server/src/smart/mod.rs, app/ferroterm-sync/src/auth.rs` |
 | Client assertions of the outbound client credentials grant (private_key_jwt) with an ML-DSA key, as the examples configure it | ML-DSA-44, ML-DSA-65 or ML-DSA-87, the parameter set of the key (ML-DSA-65 in the examples); with a classical key RS384 by default, RS256 to PS512, ES256, ES384 or EdDSA | yes | RFC 9964 | `ferrohealth-smart client assertion, app/ferroterm-sync/src/revalidate.rs, addons/nts/src/source.rs` |
-| DPoP proofs of the outbound client credentials grant | ES256 or ES384 with a P-256 or P-384 key; ML-DSA-44, ML-DSA-65 or ML-DSA-87 with an ML-DSA key, which ferrohealth-smart 0.36.0 reads | no | RFC 9964 | `ferrohealth-smart client dpop, addons/nts/src/source.rs` |
+| DPoP proofs of the outbound client credentials grant with an ML-DSA DPoP key, as the examples configure it | ML-DSA-44, ML-DSA-65 or ML-DSA-87, the parameter set of the key (ML-DSA-65 in the examples); with a P-256 or P-384 key ES256 or ES384 | yes | RFC 9964 | `ferrohealth-smart client dpop, app/ferroterm-sync/src/reload.rs, addons/nts/src/source.rs` |
 | Console sign-in ID token verification with [jose] post_quantum_only = true | ML-DSA-44, ML-DSA-65 or ML-DSA-87 alone; off (the default), those beside RS256, RS384, RS512, PS256, PS384, PS512, ES256, ES384 and EdDSA | yes | RFC 9964 | `ferrohealth-smart oidc, app/ferroterm-console/src/config/mod.rs, app/ferroterm-console/src/server.rs` |
 | Console sign-in PKCE challenge | SHA-256 (S256) | yes | NIST IR 8547 4.1.3 | `ferrohealth-smart oidc, app/ferroterm-console/src/server.rs` |
 | Basic password hashing | Argon2id | yes | NIST IR 8547 4.1.3 | `ferrohealth-smart basic, app/ferroterm-server/src/smart/mod.rs, app/ferroterm-sync/src/auth.rs` |
