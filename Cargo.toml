@@ -219,22 +219,22 @@ ferrobridge-term = { version = "0.24.0", default-features = false, features = ["
 # Workspace-internal crates. The `crates/*` members carry the published crate
 # line (lockstep, bumped with their packaged content, never the product
 # version); the tools stay on the workspace version.
-rf2 = { path = "crates/rf2", version = "0.16.0" }
-loinc = { path = "crates/loinc", version = "0.16.0" }
-classification = { path = "crates/classification", version = "0.16.0" }
-dhd-thesaurus = { path = "crates/dhd-thesaurus", version = "0.16.0" }
-gstandaard = { path = "crates/gstandaard", version = "0.16.0" }
-labcodeset = { path = "crates/labcodeset", version = "0.16.0" }
-icd11 = { path = "crates/icd11", version = "0.16.0" }
-rxnorm-rrf = { path = "crates/rxnorm-rrf", version = "0.16.0" }
-concept-graph = { path = "crates/concept-graph", version = "0.16.0" }
-concept-store = { path = "crates/concept-store", version = "0.16.0" }
-designation-index = { path = "crates/designation-index", version = "0.16.0" }
-sct-ecl = { path = "crates/sct-ecl", version = "0.16.0" }
-sct-scg = { path = "crates/sct-scg", version = "0.16.0" }
-fhir-terminology = { path = "crates/fhir-terminology", version = "0.16.0" }
-terminology-syndication = { path = "crates/terminology-syndication", version = "0.16.0" }
-ferroterm-problem = { path = "crates/ferroterm-problem", version = "0.16.0" }
+rf2 = { path = "crates/rf2", version = "0.16.1" }
+loinc = { path = "crates/loinc", version = "0.16.1" }
+classification = { path = "crates/classification", version = "0.16.1" }
+dhd-thesaurus = { path = "crates/dhd-thesaurus", version = "0.16.1" }
+gstandaard = { path = "crates/gstandaard", version = "0.16.1" }
+labcodeset = { path = "crates/labcodeset", version = "0.16.1" }
+icd11 = { path = "crates/icd11", version = "0.16.1" }
+rxnorm-rrf = { path = "crates/rxnorm-rrf", version = "0.16.1" }
+concept-graph = { path = "crates/concept-graph", version = "0.16.1" }
+concept-store = { path = "crates/concept-store", version = "0.16.1" }
+designation-index = { path = "crates/designation-index", version = "0.16.1" }
+sct-ecl = { path = "crates/sct-ecl", version = "0.16.1" }
+sct-scg = { path = "crates/sct-scg", version = "0.16.1" }
+fhir-terminology = { path = "crates/fhir-terminology", version = "0.16.1" }
+terminology-syndication = { path = "crates/terminology-syndication", version = "0.16.1" }
+ferroterm-problem = { path = "crates/ferroterm-problem", version = "0.16.1" }
 # The source add-ons. Path-only and never published; only app/ferroterm-sync
 # may take one (scripts/checks/addon-boundary.sh).
 addon-nts = { path = "addons/nts" }

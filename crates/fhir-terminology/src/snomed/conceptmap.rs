@@ -29,7 +29,9 @@ use crate::provider::concept_map::{
     ConceptMapModel, DependsOn, Element, Group, Relationship, Target,
 };
 use crate::provider::{CodeSystemProvider, Concept, MapSelection, Successor, error::ProviderError};
+use crate::snomed::implicit::percent_decode;
 use crate::snomed::{FHIR_CM, FHIR_VS, SYSTEM, SnomedProvider};
+use rf2::id::ConceptId;
 
 /// The reference set field an association member points through.
 const TARGET_COMPONENT: &str = "targetComponentId";
@@ -323,6 +325,43 @@ pub(crate) fn concept_map(
             unmapped: None,
         }],
     })
+}
+
+/// The implicit concept map the `?fhir_cm=` form `form` of `url` names: a map or
+/// association reference set, the LOINC Extension map, or an edition map.
+///
+/// # Errors
+///
+/// Returns [`ProviderError::MalformedImplicitConceptMap`] for a form that is
+/// not one of them, and the errors of the map it names.
+pub(crate) fn implicit(
+    provider: &SnomedProvider,
+    url: &str,
+    form: &str,
+    selection: MapSelection<'_>,
+) -> Result<ConceptMapModel, ProviderError> {
+    let malformed = |reason: String| ProviderError::MalformedImplicitConceptMap {
+        url: url.to_owned(),
+        reason,
+    };
+    let Some(decoded) = percent_decode(form) else {
+        return Err(malformed(format!(
+            "`{form}` is not a percent-encoded SCTID"
+        )));
+    };
+    if let Some(module) = decoded.trim().strip_prefix(super::edition_map::FORM) {
+        let Ok(module) = ConceptId::parse(module) else {
+            return Err(malformed(format!("`{module}` is not an SCTID")));
+        };
+        return super::edition_map::concept_map(provider, url, module.value(), selection);
+    }
+    let Ok(refset) = ConceptId::parse(decoded.trim()) else {
+        return Err(malformed(format!("`{decoded}` is not an SCTID")));
+    };
+    if refset.value() == super::loinc_map::LOINC_MODULE {
+        return super::loinc_map::concept_map(provider, url, selection);
+    }
+    concept_map(provider, url, refset.value(), selection)
 }
 
 /// The rows `selection` admits, in the order the reference set holds them.
