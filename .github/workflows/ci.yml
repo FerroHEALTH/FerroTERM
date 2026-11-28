@@ -776,10 +776,11 @@ jobs:
           fi
           bash scripts/checks/changelog-guard.sh "$BASE" "$HEAD"
 
-  # The crate-line bump rule (.claude/rules/crates-publishing.md): a PR that
-  # changes packaged content of a crates/* member bumps the lockstep crate
-  # version in the same PR. The `no-crate-bump` label is the escape for a diff
-  # that provably does not alter packaged bytes.
+  # The crate-line rule (.claude/rules/crates-publishing.md): a PR that
+  # changes packaged content of a crates/* member leaves the lockstep crate
+  # line above its newest crates.io release, one step per publish. The
+  # `no-crate-bump` label is the escape for a diff that provably does not
+  # alter packaged bytes.
   crate-version-guard:
     name: crate-version-guard
     if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
@@ -795,6 +796,8 @@ jobs:
           fetch-depth: 0
       - name: Crate-version guard self-test
         run: bash scripts/checks/crate-version-guard.sh --self-test
+      - name: SemVer baseline self-test
+        run: bash scripts/checks/semver.sh --self-test
       # The base is the target branch as fetched now, and the guard diffs
       # from its merge base with the head, so a crate change the target
       # gained after the fork is not counted.
@@ -820,7 +823,7 @@ jobs:
       # the pull request (`gh-readonly-queue/main/pr-<n>-<sha>`), whose label
       # is the same escape.
       - id: guard-queue
-        name: The queued change moves the crate line above the queue base
+        name: The queued change keeps the crate line above its release
         if: github.event_name == 'merge_group'
         env:
           GH_TOKEN: ${{ github.token }}

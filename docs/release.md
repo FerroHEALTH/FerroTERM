@@ -101,7 +101,10 @@ cut follows, in order.
    `publish-dry-run` jobs are green (`.claude/rules/crates-publishing.md`),
    and `bash scripts/release/publish-crates.sh semver` finds that every
    crate's step since its newest release on crates.io answers its change
-   (the plan job runs it too).
+   (the plan job runs it too). The line steps once per publish: every pull
+   request since the last publish shares the version this release uploads,
+   and the first pull request after it that changes packaged content takes
+   the next step.
 8. **The advisories are drafted.** Every `GHSA-` id the section names is a
    draft advisory on this repository, ready to publish with the release, or
    an advisory an upstream crate's repository has already published, which
