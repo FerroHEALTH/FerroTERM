@@ -7,7 +7,7 @@
 use super::implicit::implicit_forms;
 use super::properties::{LOINC_PROPERTY, LOINC_SCHEME};
 use super::{
-    EXPRESSIONS, FHIR_PROPERTIES, GENERATED_PROPERTIES, Keys, Manifest, OpenError, SYSTEM, Snomed,
+    EXPRESSIONS, FHIR_PROPERTIES, GENERATED_PROPERTIES, Keys, OpenError, SYSTEM, Snomed,
     SnomedProvider,
 };
 use crate::provider::Identity;
@@ -282,4 +282,29 @@ impl SnomedProvider {
             .first()
             .map_or(wanted, |first| primary_subtag(first))
     }
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub(super) struct Manifest {
+    system: String,
+    edition: String,
+    version: String,
+    /// The release date the offline build recorded for the edition.
+    #[serde(default, rename = "releaseDate")]
+    release_date: Option<String>,
+    /// The reference set memberships; an artifact built before they were
+    /// written has none.
+    #[serde(default)]
+    refsets: Option<String>,
+    /// The attribute relationships, the reference set member rows, and the
+    /// alternate identifiers the ECL evaluator reads; an artifact built before
+    /// they were written has none.
+    #[serde(default)]
+    attributes: Option<String>,
+    #[serde(default)]
+    members: Option<String>,
+    #[serde(default)]
+    identifiers: Option<String>,
+    #[serde(default)]
+    languages: Vec<String>,
 }
