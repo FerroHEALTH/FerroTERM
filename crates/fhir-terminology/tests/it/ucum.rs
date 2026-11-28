@@ -14,7 +14,7 @@ use fhir_terminology::operations::{
     Invocation, OperationError, expand, sources::Sources, subsumes, value_set_validate_code,
 };
 use fhir_terminology::provider::filter::{Filter, FilterOperator};
-use fhir_terminology::provider::{CodeSystemProvider, error::ProviderError};
+use fhir_terminology::provider::{CodeSystemProvider, Concept, error::ProviderError};
 use fhir_terminology::registries::ucum::essence::ESSENCE_DATA;
 use fhir_terminology::registries::ucum::grammar::{GrammarError, parse};
 use fhir_terminology::registries::ucum::provider::{URL, UcumProvider};
@@ -198,10 +198,6 @@ fn the_provider_locates_describes_and_filters_expressions() {
         Err(ProviderError::InvalidFilterValue(_))
     ));
     assert!(matches!(provider.all(), Err(ProviderError::NotEnumerable)));
-    assert!(matches!(
-        provider.filter(&filter("canonical", FilterOperator::Equal, "g")),
-        Err(ProviderError::NotEnumerable)
-    ));
     let annotated = provider
         .locate("mg/dL{milligram per deciliter}")
         .expect("reads")
@@ -317,7 +313,7 @@ fn ucum_answers_the_operations_the_ecosystem_suite_asks() {
 }
 
 #[test]
-fn ucum_validates_by_canonical_membership_and_refuses_expansion() {
+fn ucum_validates_by_canonical_membership_and_expands_only_the_comparable_atoms() {
     let mut registry = Registry::default();
     registry
         .register(Arc::new(UcumProvider::new()))
@@ -375,12 +371,15 @@ fn ucum_validates_by_canonical_membership_and_refuses_expansion() {
         )),
         ..ExpandInput::default()
     };
+    let expansion = expand::expand(&sources, &mass).expect("the essence's comparable atoms");
     assert!(
-        matches!(
-            expand::expand(&sources, &mass),
-            Err(OperationError::NotSupported(_))
-        ),
-        "commensurable units are unbounded too"
+        expansion.unclosed,
+        "the grammar makes unboundedly many more"
+    );
+    let codes: Vec<&str> = expansion.contains.iter().map(|c| c.code.as_str()).collect();
+    assert!(
+        codes.contains(&"g") && codes.contains(&"[lb_av]"),
+        "{codes:?}"
     );
 }
 
@@ -464,5 +463,48 @@ fn every_declared_implicit_value_set_form_resolves() {
             ("http://unitsofmeasure.org/vs", &[]),
             ("http://unitsofmeasure.org/vs/[expression]", &["mg/dL"]),
         ],
+    );
+}
+
+/// The terminology ecosystem IG, UCUM: "The server SHALL support the two
+/// special value sets: all UCUM codes, and the canonical units". A selection
+/// lists the essence's atoms that pass it, and stays unclosed.
+#[test]
+fn the_canonical_and_property_filters_enumerate_the_essence_atoms() {
+    let provider = UcumProvider::new();
+    let kg = provider.locate("kg").expect("reads").expect("valid");
+    let mass = provider
+        .filter(&filter("canonical", FilterOperator::Equal, "g"))
+        .expect("enumerates the atoms");
+    let mut codes: Vec<String> = mass
+        .iter()
+        .filter_map(|i| provider.code(Concept::new(i)).expect("reads"))
+        .collect();
+    codes.sort();
+    for unit in ["g", "kg", "mg", "[lb_av]", "[oz_av]", "t"] {
+        assert!(codes.iter().any(|c| c == unit), "{unit} in {codes:?}");
+    }
+    assert!(
+        !codes.iter().any(|c| c == "m" || c == "mmol"),
+        "a length or an amount is not comparable to g: {codes:?}"
+    );
+    assert!(
+        !codes.iter().any(|c| c == "k[lb_av]"),
+        "a prefix goes only on a metric unit: {codes:?}"
+    );
+    let masses = provider
+        .filter(&filter("property", FilterOperator::Equal, "mass"))
+        .expect("enumerates the atoms");
+    assert!(masses.contains(kg.concept.index()));
+    assert!(matches!(
+        provider.filter(&filter("canonical", FilterOperator::Equal, "not a unit")),
+        Err(ProviderError::InvalidFilterValue(_))
+    ));
+    assert!(provider.unclosed(&[]), "the grammar makes many more");
+    assert!(
+        provider
+            .unclosed_reason()
+            .is_some_and(|reason| reason.contains("UCUM essence")),
+        "the reason names what the expansion lists"
     );
 }

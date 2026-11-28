@@ -248,7 +248,11 @@ and it does so **without reading an openEHR artefact**.
   an English name composed from the essence as a designation). `$subsumes`
   answers `equivalent` for the same unit (dimensions, magnitude, special
   function) and `not-subsumed` otherwise; `canonical` and `property` are
-  answered as properties and filters; enumeration is refused.
+  answered as properties and filters. Enumerating every unit is refused; a
+  `canonical` or `property` selection expands, as the terminology ecosystem IG
+  requires of the canonical-units value set, to the essence's units that pass
+  it, each metric unit also under every prefix, marked unclosed (the members
+  are our own design).
 - **FHIR-defined behaviour.** Filters `property =` (base-unit property of the
   canonical form) and `canonical = | in` (comparable expressions). Implicit
   value sets `http://unitsofmeasure.org/vs` and

@@ -213,6 +213,35 @@ impl UcumProvider {
         text
     }
 
+    /// Every atom of the essence as a code: each base unit and unit, and each
+    /// metric one under every prefix, in the essence's order.
+    fn atoms(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        let metric = self
+            .essence
+            .base_units
+            .keys()
+            .map(|code| (code, true))
+            .chain(
+                self.essence
+                    .units
+                    .values()
+                    .map(|unit| (&unit.code, unit.is_metric)),
+            );
+        for (code, is_metric) in metric {
+            out.push(code.clone());
+            if is_metric {
+                out.extend(
+                    self.essence
+                        .prefixes
+                        .keys()
+                        .map(|prefix| format!("{prefix}{code}")),
+                );
+            }
+        }
+        out
+    }
+
     fn matches(
         &self,
         expression: &Expression,
@@ -400,19 +429,33 @@ impl CodeSystemProvider for UcumProvider {
         true
     }
 
+    fn unclosed_reason(&self) -> Option<String> {
+        Some(format!(
+            "The code System '{URL}' has a grammar and so has infinite members. This expansion lists the units of the UCUM essence, each metric unit also under every prefix"
+        ))
+    }
+
+    /// The atoms of the essence that pass `filter`: every base unit and unit,
+    /// each metric one also under every prefix. The grammar makes infinitely
+    /// many more, so the expansion is unclosed (see [`Self::unclosed`]).
+    ///
+    /// No specification lists the members of a `canonical` or `property`
+    /// selection (<https://terminology.hl7.org/UCUM.html>: "any expression that
+    /// is comparable to the given unit"): our own design.
     fn filter(&self, filter: &Filter) -> Result<ConceptSet, ProviderError> {
-        if self
-            .declaration
-            .filters
-            .iter()
-            .any(|f| f.code == filter.property)
-        {
-            return Err(ProviderError::NotEnumerable);
+        let mut set = ConceptSet::new();
+        for code in self.atoms() {
+            let Some(expression) = self.expression(&code) else {
+                continue;
+            };
+            let Some(canonical) = self.canonical(&expression) else {
+                continue;
+            };
+            if self.matches(&expression, &canonical, filter)? {
+                set.insert(self.interned.intern(&code)?.index());
+            }
         }
-        Err(ProviderError::UnsupportedFilter {
-            property: filter.property.clone(),
-            operator: filter.op.code().to_owned(),
-        })
+        Ok(set)
     }
 
     fn filter_matches(&self, concept: Concept, filter: &Filter) -> Result<bool, ProviderError> {
