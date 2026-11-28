@@ -31,6 +31,11 @@ pub const CHEMISTRY_PART: &str = "LP70002";
 pub const GLUCOSE_PART: &str = "LP70003";
 /// A class part only the hierarchy names (`Sodium | Serum or Plasma | Chemistry`).
 pub const SODIUM_CLASS: &str = "LP70005";
+/// The class part whose name, `CHEM`, is the `CLASS` of the chemistry terms.
+pub const CHEM_CLASS: &str = "LP70006";
+/// A component part whose display name is `Glucose` and whose name is not,
+/// linked to the survey term.
+pub const GLUCOSE_CHALLENGE_PART: &str = "LP70007";
 /// The answer list.
 pub const ANSWER_LIST: &str = "LL70001";
 /// The first answer.
@@ -270,6 +275,20 @@ pub fn write_release(root: &Path) -> std::io::Result<()> {
                         "Glucose",
                         "ACTIVE",
                     ]),
+                    s(&[
+                        &code(CHEM_CLASS),
+                        "CLASS",
+                        "CHEM",
+                        "Chemistry - non-challenge",
+                        "ACTIVE",
+                    ]),
+                    s(&[
+                        &code(GLUCOSE_CHALLENGE_PART),
+                        "COMPONENT",
+                        "Glucose^post dose",
+                        "Glucose",
+                        "ACTIVE",
+                    ]),
                 ],
             ),
         ),
@@ -302,6 +321,16 @@ pub fn write_release(root: &Path) -> std::io::Result<()> {
                         "Glucose [Mass/volume] in Blood (superseded)",
                         &code(GLUCOSE_PART),
                         "Glucose",
+                        "http://loinc.org",
+                        "COMPONENT",
+                        "Primary",
+                        "http://loinc.org/property/COMPONENT",
+                    ]),
+                    s(&[
+                        &code(SURVEY),
+                        "Fasting status [Presence]",
+                        &code(GLUCOSE_CHALLENGE_PART),
+                        "Glucose^post dose",
                         "http://loinc.org",
                         "COMPONENT",
                         "Primary",

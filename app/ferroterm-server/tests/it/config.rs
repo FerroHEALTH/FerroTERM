@@ -213,7 +213,7 @@ fn a_loinc_artifact_is_served_beside_the_edition() {
         .find(|s| s.url == "http://loinc.org")
         .expect("loinc");
     assert_eq!(loinc_summary.version, ferroterm_testkit::loinc::VERSION);
-    assert_eq!(loinc_summary.concepts, Some(11));
+    assert_eq!(loinc_summary.concepts, Some(13));
     assert_eq!(loinc_summary.path.as_deref(), Some(loinc.path()));
     let empty = tempfile::tempdir().expect("tempdir");
     std::fs::write(

@@ -42,7 +42,7 @@ mode run also carries the two mode-independent `metadata` cases and the 11
 edition, `icf` over the ICF `CodeSystem` resources of `fhir.tx.support` 1.0.5,
 and `icd-11` over the three artifacts built from the WHO ICD-API local
 deployment of release 2026-01 in English. The other rows were measured by hand
-on 2026-11-27 on the same pins, over LOINC 2.83.
+on 2026-11-28 on the same pins, over LOINC 2.83.
 
 | mode | surface | pass list | passed of ran | needs | open failures |
 |---|---|---|---|---|---|
@@ -52,8 +52,8 @@ on 2026-11-27 on the same pins, over LOINC 2.83.
 | `snomed` | `/r4b` | `passing-snomed.txt` | 326 of 378 | the suite's SNOMED CT test edition, with `terminology.default_language = "en-US"` (the script sets it) | #1413, #1068, #1380 |
 | `icd-11` | `/r4b` | `passing-icd-11.txt` | 28 of 145 | the three ICD-11 artifacts | #1391, #1068, #1380 |
 | `icf` | `/r4b` | `passing-icf.txt` | 79 of 96 | the standalone ICF releases | #1330, #1376, #1068, #1380 |
-| `loinc` | `/r4b` | `passing-loinc.txt` | 56 of 110 | a LOINC release | #1383, #1068, #1380 |
-| `loinc` | `/r5` | `passing-r5-loinc.txt` | 57 of 110 | a LOINC release | #1383, #1068 |
+| `loinc` | `/r4b` | `passing-loinc.txt` | 58 of 110 | a LOINC release | #1383, #1068, #1380 |
+| `loinc` | `/r5` | `passing-r5-loinc.txt` | 59 of 110 | a LOINC release | #1383, #1068 |
 | `tx.fhir.org` | `/r4b` | `passing-tx.fhir.org.txt` | 29 of 189 | a LOINC release | #1384, #1068, #1380 |
 | `tx.fhir.org` | `/r5` | `passing-r5-tx.fhir.org.txt` | 31 of 189 | a LOINC release | #1384, #1068 |
 | `mimetypes` | `/r4b` | `passing-mimetypes.txt` | 40 of 52 | nothing | #1068, #1380 |

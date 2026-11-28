@@ -46,11 +46,11 @@ fn every_file_of_the_release_reads_by_column_name() {
             .is_some()
     );
     let parts = part::read_parts(&release).expect("parts");
-    assert_eq!(parts.len(), 3);
+    assert_eq!(parts.len(), 5);
     let edges = part::read_hierarchy(&release).expect("hierarchy");
     assert_eq!(edges.len(), 7, "the class part and its term");
     let links = part::read_links(&release).expect("links");
-    assert_eq!(links.len(), 2);
+    assert_eq!(links.len(), 3);
     assert_eq!(links[0].axis, "COMPONENT");
     assert_eq!(links[0].part, code(GLUCOSE_PART));
     assert!(edges.iter().any(

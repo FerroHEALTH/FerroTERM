@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: Cadasto B.V.
 # SPDX-License-Identifier: BUSL-1.1
-# The default local gate: rustfmt, clippy, nextest and the doctests on the
-# workspace packages a change reaches, and a check of the fuzz crate when the
-# change reaches a crate it builds on. CI stays the full gate: its Rust lanes
+# The default local gate on the workspace packages a change reaches: rustfmt,
+# clippy, a check of the fuzz crate when the change reaches a crate it builds
+# on, then nextest and the doctests. CI stays the full gate: its Rust lanes
 # run every package on every pull request (.github/workflows/ci.yml).
 # No specification governs this: our own design (docs/ci-cd.md).
 #
@@ -138,6 +138,21 @@ args=()
 for package in $reached; do args+=(-p "$package"); done
 run cargo fmt --check "${args[@]}"
 run cargo clippy --locked "${args[@]}" --all-targets --all-features -- -D warnings
+# The fuzz crate sits outside the workspace (fuzz/Cargo.toml), so the other
+# steps never compile it; it is checked when the change reaches a crate it
+# takes by path, on the stable toolchain, since a check runs no sanitizer. It
+# runs beside clippy, before the tests, so a moved public type a fuzz target
+# imports fails in seconds rather than after the test run.
+fuzz_paths=" $(cargo metadata --manifest-path fuzz/Cargo.toml --format-version 1 --no-deps --locked |
+  jq -r '.packages[].dependencies[] | select(.path != null) | .name' | tr '\n' ' ')"
+for package in $reached; do
+  case "$fuzz_paths" in
+    *" $package "*)
+      run cargo check --locked --manifest-path fuzz/Cargo.toml --bins
+      break
+      ;;
+  esac
+done
 run cargo nextest run --locked "${args[@]}" --no-tests=pass
 # `cargo test --doc` refuses a package without a library target.
 libraries=" $(jq -r '
@@ -154,19 +169,6 @@ done
 if [[ "${#docs[@]}" -gt 0 ]]; then
   run cargo test --doc --locked "${docs[@]}"
 fi
-# The fuzz crate sits outside the workspace (fuzz/Cargo.toml), so the steps
-# above never compile it; it is checked when the change reaches a crate it
-# takes by path, on the stable toolchain, since a check runs no sanitizer.
-fuzz_paths=" $(cargo metadata --manifest-path fuzz/Cargo.toml --format-version 1 --no-deps --locked |
-  jq -r '.packages[].dependencies[] | select(.path != null) | .name' | tr '\n' ' ')"
-for package in $reached; do
-  case "$fuzz_paths" in
-    *" $package "*)
-      run cargo check --locked --manifest-path fuzz/Cargo.toml --bins
-      break
-      ;;
-  esac
-done
 if [[ "$dry" = true ]]; then
   echo "fast: dry run, nothing ran"
 else
