@@ -11,7 +11,9 @@ loinc/loinc-expand-filter-answers-for2
 loinc/loinc-expand-filter-list-request-parameters
 loinc/loinc-expand-filter-no-method-total
 loinc/loinc-expand-implicit-part
+loinc/loinc-expand-parent
 loinc/loinc-expand-prop-dockind-total
+loinc/loinc-expand-prop-method
 loinc/loinc-expand-prop-method-part
 loinc/loinc-expand-prop-order-obs-total
 loinc/loinc-expand-property
