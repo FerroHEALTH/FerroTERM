@@ -234,28 +234,26 @@ fn check_targets(
         };
         // NOTE: only a complete code system holds every code it defines, so no
         // other can call one invalid (<https://hl7.org/fhir/R4B/codesystem-content-mode.html>).
-        let located = resolved.provider.locate(code)?;
-        // NOTE: a target not in its code system's normal form is also returned
-        // as `normalized-concept`, the concept as `concept` states it staying
-        // (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>, `$translate`).
-        if let Some(located) = &located
-            && located.code != *code
-        {
-            found.origin.normalized_concept = Some(CodingRef {
-                system: Some(system.clone()),
-                version: version.clone(),
-                code: Some(located.code.clone()),
-                display: None,
-            });
-        }
         if resolved.provider.declaration().content != ContentMode::Complete {
             continue;
         }
-        if located.is_none() {
+        let Some(located) = resolved.provider.locate(code)? else {
             let error = format!("The code '{code}' is not valid in the code system '{system}'");
             if !errors.contains(&error) {
                 errors.push(error);
             }
+            continue;
+        };
+        // NOTE: a target not in its code system's normal form is also returned
+        // as `normalized-concept`, `concept` keeping the map's form
+        // (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>, `$translate`).
+        if located.code != *code {
+            found.origin.normalized_concept = Some(CodingRef {
+                system: Some(system.clone()),
+                version: version.clone(),
+                code: Some(located.code),
+                display: None,
+            });
         }
     }
     Ok(errors)

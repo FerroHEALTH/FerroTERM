@@ -69,10 +69,11 @@ macro_rules! family_map {
             const OWN_PARAMETERS: &[&str] = $crate::version::map::family_map!(@own_parameters $flavour);
 
             $crate::version::map::family_map!(@update $flavour,
-            /// The `$lookup` outcome as the version's response: `name`, `version`,
-            /// `display`, R5's `definition`, `designation`, and `property` with its
-            /// `subproperty` parts, then the ecosystem's `code`, `system`,
-            /// `abstract` and `used-supplement`.
+            /// The `$lookup` outcome as the version's response.
+            ///
+            /// It carries `name`, `version`, `display`, R5's `definition`,
+            /// `designation`, and `property` with its `subproperty` parts, then the
+            /// ecosystem's `code`, `system`, `abstract` and `used-supplement`.
             #[must_use]
             pub fn lookup_response(outcome: LookupOutcome) -> CodeSystemLookupResponse {
                 let r#abstract = abstract_of(&outcome);

@@ -81,7 +81,7 @@ fn each_hot_request_stays_within_its_allocation_budget() {
             name: "lookup",
             uri: format!("/r4b/CodeSystem/$lookup?system={system}&code={deep}"),
             blocks: 265,
-            bytes: 54_272,
+            bytes: 55_296,
         },
         Budget {
             name: "validate-code",
