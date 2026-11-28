@@ -631,18 +631,22 @@ impl StoredSystem for Snomed {
 
     /// The LOINC Extension map (`loinc_map`), between this edition and LOINC
     /// either way, when the edition carries LOINC codes.
-    fn implicit_concept_maps(provider: &SnomedProvider, source: &str, target: &str) -> Vec<String> {
+    fn implicit_concept_maps(
+        provider: &SnomedProvider,
+        source: &str,
+        target: &str,
+    ) -> Result<Vec<String>, ProviderError> {
         let (target, version) = target
             .split_once('|')
             .map_or((target, None), |(s, v)| (s, Some(v)));
         let this_version = version.is_none_or(|v| provider.implicit_version(v).is_ok());
         let between = (source == SYSTEM && target == properties::LOINC_SYSTEM)
             || (source == properties::LOINC_SYSTEM && target == SYSTEM && this_version);
-        if between && loinc_map::held(provider) {
+        Ok(if between && loinc_map::held(provider) {
             vec![loinc_map::url(&provider.identity().version)]
         } else {
             Vec::new()
-        }
+        })
     }
 
     /// The implicit value sets of the FHIR SNOMED CT page

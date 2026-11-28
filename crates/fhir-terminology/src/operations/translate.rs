@@ -588,7 +588,7 @@ fn maps_for(
             {
                 for url in sources
                     .registry
-                    .implicit_concept_maps(&subject.system, target)
+                    .implicit_concept_maps(&subject.system, target)?
                 {
                     if let Some(map) = sources.registry.implicit_concept_map(&url, selection) {
                         maps.push(Arc::new(map?));

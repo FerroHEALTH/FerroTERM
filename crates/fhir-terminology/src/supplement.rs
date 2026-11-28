@@ -477,7 +477,11 @@ impl CodeSystemProvider for Supplemented {
         self.inner.implicit_concept_map(url, selection)
     }
 
-    fn implicit_concept_maps(&self, source: &str, target: &str) -> Vec<String> {
+    fn implicit_concept_maps(
+        &self,
+        source: &str,
+        target: &str,
+    ) -> Result<Vec<String>, ProviderError> {
         self.inner.implicit_concept_maps(source, target)
     }
 

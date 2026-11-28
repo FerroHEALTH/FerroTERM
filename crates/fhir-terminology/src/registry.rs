@@ -571,22 +571,29 @@ impl Registry {
 
     /// The implicit concept maps every loaded version defines from codes of
     /// `source` to codes of `target` ([`CodeSystemProvider::implicit_concept_maps`]).
-    #[must_use]
-    pub fn implicit_concept_maps(&self, source: &str, target: &str) -> Vec<String> {
+    ///
+    /// # Errors
+    ///
+    /// Returns the first provider's [`ProviderError`].
+    pub fn implicit_concept_maps(
+        &self,
+        source: &str,
+        target: &str,
+    ) -> Result<Vec<String>, ProviderError> {
         let mut urls = Vec::new();
         for canonical in self.canonicals() {
             let Some(system) = self.system(canonical) else {
                 continue;
             };
             for provider in system.versions.values() {
-                for url in provider.implicit_concept_maps(source, target) {
+                for url in provider.implicit_concept_maps(source, target)? {
                     if !urls.contains(&url) {
                         urls.push(url);
                     }
                 }
             }
         }
-        urls
+        Ok(urls)
     }
 
     /// The system URIs registered here, sorted.
