@@ -116,6 +116,9 @@ case "$mode" in
   mimetypes)
     # BCP 13 is served from the vendored IANA media types registry.
     ;;
+  omop)
+    # The server loads no OMOP vocabulary, so the run measures what it serves.
+    ;;
   *)
     echo "tx-ecosystem-mode: no content recipe for $mode" >&2
     exit 2

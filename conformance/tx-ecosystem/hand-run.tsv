@@ -12,4 +12,3 @@ r4b	loinc	110	2026-11-27	needs a LOINC release; its CI lane is not built yet (#1
 r5	loinc	110	2026-11-27	needs a LOINC release; its CI lane is not built yet (#1437)
 r4b	tx.fhir.org	189	2026-11-27	needs a LOINC release; its CI lane is not built yet (#1437)
 r5	tx.fhir.org	189	2026-11-27	needs a LOINC release; its CI lane is not built yet (#1437)
-r4b	omop	40	2026-11-27	its CI lane is not built yet (#1437)
