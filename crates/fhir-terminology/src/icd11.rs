@@ -42,8 +42,8 @@ use crate::provider::declaration::{
 use crate::provider::filter::{Filter, FilterOperator};
 use crate::provider::source::Source;
 use crate::provider::{
-    CodeSystemProvider, Concept, Hierarchy, Identity, Located, Property, PropertyValue, Status,
-    Subproperty, error::ProviderError,
+    CodeSystemProvider, Concept, ConceptSet, Hierarchy, Identity, Located, Property, PropertyValue,
+    Status, Subproperty, error::ProviderError,
 };
 use crate::registries::interned::Interned;
 use crate::stored::artifact::{Artifact, Layout};
@@ -257,12 +257,26 @@ impl Icd11Provider {
             .unwrap_or_default()
     }
 
-    /// The short code of the entity at `ordinal`, else its URI.
-    fn code_or_uri(&self, ordinal: u32) -> String {
+    /// The code of the entity at `ordinal`: its entity id in a linearization,
+    /// its URI in the Foundation.
+    // NOTE: tx-ecosystem IG `icd-11.md` at 9c2bbce, ICD-11 Codes: in MMS and ICF
+    // "the entity id is the code, and the normal form"; the Foundation's codes
+    // are "for now, the full entity uri".
+    fn code_of(&self, ordinal: u32) -> String {
+        if self.system().linearization == Linearization::Foundation {
+            return self.uri(ordinal);
+        }
+        Self::at(ordinal)
+            .and_then(|i| self.system().ids.get(i))
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// The short classification code of the entity at `ordinal`, when it has one.
+    fn classification_code(&self, ordinal: u32) -> Option<String> {
         Self::at(ordinal)
             .and_then(|i| self.system().codes.get(i))
             .and_then(Clone::clone)
-            .unwrap_or_else(|| self.uri(ordinal))
     }
 
     /// The entity ordinal a URI names, in either form.
@@ -271,14 +285,32 @@ impl Icd11Provider {
         self.system().keys.get(Linearization::key_of(&id)?)
     }
 
-    /// The entity ordinal a token names: a URI in either form, or a short
-    /// code (the linearizations only; the Foundation has no short codes).
+    /// The entity ordinal the entity id `text` names, spelled exactly as the
+    /// release spells it.
+    fn ordinal_of_id(&self, text: &str) -> Option<u32> {
+        let ordinal = self.system().keys.get(Linearization::key_of(text)?)?;
+        let spelled = Self::at(ordinal).and_then(|i| self.system().ids.get(i))?;
+        (spelled == text).then_some(ordinal)
+    }
+
+    /// The entity ordinal a token names: in a linearization an entity id or a
+    /// short classification code, in the Foundation an entity URI.
+    // NOTE: tx-ecosystem IG `icd-11.md` at 9c2bbce, ICD-11 Codes: the
+    // classification code is "an alternative spelling", and "the full entity
+    // uri is not a code in MMS or ICF".
     fn resolve(&self, token: &Token) -> Result<Option<u32>, ProviderError> {
-        if token.uri {
-            return Ok(self.ordinal_of_uri(&token.text));
-        }
         if self.system().linearization == Linearization::Foundation {
+            return Ok(if token.uri {
+                self.ordinal_of_uri(&token.text)
+            } else {
+                None
+            });
+        }
+        if token.uri {
             return Ok(None);
+        }
+        if let Some(ordinal) = self.ordinal_of_id(&token.text) {
+            return Ok(Some(ordinal));
         }
         Ok(self
             .stored()
@@ -323,6 +355,14 @@ impl StoredSystem for Icd11 {
         if text.is_empty() {
             return Ok(None);
         }
+        if provider.system().linearization != Linearization::Foundation
+            && let Some(ordinal) = provider.ordinal_of_id(text)
+        {
+            return Ok(Some(Located {
+                concept: Concept::new(ordinal),
+                code: provider.code_of(ordinal),
+            }));
+        }
         let icf = provider.system().linearization == Linearization::Icf;
         let Some(expression) = Expression::parse(text, icf) else {
             return Ok(None);
@@ -333,7 +373,7 @@ impl StoredSystem for Icd11 {
             };
             return Ok(provider.resolve(token)?.map(|ordinal| Located {
                 concept: Concept::new(ordinal),
-                code: provider.code_or_uri(ordinal),
+                code: provider.code_of(ordinal),
             }));
         }
         if provider.system().linearization == Linearization::Foundation {
@@ -344,7 +384,7 @@ impl StoredSystem for Icd11 {
 
     fn code(provider: &Icd11Provider, concept: Concept) -> Result<Option<String>, ProviderError> {
         if concept.index() < provider.stored().concepts {
-            return Ok(Some(provider.code_or_uri(concept.index())));
+            return Ok(Some(provider.code_of(concept.index())));
         }
         Ok(provider.system().expressions.code(Concept::new(
             concept.index().saturating_sub(provider.stored().concepts),
@@ -363,6 +403,27 @@ impl StoredSystem for Icd11 {
             Some(cluster) => Ok(Some(provider.cluster_display(&cluster, language)?)),
             None => Ok(None),
         }
+    }
+
+    // NOTE: tx-ecosystem IG `icd-11.md` at 9c2bbce, Filter Properties: the text
+    // filter matches "the start of the classification code - so `XN8` finds
+    // `XN8P1` and `XN8KD`".
+    fn search_codes(provider: &Icd11Provider, text: &str) -> ConceptSet {
+        let text = text.trim();
+        let mut concepts = ConceptSet::new();
+        if text.is_empty() {
+            return concepts;
+        }
+        for (ordinal, code) in (0_u32..).zip(&provider.system().codes) {
+            let starts = code.as_deref().is_some_and(|code| {
+                code.get(..text.len())
+                    .is_some_and(|head| head.eq_ignore_ascii_case(text))
+            });
+            if starts {
+                concepts.insert(ordinal);
+            }
+        }
+        concepts
     }
 
     fn definition(
@@ -418,13 +479,14 @@ impl StoredSystem for Icd11 {
             };
         }
         let ordinal = concept.index();
-        let mut out = Vec::new();
-        if let Some(code) = Icd11Provider::at(ordinal)
-            .and_then(|i| provider.system().codes.get(i))
-            .and_then(Clone::clone)
-        {
+        let mut out = vec![Property {
+            code: String::from("code"),
+            value: PropertyValue::Code(provider.code_of(ordinal)),
+            ..Property::default()
+        }];
+        if let Some(code) = provider.classification_code(ordinal) {
             out.push(Property {
-                code: String::from("code"),
+                code: String::from("classificationCode"),
                 value: PropertyValue::Code(code),
                 ..Property::default()
             });
@@ -438,7 +500,7 @@ impl StoredSystem for Icd11 {
             let Some(name) = provider.stored().keys.get(&key) else {
                 continue;
             };
-            if name == "definition" {
+            if name == "definition" || name == "id" {
                 continue;
             }
             for value in values {
@@ -461,14 +523,14 @@ impl StoredSystem for Icd11 {
         for parent in provider.stored().tree.parents(concept) {
             out.push(Property {
                 code: String::from("parent"),
-                value: PropertyValue::Code(provider.uri(parent)),
+                value: PropertyValue::Code(provider.code_of(parent)),
                 ..Property::default()
             });
         }
         for child in provider.stored().tree.children(concept) {
             out.push(Property {
                 code: String::from("child"),
-                value: PropertyValue::Code(provider.uri(child)),
+                value: PropertyValue::Code(provider.code_of(child)),
                 ..Property::default()
             });
         }
@@ -528,7 +590,7 @@ impl StoredSystem for Icd11 {
                 filters: vec![Filter {
                     property: String::from("concept"),
                     op: FilterOperator::IsA,
-                    value: provider.uri(e),
+                    value: provider.code_of(e),
                 }],
                 ..Include::default()
             })
@@ -562,10 +624,18 @@ impl StoredSystem for Icd11 {
 /// What the code system declares.
 fn declaration(linearization: Linearization, languages: Vec<String>) -> Declaration {
     let mut properties: Vec<PropertyDefinition> = [
-        ("id", PropertyKind::Code, "The entity URI"),
-        ("code", PropertyKind::Code, "The short code"),
-        ("parent", PropertyKind::Code, "The parent entity's URI"),
-        ("child", PropertyKind::Code, "A child entity's URI"),
+        (
+            "code",
+            PropertyKind::Code,
+            "The code: the entity id (MMS, ICF) or URI (Foundation)",
+        ),
+        (
+            "classificationCode",
+            PropertyKind::Code,
+            "The short classification code, where there is one",
+        ),
+        ("parent", PropertyKind::Code, "A parent of the entity"),
+        ("child", PropertyKind::Code, "A child of the entity"),
         (
             "classKind",
             PropertyKind::Code,
