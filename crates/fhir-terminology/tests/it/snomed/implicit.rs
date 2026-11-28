@@ -192,15 +192,26 @@ fn malformed_and_unknown_implicit_value_sets_are_refused() {
         matches!(
             p.implicit_value_set(&format!("{base}?fhir_vs=refset/{}", sctid(item(FUR))))
                 .expect("implicit"),
-            Err(ProviderError::UnknownCode(_))
+            Err(ProviderError::UnknownImplicitValueSet { .. })
         ),
-        "a concept that is not a reference set"
+        "a concept that is not a reference set names no value set"
     );
+    // "Where the implicit value set names a refset or a concept that does not
+    // exist, the server SHALL return an error naming the value set that was
+    // asked for" (tx-ecosystem IG, requirements, SNOMED CT).
     assert!(matches!(
         p.implicit_value_set(&format!("{base}?fhir_vs=isa/{}", sctid(Item::raw(77))))
             .expect("implicit"),
-        Err(ProviderError::UnknownCode(_))
+        Err(ProviderError::UnknownImplicitValueSet { ref url }) if url.ends_with(&sctid(Item::raw(77)))
     ));
+    assert!(
+        matches!(
+            p.implicit_value_set(&format!("{base}?fhir_vs=isa/4106070063"))
+                .expect("implicit"),
+            Err(ProviderError::UnknownImplicitValueSet { .. })
+        ),
+        "an identifier with a wrong check digit names no concept"
+    );
     assert!(matches!(
         p.implicit_value_set(&format!("{base}?fhir_vs=isa/abc"))
             .expect("implicit"),

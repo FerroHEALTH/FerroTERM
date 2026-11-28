@@ -246,6 +246,10 @@ impl From<ProviderError> for OperationError {
             // (<https://hl7.org/fhir/R4B/conceptmap-operation-translate.html>).
             ProviderError::MalformedImplicitConceptMap { .. } => Self::Invalid(error.to_string()),
             ProviderError::UnknownImplicitConceptMap { url } => Self::UnknownConceptMap(url),
+            // NOTE: "Where the implicit value set names a refset or a concept that does not
+            // exist, the server SHALL return an error naming the value set that was asked
+            // for" (tx-ecosystem IG, requirements, SNOMED CT): the value set is not found.
+            ProviderError::UnknownImplicitValueSet { url } => Self::UnknownValueSet(url),
             // NOTE: an implicit URI whose base names an edition version the server
             // does not hold is a version it cannot find, not a malformed value set
             // (<https://hl7.org/fhir/R4B/snomedct.html>, "Implicit Value Sets").
