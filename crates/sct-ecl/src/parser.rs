@@ -31,10 +31,12 @@ use sct_scg::front::{
 };
 
 mod filter;
+mod junction;
 
 use self::filter::{
     concept_filter_constraint, description_filter_constraint, member_filter_constraint,
 };
+use self::junction::{Junction, joins, operand};
 
 /// A word, compared case-insensitively (every keyword of the grammar spells
 /// each letter as `(CAP_X | X)`).
@@ -768,40 +770,6 @@ fn refinement(i: &mut Tokens<'_, Kind>) -> PResult<Refinement> {
         return Ok(Refinement::Disjunction(all));
     }
     Ok(Refinement::Single(Box::new(first)))
-}
-
-/// The two junctions of a refinement.
-#[derive(Clone, Copy)]
-enum Junction {
-    And,
-    Or,
-}
-
-/// Whether `item` is an unbracketed attribute set joined by `junction`.
-fn joins(item: &SubRefinement, junction: Junction) -> bool {
-    matches!(
-        (item, junction),
-        (
-            SubRefinement::AttributeSet(AttributeSet::Conjunction(_)),
-            Junction::And
-        ) | (
-            SubRefinement::AttributeSet(AttributeSet::Disjunction(_)),
-            Junction::Or
-        )
-    )
-}
-
-/// A `subrefinement` joined by `junction`, refused when it mixes in the other.
-fn operand<'i>(
-    junction: Junction,
-) -> impl Parser<Tokens<'i, Kind>, SubRefinement, ErrMode<Failure>> {
-    let other = match junction {
-        Junction::And => Junction::Or,
-        Junction::Or => Junction::And,
-    };
-    sub_refinement
-        .verify(move |item: &SubRefinement| !joins(item, other))
-        .expecting("round brackets around a mix of AND and OR")
 }
 
 /// A whole input: one expression constraint and nothing after it.
