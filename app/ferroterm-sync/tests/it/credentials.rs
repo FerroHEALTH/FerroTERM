@@ -187,3 +187,71 @@ fn the_client_credentials_table_reads_from_the_file() {
         .expect("the client credentials table");
     assert_eq!(oauth.client_id, "ferroterm-sync");
 }
+
+/// An ML-DSA-65 private key as PKCS#8 PEM in its seed form (RFC 9881 §6),
+/// the file `openssl genpkey -algorithm ML-DSA-65` writes, from a fixed seed.
+fn ml_dsa_65_pem() -> String {
+    use base64::Engine as _;
+    let mut der = vec![
+        0x30, 0x34, 0x02, 0x01, 0x00, 0x30, 0x0b, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03,
+        0x04, 0x03, 0x12, 0x04, 0x22, 0x80, 0x20,
+    ];
+    der.extend_from_slice(&[7; 32]);
+    let body = base64::engine::general_purpose::STANDARD.encode(der);
+    format!("-----BEGIN PRIVATE KEY-----\n{body}\n-----END PRIVATE KEY-----\n")
+}
+
+// RFC 9449 §4.2 asks only for an asymmetric algorithm, and RFC 9964 names
+// ML-DSA for JOSE: an ML-DSA DPoP key signs every proof with its parameter set.
+#[tokio::test]
+async fn an_ml_dsa_dpop_key_signs_its_proofs_with_ml_dsa() {
+    use base64::Engine as _;
+    let dir = tempfile::tempdir().expect("tempdir");
+    let key = dir.path().join("sync-dpop.pem");
+    std::fs::write(&key, ml_dsa_65_pem()).expect("the key is written");
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/token"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "access_token": "synthetic-token",
+            "token_type": "DPoP",
+            "expires_in": 300,
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/reload"))
+        .and(header("authorization", "DPoP synthetic-token"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("{\"outcome\":\"ok\"}"))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let mut credentials = oauth(&server);
+    if let Some(oauth) = credentials.oauth.as_mut() {
+        oauth.dpop_key_file = Some(key);
+    }
+
+    client(&server, credentials)
+        .reload()
+        .await
+        .expect("the server reloads");
+    let requests = server.received_requests().await.unwrap_or_default();
+    assert_eq!(requests.len(), 2, "one token request and one reload");
+    for request in &requests {
+        let proof = request
+            .headers
+            .get("dpop")
+            .and_then(|value| value.to_str().ok())
+            .expect("every call carries a DPoP proof");
+        let header = proof.split('.').next().expect("a compact JWS");
+        let header: serde_json::Value = serde_json::from_slice(
+            &base64::engine::general_purpose::URL_SAFE_NO_PAD
+                .decode(header)
+                .expect("base64url"),
+        )
+        .expect("a JSON header");
+        assert_eq!(header["alg"], "ML-DSA-65", "{}", request.url.path());
+        assert_eq!(header["typ"], "dpop+jwt", "{}", request.url.path());
+        assert_eq!(header["jwk"]["kty"], "AKP", "{}", request.url.path());
+    }
+}

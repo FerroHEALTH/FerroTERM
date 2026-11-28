@@ -1,0 +1,1 @@
+- The book documents `oauth.dpop_key_file` for the sync service's client credentials grant. Its post-quantum example binds the tokens to an ML-DSA-65 DPoP key, so every DPoP proof is signed with ML-DSA (RFC 9964, RFC 9449 §4.2). The post-quantum inventory counts the outbound DPoP proofs as safe in that configuration: 13 of 15 uses.
