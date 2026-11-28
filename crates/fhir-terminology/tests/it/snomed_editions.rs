@@ -16,6 +16,7 @@ use fhir_terminology::operations::Invocation;
 use fhir_terminology::operations::expand::{ExpandInput, expand};
 use fhir_terminology::operations::lookup::{LookupInput, lookup};
 use fhir_terminology::operations::translate::{TranslateInput, translate};
+use fhir_terminology::operations::validate_code::{ValidateCodeInput, validate_code};
 use fhir_terminology::operations::{OperationError, sources::Sources};
 use fhir_terminology::registry::{Registry, ResolveError};
 use fhir_terminology::snomed::{SYSTEM, SnomedProvider};
@@ -323,5 +324,64 @@ fn an_edition_uri_without_a_date_names_the_greatest_release_of_that_edition() {
     assert_eq!(
         outcome.version.as_deref(),
         Some(snomed::later_version().as_str())
+    );
+}
+
+#[test]
+fn an_inactive_description_is_left_out_of_an_expansion_and_marked_in_a_lookup() {
+    // tx-ecosystem IG, requirements, Inactive, Deprecated and Not-Selectable
+    // Codes: an inactive designation an expansion includes carries a
+    // standards-status, and one given as a display is no longer current.
+    let editions = Editions::new();
+    let outcome = expand(
+        &editions.sources(),
+        &ExpandInput {
+            url: Some(format!("{EDITION}?fhir_vs=isa/{}", code(ANIMAL))),
+            include_designations: Some(true),
+            ..ExpandInput::default()
+        },
+    )
+    .expect("expands");
+    let cat = outcome
+        .contains
+        .iter()
+        .find(|c| c.code == code(CAT))
+        .expect("the cat");
+    assert!(!cat.designations.iter().any(|d| d.value == "Moggy"));
+    assert!(cat.designations.iter().any(|d| d.value == "Kat"));
+    let looked_up = lookup(
+        &editions.registry,
+        &Invocation::Type,
+        &LookupInput {
+            system: Some(SYSTEM.to_owned()),
+            code: Some(code(CAT)),
+            ..LookupInput::default()
+        },
+    )
+    .expect("looks up");
+    let moggy = looked_up
+        .designations
+        .iter()
+        .find(|d| d.value == "Moggy")
+        .expect("a lookup lists the inactive synonym");
+    assert_eq!(moggy.standards_status.as_deref(), Some("withdrawn"));
+    let validated = validate_code(
+        &editions.registry,
+        &Invocation::Type,
+        &ValidateCodeInput {
+            url: Some(SYSTEM.to_owned()),
+            code: Some(code(CAT)),
+            display: Some(String::from("Moggy")),
+            lenient_display: true,
+            ..ValidateCodeInput::default()
+        },
+    )
+    .expect("validates");
+    assert!(validated.result, "an inactive display is still valid");
+    assert!(
+        validated.issues.iter().any(|i| i.severity == "warning"
+            && i.text.contains("no longer considered a correct display")),
+        "{:?}",
+        validated.issues
     );
 }

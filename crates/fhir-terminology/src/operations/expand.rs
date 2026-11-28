@@ -19,6 +19,7 @@ use super::sources::Sources;
 use crate::compose::negotiation::{Negotiation, canonicals};
 use crate::compose::{Expansion, Item, Options};
 use crate::provider::compose::{Compose, Include};
+use crate::provider::declaration::ContentMode;
 use crate::provider::{Designation, Property, PropertyValue};
 use crate::valueset::expansion::{
     Contains, ExpansionOutcome, ExpansionParameter, ExpansionProperty, ParameterValue,
@@ -571,10 +572,15 @@ fn designations_of(
             None => d.language.as_deref() == Some(*w),
         })
     };
+    // NOTE: the tx-ecosystem IG lets an expansion leave an inactive designation out
+    // (Inactive, Deprecated and Not-Selectable Codes); a release's withdrawn terms stay
+    // out of pick-lists for clinical safety, a resource's keep their marker: our own design.
+    let released = resolved.provider.declaration().content == ContentMode::NotPresent;
     let mut designations: Vec<Designation> = resolved
         .provider
         .designations(located.concept, None)?
         .into_iter()
+        .filter(|d| !(released && d.standards_status.is_some()))
         .filter(selected)
         .collect();
     // A `displayLanguage` that lands on a designation makes that designation
