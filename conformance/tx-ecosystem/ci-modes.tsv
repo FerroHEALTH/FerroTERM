@@ -7,3 +7,5 @@
 # from its row, and scripts/checks/conformance-badges.sh draws its badge.
 surface	mode	ran
 r4b	snomed	378
+r4b	mimetypes	52
+r4b	omop	40

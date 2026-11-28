@@ -277,6 +277,10 @@ impl CodeSystemProvider for Supplemented {
         self.inner.rejection(code)
     }
 
+    fn advisories(&self, concept: Concept) -> Result<Vec<String>, ProviderError> {
+        self.inner.advisories(concept)
+    }
+
     fn admits_post_coordination(&self, filters: &[crate::provider::filter::Filter]) -> bool {
         self.inner.admits_post_coordination(filters)
     }

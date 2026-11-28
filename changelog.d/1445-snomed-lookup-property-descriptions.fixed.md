@@ -1,0 +1,1 @@
+- SNOMED CT `$lookup` gives every concept-valued property (`parent`, `child`, `moduleId` and the defining relationships) the concept's display as its `description`, and lists a relationship value a concept carries in more than one role group once. A display read in the default language no longer allocates a lowered copy of the language for each comparison.

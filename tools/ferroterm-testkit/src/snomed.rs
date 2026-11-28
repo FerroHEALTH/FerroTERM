@@ -8,6 +8,7 @@
 //! lays it out: invented concepts in an invented namespace with valid check
 //! digits, and no SNOMED content.
 
+pub mod mrcm;
 mod shape;
 
 use std::path::Path;
@@ -115,6 +116,11 @@ pub const NL_LANGUAGE_REFSET: u32 = 20;
 /// The bird, under the animal and a member of the pets reference set; only the
 /// second edition ([`write_second`]) holds it.
 pub const BIRD: u32 = 21;
+/// The published SCTID of `30051010000102 |LOINC code identifier|`, the scheme
+/// under which the cat carries [`CAT_LOINC`].
+pub const LOINC_SCHEME: u64 = 30_051_010_000_102;
+/// The cat's code in [`LOINC_SCHEME`], invented and of no LOINC release.
+pub const CAT_LOINC: &str = "SYNTH-1";
 /// The published SCTID of the ICD-10 extended map reference set.
 pub const ICD10_MAP_SCTID: &str = "447562003";
 /// The code system the ICD-10 extended map reference set maps to.
@@ -272,6 +278,8 @@ struct Shape<'a> {
     release_date: &'a str,
     /// Whether the edition holds [`BIRD`].
     bird: bool,
+    /// Whether the edition carries the concept model of [`mrcm`].
+    mrcm: bool,
 }
 
 /// The edition URI of the second synthetic edition ([`write_second`]).
@@ -300,6 +308,27 @@ pub fn write(dir: &Path) -> Result<(), FixtureError> {
             version: VERSION,
             release_date: DATE,
             bird: false,
+            mrcm: false,
+        },
+    )
+}
+
+/// Writes the first edition with [`BIRD`] and the concept model of [`mrcm`]
+/// under `dir`, for the tests of the concept model check.
+///
+/// # Errors
+///
+/// Returns [`FixtureError`] when a writer fails; the fixture is fixed content,
+/// so a failure means the writers or the directory are at fault.
+pub fn write_with_concept_model(dir: &Path) -> Result<(), FixtureError> {
+    write_shape(
+        dir,
+        &Shape {
+            edition: EDITION,
+            version: VERSION,
+            release_date: DATE,
+            bird: true,
+            mrcm: true,
         },
     )
 }
@@ -329,6 +358,7 @@ pub fn write_later(dir: &Path) -> Result<(), FixtureError> {
             version: &later_version(),
             release_date: LATER_DATE,
             bird: true,
+            mrcm: false,
         },
     )
 }
@@ -352,6 +382,7 @@ pub fn write_second(dir: &Path) -> Result<(), FixtureError> {
             version: &second_version(),
             release_date: SECOND_DATE,
             bird: true,
+            mrcm: false,
         },
     )
 }

@@ -426,6 +426,17 @@ pub trait CodeSystemProvider: fmt::Debug + Send + Sync {
         None
     }
 
+    /// What a code the system accepts breaks of its recommendations, each a
+    /// warning `$validate-code` reports beside a `true` result; a system with
+    /// no such rules has none.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProviderError`] when the substrate fails.
+    fn advisories(&self, _concept: Concept) -> Result<Vec<String>, ProviderError> {
+        Ok(Vec::new())
+    }
+
     /// Whether an include with `filters` admits post-coordinated expressions
     /// into its selection.
     ///

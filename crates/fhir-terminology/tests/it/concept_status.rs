@@ -409,7 +409,8 @@ fn a_deprecation_stated_through_the_standard_properties_earns_the_deprecation_no
         assert_eq!(outcome.status.as_deref(), Some("deprecated"), "{code}");
         assert!(
             outcome.issues.iter().any(|issue| {
-                issue.message == fhir_terminology::operations::MessageId::DeprecatedConceptFound
+                issue.message
+                    == Some(fhir_terminology::operations::MessageId::DeprecatedConceptFound)
                     && issue.severity == "warning"
             }),
             "{code} earns DEPRECATED_CONCEPT_FOUND: {:?}",

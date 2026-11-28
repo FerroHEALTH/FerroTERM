@@ -5,6 +5,7 @@
 //! reads, the vocabulary keys, and the base language.
 
 use super::implicit::implicit_forms;
+use super::properties::{LOINC_PROPERTY, LOINC_SCHEME};
 use super::{
     EXPRESSIONS, FHIR_PROPERTIES, GENERATED_PROPERTIES, Keys, Manifest, OpenError, SYSTEM, Snomed,
     SnomedProvider,
@@ -85,6 +86,16 @@ impl SnomedProvider {
             description: None,
             kind: PropertyKind::Code,
         }));
+        if identifiers.schemes().contains(&LOINC_SCHEME) {
+            properties.push(PropertyDefinition {
+                code: LOINC_PROPERTY.to_owned(),
+                uri: None,
+                description: Some(String::from(
+                    "The LOINC code the LOINC Extension gives the concept",
+                )),
+                kind: PropertyKind::Coding,
+            });
+        }
         let identity = Identity {
             url: SYSTEM.to_owned(),
             version: manifest.version,
@@ -133,6 +144,7 @@ impl SnomedProvider {
                 scg: Mutex::new(super::expression::Expressions::default()),
                 attribute_ordinals: OnceLock::new(),
                 inactive: OnceLock::new(),
+                mrcm: OnceLock::new(),
                 keys,
                 edition: manifest.edition,
                 base_language,

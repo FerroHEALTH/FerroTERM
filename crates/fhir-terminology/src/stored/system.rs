@@ -114,6 +114,18 @@ pub trait StoredSystem: fmt::Debug + Send + Sync + Sized {
         None
     }
 
+    /// As [`CodeSystemProvider::advisories`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProviderError`] when the substrate fails.
+    fn advisories(
+        _provider: &StoredProvider<Self>,
+        _concept: Concept,
+    ) -> Result<Vec<String>, ProviderError> {
+        Ok(Vec::new())
+    }
+
     /// As [`CodeSystemProvider::admits_post_coordination`].
     fn admits_post_coordination(_provider: &StoredProvider<Self>, _filters: &[Filter]) -> bool {
         false
@@ -327,6 +339,10 @@ impl<S: StoredSystem> CodeSystemProvider for StoredProvider<S> {
 
     fn rejection(&self, code: &str) -> Option<String> {
         S::rejection(self, code)
+    }
+
+    fn advisories(&self, concept: Concept) -> Result<Vec<String>, ProviderError> {
+        S::advisories(self, concept)
     }
 
     fn admits_post_coordination(&self, filters: &[Filter]) -> bool {
