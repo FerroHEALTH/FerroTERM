@@ -4,12 +4,12 @@
 //! Writing one shaped edition as the build writes it: the store, the hierarchy, the designation index, the reference set memberships, the attribute and member tables, and the manifest.
 
 use super::{
-    ALTERNATIVE, ALTERNATIVE_SCTID, ANIMAL, BIRD, CAT, CAT_LOINC, CODES_MAP, COVERING, DOG, FISH,
-    FUR, FixtureError, GB_LANGUAGE_REFSET, GB_REFSET, HISTORICAL, HISTORICAL_SCTID, ICD10_MAP,
-    ICD10_MAP_SCTID, Item, LEGS, LOINC_SCHEME, MODULE_CONCEPT, MODULE_DEPENDENCY,
-    MODULE_DEPENDENCY_SCTID, NL_LANGUAGE_REFSET, NL_REFSET, PETS, POSSIBLY_EQUIVALENT_TO,
-    POSSIBLY_EQUIVALENT_TO_SCTID, REPLACED_BY, REPLACED_BY_SCTID, Row, SAME_AS, SAME_AS_SCTID,
-    SCHEME, Shape, TOP, code_of, item, sctid, write_concepts,
+    ALTERNATIVE, ALTERNATIVE_SCTID, ANIMAL, BIRD, CAT, CAT_LOINC, CODES_MAP, COVERING,
+    DEPENDED_DATE, DOG, FISH, FUR, FixtureError, GB_LANGUAGE_REFSET, GB_REFSET, HISTORICAL,
+    HISTORICAL_SCTID, ICD10_MAP, ICD10_MAP_SCTID, Item, LEGS, LOINC_SCHEME, MODULE_CONCEPT,
+    MODULE_DEPENDENCY, MODULE_DEPENDENCY_SCTID, NL_LANGUAGE_REFSET, NL_REFSET, PETS,
+    POSSIBLY_EQUIVALENT_TO, POSSIBLY_EQUIVALENT_TO_SCTID, REPLACED_BY, REPLACED_BY_SCTID, Row,
+    SAME_AS, SAME_AS_SCTID, SCHEME, Shape, TOP, code_of, item, sctid, write_concepts,
 };
 use crate::edition::{self, ord};
 use concept_graph::attributes::{self, Attributes};
@@ -23,6 +23,14 @@ use concept_store::store::Vocabulary;
 use concept_store::tables;
 use designation_index::index::IndexBuilder;
 use std::path::Path;
+
+/// The code of the row at `ordinal`.
+fn code_of_ordinal(rows: &[Row], ordinal: u32) -> String {
+    rows.iter()
+        .find(|row| row.ordinal == ordinal)
+        .map(code_of)
+        .unwrap_or_default()
+}
 
 #[expect(
     clippy::too_many_lines,
@@ -382,7 +390,21 @@ pub(super) fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureEr
     )?;
 
     let mut text = IndexBuilder::default();
-    write_concepts(&mut builder, &mut text, &rows, &is_a, &module)?;
+    let own_module = shape
+        .edition
+        .rsplit('/')
+        .next()
+        .unwrap_or_default()
+        .to_owned();
+    let depended = code_of_ordinal(&rows, MODULE_CONCEPT);
+    let module_of = |ordinal: u32| -> String {
+        match (shape.extension, ordinal) {
+            (true, DOG | BIRD) => own_module.clone(),
+            (true, _) => depended.clone(),
+            (false, _) => module.clone(),
+        }
+    };
+    write_concepts(&mut builder, &mut text, &rows, &is_a, &module_of)?;
     // The cat and the dog have covering fur and four legs; the cat states both
     // in one role group, the dog in two.
     for animal in [CAT, DOG] {
@@ -501,13 +523,25 @@ pub(super) fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureEr
                     refsets::FieldKind::Integer,
                 ),
             ],
-            vec![member(
-                MODULE_CONCEPT,
-                vec![
-                    refsets::FieldValue::Integer(20_260_101),
-                    refsets::FieldValue::Integer(20_260_101),
-                ],
-            )],
+            vec![if shape.extension {
+                refsets::MemberRow {
+                    concept: Ordinal::new(MODULE_CONCEPT),
+                    effective_time: 20_260_101,
+                    module: own_module.parse().unwrap_or_default(),
+                    values: vec![
+                        refsets::FieldValue::Integer(20_260_101),
+                        refsets::FieldValue::Integer(DEPENDED_DATE.parse().unwrap_or_default()),
+                    ],
+                }
+            } else {
+                member(
+                    MODULE_CONCEPT,
+                    vec![
+                        refsets::FieldValue::Integer(20_260_101),
+                        refsets::FieldValue::Integer(20_260_101),
+                    ],
+                )
+            }],
         )
         .map_err(|e| FixtureError::Graph(e.to_string()))?;
     tables

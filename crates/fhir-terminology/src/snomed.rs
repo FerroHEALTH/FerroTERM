@@ -606,44 +606,13 @@ impl StoredSystem for Snomed {
         selection: crate::provider::MapSelection<'_>,
     ) -> Option<Result<crate::provider::concept_map::ConceptMapModel, ProviderError>> {
         let (base, form) = implicit_parts(url, FHIR_CM)?;
-        let malformed = |reason: String| ProviderError::MalformedImplicitConceptMap {
-            url: url.to_owned(),
-            reason,
-        };
         // NOTE: the base must be this edition or the bare system URI; the map itself
         // always states the served version
         // (<https://hl7.org/fhir/R4B/snomedct.html>, "Implicit Concept Maps").
         if let Err(error) = provider.implicit_version(base) {
             return Some(Err(error));
         }
-        let Some(decoded) = percent_decode(form) else {
-            return Some(Err(malformed(format!(
-                "`{form}` is not a percent-encoded SCTID"
-            ))));
-        };
-        if let Some(module) = decoded.trim().strip_prefix(edition_map::FORM) {
-            let Ok(module) = ConceptId::parse(module) else {
-                return Some(Err(malformed(format!("`{module}` is not an SCTID"))));
-            };
-            return Some(edition_map::concept_map(
-                provider,
-                url,
-                module.value(),
-                selection,
-            ));
-        }
-        let Ok(refset) = ConceptId::parse(decoded.trim()) else {
-            return Some(Err(malformed(format!("`{decoded}` is not an SCTID"))));
-        };
-        if refset.value() == loinc_map::LOINC_MODULE {
-            return Some(loinc_map::concept_map(provider, url, selection));
-        }
-        Some(conceptmap::concept_map(
-            provider,
-            url,
-            refset.value(),
-            selection,
-        ))
+        Some(conceptmap::implicit(provider, url, form, selection))
     }
 
     /// The LOINC Extension map (`loinc_map`), between this edition and LOINC
@@ -659,11 +628,20 @@ impl StoredSystem for Snomed {
         let this_version = version.is_none_or(|v| provider.implicit_version(v).is_ok());
         let between = (source == SYSTEM && target == properties::LOINC_SYSTEM)
             || (source == properties::LOINC_SYSTEM && target == SYSTEM && this_version);
-        Ok(if between && loinc_map::held(provider) {
-            vec![loinc_map::url(&provider.identity().version)]
-        } else {
-            Vec::new()
-        })
+        let mut urls = Vec::new();
+        if between && loinc_map::held(provider) {
+            urls.push(loinc_map::url(&provider.identity().version));
+        }
+        // An edition this one depends on, named by its edition or version URI.
+        if source == SYSTEM
+            && target == SYSTEM
+            && !this_version
+            && let Some(module) = version.and_then(edition_map::module_of_uri)
+            && provider.depends_on(module)?
+        {
+            urls.push(edition_map::url(&provider.identity().version, module));
+        }
+        Ok(urls)
     }
 
     /// The implicit value sets of the FHIR SNOMED CT page

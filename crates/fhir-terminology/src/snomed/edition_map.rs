@@ -46,6 +46,15 @@ pub(super) fn url(version: &str, module: u64) -> String {
     format!("{version}?{FHIR_CM}={FORM}{module}")
 }
 
+/// The module of an edition or version URI, `http://snomed.info/sct/[module]`
+/// with an optional `/version/[date]`.
+pub(super) fn module_of_uri(uri: &str) -> Option<u64> {
+    let rest = uri
+        .strip_prefix("http://snomed.info/sct/")
+        .or_else(|| uri.strip_prefix("http://snomed.info/xsct/"))?;
+    rest.split('/').next()?.parse().ok()
+}
+
 /// The target edition: its modules and the version this edition depends on.
 #[derive(Debug)]
 struct TargetEdition {
@@ -119,6 +128,11 @@ impl SnomedProvider {
             modules,
             version: format!("http://snomed.info/sct/{module}/version/{time}"),
         }))
+    }
+
+    /// Whether this edition depends on the edition `module` heads.
+    pub(super) fn depends_on(&self, module: u64) -> Result<bool, ProviderError> {
+        Ok(self.target_edition(module)?.is_some())
     }
 
     fn in_target(&self, target: &TargetEdition, concept: Ordinal) -> Result<bool, ProviderError> {
