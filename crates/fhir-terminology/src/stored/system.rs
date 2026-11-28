@@ -178,6 +178,11 @@ pub trait StoredSystem: fmt::Debug + Send + Sync + Sized {
         false
     }
 
+    /// As [`CodeSystemProvider::requested_properties`].
+    fn requested_properties(_provider: &StoredProvider<Self>) -> &[&'static str] {
+        &[]
+    }
+
     /// As [`CodeSystemProvider::generated_properties`].
     fn generated_properties(_provider: &StoredProvider<Self>) -> &[&'static str] {
         &[]
@@ -469,6 +474,10 @@ impl<S: StoredSystem> CodeSystemProvider for StoredProvider<S> {
 
     fn answers_version(&self, version: &str) -> bool {
         S::answers_version(self, version)
+    }
+
+    fn requested_properties(&self) -> &[&'static str] {
+        S::requested_properties(self)
     }
 
     fn generated_properties(&self) -> &[&'static str] {

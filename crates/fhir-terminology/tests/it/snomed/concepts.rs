@@ -114,9 +114,15 @@ fn properties_follow_the_snomed_on_fhir_list() {
         find("moduleId"),
         [&PropertyValue::Code(sctid(Item::raw(99)))]
     );
+    // The HL7 Terminology SNOMEDCT page types `effectiveTime` as `dateTime`
+    // and defines `semanticTag` from the fully specified name.
     assert_eq!(
         find("effectiveTime"),
-        [&PropertyValue::String(String::from("20260101"))]
+        [&PropertyValue::DateTime(String::from("2026-01-01"))]
+    );
+    assert_eq!(
+        find("semanticTag"),
+        [&PropertyValue::Code(String::from("synthetic"))]
     );
     assert_eq!(find("parent"), [&PropertyValue::Code(sctid(item(ANIMAL)))]);
     assert_eq!(find("child"), Vec::<&PropertyValue>::new());
@@ -594,17 +600,32 @@ fn the_normal_form_is_answered_only_where_a_request_asks_for_it() {
         .expect("looks up")
         .properties
         .iter()
-        .any(|property| property.code == "normalForm")
+        .map(|property| property.code.clone())
+        .collect::<Vec<_>>()
     };
-    assert!(!ask(Vec::new()), "a request naming none pays for none");
+    let has = |properties: Vec<String>, code: &str| ask(properties).iter().any(|c| c == code);
     assert!(
-        ask(vec![String::from("normalForm")]),
+        !has(Vec::new(), "normalForm"),
+        "a request naming none pays for none"
+    );
+    assert!(
+        has(vec![String::from("normalForm")], "normalForm"),
         "naming it answers it"
     );
-    assert!(
-        ask(vec![String::from("*")]),
-        "`*` asks for everything there is"
-    );
+    // tx-ecosystem IG, requirements, SNOMED CT: the normal forms are returned
+    // "only when they are asked for by name": not by default, and not for `*`.
+    assert!(!has(vec![String::from("*")], "normalForm"));
+    for held_back in ["sufficientlyDefined", "semanticTag"] {
+        assert!(!has(Vec::new(), held_back), "{held_back} waits to be asked");
+        assert!(
+            has(vec![String::from("*")], held_back),
+            "{held_back} for `*`"
+        );
+        assert!(
+            has(vec![held_back.to_owned()], held_back),
+            "{held_back} by name"
+        );
+    }
 }
 
 #[test]
