@@ -24,7 +24,7 @@ on:
       mode:
         description: The mode to run; all runs every row of ci-modes.tsv.
         type: choice
-        options: [all, snomed, mimetypes, omop, icf]
+        options: [all, snomed, mimetypes, omop, icf, icd-11]
         default: all
   pull_request:
     paths:
@@ -76,7 +76,8 @@ jobs:
     name: ${{ matrix.mode }} ${{ matrix.fhir }}
     needs: plan
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # The icd-11 recipe starts WHO's ICD-API deployment and walks it.
+    timeout-minutes: 150
     permissions:
       contents: read
       # A failed scheduled or dispatched run is filed where the work is tracked.
