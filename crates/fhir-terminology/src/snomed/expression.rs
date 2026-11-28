@@ -658,8 +658,8 @@ impl SnomedProvider {
     /// defines for "the given code or expression"
     /// (<https://hl7.org/fhir/R4B/snomedct.html>, "SNOMED CT Properties").
     ///
-    /// A nested sub-expression has no `code` to carry as a property value, so
-    /// its attribute is left out; the normal form renders it in full.
+    /// A nested sub-expression is an expression, a code of the system (the FHIR
+    /// SNOMED CT page, Expressions), so its value is the code its terse form writes.
     pub(super) fn expression_attributes(
         &self,
         record: &Registered,
@@ -676,8 +676,6 @@ impl SnomedProvider {
                 }
                 ast::AttributeValue::Text(text) => PropertyValue::String(text.clone()),
                 ast::AttributeValue::Number(number) => PropertyValue::Decimal(number.clone()),
-                // NOTE: an expression is a code of the SNOMED CT system (the FHIR SNOMED CT
-                // page, Expressions), so a nested value is the code its terse form writes.
                 ast::AttributeValue::Nested(nested) => {
                     let nested = ast::Expression {
                         definition_status: None,
