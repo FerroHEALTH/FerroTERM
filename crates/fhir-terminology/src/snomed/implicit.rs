@@ -21,13 +21,17 @@ impl SnomedProvider {
     pub(super) fn sctid_of(&self, url: &str, text: &str) -> Result<String, ProviderError> {
         match self.locate(text)? {
             Some(located) => Ok(located.code),
-            None => Err(match ConceptId::parse(text) {
-                Ok(_) => ProviderError::UnknownCode(text.to_owned()),
-                Err(_) => ProviderError::malformed_implicit_value_set(
-                    url,
-                    format!("`{text}` is not an SCTID"),
-                ),
-            }),
+            // An identifier with a wrong check digit still names no concept, so only
+            // a text that is no identifier at all makes the URI malformed.
+            None if !text.is_empty() && text.bytes().all(|b| b.is_ascii_digit()) => {
+                Err(ProviderError::UnknownImplicitValueSet {
+                    url: url.to_owned(),
+                })
+            }
+            None => Err(ProviderError::malformed_implicit_value_set(
+                url,
+                format!("`{text}` is not an SCTID"),
+            )),
         }
     }
 
@@ -116,7 +120,9 @@ impl SnomedProvider {
                             "a language reference set references descriptions, not concepts",
                         ));
                     }
-                    return Err(ProviderError::UnknownCode(refset));
+                    return Err(ProviderError::UnknownImplicitValueSet {
+                        url: url.to_owned(),
+                    });
                 }
                 Ok(Filter {
                     property: String::from("concept"),

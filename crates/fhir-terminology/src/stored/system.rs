@@ -143,6 +143,23 @@ pub trait StoredSystem: fmt::Debug + Send + Sync + Sized {
         false
     }
 
+    /// As [`CodeSystemProvider::display_standing`]: a postcoordinated concept's
+    /// display is the one its grammar generates.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProviderError`] when the substrate fails.
+    fn display_standing(
+        provider: &StoredProvider<Self>,
+        concept: Concept,
+    ) -> Result<crate::provider::DisplayStanding, ProviderError> {
+        Ok(if Self::is_postcoordinated(provider, concept) {
+            crate::provider::DisplayStanding::Generated
+        } else {
+            crate::provider::DisplayStanding::Defined
+        })
+    }
+
     /// As [`CodeSystemProvider::implicit_value_set`].
     fn implicit_value_set(
         _provider: &StoredProvider<Self>,
@@ -382,6 +399,13 @@ impl<S: StoredSystem> CodeSystemProvider for StoredProvider<S> {
 
     fn is_postcoordinated(&self, concept: Concept) -> bool {
         S::is_postcoordinated(self, concept)
+    }
+
+    fn display_standing(
+        &self,
+        concept: Concept,
+    ) -> Result<crate::provider::DisplayStanding, ProviderError> {
+        S::display_standing(self, concept)
     }
 
     fn designations(

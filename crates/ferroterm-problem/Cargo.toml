@@ -3,7 +3,7 @@
 [package]
 name = "ferroterm-problem"
 description = "The RFC 9457 problem document FerroTERM's services write outside the FHIR bases"
-version = "0.16.1"
+version = "0.17.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
