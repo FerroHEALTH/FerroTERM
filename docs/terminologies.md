@@ -333,15 +333,21 @@ and it does so **without reading an openEHR artefact**.
   specified names, inclusions, and index terms as designations by language,
   `id`, `classKind`, `notSelectable`, `definition`, `exclusion`, `source`, and
   `browserUrl` as properties, and the postcoordination scales beside the
-  store. The provider follows the HL7 terminology ecosystem cases for ICD-11:
-  a code is a short code, an entity URI in the unversioned or versioned form,
-  or a postcoordination expression (`1A00&XN8P1`, `1D01.0Y/1G41/1G40`, the
-  ICF `d5409.qp3`, the URI form), validated against the stem's axes (an
-  unfilled axis first, then a required one, then WHO's order; a `/` member
-  that fits an unfilled axis is a value, else a new stem) with `stem` and
-  `postcoordinationValues` reporting the binding; `parent` and `child` are
-  URIs; a stem's scale is the implicit value set
-  `<uri>/postcoordinationScale/<axis>`; `$subsumes` follows the tree. The
+  store. The provider follows the HL7 terminology ecosystem IG's ICD-11 page
+  (`icd-11.md` at `9c2bbce`): in MMS and ICF the entity id (`257068234`,
+  `1363559646/other`) is the code and the normal form, and the short
+  classification code (`1A00`) is an alternative spelling, valid but not in
+  normal form, answered with the id as `normalized-code`; a full entity URI
+  is no code there, and the Foundation's code is the entity URI. A
+  postcoordination expression (`1A00&XN8P1`, `1D01.0Y/1G41/1G40`, the ICF
+  `d5409.qp3`) is validated against the stem's axes (an unfilled axis first,
+  then a required one, then WHO's order; a `/` member that fits an unfilled
+  axis is a value, else a new stem), and its code is its entity-id form, with
+  `stem` and `postcoordinationValues` reporting the binding; `code` is the
+  id, `classificationCode` the short code, `parent` and `child` are ids; a
+  text filter also matches the start of a classification code; a stem's
+  scale is the implicit value set `<uri>/postcoordinationScale/<axis>`;
+  `$subsumes` follows the tree. The
   cache and the artifacts stay local under the CC BY-ND terms.
 
 

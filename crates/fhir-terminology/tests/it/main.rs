@@ -37,6 +37,7 @@ mod rxnorm;
 mod scaled;
 mod snomed;
 mod snomed_concept_map;
+mod snomed_edition_map;
 mod snomed_editions;
 mod snomed_expression;
 mod snomed_loinc_map;

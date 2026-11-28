@@ -12,7 +12,7 @@ use concept_graph::attributes::Attributes;
 use concept_graph::identifiers::Identifiers;
 use concept_graph::ordinal::Ordinal;
 use concept_graph::refsets::RefsetMembers;
-use concept_store::record::{self, DesignationRef};
+use concept_store::record::DesignationRef;
 use concept_store::store::{StoreError, Vocabulary};
 use designation_index::index::Query;
 use rf2::constants;
@@ -125,19 +125,6 @@ impl SnomedProvider {
             }
         }
         Ok(self.system().defined.get_or_init(|| set))
-    }
-
-    /// The module SCTID of a concept, from its stored property.
-    fn module_of(&self, concept: Ordinal) -> Result<Option<u64>, EvalError> {
-        let module = self
-            .stored()
-            .store
-            .property(concept, self.system().keys.module)
-            .map_err(|e| storage(&e))?;
-        Ok(module.first().and_then(|v| match v {
-            record::PropertyValueRef::Code(code) => code.parse().ok(),
-            _ => None,
-        }))
     }
 
     /// The SCTID a designation use ordinal stands for.
@@ -496,7 +483,9 @@ impl SnomedProvider {
     ) -> Result<RoaringBitmap, EvalError> {
         let mut keep = RoaringBitmap::new();
         for concept in set {
-            let module = self.module_of(Ordinal::new(concept))?;
+            let module = self
+                .module_of(Ordinal::new(concept))
+                .map_err(|e| storage(&e))?;
             if module.is_some_and(|m| modules.contains(&m)) != negated {
                 keep.insert(concept);
             }
