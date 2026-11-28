@@ -91,7 +91,13 @@ fn bcp47_locates_in_canonical_case_with_a_composed_display_and_parts() {
         .properties(located.concept)
         .expect("reads")
         .into_iter()
-        .map(|p| format!("{}={}", p.code, p.value.as_text()))
+        .map(|p| {
+            format!(
+                "{}={}",
+                p.code,
+                p.value.as_ref().expect("a value").as_text()
+            )
+        })
         .collect();
     assert_eq!(codes, ["language=en", "script=Latn", "region=GB"]);
     assert!(

@@ -669,7 +669,7 @@ impl Grammar for LanguageTags {
             for value in Self::part(&tag, name) {
                 out.push(Property {
                     code: name.to_owned(),
-                    value: PropertyValue::Code(value.to_owned()),
+                    value: Some(PropertyValue::Code(value.to_owned())),
                     ..Property::default()
                 });
             }

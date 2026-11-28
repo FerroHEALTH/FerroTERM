@@ -22,7 +22,7 @@ fn the_cache_builds_three_artifacts_with_keys_and_scales() {
         .expect("mms");
     assert_eq!(mms.version, RELEASE);
     assert_eq!(mms.concepts, 12);
-    assert_eq!(mms.scales, 4);
+    assert_eq!(mms.scales, 5);
     let foundation = reports
         .iter()
         .find(|r| r.system == ::icd11::FOUNDATION)

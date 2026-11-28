@@ -34,7 +34,13 @@ fn iso3166_is_a_case_insensitive_table_with_user_assigned_codes() {
         .properties(nl.concept)
         .expect("reads")
         .into_iter()
-        .map(|p| format!("{}={}", p.code, p.value.as_text()))
+        .map(|p| {
+            format!(
+                "{}={}",
+                p.code,
+                p.value.as_ref().expect("a value").as_text()
+            )
+        })
         .collect();
     assert!(props.contains(&String::from("alpha3=NLD")));
     assert!(props.contains(&String::from("numeric=528")));

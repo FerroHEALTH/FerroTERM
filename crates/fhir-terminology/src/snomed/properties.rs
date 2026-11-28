@@ -30,11 +30,11 @@ pub(super) fn push_loinc(provider: &SnomedProvider, concept: Ordinal, out: &mut 
         if scheme == LOINC_SCHEME {
             out.push(Property {
                 code: LOINC_PROPERTY.to_owned(),
-                value: PropertyValue::Coding {
+                value: Some(PropertyValue::Coding {
                     system: LOINC_SYSTEM.to_owned(),
                     code: code.to_owned(),
                     display: None,
-                },
+                }),
                 ..Property::default()
             });
         }
@@ -51,12 +51,14 @@ pub(super) fn of_expression(
     let mut out = vec![
         Property {
             code: String::from("inactive"),
-            value: PropertyValue::Boolean(!provider.expression_is_active(record)?),
+            value: Some(PropertyValue::Boolean(
+                !provider.expression_is_active(record)?,
+            )),
             ..Property::default()
         },
         Property {
             code: String::from("sufficientlyDefined"),
-            value: PropertyValue::Boolean(record.sufficiently_defined()),
+            value: Some(PropertyValue::Boolean(record.sufficiently_defined())),
             ..Property::default()
         },
     ];
@@ -87,7 +89,7 @@ pub(super) fn describe(
     out: &mut [Property],
 ) -> Result<(), ProviderError> {
     for property in out.iter_mut() {
-        let PropertyValue::Code(code) = &property.value else {
+        let Some(PropertyValue::Code(code)) = &property.value else {
             continue;
         };
         let Some(ordinal) = provider.stored().store.ordinal(code).map_err(storage)? else {
@@ -107,7 +109,7 @@ mod tests {
     fn a_value_repeated_in_another_role_group_is_listed_once() {
         let site = |code: &str| Property {
             code: String::from("363698007"),
-            value: PropertyValue::Code(code.to_owned()),
+            value: Some(PropertyValue::Code(code.to_owned())),
             ..Property::default()
         };
         let mut out = Vec::new();

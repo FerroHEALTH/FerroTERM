@@ -269,7 +269,7 @@ pub fn lookup(
     {
         properties.push(Property {
             code: String::from(NOT_SELECTABLE),
-            value: PropertyValue::Boolean(abstract_concept),
+            value: Some(PropertyValue::Boolean(abstract_concept)),
             ..Property::default()
         });
     }
@@ -375,7 +375,7 @@ fn properties(
     {
         properties.push(Property {
             code: String::from(DEFINITION),
-            value: PropertyValue::String(definition),
+            value: Some(PropertyValue::String(definition)),
             ..Property::default()
         });
     }

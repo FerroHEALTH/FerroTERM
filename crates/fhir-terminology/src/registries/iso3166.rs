@@ -141,7 +141,7 @@ fn from_json(
         if !official {
             properties.push(Property {
                 code: String::from("userAssigned"),
-                value: PropertyValue::Boolean(true),
+                value: Some(PropertyValue::Boolean(true)),
                 ..Property::default()
             });
         }
@@ -238,7 +238,7 @@ fn numeric_of<'a>(
 fn code_value(code: &str, value: &str) -> Property {
     Property {
         code: code.to_owned(),
-        value: PropertyValue::Code(value.to_owned()),
+        value: Some(PropertyValue::Code(value.to_owned())),
         ..Property::default()
     }
 }

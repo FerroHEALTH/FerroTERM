@@ -59,7 +59,7 @@ fn lookup_by_system_and_code_returns_name_version_display_designations_propertie
     assert_eq!(languages, ["en", "nl"]);
     let codes: Vec<&str> = outcome.properties.iter().map(|p| p.code.as_str()).collect();
     assert_eq!(codes, ["legs", "kingdom"]);
-    assert_eq!(outcome.properties[0].value, PropertyValue::Integer(4));
+    assert_eq!(outcome.properties[0].value, Some(PropertyValue::Integer(4)));
 }
 
 #[test]

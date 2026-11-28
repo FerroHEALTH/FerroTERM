@@ -317,7 +317,12 @@ fn lookup_returns_the_declared_lifecycle_properties_as_they_were_written() {
         .expect("looks up")
         .properties
         .iter()
-        .map(|property| (property.code.clone(), property.value.clone()))
+        .map(|property| {
+            (
+                property.code.clone(),
+                property.value.clone().expect("a value"),
+            )
+        })
         .collect::<Vec<_>>()
     };
     assert_eq!(
@@ -475,7 +480,7 @@ fn a_property_value_without_a_value_is_no_property_and_never_a_default() {
     assert!(
         !properties
             .iter()
-            .any(|p| p.code == "inactive" && p.value != PropertyValue::Boolean(false)),
+            .any(|p| p.code == "inactive" && p.value != Some(PropertyValue::Boolean(false))),
         "the derived `inactive` is the only one answered: {properties:?}"
     );
 }

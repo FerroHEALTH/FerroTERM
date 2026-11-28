@@ -235,7 +235,7 @@ impl StoredSystem for Snomed {
         };
         Ok(Some(Property {
             code: name.to_owned(),
-            value: PropertyValue::String(expression),
+            value: Some(PropertyValue::String(expression)),
             ..Property::default()
         }))
     }
@@ -445,14 +445,14 @@ impl StoredSystem for Snomed {
         let of = |key: u32| stored.iter().find(|(k, _)| *k == key).map(|(_, v)| v);
         let mut out = vec![Property {
             code: String::from("inactive"),
-            value: PropertyValue::Boolean(!record.active),
+            value: Some(PropertyValue::Boolean(!record.active)),
             ..Property::default()
         }];
         let defined = of(provider.system().keys.definition_status)
             .is_some_and(|values| selection::states_defined(values));
         out.push(Property {
             code: String::from("sufficientlyDefined"),
-            value: PropertyValue::Boolean(defined),
+            value: Some(PropertyValue::Boolean(defined)),
             ..Property::default()
         });
         if let Some(values) = of(provider.system().keys.module)
@@ -460,14 +460,14 @@ impl StoredSystem for Snomed {
         {
             out.push(Property {
                 code: String::from("moduleId"),
-                value: PropertyValue::Code((*module).to_owned()),
+                value: Some(PropertyValue::Code((*module).to_owned())),
                 ..Property::default()
             });
         }
         if let Some(time) = record.effective_time {
             out.push(Property {
                 code: String::from("effectiveTime"),
-                value: PropertyValue::String(time),
+                value: Some(PropertyValue::String(time)),
                 ..Property::default()
             });
         }
@@ -484,7 +484,7 @@ impl StoredSystem for Snomed {
                     &mut out,
                     Property {
                         code: sctid.clone(),
-                        value,
+                        value: Some(value),
                         ..Property::default()
                     },
                 );

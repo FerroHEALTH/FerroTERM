@@ -103,7 +103,7 @@ macro_rules! family_map {
             fn property(property: Property) -> CodeSystemLookupResponseProperty {
                 CodeSystemLookupResponseProperty {
                     code: property.code.into(),
-                    value: Some(parameter_value(&property.value)),
+                    value: property.value.as_ref().map(parameter_value),
                     description: property.description.map(Into::into),
                     subproperty: property.subproperties.iter().map(subproperty).collect(),
                     ..Default::default()
@@ -149,7 +149,7 @@ macro_rules! family_map {
                     .iter()
                     .any(|property| {
                         property.code == "notSelectable"
-                            && property.value == PropertyValue::Boolean(false)
+                            && property.value == Some(PropertyValue::Boolean(false))
                     })
                     .then_some(false.into())
             }

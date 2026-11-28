@@ -39,7 +39,13 @@ fn bcp13_parses_the_grammar_knows_the_registry_and_subsumes_by_parameters() {
             .properties(c)
             .expect("reads")
             .into_iter()
-            .map(|p| format!("{}={}", p.code, p.value.as_text()))
+            .map(|p| {
+                format!(
+                    "{}={}",
+                    p.code,
+                    p.value.as_ref().expect("a value").as_text()
+                )
+            })
             .collect()
     };
     assert_eq!(
