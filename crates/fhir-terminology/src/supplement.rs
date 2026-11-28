@@ -277,6 +277,10 @@ impl CodeSystemProvider for Supplemented {
         self.inner.rejection(code)
     }
 
+    fn advisories(&self, concept: Concept) -> Result<Vec<String>, ProviderError> {
+        self.inner.advisories(concept)
+    }
+
     fn admits_post_coordination(&self, filters: &[crate::provider::filter::Filter]) -> bool {
         self.inner.admits_post_coordination(filters)
     }
@@ -471,6 +475,14 @@ impl CodeSystemProvider for Supplemented {
         selection: MapSelection<'_>,
     ) -> Option<Result<crate::provider::concept_map::ConceptMapModel, ProviderError>> {
         self.inner.implicit_concept_map(url, selection)
+    }
+
+    fn implicit_concept_maps(
+        &self,
+        source: &str,
+        target: &str,
+    ) -> Result<Vec<String>, ProviderError> {
+        self.inner.implicit_concept_maps(source, target)
     }
 
     // NOTE: a supplement adds properties to the concepts of the code system it

@@ -4,12 +4,12 @@
 //! Writing one shaped edition as the build writes it: the store, the hierarchy, the designation index, the reference set memberships, the attribute and member tables, and the manifest.
 
 use super::{
-    ALTERNATIVE, ALTERNATIVE_SCTID, ANIMAL, BIRD, CAT, CODES_MAP, COVERING, DOG, FISH, FUR,
-    FixtureError, GB_LANGUAGE_REFSET, GB_REFSET, HISTORICAL, HISTORICAL_SCTID, ICD10_MAP,
-    ICD10_MAP_SCTID, Item, LEGS, MODULE_CONCEPT, MODULE_DEPENDENCY, MODULE_DEPENDENCY_SCTID,
-    NL_LANGUAGE_REFSET, NL_REFSET, PETS, POSSIBLY_EQUIVALENT_TO, POSSIBLY_EQUIVALENT_TO_SCTID,
-    REPLACED_BY, REPLACED_BY_SCTID, Row, SAME_AS, SAME_AS_SCTID, SCHEME, Shape, TOP, code_of, item,
-    sctid, write_concepts,
+    ALTERNATIVE, ALTERNATIVE_SCTID, ANIMAL, BIRD, CAT, CAT_LOINC, CODES_MAP, COVERING, DOG, FISH,
+    FUR, FixtureError, GB_LANGUAGE_REFSET, GB_REFSET, HISTORICAL, HISTORICAL_SCTID, ICD10_MAP,
+    ICD10_MAP_SCTID, Item, LEGS, LOINC_SCHEME, MODULE_CONCEPT, MODULE_DEPENDENCY,
+    MODULE_DEPENDENCY_SCTID, NL_LANGUAGE_REFSET, NL_REFSET, PETS, POSSIBLY_EQUIVALENT_TO,
+    POSSIBLY_EQUIVALENT_TO_SCTID, REPLACED_BY, REPLACED_BY_SCTID, Row, SAME_AS, SAME_AS_SCTID,
+    SCHEME, Shape, TOP, code_of, item, sctid, write_concepts,
 };
 use crate::edition::{self, ord};
 use concept_graph::attributes::{self, Attributes};
@@ -36,9 +36,9 @@ pub(super) fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureEr
     let (preferred, acceptable) = (0, 1);
     // The association reference set concepts share one shape: a published SCTID,
     // the metadata fully specified name, and the bare name as the synonym.
-    let metadata_refset = |ordinal: u32, code: &'static str, name: &'static str| Row {
+    let metadata_refset = |ordinal: u32, code: Option<&'static str>, name: &'static str| Row {
         ordinal,
-        code: Some(code),
+        code,
         active: true,
         defined: false,
         designations: vec![
@@ -258,22 +258,22 @@ pub(super) fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureEr
         },
         metadata_refset(
             REPLACED_BY,
-            REPLACED_BY_SCTID,
+            Some(REPLACED_BY_SCTID),
             "REPLACED BY association reference set (foundation metadata concept)",
         ),
         metadata_refset(
             POSSIBLY_EQUIVALENT_TO,
-            POSSIBLY_EQUIVALENT_TO_SCTID,
+            Some(POSSIBLY_EQUIVALENT_TO_SCTID),
             "POSSIBLY EQUIVALENT TO association reference set (foundation metadata concept)",
         ),
         metadata_refset(
             ALTERNATIVE,
-            ALTERNATIVE_SCTID,
+            Some(ALTERNATIVE_SCTID),
             "ALTERNATIVE association reference set (foundation metadata concept)",
         ),
         metadata_refset(
             MODULE_DEPENDENCY,
-            MODULE_DEPENDENCY_SCTID,
+            Some(MODULE_DEPENDENCY_SCTID),
             "Module dependency reference set (foundation metadata concept)",
         ),
         Row {
@@ -300,17 +300,17 @@ pub(super) fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureEr
         },
         metadata_refset(
             ICD10_MAP,
-            ICD10_MAP_SCTID,
+            Some(ICD10_MAP_SCTID),
             "ICD-10 extended map reference set (foundation metadata concept)",
         ),
         metadata_refset(
             GB_LANGUAGE_REFSET,
-            GB_REFSET,
+            Some(GB_REFSET),
             "Great Britain English language reference set (foundation metadata concept)",
         ),
         metadata_refset(
             NL_LANGUAGE_REFSET,
-            NL_REFSET,
+            Some(NL_REFSET),
             "Netherlands Dutch language reference set (foundation metadata concept)",
         ),
     ];
@@ -349,6 +349,12 @@ pub(super) fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureEr
             ],
         });
         is_a.push((BIRD, ANIMAL));
+    }
+    if shape.mrcm {
+        rows.extend(super::mrcm::rows(|ordinal, code, name| {
+            metadata_refset(ordinal, code, name)
+        }));
+        is_a.extend(super::mrcm::is_a());
     }
     let rows = rows;
     let is_a = is_a;
@@ -544,11 +550,16 @@ pub(super) fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureEr
             )
             .map_err(|e| FixtureError::Graph(e.to_string()))?;
     }
+    if shape.mrcm {
+        super::mrcm::tables(&mut tables, &rows, member)
+            .map_err(|e| FixtureError::Graph(e.to_string()))?;
+    }
     edition::write_graph_part(dir, "members.bin", |bytes| tables.write_to(bytes))?;
     let scheme: u64 = sctid(item(SCHEME)).parse().unwrap_or_default();
     let identifiers = Identifiers::new(vec![
         (scheme, String::from("cat-1"), Ordinal::new(CAT)),
         (scheme, String::from("dog-1"), Ordinal::new(DOG)),
+        (LOINC_SCHEME, String::from(CAT_LOINC), Ordinal::new(CAT)),
     ]);
     edition::write_graph_part(dir, "identifiers.bin", |bytes| identifiers.write_to(bytes))?;
     edition::write_graph_part(dir, "refsets.bin", |bytes| memberships.write_to(bytes))?;

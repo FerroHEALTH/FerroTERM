@@ -13,28 +13,38 @@
 #                            URI, for the logo= parameter of a static badge
 #   badge_logo_check FILE... fails for each endpoint badge without a logo
 #   badge_logo_readme FILE   fails for each static badge without a logo
-#   badge_caption_check FILE fails unless the conformance caption sits on its
-#                            own line directly under a bold badge heading
+#   badge_caption_check FILE fails unless the conformance caption sits once on its
+#                            own line directly beside a bold badge heading
 #   badge_count_color N M [HELD]
 #                            the message colour of N passing out of M, of
 #                            which HELD failing ones an open upstream report
 #                            holds
-#   badge_color_check FILE...
+#   badge_color_check FILE[=HELD]...
 #                            fails for each endpoint badge whose colour does
-#                            not follow its count, or, with no count, is not
-#                            the informational blue
+#                            not follow its count, with HELD failing cases
+#                            an open upstream report holds when the caller
+#                            names them, or, with no count, is not the
+#                            informational blue
 #   badge_length_check FILE...
 #                            fails for each endpoint badge whose label runs
-#                            past badge_label_max characters or whose
-#                            message runs past badge_message_max
+#                            past badge_label_max characters, whose message
+#                            runs past badge_message_max, or whose message
+#                            carries a date or "by hand"
 #   badge_length_readme FILE fails for each static shields.io badge of FILE
 #                            whose label or message runs past those limits
-#   badge_length_self_test   the cases of the two above
+#   badge_block_check FILE   fails when the README badge block of FILE, from
+#                            its first badge to its first markdown heading,
+#                            holds more than one line of prose
+#   badge_render_check FILE  fails for each badge line of FILE that a
+#                            CommonMark renderer shows as text: one inside
+#                            an HTML block or comment
+#   badge_length_self_test   the cases of the four above
 #   badge_count_color_self_test
 #                            the cases of badge_count_color
 #   badge_post_quantum TSV   the endpoint JSON of the post-quantum badge of
 #                            the inventory TSV: label post-quantum, message
-#                            <safe>/<total>, coloured by the count
+#                            <safe>/<rows with a standard>, coloured by the
+#                            count
 #   badge_post_quantum_check TSV FILE
 #                            fails when the badge FILE disagrees with TSV,
 #                            or TSV holds a malformed row
@@ -44,7 +54,9 @@
 # A post-quantum inventory (conformance/post-quantum.tsv) has the header
 # use, algorithm, safe, pq_standard, location, tab-separated, and one row
 # per cryptographic use; safe is yes or no. A row whose pq_standard is
-# "no standard yet" counts as not safe whatever its safe column says. The
+# "no standard yet" counts as not safe whatever its safe column says, and
+# stays out of the badge fraction, since no change can move it until a
+# standard exists; the caller's page names those rows. The
 # rows count what NIST IR 8547 (final) §4.1 and the EU coordinated
 # implementation roadmap (NIS Cooperation Group, v1.1) §4.1 and §4.2 treat
 # as quantum-vulnerable.
@@ -53,7 +65,7 @@
 
 badge_logo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # NOTE: owner decision 2026-11-25; the badges stay short and this caption says once what they count.
-badge_caption='<sub>(self-tested and self-assessed counts; none is a certification)</sub>'
+badge_caption='<sub>Self-tested and self-assessed; none is a certification.</sub>'
 
 # The pictogram NAME as one line of SVG, its comments removed.
 badge_logo_svg() {
@@ -114,11 +126,15 @@ badge_logo_readme() {
 
 badge_caption_check() {
   if ! awk -v caption="$badge_caption" '
-    previous ~ /^\*\*[^*]+\*\*(<br>)?$/ && ($0 == caption || $0 == caption "<br>") { found = 1 }
-    { previous = $0 }
-    END { exit !found }
+    { line[NR] = $0 }
+    $0 == caption || $0 == caption "<br>" { n++; at = NR }
+    END {
+      if (n != 1) exit 1
+      heading = "^\\*\\*[^*]+\\*\\*(<br>)?$"
+      exit !(line[at - 1] ~ heading || line[at + 1] ~ heading)
+    }
   ' "$1"; then
-    echo "badge logo: $1 has no line $badge_caption directly under a bold badge heading" >&2
+    echo "badge logo: $1 does not hold the line $badge_caption once, beside a bold badge heading" >&2
     return 1
   fi
 }
@@ -148,16 +164,34 @@ badge_count_color_self_test() {
       return 1
     fi
   done
+  local work
+  work="$(mktemp -d)"
+  jq -cn '{message: "2/4", color: "yellowgreen"}' > "$work/b.json"
+  if ! badge_color_check "$work/b.json=2" 2> /dev/null || badge_color_check "$work/b.json" 2> /dev/null ||
+    badge_color_check "$work/b.json=1" 2> /dev/null; then
+    echo "badge colour: self-test FAILED: badge_color_check does not read the held count its caller names" >&2
+    rm -f "$work/b.json"
+    rmdir "$work"
+    return 1
+  fi
+  rm -f "$work/b.json"
+  rmdir "$work"
   echo "badge colour: self-test OK"
 }
 
 badge_color_check() {
-  local file message color want failures=0
-  for file in "$@"; do
+  local entry file held message color want failures=0
+  for entry in "$@"; do
+    file="$entry"
+    held=0
+    if [[ "$entry" =~ ^(.+)=([0-9]+)$ && ! -f "$entry" ]]; then
+      file="${BASH_REMATCH[1]}"
+      held="${BASH_REMATCH[2]}"
+    fi
     message="$(jq -r .message "$file")"
     color="$(jq -r .color "$file")"
     if [[ "$message" =~ ([0-9]+)\ ?/\ ?([0-9]+) ]]; then
-      want="$(badge_count_color "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}")"
+      want="$(badge_count_color "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "$held")"
     else
       want=blue
     fi
@@ -186,8 +220,72 @@ badge_length_check() {
       echo "badge length: $file has a message longer than $badge_message_max characters: $message" >&2
       failures=$((failures + 1))
     fi
+    if grep -qiE '[0-9]{4}-[0-9]{2}-[0-9]{2}|by hand' <<< "$message"; then
+      echo "badge length: $file names a date or 'by hand' in its message, which belongs on the linked page: $message" >&2
+      failures=$((failures + 1))
+    fi
   done
   [[ "$failures" -eq 0 ]]
+}
+
+# NOTE: owner decision 2026-11-27; a badge block is headings and badges, with at most one short line, the rest on the linked pages.
+badge_block_max_prose=1
+
+# Prints each prose line of the README badge block of FILE: every line from
+# the first badge or the caption to the first markdown heading that is not a
+# badge, a bold group heading, a break, a blank line, an HTML comment or an
+# HTML tag alone.
+badge_block_prose() {
+  awk -v caption="$badge_caption" '
+    !started && (/\[!\[/ || $0 == caption || $0 == caption "<br>") { started = 1 }
+    !started { next }
+    /^#/ { exit }
+    /\[!\[/ { next }
+    /^[[:space:]]*$/ { next }
+    /^\*\*[^*]+\*\*(<br>)?$/ { next }
+    /^(<br>|<br\/>|<\/?div[^>]*>|<\/?p[^>]*>|<\/?details>|<summary>.*<\/summary>|<!--.*-->)$/ { next }
+    { print }
+  ' "$1"
+}
+
+badge_block_check() {
+  local prose count
+  prose="$(badge_block_prose "$1")"
+  count="$(grep -c . <<< "$prose" || true)"
+  if [[ "$count" -gt "$badge_block_max_prose" ]]; then
+    echo "badge block: $1 holds $count lines of prose among its badges, more than $badge_block_max_prose; move them to the page the badges link to:" >&2
+    printf '  %s\n' "${prose//$'\n'/$'\n'  }" >&2
+    return 1
+  fi
+}
+
+# Prints each badge line of FILE that CommonMark 0.31.2 §4.6 reads as raw
+# HTML, so GitHub shows it as text: a line inside an HTML block, which a
+# block-level tag opens anywhere and a line holding one other tag alone opens
+# outside a paragraph, running to the next blank line; or inside a comment.
+badge_render_raw() {
+  awk '
+    BEGIN {
+      block = "address|article|aside|blockquote|body|center|details|dialog|dd|div|dl|dt|fieldset|figcaption|figure|footer|form|h[1-6]|header|hr|html|li|main|nav|ol|p|section|summary|table|tbody|td|tfoot|th|thead|tr|ul"
+    }
+    comment { if (/\[!\[/) print NR ": " $0; if (/-->/) { comment = 0; para = 0 } next }
+    html { if (/^[[:space:]]*$/) { html = 0; para = 0 } else if (/\[!\[/) print NR ": " $0; next }
+    /^[[:space:]]*$/ { para = 0; next }
+    /^ {0,3}<!--/ { if (!/-->/) comment = 1; para = 0; next }
+    $0 ~ "^ {0,3}</?(" block ")([[:space:]/>]|$)" { html = 1; next }
+    !para && /^ {0,3}(<[A-Za-z][A-Za-z0-9-]*([[:space:]]+[^<>]*)?\/?>|<\/[A-Za-z][A-Za-z0-9-]*[[:space:]]*>)[[:space:]]*$/ { html = 1; next }
+    { para = 1 }
+  ' "$1"
+}
+
+badge_render_check() {
+  local raw
+  raw="$(badge_render_raw "$1")"
+  if [[ -n "$raw" ]]; then
+    echo "badge render: $1 has badges that CommonMark reads as raw HTML, so GitHub shows them as text; end the HTML block with a blank line:" >&2
+    printf '  %s\n' "${raw//$'\n'/$'\n'  }" >&2
+    return 1
+  fi
 }
 
 # Prints "<label><TAB><message>" of each static shields.io badge in FILE: the
@@ -276,6 +374,40 @@ badge_length_self_test() {
     rmdir "$work"
     return 1
   fi
+  badge_length_case "IHE ATNA interoperability" "3/3 2026-10-29" fail || return 1
+  badge_length_case "tx 1.11.0 snomed R4B" "2/378, by hand" fail || return 1
+  badge_length_case "Xt-EHR D8.2 2026-05-19" "11/11 evidenced" pass || return 1
+  printf '# T\n\n[![a](x)](y)\n\n**Group**<br>\n<sub>Self-tested; none is a certification.</sub><br>\n[![b](x)](y)\n<br>\n<!-- c -->\n</div>\n\n## Next\n\nprose\nmore prose\n' > "$work/r.md"
+  if ! badge_block_check "$work/r.md" 2> /dev/null; then
+    echo "badge block: self-test FAILED: a block with one line of prose is refused" >&2
+    rm -f "$work/b.json" "$work/r.md"
+    rmdir "$work"
+    return 1
+  fi
+  printf '[![a](x)](y)\n<sub>one</sub><br>\n**Group**<br>\n<sub>the red rows are a deviation</sub><br>\n[![b](x)](y)\n' > "$work/r.md"
+  if badge_block_check "$work/r.md" 2> /dev/null; then
+    echo "badge block: self-test FAILED: a block with two lines of prose passes" >&2
+    rm -f "$work/b.json" "$work/r.md"
+    rmdir "$work"
+    return 1
+  fi
+  printf '<div align="center">\n\n**G**<br>\n[![a](x)](y)\n<br>\n**H**<br>\n[![b](x)](y)\n<!-- m -->\n[![c](x)](y)\n<details>\n<summary>s</summary>\n\n[![d](x)](y)\n\n</details>\n</div>\n' > "$work/r.md"
+  if ! badge_render_check "$work/r.md" 2> /dev/null; then
+    echo "badge render: self-test FAILED: a README whose badges render is refused" >&2
+    rm -f "$work/b.json" "$work/r.md"
+    rmdir "$work"
+    return 1
+  fi
+  local raw_case
+  for raw_case in '<!-- m -->\n<br>\n**H**<br>\n[![a](x)](y)\n' '<div align="center">\n[![a](x)](y)\n' '<!-- open\n[![a](x)](y)\n-->\n'; do
+    printf '%b' "$raw_case" > "$work/r.md"
+    if badge_render_check "$work/r.md" 2> /dev/null; then
+      echo "badge render: self-test FAILED: a badge inside an HTML block passes: $raw_case" >&2
+      rm -f "$work/b.json" "$work/r.md"
+      rmdir "$work"
+      return 1
+    fi
+  done
   rm -f "$work/b.json" "$work/r.md"
   rmdir "$work"
   echo "badge length: self-test OK"
@@ -284,30 +416,30 @@ badge_length_self_test() {
 # The header of a post-quantum inventory.
 badge_post_quantum_header=$'use\talgorithm\tsafe\tpq_standard\tlocation'
 
-# Prints "<safe> <total>" of the post-quantum inventory $1, or fails naming
-# the first malformed row.
+# Prints "<safe> <with a standard> <total>" of the post-quantum inventory
+# $1, or fails naming the first malformed row.
 badge_post_quantum_count() {
   awk -F'\t' -v header="$badge_post_quantum_header" '
     /^(#|$)/ { next }
     !seen { seen = 1; if ($0 != header) { print "post-quantum: the header is not " header > "/dev/stderr"; bad = 1; exit } next }
     NF != 5 { printf "post-quantum: line %d has %d columns, not 5\n", NR, NF > "/dev/stderr"; bad = 1; exit }
     $3 != "yes" && $3 != "no" { printf "post-quantum: line %d says safe is %s, not yes or no\n", NR, $3 > "/dev/stderr"; bad = 1; exit }
-    { total++; if ($3 == "yes" && $4 != "no standard yet") safe++ }
+    { total++; if ($4 != "no standard yet") { standard++; if ($3 == "yes") safe++ } }
     END {
       if (bad) exit 1
       if (!seen) { print "post-quantum: the inventory is empty" > "/dev/stderr"; exit 1 }
-      print safe + 0, total + 0
+      print safe + 0, standard + 0, total + 0
     }
   ' "$1"
 }
 
 badge_post_quantum() {
-  local counts safe total color logo
+  local counts safe standard color logo
   counts="$(badge_post_quantum_count "$1")" || return 1
-  read -r safe total <<< "$counts"
-  color="$(badge_count_color "$safe" "$total")"
+  read -r safe standard _ <<< "$counts"
+  color="$(badge_count_color "$safe" "$standard")"
   logo="$(badge_logo_fields key)"
-  jq -cn --arg message "$safe/$total" --arg color "$color" --argjson logo "$logo" \
+  jq -cn --arg message "$safe/$standard" --arg color "$color" --argjson logo "$logo" \
     '{schemaVersion: 1, label: "post-quantum", message: $message, color: $color} + $logo'
 }
 
@@ -351,7 +483,15 @@ badge_post_quantum_self_test() {
   { echo "$header"; badge_pq_row tls X25519 no 'RFC 10024' a; badge_pq_row tokens RS256 no 'RFC 9964' b; } > "$work/pq.tsv"
   badge_pq_expect 0/2 red "no row safe" || return 1
   { echo "$header"; badge_pq_row tls X25519MLKEM768 yes 'RFC 10024' a; badge_pq_row saml RSA yes 'no standard yet' b; } > "$work/pq.tsv"
-  badge_pq_expect 1/2 yellow "a no-standard-yet row marked yes" || return 1
+  badge_pq_expect 1/1 brightgreen "a no-standard-yet row marked yes, out of the fraction" || return 1
+  { echo "$header"; badge_pq_row tls X25519 no 'RFC 10024' a; badge_pq_row saml RSA no 'no standard yet' b; } > "$work/pq.tsv"
+  badge_pq_expect 0/1 red "an unsafe row beside one with no standard" || return 1
+  if [[ "$(badge_post_quantum_count "$work/pq.tsv")" != "0 1 2" ]]; then
+    echo "post-quantum: self-test FAILED: the count names the rows with a standard and every row" >&2
+    rm -f "$work/pq.tsv"
+    rmdir "$work"
+    return 1
+  fi
   { echo "$header"; badge_pq_row tls X25519 no 'RFC 10024' a; printf 'tokens\tRS256\tno\tRFC 9964\n'; } > "$work/pq.tsv"
   badge_pq_refused "a row of four columns" || return 1
   { echo "$header"; badge_pq_row tls X25519 maybe 'RFC 10024' a; } > "$work/pq.tsv"

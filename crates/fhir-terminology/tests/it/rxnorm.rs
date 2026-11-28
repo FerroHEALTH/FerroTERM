@@ -266,7 +266,7 @@ fn a_display_in_the_releases_language_does_not_satisfy_a_request_for_another_one
     assert_eq!(issue.kind, "invalid-display");
     assert_eq!(
         issue.message_id(),
-        "NO_VALID_DISPLAY_FOUND_NONE_FOR_LANG_OK"
+        Some("NO_VALID_DISPLAY_FOUND_NONE_FOR_LANG_OK")
     );
     assert!(none.message.is_some(), "{none:?}");
 
@@ -279,7 +279,7 @@ fn a_display_in_the_releases_language_does_not_satisfy_a_request_for_another_one
     assert_eq!(issue.kind, "invalid-display");
     assert_eq!(
         issue.message_id(),
-        "NO_VALID_DISPLAY_FOUND_NONE_FOR_LANG_ERR"
+        Some("NO_VALID_DISPLAY_FOUND_NONE_FOR_LANG_ERR")
     );
     assert!(
         issue.text.contains("aspirin 81 MG Oral Tablet"),

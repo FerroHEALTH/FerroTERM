@@ -150,9 +150,16 @@ An expansion lists only the expressions a value set enumerates, and
 `excludePostCoordinated=true` drops those; a filtered selection stays the
 `valueset-unclosed` case.
 
-Three boundaries are deliberate. No concept model (MRCM) check runs, so an
-expression the concept model forbids still validates. No close-to-user
-transformation runs, so an expression is compared as written. Subsumption is
+`$validate-code` checks an expression against the concept model the edition
+carries in its MRCM reference sets, as the MRCM specification describes for
+postcoordinated content: each attribute's domain, grouping, cardinality and
+range, and concrete values against their `int()`, `dec()`, `str()` and
+`bool()` ranges. A mandatory rule broken refuses the expression, with an
+`information` issue naming each rule; an optional rule broken is a warning
+beside a `true` result. An edition that carries no MRCM is not checked.
+
+Two boundaries are deliberate. No close-to-user transformation runs, so an
+expression is compared as written. Subsumption is
 decided over the edition's inferred view without a description logic
 classifier: what the server answers `subsumes` or `subsumed-by` holds, and
 what it answers `not-subsumed` is what that view does not state. SNOMED

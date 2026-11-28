@@ -155,6 +155,83 @@ fn properties_follow_the_snomed_on_fhir_list() {
 }
 
 #[test]
+fn a_concept_with_a_loinc_identifier_carries_it_as_the_loinc_property() {
+    let (_dir, p) = provider();
+    let loinc = |concept: u32| -> Vec<PropertyValue> {
+        p.properties(Concept::new(concept))
+            .expect("reads")
+            .into_iter()
+            .filter(|p| p.code == "loinc")
+            .map(|p| p.value)
+            .collect()
+    };
+    assert_eq!(
+        loinc(CAT),
+        [PropertyValue::Coding {
+            system: String::from("http://loinc.org"),
+            code: String::from(snomed::CAT_LOINC),
+            display: None,
+        }]
+    );
+    assert!(loinc(DOG).is_empty(), "the dog has no LOINC identifier");
+    assert!(
+        p.declaration().properties.iter().any(|d| d.code == "loinc"),
+        "an edition with LOINC identifiers declares the property"
+    );
+}
+
+#[test]
+fn a_property_naming_a_concept_describes_it_with_its_display() {
+    // `property.description`: "Human Readable representation of the property
+    // value (e.g. display for a code)" (`OperationDefinition/CodeSystem-lookup`).
+    let (_dir, p) = provider();
+    let props = p.properties(Concept::new(CAT)).expect("reads");
+    let described = |code: &str| -> Vec<Option<&str>> {
+        props
+            .iter()
+            .filter(|p| p.code == code)
+            .map(|p| p.description.as_deref())
+            .collect()
+    };
+    assert_eq!(described("parent"), [Some("Animal")]);
+    assert_eq!(described(&sctid(item(COVERING))), [Some("Fur")]);
+    assert_eq!(
+        described(&sctid(item(LEGS))),
+        [None],
+        "a number names no concept"
+    );
+    assert_eq!(described("inactive"), [None]);
+}
+
+#[test]
+fn the_mapped_filter_selects_the_concepts_an_identifier_scheme_gives_a_code() {
+    let (_dir, p) = provider();
+    let mapped = |value: &str| {
+        p.filter(&Filter {
+            property: format!("mapped:{}", snomed::LOINC_SCHEME),
+            op: FilterOperator::Exists,
+            value: value.to_owned(),
+        })
+        .expect("filters")
+    };
+    assert_eq!(mapped("true").iter().collect::<Vec<_>>(), [CAT]);
+    let without = mapped("false");
+    assert!(!without.contains(CAT) && without.contains(DOG));
+    let refused = p.filter(&Filter {
+        property: String::from("mapped:loinc"),
+        op: FilterOperator::Exists,
+        value: String::from("true"),
+    });
+    assert!(refused.is_err(), "a scheme is an SCTID");
+    assert!(
+        p.declaration()
+            .filters
+            .iter()
+            .any(|f| f.code == format!("mapped:{}", snomed::LOINC_SCHEME))
+    );
+}
+
+#[test]
 fn the_hierarchy_answers_subsumption_and_the_filters_from_the_closure() {
     let (_dir, p) = provider();
     let hierarchy = p.hierarchy().expect("snomed has a hierarchy");
@@ -360,7 +437,7 @@ fn a_display_in_the_editions_language_does_not_satisfy_a_request_for_another_one
     assert_eq!(issue.kind, "invalid-display");
     assert_eq!(
         issue.message_id(),
-        "Display_Name_for__should_be_one_of__instead_of"
+        Some("Display_Name_for__should_be_one_of__instead_of")
     );
     assert!(issue.text.contains("Kat"), "{}", issue.text);
     assert_eq!(wrong.message.as_deref(), Some(issue.text.as_str()));
@@ -374,7 +451,7 @@ fn a_display_in_the_editions_language_does_not_satisfy_a_request_for_another_one
     assert_eq!(issue.kind, "invalid-display");
     assert_eq!(
         issue.message_id(),
-        "NO_VALID_DISPLAY_FOUND_NONE_FOR_LANG_OK"
+        Some("NO_VALID_DISPLAY_FOUND_NONE_FOR_LANG_OK")
     );
     assert!(none.message.is_some(), "{none:?}");
 }

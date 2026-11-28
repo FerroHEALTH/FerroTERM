@@ -426,6 +426,17 @@ pub trait CodeSystemProvider: fmt::Debug + Send + Sync {
         None
     }
 
+    /// What a code the system accepts breaks of its recommendations, each a
+    /// warning `$validate-code` reports beside a `true` result; a system with
+    /// no such rules has none.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProviderError`] when the substrate fails.
+    fn advisories(&self, _concept: Concept) -> Result<Vec<String>, ProviderError> {
+        Ok(Vec::new())
+    }
+
     /// Whether an include with `filters` admits post-coordinated expressions
     /// into its selection.
     ///
@@ -641,6 +652,22 @@ pub trait CodeSystemProvider: fmt::Debug + Send + Sync {
         _selection: MapSelection<'_>,
     ) -> Option<Result<concept_map::ConceptMapModel, ProviderError>> {
         None
+    }
+
+    /// The URIs of the implicit concept maps this system defines from codes of
+    /// `source` to codes of `target`, each a code system URI, `target` with an
+    /// optional `|version`; a `$translate` that names no map finds them by the
+    /// systems it names. The default declares none.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProviderError`] when the substrate fails.
+    fn implicit_concept_maps(
+        &self,
+        _source: &str,
+        _target: &str,
+    ) -> Result<Vec<String>, ProviderError> {
+        Ok(Vec::new())
     }
 
     /// The concepts a filter selects.

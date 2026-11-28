@@ -114,6 +114,18 @@ pub trait StoredSystem: fmt::Debug + Send + Sync + Sized {
         None
     }
 
+    /// As [`CodeSystemProvider::advisories`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProviderError`] when the substrate fails.
+    fn advisories(
+        _provider: &StoredProvider<Self>,
+        _concept: Concept,
+    ) -> Result<Vec<String>, ProviderError> {
+        Ok(Vec::new())
+    }
+
     /// As [`CodeSystemProvider::admits_post_coordination`].
     fn admits_post_coordination(_provider: &StoredProvider<Self>, _filters: &[Filter]) -> bool {
         false
@@ -185,6 +197,19 @@ pub trait StoredSystem: fmt::Debug + Send + Sync + Sized {
         _selection: MapSelection<'_>,
     ) -> Option<Result<ConceptMapModel, ProviderError>> {
         None
+    }
+
+    /// As [`CodeSystemProvider::implicit_concept_maps`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProviderError`] when the substrate fails.
+    fn implicit_concept_maps(
+        _provider: &StoredProvider<Self>,
+        _source: &str,
+        _target: &str,
+    ) -> Result<Vec<String>, ProviderError> {
+        Ok(Vec::new())
     }
 
     /// As [`CodeSystemProvider::unclosed`].
@@ -320,6 +345,10 @@ impl<S: StoredSystem> CodeSystemProvider for StoredProvider<S> {
         S::rejection(self, code)
     }
 
+    fn advisories(&self, concept: Concept) -> Result<Vec<String>, ProviderError> {
+        S::advisories(self, concept)
+    }
+
     fn admits_post_coordination(&self, filters: &[Filter]) -> bool {
         S::admits_post_coordination(self, filters)
     }
@@ -423,6 +452,14 @@ impl<S: StoredSystem> CodeSystemProvider for StoredProvider<S> {
         selection: MapSelection<'_>,
     ) -> Option<Result<ConceptMapModel, ProviderError>> {
         S::implicit_concept_map(self, url, selection)
+    }
+
+    fn implicit_concept_maps(
+        &self,
+        source: &str,
+        target: &str,
+    ) -> Result<Vec<String>, ProviderError> {
+        S::implicit_concept_maps(self, source, target)
     }
 
     fn filter(&self, filter: &Filter) -> Result<ConceptSet, ProviderError> {

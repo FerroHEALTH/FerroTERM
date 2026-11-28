@@ -30,7 +30,12 @@ pub(super) fn matches_in(
     let mut out = Vec::new();
     for group in &map.groups {
         let (from, from_version, to, to_version) = group_direction(group, reverse);
-        if !group_applies(from, from_version, to, subject, target_system) {
+        if !group_applies(
+            (from, from_version),
+            (to, to_version),
+            subject,
+            target_system,
+        ) {
             continue;
         }
         let found = group_matches(map, group, subject, reverse, to, to_version, &mut out);
@@ -79,9 +84,8 @@ fn group_direction(
 /// Whether a group reading `from` at `from_version` to `to` translates
 /// `subject` into `target_system`.
 fn group_applies(
-    from: Option<&str>,
-    from_version: Option<&str>,
-    to: Option<&str>,
+    (from, from_version): (Option<&str>, Option<&str>),
+    (to, to_version): (Option<&str>, Option<&str>),
     subject: &Subject,
     target_system: Option<&str>,
 ) -> bool {
@@ -93,8 +97,15 @@ fn group_applies(
     {
         return false;
     }
-    if target_system.is_some_and(|t| to != Some(t)) {
-        return false;
+    // NOTE: a target system may carry `|version`, as a canonical does
+    // (<https://hl7.org/fhir/R5/references.html#canonical>); the group states both.
+    if let Some(wanted) = target_system {
+        let (system, version) = wanted
+            .split_once('|')
+            .map_or((wanted, None), |(s, v)| (s, Some(v)));
+        if to != Some(system) || version.is_some_and(|v| to_version.is_some_and(|held| held != v)) {
+            return false;
+        }
     }
     true
 }

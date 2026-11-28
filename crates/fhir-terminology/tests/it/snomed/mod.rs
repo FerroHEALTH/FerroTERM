@@ -7,6 +7,7 @@ use fhir_terminology::snomed::SnomedProvider;
 
 use ferroterm_testkit::snomed;
 
+mod concept_model;
 mod concepts;
 mod grammar;
 mod implicit;

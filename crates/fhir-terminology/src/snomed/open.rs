@@ -5,8 +5,9 @@
 //! reads, the vocabulary keys, and the base language.
 
 use super::implicit::implicit_forms;
+use super::properties::{LOINC_PROPERTY, LOINC_SCHEME};
 use super::{
-    EXPRESSIONS, FHIR_PROPERTIES, GENERATED_PROPERTIES, Keys, Manifest, OpenError, SYSTEM, Snomed,
+    EXPRESSIONS, FHIR_PROPERTIES, GENERATED_PROPERTIES, Keys, OpenError, SYSTEM, Snomed,
     SnomedProvider,
 };
 use crate::provider::Identity;
@@ -85,6 +86,16 @@ impl SnomedProvider {
             description: None,
             kind: PropertyKind::Code,
         }));
+        if identifiers.schemes().contains(&LOINC_SCHEME) {
+            properties.push(PropertyDefinition {
+                code: LOINC_PROPERTY.to_owned(),
+                uri: None,
+                description: Some(String::from(
+                    "The LOINC code the LOINC Extension gives the concept",
+                )),
+                kind: PropertyKind::Coding,
+            });
+        }
         let identity = Identity {
             url: SYSTEM.to_owned(),
             version: manifest.version,
@@ -108,7 +119,7 @@ impl SnomedProvider {
             properties,
             // NOTE: the FHIR SNOMED CT page defines `concept is-a` and `concept in`
             // (<https://hl7.org/fhir/R4B/snomedct.html>, "Filter Properties").
-            filters: Self::filter_definitions(),
+            filters: Self::filter_definitions(&identifiers),
             capabilities: BTreeSet::from([
                 Capability::Subsumption,
                 Capability::Enumeration,
@@ -133,6 +144,7 @@ impl SnomedProvider {
                 scg: Mutex::new(super::expression::Expressions::default()),
                 attribute_ordinals: OnceLock::new(),
                 inactive: OnceLock::new(),
+                mrcm: OnceLock::new(),
                 keys,
                 edition: manifest.edition,
                 base_language,
@@ -200,8 +212,8 @@ impl SnomedProvider {
 
     /// The filters of the FHIR SNOMED CT page
     /// (<https://hl7.org/fhir/R4B/snomedct.html>, "Filter Properties").
-    pub(super) fn filter_definitions() -> Vec<FilterDefinition> {
-        vec![
+    pub(super) fn filter_definitions(identifiers: &Identifiers) -> Vec<FilterDefinition> {
+        let mut filters = vec![
             FilterDefinition {
                 code: String::from("concept"),
                 description: Some(String::from(
@@ -230,7 +242,21 @@ impl SnomedProvider {
                 operators: vec![FilterOperator::Equal],
                 value: String::from("true or false"),
             },
-        ]
+        ];
+        filters.extend(
+            identifiers
+                .schemes()
+                .into_iter()
+                .map(|scheme| FilterDefinition {
+                    code: format!("{}{scheme}", super::selection::MAPPED),
+                    description: Some(String::from(
+                        "whether the concept has an identifier in the scheme",
+                    )),
+                    operators: vec![FilterOperator::Exists],
+                    value: String::from("true or false"),
+                }),
+        );
+        filters
     }
 
     /// The files the ECL evaluator reads, when the artifact has them.
@@ -270,4 +296,29 @@ impl SnomedProvider {
             .first()
             .map_or(wanted, |first| primary_subtag(first))
     }
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub(super) struct Manifest {
+    system: String,
+    edition: String,
+    version: String,
+    /// The release date the offline build recorded for the edition.
+    #[serde(default, rename = "releaseDate")]
+    release_date: Option<String>,
+    /// The reference set memberships; an artifact built before they were
+    /// written has none.
+    #[serde(default)]
+    refsets: Option<String>,
+    /// The attribute relationships, the reference set member rows, and the
+    /// alternate identifiers the ECL evaluator reads; an artifact built before
+    /// they were written has none.
+    #[serde(default)]
+    attributes: Option<String>,
+    #[serde(default)]
+    members: Option<String>,
+    #[serde(default)]
+    identifiers: Option<String>,
+    #[serde(default)]
+    languages: Vec<String>,
 }
