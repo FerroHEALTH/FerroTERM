@@ -66,16 +66,16 @@ requested on that repository's tracker.
 
 | Package | Pin | Notes |
 |---|---|---|
-| `fhir-types` | 0.3.0 | from crates.io; the requirement lives in the root `Cargo.toml` `[workspace.dependencies]` |
+| `fhir-types` | 0.4.0 | from crates.io; the requirement lives in the root `Cargo.toml` `[workspace.dependencies]` |
 
-The requirement is a caret, so a later 0.2.x release resolves into `Cargo.lock`
+The requirement is a caret, so a later 0.4.x release resolves into `Cargo.lock`
 by itself. `scripts/checks/versions.sh` fails when the row above, the root
 requirement, and the lock disagree, so a new FHIR model reaches the build only
 in a change that moves the pin with it.
 
 | Item | Pin |
 |---|---|
-| FHIR R6 terminology bundles | 6.0.0-snapshot1 (the `hl7.fhir.r6.core` package `crates/fhir-terminology/data/fhir/r6/` is generated from, the R6 package FerroBRIDGE pins; it follows the `r6` model of `fhir-types` 0.3.0, so the surface, the model and the bundles name one package) |
+| FHIR R6 terminology bundles | 6.0.0-snapshot1 (the `hl7.fhir.r6.core` package `crates/fhir-terminology/data/fhir/r6/` is generated from, the R6 package FerroBRIDGE pins; it follows the `r6` model of `fhir-types` 0.4.0, so the surface, the model and the bundles name one package) |
 
 ## SNOMED CT / ECL
 
