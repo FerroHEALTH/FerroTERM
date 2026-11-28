@@ -24,6 +24,9 @@ use crate::provider::{
     error::ProviderError,
 };
 
+/// The standards-status of an inactive designation.
+const WITHDRAWN: &str = "withdrawn";
+
 /// Whether an artifact carries a hierarchy file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Layout {
@@ -339,6 +342,10 @@ impl Artifact {
 
     /// The stored designations of `concept`, only those in `language` when
     /// one is named, each with the use `coding` gives its ordinal.
+    ///
+    /// An inactive designation is marked `withdrawn`, the standards-status the
+    /// tx-ecosystem IG names for an inactive designation (requirements,
+    /// Inactive, Deprecated and Not-Selectable Codes).
     pub(crate) fn designations(
         &self,
         concept: Concept,
@@ -357,7 +364,7 @@ impl Artifact {
                     .is_none_or(|w| primary_subtag(&d.language) == w)
             })
             .map(|d| Designation {
-                standards_status: None,
+                standards_status: (!d.active).then(|| String::from(WITHDRAWN)),
                 language: Some(d.language.clone()),
                 use_: Some(coding(d.use_ordinal)),
                 value: d.term,
