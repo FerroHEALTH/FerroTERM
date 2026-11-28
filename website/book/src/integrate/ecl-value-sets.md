@@ -68,6 +68,13 @@ each listed reference set, as the page defines `in` for SNOMED CT), plus the gen
 }
 ```
 
+A `display` filter with `regex` selects the concepts with an active fully
+specified name or synonym whose whole term matches the pattern,
+case-sensitively, in one language: the first language of `displayLanguage`
+the edition has descriptions in, else the edition's own, as the terminology
+ecosystem IG defines it. Text definitions and inactive descriptions do not
+count.
+
 ## ECL
 
 An expression constraint names a set of concepts, and the evaluator answers it

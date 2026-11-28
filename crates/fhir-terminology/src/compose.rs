@@ -643,11 +643,41 @@ impl<'a> Expander<'a> {
         };
         let mut selected = if include.concepts.is_empty() {
             let unclosed = provider.unclosed(&include.filters);
-            let stated = provider.filter_ordered(&include.filters).map_err(failed)?;
-            let set = match &stated {
-                Some(order) => order.iter().copied().collect(),
-                None => provider.filter_all(&include.filters).map_err(failed)?,
+            // A filter that searches the displays searches the request's language.
+            let mut in_language = Vec::new();
+            let mut searched = Vec::new();
+            for (at, filter) in include.filters.iter().enumerate() {
+                if let Some(selected) =
+                    provider.filter_in_language(filter, options.language.as_deref())
+                {
+                    in_language.push(selected.map_err(failed)?);
+                    searched.push(at);
+                }
+            }
+            let stated = if in_language.is_empty() {
+                provider.filter_ordered(&include.filters).map_err(failed)?
+            } else {
+                None
             };
+            let mut set: ConceptSet = match &stated {
+                Some(order) => order.iter().copied().collect(),
+                None if searched.is_empty() => {
+                    provider.filter_all(&include.filters).map_err(failed)?
+                }
+                None => {
+                    let rest: Vec<_> = include
+                        .filters
+                        .iter()
+                        .enumerate()
+                        .filter(|(at, _)| !searched.contains(at))
+                        .map(|(_, filter)| filter.clone())
+                        .collect();
+                    provider.filter_all(&rest).map_err(failed)?
+                }
+            };
+            for selected in in_language {
+                set &= selected;
+            }
             Selected {
                 set,
                 stated,

@@ -649,6 +649,12 @@
               ]
             },
             {
+              "code": "display",
+              "op": [
+                "regex"
+              ]
+            },
+            {
               "code": "constraint",
               "op": [
                 "="
@@ -1102,7 +1108,7 @@
       ]
     }
   ],
-  "date": "2026-11-28T03:40:28.910845Z",
+  "date": "2026-11-28T05:58:28.407637Z",
   "description": "Serves the FHIR R6 ballot (version 6.0.0-snapshot1). Every behaviour grounded only in the ballot is re-verified against the published specification when it appears, and may change with it.",
   "expansion": {
     "hierarchical": false,
