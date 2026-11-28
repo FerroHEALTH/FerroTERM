@@ -23,7 +23,41 @@ pub(super) fn states_defined(status: &[record::PropertyValueRef<'_>]) -> bool {
     })
 }
 
+/// The prefix of the filter on the concepts an identifier scheme gives a code.
+pub(super) const MAPPED: &str = "mapped:";
+
 impl SnomedProvider {
+    /// The concepts with (`true`) or without (`false`) an identifier in the
+    /// scheme `mapped:[scheme]` names, from the RF2 identifier file.
+    ///
+    /// The tx-ecosystem IG's `tx-source` readme (LOINC Extension content) is the
+    /// only source of this filter, pending review by the SNOMED committee: our
+    /// own design otherwise.
+    pub(super) fn mapped(
+        &self,
+        scheme: &str,
+        filter: &Filter,
+    ) -> Result<ConceptSet, ProviderError> {
+        let Ok(id) = ConceptId::parse(scheme) else {
+            return Err(ProviderError::invalid_filter_value(
+                &filter.property,
+                scheme,
+                "the scheme is not an SCTID",
+            ));
+        };
+        let held: ConceptSet = self
+            .system()
+            .identifiers
+            .concepts(id.value())
+            .map(Ordinal::index)
+            .collect();
+        if crate::provider::filter::boolean(filter)? {
+            Ok(held)
+        } else {
+            Ok(self.all()? - held)
+        }
+    }
+
     /// The inactive concepts, scanned once from the store and kept.
     pub(super) fn inactive_set(&self) -> Result<ConceptSet, ProviderError> {
         if let Some(set) = self.system().inactive.get() {

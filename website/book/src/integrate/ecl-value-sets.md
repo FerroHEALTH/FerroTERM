@@ -157,10 +157,13 @@ range, and concrete values against their `int()`, `dec()`, `str()` and
 `bool()` ranges. A mandatory rule broken refuses the expression, with an
 `information` issue naming each rule; an optional rule broken is a warning
 beside a `true` result. An edition that carries no MRCM is not checked.
+An attribute the MRCM groups but the expression writes loose, once, is moved
+into a group of its own (the postcoordination guide's "Adding a Self-grouped
+Attribute"), so `40468003:363698007=10200004` and
+`40468003:{363698007=10200004}` are one expression for validation, display and
+subsumption. No other close-to-user transformation runs.
 
-Two boundaries are deliberate. No close-to-user transformation runs, so an
-expression is compared as written. Subsumption is
-decided over the edition's inferred view without a description logic
+One boundary is deliberate. Subsumption is decided over the edition's inferred view without a description logic
 classifier: what the server answers `subsumes` or `subsumed-by` holds, and
 what it answers `not-subsumed` is what that view does not state. SNOMED
 International withdrew normal-form comparison as a subsumption test in the

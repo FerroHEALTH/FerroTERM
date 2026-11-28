@@ -210,7 +210,7 @@ claim, not a test that merely touches the area.
 | Claim | Evidence |
 |---|---|
 | The badges are derived from the committed pass lists and the suite total | `scripts/checks/conformance-badges.sh` |
-| The suite is the HL7 terminology ecosystem IG's test cases, run with the FHIR Validator's `txTests` | `scripts/checks/tx-ecosystem.sh`, its `java -jar "$jar" txTests` call; suite commit `9c2bbce57366319d6a5265cbfbf6697f094822e3`, validator 7.0.6, pinned in `docs/VERSIONS.md` |
+| The suite is the HL7 terminology ecosystem IG's test cases, run with the FHIR Validator's `txTests` | `scripts/checks/tx-ecosystem.sh`, its `"$java" -jar "$jar" txTests` call; suite commit `9c2bbce57366319d6a5265cbfbf6697f094822e3`, validator 7.0.6, pinned in `docs/VERSIONS.md` |
 | The `general` mode runs once per served version on every pull request and push to `main` | `.github/workflows/ci.yml` job `tx-ecosystem` |
 | CI fails when a listed case stops passing | `scripts/checks/tx-ecosystem.sh` compares against the list |
 | Passing a case is not an HL7 certification | Correct as stated: HL7 issues no such certification |
@@ -233,7 +233,7 @@ Per system, the loader flag, the provider, and the test that exercises it:
 | ICD-10 (WHO), `--claml --system` | The generic ClaML path (`crates/fhir-terminology/src/classification.rs::ClassificationProvider`). **No test names the WHO URI.** See [E2](#e2) |
 | ICD-10-NL, `--claml --system` | `crates/fhir-terminology/tests/it/classification.rs::the_identity_and_declaration_follow_the_manifest_and_the_icd_page`; `tools/ferroterm-build/tests/it/classification.rs::the_claml_classification_builds_an_artifact_the_store_graph_and_text_open` |
 | ICD-10-CM, `--icd10cm` | `crates/fhir-terminology/tests/it/classification.rs::the_icd10cm_artifact_serves_valid_and_the_seventh_character_codes` |
-| ICD-11 MMS, `--icd11` | `crates/fhir-terminology/src/icd11.rs::Icd11Provider`; `crates/fhir-terminology/tests/it/icd11.rs::codes_and_entity_uris_in_both_forms_name_the_same_concept` |
+| ICD-11 MMS, `--icd11` | `crates/fhir-terminology/src/icd11.rs::Icd11Provider`; `crates/fhir-terminology/tests/it/icd11.rs::the_entity_id_is_the_code_and_the_classification_code_spells_it_too` |
 | ICD-11 ICF | `crates/fhir-terminology/tests/it/icd11.rs::postcoordination_expressions_validate_against_the_axes`; `app/ferroterm-server/tests/it/config.rs::the_three_icd11_artifacts_are_served_by_their_manifest_kind` |
 | ICD-11 Foundation | `crates/icd11/src/lib.rs::FOUNDATION`; the same two tests |
 | ATC/DDD, `--atc` | `crates/fhir-terminology/tests/it/classification.rs::the_atc_artifact_serves_the_five_levels_with_ddds_as_properties`; the readers in `crates/classification/tests/it/atc.rs`. No test drives the CLI flag end to end |

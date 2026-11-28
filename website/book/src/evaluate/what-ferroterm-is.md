@@ -48,7 +48,7 @@ The server exposes the FHIR terminology API on R4 (`/r4`), R4B (`/r4b`), R5
 | LOINC | `Loinc_x.yy.zip` | terms, parts, answer lists, and answers as codes; the FHIR LOINC properties and filters; `/vs`, `/vs/[LL…]`, `/vs/[LP…]` |
 | ICD-10 (WHO and national translations), ICPC-2 | a ClaML document | the `classified-with` tree, modifiers expanded onto their leaves, inclusion and exclusion notes as properties |
 | ICD-10-CM | the CMS tabular XML and order file | codes with the period, seventh-character codes under their stem, the `valid` flag |
-| ICD-11 (MMS, ICF, the Foundation) | a local deployment of the WHO ICD-API | short codes, entity URIs, postcoordination expressions validated against the axes, the scale value sets |
+| ICD-11 (MMS, ICF, the Foundation) | a local deployment of the WHO ICD-API | entity ids as codes with the classification code as an alternative spelling, postcoordination expressions validated against the axes, the scale value sets |
 | RxNorm | the RRF release or the prescribable subset | the FHIR `STY`, `SAB`, `TTY`, `REL`, and `RELA` filters over typed edges, `/vs` |
 | ATC/DDD | the WHO index as CSV, or the G-Standaard `BST801T` file | the five levels as a `classified-with` tree, DDDs as properties |
 | DHD thesauri | the Uitleverformaat 5.0 delivery zip | a flat table with the SNOMED CT, ICD-10, DBC, and ZA links as properties and as concept maps |

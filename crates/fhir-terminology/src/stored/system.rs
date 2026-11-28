@@ -104,6 +104,12 @@ pub trait StoredSystem: fmt::Debug + Send + Sync + Sized {
         Ok(None)
     }
 
+    /// The concepts a text filter matches beside their designations, when the
+    /// system matches some other text too; none by default.
+    fn search_codes(_provider: &StoredProvider<Self>, _text: &str) -> ConceptSet {
+        ConceptSet::new()
+    }
+
     /// As [`CodeSystemProvider::is_expression`].
     fn is_expression(_provider: &StoredProvider<Self>, _code: &str) -> bool {
         false
@@ -197,6 +203,19 @@ pub trait StoredSystem: fmt::Debug + Send + Sync + Sized {
         _selection: MapSelection<'_>,
     ) -> Option<Result<ConceptMapModel, ProviderError>> {
         None
+    }
+
+    /// As [`CodeSystemProvider::implicit_concept_maps`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProviderError`] when the substrate fails.
+    fn implicit_concept_maps(
+        _provider: &StoredProvider<Self>,
+        _source: &str,
+        _target: &str,
+    ) -> Result<Vec<String>, ProviderError> {
+        Ok(Vec::new())
     }
 
     /// As [`CodeSystemProvider::unclosed`].
@@ -398,6 +417,7 @@ impl<S: StoredSystem> CodeSystemProvider for StoredProvider<S> {
                 concepts.insert(entry.concept.index());
             }
         }
+        concepts |= S::search_codes(self, text);
         Ok(concepts)
     }
 
@@ -439,6 +459,14 @@ impl<S: StoredSystem> CodeSystemProvider for StoredProvider<S> {
         selection: MapSelection<'_>,
     ) -> Option<Result<ConceptMapModel, ProviderError>> {
         S::implicit_concept_map(self, url, selection)
+    }
+
+    fn implicit_concept_maps(
+        &self,
+        source: &str,
+        target: &str,
+    ) -> Result<Vec<String>, ProviderError> {
+        S::implicit_concept_maps(self, source, target)
     }
 
     fn filter(&self, filter: &Filter) -> Result<ConceptSet, ProviderError> {

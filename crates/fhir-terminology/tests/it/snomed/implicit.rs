@@ -325,3 +325,34 @@ fn concept_in_selects_the_listed_concepts_and_the_members_of_a_listed_reference_
         Err(ProviderError::UnknownCode(_))
     ));
 }
+
+#[test]
+fn an_unpublished_edition_answers_the_sct_uri_of_its_module() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    snomed::write_unpublished(dir.path()).expect("writes the fixture");
+    let p = fhir_terminology::snomed::SnomedProvider::open(dir.path(), "en").expect("opens");
+    let isa = |base: &str| {
+        p.implicit_value_set(&format!("{base}?fhir_vs=isa/{}", sctid(item(ANIMAL))))
+            .expect("implicit")
+    };
+    for base in [
+        EDITION,
+        VERSION,
+        snomed::UNPUBLISHED_EDITION,
+        snomed::UNPUBLISHED_VERSION,
+    ] {
+        let compose = isa(base).expect("compose");
+        assert_eq!(
+            compose.include[0]
+                .system
+                .as_ref()
+                .and_then(|s| s.version.as_deref()),
+            Some(snomed::UNPUBLISHED_VERSION),
+            "{base}"
+        );
+    }
+    assert!(
+        isa("http://snomed.info/sct/91234567105/version/20990101").is_err(),
+        "another date is another version"
+    );
+}
