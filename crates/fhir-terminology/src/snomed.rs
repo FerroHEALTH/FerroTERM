@@ -525,6 +525,11 @@ impl StoredSystem for Snomed {
                 _ => {}
             }
         }
+        if let Some(scheme) = filter.property.strip_prefix(selection::MAPPED)
+            && filter.op == FilterOperator::Exists
+        {
+            return Some(provider.mapped(scheme, filter));
+        }
         (filter.property == "concept" && filter.op == FilterOperator::In)
             .then(|| provider.reference_set_members(filter))
     }
