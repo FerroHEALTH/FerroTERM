@@ -19,6 +19,12 @@ inputs:
       separate from another's.
     required: false
     default: ""
+  cache-save-if:
+    description: >-
+      Whether the job saves the build cache; "false" only restores it, for a
+      matrix whose jobs share one cache key.
+    required: false
+    default: "true"
 runs:
   using: composite
   steps:
@@ -29,3 +35,4 @@ runs:
       with:
         components: ${{ inputs.components }}
         cache-key: ${{ inputs.cache-key }}
+        cache-save-if: ${{ inputs.cache-save-if }}
