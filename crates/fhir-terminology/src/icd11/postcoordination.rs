@@ -186,7 +186,9 @@ impl Icd11Provider {
             };
             members.push(Member { stem, values });
         }
-        let index = self.system().expressions.intern(text)?.index();
+        let cluster = Cluster { members, joined };
+        let code = self.cluster_code(&cluster);
+        let index = self.system().expressions.intern(&code)?.index();
         let mut clusters = self
             .system()
             .clusters
@@ -194,14 +196,14 @@ impl Icd11Provider {
             .unwrap_or_else(PoisonError::into_inner);
         if let Some(slot) = Self::at(index) {
             if slot == clusters.len() {
-                clusters.push(Cluster { members, joined });
+                clusters.push(cluster);
             } else if let Some(existing) = clusters.get_mut(slot) {
-                *existing = Cluster { members, joined };
+                *existing = cluster;
             }
         }
         Ok(Some(Located {
             concept: Concept::new(self.stored().concepts.saturating_add(index)),
-            code: text.to_owned(),
+            code,
         }))
     }
 
@@ -235,14 +237,27 @@ impl Icd11Provider {
         Ok(parts.join(" / "))
     }
 
-    /// The short-code form of an expression.
+    /// The entity-id form of an expression.
     fn cluster_code(&self, cluster: &Cluster) -> String {
-        Self::cluster_text(cluster, |ordinal| self.code_or_uri(ordinal), "&", "/")
+        Self::cluster_text(cluster, |ordinal| self.code_of(ordinal), "&", "/")
     }
 
-    /// The URI form of an expression: the members' URIs, values joined with ` & `.
-    fn cluster_uri(&self, cluster: &Cluster) -> String {
-        Self::cluster_text(cluster, |ordinal| self.uri(ordinal), " & ", " / ")
+    /// The short-code form of an expression, when every part has a short code.
+    fn cluster_classification_code(&self, cluster: &Cluster) -> Option<String> {
+        let all = cluster.written().all(|(stem, values)| {
+            self.classification_code(stem).is_some()
+                && values
+                    .iter()
+                    .all(|&v| self.classification_code(v).is_some())
+        });
+        all.then(|| {
+            Self::cluster_text(
+                cluster,
+                |ordinal| self.classification_code(ordinal).unwrap_or_default(),
+                "&",
+                "/",
+            )
+        })
     }
 
     /// An expression written out with `spell`: each stem followed by its own
@@ -272,25 +287,25 @@ impl Icd11Provider {
         cluster: &Cluster,
         language: Option<&str>,
     ) -> Result<Vec<Property>, ProviderError> {
-        let mut out = vec![
-            Property {
-                code: String::from("code"),
-                value: PropertyValue::Code(self.cluster_code(cluster)),
+        let mut out = vec![Property {
+            code: String::from("code"),
+            value: PropertyValue::Code(self.cluster_code(cluster)),
+            ..Property::default()
+        }];
+        if let Some(code) = self.cluster_classification_code(cluster) {
+            out.push(Property {
+                code: String::from("classificationCode"),
+                value: PropertyValue::Code(code),
                 ..Property::default()
-            },
-            Property {
-                code: String::from("id"),
-                value: PropertyValue::Code(self.cluster_uri(cluster)),
-                ..Property::default()
-            },
-        ];
+            });
+        }
         for (position, member) in cluster.members.iter().enumerate() {
             if cluster.joined.iter().any(|(p, _)| *p == position) {
                 continue;
             }
             out.push(Property {
                 code: String::from("stem"),
-                value: PropertyValue::Code(self.code_or_uri(member.stem)),
+                value: PropertyValue::Code(self.code_of(member.stem)),
                 subproperties: vec![
                     Subproperty {
                         code: String::from("stemLabel"),
@@ -309,8 +324,8 @@ impl Icd11Provider {
             });
             let mut bounds: Vec<&Bound> = member.values.iter().collect();
             bounds.sort_by(|a, b| {
-                self.code_or_uri(a.value)
-                    .cmp(&self.code_or_uri(b.value))
+                self.code_of(a.value)
+                    .cmp(&self.code_of(b.value))
                     .then_with(|| a.axis.cmp(&b.axis))
             });
             // NOTE: the ecosystem's icd-11 `lookup-pc-simple` keys each bound value's
@@ -320,7 +335,7 @@ impl Icd11Provider {
                     code: String::from("postcoordinationValues"),
                     value: PropertyValue::Code(bound.axis.clone()),
                     subproperties: vec![Subproperty {
-                        code: self.code_or_uri(bound.value),
+                        code: self.code_of(bound.value),
                         value: PropertyValue::Uri(self.uri(bound.value)),
                         description: self.title(bound.value, language)?,
                     }],

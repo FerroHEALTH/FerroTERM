@@ -104,6 +104,12 @@ pub trait StoredSystem: fmt::Debug + Send + Sync + Sized {
         Ok(None)
     }
 
+    /// The concepts a text filter matches beside their designations, when the
+    /// system matches some other text too; none by default.
+    fn search_codes(_provider: &StoredProvider<Self>, _text: &str) -> ConceptSet {
+        ConceptSet::new()
+    }
+
     /// As [`CodeSystemProvider::is_expression`].
     fn is_expression(_provider: &StoredProvider<Self>, _code: &str) -> bool {
         false
@@ -435,6 +441,7 @@ impl<S: StoredSystem> CodeSystemProvider for StoredProvider<S> {
                 concepts.insert(entry.concept.index());
             }
         }
+        concepts |= S::search_codes(self, text);
         Ok(concepts)
     }
 
