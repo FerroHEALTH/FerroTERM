@@ -6,9 +6,10 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use fhir_terminology::provider::concept_map::MapSelection;
 use fhir_terminology::provider::filter::{Filter, FilterOperator};
 use fhir_terminology::provider::{
-    CodeSystemProvider, Designation, MapSelection, Property, PropertyValue, error::ProviderError,
+    CodeSystemProvider, Designation, Property, PropertyValue, error::ProviderError,
 };
 use fhir_terminology::registries::bcp13::Bcp13Provider;
 use fhir_terminology::snomed::{SYSTEM, SnomedProvider};

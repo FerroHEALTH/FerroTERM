@@ -43,9 +43,6 @@ struct Bound {
     group: Group,
 }
 
-/// A code and its qualifiers as written.
-type AsWritten = (u32, Vec<u32>);
-
 /// A validated postcoordination expression.
 #[derive(Debug, Clone)]
 pub(super) struct Cluster {
@@ -53,8 +50,6 @@ pub(super) struct Cluster {
     root: Group,
     /// The `/` members, bound to the root's axes.
     members: Vec<Bound>,
-    /// Each code with its qualifiers as written, the root first.
-    written: Vec<AsWritten>,
     /// Whether the qualifiers are written with ICF's `.`.
     dotted: bool,
 }
@@ -131,7 +126,7 @@ impl Icd11Provider {
         text: &str,
         written: &Written,
         dotted: bool,
-    ) -> Result<Option<(Group, AsWritten)>, ProviderError> {
+    ) -> Result<Option<Group>, ProviderError> {
         let invalid = |reason: String| ProviderError::InvalidCode {
             code: text.to_owned(),
             reason,
@@ -167,7 +162,7 @@ impl Icd11Provider {
                 written.code
             )));
         }
-        Ok(Some((Group { code, qualifiers }, (code, values))))
+        Ok(Some(Group { code, qualifiers }))
     }
 
     /// Validates the expression `text`, interning its normal form when it holds.
@@ -176,25 +171,21 @@ impl Icd11Provider {
         text: &str,
         expression: &Expression,
     ) -> Result<Option<Located>, ProviderError> {
-        let Some((root, root_written)) = self.group(text, &expression.root, expression.dotted)?
-        else {
+        let Some(root) = self.group(text, &expression.root, expression.dotted)? else {
             return Ok(None);
         };
-        let mut written = vec![root_written];
         let mut members = Vec::with_capacity(expression.members.len());
         for member in &expression.members {
-            let Some((group, as_written)) = self.group(text, member, expression.dotted)? else {
+            let Some(group) = self.group(text, member, expression.dotted)? else {
                 return Ok(None);
             };
             members.push(group);
-            written.push(as_written);
         }
         let filled = root.qualifiers.iter().filter_map(|b| b.axis).collect();
         let members = self.bind_all(root.code, members, filled);
         let cluster = Cluster {
             root,
             members,
-            written,
             dotted: expression.dotted,
         };
         let code = self.cluster_code(&cluster);
@@ -227,25 +218,68 @@ impl Icd11Provider {
             .cloned()
     }
 
-    /// The display of an expression as written, duplicates kept: each code's
-    /// title with its qualifiers' titles in brackets, the members joined by
-    /// ` / ` (`icd-11.md`, Display Terms).
+    /// The display of an expression in its normal form, for a request that
+    /// names it by no spelling of its own.
     pub(super) fn cluster_display(
         &self,
         cluster: &Cluster,
         language: Option<&str>,
     ) -> Result<String, ProviderError> {
-        let mut parts = Vec::with_capacity(cluster.written.len());
-        for (code, qualifiers) in &cluster.written {
+        let group = |group: &Group| {
+            (
+                group.code,
+                group.qualifiers.iter().map(|b| b.group.code).collect(),
+            )
+        };
+        let parts: Vec<(u32, Vec<u32>)> = std::iter::once(group(&cluster.root))
+            .chain(cluster.members.iter().map(|member| group(&member.group)))
+            .collect();
+        self.render(&parts, language)
+    }
+
+    /// The display of an expression as `spelling` writes it, duplicates kept
+    /// (`icd-11.md`, Display Terms); `None` when a code of it names no
+    /// concept.
+    pub(super) fn written_display(
+        &self,
+        expression: &Expression,
+        language: Option<&str>,
+    ) -> Result<Option<String>, ProviderError> {
+        let mut parts = Vec::with_capacity(expression.members.len().saturating_add(1));
+        for written in std::iter::once(&expression.root).chain(&expression.members) {
+            let Some(code) = self.resolve(&written.code)? else {
+                return Ok(None);
+            };
+            let mut qualifiers = Vec::with_capacity(written.qualifiers.len());
+            for token in &written.qualifiers {
+                let Some(value) = self.resolve(token)? else {
+                    return Ok(None);
+                };
+                qualifiers.push(value);
+            }
+            parts.push((code, qualifiers));
+        }
+        self.render(&parts, language).map(Some)
+    }
+
+    /// Each code's title with its qualifiers' titles in brackets, the members
+    /// joined by ` / `.
+    fn render(
+        &self,
+        parts: &[(u32, Vec<u32>)],
+        language: Option<&str>,
+    ) -> Result<String, ProviderError> {
+        let mut out = Vec::with_capacity(parts.len());
+        for (code, qualifiers) in parts {
             let mut part = self.title(*code, language)?.unwrap_or_default();
             for &qualifier in qualifiers {
                 part.push_str(" [");
                 part.push_str(&self.title(qualifier, language)?.unwrap_or_default());
                 part.push(']');
             }
-            parts.push(part);
+            out.push(part);
         }
-        Ok(parts.join(" / "))
+        Ok(out.join(" / "))
     }
 
     /// The normal form of an expression, in entity ids.

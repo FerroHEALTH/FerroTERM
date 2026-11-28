@@ -564,7 +564,7 @@ impl Registry {
     pub fn implicit_concept_map(
         &self,
         url: &str,
-        selection: crate::provider::MapSelection<'_>,
+        selection: crate::provider::concept_map::MapSelection<'_>,
     ) -> Option<Result<crate::provider::concept_map::ConceptMapModel, ProviderError>> {
         let mut unserved = None;
         for provider in self.implicit_candidates(url) {

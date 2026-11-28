@@ -30,8 +30,9 @@ use concept_graph::refsets::ValueRef;
 
 use super::expression::Terms;
 use crate::normal_form;
+use crate::provider::concept_map::MapSelection;
 use crate::provider::concept_map::{ConceptMapModel, Element, Group, Relationship, Target};
-use crate::provider::{CodeSystemProvider, Concept, MapSelection, error::ProviderError};
+use crate::provider::{CodeSystemProvider, Concept, error::ProviderError};
 use crate::snomed::{FHIR_CM, SYSTEM, SnomedProvider};
 use crate::stored::storage;
 

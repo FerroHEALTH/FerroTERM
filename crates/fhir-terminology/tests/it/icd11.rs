@@ -341,11 +341,18 @@ fn the_normal_form_orders_each_group_by_axis_then_entity_id() {
     let duplicate = ids(&[CHOLERA, CLASSICAL, CLASSICAL]);
     assert_eq!(normal(&mms, &duplicate), ids(&[CHOLERA, CLASSICAL]));
     assert_eq!(
-        mms.display(located(&mms, &duplicate), None)
+        mms.spelled_display(located(&mms, &duplicate), &duplicate, None)
             .expect("reads")
             .as_deref(),
         Some("Cholera [Vibrio cholerae O1, biovar cholerae] [Vibrio cholerae O1, biovar cholerae]"),
         "the display keeps what was written"
+    );
+    assert_eq!(
+        mms.display(located(&mms, &duplicate), None)
+            .expect("reads")
+            .as_deref(),
+        Some("Cholera [Vibrio cholerae O1, biovar cholerae]"),
+        "with no spelling, the display renders the normal form"
     );
     let members = format!("{CHOLERA}/{OTHER_VIBRIO}/{SEPSIS}");
     assert_eq!(
@@ -354,7 +361,7 @@ fn the_normal_form_orders_each_group_by_axis_then_entity_id() {
         "a member on an axis of the root before one on none"
     );
     assert_eq!(
-        mms.display(located(&mms, &members), None)
+        mms.spelled_display(located(&mms, &members), &members, None)
             .expect("reads")
             .as_deref(),
         Some("Cholera / Intestinal infection due to other Vibrio / Sepsis without septic shock")
@@ -1025,6 +1032,49 @@ fn a_classification_code_validates_and_names_the_entity_id_as_its_normal_form() 
     assert!(
         !by_uri.result,
         "a full entity uri is no MMS code: {by_uri:?}"
+    );
+}
+
+// NOTE: tx-ecosystem IG `icd-11.md` at 9c2bbce, Display Terms: an expression's display is built
+// from its parts as written, so it follows the spelling the request located.
+#[test]
+fn two_spellings_of_one_expression_keep_their_own_displays() {
+    let (_dir, mms, _icf, _foundation) = providers();
+    let written = format!("{CHOLERA}&{ELTOR}&{CLASSICAL}");
+    let normal_form = format!("{CHOLERA}&{CLASSICAL}&{ELTOR}");
+    let first = located(&mms, &written);
+    let second = located(&mms, &normal_form);
+    assert_eq!(first, second, "one expression, one concept");
+    let eltor_first =
+        "Cholera [Vibrio cholerae O1, biovar eltor] [Vibrio cholerae O1, biovar cholerae]";
+    let classical_first =
+        "Cholera [Vibrio cholerae O1, biovar cholerae] [Vibrio cholerae O1, biovar eltor]";
+    assert_eq!(
+        mms.spelled_display(first, &written, None)
+            .expect("reads")
+            .as_deref(),
+        Some(eltor_first),
+        "the spelling located last does not decide another's display"
+    );
+    assert_eq!(
+        mms.spelled_display(second, &normal_form, None)
+            .expect("reads")
+            .as_deref(),
+        Some(classical_first)
+    );
+    assert_eq!(
+        mms.spelled_display(first, "1A00&XN62R&XN8P1", None)
+            .expect("reads")
+            .as_deref(),
+        Some(eltor_first),
+        "short codes spell the same parts"
+    );
+    assert_eq!(
+        mms.spelled_display(first, &format!("{CHOLERA}&{SEPSIS}"), None)
+            .expect("reads")
+            .as_deref(),
+        Some(classical_first),
+        "a spelling of another expression falls back to the normal form"
     );
 }
 

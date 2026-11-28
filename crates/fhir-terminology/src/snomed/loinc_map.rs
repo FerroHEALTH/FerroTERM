@@ -13,8 +13,9 @@
 
 use concept_graph::ordinal::Ordinal;
 
+use crate::provider::concept_map::MapSelection;
 use crate::provider::concept_map::{ConceptMapModel, Element, Group, Relationship, Target};
-use crate::provider::{CodeSystemProvider, Concept, MapSelection, error::ProviderError};
+use crate::provider::{CodeSystemProvider, Concept, error::ProviderError};
 use crate::snomed::properties::{LOINC_SCHEME, LOINC_SYSTEM};
 use crate::snomed::{SYSTEM, SnomedProvider};
 use crate::stored::storage;

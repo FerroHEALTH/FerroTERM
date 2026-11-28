@@ -261,7 +261,7 @@ pub(super) fn materialize(
     } else {
         let asked = language::for_provider(provider.as_ref(), requested);
         let shown = provider
-            .display(concept, asked.as_deref())
+            .spelled_display(concept, &code, asked.as_deref())
             .map_err(failed)?;
         // NOTE: a request refusing every language it does not name has no
         // display to answer with here, so the item carries none
