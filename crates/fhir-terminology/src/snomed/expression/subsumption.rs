@@ -50,8 +50,10 @@ impl SnomedProvider {
             // not the same as establishing that there is none" (tx-ecosystem IG, SNOMED CT);
             // concepts and their conjunctions the inferred hierarchy decides.
             (false, false) if refined(&a) || refined(&b) => {
-                return Err(ProviderError::CannotDetermine(String::from(
-                    "the structure of the expressions does not settle their relationship",
+                return Err(ProviderError::CannotDetermine(format!(
+                    "the structure of `{}` and `{}` does not settle their relationship",
+                    a.key(),
+                    b.key()
                 )));
             }
             (false, false) => Outcome::NotSubsumed,
