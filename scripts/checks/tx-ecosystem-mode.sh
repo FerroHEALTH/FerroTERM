@@ -113,6 +113,9 @@ case "$mode" in
     [[ "$status" == 0 ]] || { echo "tx-ecosystem-mode: the build of the SNOMED CT test edition failed" >&2; exit 1; }
     rm -rf "$ig" "$scratch/edition"
     ;;
+  mimetypes)
+    # BCP 13 is served from the vendored IANA media types registry.
+    ;;
   *)
     echo "tx-ecosystem-mode: no content recipe for $mode" >&2
     exit 2
