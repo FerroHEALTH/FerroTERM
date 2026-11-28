@@ -60,14 +60,20 @@ impl SnomedProvider {
         // NOTE: an unpublished edition's `xsct` URI and the `sct` URI of the same
         // module and date name one edition here, as the tx-ecosystem IG's test edition
         // cases do (`snomed-expand-implicit-edition`): our own design.
-        let published =
-            |uri: &str| uri.replacen("http://snomed.info/xsct/", "http://snomed.info/sct/", 1);
-        let named = published(base);
+        let names = |held: &str| {
+            base == held
+                || base
+                    .strip_prefix("http://snomed.info/sct/")
+                    .or_else(|| base.strip_prefix("http://snomed.info/xsct/"))
+                    .is_some_and(|named| {
+                        held.strip_prefix("http://snomed.info/sct/")
+                            .or_else(|| held.strip_prefix("http://snomed.info/xsct/"))
+                            == Some(named)
+                    })
+        };
         if base == SYSTEM {
             Ok(None)
-        } else if named == published(&self.system().edition)
-            || named == published(&self.identity().version)
-        {
+        } else if names(&self.system().edition) || names(&self.identity().version) {
             Ok(Some(self.identity().version.clone()))
         } else {
             Err(ProviderError::UnservedImplicitVersion {
