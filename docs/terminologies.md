@@ -339,12 +339,17 @@ and it does so **without reading an openEHR artefact**.
   classification code (`1A00`) is an alternative spelling, valid but not in
   normal form, answered with the id as `normalized-code`; a full entity URI
   is no code there, and the Foundation's code is the entity URI. A
-  postcoordination expression (`1A00&XN8P1`, `1D01.0Y/1G41/1G40`, the ICF
-  `d5409.qp3`) is validated against the stem's axes (an unfilled axis first,
-  then a required one, then WHO's order; a `/` member that fits an unfilled
-  axis is a value, else a new stem), and its code is its entity-id form, with
-  `stem` and `postcoordinationValues` reporting the binding; `code` is the
-  id, `classificationCode` the short code, `parent` and `child` are ids; a
+  postcoordination expression (`257068234&194483911`, `1D01.0Y/1G41/1G40`,
+  the ICF `1860600370/unspecified.992904195`) has a root, `&` qualifiers of
+  the code before them, and `/` members that qualify the root; each code is
+  bound to an axis of the code it qualifies (an axis with no value first, a
+  required one before WHO's order, the codes in entity id order), and its
+  code is its normal form: each group in its code's axis order and by entity
+  id within an axis, the members on no axis of the root last, duplicates
+  deleted, the syntax kept. The display renders the expression as written;
+  `stem` (a Coding) and one `postcoordination` property per valued axis report
+  the binding; `code` is the id, `classificationCode` the short code,
+  `parent` and `child` are ids; a
   text filter also matches the start of a classification code; a stem's
   scale is the implicit value set `<uri>/postcoordinationScale/<axis>`;
   `$subsumes` follows the tree. The

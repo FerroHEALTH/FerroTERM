@@ -30,7 +30,9 @@ use fhir_terminology::valueset;
 use fhir_terminology::valueset::store::ValueSetStore;
 
 use ferroterm_testkit::snomed;
-use ferroterm_testkit::snomed::{ANIMAL, CAT, COVERING, DOG, FISH, FUR, LEGS, TOP, VERSION, code};
+use ferroterm_testkit::snomed::{
+    ANIMAL, CAT, COVERING, DOG, FISH, FUR, KITTEN, LEGS, TOP, VERSION, code,
+};
 
 fn registry() -> (tempfile::TempDir, Registry) {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -42,10 +44,14 @@ fn registry() -> (tempfile::TempDir, Registry) {
 }
 
 fn looked_up(registry: &Registry, code: &str) -> lookup::LookupOutcome {
+    looked_up_with(registry, code, &["*"])
+}
+
+fn looked_up_with(registry: &Registry, code: &str, properties: &[&str]) -> lookup::LookupOutcome {
     let input = lookup::LookupInput {
         system: Some(SYSTEM.to_owned()),
         code: Some(code.to_owned()),
-        properties: vec![String::from("*")],
+        properties: properties.iter().map(|p| (*p).to_owned()).collect(),
         ..lookup::LookupInput::default()
     };
     lookup::lookup(registry, &Invocation::Type, &input).expect("looks up")
@@ -198,7 +204,12 @@ fn lookup_answers_the_display_in_the_language_the_request_asks_for() {
 #[test]
 fn lookup_generates_the_normal_form_of_an_expression() {
     let (_dir, registry) = registry();
-    let outcome = looked_up(&registry, &refined(ANIMAL, COVERING, FUR));
+    // The normal forms answer only when named (tx-ecosystem IG, requirements).
+    let outcome = looked_up_with(
+        &registry,
+        &refined(ANIMAL, COVERING, FUR),
+        &["normalForm", "normalFormTerse"],
+    );
     let terse = outcome
         .properties
         .iter()
@@ -207,7 +218,7 @@ fn lookup_generates_the_normal_form_of_an_expression() {
     // The focus concept keeps its own definition's attributes beside the
     // expression's refinement; the animal has none of its own.
     assert_eq!(
-        format!("{:?}", terse.value),
+        format!("{:?}", terse.value.as_ref().expect("a value")),
         format!(
             "String(\"{}:{}={}\")",
             code(ANIMAL),
@@ -221,7 +232,7 @@ fn lookup_generates_the_normal_form_of_an_expression() {
         .find(|p| p.code == "normalForm")
         .expect("normalForm");
     assert!(
-        format!("{:?}", with_terms.value).contains("|Animal|"),
+        format!("{:?}", with_terms.value.as_ref().expect("a value")).contains("|Animal|"),
         "{:?}",
         with_terms.value
     );
@@ -242,6 +253,8 @@ fn an_expression_states_its_own_definition_status_as_a_property() {
                 .find(|p| p.code == "sufficientlyDefined")
                 .expect("sufficientlyDefined")
                 .value
+                .as_ref()
+                .expect("a value")
         )
     };
     assert_eq!(sufficiently_defined(&assumed), "Boolean(true)");
@@ -317,6 +330,34 @@ fn a_grouped_attribute_is_more_specific_than_the_same_attribute_ungrouped() {
         Outcome::SubsumedBy
     );
     assert_eq!(outcome(&registry, &ungrouped, &grouped), Outcome::Subsumes);
+}
+
+#[test]
+fn a_defined_concept_under_a_defined_parent_is_its_definition_over_primitives() {
+    // A normal form references no fully defined concept (SNOMED CT Glossary,
+    // "normal form"), so the kitten's definition is over the primitive animal.
+    let dir = tempfile::tempdir().expect("tempdir");
+    snomed::write_with_kitten(dir.path()).expect("writes the fixture");
+    let provider = SnomedProvider::open(dir.path(), "en").expect("opens");
+    let mut registry = Registry::default();
+    registry.register(Arc::new(provider)).expect("registers");
+    let definition = format!(
+        "{} : {{ {} = {}, {} = #4 }}",
+        code(ANIMAL),
+        code(COVERING),
+        code(FUR),
+        code(LEGS)
+    );
+    assert_eq!(
+        outcome(&registry, &code(KITTEN), &definition),
+        Outcome::Equivalent
+    );
+    let wider = format!("{} : {} = {}", code(ANIMAL), code(COVERING), code(FUR));
+    assert_eq!(
+        outcome(&registry, &code(KITTEN), &wider),
+        Outcome::SubsumedBy,
+        "an animal with fur needs no legs"
+    );
 }
 
 #[test]
@@ -650,7 +691,10 @@ fn an_expression_over_an_inactive_concept_validates_and_is_marked_inactive() {
         .iter()
         .find(|p| p.code == "inactive")
         .expect("inactive");
-    assert_eq!(format!("{:?}", inactive.value), "Boolean(true)");
+    assert_eq!(
+        format!("{:?}", inactive.value.as_ref().expect("a value")),
+        "Boolean(true)"
+    );
     // An expression over active concepts alone stays active.
     assert_eq!(
         validated(&registry, &refined(CAT, COVERING, FUR)).inactive,
@@ -671,7 +715,7 @@ fn an_expression_answers_its_own_refinement_as_concept_model_properties() {
         .find(|p| p.code == code(COVERING))
         .expect("the covering attribute");
     assert_eq!(
-        format!("{:?}", covering.value),
+        format!("{:?}", covering.value.as_ref().expect("a value")),
         format!("Code({:?})", code(FUR))
     );
 }
@@ -935,4 +979,13 @@ fn an_expression_display_is_generated_and_a_concept_display_defined() {
         provider.display_standing(cat.concept).expect("reads"),
         fhir_terminology::provider::DisplayStanding::Defined
     );
+}
+
+// NOTE: every tx-ecosystem `$lookup` case at 9c2bbce echoes the code as sent, as
+// `$validate-code` does (#1418).
+#[test]
+fn lookup_answers_an_expression_as_sent() {
+    let (_dir, registry) = registry();
+    let sent = refined(CAT, COVERING, FUR);
+    assert_eq!(looked_up(&registry, &sent).code, sent);
 }

@@ -168,7 +168,7 @@ fn properties_and_hierarchy_come_from_nesting_and_subsumed_by() {
     let parents: Vec<&PropertyValue> = props
         .iter()
         .filter(|p| p.code == "parent")
-        .map(|p| &p.value)
+        .map(|p| p.value.as_ref().expect("a value"))
         .collect();
     assert_eq!(
         parents,
@@ -180,12 +180,12 @@ fn properties_and_hierarchy_come_from_nesting_and_subsumed_by() {
     assert!(
         props
             .iter()
-            .any(|p| p.code == "legs" && p.value == PropertyValue::Integer(4))
+            .any(|p| p.code == "legs" && p.value == Some(PropertyValue::Integer(4)))
     );
     assert!(
         props
             .iter()
-            .any(|p| p.code == "inactive" && p.value == PropertyValue::Boolean(false))
+            .any(|p| p.code == "inactive" && p.value == Some(PropertyValue::Boolean(false)))
     );
     let hierarchy = animals.hierarchy().expect("is-a hierarchy");
     let living = animals
@@ -458,7 +458,12 @@ fn lookup_property_star_answers_parent_child_inactive_and_the_declared_propertie
     let properties: Vec<(&str, String)> = outcome
         .properties
         .iter()
-        .map(|p| (p.code.as_str(), p.value.as_text()))
+        .map(|p| {
+            (
+                p.code.as_str(),
+                p.value.as_ref().expect("a value").as_text(),
+            )
+        })
         .collect();
     assert_eq!(
         properties,
@@ -657,7 +662,7 @@ fn not_selectable_is_known_by_its_standard_uri_and_a_declared_false_stays_a_prop
             .properties(s.concept)
             .expect("properties")
             .into_iter()
-            .any(|p| p.code == property_code && p.value == PropertyValue::Boolean(false));
+            .any(|p| p.code == property_code && p.value == Some(PropertyValue::Boolean(false)));
         assert!(
             declared_false,
             "{property_code}: an explicit false is still listed"
@@ -824,6 +829,6 @@ fn a_not_selectable_code_under_another_uri_is_no_abstract_marker() {
         .properties(ns.concept)
         .expect("properties")
         .into_iter()
-        .any(|p| p.code == "notSelectable" && p.value == PropertyValue::Boolean(true));
+        .any(|p| p.code == "notSelectable" && p.value == Some(PropertyValue::Boolean(true)));
     assert!(stated, "the property is still listed as stated");
 }

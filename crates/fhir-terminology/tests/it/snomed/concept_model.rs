@@ -212,7 +212,7 @@ fn a_concrete_number_is_typed_by_the_attribute_range() {
         .expect("reads")
         .into_iter()
         .filter(|p| p.code == code(LEGS))
-        .map(|p| p.value)
+        .filter_map(|p| p.value)
         .collect();
     assert_eq!(legs, [PropertyValue::Integer(4)]);
 }

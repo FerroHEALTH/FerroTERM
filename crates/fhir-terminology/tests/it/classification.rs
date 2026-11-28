@@ -151,7 +151,13 @@ fn properties_carry_the_kind_notes_usage_and_tree() {
         .properties(liver)
         .expect("reads")
         .into_iter()
-        .map(|p| format!("{}={}", p.code, p.value.as_text()))
+        .map(|p| {
+            format!(
+                "{}={}",
+                p.code,
+                p.value.as_ref().expect("a value").as_text()
+            )
+        })
         .collect();
     assert!(props.contains(&String::from("kind=category")));
     assert!(props.contains(&String::from(
@@ -165,14 +171,26 @@ fn properties_carry_the_kind_notes_usage_and_tree() {
         .properties(located(&provider, BILE_DUCT))
         .expect("reads")
         .into_iter()
-        .map(|p| format!("{}={}", p.code, p.value.as_text()))
+        .map(|p| {
+            format!(
+                "{}={}",
+                p.code,
+                p.value.as_ref().expect("a value").as_text()
+            )
+        })
         .collect();
     assert!(bile.contains(&String::from("usage=dagger")));
     let closed: Vec<String> = provider
         .properties(located(&provider, VAULT_CLOSED))
         .expect("reads")
         .into_iter()
-        .map(|p| format!("{}={}", p.code, p.value.as_text()))
+        .map(|p| {
+            format!(
+                "{}={}",
+                p.code,
+                p.value.as_ref().expect("a value").as_text()
+            )
+        })
         .collect();
     assert!(closed.contains(&String::from("modifier=0")));
 }
@@ -249,7 +267,13 @@ fn the_icd10cm_artifact_serves_valid_and_the_seventh_character_codes() {
         .properties(cholera)
         .expect("reads")
         .into_iter()
-        .map(|p| format!("{}={}", p.code, p.value.as_text()))
+        .map(|p| {
+            format!(
+                "{}={}",
+                p.code,
+                p.value.as_ref().expect("a value").as_text()
+            )
+        })
         .collect();
     assert!(props.contains(&String::from("valid=false")));
     assert!(props.contains(&String::from("excludes1=cholera-like illness (A09)")));
@@ -301,7 +325,13 @@ fn the_atc_artifact_serves_the_five_levels_with_ddds_as_properties() {
         .properties(substance)
         .expect("reads")
         .into_iter()
-        .map(|p| format!("{}={}", p.code, p.value.as_text()))
+        .map(|p| {
+            format!(
+                "{}={}",
+                p.code,
+                p.value.as_ref().expect("a value").as_text()
+            )
+        })
         .collect();
     assert!(p.contains(&String::from("kind=chemical-substance")));
     assert!(p.contains(&String::from("ddd=2 g O")));
@@ -358,7 +388,13 @@ fn the_dhd_artifact_serves_a_flat_thesaurus_with_dutch_terms() {
         .properties(fracture)
         .expect("reads")
         .into_iter()
-        .map(|p| format!("{}={}", p.code, p.value.as_text()))
+        .map(|p| {
+            format!(
+                "{}={}",
+                p.code,
+                p.value.as_ref().expect("a value").as_text()
+            )
+        })
         .collect();
     assert!(p.contains(&format!(
         "snomed={}",
@@ -413,7 +449,13 @@ fn the_gstandaard_rungs_serve_flat_with_the_ladder_as_properties() {
         .properties(article)
         .expect("reads")
         .into_iter()
-        .map(|p| format!("{}={}", p.code, p.value.as_text()))
+        .map(|p| {
+            format!(
+                "{}={}",
+                p.code,
+                p.value.as_ref().expect("a value").as_text()
+            )
+        })
         .collect();
     assert!(p.contains(&format!("hpk={}", ferroterm_testkit::gstandaard::HPK)));
     assert!(p.contains(&format!("gpk={}", ferroterm_testkit::gstandaard::GPK)));

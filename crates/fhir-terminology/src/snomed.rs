@@ -33,7 +33,6 @@ use concept_graph::attributes::{Attributes, AttributesError};
 use concept_graph::identifiers::{Identifiers, IdentifiersError};
 use concept_graph::members::{MembersError, Memberships};
 use concept_graph::refsets::{RefsetMembers, RefsetsError};
-use concept_store::record;
 use concept_store::store::StoreError;
 use rf2::constants;
 use rf2::id::ConceptId;
@@ -98,15 +97,24 @@ const NORMAL_FORM_TERSE: &str = "normalFormTerse";
 const GENERATED_PROPERTIES: [&str; 2] = [NORMAL_FORM, NORMAL_FORM_TERSE];
 
 /// The FHIR-defined SNOMED properties this provider serves, in output order
-/// (<https://hl7.org/fhir/R4B/snomedct.html>, the properties section).
-pub const FHIR_PROPERTIES: [(&str, PropertyKind); 6] = [
+/// (<https://terminology.hl7.org/SNOMEDCT.html>, the properties section).
+pub const FHIR_PROPERTIES: [(&str, PropertyKind); 7] = [
     ("inactive", PropertyKind::Boolean),
     ("sufficientlyDefined", PropertyKind::Boolean),
     ("moduleId", PropertyKind::Code),
-    ("effectiveTime", PropertyKind::String),
+    ("effectiveTime", PropertyKind::DateTime),
     ("parent", PropertyKind::Code),
     ("child", PropertyKind::Code),
+    (SEMANTIC_TAG, PropertyKind::Code),
 ];
+
+/// "The phrase inside the last set of brackets of its Fully Specified Name"
+/// (<https://terminology.hl7.org/SNOMEDCT.html>, the properties section).
+const SEMANTIC_TAG: &str = "semanticTag";
+
+// NOTE: `$lookup` leaves the properties of a request naming none to the server
+// (R4B CodeSystem-lookup, `property`), so these two wait to be asked: our own design.
+const REQUESTED_PROPERTIES: [&str; 2] = ["sufficientlyDefined", SEMANTIC_TAG];
 
 /// A failure to open an artifact directory.
 #[derive(Debug, thiserror::Error)]
@@ -212,6 +220,10 @@ impl StoredSystem for Snomed {
         &UNSERVED_PROPERTIES
     }
 
+    fn requested_properties(_provider: &SnomedProvider) -> &[&'static str] {
+        &REQUESTED_PROPERTIES
+    }
+
     fn generated_properties(_provider: &SnomedProvider) -> &[&'static str] {
         &GENERATED_PROPERTIES
     }
@@ -235,7 +247,7 @@ impl StoredSystem for Snomed {
         };
         Ok(Some(Property {
             code: name.to_owned(),
-            value: PropertyValue::String(expression),
+            value: Some(PropertyValue::String(expression)),
             ..Property::default()
         }))
     }
@@ -433,67 +445,7 @@ impl StoredSystem for Snomed {
         if let Some(record) = provider.registered(concept)? {
             return properties::of_expression(provider, &record);
         }
-        let ordinal = SnomedProvider::ordinal(concept);
-        let Some(record) = provider.stored().store.concept(ordinal).map_err(storage)? else {
-            return Ok(Vec::new());
-        };
-        let stored = provider
-            .stored()
-            .store
-            .properties(ordinal)
-            .map_err(storage)?;
-        let of = |key: u32| stored.iter().find(|(k, _)| *k == key).map(|(_, v)| v);
-        let mut out = vec![Property {
-            code: String::from("inactive"),
-            value: PropertyValue::Boolean(!record.active),
-            ..Property::default()
-        }];
-        let defined = of(provider.system().keys.definition_status)
-            .is_some_and(|values| selection::states_defined(values));
-        out.push(Property {
-            code: String::from("sufficientlyDefined"),
-            value: PropertyValue::Boolean(defined),
-            ..Property::default()
-        });
-        if let Some(values) = of(provider.system().keys.module)
-            && let Some(record::PropertyValueRef::Code(module)) = values.first()
-        {
-            out.push(Property {
-                code: String::from("moduleId"),
-                value: PropertyValue::Code((*module).to_owned()),
-                ..Property::default()
-            });
-        }
-        if let Some(time) = record.effective_time {
-            out.push(Property {
-                code: String::from("effectiveTime"),
-                value: PropertyValue::String(time),
-                ..Property::default()
-            });
-        }
-        provider.stored().relatives(concept, &mut out)?;
-        for (key, sctid) in &provider.system().keys.attributes {
-            let Some(values) = of(*key) else {
-                continue;
-            };
-            for value in values {
-                let Some(value) = provider.stored().property_value(*value)? else {
-                    continue;
-                };
-                let value = properties::typed(provider, sctid, value)?;
-                properties::push_once(
-                    &mut out,
-                    Property {
-                        code: sctid.clone(),
-                        value,
-                        ..Property::default()
-                    },
-                );
-            }
-        }
-        properties::push_loinc(provider, ordinal, &mut out);
-        properties::describe(provider, &mut out)?;
-        Ok(out)
+        properties::of_concept(provider, concept)
     }
 
     /// The inactive concepts, scanned once from the store and kept.

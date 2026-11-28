@@ -266,7 +266,7 @@ fn a_qualified_code_reports_its_qualifiers_and_sits_under_its_category() {
             .properties
             .iter()
             .find(|p| p.code == name)
-            .map(|p| p.value.clone())
+            .and_then(|p| p.value.clone())
     };
     assert_eq!(
         value("parent"),

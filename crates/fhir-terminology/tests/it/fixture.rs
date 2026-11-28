@@ -301,7 +301,7 @@ impl CodeSystemProvider for Fixture {
         if let Some(legs) = row.legs {
             properties.push(Property {
                 code: String::from("legs"),
-                value: PropertyValue::Integer(legs),
+                value: Some(PropertyValue::Integer(legs)),
                 ..Property::default()
             });
         }
@@ -310,7 +310,7 @@ impl CodeSystemProvider for Fixture {
         {
             properties.push(Property {
                 code: String::from("kingdom"),
-                value: PropertyValue::Code(String::from("animal")),
+                value: Some(PropertyValue::Code(String::from("animal"))),
                 ..Property::default()
             });
         }

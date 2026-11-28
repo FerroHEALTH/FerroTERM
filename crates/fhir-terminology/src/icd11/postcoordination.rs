@@ -1,66 +1,62 @@
 // SPDX-FileCopyrightText: Cadasto B.V.
 // SPDX-License-Identifier: BUSL-1.1
 
-//! The postcoordination expressions of an ICD-11 linearization: binding each
-//! value to an axis of its stem, and the display, code and properties of the
-//! validated expression.
+//! The postcoordination expressions of an ICD-11 linearization: each
+//! qualifier bound to an axis of the code it qualifies, the normal form, and
+//! the display, code and properties of the validated expression.
+//!
+//! The contract is the HL7 terminology ecosystem IG's ICD-11 page
+//! (`HL7/fhir-tx-ecosystem-ig` at `9c2bbce`, `input/pagecontent/icd-11.md`,
+//! Post Coordination Expressions and Properties). The axis a code binds to is
+//! the suite's rule (`tests/icd-11/doco.txt` at `9c2bbce`, items 12b and "How
+//! an expression is read"): an axis with no value first, a required one
+//! before WHO's order, the codes taken in entity id order.
 
 use std::sync::PoisonError;
 
-use ::icd11::expression::Expression;
+use ::icd11::SCHEMA;
+use ::icd11::expression::{Expression, Group as Written};
 use concept_graph::ordinal::Ordinal;
 
 use crate::provider::{
-    Concept, Located, Property, PropertyValue, Subproperty, error::ProviderError,
+    CodeSystemProvider, Concept, Located, Property, PropertyValue, Subproperty,
+    error::ProviderError,
 };
 
-use super::{Icd11Provider, Scale};
+use super::{Icd11Provider, Scale, axis_short};
 
-/// One value of a postcoordination expression, bound to an axis.
-#[derive(Debug, Clone)]
+/// The `allowMultipleValues` of an axis that takes one value.
+const NOT_ALLOWED: &str = "NotAllowed";
+
+/// One code with its qualifiers bound to its axes, in normal order.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Group {
+    code: u32,
+    qualifiers: Vec<Bound>,
+}
+
+/// A code on an axis of the code it qualifies, the axis an index into that
+/// code's scales; a `/` member on no axis of the root has none.
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Bound {
-    axis: String,
-    value: u32,
-    /// The value token as written.
-    text: String,
+    axis: Option<usize>,
+    group: Group,
 }
 
-/// One syntactic member of an expression: a stem with its bound values.
-#[derive(Debug, Clone)]
-struct Member {
-    stem: u32,
-    values: Vec<Bound>,
-}
+/// A code and its qualifiers as written.
+type AsWritten = (u32, Vec<u32>);
 
 /// A validated postcoordination expression.
 #[derive(Debug, Clone)]
 pub(super) struct Cluster {
-    members: Vec<Member>,
-    /// The members that were read as values of an earlier stem, with the
-    /// axis they bound to (index into `members`, then the binding).
-    joined: Vec<(usize, Bound)>,
-}
-
-impl Cluster {
-    /// Each member as written: its stem, and the values written after it,
-    /// which a member read as a value of an earlier stem has none of.
-    fn written(&self) -> impl Iterator<Item = (u32, Vec<u32>)> + '_ {
-        self.members.iter().enumerate().map(|(position, member)| {
-            let own = !self.joined.iter().any(|(p, _)| *p == position);
-            let values = member
-                .values
-                .iter()
-                .filter(|bound| {
-                    own && !self
-                        .joined
-                        .iter()
-                        .any(|(_, b)| b.value == bound.value && b.text == bound.text)
-                })
-                .map(|bound| bound.value)
-                .collect();
-            (member.stem, values)
-        })
-    }
+    /// The root with its `&` qualifiers.
+    root: Group,
+    /// The `/` members, bound to the root's axes.
+    members: Vec<Bound>,
+    /// Each code with its qualifiers as written, the root first.
+    written: Vec<AsWritten>,
+    /// Whether the qualifiers are written with ICF's `.`.
+    dotted: bool,
 }
 
 impl Icd11Provider {
@@ -77,116 +73,130 @@ impl Icd11Provider {
         })
     }
 
-    /// The axis `value` binds to on `stem`, given the axes already filled:
-    /// an unfilled axis first, then a required one, then WHO's order.
-    fn bind(&self, stem: u32, value: u32, filled: &[String]) -> Option<String> {
-        let scales = self.system().scales.get(&stem)?;
-        let candidates: Vec<&Scale> = scales.iter().filter(|s| self.fits(s, value)).collect();
-        let pick = |unfilled_only: bool| {
+    /// The axis of `code` that `value` binds to, given the axes already
+    /// carrying a value: an axis with none first, a required one before
+    /// WHO's order.
+    fn bind(&self, code: u32, value: u32, filled: &[usize]) -> Option<usize> {
+        let scales = self.system().scales.get(&code)?;
+        let candidates: Vec<(usize, &Scale)> = scales
+            .iter()
+            .enumerate()
+            .filter(|(_, scale)| self.fits(scale, value))
+            .collect();
+        let first = |open: bool, required: bool| {
             candidates
                 .iter()
-                .filter(|s| !unfilled_only || !filled.contains(&s.axis))
-                .find(|s| s.required)
-                .or_else(|| {
-                    candidates
-                        .iter()
-                        .find(|s| !unfilled_only || !filled.contains(&s.axis))
+                .find(|(axis, scale)| {
+                    (!open || !filled.contains(axis)) && (!required || scale.required)
                 })
-                .map(|s| s.axis.clone())
+                .map(|(axis, _)| *axis)
         };
-        pick(true).or_else(|| pick(false))
+        first(true, true)
+            .or_else(|| first(true, false))
+            .or_else(|| first(false, true))
+            .or_else(|| first(false, false))
     }
 
-    /// Binds `stem` onto an unfilled postcoordination axis of `last`, when one
-    /// takes it: the value, recorded on `last` as well.
-    fn join(&self, last: &mut Member, stem: u32, text: &str) -> Option<Bound> {
-        let filled: Vec<String> = last.values.iter().map(|b| b.axis.clone()).collect();
-        let axis = self.bind(last.stem, stem, &filled)?;
-        if filled.contains(&axis) {
-            return None;
+    /// The entity id of a group and the group in entity ids: the order a
+    /// group sorts in after its axis, so the same member with other
+    /// qualifiers stays apart.
+    fn sort_key(&self, group: &Group) -> (String, String) {
+        (
+            self.code_of(group.code),
+            spell_group(group, '&', &|o| Some(self.code_of(o))).unwrap_or_default(),
+        )
+    }
+
+    /// Binds each of `values` to an axis of `code` in entity id order, the
+    /// axes in `filled` already carrying a value, then puts them in the
+    /// normal order; a duplicate is deleted and a value on no axis has none.
+    fn bind_all(&self, code: u32, mut values: Vec<Group>, mut filled: Vec<usize>) -> Vec<Bound> {
+        values.sort_by_cached_key(|group| self.sort_key(group));
+        values.dedup();
+        let mut bound = Vec::with_capacity(values.len());
+        for group in values {
+            let axis = self.bind(code, group.code, &filled);
+            filled.extend(axis);
+            bound.push(Bound { axis, group });
         }
-        let bound = Bound {
-            axis,
-            value: stem,
-            text: text.to_owned(),
-        };
-        last.values.push(bound.clone());
-        Some(bound)
+        bound.sort_by_cached_key(|b| (b.axis.unwrap_or(usize::MAX), self.sort_key(&b.group)));
+        bound
     }
 
-    /// The values `member` binds onto the axes of `stem`, in the order written;
-    /// `None` when a dotted qualifier names no code.
-    fn bindings(
+    /// One written code and its qualifiers, resolved, with each qualifier
+    /// bound to an axis of the code; `None` when the code, or an ICF dotted
+    /// qualifier, names no concept.
+    fn group(
         &self,
         text: &str,
-        expression: &Expression,
-        member: &::icd11::expression::Member,
-        stem: u32,
-    ) -> Result<Option<Vec<Bound>>, ProviderError> {
+        written: &Written,
+        dotted: bool,
+    ) -> Result<Option<(Group, AsWritten)>, ProviderError> {
         let invalid = |reason: String| ProviderError::InvalidCode {
             code: text.to_owned(),
             reason,
         };
-        let mut values: Vec<Bound> = Vec::new();
-        for token in &member.values {
+        let Some(code) = self.resolve(&written.code)? else {
+            return Ok(None);
+        };
+        let mut values = Vec::with_capacity(written.qualifiers.len());
+        for token in &written.qualifiers {
             let Some(value) = self.resolve(token)? else {
                 // NOTE: an ICF dotted qualifier that is no code (`d5409.3`) is an unknown
                 // code (the ecosystem's `lookup-icf-pc-old`), not a malformed expression.
-                if expression.dotted {
+                if dotted {
                     return Ok(None);
                 }
-                return Err(invalid(format!("`{}` is not a code", token.text)));
+                return Err(invalid(format!("`{token}` is not a code")));
             };
-            let filled: Vec<String> = values.iter().map(|b: &Bound| b.axis.clone()).collect();
-            let Some(axis) = self.bind(stem, value, &filled) else {
-                return Err(invalid(format!(
-                    "`{}` is on no postcoordination axis of `{}`",
-                    token.text, member.stem.text
-                )));
-            };
-            values.push(Bound {
-                axis,
-                value,
-                text: token.text.clone(),
-            });
+            values.push(value);
         }
-        Ok(Some(values))
+        let single = |&value: &u32| Group {
+            code: value,
+            qualifiers: Vec::new(),
+        };
+        let qualifiers = self.bind_all(code, values.iter().map(single).collect(), Vec::new());
+        if let Some(stray) = qualifiers.iter().find(|bound| bound.axis.is_none()) {
+            let token = values
+                .iter()
+                .position(|&value| value == stray.group.code)
+                .and_then(|at| written.qualifiers.get(at))
+                .map_or("", String::as_str);
+            return Err(invalid(format!(
+                "`{token}` is on no postcoordination axis of `{}`",
+                written.code
+            )));
+        }
+        Ok(Some((Group { code, qualifiers }, (code, values))))
     }
 
-    /// Validates the expression `text`, interning it when it holds.
+    /// Validates the expression `text`, interning its normal form when it holds.
     pub(super) fn cluster(
         &self,
         text: &str,
         expression: &Expression,
     ) -> Result<Option<Located>, ProviderError> {
-        let mut members: Vec<Member> = Vec::new();
-        let mut joined: Vec<(usize, Bound)> = Vec::new();
-        let mut last_stem: Option<usize> = None;
-        for (position, member) in expression.members.iter().enumerate() {
-            let Some(stem) = self.resolve(&member.stem)? else {
+        let Some((root, root_written)) = self.group(text, &expression.root, expression.dotted)?
+        else {
+            return Ok(None);
+        };
+        let mut written = vec![root_written];
+        let mut members = Vec::with_capacity(expression.members.len());
+        for member in &expression.members {
+            let Some((group, as_written)) = self.group(text, member, expression.dotted)? else {
                 return Ok(None);
             };
-            // A `/` member without values that fits an unfilled axis of the
-            // stem before it is a value of that stem.
-            if position > 0
-                && member.values.is_empty()
-                && let Some(last) = last_stem.and_then(|i| members.get_mut(i))
-                && let Some(bound) = self.join(last, stem, &member.stem.text)
-            {
-                joined.push((position, bound));
-                members.push(Member {
-                    stem,
-                    values: Vec::new(),
-                });
-                continue;
-            }
-            last_stem = Some(members.len());
-            let Some(values) = self.bindings(text, expression, member, stem)? else {
-                return Ok(None);
-            };
-            members.push(Member { stem, values });
+            members.push(group);
+            written.push(as_written);
         }
-        let cluster = Cluster { members, joined };
+        let filled = root.qualifiers.iter().filter_map(|b| b.axis).collect();
+        let members = self.bind_all(root.code, members, filled);
+        let cluster = Cluster {
+            root,
+            members,
+            written,
+            dotted: expression.dotted,
+        };
         let code = self.cluster_code(&cluster);
         let index = self.system().expressions.intern(&code)?.index();
         let mut clusters = self
@@ -217,19 +227,20 @@ impl Icd11Provider {
             .cloned()
     }
 
-    /// The display of an expression: the members joined by ` / `, each stem
-    /// title followed by its `&` values' titles in brackets.
+    /// The display of an expression as written, duplicates kept: each code's
+    /// title with its qualifiers' titles in brackets, the members joined by
+    /// ` / ` (`icd-11.md`, Display Terms).
     pub(super) fn cluster_display(
         &self,
         cluster: &Cluster,
         language: Option<&str>,
     ) -> Result<String, ProviderError> {
-        let mut parts = Vec::new();
-        for (stem, values) in cluster.written() {
-            let mut part = self.title(stem, language)?.unwrap_or_default();
-            for value in values {
+        let mut parts = Vec::with_capacity(cluster.written.len());
+        for (code, qualifiers) in &cluster.written {
+            let mut part = self.title(*code, language)?.unwrap_or_default();
+            for &qualifier in qualifiers {
                 part.push_str(" [");
-                part.push_str(&self.title(value, language)?.unwrap_or_default());
+                part.push_str(&self.title(qualifier, language)?.unwrap_or_default());
                 part.push(']');
             }
             parts.push(part);
@@ -237,51 +248,47 @@ impl Icd11Provider {
         Ok(parts.join(" / "))
     }
 
-    /// The entity-id form of an expression.
+    /// The normal form of an expression, in entity ids.
     fn cluster_code(&self, cluster: &Cluster) -> String {
-        Self::cluster_text(cluster, |ordinal| self.code_of(ordinal), "&", "/")
+        spell(cluster, &|ordinal| Some(self.code_of(ordinal))).unwrap_or_default()
     }
 
-    /// The short-code form of an expression, when every part has a short code.
+    /// The normal form in short codes, when every code has one.
     fn cluster_classification_code(&self, cluster: &Cluster) -> Option<String> {
-        let all = cluster.written().all(|(stem, values)| {
-            self.classification_code(stem).is_some()
-                && values
-                    .iter()
-                    .all(|&v| self.classification_code(v).is_some())
-        });
-        all.then(|| {
-            Self::cluster_text(
-                cluster,
-                |ordinal| self.classification_code(ordinal).unwrap_or_default(),
-                "&",
-                "/",
-            )
+        spell(cluster, &|ordinal| self.classification_code(ordinal))
+    }
+
+    /// A code of this system as a `Coding`, with its title.
+    fn coding(&self, ordinal: u32, language: Option<&str>) -> Result<PropertyValue, ProviderError> {
+        Ok(PropertyValue::Coding {
+            system: self.identity().url.clone(),
+            code: self.code_of(ordinal),
+            display: self.title(ordinal, language)?,
         })
     }
 
-    /// An expression written out with `spell`: each stem followed by its own
-    /// values after `and`, the members joined by `then`.
-    fn cluster_text(
-        cluster: &Cluster,
-        spell: impl Fn(u32) -> String,
-        and: &str,
-        then: &str,
-    ) -> String {
-        cluster
-            .written()
-            .map(|(stem, values)| {
-                let mut text = spell(stem);
-                for value in values {
-                    text.push_str(and);
-                    text.push_str(&spell(value));
-                }
-                text
+    /// The `value` subproperties of `bounds`.
+    fn values<'a>(
+        &self,
+        bounds: impl Iterator<Item = &'a Bound>,
+        language: Option<&str>,
+    ) -> Result<Vec<Subproperty>, ProviderError> {
+        // TODO(#1391): a member's own qualifiers as `postcoordination` subproperties inside
+        // its `value`, once fhir-types carries a subproperty inside a subproperty.
+        bounds
+            .map(|bound| {
+                Ok(Subproperty {
+                    code: String::from("value"),
+                    value: self.coding(bound.group.code, language)?,
+                    description: None,
+                })
             })
-            .collect::<Vec<_>>()
-            .join(then)
+            .collect()
     }
 
+    /// `code`, `classificationCode`, `stem`, and one `postcoordination`
+    /// property per axis of the root that has a value, then one for the
+    /// members on no axis of the root (`icd-11.md`, Properties).
     pub(super) fn cluster_properties(
         &self,
         cluster: &Cluster,
@@ -289,60 +296,177 @@ impl Icd11Provider {
     ) -> Result<Vec<Property>, ProviderError> {
         let mut out = vec![Property {
             code: String::from("code"),
-            value: PropertyValue::Code(self.cluster_code(cluster)),
+            value: Some(PropertyValue::Code(self.cluster_code(cluster))),
             ..Property::default()
         }];
         if let Some(code) = self.cluster_classification_code(cluster) {
             out.push(Property {
                 code: String::from("classificationCode"),
-                value: PropertyValue::Code(code),
+                value: Some(PropertyValue::Code(code)),
                 ..Property::default()
             });
         }
-        for (position, member) in cluster.members.iter().enumerate() {
-            if cluster.joined.iter().any(|(p, _)| *p == position) {
+        out.push(Property {
+            code: String::from("stem"),
+            value: Some(self.coding(cluster.root.code, language)?),
+            ..Property::default()
+        });
+        let on_root = |axis: Option<usize>| {
+            cluster
+                .root
+                .qualifiers
+                .iter()
+                .chain(&cluster.members)
+                .filter(move |bound| bound.axis == axis)
+        };
+        let scales = self.system().scales.get(&cluster.root.code);
+        for (index, scale) in scales.into_iter().flatten().enumerate() {
+            if on_root(Some(index)).next().is_none() {
                 continue;
             }
+            let mut subproperties = vec![Subproperty {
+                code: String::from("axis"),
+                value: axis_coding(&scale.axis),
+                description: None,
+            }];
+            subproperties.extend(self.values(on_root(Some(index)), language)?);
             out.push(Property {
-                code: String::from("stem"),
-                value: PropertyValue::Code(self.code_of(member.stem)),
-                subproperties: vec![
-                    Subproperty {
-                        code: String::from("stemLabel"),
-                        value: PropertyValue::String(
-                            self.title(member.stem, language)?.unwrap_or_default(),
-                        ),
-                        description: None,
-                    },
-                    Subproperty {
-                        code: String::from("stemUri"),
-                        value: PropertyValue::Uri(self.uri(member.stem)),
-                        description: None,
-                    },
-                ],
+                code: String::from("postcoordination"),
+                subproperties,
                 ..Property::default()
             });
-            let mut bounds: Vec<&Bound> = member.values.iter().collect();
-            bounds.sort_by(|a, b| {
-                self.code_of(a.value)
-                    .cmp(&self.code_of(b.value))
-                    .then_with(|| a.axis.cmp(&b.axis))
+        }
+        if on_root(None).next().is_some() {
+            out.push(Property {
+                code: String::from("postcoordination"),
+                subproperties: self.values(on_root(None), language)?,
+                ..Property::default()
             });
-            // NOTE: the ecosystem's icd-11 `lookup-pc-simple` keys each bound value's
-            // subproperty by the value's code, not by an axis property name.
-            for bound in bounds {
-                out.push(Property {
-                    code: String::from("postcoordinationValues"),
-                    value: PropertyValue::Code(bound.axis.clone()),
-                    subproperties: vec![Subproperty {
-                        code: self.code_of(bound.value),
-                        value: PropertyValue::Uri(self.uri(bound.value)),
-                        description: self.title(bound.value, language)?,
-                    }],
-                    ..Property::default()
-                });
-            }
         }
         Ok(out)
+    }
+
+    /// The axes that take one value and are given several, each a warning.
+    // NOTE: tx-ecosystem `cs-validate-nf-axis-not-multiple` at 9c2bbce: several values on an
+    // axis that takes one is still valid and in normal form, with a warning naming the axis.
+    pub(super) fn cluster_advisories(&self, cluster: &Cluster) -> Vec<String> {
+        let mut out = Vec::new();
+        let root: Vec<&Bound> = cluster
+            .root
+            .qualifiers
+            .iter()
+            .chain(&cluster.members)
+            .collect();
+        self.crowded(cluster.root.code, &root, &mut out);
+        for member in &cluster.members {
+            let qualifiers: Vec<&Bound> = member.group.qualifiers.iter().collect();
+            self.crowded(member.group.code, &qualifiers, &mut out);
+        }
+        out
+    }
+
+    /// Pushes a warning for each axis of `code` that takes one value and
+    /// carries more than one of `bounds`.
+    fn crowded(&self, code: u32, bounds: &[&Bound], out: &mut Vec<String>) {
+        let scales = self.system().scales.get(&code);
+        for (index, scale) in scales.into_iter().flatten().enumerate() {
+            let count = bounds.iter().filter(|b| b.axis == Some(index)).count();
+            if scale.multiple == NOT_ALLOWED && count > 1 {
+                out.push(format!(
+                    "The postcoordination axis '{}' of '{}' takes one value, and is given {count}",
+                    axis_short(&scale.axis),
+                    self.code_of(code)
+                ));
+            }
+        }
+    }
+}
+
+/// The normal form of `cluster` written with `name`, `None` when a code has
+/// no name.
+fn spell(cluster: &Cluster, name: &dyn Fn(u32) -> Option<String>) -> Option<String> {
+    let qualifier = if cluster.dotted { '.' } else { '&' };
+    let mut text = spell_group(&cluster.root, qualifier, name)?;
+    for member in &cluster.members {
+        text.push('/');
+        text.push_str(&spell_group(&member.group, qualifier, name)?);
+    }
+    Some(text)
+}
+
+/// One group written with `name`, each qualifier after `qualifier`.
+fn spell_group(
+    group: &Group,
+    qualifier: char,
+    name: &dyn Fn(u32) -> Option<String>,
+) -> Option<String> {
+    let mut text = name(group.code)?;
+    for bound in &group.qualifiers {
+        text.push(qualifier);
+        text.push_str(&name(bound.group.code)?);
+    }
+    Some(text)
+}
+
+/// An axis as a `Coding` in the ICD schema, its display read from its name.
+fn axis_coding(axis: &str) -> PropertyValue {
+    let short = axis_short(axis);
+    PropertyValue::Coding {
+        system: SCHEMA.trim_end_matches('/').to_owned(),
+        code: short.to_owned(),
+        display: Some(axis_display(short)),
+    }
+}
+
+/// An axis name in sentence case: `hasAlternativeSeverity1` is "Has
+/// alternative severity 1".
+// NOTE: no specification governs this: our own design; the ICD-API names an axis by its
+// schema URI only, and the ecosystem's `icd-11` cases expect this display.
+fn axis_display(name: &str) -> String {
+    let chars: Vec<char> = name.chars().collect();
+    let mut out = String::with_capacity(name.len().saturating_add(4));
+    for (at, &c) in chars.iter().enumerate() {
+        let before = at.checked_sub(1).and_then(|b| chars.get(b));
+        let after = chars.get(at.saturating_add(1));
+        let upper_before = before.is_some_and(|b| b.is_uppercase());
+        let lower_after = after.is_some_and(|a| a.is_lowercase());
+        let acronym = c.is_uppercase()
+            && (after.is_some_and(|a| a.is_uppercase()) || (upper_before && !lower_after));
+        let word = before.is_some_and(|&b| {
+            (c.is_uppercase() && !b.is_uppercase())
+                || (c.is_ascii_digit() != b.is_ascii_digit())
+                || (c.is_uppercase() && upper_before && lower_after)
+        });
+        if word {
+            out.push(' ');
+        }
+        if out.is_empty() {
+            out.extend(c.to_uppercase());
+        } else if c.is_uppercase() && !acronym {
+            out.extend(c.to_lowercase());
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::axis_display;
+
+    #[test]
+    fn an_axis_name_reads_in_sentence_case() {
+        assert_eq!(axis_display("laterality"), "Laterality");
+        assert_eq!(axis_display("specificAnatomy"), "Specific anatomy");
+        assert_eq!(
+            axis_display("objectOrSubstanceProducingInjury"),
+            "Object or substance producing injury"
+        );
+        assert_eq!(
+            axis_display("hasAlternativeSeverity1"),
+            "Has alternative severity 1"
+        );
+        assert_eq!(axis_display("typeOfICDCode"), "Type of ICD code");
     }
 }

@@ -20,7 +20,8 @@ ICD-11 are the authority, with THO's ICD-11 page for identity.
   it sits behind the `api` cargo feature, off by default and enabled only by
   `tools/ferroterm-build`. The server binary carries no HTTP client, which
   `scripts/checks/no-client-in-server.sh` measures.
-- Postcoordination expressions are parsed here (`&` values on a stem, `/`
-  between cluster members, ICF's `.` for qualifiers, the URI form); their
+- Postcoordination expressions are parsed here (a root, `&` qualifiers of the
+  code before them, `/` members that qualify the root, ICF's `.` for
+  qualifiers, and the `/other` and `/unspecified` of a residual's id); their
   validation against the axes needs the built hierarchy and lives in the
   provider.

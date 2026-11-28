@@ -8,14 +8,10 @@
 //! (`HL7/fhir-tx-ecosystem-ig` at `9c2bbce`, `input/pagecontent/icd-11.md`):
 //! in a linearization the entity id is the code and the normal form, the
 //! short classification code an alternative spelling, and an expression's
-//! code its entity-id form; the Foundation's code is the entity URI. A stem's
-//! postcoordination scales are properties and implicit value sets
+//! code its normal form; the Foundation's code is the entity URI. A stem's
+//! postcoordination scales are implicit value sets
 //! (`<uri>/postcoordinationScale/<axis>`), and an expression's `stem` and
-//! `postcoordinationValues` report how its values bound to the axes. The axis
-//! binding rule (an unfilled axis first, then required axes, then WHO's order)
-//! and the reading of `/` (a value when it fits an unfilled axis of the stem
-//! before it, else a new stem) are the earlier suite's; no FHIR specification
-//! governs them.
+//! `postcoordination` properties report how its codes bound to the axes.
 
 mod postcoordination;
 
@@ -26,7 +22,7 @@ use std::path::Path;
 use std::sync::RwLock;
 
 use ::icd11::Linearization;
-use ::icd11::expression::{Expression, Token};
+use ::icd11::expression::Expression;
 use concept_graph::ordinal::Ordinal;
 use concept_store::keys::{KeyTable, KeyTableError};
 use concept_store::record;
@@ -42,7 +38,7 @@ use crate::provider::filter::{Filter, FilterOperator};
 use crate::provider::source::Source;
 use crate::provider::{
     CodeSystemProvider, Concept, ConceptSet, Hierarchy, Identity, Located, Property, PropertyValue,
-    Status, Subproperty, error::ProviderError,
+    Status, error::ProviderError,
 };
 use crate::registries::interned::Interned;
 use crate::stored::artifact::{Artifact, Layout};
@@ -292,29 +288,19 @@ impl Icd11Provider {
         (spelled == text).then_some(ordinal)
     }
 
-    /// The entity ordinal a token names: in a linearization an entity id or a
-    /// short classification code, in the Foundation an entity URI.
+    /// The entity ordinal a linearization's token names: an entity id or a
+    /// short classification code.
     // NOTE: tx-ecosystem IG `icd-11.md` at 9c2bbce, ICD-11 Codes: the
     // classification code is "an alternative spelling", and "the full entity
     // uri is not a code in MMS or ICF".
-    fn resolve(&self, token: &Token) -> Result<Option<u32>, ProviderError> {
-        if self.system().linearization == Linearization::Foundation {
-            return Ok(if token.uri {
-                self.ordinal_of_uri(&token.text)
-            } else {
-                None
-            });
-        }
-        if token.uri {
-            return Ok(None);
-        }
-        if let Some(ordinal) = self.ordinal_of_id(&token.text) {
+    fn resolve(&self, token: &str) -> Result<Option<u32>, ProviderError> {
+        if let Some(ordinal) = self.ordinal_of_id(token) {
             return Ok(Some(ordinal));
         }
         Ok(self
             .stored()
             .store
-            .ordinal(&token.text)
+            .ordinal(token)
             .map_err(storage)?
             .map(Ordinal::index))
     }
@@ -347,36 +333,27 @@ impl StoredSystem for Icd11 {
         provider.base_language()
     }
 
-    /// A short code, an entity URI in either form, or (in a linearization) a
-    /// postcoordination expression; case sensitive throughout.
+    /// In the Foundation an entity URI; in a linearization an entity id, a
+    /// short code, or a postcoordination expression of either; case
+    /// sensitive throughout.
     fn locate(provider: &Icd11Provider, code: &str) -> Result<Option<Located>, ProviderError> {
         let text = code.trim();
-        if text.is_empty() {
-            return Ok(None);
+        let located = |ordinal: u32| Located {
+            concept: Concept::new(ordinal),
+            code: provider.code_of(ordinal),
+        };
+        let linearization = provider.system().linearization;
+        if linearization == Linearization::Foundation {
+            return Ok(provider.ordinal_of_uri(text).map(located));
         }
-        if provider.system().linearization != Linearization::Foundation
-            && let Some(ordinal) = provider.ordinal_of_id(text)
-        {
-            return Ok(Some(Located {
-                concept: Concept::new(ordinal),
-                code: provider.code_of(ordinal),
-            }));
+        if let Some(ordinal) = provider.ordinal_of_id(text) {
+            return Ok(Some(located(ordinal)));
         }
-        let icf = provider.system().linearization == Linearization::Icf;
-        let Some(expression) = Expression::parse(text, icf) else {
+        let Some(expression) = Expression::parse(text, linearization == Linearization::Icf) else {
             return Ok(None);
         };
         if expression.is_simple() {
-            let Some(token) = expression.members.first().map(|m| &m.stem) else {
-                return Ok(None);
-            };
-            return Ok(provider.resolve(token)?.map(|ordinal| Located {
-                concept: Concept::new(ordinal),
-                code: provider.code_of(ordinal),
-            }));
-        }
-        if provider.system().linearization == Linearization::Foundation {
-            return Ok(None);
+            return Ok(provider.resolve(&expression.root.code)?.map(located));
         }
         provider.cluster(text, &expression)
     }
@@ -447,6 +424,16 @@ impl StoredSystem for Icd11 {
             }))
     }
 
+    fn advisories(
+        provider: &Icd11Provider,
+        concept: Concept,
+    ) -> Result<Vec<String>, ProviderError> {
+        Ok(provider
+            .cluster_of(concept)
+            .map(|cluster| provider.cluster_advisories(&cluster))
+            .unwrap_or_default())
+    }
+
     fn is_postcoordinated(provider: &Icd11Provider, concept: Concept) -> bool {
         concept.index() >= provider.stored().concepts
     }
@@ -480,13 +467,13 @@ impl StoredSystem for Icd11 {
         let ordinal = concept.index();
         let mut out = vec![Property {
             code: String::from("code"),
-            value: PropertyValue::Code(provider.code_of(ordinal)),
+            value: Some(PropertyValue::Code(provider.code_of(ordinal))),
             ..Property::default()
         }];
         if let Some(code) = provider.classification_code(ordinal) {
             out.push(Property {
                 code: String::from("classificationCode"),
-                value: PropertyValue::Code(code),
+                value: Some(PropertyValue::Code(code)),
                 ..Property::default()
             });
         }
@@ -514,7 +501,7 @@ impl StoredSystem for Icd11 {
                 };
                 out.push(Property {
                     code: name.clone(),
-                    value,
+                    value: Some(value),
                     ..Property::default()
                 });
             }
@@ -522,42 +509,14 @@ impl StoredSystem for Icd11 {
         for parent in provider.stored().tree.parents(concept) {
             out.push(Property {
                 code: String::from("parent"),
-                value: PropertyValue::Code(provider.code_of(parent)),
+                value: Some(PropertyValue::Code(provider.code_of(parent))),
                 ..Property::default()
             });
         }
         for child in provider.stored().tree.children(concept) {
             out.push(Property {
                 code: String::from("child"),
-                value: PropertyValue::Code(provider.code_of(child)),
-                ..Property::default()
-            });
-        }
-        for scale in provider.system().scales.get(&ordinal).into_iter().flatten() {
-            out.push(Property {
-                code: String::from("postcoordinationScale"),
-                value: PropertyValue::Code(scale.axis.clone()),
-                subproperties: vec![
-                    Subproperty {
-                        code: String::from("valueSet"),
-                        value: PropertyValue::Uri(format!(
-                            "{}{SCALE_SEGMENT}{}",
-                            provider.uri(ordinal),
-                            axis_short(&scale.axis)
-                        )),
-                        description: None,
-                    },
-                    Subproperty {
-                        code: String::from("requiredPostcoordination"),
-                        value: PropertyValue::Boolean(scale.required),
-                        description: None,
-                    },
-                    Subproperty {
-                        code: String::from("allowMultipleValues"),
-                        value: PropertyValue::Code(scale.multiple.clone()),
-                        description: None,
-                    },
-                ],
+                value: Some(PropertyValue::Code(provider.code_of(child))),
                 ..Property::default()
             });
         }
@@ -661,21 +620,15 @@ fn declaration(linearization: Linearization, languages: Vec<String>) -> Declarat
     let capabilities = BTreeSet::from([Capability::Subsumption, Capability::Enumeration]);
     let mut implicit_forms = Vec::new();
     if linearization != Linearization::Foundation {
-        for (code, description) in [
-            ("postcoordinationScale", "An axis the stem takes values on"),
-            ("stem", "A stem of a postcoordination expression"),
-            (
-                "postcoordinationValues",
-                "A value of a postcoordination expression, on its axis",
-            ),
-        ] {
-            properties.push(PropertyDefinition {
-                code: code.to_owned(),
-                uri: None,
-                description: Some(description.to_owned()),
-                kind: PropertyKind::Code,
-            });
-        }
+        // NOTE: `postcoordination` has no value of its own, and `CodeSystem.property.type`
+        // (<https://hl7.org/fhir/R4B/codesystem-definitions.html#CodeSystem.property.type>)
+        // names no type for one, so it is returned and not declared.
+        properties.push(PropertyDefinition {
+            code: String::from("stem"),
+            uri: None,
+            description: Some(String::from("The root of a postcoordinated expression")),
+            kind: PropertyKind::Coding,
+        });
         // NOTE: no FHIR/SNOMED spec governs this: our own design, the WHO
         // ICD-API's scale URI (<https://icd.who.int/icdapi>) with two placeholders.
         implicit_forms.push(ImplicitForm::new(
