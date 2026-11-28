@@ -21,6 +21,7 @@ use fhir_terminology::operations::{
     Invocation, OperationError, closure, lookup, sources::Sources, subsumes, validate_code,
     value_set_validate_code,
 };
+use fhir_terminology::provider::CodeSystemProvider;
 use fhir_terminology::provider::compose::{Compose, ConceptRef, Echoes, Include, SystemRef};
 use fhir_terminology::provider::concept_map::Relationship;
 use fhir_terminology::registry::Registry;
@@ -884,5 +885,32 @@ fn an_expression_constraint_is_tested_against_the_expression_itself() {
             &format!("=== {}", code(CAT))
         ),
         "an expression that refines nothing is its focus concept"
+    );
+}
+
+#[test]
+fn an_expression_display_is_generated_and_a_concept_display_defined() {
+    // "SNOMED International does not define terms for expressions"
+    // (<https://hl7.org/fhir/R4B/snomedct.html>, "Display"), so an
+    // extension-codes supplement's display for one replaces the generated one.
+    let dir = tempfile::tempdir().expect("tempdir");
+    snomed::write(dir.path()).expect("writes the fixture");
+    let provider = SnomedProvider::open(dir.path(), "en").expect("opens");
+    let expression = format!("{}:{}={}", code(CAT), code(COVERING), code(FUR));
+    let located = provider
+        .locate(&expression)
+        .expect("locates")
+        .expect("an expression of the edition");
+    assert_eq!(
+        provider.display_standing(located.concept).expect("reads"),
+        fhir_terminology::provider::DisplayStanding::Generated
+    );
+    let cat = provider
+        .locate(&code(CAT))
+        .expect("locates")
+        .expect("the cat");
+    assert_eq!(
+        provider.display_standing(cat.concept).expect("reads"),
+        fhir_terminology::provider::DisplayStanding::Defined
     );
 }
