@@ -19,6 +19,7 @@ mod loinc_map;
 mod open;
 mod properties;
 mod selection;
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -162,6 +163,8 @@ pub struct Snomed {
     attributes: Attributes,
     member_tables: RefsetMembers,
     identifiers: Identifiers,
+    /// The ECL alternate identifier scheme aliases, each to its scheme concept.
+    scheme_aliases: BTreeMap<String, u64>,
     roots: OnceLock<RoaringBitmap>,
     leaves: OnceLock<RoaringBitmap>,
     defined: OnceLock<RoaringBitmap>,

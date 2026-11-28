@@ -22,6 +22,7 @@
 //! code_systems = ["/data/codesystems"]
 //! resources = "/data/resources.redb"
 //! default_language = "en"
+//! ecl_scheme_aliases = { LOINC = 30051010000102 }
 //!
 //! [fhir]
 //! base_url = "https://tx.example.org/fhir"
@@ -144,6 +145,13 @@ pub struct TerminologySection {
     /// The display language (BCP 47) used when a request names none; a
     /// SNOMED CT dialect (`en-US`) selects its language reference set.
     pub default_language: String,
+    /// The ECL alternate identifier scheme aliases of every SNOMED CT edition,
+    /// each alias (`LOINC` in `LOINC#14394-1`) to the SCTID of its identifier
+    /// scheme concept, compared without case; an alias with no entry is
+    /// refused. A table set here replaces the default.
+    // NOTE: ECL 2.3 6.1 defines no alias table, and the tx-ecosystem IG tx-source
+    // readme names `30051010000102 |LOINC code identifier|`: our own design.
+    pub ecl_scheme_aliases: BTreeMap<String, u64>,
 }
 
 impl Default for TerminologySection {
@@ -153,6 +161,7 @@ impl Default for TerminologySection {
             code_systems: Vec::new(),
             resources: None,
             default_language: String::from("en"),
+            ecl_scheme_aliases: BTreeMap::from([(String::from("LOINC"), 30_051_010_000_102)]),
         }
     }
 }
@@ -530,6 +539,20 @@ mod tests {
         assert!(config.auth.issuers().next().is_none(), "no issuer is named");
         assert_eq!(config.server.listen.to_string(), "127.0.0.1:8080");
         assert_eq!(config.terminology.default_language, "en");
+        assert_eq!(
+            config.terminology.ecl_scheme_aliases,
+            BTreeMap::from([(String::from("LOINC"), 30_051_010_000_102)])
+        );
+        let aliases = Config::from_sources(
+            Some("[terminology]\necl_scheme_aliases = { ZOO = 12 }\n"),
+            &BTreeMap::new(),
+        )
+        .expect("reads");
+        assert_eq!(
+            aliases.terminology.ecl_scheme_aliases,
+            BTreeMap::from([(String::from("ZOO"), 12)]),
+            "a table set in the file replaces the default"
+        );
         let off =
             Config::from_sources(None, &environment(&[("FERROTERM__AUTH__ENABLED", "false")]))
                 .expect("reads");
