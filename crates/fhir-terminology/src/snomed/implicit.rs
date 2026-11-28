@@ -57,9 +57,23 @@ impl SnomedProvider {
     /// the caller asks the other loaded editions before the server answers
     /// that it holds no such version.
     pub(crate) fn implicit_version(&self, base: &str) -> Result<Option<String>, ProviderError> {
+        // NOTE: an unpublished edition's `xsct` URI and the `sct` URI of the same
+        // module and date name one edition here, as the tx-ecosystem IG's test edition
+        // cases do (`snomed-expand-implicit-edition`): our own design.
+        let names = |held: &str| {
+            base == held
+                || base
+                    .strip_prefix("http://snomed.info/sct/")
+                    .or_else(|| base.strip_prefix("http://snomed.info/xsct/"))
+                    .is_some_and(|named| {
+                        held.strip_prefix("http://snomed.info/sct/")
+                            .or_else(|| held.strip_prefix("http://snomed.info/xsct/"))
+                            == Some(named)
+                    })
+        };
         if base == SYSTEM {
             Ok(None)
-        } else if base == self.system().edition || base == self.identity().version {
+        } else if names(&self.system().edition) || names(&self.identity().version) {
             Ok(Some(self.identity().version.clone()))
         } else {
             Err(ProviderError::UnservedImplicitVersion {
