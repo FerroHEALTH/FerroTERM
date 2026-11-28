@@ -387,6 +387,7 @@ pub fn write_unpublished(dir: &Path) -> Result<(), FixtureError> {
             release_date: DATE,
             bird: false,
             mrcm: false,
+            extension: false,
         },
     )
 }
