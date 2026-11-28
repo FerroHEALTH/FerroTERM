@@ -344,7 +344,7 @@ pub(super) fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureEr
         (GB_LANGUAGE_REFSET, TOP),
         (NL_LANGUAGE_REFSET, TOP),
     ];
-    if shape.bird {
+    if shape.extras.bird() {
         rows.push(Row {
             ordinal: BIRD,
             code: None,
@@ -358,7 +358,7 @@ pub(super) fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureEr
         });
         is_a.push((BIRD, ANIMAL));
     }
-    if shape.kitten {
+    if shape.extras.kitten() {
         rows.push(Row {
             ordinal: KITTEN,
             code: None,
@@ -420,7 +420,7 @@ pub(super) fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureEr
     write_concepts(&mut builder, &mut text, &rows, &is_a, &module_of)?;
     // The cat and the dog have covering fur and four legs; the cat states both
     // in one role group, the dog in two.
-    let animals: &[u32] = if shape.kitten {
+    let animals: &[u32] = if shape.extras.kitten() {
         &[CAT, DOG, KITTEN]
     } else {
         &[CAT, DOG]
@@ -481,7 +481,8 @@ pub(super) fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureEr
         .into_iter()
         .chain(
             shape
-                .kitten
+                .extras
+                .kitten()
                 .then(|| {
                     [
                         edge(
@@ -522,7 +523,7 @@ pub(super) fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureEr
     let alternative = refset_id(ALTERNATIVE)?;
     memberships.insert(pets, Ordinal::new(CAT));
     memberships.insert(pets, Ordinal::new(DOG));
-    if shape.bird {
+    if shape.extras.bird() {
         memberships.insert(pets, Ordinal::new(BIRD));
     }
     memberships.insert(codes_map, Ordinal::new(CAT));
@@ -544,7 +545,7 @@ pub(super) fn write_shape(dir: &Path, shape: &Shape<'_>) -> Result<(), FixtureEr
     };
     let mut tables = RefsetMembers::default();
     let mut pet_rows = vec![member(CAT, vec![]), member(DOG, vec![])];
-    if shape.bird {
+    if shape.extras.bird() {
         pet_rows.push(member(BIRD, vec![]));
     }
     tables
