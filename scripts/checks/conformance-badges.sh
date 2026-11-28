@@ -298,7 +298,7 @@ if [[ -n "$self_test" ]]; then
     exit 1
   fi
   rm "$out/table.md"
-  badge long.json "tx-ecosystem 1.11.0 tx.fhir.org R4B" 29 189 ", by hand 2026-11-27" shield-check > /dev/null
+  badge long.json "tx-ecosystem 1.11.0 terminology tx.fhir.org R4B" 29 189 " cases passed of all" shield-check > /dev/null
   if badge_length_check "$out/long.json" 2>/dev/null; then
     echo "conformance-badges: self-test: a badge past the length limits passes" >&2
     exit 1
