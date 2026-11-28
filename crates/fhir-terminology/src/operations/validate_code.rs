@@ -135,7 +135,7 @@ fn supplement_as_system(
             severity: "error",
             code: "invalid",
             kind: "invalid-data",
-            message: super::MessageId::CodeSystemCsNoSupplement,
+            message: Some(super::MessageId::CodeSystemCsNoSupplement),
             text,
             expression: super::at(expression, "system"),
         }],
@@ -386,11 +386,11 @@ fn check_codeable_concept(
             severity: "error",
             code: "code-invalid",
             kind: "invalid-code",
-            message: if identity.version.is_empty() {
+            message: Some(if identity.version.is_empty() {
                 super::MessageId::UnknownCodeIn
             } else {
                 super::MessageId::UnknownCodeInVersion
-            },
+            }),
             text: message,
             expression: None,
         }],
@@ -400,6 +400,51 @@ fn check_codeable_concept(
         inactive: None,
         status: None,
     })
+}
+
+/// The validation of a code the system does not have: an `invalid-code`
+/// error, a warning in a fragment, and the grammar's detail beside it.
+fn unknown(
+    provider: &dyn CodeSystemProvider,
+    code: &str,
+    version: Option<String>,
+    expression: &str,
+) -> ValidationOutcome {
+    let identity = provider.identity();
+    let (id, text) = super::display::unknown_code(provider, code);
+    // A `fragment` resource carries "a subset of the code system concepts"
+    // (<https://hl7.org/fhir/R4B/codesystem-content-mode.html>), so a code
+    // it does not carry is one the server cannot call invalid.
+    let fragment = provider.declaration().content == ContentMode::Fragment;
+    let detail = super::display::rejection(provider, code, super::at(expression, "code"));
+    let message = match &detail {
+        Some(detail) => format!("{text} - {}", detail.text),
+        None => text.clone(),
+    };
+    ValidationOutcome {
+        result: fragment,
+        message: (!fragment).then_some(message),
+        display: None,
+        code: Some(code.to_owned()),
+        normalized_code: None,
+        system: Some(identity.url.clone()),
+        version,
+        issues: std::iter::once(Issue {
+            severity: if fragment { "warning" } else { "error" },
+            code: "code-invalid",
+            kind: "invalid-code",
+            message: Some(id),
+            text,
+            expression: super::at(expression, "code"),
+        })
+        .chain(detail)
+        .collect(),
+        unknown_systems: Vec::new(),
+        x_unknown_systems: Vec::new(),
+        codeable_concept: None,
+        inactive: None,
+        status: None,
+    }
 }
 
 /// Checks one code against a system: found, its display matches when one was
@@ -415,33 +460,7 @@ fn check(
     let identity = provider.identity();
     let version = Some(identity.version.clone()).filter(|v| !v.is_empty());
     let Some(located) = provider.locate(code)? else {
-        let (id, text) = super::display::unknown_code(provider.as_ref(), code);
-        // A `fragment` resource carries "a subset of the code system concepts"
-        // (<https://hl7.org/fhir/R4B/codesystem-content-mode.html>), so a code
-        // it does not carry is one the server cannot call invalid.
-        let fragment = provider.declaration().content == ContentMode::Fragment;
-        return Ok(ValidationOutcome {
-            result: fragment,
-            message: (!fragment).then(|| text.clone()),
-            display: None,
-            code: Some(code.to_owned()),
-            normalized_code: None,
-            system: Some(identity.url.clone()),
-            version,
-            issues: vec![Issue {
-                severity: if fragment { "warning" } else { "error" },
-                code: "code-invalid",
-                kind: "invalid-code",
-                message: id,
-                text,
-                expression: super::at(expression, "code"),
-            }],
-            unknown_systems: Vec::new(),
-            x_unknown_systems: Vec::new(),
-            codeable_concept: None,
-            inactive: None,
-            status: None,
-        });
+        return Ok(unknown(provider.as_ref(), code, version, expression));
     };
     let concept = located.concept;
     let requested_language = language;
@@ -492,6 +511,10 @@ fn check(
         messages.push(note.text.clone());
         issues.push(note);
         status_code = Some(code_status);
+    }
+    for advisory in super::display::advisories(provider.as_ref(), concept, expression)? {
+        messages.push(advisory.text.clone());
+        issues.push(advisory);
     }
     let canonical = format!("{}|{}", identity.url, identity.version);
     issues.extend(super::standing_note(

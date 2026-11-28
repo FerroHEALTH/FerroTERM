@@ -429,7 +429,7 @@ fn a_unit_name_in_english_does_not_satisfy_a_request_for_another_language() {
     assert_eq!(issue.kind, "invalid-display");
     assert_eq!(
         issue.message_id(),
-        "NO_VALID_DISPLAY_FOUND_NONE_FOR_LANG_OK"
+        Some("NO_VALID_DISPLAY_FOUND_NONE_FOR_LANG_OK")
     );
 
     // The lookup states the language it answered in, not the one it was asked
