@@ -27,6 +27,43 @@ pub(super) fn states_defined(status: &[record::PropertyValueRef<'_>]) -> bool {
 pub(super) const MAPPED: &str = "mapped:";
 
 impl SnomedProvider {
+    /// The concepts with an active fully specified name or synonym in one
+    /// language whose whole term matches `pattern`, case-sensitively: the
+    /// language `requested` names first that the edition has descriptions in,
+    /// else the edition's own (tx-ecosystem IG, requirements, SNOMED CT: "A
+    /// concept matches when at least one of its active descriptions in the
+    /// chosen language matches the pattern", and "Only one language is
+    /// searched").
+    pub(super) fn display_regex(
+        &self,
+        pattern: &str,
+        requested: Option<&str>,
+    ) -> Result<ConceptSet, ProviderError> {
+        let regex = crate::provider::filter::anchored(pattern)?;
+        let language = crate::language::answered(self, requested)
+            .unwrap_or_else(|| self.system().base_language.clone());
+        let wanted = crate::stored::primary_subtag(&language);
+        let keys = &self.system().keys;
+        let mut set = ConceptSet::new();
+        for index in 0..self.stored().concepts {
+            let mut matched = false;
+            self.stored()
+                .store
+                .scan_designations(Ordinal::new(index), |d| {
+                    matched = d.active
+                        && (d.use_ordinal == keys.fsn || d.use_ordinal == keys.synonym)
+                        && crate::stored::has_primary_subtag(d.language, &wanted)
+                        && regex.is_match(d.term);
+                    !matched
+                })
+                .map_err(storage)?;
+            if matched {
+                set.insert(index);
+            }
+        }
+        Ok(set)
+    }
+
     /// The concepts with (`true`) or without (`false`) an identifier in the
     /// scheme `mapped:[scheme]` names, from the RF2 identifier file.
     ///
@@ -78,7 +115,8 @@ impl SnomedProvider {
         Ok(self.system().inactive.get_or_init(|| set).clone())
     }
 
-    /// The members of the reference sets a `concept in` filter names.
+    /// The concepts a `concept in` filter lists, each reference set among them
+    /// standing for its members.
     pub(super) fn reference_set_members(
         &self,
         filter: &Filter,
@@ -98,12 +136,20 @@ impl SnomedProvider {
                     "not an SCTID",
                 ));
             };
-            let members = self
-                .system()
-                .memberships
-                .members(refset.value())
+            // NOTE: `in` selects the codes the value lists ("the set of codes or concepts
+            // specified", R4B filter-operator), and a reference set among them stands for
+            // its members (<https://hl7.org/fhir/R4B/snomedct.html>, "Filter Properties").
+            if let Some(members) = self.system().memberships.members(refset.value()) {
+                set |= members;
+                continue;
+            }
+            let concept = self
+                .stored()
+                .store
+                .ordinal(value)
+                .map_err(storage)?
                 .ok_or_else(|| ProviderError::UnknownCode(value.to_owned()))?;
-            set |= members;
+            set.insert(concept.index());
         }
         Ok(set)
     }

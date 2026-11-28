@@ -192,15 +192,26 @@ fn malformed_and_unknown_implicit_value_sets_are_refused() {
         matches!(
             p.implicit_value_set(&format!("{base}?fhir_vs=refset/{}", sctid(item(FUR))))
                 .expect("implicit"),
-            Err(ProviderError::UnknownCode(_))
+            Err(ProviderError::UnknownImplicitValueSet { .. })
         ),
-        "a concept that is not a reference set"
+        "a concept that is not a reference set names no value set"
     );
+    // "Where the implicit value set names a refset or a concept that does not
+    // exist, the server SHALL return an error naming the value set that was
+    // asked for" (tx-ecosystem IG, requirements, SNOMED CT).
     assert!(matches!(
         p.implicit_value_set(&format!("{base}?fhir_vs=isa/{}", sctid(Item::raw(77))))
             .expect("implicit"),
-        Err(ProviderError::UnknownCode(_))
+        Err(ProviderError::UnknownImplicitValueSet { ref url }) if url.ends_with(&sctid(Item::raw(77)))
     ));
+    assert!(
+        matches!(
+            p.implicit_value_set(&format!("{base}?fhir_vs=isa/4106070063"))
+                .expect("implicit"),
+            Err(ProviderError::UnknownImplicitValueSet { .. })
+        ),
+        "an identifier with a wrong check digit names no concept"
+    );
     assert!(matches!(
         p.implicit_value_set(&format!("{base}?fhir_vs=isa/abc"))
             .expect("implicit"),
@@ -291,6 +302,28 @@ fn every_declared_implicit_value_set_form_resolves() {
             ("http://snomed.info/sct?fhir_vs=ecl/[ecl]", &[&ecl]),
         ],
     );
+}
+
+#[test]
+fn concept_in_selects_the_listed_concepts_and_the_members_of_a_listed_reference_set() {
+    // `in`: "the set of codes or concepts specified in the provided value"
+    // (R4B filter-operator); a reference set stands for its members.
+    let (_dir, p) = provider();
+    let selected = |value: String| {
+        p.filter(&Filter {
+            property: String::from("concept"),
+            op: FilterOperator::In,
+            value,
+        })
+    };
+    let fur = selected(format!("{},{}", sctid(item(FUR)), sctid(item(PETS)))).expect("filters");
+    let mut members: Vec<u32> = fur.iter().collect();
+    members.sort_unstable();
+    assert_eq!(members, [CAT, DOG, FUR]);
+    assert!(matches!(
+        selected(sctid(Item::raw(4242))),
+        Err(ProviderError::UnknownCode(_))
+    ));
 }
 
 #[test]

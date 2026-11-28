@@ -73,6 +73,13 @@ pub enum ProviderError {
         /// Why.
         reason: String,
     },
+    /// An implicit value set URI names a concept or reference set this system
+    /// does not hold, so the URI names no value set.
+    #[error("implicit value set `{url}` names no concept of this code system")]
+    UnknownImplicitValueSet {
+        /// The URI.
+        url: String,
+    },
     /// An implicit concept map URI names a map this system does not hold.
     #[error("implicit concept map `{url}` names no map this code system holds")]
     UnknownImplicitConceptMap {

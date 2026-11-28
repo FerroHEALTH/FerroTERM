@@ -143,6 +143,23 @@ pub trait StoredSystem: fmt::Debug + Send + Sync + Sized {
         false
     }
 
+    /// As [`CodeSystemProvider::display_standing`]: a postcoordinated concept's
+    /// display is the one its grammar generates.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProviderError`] when the substrate fails.
+    fn display_standing(
+        provider: &StoredProvider<Self>,
+        concept: Concept,
+    ) -> Result<crate::provider::DisplayStanding, ProviderError> {
+        Ok(if Self::is_postcoordinated(provider, concept) {
+            crate::provider::DisplayStanding::Generated
+        } else {
+            crate::provider::DisplayStanding::Defined
+        })
+    }
+
     /// As [`CodeSystemProvider::implicit_value_set`].
     fn implicit_value_set(
         _provider: &StoredProvider<Self>,
@@ -241,6 +258,15 @@ pub trait StoredSystem: fmt::Debug + Send + Sync + Sized {
     fn filter(
         _provider: &StoredProvider<Self>,
         _filter: &Filter,
+    ) -> Option<Result<ConceptSet, ProviderError>> {
+        None
+    }
+
+    /// As [`CodeSystemProvider::filter_in_language`].
+    fn filter_in_language(
+        _provider: &StoredProvider<Self>,
+        _filter: &Filter,
+        _requested: Option<&str>,
     ) -> Option<Result<ConceptSet, ProviderError>> {
         None
     }
@@ -380,6 +406,13 @@ impl<S: StoredSystem> CodeSystemProvider for StoredProvider<S> {
         S::is_postcoordinated(self, concept)
     }
 
+    fn display_standing(
+        &self,
+        concept: Concept,
+    ) -> Result<crate::provider::DisplayStanding, ProviderError> {
+        S::display_standing(self, concept)
+    }
+
     fn designations(
         &self,
         concept: Concept,
@@ -480,6 +513,14 @@ impl<S: StoredSystem> CodeSystemProvider for StoredProvider<S> {
 
     fn unclosed(&self, filters: &[Filter]) -> bool {
         S::unclosed(self, filters)
+    }
+
+    fn filter_in_language(
+        &self,
+        filter: &Filter,
+        requested: Option<&str>,
+    ) -> Option<Result<ConceptSet, ProviderError>> {
+        S::filter_in_language(self, filter, requested)
     }
 
     fn filter_matches(&self, concept: Concept, filter: &Filter) -> Result<bool, ProviderError> {

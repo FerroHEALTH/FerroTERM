@@ -1,0 +1,1 @@
+- A SNOMED CT implicit value set that names a concept or reference set the edition does not hold, or an identifier with a wrong check digit, answers `not-found` naming the value set, as the terminology ecosystem IG requires; a text that is no identifier is still a malformed URI.
