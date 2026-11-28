@@ -385,6 +385,23 @@ pub trait CodeSystemProvider: fmt::Debug + Send + Sync {
         language: Option<&str>,
     ) -> Result<Option<String>, ProviderError>;
 
+    /// The display of `concept` as the request spelled it, `spelling`: a
+    /// system whose display follows the spelling (an ICD-11 expression,
+    /// rendered as written) answers from it, every other one as
+    /// [`CodeSystemProvider::display`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProviderError::Storage`] when the substrate fails.
+    fn spelled_display(
+        &self,
+        concept: Concept,
+        _spelling: &str,
+        language: Option<&str>,
+    ) -> Result<Option<String>, ProviderError> {
+        self.display(concept, language)
+    }
+
     /// The formal definition, if the system has one.
     ///
     /// # Errors

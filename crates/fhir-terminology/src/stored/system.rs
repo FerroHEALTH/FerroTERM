@@ -54,6 +54,20 @@ pub trait StoredSystem: fmt::Debug + Send + Sync + Sized {
         language: Option<&str>,
     ) -> Result<Option<String>, ProviderError>;
 
+    /// As [`CodeSystemProvider::spelled_display`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProviderError`] when the substrate fails.
+    fn spelled_display(
+        provider: &StoredProvider<Self>,
+        concept: Concept,
+        _spelling: &str,
+        language: Option<&str>,
+    ) -> Result<Option<String>, ProviderError> {
+        Self::display(provider, concept, language)
+    }
+
     /// The status, as [`CodeSystemProvider::status`].
     ///
     /// # Errors
@@ -368,6 +382,15 @@ impl<S: StoredSystem> CodeSystemProvider for StoredProvider<S> {
         language: Option<&str>,
     ) -> Result<Option<String>, ProviderError> {
         S::display(self, concept, language)
+    }
+
+    fn spelled_display(
+        &self,
+        concept: Concept,
+        spelling: &str,
+        language: Option<&str>,
+    ) -> Result<Option<String>, ProviderError> {
+        S::spelled_display(self, concept, spelling, language)
     }
 
     fn definition(&self, concept: Concept) -> Result<Option<String>, ProviderError> {

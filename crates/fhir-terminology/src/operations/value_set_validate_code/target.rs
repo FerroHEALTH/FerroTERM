@@ -567,6 +567,7 @@ pub(super) fn assess(
             super::super::display::Asserted {
                 system: &item.system,
                 code: &located.code,
+                sent: subject.code,
                 given,
                 requested: language,
                 lenient: policy.display == DisplayCheck::Lenient,
