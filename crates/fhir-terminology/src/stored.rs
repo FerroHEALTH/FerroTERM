@@ -87,6 +87,16 @@ pub(crate) fn primary_subtag(language: &str) -> String {
         .to_ascii_lowercase()
 }
 
+/// Whether the primary language subtag of `language` is `primary`, ignoring
+/// case, without the allocation [`primary_subtag`] makes.
+pub(crate) fn has_primary_subtag(language: &str, primary: &str) -> bool {
+    language
+        .split(['-', '_'])
+        .next()
+        .unwrap_or(language)
+        .eq_ignore_ascii_case(primary)
+}
+
 /// Accepts an artifact whose manifest names `found` where the system reads
 /// `wanted`, and refuses any other with `refuse`.
 ///

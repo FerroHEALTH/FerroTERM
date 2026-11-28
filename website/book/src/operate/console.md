@@ -116,10 +116,9 @@ sets one refuses the start. `[ferroterm.server]` defaults to
 `http://127.0.0.1:8080/` with a timeout of `"30s"`, and a key the table
 leaves out keeps its default; `[ferroterm.sync]` and `[ferroterm.admin]`
 take the family's (`timeout = "10s"`).
-`[session] store = "memory"` keeps the sessions in the console's process;
-`"sealed"` keeps each in one encrypted cookie, for a console that runs as
-several instances, and needs `key` or `key_file` (base64 of at least 64
-bytes, the same on every instance) and `offline_access` off.
+`[session] store = "memory"`, the only store, keeps the sessions in the
+console's process, so a restart signs every reader out. Run the console as
+one instance, or route each session to one replica at the ingress.
 
 ## Signing in
 

@@ -92,7 +92,7 @@ for version in r4 r4b r5 r6; do
   inapplicable="$(awk -F'\t' -v surface="$version" '!/^#/ && $1 == surface' conformance/tx-ecosystem/not-applicable.tsv | wc -l | tr -d ' ')"
   message="$passed/$total"
   colour="$(badge_count_color "$passed" "$total")"
-  label="tx-ecosystem $suite $(printf '%s' "$version" | tr '[:lower:]' '[:upper:]')"
+  label="$(printf '%s' "$version" | tr '[:lower:]' '[:upper:]')"
   jq -cn --arg label "$label" --arg message "$message" --arg color "$colour" \
     --argjson logo "$(badge_logo_fields shield-check)" \
     '{schemaVersion: 1, label: $label, message: $message, color: $color} + $logo' > "$out/$version.json"
@@ -159,7 +159,7 @@ while IFS=$'\t' read -r surface mode ran measured reason; do
     exit 1
   fi
   badge "$(printf '%s' "$mode" | tr '.' '-')-$surface.json" \
-    "tx $suite $mode $(printf '%s' "$surface" | tr '[:lower:]' '[:upper:]')" \
+    "$mode $(printf '%s' "$surface" | tr '[:lower:]' '[:upper:]')" \
     "$passed" "$ran" "" shield-check
 done < <(mode_rows "$ci_modes"; mode_rows "$hand_run")
 if mode_rows "$hand_run" | awk -F'\t' '$4 == "" || $5 == "" { bad = 1 } END { exit !bad }'; then
@@ -176,7 +176,7 @@ served="$(awk -F'|' '/served under `\/r[0-9a-z]+`/ {
 }' "$versions_page")"
 [[ -n "$served" ]] || { echo "conformance-badges: $versions_page names no served version" >&2; exit 1; }
 jq -cn --arg message "$served" --argjson logo "$(badge_logo_fields exchange)" \
-  '{schemaVersion: 1, label: "FHIR versions served", message: $message, color: "blue"} + $logo' > "$out/fhir-versions.json"
+  '{schemaVersion: 1, label: "versions served", message: $message, color: "blue"} + $logo' > "$out/fhir-versions.json"
 echo "conformance-badges: fhir-versions.json $served"
 
 count_rows() {
@@ -207,6 +207,13 @@ echo "conformance-badges: post-quantum.json $(jq -r .message "$out/post-quantum.
 # breakdown is the book's conformance page and conformance/tx-ecosystem/README.md.
 badge_length_check "$out"/*.json || exit 1
 badge_length_readme README.md || exit 1
+badge_block_check README.md || exit 1
+badge_render_check README.md || exit 1
+# The suite badges carry no suite version, so their README heading names it.
+grep -qxF "**HL7 tx-ecosystem $suite**<br>" README.md || {
+  echo "conformance-badges: README.md has no heading **HL7 tx-ecosystem $suite**<br> over the suite badges" >&2
+  exit 1
+}
 
 # The README shows exactly the badges this script writes.
 readme_badges=README.md
@@ -291,7 +298,7 @@ if [[ -n "$self_test" ]]; then
     exit 1
   fi
   rm "$out/table.md"
-  badge long.json "tx-ecosystem 1.11.0 tx.fhir.org R4B" 29 189 ", by hand 2026-11-27" shield-check > /dev/null
+  badge long.json "tx-ecosystem 1.11.0 terminology tx.fhir.org R4B" 29 189 " cases passed of all" shield-check > /dev/null
   if badge_length_check "$out/long.json" 2>/dev/null; then
     echo "conformance-badges: self-test: a badge past the length limits passes" >&2
     exit 1

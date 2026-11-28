@@ -1,0 +1,1 @@
+- Breaking: the console's `[session] store = "sealed"` is gone with `ferrohealth-session` 0.33, and so are `key` and `key_file`. The memory store is the only store, so the console runs as one instance or routes each session to one replica at its ingress. A configuration that names `sealed`, `key` or `key_file` is refused when it loads; remove them.

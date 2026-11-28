@@ -8,9 +8,11 @@
 # A mode's content is fetched by scripts/checks/tx-ecosystem-mode.sh from its
 # public source, checked against a pinned sha256, and deleted when the run
 # ends. It lives outside target/, so the build cache never saves it, and the
-# lane uploads no artifact. This log is public, so the script prints only case
-# names, counts and its own messages; the runner's and the server's logs stay
-# in the temporary directory. The `general` mode runs on every push in ci.yml.
+# lane uploads no artifact. A failed scheduled or dispatched run files an
+# issue, one per mode and surface, as differential.yml does. This log is
+# public, so the script prints only case names, counts and its own messages;
+# the runner's and the server's logs stay in the temporary directory. The
+# `general` mode runs on every push in ci.yml.
 
 name: tx-ecosystem modes
 
@@ -22,7 +24,7 @@ on:
       mode:
         description: The mode to run; all runs every row of ci-modes.tsv.
         type: choice
-        options: [all, snomed]
+        options: [all, snomed, mimetypes, omop, icf]
         default: all
   pull_request:
     paths:
@@ -77,6 +79,8 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
+      # A failed scheduled or dispatched run is filed where the work is tracked.
+      issues: write
     strategy:
       fail-fast: false
       matrix:
@@ -94,7 +98,43 @@ jobs:
           java-version: "21"
       - run: cargo build --release --locked -p ferroterm-server -p ferroterm-build
       - name: Run the mode over its fetched content
+        id: run
         env:
           MODE: ${{ matrix.mode }}
           FHIR: ${{ matrix.fhir }}
         run: scripts/checks/tx-ecosystem-mode.sh --mode "$MODE" --fhir "$FHIR"
+
+      # The issue names the mode and links the run, whose log carries only case
+      # names and counts; one open issue per mode and surface collects every
+      # later failure as a comment.
+      - name: File the failure
+        if: failure() && steps.run.conclusion == 'failure' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          MODE: ${{ matrix.mode }}
+          FHIR: ${{ matrix.fhir }}
+        run: |
+          set -euo pipefail
+          title="test(conformance): the tx-ecosystem ${MODE} lane fails on /${FHIR}"
+          export title
+          body="$RUNNER_TEMP/tx-ecosystem-failure.md"
+          {
+            echo "The ${MODE} mode of the HL7 terminology ecosystem suite failed on /${FHIR}."
+            echo
+            echo "Run: ${RUN_URL}"
+            echo
+            echo "The run log names each case that left conformance/tx-ecosystem/ and every"
+            echo "count that differs from conformance/tx-ecosystem/ci-modes.tsv. A listed case"
+            echo "that fails is a regression to fix; the suite's own text decides"
+            echo "(<https://build.fhir.org/ig/HL7/fhir-tx-ecosystem-ig/>)."
+          } > "$body"
+          open=$(gh issue list --state open --search "$title in:title" \
+            --json number,title --jq '[.[] | select(.title == env.title)][0].number // empty')
+          if [[ -n "$open" ]]; then
+            gh issue comment "$open" --body-file "$body"
+          else
+            bash scripts/gh/fields.sh new task high medium \
+              --title "$title" --body-file "$body" --label test
+          fi

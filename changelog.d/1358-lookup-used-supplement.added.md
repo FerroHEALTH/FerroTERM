@@ -1,0 +1,1 @@
+- `CodeSystem/$lookup` reports every supplement it applied as a `used-supplement` output on each surface, a global language pack among them, as the HL7 terminology ecosystem IG requires.

@@ -7,10 +7,7 @@
 # per row and writes the table of the book's conformance page from this file.
 surface	mode	ran	measured	reason
 r4b	icd-11	145	2026-11-27	needs the WHO ICD-API container; its CI lane is not built yet (#1437)
-r4b	icf	96	2026-11-27	needs the ICF releases of fhir.tx.support; its CI lane is not built yet (#1437)
 r4b	loinc	110	2026-11-27	needs a LOINC release; its CI lane is not built yet (#1437)
 r5	loinc	110	2026-11-27	needs a LOINC release; its CI lane is not built yet (#1437)
 r4b	tx.fhir.org	189	2026-11-27	needs a LOINC release; its CI lane is not built yet (#1437)
 r5	tx.fhir.org	189	2026-11-27	needs a LOINC release; its CI lane is not built yet (#1437)
-r4b	mimetypes	52	2026-11-27	its CI lane is not built yet (#1437)
-r4b	omop	40	2026-11-27	its CI lane is not built yet (#1437)

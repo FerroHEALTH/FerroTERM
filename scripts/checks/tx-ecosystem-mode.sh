@@ -25,6 +25,10 @@ cd "$(dirname "$0")/../.."
 SUITE_REPO=https://github.com/HL7/fhir-tx-ecosystem-ig
 SUITE_COMMIT=9c2bbce57366319d6a5265cbfbf6697f094822e3
 SNOMED_SHA256=b70fb3a4f7e565b34c832670171133d3d69a8844eb35deb29d6e60d0f0bd29b5
+# The ICF releases 2001a and 2017a, as the CodeSystem resources of the
+# fhir.tx.support package (CC0-1.0, publisher WHO) on the FHIR package registry.
+ICF_PACKAGE=https://packages-cdn.fhir.org/web/fhir.tx.support-1.0.5.tgz
+ICF_SHA256=1de150b9c1d277280309f94ae7bea9e1b57c20685c898c00e10e2938cac46a1a
 
 # The lines a run may print. None can carry a term: a case name is the suite's
 # identifier, and the scripts' messages name counts, paths and system URIs.
@@ -112,6 +116,25 @@ case "$mode" in
     print_allowed "$scratch/build.log" || status=1
     [[ "$status" == 0 ]] || { echo "tx-ecosystem-mode: the build of the SNOMED CT test edition failed" >&2; exit 1; }
     rm -rf "$ig" "$scratch/edition"
+    ;;
+  mimetypes)
+    # BCP 13 is served from the vendored IANA media types registry.
+    ;;
+  omop)
+    # The server loads no OMOP vocabulary, so the run measures what it serves.
+    ;;
+  icf)
+    curl --proto '=https' --tlsv1.2 -sSfL -o "$scratch/package.tgz" "$ICF_PACKAGE"
+    digest="$(shasum -a 256 "$scratch/package.tgz" | cut -d' ' -f1)"
+    if [[ "$digest" != "$ICF_SHA256" ]]; then
+      echo "tx-ecosystem-mode: the fhir.tx.support package hashes to $digest, not $ICF_SHA256" >&2
+      exit 1
+    fi
+    mkdir -p "$scratch/code-systems"
+    tar -xzf "$scratch/package.tgz" -C "$scratch/code-systems" --strip-components 1 \
+      package/CodeSystem-icf-2001a.json package/CodeSystem-icf-2017a.json
+    rm "$scratch/package.tgz"
+    export FERROTERM__TERMINOLOGY__CODE_SYSTEMS="$scratch/code-systems"
     ;;
   *)
     echo "tx-ecosystem-mode: no content recipe for $mode" >&2
