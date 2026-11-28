@@ -660,9 +660,12 @@ impl SnomedProvider {
     ///
     /// A nested sub-expression has no `code` to carry as a property value, so
     /// its attribute is left out; the normal form renders it in full.
-    pub(super) fn expression_attributes(record: &Registered) -> Vec<Property> {
+    pub(super) fn expression_attributes(
+        &self,
+        record: &Registered,
+    ) -> Result<Vec<Property>, ProviderError> {
         let Some(refinement) = &record.tree.sub_expression.refinement else {
-            return Vec::new();
+            return Ok(Vec::new());
         };
         let mut out = Vec::new();
         let groups = refinement.groups.iter().flat_map(|g| g.attributes.iter());
@@ -673,7 +676,15 @@ impl SnomedProvider {
                 }
                 ast::AttributeValue::Text(text) => PropertyValue::String(text.clone()),
                 ast::AttributeValue::Number(number) => PropertyValue::Decimal(number.clone()),
-                ast::AttributeValue::Nested(_) => continue,
+                // NOTE: an expression is a code of the SNOMED CT system (the FHIR SNOMED CT
+                // page, Expressions), so a nested value is the code its terse form writes.
+                ast::AttributeValue::Nested(nested) => {
+                    let nested = ast::Expression {
+                        definition_status: None,
+                        sub_expression: (**nested).clone(),
+                    };
+                    PropertyValue::Code(self.render(&nested, true, Terms::None)?)
+                }
             };
             out.push(Property {
                 code: attribute.name.concept_id.clone(),
@@ -681,7 +692,7 @@ impl SnomedProvider {
                 ..Property::default()
             });
         }
-        out
+        Ok(out)
     }
 
     /// The Necessary Normal Form of an expression, with terms when `terms`
