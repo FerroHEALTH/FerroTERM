@@ -527,8 +527,9 @@ fn check(context: &Context<'_>, subject: &Subject<'_>) -> Result<Validation, Ope
         validation.unknown_systems.extend(target.unknown_systems);
         return Ok(validation);
     };
-    let display = provider.display(
+    let display = provider.spelled_display(
         located.concept,
+        subject.code,
         language::for_provider(provider.as_ref(), language).as_deref(),
     )?;
     if !target.resolvable {
@@ -674,6 +675,7 @@ fn accepts_display(
         super::display::Asserted {
             system: &candidate.identity().url,
             code: &located.code,
+            sent: subject.code,
             given,
             requested: language,
             lenient: false,

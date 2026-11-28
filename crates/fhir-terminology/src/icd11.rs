@@ -381,6 +381,28 @@ impl StoredSystem for Icd11 {
         }
     }
 
+    /// An expression as the request wrote it, when the spelling locates this
+    /// concept; every other concept as [`StoredSystem::display`].
+    fn spelled_display(
+        provider: &Icd11Provider,
+        concept: Concept,
+        spelling: &str,
+        language: Option<&str>,
+    ) -> Result<Option<String>, ProviderError> {
+        if concept.index() >= provider.stored().concepts
+            && let Some(expression) = Expression::parse(
+                spelling.trim(),
+                provider.system().linearization == Linearization::Icf,
+            )
+            && !expression.is_simple()
+            && Self::locate(provider, spelling)?.is_some_and(|located| located.concept == concept)
+            && let Some(display) = provider.written_display(&expression, language)?
+        {
+            return Ok(Some(display));
+        }
+        Self::display(provider, concept, language)
+    }
+
     // NOTE: tx-ecosystem IG `icd-11.md` at 9c2bbce, Filter Properties: the text
     // filter matches "the start of the classification code - so `XN8` finds
     // `XN8P1` and `XN8KD`".

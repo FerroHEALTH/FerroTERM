@@ -590,7 +590,9 @@ fn designations_of(
     // so the answer carries each translation once
     // (<https://hl7.org/fhir/R5/valueset-operation-expand.html>,
     // `displayLanguage`).
-    let base = resolved.provider.display(located.concept, None)?;
+    let base = resolved
+        .provider
+        .spelled_display(located.concept, &item.code, None)?;
     if let Some(base) = base
         && item.display.as_ref().is_none_or(|shown| *shown != base)
     {

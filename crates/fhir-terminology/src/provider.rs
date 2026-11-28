@@ -268,45 +268,6 @@ pub struct Subproperty {
     pub description: Option<String>,
 }
 
-/// One concept a system names in place of an inactive one.
-///
-/// SNOMED CT states these in its historical association reference sets, so a
-/// translation of a retired concept answers with its successor
-/// (<https://hl7.org/fhir/R4B/snomedct.html>).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Successor {
-    /// The code that stands in for the inactive one.
-    pub code: String,
-    /// Its display.
-    pub display: Option<String>,
-    /// The relationship the association asserts.
-    pub relationship: concept_map::Relationship,
-    /// The canonical of the implicit concept map the association forms.
-    pub map: String,
-}
-
-/// Which of an implicit concept map's mappings a caller needs.
-///
-/// Reading the `ConceptMap` resource needs every one; `$translate` needs the
-/// mappings from one code, and a reverse translation the mappings to one
-/// (<https://hl7.org/fhir/R4B/conceptmap-operation-translate.html>). An
-/// implicit map is built on demand out of a system's own content, so the
-/// selection is what keeps a translation costing the size of its answer
-/// rather than the size of the map. No specification governs it: our own
-/// design.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MapSelection<'a> {
-    /// Every mapping the map states.
-    Whole,
-    /// The mappings from this code, as the elements that carry them.
-    Source(&'a str),
-    /// The mappings to this code, as the elements that carry them.
-    ///
-    /// An element that also targets other codes keeps only the targets that
-    /// carry this one, which is what a reverse translation reads.
-    Target(&'a str),
-}
-
 /// The hierarchy of a system whose `hierarchyMeaning` is `is-a`.
 pub trait Hierarchy: fmt::Debug {
     /// The direct parents.
@@ -384,6 +345,23 @@ pub trait CodeSystemProvider: fmt::Debug + Send + Sync {
         concept: Concept,
         language: Option<&str>,
     ) -> Result<Option<String>, ProviderError>;
+
+    /// The display of `concept` as the request spelled it, `spelling`: a
+    /// system whose display follows the spelling (an ICD-11 expression,
+    /// rendered as written) answers from it, every other one as
+    /// [`CodeSystemProvider::display`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProviderError::Storage`] when the substrate fails.
+    fn spelled_display(
+        &self,
+        concept: Concept,
+        _spelling: &str,
+        language: Option<&str>,
+    ) -> Result<Option<String>, ProviderError> {
+        self.display(concept, language)
+    }
 
     /// The formal definition, if the system has one.
     ///
@@ -631,7 +609,7 @@ pub trait CodeSystemProvider: fmt::Debug + Send + Sync {
     /// # Errors
     ///
     /// Returns [`ProviderError::Storage`] when the substrate fails.
-    fn successors(&self, _concept: Concept) -> Result<Vec<Successor>, ProviderError> {
+    fn successors(&self, _concept: Concept) -> Result<Vec<concept_map::Successor>, ProviderError> {
         Ok(Vec::new())
     }
 
@@ -646,7 +624,7 @@ pub trait CodeSystemProvider: fmt::Debug + Send + Sync {
     fn implicit_concept_map(
         &self,
         _url: &str,
-        _selection: MapSelection<'_>,
+        _selection: concept_map::MapSelection<'_>,
     ) -> Option<Result<concept_map::ConceptMapModel, ProviderError>> {
         None
     }
@@ -783,6 +761,3 @@ pub trait CodeSystemProvider: fmt::Debug + Send + Sync {
         Ok(None)
     }
 }
-
-#[cfg(test)]
-mod tests {}

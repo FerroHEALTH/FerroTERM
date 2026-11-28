@@ -11,7 +11,7 @@
 
 use std::sync::{Arc, LazyLock};
 
-use fhir_terminology::provider::MapSelection;
+use fhir_terminology::provider::concept_map::MapSelection;
 use fhir_terminology::registry::Registry;
 use fhir_terminology::snomed::SnomedProvider;
 use libfuzzer_sys::fuzz_target;

@@ -81,6 +81,16 @@ impl Concrete {
         Some(concrete)
     }
 
+    /// Whether the range is over integers (`Some(true)`) or decimals
+    /// (`Some(false)`); `None` for a string or boolean range.
+    pub(super) fn integral(&self) -> Option<bool> {
+        match self.kind {
+            Kind::Integer => Some(true),
+            Kind::Decimal => Some(false),
+            Kind::String | Kind::Boolean => None,
+        }
+    }
+
     /// Whether the concrete number `number` (`#4000`, `#2.5`) is in the range.
     pub(super) fn holds_number(&self, number: &str) -> bool {
         let number = number.trim_start_matches('#');

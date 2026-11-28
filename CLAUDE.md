@@ -192,8 +192,10 @@ RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-it
 The default local gate is `scripts/checks/fast.sh`: rustfmt, clippy, nextest
 and the doctests, one cargo invocation each, over the workspace packages the
 change reaches (the ones whose files it touches and every package depending
-on them; a change outside the packages reaches them all). `--dry-run` prints
-the plan. CI runs every package and stays the full gate.
+on them; a change outside the packages reaches them all). When the change
+reaches a crate the fuzz crate builds on, a check of `fuzz/` runs right after
+clippy, before the tests. `--dry-run` prints the plan. CI runs every package
+and stays the full gate.
 
 Conformance is measured against Snowstorm as the reference server (see
 `docs/architecture.md` §Verification).

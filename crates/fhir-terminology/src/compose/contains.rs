@@ -215,8 +215,9 @@ impl Expander<'_> {
         let display = match overridden {
             Some(display) => Some(display),
             None => provider
-                .display(
+                .spelled_display(
                     located.concept,
+                    code,
                     language::for_provider(provider.as_ref(), language).as_deref(),
                 )
                 .map_err(failed)?,

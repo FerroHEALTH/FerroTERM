@@ -78,9 +78,10 @@ fn fold(text: &str) -> String {
 fn candidates(
     provider: &Arc<dyn CodeSystemProvider>,
     concept: Concept,
+    sent: &str,
 ) -> Result<Vec<Candidate>, ProviderError> {
     let mut out: Vec<Candidate> = Vec::new();
-    if let Some(display) = provider.display(concept, None)? {
+    if let Some(display) = provider.spelled_display(concept, sent, None)? {
         out.push(Candidate {
             text: display,
             language: provider.language().map(str::to_owned),
@@ -133,6 +134,8 @@ pub struct Asserted<'a> {
     pub system: &'a str,
     /// The code as the system spells it, for the text.
     pub code: &'a str,
+    /// The code as the request spelled it, which a display may follow.
+    pub sent: &'a str,
     /// The display the client sent.
     pub given: &'a str,
     /// The `displayLanguage` as the client sent it.
@@ -186,8 +189,9 @@ fn retired_designation(
         return Ok(None);
     };
     let preferred = provider
-        .display(
+        .spelled_display(
             concept,
+            asserted.sent,
             language::for_provider(provider.as_ref(), asserted.requested).as_deref(),
         )?
         .unwrap_or_default();
@@ -217,6 +221,7 @@ fn judgement(
     let Asserted {
         system,
         code,
+        sent,
         given,
         requested,
         lenient,
@@ -226,7 +231,7 @@ fn judgement(
         DisplayStanding::Suggested => true,
         DisplayStanding::Defined | DisplayStanding::Generated => lenient,
     };
-    let all = candidates(provider, concept)?;
+    let all = candidates(provider, concept, sent)?;
     let wanted = fold(given);
     let matches = |c: &&Candidate| fold(&c.text) == wanted;
     // NOTE: a display that differs only in its whitespace is still wrong, and
@@ -310,7 +315,7 @@ fn judgement(
             ),
         )));
     }
-    no_display_for_language(provider, concept, severity, given, system, code, requested)
+    no_display_for_language(provider, concept, severity, asserted, requested)
 }
 
 /// The `invalid-display` for a display that fits no designation, when the
@@ -319,14 +324,20 @@ fn no_display_for_language(
     provider: &Arc<dyn CodeSystemProvider>,
     concept: Concept,
     severity: &'static str,
-    given: &str,
-    system: &str,
-    code: &str,
+    asserted: Asserted<'_>,
     requested: &str,
 ) -> Result<Option<(&'static str, &'static str, super::MessageId, String)>, ProviderError> {
+    let Asserted {
+        system,
+        code,
+        sent,
+        given,
+        ..
+    } = asserted;
     let default = provider
-        .display(
+        .spelled_display(
             concept,
+            sent,
             language::for_provider(provider.as_ref(), None).as_deref(),
         )?
         .unwrap_or_default();
