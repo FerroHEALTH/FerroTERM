@@ -84,9 +84,6 @@ clinical data repository by the same author. FerroTERM is independent of it.
 
 ## What it does not do
 
-- It runs no concept model (MRCM) check on a post-coordinated SNOMED CT
-  expression: an expression the concept model forbids still validates
-  ([Post-coordinated expressions](../integrate/ecl-value-sets.md#post-coordinated-expressions)).
 - It authors no code system content. The server serves an index built from a
   finished release; you download the release and run the build tool over it,
   or let the synchronisation service take it from a national terminology

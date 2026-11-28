@@ -457,8 +457,9 @@ pub struct Issue {
     pub code: &'static str,
     /// The `tx-issue-type` code in `issue.details.coding`.
     pub kind: &'static str,
-    /// The ecosystem's message, decided where the issue is raised.
-    pub message: MessageId,
+    /// The ecosystem's message, decided where the issue is raised; `None` for
+    /// a detail of another issue, which the ecosystem gives no message of its own.
+    pub message: Option<MessageId>,
     /// `issue.details.text`.
     pub text: String,
     /// `issue.expression`: the parameter at fault.
@@ -468,8 +469,8 @@ pub struct Issue {
 impl Issue {
     /// The message id the terminology ecosystem attaches to this issue.
     #[must_use]
-    pub const fn message_id(&self) -> &'static str {
-        self.message.key()
+    pub fn message_id(&self) -> Option<&'static str> {
+        self.message.map(MessageId::key)
     }
 }
 
@@ -529,7 +530,7 @@ fn incomplete(message: MessageId, text: &str, base: &str) -> Issue {
         severity: "warning",
         code: "invalid",
         kind: "invalid-data",
-        message,
+        message: Some(message),
         text: text.to_owned(),
         expression: Some(element(base)),
     }
@@ -579,7 +580,7 @@ pub fn deprecated_note(
             severity: "warning",
             code: "business-rule",
             kind: "code-comment",
-            message: MessageId::DeprecatedConceptFound,
+            message: Some(MessageId::DeprecatedConceptFound),
             text: format!("The concept '{code}' is deprecated and its use should be reviewed"),
             expression,
         },
@@ -620,7 +621,7 @@ pub fn inactive_note(
             severity: "warning",
             code: "business-rule",
             kind: "code-comment",
-            message: MessageId::InactiveConceptFound,
+            message: Some(MessageId::InactiveConceptFound),
             text,
             expression,
         },
@@ -678,7 +679,7 @@ pub fn standing_note(
         severity: "information",
         code: "business-rule",
         kind: "status-check",
-        message,
+        message: Some(message),
         text: format!("Reference to {word} {kind} {canonical}"),
         expression: None,
     })
@@ -743,11 +744,11 @@ mod tests {
             severity: "information",
             code: "business-rule",
             kind: "code-rule",
-            message: MessageId::CodeCaseDifference,
+            message: Some(MessageId::CodeCaseDifference),
             text: String::from("Any wording at all"),
             expression: None,
         };
-        assert_eq!(issue.message_id(), "CODE_CASE_DIFFERENCE");
+        assert_eq!(issue.message_id(), Some("CODE_CASE_DIFFERENCE"));
         assert_eq!(MessageId::TxGeneralError.key(), "TX_GENERAL_ERROR");
     }
 }

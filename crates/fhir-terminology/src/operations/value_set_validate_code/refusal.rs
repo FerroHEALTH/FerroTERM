@@ -116,7 +116,7 @@ pub(super) fn no_system(model: &ValueSetModel, subject: &Subject<'_>) -> Validat
         severity: "warning",
         code: "invalid",
         kind: "invalid-data",
-        message: crate::operations::MessageId::CodingHasNoSystemCannotValidate,
+        message: Some(crate::operations::MessageId::CodingHasNoSystemCannotValidate),
         text: String::from(super::super::NO_SYSTEM),
         expression: Some(super::super::element(subject.expression)),
     });
@@ -160,7 +160,7 @@ pub(super) fn cannot_infer(
         severity: "error",
         code: "not-found",
         kind: "cannot-infer",
-        message,
+        message: Some(message),
         text,
         expression: super::super::at(subject.expression, "code"),
     });
@@ -194,7 +194,7 @@ pub(super) fn not_in_vs(
         severity: "error",
         code: "code-invalid",
         kind: "not-in-vs",
-        message: crate::operations::MessageId::NoneOfTheProvidedCodesAreInTheValueSetOne,
+        message: Some(crate::operations::MessageId::NoneOfTheProvidedCodesAreInTheValueSetOne),
         text: format!(
             "The provided code '{}' was not found in the value set '{}'",
             named_code(system, code, display),
@@ -235,7 +235,7 @@ pub(super) fn unknown_import(system: &str, version: String, url: &str, code: &st
             severity: "error",
             code: "not-found",
             kind: "not-found",
-            message: crate::operations::MessageId::UnableToResolveValueSet,
+            message: Some(crate::operations::MessageId::UnableToResolveValueSet),
             text: format!("A definition for the value Set '{url}' could not be found"),
             expression: None,
         },
@@ -293,7 +293,7 @@ pub(super) fn unlisted_in_fragment(
             severity: "warning",
             code: "code-invalid",
             kind: "invalid-code",
-            message,
+            message: Some(message),
             text,
             expression: super::super::at(subject.expression, "code"),
         }]
@@ -330,7 +330,7 @@ pub(super) fn unknown_code(
         severity: "error",
         code: "code-invalid",
         kind: "invalid-code",
-        message,
+        message: Some(message),
         text,
         expression: super::super::at(subject.expression, "code"),
     };
@@ -357,6 +357,11 @@ pub(super) fn unknown_code(
     // stays unreported (<https://hl7.org/fhir/6.0.0-snapshot1/valueset-operation-validate-code.html>).
     if !policy.membership_only {
         validation.issues.push(unknown);
+        validation.issues.extend(super::super::display::rejection(
+            provider.as_ref(),
+            subject.code,
+            super::super::at(subject.expression, "code"),
+        ));
     }
     // NOTE: the submitted code is echoed even when the system does not have it, the
     // shape the ecosystem expects (<https://build.fhir.org/ig/HL7/fhir-tx-ecosystem-ig/>).
@@ -389,7 +394,7 @@ pub(super) fn outside_value_set(
             severity: "error",
             code: "business-rule",
             kind: "code-rule",
-            message: crate::operations::MessageId::StatusCodeWarningCode,
+            message: Some(crate::operations::MessageId::StatusCodeWarningCode),
             text: format!("The concept '{}' is valid but is not active", located.code),
             expression: super::super::at(expression, "code"),
         });

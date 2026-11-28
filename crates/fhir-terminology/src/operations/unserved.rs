@@ -42,7 +42,7 @@ pub fn system(
             severity: "error",
             code: "not-found",
             kind: "not-found",
-            message,
+            message: Some(message),
             text,
             expression,
         },
@@ -60,7 +60,7 @@ pub fn version_none(url: &str, version: &str, expression: Option<String>) -> (St
             severity: "error",
             code: "not-found",
             kind: "not-found",
-            message: MessageId::UnknownCodeSystemVersionNone,
+            message: Some(MessageId::UnknownCodeSystemVersionNone),
             text: format!(
                 "A definition for CodeSystem '{url}' version '{version}' could not be found, so the code cannot be validated. No version of this code system is served"
             ),

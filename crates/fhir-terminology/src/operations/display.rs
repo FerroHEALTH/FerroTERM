@@ -163,7 +163,7 @@ pub fn judge(
         severity,
         code: "invalid",
         kind,
-        message,
+        message: Some(message),
         text,
         expression,
     }))
@@ -368,7 +368,7 @@ pub fn case_note(
             severity: "information",
             code: "business-rule",
             kind: "code-rule",
-            message: super::MessageId::CodeNotInNormalForm,
+            message: Some(super::MessageId::CodeNotInNormalForm),
             text: format!(
                 "The code '{given}' is valid, but it is not the normal form for the code system '{system}'; the normal form is '{located}'"
             ),
@@ -384,7 +384,7 @@ pub fn case_note(
         severity: "information",
         code: "business-rule",
         kind: "code-rule",
-        message: super::MessageId::CodeCaseDifference,
+        message: Some(super::MessageId::CodeCaseDifference),
         text: format!(
             "The code '{given}' differs from the correct code '{located}' by case. Although the code system {} is case insensitive, implementers are strongly encouraged to use the correct case anyway",
             named_system(provider.as_ref())
@@ -402,6 +402,59 @@ fn named_system(provider: &dyn CodeSystemProvider) -> String {
     } else {
         format!("'{}' version '{}'", identity.url, identity.version)
     }
+}
+
+/// The recommendations a valid `concept` breaks, each a `warning` beside the
+/// `true` result.
+///
+/// # Errors
+///
+/// Returns the provider's error when the substrate fails.
+pub fn advisories(
+    provider: &dyn CodeSystemProvider,
+    concept: Concept,
+    expression: &str,
+) -> Result<Vec<Issue>, ProviderError> {
+    Ok(provider
+        .advisories(concept)?
+        .into_iter()
+        .map(|text| Issue {
+            severity: "warning",
+            code: "business-rule",
+            kind: "code-rule",
+            message: None,
+            text,
+            expression: super::at(expression, "code"),
+        })
+        .collect())
+}
+
+/// Why a system whose grammar this server evaluates refused `code`, as the
+/// `information` issue that stands beside its `invalid-code` error; `None`
+/// for a code the grammar does not cover.
+///
+/// The Compositional Grammar names conformance to the syntax, to the concept
+/// model and to the concept references as the checks of an expression (§7.3
+/// Validating); the detail says which one failed.
+#[must_use]
+pub fn rejection(
+    provider: &dyn CodeSystemProvider,
+    code: &str,
+    expression: Option<String>,
+) -> Option<Issue> {
+    if provider.declaration().compositional
+        != crate::provider::declaration::Compositional::Supported
+    {
+        return None;
+    }
+    Some(Issue {
+        severity: "information",
+        code: "code-invalid",
+        kind: "invalid-code",
+        message: None,
+        text: provider.rejection(code)?,
+        expression,
+    })
 }
 
 /// The `invalid-code` message and text for a code the system does not have.
@@ -426,10 +479,6 @@ pub fn unknown_code(provider: &dyn CodeSystemProvider, code: &str) -> (super::Me
                 " - note that the code is an expression in the compositional grammar of the code system, which this server does not evaluate",
             )
         }
-        crate::provider::declaration::Compositional::Supported => provider
-            .rejection(code)
-            .map(|reason| format!(" - {reason}"))
-            .unwrap_or_default(),
         _ => String::new(),
     };
     if matches!(provider.declaration().content, ContentMode::Fragment) {
