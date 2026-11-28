@@ -21,7 +21,12 @@
 #   semver.sh [--baseline-rev <rev>] [<crate>...]
 #       Judge the named crates, or the published list, against <rev> or,
 #       without it, against each crate's newest release on crates.io. A crate
-#       at its baseline's version, or new since it, is left out.
+#       whose version at <rev> is above its newest release is judged against
+#       the release, since the line steps once per publish and its change is
+#       part of the step the next publish carries. A crate at its baseline's
+#       version, or new since it, is left out.
+#   semver.sh --self-test
+#       Check which baseline a crate is judged against.
 #   semver.sh --pin
 #       Print the cargo-semver-checks version docs/VERSIONS.md pins.
 #
@@ -44,6 +49,38 @@ pin="$(awk -F'|' '{ k = $2; gsub(/[` ]/, "", k) } k == "cargo-semver-checks" { v
 if [[ -z "$pin" ]]; then
   echo "semver: docs/VERSIONS.md pins no cargo-semver-checks version" >&2
   exit 2
+fi
+# Which baseline a crate at version $1 at the revision, with newest release
+# $2, is judged against: `release` when the revision holds an unpublished
+# version above the release, else `rev`.
+baseline_kind() {
+  local at_rev="$1" released="$2"
+  if [[ -n "$released" ]] && [[ "$at_rev" != "$released" ]] &&
+    [[ "$(printf '%s\n%s\n' "$at_rev" "$released" | sort -V | tail -n 1)" == "$at_rev" ]]; then
+    echo release
+  else
+    echo rev
+  fi
+}
+if [[ "${1:-}" == "--self-test" ]]; then
+  [[ "$#" -eq 1 ]] || usage
+  failures=0
+  kind() {
+    local want="$1" label="$2" got
+    got="$(baseline_kind "$3" "$4")"
+    if [[ "$got" != "$want" ]]; then
+      echo "semver: self-test: $label: $got, wanted $want" >&2
+      failures=$((failures + 1))
+    fi
+  }
+  kind rev "a branch at its newest release" 0.1.3 0.1.3
+  kind release "a branch holding an unpublished patch" 0.1.4 0.1.3
+  kind release "a branch holding an unpublished minor" 0.2.0 0.1.3
+  kind rev "a crate with no release" 0.1.0 ""
+  kind rev "a branch below its newest release" 0.1.2 0.1.3
+  [[ "$failures" -eq 0 ]] || exit 1
+  echo "semver: self-test passed"
+  exit 0
 fi
 if [[ "${1:-}" == "--pin" ]]; then
   [[ "$#" -eq 1 ]] || usage
@@ -84,12 +121,12 @@ newest_release() {
   crates_io "$1" | jq -r '.crate.max_stable_version // empty' || true
 }
 
-# The version crate $1 has at the baseline: its manifest at the baseline
-# revision, or its newest stable release on crates.io; empty when it has none.
+# The version crate $1 has at revision $2, or its newest stable release on
+# crates.io when $2 is empty; empty when it has none.
 baseline_version() {
-  local crate="$1"
-  if [[ -n "$baseline_rev" ]]; then
-    git show "$baseline_rev:crates/$crate/Cargo.toml" 2>/dev/null | package_version || true
+  local crate="$1" rev="$2"
+  if [[ -n "$rev" ]]; then
+    git show "$rev:crates/$crate/Cargo.toml" 2>/dev/null | package_version || true
   else
     newest_release "$crate"
   fi
@@ -120,14 +157,15 @@ release_lines() {
 }
 
 # The public dependencies of crate $1 that moved to another compatibility line
-# since version $2 at the baseline. Against a revision, the newest release on
-# crates.io counts too while it shares the line of $2: a move that landed
-# under an unpublished patch still breaks the consumers of that release.
+# since version $2 at revision $3 (or the release, when $3 is empty). Against a
+# revision, the newest release on crates.io counts too while it shares the
+# line of $2: a move that landed under an unpublished patch still breaks the
+# consumers of that release.
 moved_since() {
-  local crate="$1" previous="$2" current published moved=""
+  local crate="$1" previous="$2" rev="$3" current published moved=""
   current="$(tree_lines "$crate")"
-  if [[ -n "$baseline_rev" ]]; then
-    moved="$(moved_lines "$(revision_lines "$crate" "$baseline_rev")" "$current")"
+  if [[ -n "$rev" ]]; then
+    moved="$(moved_lines "$(revision_lines "$crate" "$rev")" "$current")"
     published="$(newest_release "$crate")"
     if [[ -n "$published" ]] && ! same_line "$published" "$previous"; then published=""; fi
   else
@@ -149,12 +187,22 @@ fi
 export CARGO_TARGET_DIR="$root/target/semver"
 log="$(mktemp)"
 trap 'rm -f "$log"' EXIT
-against="${baseline_rev:-crates.io}"
 failed=""
 for crate in "${crates[@]}"; do
   [[ -f "crates/$crate/Cargo.toml" ]] || { echo "semver: no crate crates/$crate" >&2; exit 2; }
   current="$(package_version < "crates/$crate/Cargo.toml")"
-  previous="$(baseline_version "$crate")"
+  rev="$baseline_rev"
+  against="${rev:-crates.io}"
+  previous="$(baseline_version "$crate" "$rev")"
+  if [[ -n "$rev" ]] && [[ -n "$previous" ]]; then
+    released="$(newest_release "$crate")"
+    if [[ "$(baseline_kind "$previous" "$released")" == release ]]; then
+      echo "semver: $crate is at the unpublished $previous at $rev; judging against its release $released"
+      rev=""
+      against="crates.io"
+      previous="$released"
+    fi
+  fi
   if [[ -z "$previous" ]]; then
     echo "semver: $crate has no release at $against to compare with"
     continue
@@ -165,7 +213,7 @@ for crate in "${crates[@]}"; do
   fi
   echo "semver: $crate $previous -> $current against $against"
   args=(check-release --package "$crate")
-  [[ -z "$baseline_rev" ]] || args+=(--baseline-rev "$baseline_rev")
+  [[ -z "$rev" ]] || args+=(--baseline-rev "$rev")
   for pass in default --only-explicit-features; do
     status=0
     if [[ "$pass" == default ]]; then
@@ -187,7 +235,7 @@ for crate in "${crates[@]}"; do
       continue 2
     fi
   done
-  moved="$(moved_since "$crate" "$previous")"
+  moved="$(moved_since "$crate" "$previous" "$rev")"
   if [[ -n "$moved" ]] && same_line "$previous" "$current"; then
     echo "::error::semver: $crate moves from $previous to $current while a public dependency moves to another compatibility line ($moved); that breaks its consumers, so it bumps the minor (.claude/rules/crates-publishing.md)." >&2
     failed="$failed $crate"
