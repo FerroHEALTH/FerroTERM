@@ -480,6 +480,7 @@ impl StoredSystem for Snomed {
                 let Some(value) = provider.stored().property_value(*value)? else {
                     continue;
                 };
+                let value = properties::typed(provider, sctid, value)?;
                 properties::push_once(
                     &mut out,
                     Property {

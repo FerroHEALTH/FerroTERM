@@ -8,6 +8,7 @@
 use std::sync::Arc;
 
 use fhir_terminology::operations::{Invocation, validate_code};
+use fhir_terminology::provider::{CodeSystemProvider, Concept, PropertyValue};
 use fhir_terminology::registry::Registry;
 use fhir_terminology::snomed::{SYSTEM, SnomedProvider};
 
@@ -197,4 +198,21 @@ fn a_loose_attribute_the_concept_model_groups_is_written_in_a_group_of_its_own()
         "{:?}",
         outcome.normalized_code
     );
+}
+
+#[test]
+fn a_concrete_number_is_typed_by_the_attribute_range() {
+    // tx-ecosystem IG, requirements, SNOMED CT: a number is "typed by the
+    // attribute's range in the MRCM"; legs ranges over `int(>#0..)`.
+    let dir = tempfile::tempdir().expect("tempdir");
+    snomed::write_with_concept_model(dir.path()).expect("writes the fixture");
+    let provider = SnomedProvider::open(dir.path(), "en").expect("opens");
+    let legs: Vec<PropertyValue> = provider
+        .properties(Concept::new(CAT))
+        .expect("reads")
+        .into_iter()
+        .filter(|p| p.code == code(LEGS))
+        .map(|p| p.value)
+        .collect();
+    assert_eq!(legs, [PropertyValue::Integer(4)]);
 }

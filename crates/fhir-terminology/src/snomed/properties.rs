@@ -64,6 +64,33 @@ pub(super) fn of_expression(
     Ok(out)
 }
 
+/// A concrete number of the attribute `sctid` typed by the attribute's MRCM
+/// range: `int()` an integer, `dec()` a decimal, and with no range a number
+/// with a decimal point a decimal and one without an integer (tx-ecosystem IG,
+/// requirements, SNOMED CT, `$lookup`); any other value as it is.
+pub(super) fn typed(
+    provider: &SnomedProvider,
+    sctid: &str,
+    value: PropertyValue,
+) -> Result<PropertyValue, ProviderError> {
+    let PropertyValue::Decimal(number) = &value else {
+        return Ok(value);
+    };
+    let integral = match provider.stored().store.ordinal(sctid).map_err(storage)? {
+        Some(attribute) => provider.integral_range(attribute)?,
+        None => None,
+    }
+    .unwrap_or(!number.contains('.'));
+    if !integral {
+        return Ok(value);
+    }
+    // NOTE: RF2 writes `#4000` and `#1` alike, so a number the range calls an integer
+    // and that does not parse as one stays the decimal it was written as: our own design.
+    Ok(number
+        .parse::<i64>()
+        .map_or(value.clone(), PropertyValue::Integer))
+}
+
 /// Adds `property` unless `out` holds the same code and value.
 ///
 /// A value a concept carries in more than one role group is one value of its

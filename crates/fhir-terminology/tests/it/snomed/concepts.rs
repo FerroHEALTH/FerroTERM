@@ -124,10 +124,9 @@ fn properties_follow_the_snomed_on_fhir_list() {
         find(&sctid(item(COVERING))),
         [&PropertyValue::Code(sctid(item(FUR)))]
     );
-    assert_eq!(
-        find(&sctid(item(LEGS))),
-        [&PropertyValue::Decimal(String::from("4"))]
-    );
+    // tx-ecosystem IG, requirements, SNOMED CT: with no MRCM range, a number
+    // without a decimal point is an integer.
+    assert_eq!(find(&sctid(item(LEGS))), [&PropertyValue::Integer(4)]);
     let animal = p.properties(Concept::new(ANIMAL)).expect("reads");
     let children: Vec<&PropertyValue> = animal
         .iter()
