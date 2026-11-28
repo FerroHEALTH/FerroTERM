@@ -960,3 +960,27 @@ async fn the_undeclared_suite_parameters_are_refused_on_every_version() {
         );
     }
 }
+
+// The ecosystem IG, `$lookup`: a supplement that applied is named in
+// `used-supplement` (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>).
+#[tokio::test]
+async fn lookup_names_the_supplement_it_applied_on_every_version() {
+    let server = Server::start_with_resources();
+    for version in VERSIONS {
+        let base = format!("/{version}/CodeSystem/$lookup?system={ANIMALS}&code=cat");
+        let (status, body) = server.get(&base).await;
+        assert_eq!(status, StatusCode::OK, "{version}: {body}");
+        assert!(
+            parameter(&body, "used-supplement").is_none(),
+            "{version}: none applied: {body}"
+        );
+        let (status, body) = server
+            .get(&format!("{base}&useSupplement={ANIMALS_NL}"))
+            .await;
+        assert_eq!(status, StatusCode::OK, "{version}: {body}");
+        let used = parameter(&body, "used-supplement").expect("used-supplement")["valueCanonical"]
+            .as_str()
+            .expect("a canonical");
+        assert!(used.starts_with(ANIMALS_NL), "{version}: {body}");
+    }
+}
