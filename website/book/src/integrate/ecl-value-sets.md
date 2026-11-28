@@ -136,7 +136,9 @@ query string has to percent-encode every one of them.
   expressions. A term you wrote is kept when it is an active description of
   its concept. A missing term, or one that does not describe the concept, is
   replaced by the edition's term in the requested language. `normalForm` and
-  `normalFormTerse` answer the expression's necessary normal form, and the
+  `normalFormTerse` answer the expression's necessary normal form when the
+  request names them (`property=*` leaves them out, as the terminology
+  ecosystem IG requires), and the
   expression's own refinement comes back as the concept-model properties keyed
   by attribute concept id. An expression over an inactive concept validates
   with `inactive = true`, the way an inactive concept does.
