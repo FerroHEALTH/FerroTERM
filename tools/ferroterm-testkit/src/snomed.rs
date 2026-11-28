@@ -343,10 +343,12 @@ pub fn write_with_concept_model(dir: &Path) -> Result<(), FixtureError> {
 /// edition of [`write_with_extension`] depends on.
 pub const DEPENDED_DATE: &str = "20250101";
 
-/// Writes the first edition as an extension under `dir`: the dog and the bird
-/// are its own concepts and every other concept belongs to the edition
-/// [`MODULE_CONCEPT`] heads, which it depends on at [`DEPENDED_DATE`], for the
-/// tests of the edition map.
+/// Writes the first edition as an extension under `dir`, for the tests of the
+/// edition map.
+///
+/// The dog and the bird are its own concepts, and every other concept belongs
+/// to the edition [`MODULE_CONCEPT`] heads, which it depends on at
+/// [`DEPENDED_DATE`].
 ///
 /// # Errors
 ///

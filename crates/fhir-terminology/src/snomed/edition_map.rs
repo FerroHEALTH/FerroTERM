@@ -305,7 +305,7 @@ impl SnomedProvider {
                 held.push(ancestor);
             }
         }
-        Ok(minimal(closure, held))
+        Ok(minimal(closure, &held))
     }
 
     /// The expression of `concept` over the target: its proximal primitive
@@ -334,7 +334,7 @@ impl SnomedProvider {
                 primitive.push(ancestor);
             }
         }
-        let focus = minimal(closure, primitive);
+        let focus = minimal(closure, &primitive);
         if focus.is_empty() {
             return Ok(None);
         }
@@ -358,7 +358,7 @@ impl SnomedProvider {
 }
 
 /// The members of `held` no other member is below.
-fn minimal(closure: &concept_graph::closure::Closure, held: Vec<Ordinal>) -> Vec<Ordinal> {
+fn minimal(closure: &concept_graph::closure::Closure, held: &[Ordinal]) -> Vec<Ordinal> {
     held.iter()
         .copied()
         .filter(|candidate| {
