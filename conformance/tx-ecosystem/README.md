@@ -49,7 +49,7 @@ over the ICF `CodeSystem` resources of `fhir.tx.support` 1.0.5.
 | `general` | `/r4b` | `passing.txt` | 730 of 805 | nothing | #1068, #1069, #1376, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
 | `general` | `/r4` | `passing-r4.txt` | 744 of 805 | nothing | #1068, #1069, #1376, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
 | `general` | `/r5` | `passing-r5.txt` | 744 of 805 | nothing | #1068, #1069, #1376, #1107, #507, #349, #1330 (the breakdown on the book's conformance page) |
-| `snomed` | `/r4b` | `passing-snomed.txt` | 294 of 378 | the suite's SNOMED CT test edition, with `terminology.default_language = "en-US"` (the script sets it) | #1413, #1068, #1380 |
+| `snomed` | `/r4b` | `passing-snomed.txt` | 295 of 378 | the suite's SNOMED CT test edition, with `terminology.default_language = "en-US"` (the script sets it) | #1413, #1068, #1380 |
 | `icd-11` | `/r4b` | `passing-icd-11.txt` | 10 of 145 | the three ICD-11 artifacts | #1391, #1068, #1380 |
 | `icf` | `/r4b` | `passing-icf.txt` | 79 of 96 | the standalone ICF releases | #1330, #1376, #1068, #1380 |
 | `loinc` | `/r4b` | `passing-loinc.txt` | 56 of 110 | a LOINC release | #1383, #1068, #1380 |

@@ -155,6 +155,29 @@ fn properties_follow_the_snomed_on_fhir_list() {
 }
 
 #[test]
+fn a_property_naming_a_concept_describes_it_with_its_display() {
+    // `property.description`: "Human Readable representation of the property
+    // value (e.g. display for a code)" (`OperationDefinition/CodeSystem-lookup`).
+    let (_dir, p) = provider();
+    let props = p.properties(Concept::new(CAT)).expect("reads");
+    let described = |code: &str| -> Vec<Option<&str>> {
+        props
+            .iter()
+            .filter(|p| p.code == code)
+            .map(|p| p.description.as_deref())
+            .collect()
+    };
+    assert_eq!(described("parent"), [Some("Animal")]);
+    assert_eq!(described(&sctid(item(COVERING))), [Some("Fur")]);
+    assert_eq!(
+        described(&sctid(item(LEGS))),
+        [None],
+        "a number names no concept"
+    );
+    assert_eq!(described("inactive"), [None]);
+}
+
+#[test]
 fn the_hierarchy_answers_subsumption_and_the_filters_from_the_closure() {
     let (_dir, p) = provider();
     let hierarchy = p.hierarchy().expect("snomed has a hierarchy");
