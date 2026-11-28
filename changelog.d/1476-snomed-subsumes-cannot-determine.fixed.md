@@ -1,0 +1,1 @@
+- SNOMED CT `$subsumes` answers `cannot-determine` (422) where a refined expression and the other code entail each other neither way, as the terminology ecosystem IG requires instead of `not-subsumed`; codes with no refinement of their own keep the answer the hierarchy gives, and `$closure` records no entry for such a pair.
