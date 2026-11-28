@@ -200,12 +200,16 @@ pub trait StoredSystem: fmt::Debug + Send + Sync + Sized {
     }
 
     /// As [`CodeSystemProvider::implicit_concept_maps`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProviderError`] when the substrate fails.
     fn implicit_concept_maps(
         _provider: &StoredProvider<Self>,
         _source: &str,
         _target: &str,
-    ) -> Vec<String> {
-        Vec::new()
+    ) -> Result<Vec<String>, ProviderError> {
+        Ok(Vec::new())
     }
 
     /// As [`CodeSystemProvider::unclosed`].
@@ -450,7 +454,11 @@ impl<S: StoredSystem> CodeSystemProvider for StoredProvider<S> {
         S::implicit_concept_map(self, url, selection)
     }
 
-    fn implicit_concept_maps(&self, source: &str, target: &str) -> Vec<String> {
+    fn implicit_concept_maps(
+        &self,
+        source: &str,
+        target: &str,
+    ) -> Result<Vec<String>, ProviderError> {
         S::implicit_concept_maps(self, source, target)
     }
 
