@@ -416,9 +416,8 @@ pub(super) fn outside_value_set(
         }
     }
     let (inactive, status) = inactive_outputs(concept_status);
-    // NOTE: no specification governs this: the IG asks for `normalized-code`
-    // "where appropriate" (requirements, `$validate-code`), and its `icd-11`
-    // `vs-validate-out` case answers none for a code outside the value set.
+    // NOTE: requirements.md at 9c2bbce, `$validate-code`: `normalized-code` "where
+    // appropriate", which is a code valid in the value set; a not-in-vs answer has none.
     let mut validation = Validation {
         result: false,
         message: None,
