@@ -11,7 +11,9 @@
 
 use regex::Regex;
 
-use crate::provider::{CodeSystemProvider, Concept, ConceptSet, Hierarchy, error::ProviderError};
+use crate::provider::{
+    CodeSystemProvider, Concept, ConceptSet, Hierarchy, PropertyValue, error::ProviderError,
+};
 
 /// `ValueSet.compose.include.filter.op`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -327,7 +329,7 @@ fn on_property<P: CodeSystemProvider + ?Sized>(
             .properties(Concept::new(index))?
             .into_iter()
             .filter(|property| property.code == filter.property)
-            .map(|property| property.value.as_text())
+            .filter_map(|property| property.value.as_ref().map(PropertyValue::as_text))
             .collect();
         let selected = match filter.op {
             FilterOperator::Equal => texts.iter().any(|text| text == &filter.value),

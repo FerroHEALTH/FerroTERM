@@ -65,7 +65,7 @@ fn a_supplement_layers_designations_and_properties_over_the_system() {
                 }],
                 properties: vec![Property {
                     code: String::from("colour"),
-                    value: PropertyValue::String(String::from("any")),
+                    value: Some(PropertyValue::String(String::from("any"))),
                     ..Property::default()
                 }],
             },
@@ -314,7 +314,7 @@ fn sized(version: &str) -> Supplement {
                 }],
                 properties: vec![Property {
                     code: String::from("size"),
-                    value: PropertyValue::String(String::from("small")),
+                    value: Some(PropertyValue::String(String::from("small"))),
                     ..Property::default()
                 }],
             },

@@ -244,27 +244,17 @@ impl PropertyValue {
 }
 
 /// One property of a concept.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Property {
     /// The property code.
     pub code: String,
-    /// The value.
-    pub value: PropertyValue,
+    /// The value; none for a property whose content is its subproperties
+    /// (`$lookup` `property.value` is `0..1`).
+    pub value: Option<PropertyValue>,
     /// A human description of the value (`$lookup` `property.description`).
     pub description: Option<String>,
     /// The parts of a structured value (`$lookup` `property.subproperty`).
     pub subproperties: Vec<Subproperty>,
-}
-
-impl Default for Property {
-    fn default() -> Self {
-        Self {
-            code: String::new(),
-            value: PropertyValue::String(String::new()),
-            description: None,
-            subproperties: Vec::new(),
-        }
-    }
 }
 
 /// One part of a structured property value.

@@ -383,17 +383,17 @@ impl Grammar for MediaTypes {
         Ok(vec![
             Property {
                 code: String::from("base"),
-                value: PropertyValue::Code(media.kind.clone()),
+                value: Some(PropertyValue::Code(media.kind.clone())),
                 ..Property::default()
             },
             Property {
                 code: String::from("base"),
-                value: PropertyValue::Code(media.base()),
+                value: Some(PropertyValue::Code(media.base())),
                 ..Property::default()
             },
             Property {
                 code: String::from("registered"),
-                value: PropertyValue::Boolean(Self::is_registered(&media)),
+                value: Some(PropertyValue::Boolean(Self::is_registered(&media))),
                 ..Property::default()
             },
         ])

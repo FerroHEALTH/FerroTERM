@@ -496,7 +496,7 @@ fn contains(
         if item.inactive && !properties.iter().any(|p| p.code == "status") {
             properties.push(Property {
                 code: String::from("status"),
-                value: PropertyValue::Code(String::from("inactive")),
+                value: Some(PropertyValue::Code(String::from("inactive"))),
                 ..Property::default()
             });
         }
@@ -691,7 +691,7 @@ fn properties_of(
     {
         out.push(Property {
             code: String::from("definition"),
-            value: PropertyValue::String(definition),
+            value: Some(PropertyValue::String(definition)),
             ..Property::default()
         });
     }
