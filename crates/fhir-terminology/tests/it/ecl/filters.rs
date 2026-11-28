@@ -3,7 +3,11 @@
 
 //! ECL description, concept and member filters, and the history supplements.
 
-use ferroterm_testkit::snomed::{ANIMAL, CAT, CODES_MAP, DOG, FISH, Item, PETS, TOP, sctid};
+use std::collections::BTreeMap;
+
+use ferroterm_testkit::snomed::{
+    ANIMAL, CAT, CODES_MAP, DOG, FISH, Item, PETS, SCHEME, TOP, item, sctid,
+};
 use sct_ecl::eval::EvalError;
 
 use super::{c, provider, refused, same_as, set};
@@ -433,8 +437,14 @@ fn history_supplements_add_the_inactive_concepts_associated_to_the_set() {
 }
 
 #[test]
-fn alternate_identifiers_resolve_through_the_scheme_alias() {
+fn alternate_identifiers_resolve_through_the_configured_scheme_alias() {
     let (_dir, p) = provider();
+    assert!(
+        matches!(refused(&p, "ZOO#cat-1"), EvalError::UnknownScheme(_)),
+        "a scheme's term is no alias until configured"
+    );
+    let scheme: u64 = sctid(item(SCHEME)).parse().expect("an SCTID");
+    let p = p.with_scheme_aliases(BTreeMap::from([(String::from("ZOO"), scheme)]));
     assert_eq!(set(&p, "ZOO#cat-1"), [CAT]);
     assert_eq!(
         set(&p, "zoo#dog-1"),
