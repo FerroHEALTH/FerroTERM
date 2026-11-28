@@ -4,7 +4,10 @@
 //! The ICD-11 provider over the testkit's API-shaped artifacts, asserting
 //! what the HL7 terminology ecosystem test cases for ICD-11 assert.
 
-use ferroterm_testkit::icd11::{BLOCK, CHOLERA, RELEASE, SEPSIS, VIBRIO, write_artifacts};
+use ferroterm_testkit::icd11::{
+    BLOCK, CHOLERA, CLASSICAL, OTHER_VIBRIO, RELEASE, RESIDUAL, SEPSIS, SEPTIC_SHOCK, SEVERE,
+    VIBRIO, write_artifacts,
+};
 use fhir_terminology::icd11::{Icd11Provider, OpenError};
 use fhir_terminology::provider::declaration::{Compositional, HierarchyMeaning};
 use fhir_terminology::provider::filter::{Filter, FilterOperator};
@@ -63,9 +66,12 @@ fn props(provider: &Icd11Provider, concept: Concept) -> Vec<String> {
         .collect()
 }
 
+// NOTE: tx-ecosystem IG `icd-11.md` at 9c2bbce, ICD-11 Codes: the entity id is
+// the code and the normal form, the classification code an alternative
+// spelling, and the full entity uri no code in MMS or ICF.
 #[test]
-fn codes_and_entity_uris_in_both_forms_name_the_same_concept() {
-    let (_dir, mms, _icf, foundation) = providers();
+fn the_entity_id_is_the_code_and_the_classification_code_spells_it_too() {
+    let (_dir, mms, _icf, _foundation) = providers();
     assert_eq!(mms.identity().url, MMS);
     assert_eq!(mms.identity().version, RELEASE);
     assert_eq!(
@@ -78,23 +84,38 @@ fn codes_and_entity_uris_in_both_forms_name_the_same_concept() {
     );
     assert!(mms.declaration().case_sensitive);
     assert_eq!(mms.declaration().languages, ["en", "fr"]);
+    let by_id = located(&mms, CHOLERA);
     let by_code = located(&mms, "1A00");
-    let by_uri = located(&mms, &format!("{MMS}/{CHOLERA}"));
-    let by_versioned = located(
-        &mms,
-        &format!("http://id.who.int/icd/release/11/{RELEASE}/mms/{CHOLERA}"),
+    assert_eq!(by_id, by_code);
+    assert_eq!(
+        mms.locate(CHOLERA).expect("reads").expect("located").code,
+        CHOLERA,
+        "the id is its own normal form"
     );
-    assert_eq!(by_code, by_uri);
-    assert_eq!(by_code, by_versioned);
     assert_eq!(
         mms.locate("1A00").expect("reads").expect("located").code,
-        "1A00"
+        CHOLERA,
+        "the classification code's normal form is the id"
     );
+    assert_eq!(mms.code(by_code).expect("reads").as_deref(), Some(CHOLERA));
+    for uri in [
+        format!("{MMS}/{CHOLERA}"),
+        format!("http://id.who.int/icd/release/11/{RELEASE}/mms/{CHOLERA}"),
+    ] {
+        assert!(
+            mms.locate(&uri).expect("reads").is_none(),
+            "a full entity uri is no MMS code: {uri}"
+        );
+    }
     assert!(
         mms.locate("1a00").expect("reads").is_none(),
         "case sensitive"
     );
     assert!(mms.locate("XXXX9").expect("reads").is_none());
+    assert!(
+        mms.locate("01002").expect("reads").is_none(),
+        "an id is matched as the release spells it"
+    );
     assert_eq!(
         mms.display(by_code, None).expect("reads").as_deref(),
         Some("Cholera")
@@ -109,9 +130,13 @@ fn codes_and_entity_uris_in_both_forms_name_the_same_concept() {
         "English when the language is missing"
     );
     let p = props(&mms, by_code);
-    assert!(p.contains(&String::from("code=1A00")));
-    assert!(p.contains(&format!("id={MMS}/{CHOLERA}")));
-    assert!(p.contains(&format!("parent={MMS}/{BLOCK}")));
+    assert!(p.contains(&format!("code={CHOLERA}")), "{p:?}");
+    assert!(
+        p.contains(&String::from("classificationCode=1A00")),
+        "{p:?}"
+    );
+    assert!(!p.iter().any(|x| x.starts_with("id=")), "{p:?}");
+    assert!(p.contains(&format!("parent={BLOCK}")), "{p:?}");
     assert!(p.contains(&String::from("classKind=category")));
     assert!(p.contains(&String::from("exclusion=Vibrio vulnificus infection")));
     assert!(p.iter().any(|x| x.starts_with(
@@ -122,18 +147,41 @@ fn codes_and_entity_uris_in_both_forms_name_the_same_concept() {
         mms.definition(by_code).expect("reads").as_deref(),
         Some("An infection of the intestine by Vibrio cholerae.")
     );
-    let block = located(&mms, &format!("{MMS}/{BLOCK}"));
+}
+
+#[test]
+fn a_grouper_and_a_residual_are_named_by_their_ids() {
+    let (_dir, mms, _icf, _foundation) = providers();
+    let block = located(&mms, BLOCK);
     let block_props = props(&mms, block);
     assert!(block_props.contains(&String::from("notSelectable=true")));
-    assert!(!block_props.iter().any(|x| x.starts_with("code=")));
+    assert!(block_props.contains(&format!("code={BLOCK}")));
+    assert!(
+        !block_props
+            .iter()
+            .any(|x| x.starts_with("classificationCode=")),
+        "a grouper has no classification code"
+    );
     assert_eq!(
         mms.display(block, None).expect("reads").as_deref(),
         Some("Bacterial intestinal infections")
     );
     let residual = located(&mms, "1A0Y");
-    assert!(props(&mms, residual).contains(&format!("id={MMS}/1001/other")));
-    assert_eq!(located(&mms, &format!("{MMS}/1001/other")), residual);
+    assert_eq!(
+        located(&mms, RESIDUAL),
+        residual,
+        "a residual's id holds a `/`"
+    );
+    assert!(props(&mms, residual).contains(&format!("code={RESIDUAL}")));
+    assert_eq!(
+        mms.locate("1A0Y").expect("reads").expect("located").code,
+        RESIDUAL
+    );
+}
 
+#[test]
+fn the_foundation_code_is_the_entity_uri() {
+    let (_dir, _mms, _icf, foundation) = providers();
     let entity = located(
         &foundation,
         &format!("http://id.who.int/icd/entity/{CHOLERA}"),
@@ -171,25 +219,32 @@ fn postcoordination_expressions_validate_against_the_axes() {
         mms.display(simple, None).expect("reads").as_deref(),
         Some("Cholera [Vibrio cholerae O1, biovar cholerae]")
     );
+    let id_form = format!("{CHOLERA}&{CLASSICAL}");
     assert_eq!(
         mms.code(simple).expect("reads").as_deref(),
-        Some("1A00&XN8P1")
+        Some(id_form.as_str()),
+        "the expression's code is its id form"
     );
+    assert_eq!(located(&mms, &id_form), simple);
     let p = props(&mms, simple);
-    assert!(p.contains(&String::from("code=1A00&XN8P1")));
-    assert!(p.contains(&format!("id={MMS}/{CHOLERA} & {MMS}/2001")));
-    assert!(p.contains(&format!(
-        "stem=1A00 [stemLabel=Cholera; stemUri={MMS}/{CHOLERA}]"
-    )));
-    assert!(p.contains(&format!(
-        "postcoordinationValues=http://id.who.int/icd/schema/infectiousAgent [XN8P1={MMS}/2001 (Vibrio cholerae O1, biovar cholerae)]"
-    )));
-    let uri_form = located(&mms, &format!("{MMS}/{CHOLERA} & {MMS}/2001"));
-    assert_eq!(
-        mms.display(uri_form, None).expect("reads").as_deref(),
-        Some("Cholera [Vibrio cholerae O1, biovar cholerae]")
+    assert!(p.contains(&format!("code={id_form}")), "{p:?}");
+    assert!(
+        p.contains(&String::from("classificationCode=1A00&XN8P1")),
+        "{p:?}"
     );
-    assert!(props(&mms, uri_form).contains(&String::from("code=1A00&XN8P1")));
+    assert!(!p.iter().any(|x| x.starts_with("id=")), "{p:?}");
+    assert!(p.contains(&format!(
+        "stem={CHOLERA} [stemLabel=Cholera; stemUri={MMS}/{CHOLERA}]"
+    )));
+    assert!(p.contains(&format!(
+        "postcoordinationValues=http://id.who.int/icd/schema/infectiousAgent [{CLASSICAL}={MMS}/{CLASSICAL} (Vibrio cholerae O1, biovar cholerae)]"
+    )));
+    assert!(
+        mms.locate(&format!("{MMS}/{CHOLERA} & {MMS}/{CLASSICAL}"))
+            .expect("reads")
+            .is_none(),
+        "an expression of full entity uris is no MMS code"
+    );
     assert!(
         mms.locate("1A00&XN8P1&XN62R").expect("reads").is_some(),
         "a second value on an AllowAlways axis"
@@ -214,12 +269,15 @@ fn postcoordination_expressions_validate_against_the_axes() {
         )
     );
     let p = props(&mms, cluster);
-    assert!(p.contains(&String::from("code=1A01/1G41/1G40")));
+    assert!(
+        p.contains(&format!("code={OTHER_VIBRIO}/{SEPTIC_SHOCK}/{SEPSIS}")),
+        "{p:?}"
+    );
     assert!(p.contains(&format!(
-        "postcoordinationValues=http://id.who.int/icd/schema/hasCausingCondition [1G41={MMS}/3001 (Sepsis with septic shock)]"
+        "postcoordinationValues=http://id.who.int/icd/schema/hasCausingCondition [{SEPTIC_SHOCK}={MMS}/{SEPTIC_SHOCK} (Sepsis with septic shock)]"
     )), "the required axis gets the first value: {p:?}");
     assert!(p.contains(&format!(
-        "postcoordinationValues=http://id.who.int/icd/schema/hasManifestation [1G40={MMS}/{SEPSIS} (Sepsis without septic shock)]"
+        "postcoordinationValues=http://id.who.int/icd/schema/hasManifestation [{SEPSIS}={MMS}/{SEPSIS} (Sepsis without septic shock)]"
     )));
     let two_stems = located(&mms, "1A00&XN8P1/XN62R");
     assert_eq!(
@@ -233,7 +291,9 @@ fn postcoordination_expressions_validate_against_the_axes() {
         Some("Dressing, unspecified [SEVERE performance difficulty (high, extreme,...) 50-95 %]")
     );
     assert!(props(&icf, dot).iter().any(|x| {
-        x.starts_with("postcoordinationValues=http://id.who.int/icd/schema/performance [qp3=")
+        x.starts_with(&format!(
+            "postcoordinationValues=http://id.who.int/icd/schema/performance [{SEVERE}="
+        ))
     }));
     assert!(
         icf.locate("d5409.3").expect("reads").is_none(),
@@ -252,10 +312,7 @@ fn scales_are_implicit_value_sets_and_the_tree_answers_filters() {
         .expect("compose");
     assert_eq!(compose.include.len(), 1);
     assert_eq!(compose.include[0].filters[0].op, FilterOperator::IsA);
-    assert_eq!(
-        compose.include[0].filters[0].value,
-        format!("{MMS}/{VIBRIO}")
-    );
+    assert_eq!(compose.include[0].filters[0].value, VIBRIO);
     assert_eq!(
         compose.include[0]
             .system
@@ -301,7 +358,7 @@ fn scales_are_implicit_value_sets_and_the_tree_answers_filters() {
         .filter(&Filter {
             property: String::from("concept"),
             op: FilterOperator::IsA,
-            value: format!("{MMS}/{VIBRIO}"),
+            value: String::from(VIBRIO),
         })
         .expect("filters");
     assert_eq!(under.len(), 4);
@@ -324,6 +381,13 @@ fn scales_are_implicit_value_sets_and_the_tree_answers_filters() {
     assert_eq!(mms.all().expect("all").len(), 12);
     assert_eq!(mms.search("chol", Some("fr")).expect("searches").len(), 1);
     assert_eq!(mms.search("asiatic", None).expect("searches").len(), 1);
+    // NOTE: tx-ecosystem IG `icd-11.md` at 9c2bbce, Filter Properties: the text
+    // filter matches the start of the classification code.
+    let xn = mms.search("XN", None).expect("searches");
+    for id in [VIBRIO, CLASSICAL] {
+        assert!(xn.contains(located(&mms, id).index()), "{id}");
+    }
+    assert!(!xn.contains(located(&mms, CHOLERA).index()));
     let dir = tempfile::tempdir().expect("tempdir");
     ferroterm_testkit::loinc::write_artifact(dir.path()).expect("builds");
     assert!(matches!(
@@ -365,14 +429,14 @@ fn a_codeless_grouper_expands_abstract_and_is_refused_when_abstract_is_not_allow
         value_sets: &value_sets,
         concept_maps: &concept_maps,
     };
-    let block_uri = format!("{MMS}/{BLOCK}");
+    let block_id = String::from(BLOCK);
     let inline = ValueSet {
         url: Some("http://example.org/inline".into()),
         status: "active".into(),
         compose: Some(ValueSetCompose {
             include: vec![ValueSetComposeInclude {
                 system: Some(MMS.into()),
-                concept: [block_uri.as_str(), "1A00"]
+                concept: [block_id.as_str(), "1A00"]
                     .iter()
                     .map(|code| ValueSetComposeIncludeConcept {
                         code: (*code).into(),
@@ -397,7 +461,7 @@ fn a_codeless_grouper_expands_abstract_and_is_refused_when_abstract_is_not_allow
     let block = vs
         .contains
         .iter()
-        .find(|c| c.code == block_uri)
+        .find(|c| c.code == block_id)
         .expect("the block");
     assert!(block.abstract_concept, "a codeless grouper is abstract");
     let cholera = vs
@@ -411,7 +475,7 @@ fn a_codeless_grouper_expands_abstract_and_is_refused_when_abstract_is_not_allow
         &sources,
         &ValueSetValidateInput {
             inline_value_set: Some(inline.clone()),
-            code: Some(block_uri.clone()),
+            code: Some(block_id.clone()),
             system: Some(MMS.to_owned()),
             abstract_ok: Some(false),
             ..ValueSetValidateInput::default()
@@ -431,7 +495,7 @@ fn a_codeless_grouper_expands_abstract_and_is_refused_when_abstract_is_not_allow
         &sources,
         &ValueSetValidateInput {
             inline_value_set: Some(inline),
-            code: Some(block_uri),
+            code: Some(block_id),
             system: Some(MMS.to_owned()),
             ..ValueSetValidateInput::default()
         },
@@ -445,9 +509,7 @@ fn a_codeless_grouper_is_abstract_and_codeless_and_a_coded_concept_is_neither() 
     let (_dir, mms, _icf, _foundation) = providers();
     // The codeless block is abstract for expansions and validation; `$lookup`
     // answers it `notSelectable` only (the ecosystem's `lookup-mms-no-code`).
-    let status = mms
-        .status(located(&mms, &format!("{MMS}/{BLOCK}")))
-        .expect("reads");
+    let status = mms.status(located(&mms, BLOCK)).expect("reads");
     assert!(status.abstract_concept);
     assert!(status.codeless);
     let status = mms.status(located(&mms, "1A00")).expect("reads");
@@ -485,14 +547,14 @@ fn the_exclude_flags_drop_a_postcoordinated_expression_and_a_codeless_grouper() 
         value_sets: &value_sets,
         concept_maps: &concept_maps,
     };
-    let block_uri = format!("{MMS}/{BLOCK}");
+    let block_id = String::from(BLOCK);
     let inline = ValueSet {
         url: Some("http://example.org/inline".into()),
         status: "active".into(),
         compose: Some(ValueSetCompose {
             include: vec![ValueSetComposeInclude {
                 system: Some(MMS.into()),
-                concept: [block_uri.as_str(), "1A00", "1A00&XN8P1"]
+                concept: [block_id.as_str(), "1A00", "1A00&XN8P1"]
                     .iter()
                     .map(|code| ValueSetComposeIncludeConcept {
                         code: (*code).into(),
@@ -523,7 +585,7 @@ fn the_exclude_flags_drop_a_postcoordinated_expression_and_a_codeless_grouper() 
     });
     assert_eq!(no_expressions.len(), 2, "{no_expressions:?}");
     assert!(!no_expressions.iter().any(|c| c.contains('&')));
-    assert!(no_expressions.contains(&block_uri));
+    assert!(no_expressions.contains(&block_id));
     let selectable = codes(ExpandInput {
         inline_value_set: Some(inline),
         exclude_not_for_ui: Some(true),
@@ -568,20 +630,18 @@ fn the_composes_spelling_survives_an_include_merge_and_a_value_set_import() {
             .collect(),
         ..Default::default()
     };
-    let cholera_uri = format!("{MMS}/{CHOLERA}");
-    let vibrio_uri = format!("{MMS}/{VIBRIO}");
-    let uri_set = ValueSet {
-        url: Some("http://example.org/icd11-uri".into()),
+    let code_set = ValueSet {
+        url: Some("http://example.org/icd11-code".into()),
         status: "active".into(),
         compose: Some(ValueSetCompose {
-            include: vec![enumerated(&[cholera_uri.as_str()])],
+            include: vec![enumerated(&["1A00"])],
             ..Default::default()
         }),
         ..Default::default()
     };
     let mut value_sets = ValueSetStore::default();
     value_sets
-        .insert(fhir_terminology::valueset::convert::r4b::convert(&uri_set).expect("converts"))
+        .insert(fhir_terminology::valueset::convert::r4b::convert(&code_set).expect("converts"))
         .expect("stores");
     let concept_maps = ConceptMapStore::default();
     let sources = Sources {
@@ -603,21 +663,23 @@ fn the_composes_spelling_survives_an_include_merge_and_a_value_set_import() {
         vs.contains.iter().map(|c| c.code.clone()).collect()
     };
 
-    // Two includes over one system: the first by code, the second by URI.
+    // Two includes over one system: the first by entity id, the second by
+    // classification code.
     let merged = codes(ValueSet {
         url: Some("http://example.org/inline".into()),
         status: "active".into(),
         compose: Some(ValueSetCompose {
-            include: vec![enumerated(&["1A00"]), enumerated(&[vibrio_uri.as_str()])],
+            include: vec![enumerated(&[CHOLERA]), enumerated(&["XN7N1"])],
             ..Default::default()
         }),
         ..Default::default()
     });
-    assert!(merged.contains(&String::from("1A00")), "{merged:?}");
+    assert!(merged.contains(&String::from(CHOLERA)), "{merged:?}");
     assert!(
-        merged.contains(&vibrio_uri),
-        "the second include's URI spelling: {merged:?}"
+        merged.contains(&String::from("XN7N1")),
+        "the second include's classification code spelling: {merged:?}"
     );
+    assert!(!merged.contains(&String::from(VIBRIO)), "{merged:?}");
 
     // An import through `include.valueSet` keeps the imported compose's spelling.
     let imported = codes(ValueSet {
@@ -625,14 +687,18 @@ fn the_composes_spelling_survives_an_include_merge_and_a_value_set_import() {
         status: "active".into(),
         compose: Some(ValueSetCompose {
             include: vec![ValueSetComposeInclude {
-                value_set: vec!["http://example.org/icd11-uri".into()],
+                value_set: vec!["http://example.org/icd11-code".into()],
                 ..Default::default()
             }],
             ..Default::default()
         }),
         ..Default::default()
     });
-    assert_eq!(imported, [cholera_uri], "the imported URI spelling");
+    assert_eq!(
+        imported,
+        ["1A00"],
+        "the imported classification code spelling"
+    );
 }
 
 #[test]
@@ -695,7 +761,7 @@ fn a_display_in_the_base_language_does_not_satisfy_a_request_for_another_one() {
 
     // The fixture carries a French title for 1A00 alone, so the English title
     // is the wrong display for a French request and the French one is named.
-    let wrong = ask("1A00", "Cholera");
+    let wrong = ask(CHOLERA, "Cholera");
     assert!(!wrong.result, "{wrong:?}");
     assert_eq!(wrong.display.as_deref(), Some("Choléra"));
     let issue = wrong.issues.first().expect("an issue");
@@ -711,7 +777,7 @@ fn a_display_in_the_base_language_does_not_satisfy_a_request_for_another_one() {
     // 1A01 has no French title at all, which is the shape of a linearization
     // built from the English bundle alone: the English display stands, and the
     // answer says the requested language has none.
-    let none = ask("1A01", "Intestinal infection due to other Vibrio");
+    let none = ask(OTHER_VIBRIO, "Intestinal infection due to other Vibrio");
     assert!(none.result, "{none:?}");
     let issue = none.issues.first().expect("an issue");
     assert_eq!(issue.severity, "information");
@@ -737,4 +803,62 @@ fn every_declared_implicit_value_set_form_resolves() {
         )],
     );
     crate::implicit_forms::declares_none(&foundation, &foundation.identity().url);
+}
+
+// NOTE: tx-ecosystem IG `icd-11.md` at 9c2bbce, ICD-11 Codes: `$validate-code`
+// reports a classification code "as valid but not in normal form, and returns
+// the entity id as `normalized-code`".
+#[test]
+fn a_classification_code_validates_and_names_the_entity_id_as_its_normal_form() {
+    use std::sync::Arc;
+
+    use fhir_terminology::operations::Invocation;
+    use fhir_terminology::operations::validate_code::{ValidateCodeInput, validate_code};
+    use fhir_terminology::registry::Registry;
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    write_artifacts(dir.path()).expect("builds");
+    let mut registry = Registry::default();
+    registry
+        .register(Arc::new(
+            Icd11Provider::open(&dir.path().join("mms")).expect("opens mms"),
+        ))
+        .expect("registers");
+    let ask = |code: &str| {
+        validate_code(
+            &registry,
+            &Invocation::Type,
+            &ValidateCodeInput {
+                url: Some(MMS.to_owned()),
+                code: Some(code.to_owned()),
+                ..ValidateCodeInput::default()
+            },
+        )
+        .expect("validates")
+    };
+    let by_code = ask("1A00");
+    assert!(by_code.result, "{by_code:?}");
+    assert_eq!(by_code.normalized_code.as_deref(), Some(CHOLERA));
+    assert!(
+        by_code
+            .issues
+            .iter()
+            .any(|i| i.severity == "information" && i.text.contains("normal form")),
+        "{:?}",
+        by_code.issues
+    );
+    let by_id = ask(CHOLERA);
+    assert!(by_id.result, "{by_id:?}");
+    assert_eq!(by_id.normalized_code, None, "the id is the normal form");
+    let short_form = ask("1A00&XN8P1");
+    assert!(short_form.result, "{short_form:?}");
+    assert_eq!(
+        short_form.normalized_code.as_deref(),
+        Some(format!("{CHOLERA}&{CLASSICAL}").as_str())
+    );
+    let by_uri = ask(&format!("{MMS}/{CHOLERA}"));
+    assert!(
+        !by_uri.result,
+        "a full entity uri is no MMS code: {by_uri:?}"
+    );
 }
