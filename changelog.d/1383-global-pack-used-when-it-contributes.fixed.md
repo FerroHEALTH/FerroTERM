@@ -1,0 +1,1 @@
+- `$expand` and `CodeSystem/$lookup` report a global supplement as a `used-supplement` only when it gave the answer a display or a designation, as the HL7 terminology ecosystem IG requires, so an expansion no longer names a language pack it did not depend on.

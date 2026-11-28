@@ -86,6 +86,29 @@ impl Supplement {
         }
     }
 
+    /// Whether this supplement gave `code` its `display`, shown in `language`,
+    /// or one of the `designations` returned for it.
+    #[must_use]
+    pub fn contributes(
+        &self,
+        code: &str,
+        display: Option<&str>,
+        language: Option<&str>,
+        designations: &[Designation],
+    ) -> bool {
+        let Some(additions) = self.concepts.get(code) else {
+            return false;
+        };
+        additions.designations.iter().any(|added| {
+            let shown = display == Some(added.value.as_str())
+                && language.is_none_or(|wanted| added.language.as_deref() == Some(wanted));
+            shown
+                || designations
+                    .iter()
+                    .any(|d| d.value == added.value && d.language == added.language)
+        })
+    }
+
     /// Whether this supplement defines `code` as an extension code.
     fn defines(&self, code: &str) -> bool {
         self.supplementing.kind == SupplementKind::ExtensionCodes

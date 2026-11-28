@@ -13,7 +13,7 @@ use super::{CodingRef, Invocation, OperationError, locate, resolve};
 use crate::language;
 use crate::provider::code_system::NOT_SELECTABLE;
 use crate::provider::{
-    CodeSystemProvider, Concept, Designation, DesignationUse, Property, PropertyValue,
+    CodeSystemProvider, Concept, Designation, DesignationUse, Identity, Property, PropertyValue,
 };
 use crate::registry::Registry;
 
@@ -232,13 +232,6 @@ pub fn lookup(
     let located = locate(provider, code)?;
     let concept = located.concept;
     let identity = provider.identity();
-    // NOTE: "A server SHALL report a global language pack as a `used-supplement` in
-    // `$lookup`" (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>, CodeSystem supplements).
-    for global in registry.global_supplements(&identity.url, &identity.version) {
-        if !used_supplements.contains(&global) {
-            used_supplements.push(global);
-        }
-    }
     let language = language::for_provider(provider.as_ref(), input.display_language.as_deref());
     let display = provider
         .spelled_display(concept, code, language.as_deref())?
@@ -259,6 +252,15 @@ pub fn lookup(
     } else {
         Vec::new()
     };
+    report_global_supplements(
+        registry,
+        identity,
+        &located.code,
+        &display,
+        language.as_deref(),
+        &designations,
+        &mut used_supplements,
+    );
     let mut properties = properties(provider.as_ref(), concept, &asked)?;
     // NOTE: the ecosystem's icd-11 `lookup-mms-no-code` answers a codeless grouper
     // `notSelectable` as a property and no `abstract`; `simple-lookup-2` wants `abstract`.
@@ -344,6 +346,31 @@ fn check_properties(
         }
     }
     Ok(())
+}
+
+/// Adds to `used` each global supplement of the looked-up system that gave
+/// `code` its display or one of its designations.
+///
+/// "A server SHALL report a global language pack as a `used-supplement` in
+/// `$lookup` and `$expand` when it contributes a display or a designation"
+/// (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>, `CodeSystem` supplements).
+fn report_global_supplements(
+    registry: &Registry,
+    identity: &Identity,
+    code: &str,
+    display: &str,
+    language: Option<&str>,
+    designations: &[Designation],
+    used: &mut Vec<String>,
+) {
+    for global in registry.global_supplements(&identity.url, &identity.version) {
+        let canonical = global.canonical();
+        if !used.contains(&canonical)
+            && global.contributes(code, Some(display), language, designations)
+        {
+            used.push(canonical);
+        }
+    }
 }
 
 /// The display as a designation: in the language the system answered in,
