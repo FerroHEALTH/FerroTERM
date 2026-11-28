@@ -451,24 +451,8 @@ impl StoredSystem for Snomed {
         provider: &SnomedProvider,
         concept: Concept,
     ) -> Result<Vec<Property>, ProviderError> {
-        // NOTE: the FHIR-defined properties of "the given code or expression"
-        // that an expression itself states (<https://hl7.org/fhir/R4B/snomedct.html>,
-        // "SNOMED CT Properties"): its status and its own refinement.
         if let Some(record) = provider.registered(concept)? {
-            let mut out = vec![
-                Property {
-                    code: String::from("inactive"),
-                    value: PropertyValue::Boolean(!provider.expression_is_active(&record)?),
-                    ..Property::default()
-                },
-                Property {
-                    code: String::from("sufficientlyDefined"),
-                    value: PropertyValue::Boolean(record.sufficiently_defined()),
-                    ..Property::default()
-                },
-            ];
-            out.extend(SnomedProvider::expression_attributes(&record));
-            return Ok(out);
+            return properties::of_expression(provider, &record);
         }
         let ordinal = SnomedProvider::ordinal(concept);
         let Some(record) = provider.stored().store.concept(ordinal).map_err(storage)? else {

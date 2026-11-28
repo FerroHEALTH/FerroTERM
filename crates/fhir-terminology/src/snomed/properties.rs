@@ -7,6 +7,29 @@ use super::SnomedProvider;
 use crate::provider::{Property, PropertyValue, error::ProviderError};
 use crate::stored::storage;
 
+/// The FHIR-defined properties of "the given code or expression" that an
+/// expression itself states (<https://hl7.org/fhir/R4B/snomedct.html>, "SNOMED
+/// CT Properties"): its status and its own refinement.
+pub(super) fn of_expression(
+    provider: &SnomedProvider,
+    record: &super::expression::Registered,
+) -> Result<Vec<Property>, ProviderError> {
+    let mut out = vec![
+        Property {
+            code: String::from("inactive"),
+            value: PropertyValue::Boolean(!provider.expression_is_active(record)?),
+            ..Property::default()
+        },
+        Property {
+            code: String::from("sufficientlyDefined"),
+            value: PropertyValue::Boolean(record.sufficiently_defined()),
+            ..Property::default()
+        },
+    ];
+    out.extend(SnomedProvider::expression_attributes(record));
+    Ok(out)
+}
+
 /// Adds `property` unless `out` holds the same code and value.
 ///
 /// A value a concept carries in more than one role group is one value of its
