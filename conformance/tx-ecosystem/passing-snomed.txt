@@ -229,6 +229,8 @@ snomed/expand-pc-none
 snomed/lookup-pc-unbracketed
 snomed/snomed-expand-code-in
 snomed/snomed-expand-descendent-leaf
+snomed/snomed-expand-display-regex
+snomed/snomed-expand-display-regex-nl
 snomed/snomed-expand-implicit-ecl
 snomed/snomed-expand-implicit-edition
 snomed/snomed-expand-implicit-system-version
@@ -249,6 +251,7 @@ snomed/snomed-lookup-loinc
 snomed/snomed-lookup-loinc-inactive
 snomed/snomed-lookup-loinc-none
 snomed/snomed-validate-code-in
+snomed/snomed-validate-display-regex
 snomed/snomed-validate-implied-refset-map
 snomed/subsumes-bad-version
 snomed/subsumes-coding
