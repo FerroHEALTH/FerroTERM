@@ -104,6 +104,13 @@ fn targets(target: &str, url: &str, version: &str) -> bool {
 #[error("Required supplement not found: {0}")]
 pub struct UnknownSupplement(pub String);
 
+/// The host of an absolute URI, `snomed.info` of `http://snomed.info/sct`.
+fn uri_host(uri: &str) -> Option<&str> {
+    uri.split("://")
+        .nth(1)
+        .and_then(|rest| rest.split('/').next())
+}
+
 impl Registry {
     /// This registry with `beneath` under it.
     ///
@@ -471,13 +478,26 @@ impl Registry {
     /// default only decides the versionless form.
     fn implicit_candidates(&self, url: &str) -> Vec<Arc<dyn CodeSystemProvider>> {
         let mut candidates = Vec::new();
+        let base = url.split_once('?').map_or(url, |(base, _)| base);
         for canonical in self.canonicals() {
-            if !url.starts_with(canonical) {
+            let prefixed = url.starts_with(canonical);
+            if !prefixed && uri_host(canonical) != uri_host(base) {
                 continue;
             }
             let Some(system) = self.system(canonical) else {
                 continue;
             };
+            // NOTE: a version that is itself a URI names its system too, as an
+            // unpublished SNOMED CT edition's `http://snomed.info/xsct/` URI does
+            // (<https://docs.snomed.org/snomed-ct-specifications/snomed-ct-uri-standard>).
+            if !prefixed
+                && !system
+                    .versions
+                    .keys()
+                    .any(|version| version.starts_with(base))
+            {
+                continue;
+            }
             let Ok(resolved) = self.resolve(canonical, None) else {
                 continue;
             };
@@ -559,6 +579,33 @@ impl Registry {
             }
         }
         unserved.map(Err)
+    }
+
+    /// The implicit concept maps every loaded version defines from codes of
+    /// `source` to codes of `target` ([`CodeSystemProvider::implicit_concept_maps`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns the first provider's [`ProviderError`].
+    pub fn implicit_concept_maps(
+        &self,
+        source: &str,
+        target: &str,
+    ) -> Result<Vec<String>, ProviderError> {
+        let mut urls = Vec::new();
+        for canonical in self.canonicals() {
+            let Some(system) = self.system(canonical) else {
+                continue;
+            };
+            for provider in system.versions.values() {
+                for url in provider.implicit_concept_maps(source, target)? {
+                    if !urls.contains(&url) {
+                        urls.push(url);
+                    }
+                }
+            }
+        }
+        Ok(urls)
     }
 
     /// The system URIs registered here, sorted.
