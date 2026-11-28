@@ -341,10 +341,11 @@ impl SnomedProvider {
         &self,
         code: &str,
     ) -> Result<Result<(Concept, String), ExpressionError>, ProviderError> {
-        let tree = match sct_scg::parse(code) {
+        let mut tree = match sct_scg::parse(code) {
             Ok(tree) => tree,
             Err(source) => return Ok(Err(ExpressionError::Syntax { source })),
         };
+        self.self_group(&mut tree.sub_expression)?;
         let term = match self.resolve_sub(&tree.sub_expression)? {
             Ok(term) => term,
             Err(error) => return Ok(Err(error)),

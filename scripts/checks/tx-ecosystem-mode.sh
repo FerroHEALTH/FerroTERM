@@ -55,7 +55,7 @@ print_allowed() {
 if [[ "${1:-}" == "--self-test" ]]; then
   probe="$(mktemp)"
   trap 'rm -f "$probe"' EXIT
-  printf '%s\n' "tx-ecosystem: 283 of 378 snomed tests pass on /r4b (tests v1.9.3, runner 7.0.6)" \
+  printf '%s\n' "tx-ecosystem: 283 of 378 snomed tests pass on /r4b (test cases 1.11.0 at 9c2bbce, runner 7.0.6)" \
     "REGRESSION: on the pass list but failing now:" "  - snomed/lookup-de" > "$probe"
   print_allowed "$probe" > /dev/null || { echo "tx-ecosystem-mode: self-test: a run's own lines are withheld" >&2; exit 1; }
   for leak in "    The display 'Liver problem' is not valid" "  - snomed/lookup with a display" \
