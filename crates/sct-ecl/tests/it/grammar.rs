@@ -235,27 +235,73 @@ fn refinements_attributes_cardinalities_and_reverse_flags() {
 }
 
 #[test]
-fn refinement_junctions_bind_attribute_sets_before_groups() {
+fn refinement_junctions_never_mix_without_brackets() {
+    // ECL 6.4 Conjunction and Disjunction: mixing AND and OR in a refinement needs brackets.
+    let at = |input: &str, junction: &str| input.find(junction).expect("junction") + 1;
+    for (input, junction) in [
+        (
+            "< 404684003 : 111115 = * , 111116 = * OR 111117 = *",
+            " OR ",
+        ),
+        (
+            "< 404684003 : 111115 = * AND 111116 = * OR 111117 = *",
+            " OR ",
+        ),
+        (
+            "< 404684003 : 111115 = * OR 111116 = * AND 111117 = *",
+            " AND ",
+        ),
+        ("< 404684003 : 111115 = * OR 111116 = * , 111117 = *", " , "),
+        (
+            "< 404684003 : 111115 = * AND 111116 = * OR 111117 = * AND 111118 = *",
+            " OR ",
+        ),
+    ] {
+        assert_eq!(refused(input).0, at(input, junction), "{input}");
+    }
+    for (input, operand) in [
+        (
+            "< 404684003 : { 111115 = * } AND 111116 = * OR 111117 = *",
+            "111116",
+        ),
+        (
+            "< 404684003 : { 111115 = * } OR 111116 = * , 111117 = *",
+            "111116",
+        ),
+    ] {
+        assert_eq!(refused(input).0, at(input, operand) - 1, "{input}");
+    }
     let ExpressionConstraint::Refined { refinement, .. } =
-        parse("< 404684003 : 111115 = * , 111116 = * OR 111117 = *").expect("parses")
+        parse("< 404684003 : ( 111115 = * , 111116 = * ) OR 111117 = *").expect("parses")
     else {
         panic!("refined");
     };
-    let Refinement::Disjunction(items) = *refinement else {
+    let Refinement::Single(single) = *refinement else {
         panic!("(a, b) OR c: {refinement:?}");
     };
     assert!(
-        matches!(&items[0], SubRefinement::AttributeSet(AttributeSet::Conjunction(pair)) if pair.len() == 2)
+        matches!(&*single, SubRefinement::AttributeSet(AttributeSet::Disjunction(items))
+            if matches!(items.first(), Some(SubAttributeSet::Nested(_))))
     );
     let ExpressionConstraint::Refined { refinement, .. } =
-        parse("< 404684003 : 111115 = * AND 111116 = * OR 111117 = * AND 111118 = *")
-            .expect("parses")
+        parse("< 404684003 : 111115 = * AND ( 111116 = * OR 111117 = * )").expect("parses")
+    else {
+        panic!("refined");
+    };
+    let Refinement::Single(single) = *refinement else {
+        panic!("a AND (b OR c): {refinement:?}");
+    };
+    assert!(
+        matches!(&*single, SubRefinement::AttributeSet(AttributeSet::Conjunction(pair)) if pair.len() == 2)
+    );
+    let ExpressionConstraint::Refined { refinement, .. } =
+        parse("< 404684003 : { 111115 = * } AND 111116 = * AND 111117 = *").expect("parses")
     else {
         panic!("refined");
     };
     assert!(
-        matches!(&*refinement, Refinement::Disjunction(items) if items.len() == 2),
-        "attribute-set junctions bind before refinement junctions: {refinement:?}"
+        matches!(&*refinement, Refinement::Conjunction(items) if items.len() == 2),
+        "one junction throughout: {refinement:?}"
     );
     let groups = "< 404684003 : { 111115 = * } AND { 111116 = * } OR { 111117 = * }";
     assert_eq!(

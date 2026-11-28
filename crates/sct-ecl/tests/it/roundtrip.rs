@@ -332,6 +332,17 @@ fn keeps_items_apart(items: &[SubRefinement]) -> bool {
     })
 }
 
+/// Whether a refinement joined by `AND` (or by `OR` when `and` is false)
+/// holds no attribute set joined by the other junction, which ECL 6.4
+/// Conjunction and Disjunction refuses without brackets.
+fn keeps_junctions_apart(items: &[SubRefinement], and: bool) -> bool {
+    !items.iter().any(|item| match item {
+        SubRefinement::AttributeSet(AttributeSet::Disjunction(_)) => and,
+        SubRefinement::AttributeSet(AttributeSet::Conjunction(_)) => !and,
+        _ => false,
+    })
+}
+
 /// Whether a parenthesized refinement stays one: without a group the grammar
 /// reads `( ... )` as a nested attribute set.
 fn has_group(items: &[SubRefinement]) -> bool {
@@ -357,16 +368,24 @@ fn refinement(sub: BoxedStrategy<SubExpressionConstraint>) -> BoxedStrategy<Refi
         prop_oneof![
             items
                 .clone()
+                .prop_filter("one junction", |items| keeps_junctions_apart(items, true))
                 .prop_map(|items| SubRefinement::Nested(Box::new(Refinement::Conjunction(items)))),
-            items.prop_map(|items| SubRefinement::Nested(Box::new(Refinement::Disjunction(items)))),
+            items
+                .prop_filter("one junction", |items| keeps_junctions_apart(items, false))
+                .prop_map(|items| SubRefinement::Nested(Box::new(Refinement::Disjunction(items)))),
         ]
     });
     let items = prop::collection::vec(sub_refinement.clone(), 2..4)
         .prop_filter("items stay apart", |items| keeps_items_apart(items));
     prop_oneof![
         sub_refinement.prop_map(|one| Refinement::Single(Box::new(one))),
-        items.clone().prop_map(Refinement::Conjunction),
-        items.prop_map(Refinement::Disjunction),
+        items
+            .clone()
+            .prop_filter("one junction", |items| keeps_junctions_apart(items, true))
+            .prop_map(Refinement::Conjunction),
+        items
+            .prop_filter("one junction", |items| keeps_junctions_apart(items, false))
+            .prop_map(Refinement::Disjunction),
     ]
     .boxed()
 }
