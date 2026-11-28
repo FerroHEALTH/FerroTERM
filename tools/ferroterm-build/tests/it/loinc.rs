@@ -8,7 +8,9 @@ use concept_store::record::PropertyValueRef;
 use concept_store::store::{Store, Vocabulary};
 use designation_index::index::Query;
 use designation_index::persist::read_from;
-use ferroterm_build::loinc::{self, ANSWER_LIST_KEY, COPYRIGHT_KEY, KIND_KEY, SYSTEM};
+use ferroterm_build::loinc::{
+    self, ANSWER_LIST_KEY, COPYRIGHT_KEY, KIND_KEY, PART_TYPE_KEY, SYSTEM,
+};
 use ferroterm_testkit::loinc::{
     ANSWER_LIST, GLUCOSE, GLUCOSE_PART, OLD_GLUCOSE, ROOT_PART, SODIUM, SURVEY, VERSION, YES, code,
     write_release,
@@ -25,7 +27,7 @@ fn the_loinc_release_builds_an_artifact_the_store_graph_and_text_open() {
         "the version comes from VersionLastChanged"
     );
     assert_eq!(report.terms, 4);
-    assert_eq!(report.parts, 3);
+    assert_eq!(report.parts, 5);
     assert_eq!(report.answer_lists, 1);
     let manifest: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(out.path().join("manifest.json")).expect("manifest"),
@@ -85,6 +87,19 @@ fn the_loinc_release_builds_an_artifact_the_store_graph_and_text_open() {
     assert!(
         store.ordinal(&code(YES)).expect("read").is_some(),
         "answers are codes too"
+    );
+    let part = store
+        .ordinal(&code(GLUCOSE_PART))
+        .expect("read")
+        .expect("part");
+    assert!(
+        store
+            .properties(part)
+            .expect("read")
+            .iter()
+            .any(|(k, v)| *k == keys(PART_TYPE_KEY)
+                && *v == vec![PropertyValueRef::Code("COMPONENT")]),
+        "a part carries its PartTypeName"
     );
 }
 

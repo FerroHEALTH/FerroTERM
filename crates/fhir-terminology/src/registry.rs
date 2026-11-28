@@ -265,17 +265,21 @@ impl Registry {
         }
     }
 
-    /// The canonicals of the global supplements that apply to version
-    /// `version` of `url`, which report as `used-supplement`
+    /// The global supplements that apply to version `version` of `url`,
+    /// which report as `used-supplement` where they contribute
     /// (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>, `CodeSystem` supplements).
     #[must_use]
-    pub fn global_supplements(&self, url: &str, version: &str) -> Vec<String> {
+    pub fn global_supplements(
+        &self,
+        url: &str,
+        version: &str,
+    ) -> Vec<&crate::supplement::Supplement> {
         self.supplements
             .values()
             .filter(|(target, supplement)| {
                 supplement.supplementing.global && targets(target, url, version)
             })
-            .map(|(_, supplement)| supplement.canonical())
+            .map(|(_, supplement)| supplement)
             .collect()
     }
 

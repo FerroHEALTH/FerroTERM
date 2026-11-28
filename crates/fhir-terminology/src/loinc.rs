@@ -14,7 +14,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use concept_graph::ordinal::{Ordinal, to_usize};
+use concept_graph::ordinal::Ordinal;
 use concept_store::record;
 use designation_index::index::Query;
 use regex::Regex;
@@ -88,6 +88,10 @@ const COPYRIGHT_KEY: &str = "copyright";
 const ANSWER_LIST_KEY: &str = "answer-list";
 const ANSWERS_KEY: &str = "answers";
 const KIND_KEY: &str = "kind";
+/// A part's `PartTypeName`, which the provider reads and never lists.
+const PART_TYPE_KEY: &str = "part-type";
+/// The `PartTypeName` of a class part.
+const CLASS_PART_TYPE: &str = "CLASS";
 /// The designation use ordinal of `LONG_COMMON_NAME`.
 const LONG_COMMON_NAME: u32 = 0;
 /// The designation use ordinal of a part, list, or answer display.
@@ -164,8 +168,7 @@ impl LoincProvider {
         ))
     }
 
-    /// The part codes a `parent`/`ancestor` filter names, as concepts.
-    /// The parts a filter value names: by code, or by an English name.
+    /// The parts a filter value names: by code, or by the Part name.
     fn parts_matching(&self, wanted: &[&str]) -> Result<ConceptSet, ProviderError> {
         let mut parts = ConceptSet::new();
         for value in wanted {
@@ -185,13 +188,11 @@ impl LoincProvider {
                 let Some(entry) = self.stored().text.entry(designation) else {
                     continue;
                 };
-                let named = self
-                    .stored()
-                    .store
-                    .designations(entry.concept)
-                    .map_err(storage)?
-                    .get(to_usize(entry.index))
-                    .is_some_and(|d| d.term.eq_ignore_ascii_case(value));
+                // NOTE: "Servers SHALL also accept the Part name as the filter value for an
+                // axis" (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>, LOINC): the
+                // `PartName`, a part's display, never its `PartDisplayName`.
+                let named = Loinc::display(self, Concept::new(entry.concept.index()), None)?
+                    .is_some_and(|name| name.eq_ignore_ascii_case(value));
                 if named {
                     parts.insert(entry.concept.index());
                 }
@@ -312,6 +313,49 @@ impl LoincProvider {
         Ok(name)
     }
 
+    /// A `CLASS` filter: a value that is the code of a class part stands for
+    /// the class name the part carries, every other value is the class name.
+    fn class_filter(&self, filter: &Filter) -> Result<ConceptSet, ProviderError> {
+        let mut values = Vec::new();
+        for value in filter.value.split(',').map(str::trim) {
+            values.push(self.class_name(value)?.unwrap_or_else(|| value.to_owned()));
+        }
+        crate::provider::filter::evaluate(
+            self,
+            &Filter {
+                property: filter.property.clone(),
+                op: filter.op,
+                value: values.join(","),
+            },
+        )
+    }
+
+    /// The class name of the class part `code`, when it is one.
+    fn class_name(&self, code: &str) -> Result<Option<String>, ProviderError> {
+        let Some(ordinal) = self
+            .stored()
+            .store
+            .ordinal(&code.to_ascii_uppercase())
+            .map_err(storage)?
+        else {
+            return Ok(None);
+        };
+        let Some(key) = self.stored().key_of(PART_TYPE_KEY) else {
+            return Ok(None);
+        };
+        let is_class = self
+            .stored()
+            .store
+            .property(ordinal, key)
+            .map_err(storage)?
+            .iter()
+            .any(|v| matches!(v, record::PropertyValueRef::Code(t) if *t == CLASS_PART_TYPE));
+        if !is_class {
+            return Ok(None);
+        }
+        Loinc::display(self, Concept::new(ordinal.index()), None)
+    }
+
     fn parts_named(&self, filter: &Filter) -> Result<Vec<Concept>, ProviderError> {
         let mut out = Vec::new();
         for code in filter.value.split(',') {
@@ -392,7 +436,9 @@ impl StoredSystem for Loinc {
         provider: &LoincProvider,
         concept: Concept,
     ) -> Result<Vec<Property>, ProviderError> {
-        provider.stored().listed_properties(concept, true)
+        let mut properties = provider.stored().listed_properties(concept, true)?;
+        properties.retain(|p| p.code != PART_TYPE_KEY);
+        Ok(properties)
     }
 
     /// `http://loinc.org/vs` (every code), `/vs/LL…` (the answers of a list),
@@ -547,6 +593,9 @@ impl StoredSystem for Loinc {
                 "COMPONENT" | "PROPERTY" | "TIME_ASPCT" | "SYSTEM" | "SCALE_TYP" | "METHOD_TYP",
                 FilterOperator::Equal | FilterOperator::In | FilterOperator::Regex,
             ) => provider.axis_filter(filter),
+            // NOTE: "Servers SHALL also accept the Part code for the class as the value of
+            // a `CLASS` filter" (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>, LOINC).
+            ("CLASS", FilterOperator::Equal | FilterOperator::In) => provider.class_filter(filter),
             ("parent" | "ancestor", FilterOperator::Equal | FilterOperator::In) => {
                 provider.part_filter(filter)
             }
@@ -694,7 +743,7 @@ fn declaration(keys: &BTreeMap<u32, String>, languages: Vec<String>) -> Declarat
         .filter(|name| {
             !matches!(
                 name.as_str(),
-                COPYRIGHT_KEY | ANSWER_LIST_KEY | ANSWERS_KEY | KIND_KEY
+                COPYRIGHT_KEY | ANSWER_LIST_KEY | ANSWERS_KEY | KIND_KEY | PART_TYPE_KEY
             )
         })
         .map(|name| FilterDefinition {

@@ -139,7 +139,7 @@ pub(super) fn of_expression(
             ..Property::default()
         },
     ];
-    out.extend(SnomedProvider::expression_attributes(record));
+    out.extend(provider.expression_attributes(record)?);
     Ok(out)
 }
 

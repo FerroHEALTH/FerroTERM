@@ -148,19 +148,6 @@ pub fn expand(
     for used in &expansion.versions {
         negotiation.check_system(&used.url, &used.version)?;
     }
-    // NOTE: "A server SHALL report a global language pack as a `used-supplement` in
-    // `$expand`" (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>, CodeSystem
-    // supplements); each global supplement of a system the expansion used is reported.
-    for used in &expansion.versions {
-        for global in sources
-            .registry
-            .global_supplements(&used.url, &used.version)
-        {
-            if !used_supplements.contains(&global) {
-                used_supplements.push(global);
-            }
-        }
-    }
     let used_value_sets = resolver.used_value_sets();
     let open_systems = resolver.open_systems();
     if expansion.unclosed && input.handle_unclosed_expansion == Some(false) {
@@ -185,6 +172,22 @@ pub fn expand(
         &input.property
     };
     let contains = contains(sources, &expansion, &model.compose, input, asked)?;
+    // NOTE: "A server SHALL report a global language pack as a `used-supplement` in
+    // `$lookup` and `$expand` when it contributes a display or a designation"
+    // (<https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>, CodeSystem supplements).
+    for used in &expansion.versions {
+        for global in sources
+            .registry
+            .global_supplements(&used.url, &used.version)
+        {
+            let canonical = global.canonical();
+            if !used_supplements.contains(&canonical)
+                && contributes(global, &used.url, options.language.as_deref(), &contains)
+            {
+                used_supplements.push(canonical);
+            }
+        }
+    }
     let properties = expansion_properties(sources, &contains)?;
     // The message says what is wrong; the conversion error adds nothing to it.
     let Ok(offset) = u64::try_from(expansion.offset) else {
@@ -460,6 +463,26 @@ fn parameters(
         push("used-valueset", ParameterValue::Uri(used.clone()));
     }
     out
+}
+
+/// Whether `supplement` gave an entry of `system` in `contains`, at any depth,
+/// its display or a designation.
+fn contributes(
+    supplement: &crate::supplement::Supplement,
+    system: &str,
+    language: Option<&str>,
+    contains: &[Contains],
+) -> bool {
+    contains.iter().any(|entry| {
+        (entry.system == system
+            && supplement.contributes(
+                &entry.code,
+                entry.display.as_deref(),
+                language,
+                &entry.designations,
+            ))
+            || contributes(supplement, system, language, &entry.contains)
+    })
 }
 
 fn contains(

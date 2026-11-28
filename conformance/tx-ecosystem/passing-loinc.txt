@@ -1,3 +1,4 @@
+loinc/loinc-expand-class-part-scale-total
 loinc/loinc-expand-class-regex-total
 loinc/loinc-expand-class-scale-total
 loinc/loinc-expand-compose-property
@@ -10,7 +11,9 @@ loinc/loinc-expand-filter-answers-for2
 loinc/loinc-expand-filter-list-request-parameters
 loinc/loinc-expand-filter-no-method-total
 loinc/loinc-expand-implicit-part
+loinc/loinc-expand-parent
 loinc/loinc-expand-prop-dockind-total
+loinc/loinc-expand-prop-method
 loinc/loinc-expand-prop-method-part
 loinc/loinc-expand-prop-order-obs-total
 loinc/loinc-expand-property
@@ -28,6 +31,7 @@ loinc/loinc-validate-code
 loinc/loinc-validate-code-supp1
 loinc/loinc-validate-code-supp2
 loinc/loinc-validate-enum-good
+loinc/loinc-validate-filter-class-part-scale-good
 loinc/loinc-validate-filter-class-regex-bad
 loinc/loinc-validate-filter-class-regex-good
 loinc/loinc-validate-filter-class-scale-bad-class

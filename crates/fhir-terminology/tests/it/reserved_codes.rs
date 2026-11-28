@@ -202,6 +202,17 @@ fn expanded(
     include: ValueSetComposeInclude,
     use_supplement: &[&str],
 ) -> ExpansionOutcome {
+    expanded_with(registry, include, |request| ExpandInput {
+        use_supplement: use_supplement.iter().map(|s| (*s).to_owned()).collect(),
+        ..request
+    })
+}
+
+fn expanded_with(
+    registry: &Registry,
+    include: ValueSetComposeInclude,
+    adjust: impl FnOnce(ExpandInput) -> ExpandInput,
+) -> ExpansionOutcome {
     let value_sets = fhir_terminology::valueset::store::ValueSetStore::default();
     let concept_maps = fhir_terminology::conceptmap::store::ConceptMapStore::default();
     let sources = Sources {
@@ -218,11 +229,10 @@ fn expanded(
         }),
         ..Default::default()
     };
-    let request = ExpandInput {
+    let request = adjust(ExpandInput {
         inline_value_set: Some(fhir_terminology::valueset::convert::r4b::convert(&inline)),
-        use_supplement: use_supplement.iter().map(|s| (*s).to_owned()).collect(),
         ..Default::default()
-    };
+    });
     expand::expand(&sources, &request).expect("expands")
 }
 
@@ -404,11 +414,14 @@ fn an_expansion_lists_reserved_codes_only_when_the_value_set_does() {
     );
     assert_eq!(
         used_supplements(&referenced),
-        [
-            format!("{LOCAL}|1.0.0"),
-            format!("{PACK}|1.0.0"),
-            format!("{GLOBAL}|1.0.0")
-        ]
+        [format!("{LOCAL}|1.0.0")],
+        "the global supplements give `U2` nothing, so the expansion does not depend on them"
+    );
+    let global = expanded(&registry, listed(&["U1"]), &[]);
+    assert_eq!(
+        used_supplements(&global),
+        [format!("{GLOBAL}|1.0.0")],
+        "the global extension-codes supplement gives `U1` its display"
     );
 }
 
@@ -441,8 +454,9 @@ fn a_filter_never_selects_a_reserved_code() {
 
 /// "A server SHALL use a global language pack ... whether or not the request
 /// or the value set refers to it", "It only applies to the code system (and
-/// versions) it supplements", and "Any other supplement SHALL only be used when
-/// it is referenced".
+/// versions) it supplements", "Any other supplement SHALL only be used when
+/// it is referenced", and the pack is a `used-supplement` "when it contributes
+/// a display or a designation".
 #[test]
 fn a_global_language_pack_applies_to_its_own_system_unreferenced() {
     let registry = registry();
@@ -464,6 +478,13 @@ fn a_global_language_pack_applies_to_its_own_system_unreferenced() {
     let referenced =
         looked_up(&registry, BASE, "hammer", Some("it"), &[PACK_LOCAL]).expect("looks up");
     assert_eq!(referenced.display, "Martello");
+    let saw = looked_up(&registry, BASE, "saw", Some("fr"), &[]).expect("looks up");
+    assert_eq!(saw.display, "Saw");
+    assert!(
+        !saw.used_supplements.iter().any(|s| s.starts_with(PACK)),
+        "the pack has no French for the saw: {:?}",
+        saw.used_supplements
+    );
     let other = looked_up(&registry, OTHER, "hammer", Some("fr"), &[]).expect("looks up");
     assert_eq!(other.display, "Garage hammer");
     assert!(
@@ -471,15 +492,23 @@ fn a_global_language_pack_applies_to_its_own_system_unreferenced() {
         "{:?}",
         other.used_supplements
     );
-    let expansion = expanded(
-        &registry,
-        ValueSetComposeInclude {
-            system: Some(BASE.into()),
-            ..Default::default()
-        },
-        &[],
+    let whole = || ValueSetComposeInclude {
+        system: Some(BASE.into()),
+        ..Default::default()
+    };
+    let in_french = expanded_with(&registry, whole(), |request| ExpandInput {
+        display_language: Some(String::from("fr")),
+        ..request
+    });
+    assert!(used_supplements(&in_french).contains(&format!("{PACK}|1.0.0")));
+    let in_english = expanded(&registry, whole(), &[]);
+    assert!(
+        !used_supplements(&in_english)
+            .iter()
+            .any(|s| s.starts_with(PACK)),
+        "the French pack gives no English display: {:?}",
+        used_supplements(&in_english)
     );
-    assert!(used_supplements(&expansion).contains(&format!("{PACK}|1.0.0")));
 }
 
 /// A global supplement also named in `useSupplement` applies once.
