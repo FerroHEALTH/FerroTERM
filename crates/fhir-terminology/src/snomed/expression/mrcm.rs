@@ -185,6 +185,26 @@ impl SnomedProvider {
         Ok(self.system().mrcm.get_or_init(|| compiled))
     }
 
+    /// Whether the MRCM ranges `attribute` over integers (`Some(true)`) or
+    /// decimals (`Some(false)`), from its first numeric concrete range; `None`
+    /// when it states none.
+    pub(in crate::snomed) fn integral_range(
+        &self,
+        attribute: Ordinal,
+    ) -> Result<Option<bool>, ProviderError> {
+        Ok(self
+            .mrcm()?
+            .attributes
+            .get(&attribute.index())
+            .and_then(|rules| {
+                rules
+                    .ranges
+                    .iter()
+                    .filter_map(|rule| range::Concrete::parse(&rule.constraint))
+                    .find_map(|concrete| concrete.integral())
+            }))
+    }
+
     /// Whether `concept` is `ancestor` or below it.
     fn is_a(&self, concept: Ordinal, ancestor: Ordinal) -> bool {
         concept == ancestor
