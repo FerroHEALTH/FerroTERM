@@ -1,5 +1,5 @@
 {
-  "date": "2026-11-26T06:41:29.812611Z",
+  "date": "2026-11-28T00:14:03.767237Z",
   "description": "Serves the FHIR R6 ballot (version 6.0.0-snapshot1). Every behaviour grounded only in the ballot is re-verified against the published specification when it appears, and may change with it.",
   "extension": [
     {
@@ -76,7 +76,7 @@
           "operation": [
             {
               "definition": "http://hl7.org/fhir/OperationDefinition/CodeSystem-lookup",
-              "documentation": "Beyond the R6 ballot definition, the server answers `code`, `system`, `abstract` (defined by the terminology ecosystem). See <https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>.",
+              "documentation": "Beyond the R6 ballot definition, the server answers `code`, `system`, `abstract`, `used-supplement` (defined by the terminology ecosystem). See <https://hl7.org/fhir/uv/tx-ecosystem/requirements.html>.",
               "extension": [
                 {
                   "url": "https://ferroterm.eu/fhir/StructureDefinition/operation-level",

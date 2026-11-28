@@ -69,13 +69,13 @@ macro_rules! family_map {
             const OWN_PARAMETERS: &[&str] = $crate::version::map::family_map!(@own_parameters $flavour);
 
             $crate::version::map::family_map!(@update $flavour,
-            /// The `$lookup` outcome as the version's response: `name`, `version`,
-            /// `display`, R5's `definition`, `designation`, and `property` with its
-            /// `subproperty` parts, then the ecosystem's `code`, `system`, and
-            /// `abstract`.
+            /// The `$lookup` outcome as the version's response.
+            ///
+            /// It carries `name`, `version`, `display`, R5's `definition`,
+            /// `designation`, and `property` with its `subproperty` parts, then the
+            /// ecosystem's `code`, `system`, `abstract` and `used-supplement`.
             #[must_use]
             pub fn lookup_response(outcome: LookupOutcome) -> CodeSystemLookupResponse {
-                // TODO(#1358): answer `outcome.used_supplements` as `used-supplement` once fhir-types declares the output.
                 let r#abstract = abstract_of(&outcome);
                 CodeSystemLookupResponse {
                     name: outcome.name.into(),
@@ -91,6 +91,7 @@ macro_rules! family_map {
                     code: Some(outcome.code.into()),
                     system: Some(outcome.system.into()),
                     r#abstract,
+                    used_supplement: outcome.used_supplements.into_iter().map(Into::into).collect(),
                     ..$crate::version::map::family_map!(@definition $flavour, outcome.definition)
                 }
             }
@@ -486,6 +487,7 @@ macro_rules! family_map {
                         .collect(),
                     source: m.source.as_deref().map(Into::into),
                     note: m.origin.note.as_deref().map(Into::into),
+                    normalized_concept: m.origin.normalized_concept.as_ref().map(coding_of),
                 }
             }
     };
@@ -514,6 +516,7 @@ macro_rules! family_map {
                     depends_on: Vec::new(),
                     origin_map: Some(m.origin.origin_map.as_str().into()),
                     note: m.origin.note.as_deref().map(Into::into),
+                    normalized_concept: m.origin.normalized_concept.as_ref().map(coding_of),
                 }
             }
     };
